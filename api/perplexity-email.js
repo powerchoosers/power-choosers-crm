@@ -2438,23 +2438,22 @@ ${(() => {
       ? `
 
 **OPENING HOOK - CREATIVE FREEDOM WITH VARIETY**:
-- **CRITICAL: NEVER use em dashes (—) or en dashes (–) in the opening hook. Use commas or natural flow.**
 - **FORBIDDEN OPENER**: "Wondering how [company] is handling..." is STRICTLY FORBIDDEN. This pattern is overused and sounds templated.
-- **FORBIDDEN REPETITION**: Do NOT default to "Quick question" every time. This is overused and makes all emails sound the same. Vary your opener style.
+- **FORBIDDEN REPETITION**: Do NOT default to "Quick question" every time. This is overused and makes all emails sound the same. Vary your opener style across emails.
+- **FORBIDDEN PHRASES**: See main FORBIDDEN PHRASES list in CREATIVE FREEDOM section above (includes em-dashes, "I noticed/I saw/I read", etc.)
 - **CREATIVE FREEDOM**: You have full creative freedom to craft a natural, conversational opener. The tone opener "${toneOpener}" is provided as INSPIRATION - use it as a stylistic guide and try to match its style, not ignore it.
-- **VARIETY IS CRITICAL**: Vary your opener style across emails. Mix between these approaches (DO NOT use "Quick question" repeatedly):
+- **VARIETY IS CRITICAL**: Vary your opener style across emails. Mix between these approaches:
   * **Direct questions**: "Are you...", "How are you...", "When does...", "What's your approach to..."
-  * **Soft curiosity**: "Curious if...", "Wonder if...", "Curious, " (use "Quick question" sparingly - it's overused)
+  * **Soft curiosity**: "Curious if...", "Wonder if...", "Curious, "
   * **Peer observations**: "Most teams...", "Usually when...", "From what I'm seeing...", "I've found that...", "Most people I talk to..."
   * **Honest/direct**: "Honestly, ", "So here's the thing, "
-  * **Disarmed/confused**: "Not sure if...", "Quick question that might be off base..." (only use this specific variation, not generic "Quick question")
+  * **Disarmed/confused**: "Not sure if..."
 - **USE THE TONE OPENER STYLE**: The tone opener "${toneOpener}" suggests a ${toneOpener.toLowerCase().includes('curious') ? 'curiosity' : toneOpener.toLowerCase().includes('honestly') ? 'direct/honest' : toneOpener.toLowerCase().includes('most') || toneOpener.toLowerCase().includes('teams') || toneOpener.toLowerCase().includes('people') ? 'peer observation' : toneOpener.toLowerCase().includes('question') ? 'direct question' : toneOpener.toLowerCase().includes('so here') ? 'direct/honest' : 'conversational'} style. Try to match this style rather than defaulting to "Quick question".
 - **NATURALNESS OVER MATCHING**: The goal is natural, human-sounding openers that vary across emails. Don't force-match the tone opener if a different natural phrasing works better, but also don't ignore it and default to "Quick question".
 - The opener must:
   1. Sound like a real person (not a template)
   2. Open with a genuine question or curiosity (not a statement)
-  3. Avoid salesy language ("I noticed", "I saw", "Hope this finds you")
-  4. Vary from previous emails - don't repeat "Quick question" or any other opener pattern
+  3. Vary from previous emails - don't repeat opener patterns
 - The opener should go immediately after the greeting with proper paragraph spacing`
       : '';
 
@@ -2463,7 +2462,7 @@ ${(() => {
 
 NEPQ STRUCTURE (MANDATORY FOR COLD EMAILS):
 - Opening hook: FIRST sentence after greeting should start with a conversational opener (any style - see tone opener options above). This can be a soft curiosity question, direct question, or peer observation - vary it across emails.
-- **CRITICAL PUNCTUATION: NEVER use em dashes (—) or en dashes (–) in the opening hook. Use commas or natural flow. Examples: "Curious, " (NOT "Curious—"), "Question for you, " (NOT "Question for you—"). This is mandatory.**
+- **CRITICAL PUNCTUATION**: See FORBIDDEN PHRASES in CREATIVE FREEDOM section above - em-dashes are forbidden. Use commas or natural flow instead.
 - **CRITICAL: You MUST include at least TWO questions in the email:**
   1. Problem-awareness question: Ask about a specific challenge/problem (can be in opening hook or second sentence)
   2. Low-friction CTA question: End with a simple qualifying question (yes/no style). Examples: "Is this on your radar?" / "Have you already handled this?" / "Is this a priority for this quarter?" / "When does your contract expire?" / "How many locations are you managing?"
@@ -2702,8 +2701,41 @@ HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 ${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', how have you seen..." (if tenure available)' : ''}
 ${contactLinkedinContext ? '- Reference contact profile: Use insights from their LinkedIn profile naturally through questions' : ''}
 
+GENERATION APPROACH - CREATIVE FREEDOM WITH GUARDRAILS:
+
+TARGET WORD COUNT: 75-120 words (natural flow, not choppy)
+- Can be 75 words or 120 words, whichever sounds more natural
+- Don't force short paragraphs to hit exact word count
+- Prioritize natural flow over hitting target precisely
+- Write 2-3 paragraphs that flow naturally - avoid choppy 1-sentence paragraphs
+
+TONE: Peer-to-peer, consultative, confident
+- Sound like you're advising a colleague, not pitching
+- One question per email (max)
+- No corporate jargon or high-pressure language
+
+FORBIDDEN PHRASES (These sound robotic):
+- "I wanted to reach out"
+- "Hope this email finds you well"
+- "I noticed", "I saw", "I read"
+- "Quick one:", "Here's the thing:", "Bottom line:"
+- "--" or em-dashes between sentences
+- "Let me ask you"
+- "We help companies"
+- Generic openers that sound templated
+
+CRITICAL: EXPLAIN WHY IT MATTERS
+- Don't just state the data: "Your contract expires June 2026"
+- DO explain impact: "With your contract ending June 2026, you're in the perfect window for renewal planning. Most companies start 6 months out to avoid last-minute negotiations."
+- Connect facts to their situation and urgency
+- Show the "why" behind the data - don't assume they know why it matters
+
+CTA GUIDANCE:
+- Use discovery questions: "Is X on your radar?", "Have you explored Y?", "Worth looking into before ${planningYear}?", "When does Y actually happen?", "How are you planning for X?"
+- Avoid high-friction CTAs: "Schedule a call", "Book a meeting", "Click here", "Reply with availability"
+
 PERSONALIZATION PRIORITY (CRITICAL - Follow This Order):
-1. **INTERNET RESEARCH (HIGHEST PRIORITY)**: If you have recentActivityContext, linkedinContext, or websiteContext, USE THESE FIRST. Reference specific details naturally through questions (e.g., "With your recent expansion in [City], how has that affected..."). DO NOT say "I noticed" or "I saw" - use questions instead.
+1. **INTERNET RESEARCH (HIGHEST PRIORITY)**: If you have recentActivityContext, linkedinContext, or websiteContext, USE THESE FIRST. Reference specific details naturally through questions (e.g., "With your recent expansion in [City], how has that affected..."). DO NOT use forbidden phrases (see FORBIDDEN PHRASES in CREATIVE FREEDOM section above) - use questions instead.
 
 2. **COMPANY DESCRIPTION (SECOND PRIORITY)**: If no research data is available, use accountDescription naturally. DO NOT copy it verbatim or make it sound like an encyclopedia entry. Instead, extract the business type and use industry-specific language (e.g., "manufacturing companies like [company]" not "As a leading provider of manufacturing services...").
 
@@ -2758,11 +2790,11 @@ CRITICAL QUALITY RULES:
 - COMPLETE CTAs: CTA must be a complete sentence, not cut off or incomplete
 - SINGLE CTA: Generate exactly ONE call to action per email
 - PROPER ENDINGS: All CTAs must end with proper punctuation (? or .)
-- EMAIL LENGTH: Keep total email body 90-130 words (research optimal range)
+- EMAIL LENGTH: Keep total email body 75-120 words (see CREATIVE FREEDOM section above for natural flow guidance)
 - CTA LENGTH: CTAs should be 8-12 words maximum
 - VALUE PROP MUST: Include HOW we help AND WHAT results using CONDITIONAL language (e.g., "We help [industry] companies secure better rates before contracts expire. Early renewal often gives more optionality and can reduce renewal risk.") Do NOT assert specific percentages as facts unless you have verified data.
 - MOBILE OPTIMIZATION: Keep paragraphs short (2-3 sentences max), use clear CTA placement, optimize for mobile preview text (52% of emails opened on mobile)
-- LENGTH VALIDATION: If email exceeds 130 words, prioritize: greeting + opening hook + value prop + CTA only
+- LENGTH VALIDATION: If email exceeds 125 words, prioritize: greeting + opening hook + value prop + CTA only
 - COMPANY DATA USAGE: MUST use current supplier, rate, contract timing, recent achievements when available
 
 FORBIDDEN PHRASES (TWO-TIER APPROACH):
@@ -3110,14 +3142,17 @@ OUTPUT FORMAT (JSON):
 {
   "subject": "[Your subject line]",
   "greeting": "Hi ${firstName || 'there'},",
-  "paragraph1": "[Opening paragraph with context - 1 sentence WITH A QUESTION, ~15-25 words]",
-  "paragraph2": "[Main message paragraph - 1-2 sentences about value, ~20-30 words]",
-  "paragraph3": "[Call to action paragraph - 1 sentence WITH A QUESTION, ~8-12 words]",
+  "paragraph1": "[Opening paragraph with context - natural flow, blend research hook and problem statement if needed]",
+  "paragraph2": "[Main message paragraph - natural flow, blend solution and value proposition if needed]",
+  "paragraph3": "[Call to action paragraph - 1 sentence WITH A QUESTION, natural flow]",
   "closing": "Best regards,\\n${senderName ? senderName.split(' ')[0] : 'Lewis'}"
 }
 
+NOTE: For word count guidance (75-120 words total, natural flow), see CREATIVE FREEDOM section above. Do not force specific word counts per paragraph - prioritize natural flow.
+
 ⚠️ RELAXED REQUIREMENTS (Natural Flow):
-1. TOTAL word count (greeting + paragraph1 + paragraph2 + paragraph3) should be 75-115 words. Maximum 125 words.
+(For comprehensive word count, creative freedom, and "WHY IT MATTERS" guidance, see CREATIVE FREEDOM section above)
+1. TOTAL word count (greeting + paragraph1 + paragraph2 + paragraph3) should be 75-120 words. Maximum 125 words.
 2. You have freedom to distribute text between paragraph1 and paragraph2:
    - paragraph1 can be the research hook AND the problem statement combined
    - paragraph2 can be the solution and value proposition
@@ -3146,6 +3181,7 @@ IMPORTANT: The closing field must include a newline between "Best regards," and 
 EMAIL TYPE: Cold Email (Never Spoke Before)
 
 ## RELAXED WORD COUNT POLICY (Natural Flow Allowed)
+(For comprehensive word count and creative freedom guidance, see CREATIVE FREEDOM section above)
 
 **Greeting:** 2 words MAX
   Example: "Hi Greg,"
@@ -3154,7 +3190,7 @@ EMAIL TYPE: Cold Email (Never Spoke Before)
   - paragraph1 can be the research hook AND the problem statement combined
   - paragraph2 can be the solution and value proposition
   - Blend sections naturally - connect research directly to value without forced breaks
-  - Target: 75-115 words total (greeting + paragraph1 + paragraph2 + paragraph3)
+  - Target: 75-120 words total (greeting + paragraph1 + paragraph2 + paragraph3)
   - Maximum: 125 words (only truncate if truly rambling)
 
 **CTA:** 8-15 words
@@ -3167,7 +3203,7 @@ EMAIL TYPE: Cold Email (Never Spoke Before)
   - GOOD (Finance): "Are you currently floating or fixed on your index?"
   - GOOD (Owner): "Has anyone reviewed your rate structure since the market shifted?"
 
-**Total Email:** 75-115 words TARGET, 125 words MAXIMUM
+**Total Email:** 75-120 words TARGET, 125 words MAXIMUM
   Use the extra space to explain *why* the research matters.
 
 ## QUESTIONS (Natural Tone - At Least 1 Required)
@@ -3254,7 +3290,7 @@ ${marketContext?.enabled ? '- You may reference general market trends, but lead 
 ${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', how have you seen..." (tenure available)' : ''}
 
 PERSONALIZATION PRIORITY (CRITICAL - Follow This Order):
-1. **INTERNET RESEARCH (HIGHEST PRIORITY)**: If you have recentActivityContext, linkedinContext, or websiteContext, USE THESE FIRST. Reference specific details naturally through questions (e.g., "With your recent expansion in [City], how has that affected..."). DO NOT say "I noticed" or "I saw" - use questions instead.
+1. **INTERNET RESEARCH (HIGHEST PRIORITY)**: If you have recentActivityContext, linkedinContext, or websiteContext, USE THESE FIRST. Reference specific details naturally through questions (e.g., "With your recent expansion in [City], how has that affected..."). DO NOT use forbidden phrases (see FORBIDDEN PHRASES in CREATIVE FREEDOM section above) - use questions instead.
 
 2. **COMPANY DESCRIPTION (SECOND PRIORITY)**: If no research data is available, use accountDescription naturally. DO NOT copy it verbatim or make it sound like an encyclopedia entry. Instead, extract the business type and use industry-specific language (e.g., "manufacturing companies like [company]" not "As a leading provider of manufacturing services...").
 
@@ -3298,7 +3334,7 @@ Paragraph 3 (CTA - 1 sentence, ~8-12 words):
 - Qualifying question or soft ask
 - Under 12 words
 - Complete sentence with proper punctuation
-- Final reminder: TOTAL must be 50-90 words including greeting
+- Final reminder: TOTAL must be 75-120 words including greeting (see CREATIVE FREEDOM section above for details)
 
 FORMATTING REQUIREMENTS:
 - Use EXACTLY TWO line breaks between each paragraph
@@ -3411,12 +3447,10 @@ ${suggestedSubject ? `SUGGESTED SUBJECT: "${suggestedSubject}" (use this pattern
 - Role-specific: Controllers/CFO = "budget question", Operations = "facility renewal timing"
 
 ⚠️ WORD COUNT TARGETS (CRITICAL - REINFORCEMENT):
-- Email body (greeting + opening + value prop + CTA, excluding closing): 50-90 words MAXIMUM
-- This is a HARD REQUIREMENT - emails over 90 words will be rejected
-- Count your words before finishing. If over 90, cut content immediately.
-- Keep it short. Do NOT write long paragraphs.
-- Scanability beats completeness. Use 1-sentence paragraphs where possible.
-- TOTAL LENGTH: 60-90 words for body content (scannable, not overwhelming - 2-3 short paragraphs)
+(For comprehensive word count, creative freedom, and "WHY IT MATTERS" guidance, see CREATIVE FREEDOM section above)
+- Email body (greeting + opening + value prop + CTA, excluding closing): 75-120 words (natural flow, not choppy)
+- Maximum 125 words - only truncate if truly rambling
+- TOTAL LENGTH: 75-120 words for body content (natural flow, not choppy - 2-3 paragraphs)
 CTA LENGTH: 8-15 words maximum, must be complete and assertive
 TONE: Write like a 29-year-old Texas business pro - conversational, confident, direct, peer-to-peer
 - Use contractions: "we're," "don't," "it's," "you're," "I'm"
@@ -3430,13 +3464,14 @@ TONE: Write like a 29-year-old Texas business pro - conversational, confident, d
     // WORD COUNT MUST BE FIRST - highest priority (add before everything else)
     const wordLimitSection = templateType === 'cold_email' ? `
 ## RELAXED WORD COUNT POLICY (Natural Flow Allowed)
+(For comprehensive word count and creative freedom guidance, see CREATIVE FREEDOM section above)
 
 GREETING: "Hi [FirstName]," (2 words)
 BODY CONTENT: You have freedom to distribute text between paragraph1 and paragraph2. 
 - paragraph1 can be the research hook AND the problem statement combined
 - paragraph2 can be the solution and value proposition
 - Blend sections naturally - it's okay to combine observation and question
-- Target: 75-115 words total (greeting + paragraph1 + paragraph2 + paragraph3)
+- Target: 75-120 words total (greeting + paragraph1 + paragraph2 + paragraph3)
 - Maximum: 125 words (only truncate if truly rambling)
 
 CTA: 8-15 words - Context-wrapped question with value (e.g., "Given rising delivery costs, does your current contract cover you through next summer?")
@@ -3448,7 +3483,7 @@ QUESTIONS: Include at least ONE question somewhere in the email (preferably in O
 - Value-verification questions work well
 - Don't force multiple questions if one flows naturally
 
-**CREATIVE FREEDOM:** Vary your structure. Write like you're texting a colleague, not writing a press release. Use the extra space (75-115 words) to explain *why* the research matters.
+**CREATIVE FREEDOM:** (See main CREATIVE FREEDOM section above for comprehensive guidance on natural flow, word count, and explaining why it matters)
 
 ` : '';
     
