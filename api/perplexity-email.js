@@ -554,6 +554,10 @@ async function researchRecentCompanyActivity(companyName, industry, city, state,
     const data = await response.json();
     const activityData = data.choices?.[0]?.message?.content || null;
     
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:555','message':'Raw research data from Perplexity API','data':{companyName,activityDataPreview:activityData?.substring(0,200)||null,hasActivityData:!!activityData,activityDataLength:activityData?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
     // Only cache if we found actual activity
     if (activityData && !activityData.toLowerCase().includes('no recent') && !activityData.toLowerCase().includes('unable to find')) {
       recentActivityCache.set(cacheKey, activityData);
@@ -2271,8 +2275,14 @@ async function buildSystemPrompt({
           if (data) {
             // Validate relevance before using
             const validation = validateResearchRelevance(data, company, industry);
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:2273','message':'Research validation result','data':{company,researchPreview:data.substring(0,200),isRelevant:validation.relevant,validationReason:validation.reason||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
             if (validation.relevant) {
               recentActivityContext = data;
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:2276','message':'Research context set after validation','data':{company,recentActivityContextPreview:recentActivityContext.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+              // #endregion
             } else {
               // Don't set recentActivityContext - it will be null and system will fall back to next tier
             }
@@ -2498,7 +2508,12 @@ RESEARCH DATA:
 ${linkedinContext ? '- Company LinkedIn: ' + linkedinContext : ''}
 ${websiteContext ? '- Company Website: ' + websiteContext : ''}
 ${contactLinkedinContext ? '- Contact LinkedIn Profile: ' + contactLinkedinContext + ' (use for tenure, career background, recent posts)' : ''}
-${recentActivityContext ? '- Recent Company Activity: ' + recentActivityContext + ' (reference naturally through questions, not "I noticed" or "I saw"). IMPORTANT: This activity has been validated as relevant to energy/electricity procurement. If activity mentions "new" facilities/offices, verify timing - if it\'s from 2022 or earlier, frame as "your [location] facility" not "new facility" to avoid sounding outdated. DO NOT use activity about product launches, software releases, or non-energy-related hiring.' : ''}
+${recentActivityContext ? (() => {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:2501','message':'Research context inserted into prompt','data':{company,recentActivityContextPreview:recentActivityContext.substring(0,200),hasCompanyNameInResearch:company?recentActivityContext.toLowerCase().includes(company.toLowerCase()):false},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+  // #endregion
+  return '- Recent Company Activity: ' + recentActivityContext + ' (reference naturally through questions, not "I noticed" or "I saw"). IMPORTANT: This activity has been validated as relevant to energy/electricity procurement. If activity mentions "new" facilities/offices, verify timing - if it\'s from 2022 or earlier, frame as "your [location] facility" not "new facility" to avoid sounding outdated. DO NOT use activity about product launches, software releases, or non-energy-related hiring.';
+})() : ''}
 ${locationContextData ? '- Regional Energy Market: ' + locationContextData + ' (use for location-specific context)' : ''}
 
 ENERGY DATA:
@@ -4396,6 +4411,13 @@ CRITICAL: Use these EXACT meeting times in your CTA.
       sizeCategory: sizeCategoryStd,
       job: recipient?.title || recipient?.job || recipient?.role || null
     };
+    // #region agent log
+    const companyNameFinal = recipient?.company || '';
+    const contentLower = content.toLowerCase();
+    const hasLowercaseCompanyName = companyNameFinal && contentLower.includes(companyNameFinal.toLowerCase()) && !content.includes(companyNameFinal);
+    const companyNameMatches = companyNameFinal ? content.match(new RegExp(companyNameFinal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')) : null;
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:4407','message':'Final email output - company name check','data':{companyName:companyNameFinal,contentPreview:content.substring(0,300),hasLowercaseCompanyName,companyNameMatches:companyNameMatches?.length||0,hasResearch:!!researchContext?.recentActivityContext},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
     // Sanitize percentages and personalize
     let polished = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(content, personalizeCtxStd)));
     polished = polished
