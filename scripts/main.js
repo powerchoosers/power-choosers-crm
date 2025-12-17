@@ -275,8 +275,11 @@ class PowerChoosersCRM {
         this.setupEntranceObservers();
         
         // Load home activities
+        let activitiesLoaded = false; // Prevent duplicate calls
         const loadActivities = () => {
+            if (activitiesLoaded) return; // Already loading or loaded
             if (window.ActivityManager && document.getElementById('dashboard-page')?.classList.contains('active')) {
+                activitiesLoaded = true; // Mark as loading
                 console.log('[CRM] Loading home activities...');
                 window.ActivityManager.renderActivities('home-activity-timeline', 'global');
             } else {
@@ -285,9 +288,8 @@ class PowerChoosersCRM {
             }
         };
         
-        // Try with small delays to ensure DOM is ready
-        setTimeout(loadActivities, 50);
-        setTimeout(loadActivities, 200);
+        // Try with small delay to ensure DOM is ready (only call once)
+        setTimeout(loadActivities, 100);
         
         // Start background calls loading immediately
         // This ensures calls data is pre-loaded before user clicks calls page
