@@ -274,14 +274,41 @@ class PowerChoosersCRM {
         // Observe dashboard containers and animate height once when real content arrives
         this.setupEntranceObservers();
         
-        // Load home activities
+        // Load home activities - wait for background loaders if they're still loading (cold start optimization)
         let activitiesLoaded = false; // Prevent duplicate calls
         const loadActivities = () => {
             if (activitiesLoaded) return; // Already loading or loaded
             if (window.ActivityManager && document.getElementById('dashboard-page')?.classList.contains('active')) {
-                activitiesLoaded = true; // Mark as loading
-                console.log('[CRM] Loading home activities...');
-                window.ActivityManager.renderActivities('home-activity-timeline', 'global');
+                // Check if background loaders are ready (for cold start optimization)
+                const emailsReady = !!(window.BackgroundEmailsLoader && window.BackgroundEmailsLoader.getEmailsData && window.BackgroundEmailsLoader.getEmailsData()?.length);
+                const tasksReady = !!(window.BackgroundTasksLoader && window.BackgroundTasksLoader.getTasksData && window.BackgroundTasksLoader.getTasksData()?.length);
+                const contactsReady = !!(window.BackgroundContactsLoader && window.BackgroundContactsLoader.getContactsData && window.BackgroundContactsLoader.getContactsData()?.length);
+                
+                // If any background loader is empty, wait for it to load (max 10 seconds)
+                if (!emailsReady || !tasksReady || !contactsReady) {
+                    console.log('[CRM] Waiting for background loaders to finish...', { emailsReady, tasksReady, contactsReady });
+                    let waitCount = 0;
+                    const maxWait = 50; // 50 * 200ms = 10 seconds max wait
+                    const checkAndLoad = () => {
+                        waitCount++;
+                        const nowEmailsReady = !!(window.BackgroundEmailsLoader && window.BackgroundEmailsLoader.getEmailsData && window.BackgroundEmailsLoader.getEmailsData()?.length);
+                        const nowTasksReady = !!(window.BackgroundTasksLoader && window.BackgroundTasksLoader.getTasksData && window.BackgroundTasksLoader.getTasksData()?.length);
+                        const nowContactsReady = !!(window.BackgroundContactsLoader && window.BackgroundContactsLoader.getContactsData && window.BackgroundContactsLoader.getContactsData()?.length);
+                        
+                        if ((nowEmailsReady && nowTasksReady && nowContactsReady) || waitCount >= maxWait) {
+                            activitiesLoaded = true; // Mark as loading
+                            console.log('[CRM] Loading home activities...', { waited: waitCount * 200 + 'ms', emailsReady: nowEmailsReady, tasksReady: nowTasksReady, contactsReady: nowContactsReady });
+                            window.ActivityManager.renderActivities('home-activity-timeline', 'global');
+                        } else {
+                            setTimeout(checkAndLoad, 200);
+                        }
+                    };
+                    setTimeout(checkAndLoad, 200);
+                } else {
+                    activitiesLoaded = true; // Mark as loading
+                    console.log('[CRM] Loading home activities...');
+                    window.ActivityManager.renderActivities('home-activity-timeline', 'global');
+                }
             } else {
                 console.log('[CRM] ActivityManager not ready, retrying...');
                 setTimeout(loadActivities, 200);

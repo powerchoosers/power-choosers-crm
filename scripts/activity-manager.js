@@ -321,27 +321,20 @@ class ActivityManager {
     const activities = [];
     
     try {
-      const emails = await this.fetchEmails(limit);
+      emails = await this.fetchEmails(limit);
       
-      // Get all contacts from CRM (people.js) - CRITICAL: Only show emails from contacts in CRM
-      const allContacts = window.getPeopleData ? (window.getPeopleData() || []) : [];
+      // OPTIMIZATION: fetchEmails already filtered emails to only include CRM contacts,
+      // so we don't need to rebuild contactEmailsSet here. We only need contacts for entity-specific filtering.
+      // Use BackgroundContactsLoader cached data if available (faster than getPeopleData)
+      if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+        allContacts = window.BackgroundContactsLoader.getContactsData() || [];
+      } else {
+        allContacts = window.getPeopleData ? (window.getPeopleData() || []) : [];
+      }
       const contactIdsSet = new Set(allContacts.map(c => c.id).filter(Boolean));
       
-      // Build comprehensive set of all contact email addresses (main email + emails array)
-      const contactEmailsSet = new Set();
-      allContacts.forEach(c => {
-        // Add main email field
-        const mainEmail = (c.email || '').toLowerCase().trim();
-        if (mainEmail) contactEmailsSet.add(mainEmail);
-        
-        // Add emails from emails array (if it exists)
-        if (Array.isArray(c.emails)) {
-          c.emails.forEach(e => {
-            const emailAddr = (e.address || e.email || e || '').toLowerCase().trim();
-            if (emailAddr) contactEmailsSet.add(emailAddr);
-          });
-        }
-      });
+      // NOTE: We don't need to build contactEmailsSet here since fetchEmails already filtered emails.
+      // We only need allContacts for entity-specific filtering below.
       
       // Helper to extract email addresses from string or array
       const extractEmails = (value) => {
@@ -358,27 +351,9 @@ class ActivityManager {
       // Helper to normalize email for comparison
       const normalizeEmail = (email) => String(email || '').toLowerCase().trim();
       
-      // Helper to check if email is from a contact in CRM
-      const isEmailFromCrmContact = (email) => {
-        // Check by contactId
-        if (email.contactId && contactIdsSet.has(email.contactId)) {
-          return true;
-        }
-        
-        // Check by email address (to/from fields)
-        const emailTo = extractEmails(email.to);
-        const emailFrom = extractEmails(email.from);
-        const allEmailAddresses = [...emailTo, ...emailFrom];
-        
-        // Check if any email address matches a contact in CRM
-        return allEmailAddresses.some(addr => contactEmailsSet.has(addr));
-      };
-      
+      // NOTE: fetchEmails already filters emails to only include those from CRM contacts,
+      // so we don't need to filter again here. We just process the pre-filtered emails.
       for (const email of emails) {
-        // CRITICAL FILTER: Only include emails from contacts that exist in CRM
-        if (!isEmailFromCrmContact(email)) {
-          continue; // Skip emails not from CRM contacts
-        }
         
         let shouldInclude = false;
         
@@ -496,7 +471,6 @@ class ActivityManager {
     } catch (error) {
       console.error('Error fetching email activities:', error);
     }
-
     return activities;
   }
 
@@ -546,6 +520,7 @@ class ActivityManager {
    * Fetch calls from Firebase or local storage
    */
   async fetchCalls(limit = this.fetchLimitPerType) {
+    
     try {
       // Try Firebase first
       if (window.db) {
@@ -553,6 +528,7 @@ class ActivityManager {
           .orderBy('timestamp', 'desc')
           .limit(limit || this.fetchLimitPerType)
           .get();
+        
         return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).slice(0, limit || this.fetchLimitPerType);
       }
       
@@ -588,6 +564,7 @@ class ActivityManager {
    * Fetch contacts with notes from Firebase and localStorage
    */
   async fetchContactsWithNotes(limit = this.fetchLimitPerType) {
+    
     try {
       let contacts = [];
       
@@ -625,6 +602,7 @@ class ActivityManager {
             return timeB - timeA;
           });
           const result = contactsWithNotes.slice(0, limit || this.fetchLimitPerType);
+          
           return result;
         }
       }
@@ -676,6 +654,7 @@ class ActivityManager {
               });
               // Apply limit after merge
               contacts = contacts.slice(0, limit || this.fetchLimitPerType);
+              
             } catch (error) {
               // Detect missing Firestore index
               if (error.code === 'failed-precondition' || (error.message && error.message.includes('index'))) {
@@ -728,6 +707,7 @@ class ActivityManager {
    * Fetch accounts with notes from Firebase and localStorage
    */
   async fetchAccountsWithNotes(limit = this.fetchLimitPerType) {
+    
     try {
       let accounts = [];
       
@@ -765,6 +745,7 @@ class ActivityManager {
             return timeB - timeA;
           });
           const result = accountsWithNotes.slice(0, limit || this.fetchLimitPerType);
+          
           return result;
         }
       }
@@ -857,6 +838,7 @@ class ActivityManager {
       }
       
       const result = accounts.slice(0, limit || this.fetchLimitPerType);
+      
       return result;
     } catch (error) {
       console.error('Error fetching accounts with notes:', error);
@@ -946,6 +928,7 @@ class ActivityManager {
    * Fetch emails from Firebase or local storage
    */
   async fetchEmails(limit = this.fetchLimitPerType) {
+    
     try {
       let emails = [];
       
@@ -976,7 +959,13 @@ class ActivityManager {
         const cachedEmails = window.BackgroundEmailsLoader.getEmailsData() || [];
         if (cachedEmails.length > 0) {
           // Get all contacts from CRM to filter emails (only show emails from contacts in CRM)
-          const allContacts = window.getPeopleData ? (window.getPeopleData() || []) : [];
+          // OPTIMIZATION: Use BackgroundContactsLoader cached data if available (faster than getPeopleData)
+          let allContacts = [];
+          if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+            allContacts = window.BackgroundContactsLoader.getContactsData() || [];
+          } else {
+            allContacts = window.getPeopleData ? (window.getPeopleData() || []) : [];
+          }
           const contactIdsSet = new Set(allContacts.map(c => c.id).filter(Boolean));
           
           // Build comprehensive set of all contact email addresses (main email + emails array)
@@ -1008,20 +997,54 @@ class ActivityManager {
           
           // Filter emails to only include those from CRM contacts
           // CRITICAL: Only show emails where sender/recipient matches an existing contact's email address
-          const filteredEmails = cachedEmails.filter(email => {
+          
+          // Helper to determine if email is from a contact
+          const isEmailFromCrmContact = (email) => {
             // Check by contactId first (fastest)
             if (email.contactId && contactIdsSet.has(email.contactId)) {
               return true;
             }
             
-            // Check by email addresses in to/from fields
+            // Determine if email is sent or received
+            const currentUserEmail = window.DataManager?.getCurrentUserEmail?.() || window.currentUserEmail || '';
             const emailTo = extractEmails(email.to);
             const emailFrom = extractEmails(email.from);
-            const allEmailAddresses = [...emailTo, ...emailFrom];
+            const isSent = email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail;
+            const isReceived = email.type === 'received' || email.emailType === 'received' || 
+                              (emailFrom.length > 0 && !emailFrom.some(e => e.toLowerCase().includes(currentUserEmail.toLowerCase())));
             
-            // Only include if at least one email address matches a contact in CRM
-            return allEmailAddresses.some(addr => contactEmailsSet.has(addr));
+            // For received emails: sender (from) must be a contact
+            if (isReceived && !isSent) {
+              return emailFrom.some(addr => contactEmailsSet.has(addr));
+            }
+            
+            // For sent emails: recipient (to) must be a contact
+            if (isSent) {
+              return emailTo.some(addr => contactEmailsSet.has(addr));
+            }
+            
+            // Fallback: if we can't determine direction, check if sender is a contact
+            return emailFrom.some(addr => contactEmailsSet.has(addr));
+          };
+          
+          const filteredEmails = cachedEmails.filter(email => {
+            // Check by contactId first (fastest)
+            if (email.contactId && contactIdsSet.has(email.contactId)) {
+              
+              return true;
+            }
+            
+            // Check by email addresses using proper sent/received logic
+            const matches = isEmailFromCrmContact(email);
+            if (matches) {
+              
+              return true;
+            } else {
+              
+              return false;
+            }
           });
+          
           
           
           // Sort by timestamp desc and limit
@@ -1031,12 +1054,14 @@ class ActivityManager {
             return timeB - timeA;
           });
           const result = filteredEmails.slice(0, limit || this.fetchLimitPerType);
+          
           return result;
         }
       }
       
       // Fallback to Firestore if cache empty
       if (window.firebaseDB) {
+        
         if (!isAdmin()) {
           // Non-admin: filter by ownership
           const email = getUserEmail();
@@ -1045,6 +1070,7 @@ class ActivityManager {
             // DataManager.queryWithOwnership loads ALL emails (no limit), causing 7+ second delays
             // Query both ownerId and assignedTo in parallel, then merge and sort
             try {
+              
               const [ownedSnap, assignedSnap] = await Promise.all([
                 window.firebaseDB.collection('emails')
                   .where('ownerId', '==', email)
@@ -1138,9 +1164,11 @@ class ActivityManager {
           } catch (error) {
             // If orderBy fails, try without it and sort client-side
             try {
+              
               const snapshot = await window.firebaseDB.collection('emails')
                 .limit(limit || this.fetchLimitPerType)
                 .get();
+              
               emails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
               // Sort client-side
               emails.sort((a, b) => {
@@ -1163,6 +1191,90 @@ class ActivityManager {
         }
       }
       
+      // CRITICAL: Filter emails to only include those from CRM contacts (even when from Firestore)
+      // Get all contacts from CRM to filter emails
+      const allContacts = window.getPeopleData ? (window.getPeopleData() || []) : [];
+      const contactIdsSet = new Set(allContacts.map(c => c.id).filter(Boolean));
+      
+      // Build comprehensive set of all contact email addresses (main email + emails array)
+      const contactEmailsSet = new Set();
+      allContacts.forEach(c => {
+        // Add main email field
+        const mainEmail = (c.email || '').toLowerCase().trim();
+        if (mainEmail) contactEmailsSet.add(mainEmail);
+        
+        // Add emails from emails array (if it exists)
+        if (Array.isArray(c.emails)) {
+          c.emails.forEach(e => {
+            const emailAddr = (e.address || e.email || e || '').toLowerCase().trim();
+            if (emailAddr) contactEmailsSet.add(emailAddr);
+          });
+        }
+      });
+      
+      // Helper to extract email addresses from string or array
+      const extractEmails = (value) => {
+        if (!value) return [];
+        if (Array.isArray(value)) {
+          return value.map(v => String(v || '').toLowerCase().trim()).filter(e => e);
+        }
+        const str = String(value || '');
+        const matches = str.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+        return matches.map(e => e.toLowerCase().trim());
+      };
+      
+      // Filter emails to only include those from CRM contacts
+      // CRITICAL: Only show emails FROM contacts (received) or TO contacts (sent by user)
+      // Helper to determine if email is from a contact
+      const isEmailFromCrmContactFirestore = (email) => {
+        // Check by contactId first (fastest)
+        if (email.contactId && contactIdsSet.has(email.contactId)) {
+          return true;
+        }
+        
+        // Determine if email is sent or received
+        const currentUserEmail = window.DataManager?.getCurrentUserEmail?.() || window.currentUserEmail || '';
+        const emailTo = extractEmails(email.to);
+        const emailFrom = extractEmails(email.from);
+        const isSent = email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail;
+        const isReceived = email.type === 'received' || email.emailType === 'received' || 
+                          (emailFrom.length > 0 && !emailFrom.some(e => e.toLowerCase().includes(currentUserEmail.toLowerCase())));
+        
+        // For received emails: sender (from) must be a contact
+        if (isReceived && !isSent) {
+          return emailFrom.some(addr => contactEmailsSet.has(addr));
+        }
+        
+        // For sent emails: recipient (to) must be a contact
+        if (isSent) {
+          return emailTo.some(addr => contactEmailsSet.has(addr));
+        }
+        
+        // Fallback: if we can't determine direction, check if sender is a contact
+        return emailFrom.some(addr => contactEmailsSet.has(addr));
+      };
+      
+      
+      
+      emails = emails.filter(email => {
+        // Check by contactId first (fastest)
+        if (email.contactId && contactIdsSet.has(email.contactId)) {
+          
+          return true;
+        }
+        
+        const matches = isEmailFromCrmContactFirestore(email);
+        if (matches) {
+          
+          return true;
+        } else {
+          
+          return false;
+        }
+      });
+      
+      
+      
       const result = emails.slice(0, limit || this.fetchLimitPerType);
       return result;
     } catch (error) {
@@ -1175,6 +1287,7 @@ class ActivityManager {
    * Fetch tasks from Firebase or local storage
    */
   async fetchTasks(limit = this.fetchLimitPerType) {
+    
     try {
       let tasks = [];
       
@@ -1211,6 +1324,7 @@ class ActivityManager {
             return timeB - timeA;
           });
           const result = cachedTasks.slice(0, limit || this.fetchLimitPerType);
+          
           return result;
         }
       }
@@ -1245,10 +1359,12 @@ class ActivityManager {
           }
         } else {
           // Admin: unrestricted query
+          
           const snapshot = await window.firebaseDB.collection('tasks')
             .orderBy('timestamp', 'desc')
             .limit(limit || this.fetchLimitPerType)
             .get();
+          
           tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         }
       }
@@ -1287,6 +1403,7 @@ class ActivityManager {
    * Render activities for a specific container
    */
   async renderActivities(containerId, entityType = 'global', entityId = null, forceRefresh = false) {
+    
     const container = document.getElementById(containerId);
     if (!container) return;
 
@@ -1334,6 +1451,7 @@ class ActivityManager {
       
       // Show pagination if there are multiple pages
       this.updatePagination(containerId, totalPages);
+      
       
       
       // Only pre-render if there are multiple pages and we're not on the first load
@@ -2365,3 +2483,4 @@ class ActivityManager {
 if (!window.ActivityManager || !(window.ActivityManager instanceof ActivityManager)) {
   window.ActivityManager = new ActivityManager();
 }
+
