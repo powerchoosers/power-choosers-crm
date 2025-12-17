@@ -828,6 +828,27 @@ async function generatePreviewEmail(emailData) {
 // The shared module includes comprehensive patterns for all industries.
 
 // ========== ANGLE SELECTION SYSTEM ==========
+// Helper function to check if account has evidence of multiple locations
+function hasMultipleLocationsEvidence(accountData) {
+  if (!accountData) return false;
+  
+  // Check 1: Multiple service addresses in CRM
+  const serviceAddresses = accountData?.account?.serviceAddresses;
+  const hasMultipleServiceAddresses = Array.isArray(serviceAddresses) && serviceAddresses.length > 1;
+  
+  // Check 2: Account description mentions multiple locations/facilities/sites
+  const accountDesc = accountData?.account?.shortDescription || 
+                     accountData?.account?.short_desc || 
+                     accountData?.account?.descriptionShort || 
+                     accountData?.account?.description || 
+                     accountData?.account?.companyDescription || 
+                     accountData?.account?.accountDescription || '';
+  const descLower = String(accountDesc).toLowerCase();
+  const mentionsMultipleLocations = /\b(multiple|several|various|locations|facilities|sites|plants|offices|branches|stores)\b/i.test(descLower);
+  
+  return hasMultipleServiceAddresses || mentionsMultipleLocations;
+}
+
 // Simplified RANDOMIZED_ANGLES_BY_INDUSTRY (matches email-compose-global.js structure)
 const RANDOMIZED_ANGLES_BY_INDUSTRY = {
   Manufacturing: {
@@ -860,7 +881,8 @@ const RANDOMIZED_ANGLES_BY_INDUSTRY = {
         weight: 0.20,
         primaryMessage: 'multi-plant consolidation',
         openingTemplate: 'How many facilities are you managing energy for, and are they on different contracts?',
-        primaryValue: '10-20% savings by consolidating all locations'
+        primaryValue: '10-20% savings by consolidating all locations',
+        condition: (accountData) => hasMultipleLocationsEvidence(accountData)
       }
     ]
   },
@@ -897,7 +919,8 @@ const RANDOMIZED_ANGLES_BY_INDUSTRY = {
         weight: 0.40,
         primaryMessage: 'multi-location consolidation',
         openingTemplate: 'How many locations are you managing energy for?',
-        primaryValue: '10-20% savings by consolidating all locations'
+        primaryValue: '10-20% savings by consolidating all locations',
+        condition: (accountData) => hasMultipleLocationsEvidence(accountData)
       },
       {
         id: 'timing_strategy',
@@ -930,7 +953,8 @@ const RANDOMIZED_ANGLES_BY_INDUSTRY = {
         weight: 0.40,
         primaryMessage: 'multi-facility consolidation',
         openingTemplate: 'How many facilities are you managing energy for, and are they all renewing on different schedules?',
-        primaryValue: '10-20% savings by consolidating all facilities'
+        primaryValue: '10-20% savings by consolidating all facilities',
+        condition: (accountData) => hasMultipleLocationsEvidence(accountData)
       },
       {
         id: 'operational_continuity',
@@ -973,7 +997,8 @@ const RANDOMIZED_ANGLES_BY_INDUSTRY = {
         weight: 0.45,
         primaryMessage: 'multi-location volume leverage',
         openingTemplate: 'How many locations are you managing energy for?',
-        primaryValue: '10-20% savings by consolidating all locations'
+        primaryValue: '10-20% savings by consolidating all locations',
+        condition: (accountData) => hasMultipleLocationsEvidence(accountData)
       },
       {
         id: 'timing_strategy',
@@ -998,7 +1023,8 @@ const RANDOMIZED_ANGLES_BY_INDUSTRY = {
         weight: 0.40,
         primaryMessage: 'multi-property consolidation',
         openingTemplate: 'How many properties are you managing energy for, and are they all on different renewal schedules?',
-        primaryValue: '10-20% savings by consolidating all properties'
+        primaryValue: '10-20% savings by consolidating all properties',
+        condition: (accountData) => hasMultipleLocationsEvidence(accountData)
       },
       {
         id: 'timing_strategy',
