@@ -15,6 +15,67 @@ class ActivityManager {
     this.fetchLimitPerType = 25; // Smaller initial fetch to speed cold start
     this.maxFetchLimit = 200; // Safety cap for incremental fetches
     this.lastFetchLimitUsed = this.fetchLimitPerType;
+    this.loadingPromises = new Map(); // Track in-flight requests to prevent duplicates
+    
+    // Setup cache invalidation listeners for immediate updates when new activities are created
+    this.setupCacheInvalidationListeners();
+  }
+  
+  /**
+   * Setup event listeners to invalidate cache when new activities are created/updated
+   * This ensures Recent Activities is immediately updated with new records
+   */
+  setupCacheInvalidationListeners() {
+    // Invalidate global cache when contacts are created/updated (affects notes)
+    document.addEventListener('pc:contact-created', () => {
+      this.clearCache('global');
+    });
+    document.addEventListener('pc:contact-updated', (e) => {
+      const { id } = e.detail || {};
+      this.clearCache('global');
+      if (id) this.clearCache('contact', id);
+    });
+    
+    // Invalidate global cache when accounts are created/updated (affects notes)
+    document.addEventListener('pc:account-created', () => {
+      this.clearCache('global');
+    });
+    document.addEventListener('pc:account-updated', (e) => {
+      const { id } = e.detail || {};
+      this.clearCache('global');
+      if (id) this.clearCache('account', id);
+    });
+    
+    // Invalidate global cache when tasks are created/updated/deleted
+    document.addEventListener('tasksUpdated', (e) => {
+      const { taskId } = e.detail || {};
+      this.clearCache('global');
+    });
+    document.addEventListener('pc:task-deleted', (e) => {
+      const { taskId } = e.detail || {};
+      this.clearCache('global');
+    });
+    
+    // Invalidate global cache when emails are updated (but debounce to avoid too frequent invalidations)
+    let emailUpdateTimeout = null;
+    document.addEventListener('pc:emails-updated', () => {
+      // Debounce: only invalidate once per 2 seconds to avoid clearing cache too frequently
+      if (emailUpdateTimeout) clearTimeout(emailUpdateTimeout);
+      emailUpdateTimeout = setTimeout(() => {
+        this.clearCache('global');
+      }, 2000); // 2 second debounce
+    });
+    
+    // Invalidate global cache when calls are logged
+    document.addEventListener('pc:call-logged', () => {
+      this.clearCache('global');
+    });
+    
+    // Listen for explicit activity refresh requests
+    document.addEventListener('pc:activities-refresh', (e) => {
+      const { entityType, entityId, forceRefresh } = e.detail || {};
+      this.clearCache(entityType || 'global', entityId);
+    });
   }
 
   /**
@@ -24,6 +85,11 @@ class ActivityManager {
     const cacheKey = `${entityType}-${entityId || 'global'}`;
     const now = Date.now();
     
+    // OPTIMIZATION: Prevent duplicate simultaneous calls for the same cache key
+    if (!forceRefresh && this.loadingPromises.has(cacheKey)) {
+      return this.loadingPromises.get(cacheKey);
+    }
+    
     // Check cache first (unless force refresh)
     if (!forceRefresh && this.cache.has(cacheKey)) {
       const cacheTime = this.cacheTimestamp.get(cacheKey);
@@ -32,47 +98,49 @@ class ActivityManager {
       }
     }
     
-    const activities = [];
+    // Create promise for this request and store it to prevent duplicates
+    const fetchPromise = (async () => {
+      const activities = [];
+      
+      try {
+        // OPTIMIZATION: Fetch all activity types in parallel instead of sequentially
+        // This reduces total load time from sum of all fetches to max of all fetches
+        const [calls, notes, sequences, emails, tasks] = await Promise.all([
+          this.getCallActivities(entityType, entityId, this.fetchLimitPerType),
+          this.getNoteActivities(entityType, entityId, this.fetchLimitPerType),
+          this.getSequenceActivities(entityType, entityId, this.fetchLimitPerType),
+          this.getEmailActivities(entityType, entityId, this.fetchLimitPerType),
+          this.getTaskActivities(entityType, entityId, this.fetchLimitPerType)
+        ]);
+        
+        activities.push(...calls, ...notes, ...sequences, ...emails, ...tasks);
+
+        // Sort by timestamp (most recent first) using robust timestamp parsing
+        activities.sort((a, b) => {
+          const timeA = this.getTimestampMs(a.timestamp);
+          const timeB = this.getTimestampMs(b.timestamp);
+          return timeB - timeA;
+        });
+
+        // Cache the results
+        this.cache.set(cacheKey, activities);
+        this.cacheTimestamp.set(cacheKey, now);
+        this.lastFetchLimitUsed = this.fetchLimitPerType;
+
+        return activities;
+      } catch (error) {
+        console.error('Error fetching activities:', error);
+        return [];
+      } finally {
+        // Clean up loading promise when done
+        this.loadingPromises.delete(cacheKey);
+      }
+    })();
     
-    try {
-      // Get calls
-      const calls = await this.getCallActivities(entityType, entityId, this.fetchLimitPerType);
-      activities.push(...calls);
-
-      // Get notes
-      const notes = await this.getNoteActivities(entityType, entityId, this.fetchLimitPerType);
-      activities.push(...notes);
-
-      // Get sequence activities
-      const sequences = await this.getSequenceActivities(entityType, entityId, this.fetchLimitPerType);
-      activities.push(...sequences);
-
-      // Get email activities
-      const emails = await this.getEmailActivities(entityType, entityId, this.fetchLimitPerType);
-      activities.push(...emails);
-
-      // Get task activities
-      const tasks = await this.getTaskActivities(entityType, entityId, this.fetchLimitPerType);
-      activities.push(...tasks);
-
-      // Sort by timestamp (most recent first) using robust timestamp parsing
-      activities.sort((a, b) => {
-        const timeA = this.getTimestampMs(a.timestamp);
-        const timeB = this.getTimestampMs(b.timestamp);
-        return timeB - timeA;
-      });
-
-
-      // Cache the results
-      this.cache.set(cacheKey, activities);
-      this.cacheTimestamp.set(cacheKey, now);
-      this.lastFetchLimitUsed = this.fetchLimitPerType;
-
-      return activities;
-    } catch (error) {
-      console.error('Error fetching activities:', error);
-      return [];
-    }
+    // Store promise to prevent duplicate calls
+    this.loadingPromises.set(cacheKey, fetchPromise);
+    
+    return fetchPromise;
   }
 
   /**
@@ -258,14 +326,22 @@ class ActivityManager {
       // Get all contacts from CRM (people.js) - CRITICAL: Only show emails from contacts in CRM
       const allContacts = window.getPeopleData ? (window.getPeopleData() || []) : [];
       const contactIdsSet = new Set(allContacts.map(c => c.id).filter(Boolean));
-      const contactEmailsSet = new Set(
-        allContacts
-          .map(c => {
-            const email = (c.email || '').toLowerCase().trim();
-            return email || null;
-          })
-          .filter(Boolean)
-      );
+      
+      // Build comprehensive set of all contact email addresses (main email + emails array)
+      const contactEmailsSet = new Set();
+      allContacts.forEach(c => {
+        // Add main email field
+        const mainEmail = (c.email || '').toLowerCase().trim();
+        if (mainEmail) contactEmailsSet.add(mainEmail);
+        
+        // Add emails from emails array (if it exists)
+        if (Array.isArray(c.emails)) {
+          c.emails.forEach(e => {
+            const emailAddr = (e.address || e.email || e || '').toLowerCase().trim();
+            if (emailAddr) contactEmailsSet.add(emailAddr);
+          });
+        }
+      });
       
       // Helper to extract email addresses from string or array
       const extractEmails = (value) => {
@@ -416,6 +492,7 @@ class ActivityManager {
           });
         }
       }
+      
     } catch (error) {
       console.error('Error fetching email activities:', error);
     }
@@ -536,28 +613,77 @@ class ActivityManager {
         }
       };
       
-      // Try Firebase first
+      // OPTIMIZATION: Try BackgroundContactsLoader cached data first (zero Firestore reads, instant)
+      if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+        const cachedContacts = window.BackgroundContactsLoader.getContactsData() || [];
+        const contactsWithNotes = cachedContacts.filter(c => c && c.notes && c.notes.trim());
+        if (contactsWithNotes.length > 0) {
+          // Sort by notesUpdatedAt desc and limit
+          contactsWithNotes.sort((a, b) => {
+            const timeA = this.getTimestampMs(a.notesUpdatedAt || a.updatedAt || a.createdAt);
+            const timeB = this.getTimestampMs(b.notesUpdatedAt || b.updatedAt || b.createdAt);
+            return timeB - timeA;
+          });
+          const result = contactsWithNotes.slice(0, limit || this.fetchLimitPerType);
+          return result;
+        }
+      }
+      
+      // Fallback to Firestore if cache empty
       if (window.firebaseDB) {
         if (!isAdmin()) {
           // Non-admin: filter by ownership
           const email = getUserEmail();
-          if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
-            // Use DataManager helper
-            const allContacts = await window.DataManager.queryWithOwnership('contacts');
-            contacts = allContacts.filter(c => c.notes && c.notes.trim()).slice(0, limit || this.fetchLimitPerType);
-          } else if (email) {
-            // Fallback: try single query with ownerId filter
+          if (email) {
+            // CRITICAL FIX: Use direct Firestore queries with limit instead of DataManager.queryWithOwnership
+            // DataManager.queryWithOwnership loads ALL contacts (no limit), causing 24+ second delays
+            // Query both ownerId and assignedTo in parallel, then merge and sort
             try {
-              const snapshot = await window.firebaseDB.collection('contacts')
-                .where('ownerId', '==', email)
-                .where('notes', '>', '')
-                .orderBy('notes')
-                .orderBy('notesUpdatedAt', 'desc')
-                .limit(limit || this.fetchLimitPerType)
-                .get();
-              contacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+              const [ownedSnap, assignedSnap] = await Promise.all([
+                window.firebaseDB.collection('contacts')
+                  .where('ownerId', '==', email)
+                  .where('notes', '>', '')
+                  .orderBy('notes')
+                  .orderBy('notesUpdatedAt', 'desc')
+                  .limit(limit || this.fetchLimitPerType)
+                  .get(),
+                window.firebaseDB.collection('contacts')
+                  .where('assignedTo', '==', email)
+                  .where('notes', '>', '')
+                  .orderBy('notes')
+                  .orderBy('notesUpdatedAt', 'desc')
+                  .limit(limit || this.fetchLimitPerType)
+                  .get()
+              ]);
+              
+              // Merge results and deduplicate
+              const contactsMap = new Map();
+              ownedSnap.docs.forEach(doc => {
+                contactsMap.set(doc.id, { id: doc.id, ...doc.data() });
+              });
+              assignedSnap.docs.forEach(doc => {
+                if (!contactsMap.has(doc.id)) {
+                  contactsMap.set(doc.id, { id: doc.id, ...doc.data() });
+                }
+              });
+              
+              contacts = Array.from(contactsMap.values());
+              // Sort by notesUpdatedAt desc (most recent first)
+              contacts.sort((a, b) => {
+                const timeA = this.getTimestampMs(a.notesUpdatedAt || a.updatedAt || a.createdAt);
+                const timeB = this.getTimestampMs(b.notesUpdatedAt || b.updatedAt || b.createdAt);
+                return timeB - timeA;
+              });
+              // Apply limit after merge
+              contacts = contacts.slice(0, limit || this.fetchLimitPerType);
             } catch (error) {
-              // If query fails (missing index), return empty array for non-admin
+              // Detect missing Firestore index
+              if (error.code === 'failed-precondition' || (error.message && error.message.includes('index'))) {
+                console.error('[ActivityManager] Firestore index required for contacts with notes query:', error.message);
+                if (error.message && error.message.includes('https://console.firebase.google.com')) {
+                  console.error('[ActivityManager] Create index at:', error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]+/)?.[0]);
+                }
+              }
               console.warn('Error fetching contacts with notes (non-admin query):', error);
               return [];
             }
@@ -590,7 +716,8 @@ class ActivityManager {
         console.warn('Error loading contacts with notes from localStorage:', error);
       }
       
-      return contacts.slice(0, limit || this.fetchLimitPerType);
+      const result = contacts.slice(0, limit || this.fetchLimitPerType);
+      return result;
     } catch (error) {
       console.error('Error fetching contacts with notes:', error);
       return [];
@@ -626,28 +753,77 @@ class ActivityManager {
         }
       };
       
-      // Try Firebase first
+      // OPTIMIZATION: Try BackgroundAccountsLoader cached data first (zero Firestore reads, instant)
+      if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
+        const cachedAccounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+        const accountsWithNotes = cachedAccounts.filter(a => a && a.notes && a.notes.trim());
+        if (accountsWithNotes.length > 0) {
+          // Sort by notesUpdatedAt desc and limit
+          accountsWithNotes.sort((a, b) => {
+            const timeA = this.getTimestampMs(a.notesUpdatedAt || a.updatedAt || a.createdAt);
+            const timeB = this.getTimestampMs(b.notesUpdatedAt || b.updatedAt || b.createdAt);
+            return timeB - timeA;
+          });
+          const result = accountsWithNotes.slice(0, limit || this.fetchLimitPerType);
+          return result;
+        }
+      }
+      
+      // Fallback to Firestore if cache empty
       if (window.firebaseDB) {
         if (!isAdmin()) {
           // Non-admin: filter by ownership
           const email = getUserEmail();
-          if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
-            // Use DataManager helper
-            const allAccounts = await window.DataManager.queryWithOwnership('accounts');
-            accounts = allAccounts.filter(a => a.notes && a.notes.trim()).slice(0, limit || this.fetchLimitPerType);
-          } else if (email) {
-            // Fallback: try single query with ownerId filter
+          if (email) {
+            // CRITICAL FIX: Use direct Firestore queries with limit instead of DataManager.queryWithOwnership
+            // DataManager.queryWithOwnership loads ALL accounts (no limit), causing slow performance
+            // Query both ownerId and assignedTo in parallel, then merge and sort
             try {
-              const snapshot = await window.firebaseDB.collection('accounts')
-                .where('ownerId', '==', email)
-                .where('notes', '>', '')
-                .orderBy('notes')
-                .orderBy('notesUpdatedAt', 'desc')
-                .limit(limit || this.fetchLimitPerType)
-                .get();
-              accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            } catch (error) {
-              // If query fails (missing index), return empty array for non-admin
+              const [ownedSnap, assignedSnap] = await Promise.all([
+                window.firebaseDB.collection('accounts')
+                  .where('ownerId', '==', email)
+                  .where('notes', '>', '')
+                  .orderBy('notes')
+                  .orderBy('notesUpdatedAt', 'desc')
+                  .limit(limit || this.fetchLimitPerType)
+                  .get(),
+                window.firebaseDB.collection('accounts')
+                  .where('assignedTo', '==', email)
+                  .where('notes', '>', '')
+                  .orderBy('notes')
+                  .orderBy('notesUpdatedAt', 'desc')
+                  .limit(limit || this.fetchLimitPerType)
+                  .get()
+              ]);
+              
+              // Merge results and deduplicate
+              const accountsMap = new Map();
+              ownedSnap.docs.forEach(doc => {
+                accountsMap.set(doc.id, { id: doc.id, ...doc.data() });
+              });
+              assignedSnap.docs.forEach(doc => {
+                if (!accountsMap.has(doc.id)) {
+                  accountsMap.set(doc.id, { id: doc.id, ...doc.data() });
+                }
+              });
+              
+              accounts = Array.from(accountsMap.values());
+              // Sort by notesUpdatedAt desc (most recent first)
+              accounts.sort((a, b) => {
+                const timeA = this.getTimestampMs(a.notesUpdatedAt || a.updatedAt || a.createdAt);
+                const timeB = this.getTimestampMs(b.notesUpdatedAt || b.updatedAt || b.createdAt);
+                return timeB - timeA;
+              });
+              // Apply limit after merge
+              accounts = accounts.slice(0, limit || this.fetchLimitPerType);
+              } catch (error) {
+              // Detect missing Firestore index
+              if (error.code === 'failed-precondition' || (error.message && error.message.includes('index'))) {
+                console.error('[ActivityManager] Firestore index required for accounts with notes query:', error.message);
+                if (error.message && error.message.includes('https://console.firebase.google.com')) {
+                  console.error('[ActivityManager] Create index at:', error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]+/)?.[0]);
+                }
+              }
               console.warn('Error fetching accounts with notes (non-admin query):', error);
               return [];
             }
@@ -680,7 +856,8 @@ class ActivityManager {
         console.warn('Error loading accounts with notes from localStorage:', error);
       }
       
-      return accounts.slice(0, limit || this.fetchLimitPerType);
+      const result = accounts.slice(0, limit || this.fetchLimitPerType);
+      return result;
     } catch (error) {
       console.error('Error fetching accounts with notes:', error);
       return [];
@@ -794,39 +971,155 @@ class ActivityManager {
         }
       };
       
-      // Try Firebase first
+      // OPTIMIZATION: Try BackgroundEmailsLoader cached data first (zero Firestore reads, instant)
+      if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.getEmailsData === 'function') {
+        const cachedEmails = window.BackgroundEmailsLoader.getEmailsData() || [];
+        if (cachedEmails.length > 0) {
+          // Get all contacts from CRM to filter emails (only show emails from contacts in CRM)
+          const allContacts = window.getPeopleData ? (window.getPeopleData() || []) : [];
+          const contactIdsSet = new Set(allContacts.map(c => c.id).filter(Boolean));
+          
+          // Build comprehensive set of all contact email addresses (main email + emails array)
+          const contactEmailsSet = new Set();
+          allContacts.forEach(c => {
+            // Add main email field
+            const mainEmail = (c.email || '').toLowerCase().trim();
+            if (mainEmail) contactEmailsSet.add(mainEmail);
+            
+            // Add emails from emails array (if it exists)
+            if (Array.isArray(c.emails)) {
+              c.emails.forEach(e => {
+                const emailAddr = (e.address || e.email || e || '').toLowerCase().trim();
+                if (emailAddr) contactEmailsSet.add(emailAddr);
+              });
+            }
+          });
+          
+          // Helper to extract email addresses from string or array
+          const extractEmails = (value) => {
+            if (!value) return [];
+            if (Array.isArray(value)) {
+              return value.map(v => String(v || '').toLowerCase().trim()).filter(e => e);
+            }
+            const str = String(value || '');
+            const matches = str.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+            return matches.map(e => e.toLowerCase().trim());
+          };
+          
+          // Filter emails to only include those from CRM contacts
+          // CRITICAL: Only show emails where sender/recipient matches an existing contact's email address
+          const filteredEmails = cachedEmails.filter(email => {
+            // Check by contactId first (fastest)
+            if (email.contactId && contactIdsSet.has(email.contactId)) {
+              return true;
+            }
+            
+            // Check by email addresses in to/from fields
+            const emailTo = extractEmails(email.to);
+            const emailFrom = extractEmails(email.from);
+            const allEmailAddresses = [...emailTo, ...emailFrom];
+            
+            // Only include if at least one email address matches a contact in CRM
+            return allEmailAddresses.some(addr => contactEmailsSet.has(addr));
+          });
+          
+          
+          // Sort by timestamp desc and limit
+          filteredEmails.sort((a, b) => {
+            const timeA = this.getTimestampMs(a.timestamp || a.sentAt || a.receivedAt || a.date || a.createdAt);
+            const timeB = this.getTimestampMs(b.timestamp || b.sentAt || b.receivedAt || b.date || b.createdAt);
+            return timeB - timeA;
+          });
+          const result = filteredEmails.slice(0, limit || this.fetchLimitPerType);
+          return result;
+        }
+      }
+      
+      // Fallback to Firestore if cache empty
       if (window.firebaseDB) {
         if (!isAdmin()) {
           // Non-admin: filter by ownership
           const email = getUserEmail();
-          if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
-            // Use DataManager helper
-            emails = await window.DataManager.queryWithOwnership('emails');
-            emails = emails.slice(0, limit || this.fetchLimitPerType);
-          } else if (email) {
-            // Fallback: try query with ownerId filter
+          if (email) {
+            // CRITICAL FIX: Use direct Firestore queries with limit instead of DataManager.queryWithOwnership
+            // DataManager.queryWithOwnership loads ALL emails (no limit), causing 7+ second delays
+            // Query both ownerId and assignedTo in parallel, then merge and sort
             try {
-              const snapshot = await window.firebaseDB.collection('emails')
-                .where('ownerId', '==', email)
-                .orderBy('timestamp', 'desc')
-                .limit(limit || this.fetchLimitPerType)
-                .get();
-              emails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+              const [ownedSnap, assignedSnap] = await Promise.all([
+                window.firebaseDB.collection('emails')
+                  .where('ownerId', '==', email)
+                  .orderBy('timestamp', 'desc')
+                  .limit(limit || this.fetchLimitPerType)
+                  .get(),
+                window.firebaseDB.collection('emails')
+                  .where('assignedTo', '==', email)
+                  .orderBy('timestamp', 'desc')
+                  .limit(limit || this.fetchLimitPerType)
+                  .get()
+              ]);
+              
+              // Merge results and deduplicate
+              const emailsMap = new Map();
+              ownedSnap.docs.forEach(doc => {
+                emailsMap.set(doc.id, { id: doc.id, ...doc.data() });
+              });
+              assignedSnap.docs.forEach(doc => {
+                if (!emailsMap.has(doc.id)) {
+                  emailsMap.set(doc.id, { id: doc.id, ...doc.data() });
+                }
+              });
+              
+              emails = Array.from(emailsMap.values());
+              // Sort by timestamp desc (most recent first)
+              emails.sort((a, b) => {
+                const timeA = this.getTimestampMs(a.timestamp || a.sentAt || a.receivedAt || a.date || a.createdAt);
+                const timeB = this.getTimestampMs(b.timestamp || b.sentAt || b.receivedAt || b.date || b.createdAt);
+                return timeB - timeA;
+              });
+              // Apply limit after merge
+              emails = emails.slice(0, limit || this.fetchLimitPerType);
             } catch (error) {
               // If query fails (missing index), try without orderBy
               try {
-                const snapshot = await window.firebaseDB.collection('emails')
-                  .where('ownerId', '==', email)
-                  .limit(limit || this.fetchLimitPerType)
-                  .get();
-                emails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const [ownedSnap, assignedSnap] = await Promise.all([
+                  window.firebaseDB.collection('emails')
+                    .where('ownerId', '==', email)
+                    .limit(limit || this.fetchLimitPerType)
+                    .get(),
+                  window.firebaseDB.collection('emails')
+                    .where('assignedTo', '==', email)
+                    .limit(limit || this.fetchLimitPerType)
+                    .get()
+                ]);
+                
+                // Merge results and deduplicate
+                const emailsMap = new Map();
+                ownedSnap.docs.forEach(doc => {
+                  emailsMap.set(doc.id, { id: doc.id, ...doc.data() });
+                });
+                assignedSnap.docs.forEach(doc => {
+                  if (!emailsMap.has(doc.id)) {
+                    emailsMap.set(doc.id, { id: doc.id, ...doc.data() });
+                  }
+                });
+                
+                emails = Array.from(emailsMap.values());
                 // Sort client-side
                 emails.sort((a, b) => {
                   const timeA = this.getTimestampMs(a.timestamp || a.sentAt || a.receivedAt || a.date || a.createdAt);
                   const timeB = this.getTimestampMs(b.timestamp || b.sentAt || b.receivedAt || b.date || b.createdAt);
                   return timeB - timeA;
                 });
+                // Apply limit after merge
+                emails = emails.slice(0, limit || this.fetchLimitPerType);
               } catch (err2) {
+                // Detect missing Firestore index
+                if (err2.code === 'failed-precondition' || (err2.message && err2.message.includes('index'))) {
+                  console.error('[ActivityManager] Firestore index required for emails query:', err2.message);
+                  if (err2.message && err2.message.includes('https://console.firebase.google.com')) {
+                    console.error('[ActivityManager] Create index at:', err2.message.match(/https:\/\/console\.firebase\.google\.com[^\s]+/)?.[0]);
+                  }
+                }
                 console.warn('Error fetching emails (non-admin query):', err2);
                 return [];
               }
@@ -856,6 +1149,13 @@ class ActivityManager {
                 return timeB - timeA;
               });
             } catch (err2) {
+              // Detect missing Firestore index
+              if (err2.code === 'failed-precondition' || (err2.message && err2.message.includes('index'))) {
+                console.error('[ActivityManager] Firestore index required for emails query (fallback):', err2.message);
+                if (err2.message && err2.message.includes('https://console.firebase.google.com')) {
+                  console.error('[ActivityManager] Create index at:', err2.message.match(/https:\/\/console\.firebase\.google\.com[^\s]+/)?.[0]);
+                }
+              }
               console.warn('Error fetching emails:', err2);
               return [];
             }
@@ -863,7 +1163,8 @@ class ActivityManager {
         }
       }
       
-      return emails.slice(0, limit || this.fetchLimitPerType);
+      const result = emails.slice(0, limit || this.fetchLimitPerType);
+      return result;
     } catch (error) {
       console.error('Error fetching emails:', error);
       return [];
@@ -899,16 +1200,30 @@ class ActivityManager {
         }
       };
       
-      // Try Firebase first
+      // OPTIMIZATION: Try BackgroundTasksLoader cached data first (zero Firestore reads, instant)
+      if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.getTasksData === 'function') {
+        const cachedTasks = window.BackgroundTasksLoader.getTasksData() || [];
+        if (cachedTasks.length > 0) {
+          // Sort by timestamp desc and limit
+          cachedTasks.sort((a, b) => {
+            const timeA = this.getTimestampMs(a.timestamp || a.createdAt || a.updatedAt);
+            const timeB = this.getTimestampMs(b.timestamp || b.createdAt || b.updatedAt);
+            return timeB - timeA;
+          });
+          const result = cachedTasks.slice(0, limit || this.fetchLimitPerType);
+          return result;
+        }
+      }
+      
+      // Fallback to Firestore if cache empty
       if (window.firebaseDB) {
         if (!isAdmin()) {
           // Non-admin: filter by ownership
           const email = getUserEmail();
-          if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
-            // Use DataManager helper
-            tasks = await window.DataManager.queryWithOwnership('tasks');
-            tasks = tasks.slice(0, limit || this.fetchLimitPerType);
-          } else if (email) {
+          if (email) {
+            // CRITICAL FIX: Use direct Firestore queries with limit instead of DataManager.queryWithOwnership
+            // DataManager.queryWithOwnership loads ALL tasks (no limit), causing 7+ second delays
+            // Direct queries with limits are much faster and use fewer Firestore reads
             // Fallback: two separate queries and merge client-side
             try {
               const [ownedSnap, assignedSnap] = await Promise.all([
@@ -960,7 +1275,8 @@ class ActivityManager {
         console.warn('Error loading tasks from localStorage:', error);
       }
       
-      return tasks.slice(0, limit || this.fetchLimitPerType);
+      const result = tasks.slice(0, limit || this.fetchLimitPerType);
+      return result;
     } catch (error) {
       console.error('Error fetching tasks:', error);
       return [];
@@ -1018,6 +1334,7 @@ class ActivityManager {
       
       // Show pagination if there are multiple pages
       this.updatePagination(containerId, totalPages);
+      
       
       // Only pre-render if there are multiple pages and we're not on the first load
       if (totalPages > 1) {
