@@ -78,7 +78,7 @@ const angleCtaMap = {
   'timing_strategy': {
     opening: 'The 2026 ERCOT capacity cliff is already pushing forward curves higher.',
     value: 'Locking in 12-24 months early is currently saving clients 15-20% vs. waiting for the renewal window.',
-    full: 'Given rising delivery costs, does your current contract cover you through next summer?',
+    full: 'Given rising electricity costs, does your current contract cover you through 2027?',
     angleId: 'timing_strategy'
   },
   'exemption_recovery': {
@@ -3353,7 +3353,7 @@ NOTE: For word count guidance (75-120 words total, natural flow), see CREATIVE F
    - Blend sections naturally - connect research directly to value without forced breaks
 3. At least ONE question mark (?) is required somewhere in the email (preferably in paragraph1 or paragraph3)
 4. Natural, conversational tone is preferred - write like texting a colleague
-5. Value-verification questions work well in the CTA (e.g., "Given rising delivery costs, does your current contract cover you through next summer?")
+5. Value-verification questions work well in the CTA (e.g., "Given rising electricity costs, does your current contract cover you through 2027?")
 
 EXAMPLE STRUCTURE:
 paragraph1: "Noticed Cypress is navigating shifting rates in Leander. How are you handling that?" (18 words, ends with ?)
@@ -3391,7 +3391,7 @@ EMAIL TYPE: Cold Email (Never Spoke Before)
   Rule: Context-wrapped, value-verification question (No meeting asks).
   - BAD: "Is this on your radar?" (Too passive)
   - BAD: "When does your contract expire?" (Too commodity-like)
-  - GOOD: "Given rising delivery costs, does your current contract cover you through next summer?"
+  - GOOD: "Given rising electricity costs, does your current contract cover you through 2027?"
   - GOOD (General): "Are you open to a quick audit to check for hidden riders?"
   - GOOD (Industrial): "Do you have an updated peak demand strategy for this summer?"
   - GOOD (Finance): "Are you currently floating or fixed on your index?"
@@ -3668,7 +3668,7 @@ BODY CONTENT: You have freedom to distribute text between paragraph1 and paragra
 - Target: 75-120 words total (greeting + paragraph1 + paragraph2 + paragraph3)
 - Maximum: 125 words (only truncate if truly rambling)
 
-CTA: 8-15 words - Context-wrapped question with value (e.g., "Given rising delivery costs, does your current contract cover you through next summer?")
+CTA: 8-15 words - Context-wrapped question with value (e.g., "Given rising electricity costs, does your current contract cover you through 2027?")
 
 VISUALS: Use line breaks between sections for scannable format. Make it look like a text message.
 
