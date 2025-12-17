@@ -422,8 +422,17 @@ async function generatePreviewEmail(emailData) {
 
   if (aiMode === 'html') {
     const outputData = perplexityResult.output || {};
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:423',message:'HTML mode - JSON structure from AI',data:{hasOutput:!!outputData,outputKeys:Object.keys(outputData||{}),greeting:outputData?.greeting?.substring(0,50),openingHook:outputData?.opening_hook?.substring(0,50),valueProp:outputData?.value_proposition?.substring(0,50),ctaText:outputData?.cta_text?.substring(0,50),paragraph1:outputData?.paragraph1?.substring(0,50),paragraph2:outputData?.paragraph2?.substring(0,50),paragraph3:outputData?.paragraph3?.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'email-output-1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     htmlContent = buildColdEmailHtmlTemplate(outputData, recipient);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:426',message:'HTML mode - after template build',data:{htmlLength:htmlContent.length,htmlPreview:htmlContent.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'email-output-1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     textContent = removeEmDashes(buildTextVersionFromHtml(htmlContent)); // Remove em dashes from text version
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:427',message:'HTML mode - final text content',data:{textLength:textContent.length,textPreview:textContent.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'email-output-1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
   } else {
     // Standard mode: reuse production logic
     const raw = String(perplexityResult.output || '').trim();
@@ -460,15 +469,22 @@ async function generatePreviewEmail(emailData) {
     };
 
     if (jsonData && typeof jsonData === 'object') {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:462',message:'Standard mode - JSON structure from AI',data:{hasJsonData:!!jsonData,jsonKeys:Object.keys(jsonData||{}),greeting:jsonData?.greeting?.substring(0,50),openingHook:jsonData?.opening_hook?.substring(0,50),valueProp:jsonData?.value_proposition?.substring(0,50),ctaText:jsonData?.cta_text?.substring(0,50),paragraph1:jsonData?.paragraph1?.substring(0,50),paragraph2:jsonData?.paragraph2?.substring(0,50),paragraph3:jsonData?.paragraph3?.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'email-output-1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       if (jsonData.subject) subject = jsonData.subject;
       const parts = [];
       if (jsonData.greeting) {
         const cleanedGreeting = enforceFirstNameOnly(jsonData.greeting);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:465',message:'Standard mode - greeting processing',data:{originalGreeting:jsonData.greeting?.substring(0,50),cleanedGreeting:cleanedGreeting?.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'email-output-1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         parts.push(cleanedGreeting);
       }
       
       // CRITICAL: Replace "Wondering how..." in paragraph1 if present (preview path)
-      let paragraph1 = jsonData.paragraph1 || '';
+      // Check for cold_email fields first (opening_hook, value_proposition, cta_text)
+      let paragraph1 = jsonData.opening_hook || jsonData.paragraph1 || '';
       if (paragraph1 && toneOpener) {
         const paragraph1Lower = paragraph1.toLowerCase().trim();
         const hasWonderingHow = /^wondering how/i.test(paragraph1Lower);
@@ -522,8 +538,14 @@ async function generatePreviewEmail(emailData) {
       }
       
       if (paragraph1) parts.push(paragraph1);
-      if (jsonData.paragraph2) parts.push(jsonData.paragraph2);
-      if (jsonData.paragraph3) parts.push(jsonData.paragraph3);
+      // Handle cold_email structure: value_proposition as paragraph2, cta_text as paragraph3
+      const paragraph2 = jsonData.value_proposition || jsonData.paragraph2 || '';
+      const paragraph3 = jsonData.cta_text || jsonData.paragraph3 || '';
+      if (paragraph2) parts.push(paragraph2);
+      if (paragraph3) parts.push(paragraph3);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:524',message:'Standard mode - parts assembly',data:{partsCount:parts.length,partsPreview:parts.map(p=>p?.substring(0,50)||'').join(' | ')},timestamp:Date.now(),sessionId:'debug-session',runId:'email-output-1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       if (jsonData.closing) {
         parts.push(jsonData.closing);
       } else {
@@ -531,6 +553,9 @@ async function generatePreviewEmail(emailData) {
         parts.push(`Best regards,\n${senderFirstName}`);
       }
       bodyText = parts.join('\n\n') || raw;
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:533',message:'Standard mode - bodyText after join',data:{bodyTextLength:bodyText.length,bodyTextPreview:bodyText.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'email-output-1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       
       // Clean up any trailing tone opener text that might have leaked into the output
       bodyText = bodyText.replace(/\s+(Curious|Curious if|Curious,|Curious—)$/gi, '').trim();
@@ -746,6 +771,10 @@ async function generatePreviewEmail(emailData) {
       .replace(/\u2014/g, ', ')  // Em dash → comma
       .replace(/\u00A0/g, ' ')   // Non-breaking space → regular space
       .trim();
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:773',message:'Preview path - final textContent before return',data:{textContentLength:textContent.length,textContentPreview:textContent.substring(0,400),firstLines:textContent.split('\n').slice(0,5).join(' | ')},timestamp:Date.now(),sessionId:'debug-session',runId:'email-output-1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     
     emailData.generatedSubject = subject;
   }
