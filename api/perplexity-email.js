@@ -13,7 +13,8 @@ import {
   getAngleById, 
   getIndustryOpener, 
   getRoleCta, 
-  getIndustryProof 
+  getIndustryProof,
+  getAngleCta
 } from './_angle-definitions.js';
 
 // Debug logging helper - writes directly to file
@@ -97,69 +98,8 @@ function getRandomSubjectLine(type = 'cold-email', role = 'default', firstName =
 }
 
 // ========== ANGLE-BASED CTAs ==========
-// NEW: Replace with dynamic lookup from _angle-definitions.js
-function getAngleCta(selectedAngle, industry, role, company = '') {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:getAngleCta-entry',message:'getAngleCta function entry',data:{hasSelectedAngle:!!selectedAngle,selectedAngleId:selectedAngle?.id||null,industry,role,company},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'GET-ANGLE-CTA-FUNC'})}).catch(()=>{});
-  // #endregion
-  
-  if (!selectedAngle || !selectedAngle.id) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:getAngleCta-early-return',message:'getAngleCta early return - no selectedAngle',data:{hasSelectedAngle:!!selectedAngle,hasId:!!selectedAngle?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'GET-ANGLE-CTA-FUNC'})}).catch(()=>{});
-    // #endregion
-    return null;
-  }
-  
-  const angleId = selectedAngle.id;
-  const angle = getAngleById(angleId);
-  
-  if (!angle) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:getAngleCta-no-angle',message:'getAngleCta - angle not found by ID',data:{angleId},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'GET-ANGLE-CTA-FUNC'})}).catch(()=>{});
-    // #endregion
-    return null;
-  }
-  
-  // Get industry-specific opener (normalize industry to lowercase for matching)
-  const normalizedIndustry = (industry || '').toLowerCase();
-  const industryOpener = getIndustryOpener(angleId, normalizedIndustry);
-  
-  // Get role-specific CTA (if available, otherwise use default)
-  const roleCta = getRoleCta(angleId, role);
-  
-  // Get industry-specific proof
-  const proof = getIndustryProof(angleId, normalizedIndustry);
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:getAngleCta-helpers',message:'getAngleCta - helper function results',data:{angleId,normalizedIndustry,hasIndustryOpener:!!industryOpener,industryOpenerHookType:typeof industryOpener?.hook,hasRoleCta:!!roleCta,hasProof:!!proof,proofLength:proof?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'GET-ANGLE-CTA-FUNC'})}).catch(()=>{});
-  // #endregion
-  
-  // If industryOpener.hook is a function, call it with company name
-  let openingHook = 'Question about your energy strategy:';
-  if (industryOpener && industryOpener.hook) {
-    if (typeof industryOpener.hook === 'function') {
-      openingHook = industryOpener.hook(company || 'your company');
-    } else {
-      openingHook = industryOpener.hook;
-    }
-  }
-  
-  // Build CTA object
-  const result = {
-    opening: openingHook,
-    value: proof || '',
-    full: roleCta?.cta || 'Worth a quick look?',
-    angleId: angleId,
-    contextWhy: industryOpener?.contextWhy || '',
-    roleInfo: roleCta?.why || ''
-  };
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:getAngleCta-result',message:'getAngleCta function result',data:{angleId,openingHookPreview:result.opening.substring(0,100),valuePreview:result.value.substring(0,100),fullPreview:result.full.substring(0,100),hasContextWhy:!!result.contextWhy,hasRoleInfo:!!result.roleInfo},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'GET-ANGLE-CTA-FUNC'})}).catch(()=>{});
-  // #endregion
-  
-  return result;
-}
+// NOTE: getAngleCta is now imported from _angle-definitions.js
+// All calls to getAngleCta() will use the imported function
 
 // ========== EMAIL GENERATION MODES ==========
 // Different email tones to reduce template-like appearance
@@ -4136,11 +4076,15 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           const hasOldCta = /second opinion|10 minutes looking|spend.*minutes.*looking|ever want.*second/i.test(jsonData.cta_text);
           
           // If angle-based CTA should be used, check if it's missing or wrong
-          const shouldUseAngleCta = selectedAngle && getAngleCta(selectedAngle);
+          // Get industry, role, and company from recipient for getAngleCta
+          const recipientIndustry = (recipient?.industry || '').toLowerCase();
+          const recipientRole = recipient?.title || recipient?.role || recipient?.job || '';
+          const recipientCompany = recipient?.company || '';
+          const shouldUseAngleCta = selectedAngle && getAngleCta(selectedAngle, recipientIndustry, recipientRole, recipientCompany);
           let hasAngleCta = false;
           
           if (shouldUseAngleCta) {
-            const angleCta = getAngleCta(selectedAngle);
+            const angleCta = getAngleCta(selectedAngle, recipientIndustry, recipientRole, recipientCompany);
             const ctaLower = jsonData.cta_text.toLowerCase();
             // Check if CTA contains the angle's opening question (first 15-20 chars)
             const openingKey = angleCta.opening?.toLowerCase().substring(0, 20) || '';
@@ -4173,7 +4117,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           if (willOverrideCta) {
             // Use angle-based CTA if available
             if (shouldUseAngleCta) {
-              const angleCta = getAngleCta(selectedAngle);
+              const angleCta = getAngleCta(selectedAngle, recipientIndustry, recipientRole, recipientCompany);
               jsonData.cta_text = angleCta.full;
             } else {
               jsonData.cta_text = 'When does your current energy contract expire?';
