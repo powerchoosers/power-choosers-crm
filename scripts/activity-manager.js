@@ -321,11 +321,12 @@ class ActivityManager {
     const activities = [];
     
     try {
-      emails = await this.fetchEmails(limit);
+      const emails = await this.fetchEmails(limit);
       
       // OPTIMIZATION: fetchEmails already filtered emails to only include CRM contacts,
       // so we don't need to rebuild contactEmailsSet here. We only need contacts for entity-specific filtering.
       // Use BackgroundContactsLoader cached data if available (faster than getPeopleData)
+      let allContacts = [];
       if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
         allContacts = window.BackgroundContactsLoader.getContactsData() || [];
       } else {
@@ -353,8 +354,11 @@ class ActivityManager {
       
       // NOTE: fetchEmails already filters emails to only include those from CRM contacts,
       // so we don't need to filter again here. We just process the pre-filtered emails.
+      if (!emails || !Array.isArray(emails) || emails.length === 0) {
+        return activities;
+      }
+      
       for (const email of emails) {
-        
         let shouldInclude = false;
         
         if (entityType === 'global') {
@@ -430,6 +434,7 @@ class ActivityManager {
         }
 
         if (shouldInclude) {
+          includedCount++;
           // Determine if email is sent or received
           const currentUserEmail = window.DataManager?.getCurrentUserEmail?.() || window.currentUserEmail || '';
           const emailFrom = extractEmails(email.from);
@@ -468,10 +473,11 @@ class ActivityManager {
         }
       }
       
+      return activities;
     } catch (error) {
       console.error('Error fetching email activities:', error);
+      return activities;
     }
-    return activities;
   }
 
   /**
@@ -968,18 +974,37 @@ class ActivityManager {
           }
           const contactIdsSet = new Set(allContacts.map(c => c.id).filter(Boolean));
           
+          // PERFORMANCE OPTIMIZATION: Sort FIRST, then filter only the most recent emails
+          // This avoids filtering thousands of emails - we only filter the top 200-500 most recent
+          const sortStartTime = performance.now();
+          const sortedEmails = [...cachedEmails].sort((a, b) => {
+            const timeA = this.getTimestampMs(a.timestamp || a.sentAt || a.receivedAt || a.date || a.createdAt);
+            const timeB = this.getTimestampMs(b.timestamp || b.sentAt || b.receivedAt || b.date || b.createdAt);
+            return timeB - timeA; // Most recent first
+          });
+          // Take top 500 most recent emails to filter (much faster than filtering all emails)
+          const recentEmailsToFilter = sortedEmails.slice(0, Math.max(500, limit * 20));
+          
           // Build comprehensive set of all contact email addresses (main email + emails array)
+          // Also build a map from email address to contact for quick lookup
           const contactEmailsSet = new Set();
+          const emailToContactMap = new Map(); // Map email address -> contact object
           allContacts.forEach(c => {
             // Add main email field
             const mainEmail = (c.email || '').toLowerCase().trim();
-            if (mainEmail) contactEmailsSet.add(mainEmail);
+            if (mainEmail) {
+              contactEmailsSet.add(mainEmail);
+              emailToContactMap.set(mainEmail, c);
+            }
             
             // Add emails from emails array (if it exists)
             if (Array.isArray(c.emails)) {
               c.emails.forEach(e => {
                 const emailAddr = (e.address || e.email || e || '').toLowerCase().trim();
-                if (emailAddr) contactEmailsSet.add(emailAddr);
+                if (emailAddr) {
+                  contactEmailsSet.add(emailAddr);
+                  emailToContactMap.set(emailAddr, c);
+                }
               });
             }
           });
@@ -1027,32 +1052,59 @@ class ActivityManager {
             return emailFrom.some(addr => contactEmailsSet.has(addr));
           };
           
-          const filteredEmails = cachedEmails.filter(email => {
+          // Now filter only the recent emails (much faster than filtering all emails)
+          // Also set contactId on emails that match contacts by email address
+          const filterStartTime = performance.now();
+          const filteredEmails = recentEmailsToFilter.filter(email => {
             // Check by contactId first (fastest)
             if (email.contactId && contactIdsSet.has(email.contactId)) {
-              
               return true;
             }
             
             // Check by email addresses using proper sent/received logic
             const matches = isEmailFromCrmContact(email);
             if (matches) {
-              
+              // Try to set contactId by finding the matching contact
+              if (!email.contactId) {
+                const currentUserEmail = window.DataManager?.getCurrentUserEmail?.() || window.currentUserEmail || '';
+                const emailTo = extractEmails(email.to);
+                const emailFrom = extractEmails(email.from);
+                const isSent = email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail;
+                const isReceived = email.type === 'received' || email.emailType === 'received' || 
+                                  (emailFrom.length > 0 && !emailFrom.some(e => e.toLowerCase().includes(currentUserEmail.toLowerCase())));
+                
+                // Find matching contact by email address
+                let matchingContact = null;
+                if (isReceived && !isSent) {
+                  // Received: sender (from) is the contact
+                  for (const addr of emailFrom) {
+                    matchingContact = emailToContactMap.get(addr);
+                    if (matchingContact) break;
+                  }
+                } else if (isSent) {
+                  // Sent: recipient (to) is the contact
+                  for (const addr of emailTo) {
+                    matchingContact = emailToContactMap.get(addr);
+                    if (matchingContact) break;
+                  }
+                } else {
+                  // Fallback: check sender
+                  for (const addr of emailFrom) {
+                    matchingContact = emailToContactMap.get(addr);
+                    if (matchingContact) break;
+                  }
+                }
+                
+                if (matchingContact && matchingContact.id) {
+                  email.contactId = matchingContact.id;
+                }
+              }
               return true;
-            } else {
-              
-              return false;
             }
+            return false;
           });
           
-          
-          
-          // Sort by timestamp desc and limit
-          filteredEmails.sort((a, b) => {
-            const timeA = this.getTimestampMs(a.timestamp || a.sentAt || a.receivedAt || a.date || a.createdAt);
-            const timeB = this.getTimestampMs(b.timestamp || b.sentAt || b.receivedAt || b.date || b.createdAt);
-            return timeB - timeA;
-          });
+          // Limit to final count needed (already sorted, so just slice)
           const result = filteredEmails.slice(0, limit || this.fetchLimitPerType);
           
           return result;
@@ -1451,8 +1503,6 @@ class ActivityManager {
       
       // Show pagination if there are multiple pages
       this.updatePagination(containerId, totalPages);
-      
-      
       
       // Only pre-render if there are multiple pages and we're not on the first load
       if (totalPages > 1) {
@@ -1888,6 +1938,7 @@ class ActivityManager {
 
   /**
    * Get entity name for activity (for global activities)
+   * Format: "First Last • Title at Company" or "First Last • Company" (if no title)
    */
   getEntityNameForActivity(activity) {
     try {
@@ -1895,40 +1946,215 @@ class ActivityManager {
         return null;
       }
 
-      if (activity.data.entityType === 'contact') {
-        const contact = activity.data;
-        const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ');
+      // Helper function to format contact name with title and company
+      const formatContactName = (contact) => {
+        const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ').trim();
         const contactName = fullName || contact.name || 'Unknown Contact';
+        const title = contact.title || contact.jobTitle || '';
         const companyName = this.getCompanyNameForContact(contact);
-        return companyName ? `${contactName} (${companyName})` : contactName;
+        
+        // Build subtitle: Title at Company or just Company
+        let subtitle = '';
+        if (title && companyName) {
+          subtitle = `${title} at ${companyName}`;
+        } else if (companyName) {
+          subtitle = companyName;
+        } else if (title) {
+          subtitle = title;
+        }
+        
+        // Format: First Last • Subtitle (or just First Last if no subtitle)
+        return subtitle ? `${contactName} • ${subtitle}` : contactName;
+      };
+
+      if (activity.data.entityType === 'contact') {
+        // For email activities, activity.data is the email object, not the contact
+        // We need to look up the contact by contactId
+        if (activity.type === 'email' && activity.data.contactId) {
+          // Look up the actual contact object
+          try {
+            let contacts = [];
+            if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+              contacts = window.BackgroundContactsLoader.getContactsData() || [];
+            } else if (window.getPeopleData && typeof window.getPeopleData === 'function') {
+              contacts = window.getPeopleData() || [];
+            }
+            
+            const contact = contacts.find(c => c && c.id === activity.data.contactId);
+            if (contact) {
+              return formatContactName(contact);
+            }
+          } catch (error) {
+            console.warn('[ActivityManager] Error looking up contact for email:', error);
+          }
+        } else {
+          // For non-email activities (like notes), activity.data IS the contact
+          const contact = activity.data;
+          return formatContactName(contact);
+        }
       } else if (activity.data.entityType === 'account') {
         const account = activity.data;
         return account.accountName || account.name || account.companyName || 'Unknown Account';
       } else if (activity.data.contactId) {
         // Try to find contact name from contactId - with better error handling
         try {
-          if (window.getPeopleData && typeof window.getPeopleData === 'function') {
-            const contacts = window.getPeopleData() || [];
-            const contact = contacts.find(c => c && c.id === activity.data.contactId);
-            if (contact) {
-              const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ');
-              const contactName = fullName || contact.name || 'Unknown Contact';
-              const companyName = this.getCompanyNameForContact(contact);
-              return companyName ? `${contactName} (${companyName})` : contactName;
+          // Try BackgroundContactsLoader first (faster)
+          let contacts = [];
+          if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+            contacts = window.BackgroundContactsLoader.getContactsData() || [];
+          } else if (window.getPeopleData && typeof window.getPeopleData === 'function') {
+            contacts = window.getPeopleData() || [];
+          }
+          
+          const contact = contacts.find(c => c && c.id === activity.data.contactId);
+          if (contact) {
+            return formatContactName(contact);
+          } else {
+            // Fallback: For email activities, try to find contact by email address
+            if (activity.type === 'email' && activity.data) {
+              const email = activity.data;
+              const currentUserEmail = window.DataManager?.getCurrentUserEmail?.() || window.currentUserEmail || '';
+              const emailTo = (email.to ? (Array.isArray(email.to) ? email.to : [email.to]) : []).map(e => {
+                const str = String(e || '');
+                const matches = str.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+                return matches.map(m => m.toLowerCase().trim());
+              }).flat();
+              const emailFrom = (email.from ? (Array.isArray(email.from) ? [email.from] : [email.from]) : []).map(e => {
+                const str = String(e || '');
+                const matches = str.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+                return matches.map(m => m.toLowerCase().trim());
+              }).flat();
+              
+              const isSent = email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail;
+              const isReceived = email.type === 'received' || email.emailType === 'received' || 
+                                (emailFrom.length > 0 && !emailFrom.some(e => e.includes(currentUserEmail.toLowerCase())));
+              
+              // Find contact by email address
+              let matchingContact = null;
+              if (isReceived && !isSent) {
+                // Received: sender (from) is the contact
+                for (const addr of emailFrom) {
+                  matchingContact = contacts.find(c => {
+                    const mainEmail = (c.email || '').toLowerCase().trim();
+                    if (mainEmail === addr) return true;
+                    if (Array.isArray(c.emails)) {
+                      return c.emails.some(e => {
+                        const emailAddr = (e.address || e.email || e || '').toLowerCase().trim();
+                        return emailAddr === addr;
+                      });
+                    }
+                    return false;
+                  });
+                  if (matchingContact) break;
+                }
+              } else if (isSent) {
+                // Sent: recipient (to) is the contact
+                for (const addr of emailTo) {
+                  matchingContact = contacts.find(c => {
+                    const mainEmail = (c.email || '').toLowerCase().trim();
+                    if (mainEmail === addr) return true;
+                    if (Array.isArray(c.emails)) {
+                      return c.emails.some(e => {
+                        const emailAddr = (e.address || e.email || e || '').toLowerCase().trim();
+                        return emailAddr === addr;
+                      });
+                    }
+                    return false;
+                  });
+                  if (matchingContact) break;
+                }
+              }
+              
+              if (matchingContact) {
+                return formatContactName(matchingContact);
+              }
             }
           }
         } catch (error) {
           console.warn('[ActivityManager] Error looking up contact data:', error);
         }
+      } else if (activity.type === 'email' && activity.data) {
+        // For email activities without contactId, try to find contact by email address
+        try {
+          let contacts = [];
+          if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+            contacts = window.BackgroundContactsLoader.getContactsData() || [];
+          } else if (window.getPeopleData && typeof window.getPeopleData === 'function') {
+            contacts = window.getPeopleData() || [];
+          }
+          
+          const email = activity.data;
+          const currentUserEmail = window.DataManager?.getCurrentUserEmail?.() || window.currentUserEmail || '';
+          const emailTo = (email.to ? (Array.isArray(email.to) ? email.to : [email.to]) : []).map(e => {
+            const str = String(e || '');
+            const matches = str.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+            return matches.map(m => m.toLowerCase().trim());
+          }).flat();
+          const emailFrom = (email.from ? (Array.isArray(email.from) ? [email.from] : [email.from]) : []).map(e => {
+            const str = String(e || '');
+            const matches = str.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+            return matches.map(m => m.toLowerCase().trim());
+          }).flat();
+          
+          const isSent = email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail;
+          const isReceived = email.type === 'received' || email.emailType === 'received' || 
+                            (emailFrom.length > 0 && !emailFrom.some(e => e.includes(currentUserEmail.toLowerCase())));
+          
+          // Find contact by email address
+          let matchingContact = null;
+          if (isReceived && !isSent) {
+            // Received: sender (from) is the contact
+            for (const addr of emailFrom) {
+              matchingContact = contacts.find(c => {
+                const mainEmail = (c.email || '').toLowerCase().trim();
+                if (mainEmail === addr) return true;
+                if (Array.isArray(c.emails)) {
+                  return c.emails.some(e => {
+                    const emailAddr = (e.address || e.email || e || '').toLowerCase().trim();
+                    return emailAddr === addr;
+                  });
+                }
+                return false;
+              });
+              if (matchingContact) break;
+            }
+          } else if (isSent) {
+            // Sent: recipient (to) is the contact
+            for (const addr of emailTo) {
+              matchingContact = contacts.find(c => {
+                const mainEmail = (c.email || '').toLowerCase().trim();
+                if (mainEmail === addr) return true;
+                if (Array.isArray(c.emails)) {
+                  return c.emails.some(e => {
+                    const emailAddr = (e.address || e.email || e || '').toLowerCase().trim();
+                    return emailAddr === addr;
+                  });
+                }
+                return false;
+              });
+              if (matchingContact) break;
+            }
+          }
+          
+          if (matchingContact) {
+            return formatContactName(matchingContact);
+          }
+        } catch (error) {
+          console.warn('[ActivityManager] Error looking up contact by email address:', error);
+        }
       } else if (activity.data.accountId) {
         // Try to find account name from accountId - with better error handling
         try {
-          if (window.getAccountsData && typeof window.getAccountsData === 'function') {
-            const accounts = window.getAccountsData() || [];
-            const account = accounts.find(a => a && a.id === activity.data.accountId);
-            if (account) {
-              return account.accountName || account.name || account.companyName || 'Unknown Account';
-            }
+          let accounts = [];
+          if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
+            accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+          } else if (window.getAccountsData && typeof window.getAccountsData === 'function') {
+            accounts = window.getAccountsData() || [];
+          }
+          
+          const account = accounts.find(a => a && a.id === activity.data.accountId);
+          if (account) {
+            return account.accountName || account.name || account.companyName || 'Unknown Account';
           }
         } catch (error) {
           console.warn('[ActivityManager] Error looking up account data:', error);
