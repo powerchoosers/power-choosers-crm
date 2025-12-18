@@ -1225,22 +1225,24 @@ function selectRandomizedAngle(industry, manualAngleOverride, accountData, usedA
   // #endregion
   
   // Map database industry values to weight map keys
+  // Order matters: more specific matches first, then generic ones
   const industryMap = {
-    // Healthcare variations
+    // Healthcare variations (most specific first)
     'hospital & health care': 'Healthcare',
     'healthcare': 'Healthcare',
     'health care': 'Healthcare',
     'hospital': 'Healthcare',
     'medical': 'Healthcare',
     
-    // Education variations
+    // Education variations (most specific first)
     'primary/secondary education': 'Education',
     'education': 'Education',
     'school': 'Education',
     'university': 'Education',
     'college': 'Education',
     
-    // Manufacturing variations
+    // Manufacturing variations (most specific first)
+    'electrical/electronic manufacturing': 'Manufacturing',
     'oil & energy': 'Manufacturing',
     'manufacturing': 'Manufacturing',
     'industrial': 'Manufacturing',
@@ -1255,7 +1257,8 @@ function selectRandomizedAngle(industry, manualAngleOverride, accountData, usedA
     'hotel': 'Hospitality',
     'restaurant': 'Hospitality',
     
-    // Nonprofit
+    // Nonprofit variations (most specific first)
+    'nonprofit organization management': 'Nonprofit',
     'nonprofit': 'Nonprofit',
     'non-profit': 'Nonprofit',
     'charity': 'Nonprofit',
@@ -1290,9 +1293,13 @@ function selectRandomizedAngle(industry, manualAngleOverride, accountData, usedA
     } else {
       // Try partial matches - check if any map key is contained in the industry string
       // e.g., "primary/secondary education" contains "education"
+      // e.g., "electrical/electronic manufacturing" contains "manufacturing"
+      // e.g., "nonprofit organization management" contains "nonprofit"
       matchedKey = Object.keys(industryMap).find(key => {
-        // Check if industry string contains the map key, or map key contains industry
-        return normalizedIndustry.includes(key) || key.includes(normalizedIndustry);
+        // Check if industry string contains the map key (word boundary aware)
+        // Use word boundaries to avoid false matches
+        const keyPattern = new RegExp(`\\b${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+        return keyPattern.test(normalizedIndustry);
       });
       
       if (matchedKey) {
