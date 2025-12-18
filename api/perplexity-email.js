@@ -522,10 +522,6 @@ async function researchRecentCompanyActivity(companyName, industry, city, state,
     const data = await response.json();
     const activityData = data.choices?.[0]?.message?.content || null;
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:555','message':'Raw research data from Perplexity API','data':{companyName,activityDataPreview:activityData?.substring(0,200)||null,hasActivityData:!!activityData,activityDataLength:activityData?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-    
     // Only cache if we found actual activity
     if (activityData && !activityData.toLowerCase().includes('no recent') && !activityData.toLowerCase().includes('unable to find')) {
       recentActivityCache.set(cacheKey, activityData);
@@ -2243,14 +2239,8 @@ async function buildSystemPrompt({
           if (data) {
             // Validate relevance before using
             const validation = validateResearchRelevance(data, company, industry);
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:2273','message':'Research validation result','data':{company,researchPreview:data.substring(0,200),isRelevant:validation.relevant,validationReason:validation.reason||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-            // #endregion
             if (validation.relevant) {
               recentActivityContext = data;
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:2276','message':'Research context set after validation','data':{company,recentActivityContextPreview:recentActivityContext.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-              // #endregion
             } else {
               // Don't set recentActivityContext - it will be null and system will fall back to next tier
             }
@@ -2317,9 +2307,6 @@ async function buildSystemPrompt({
     } else {
       accountDescription = businessType || '';
     }
-    
-    // Log what we're passing to the AI
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:2105','message':'Account description processing','data':{company,originalLength:trimmed.length,originalPreview:trimmed.substring(0,100),processedDescription:accountDescription,hasDescription:!!accountDescription},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'J'})}).catch(()=>{});
   }
   
   // Format contract end date
@@ -2477,9 +2464,6 @@ ${linkedinContext ? '- Company LinkedIn: ' + linkedinContext : ''}
 ${websiteContext ? '- Company Website: ' + websiteContext : ''}
 ${contactLinkedinContext ? '- Contact LinkedIn Profile: ' + contactLinkedinContext + ' (use for tenure, career background, recent posts)' : ''}
 ${recentActivityContext ? (() => {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:2501','message':'Research context inserted into prompt','data':{company,recentActivityContextPreview:recentActivityContext.substring(0,200),hasCompanyNameInResearch:company?recentActivityContext.toLowerCase().includes(company.toLowerCase()):false},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-  // #endregion
   return '- Recent Company Activity: ' + recentActivityContext + ' (reference naturally through questions, not "I noticed" or "I saw"). IMPORTANT: This activity has been validated as relevant to energy/electricity procurement. If activity mentions "new" facilities/offices, verify timing - if it\'s from 2022 or earlier, frame as "your [location] facility" not "new facility" to avoid sounding outdated. DO NOT use activity about product launches, software releases, or non-energy-related hiring.';
 })() : ''}
 ${locationContextData ? '- Regional Energy Market: ' + locationContextData + ' (use for location-specific context)' : ''}
@@ -2567,17 +2551,9 @@ ${job?.toLowerCase().includes('president') || job?.toLowerCase().includes('ceo')
 
     // Build optional angle + tone opener context for cold emails
     // NEW: Get angle data with industry and role context
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:before-getAngleCta',message:'Before calling getAngleCta',data:{templateType,hasSelectedAngle:!!selectedAngle,selectedAngleId:selectedAngle?.id||null,industryLower,job,company},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'GET-ANGLE-CTA'})}).catch(()=>{});
-    // #endregion
-    
     const angleData = templateType === 'cold_email' && selectedAngle && typeof selectedAngle === 'object'
       ? getAngleCta(selectedAngle, industryLower, job, company)
       : null;
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:after-getAngleCta',message:'After calling getAngleCta - angle data retrieved',data:{hasAngleData:!!angleData,angleDataOpening:angleData?.opening?.substring(0,150)||null,angleDataValue:angleData?.value?.substring(0,150)||null,angleDataFull:angleData?.full?.substring(0,150)||null,angleDataContextWhy:angleData?.contextWhy||null,angleDataRoleInfo:angleData?.roleInfo||null,angleDataAngleId:angleData?.angleId||null},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'GET-ANGLE-CTA'})}).catch(()=>{});
-    // #endregion
     
     let angleContextBlock = '';
     if (templateType === 'cold_email' && selectedAngle && typeof selectedAngle === 'object') {
@@ -2590,10 +2566,6 @@ ${job?.toLowerCase().includes('president') || job?.toLowerCase().includes('ceo')
       const angleUsageText = hasResearch 
         ? '**CRITICAL OVERRIDE:** Research data (trigger events, recent activity, LinkedIn, website) takes ABSOLUTE PRIORITY over this angle. If research exists, USE THE RESEARCH FIRST and ignore this angle if it doesn\'t fit. The news/research IS your angle. **IMPORTANT:** All research has been validated as relevant to energy/electricity procurement - irrelevant research (product launches, software releases, aviation operations, non-energy hiring) has been filtered out.'
         : `**USE THIS ANGLE:** Since no research data is available (or research was filtered out as irrelevant), structure the email around this specific angle (${angleFocus}).`;
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:angle-context-block',message:'Building angle context block for prompt',data:{angleId,angleFocus,angleOpening:angleOpening?.substring(0,100)||null,angleValue:angleValue?.substring(0,100)||null,angleCta:angleCta?.substring(0,100)||null,hasContextWhy:!!angleData?.contextWhy,hasRoleInfo:!!angleData?.roleInfo},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'ANGLE-CONTEXT-BLOCK'})}).catch(()=>{});
-      // #endregion
       
       angleContextBlock = `
 
@@ -3820,9 +3792,6 @@ CRITICAL RULES:
 }
 
 export default async function handler(req, res) {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3535',message:'Handler entry',data:{method:req.method,hasBody:!!req.body,mode:req.body?.mode,templateType:req.body?.templateType,hasRecipient:!!req.body?.recipient},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  // #endregion
   
   if (cors(req, res)) return;
   if (req.method !== 'POST') {
@@ -3926,10 +3895,6 @@ CRITICAL: Use these EXACT meeting times in your CTA.
 
 `;
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3597',message:'About to call buildSystemPrompt',data:{mode,templateType,hasRecipient:!!recipient,selectedAngleId:selectedAngle?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
-    
     const { prompt: systemPrompt, researchData, openingStyle: openingStyleUsed, dynamicFields, researchContext } = await buildSystemPrompt({
       mode, 
       recipient, 
@@ -3946,15 +3911,6 @@ CRITICAL: Use these EXACT meeting times in your CTA.
       emailPosition,
       previousAngles
     });
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3623',message:'buildSystemPrompt returned',data:{hasResearchContext:!!researchContext,hasRecentActivity:!!researchContext?.recentActivityContext,hasLinkedIn:!!researchContext?.linkedinContext,hasWebsite:!!researchContext?.websiteContext,hasTriggerEvents:!!researchContext?.triggerEvents,triggerEventCount:researchContext?.triggerEvents?.length||0,selectedAngleId:selectedAngle?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-    
-    // #region agent log
-    const logDataPerplexity = {location:'perplexity-email.js:3201',message:'System prompt built',data:{hasToneOpenerRule:systemPrompt.includes('TONE OPENER'),toneOpenerProvided:toneOpener?.substring(0,30)||null,angleId:selectedAngle?.id||null,templateType:templateType||null,systemPromptLength:systemPrompt.length,systemPromptPreview:systemPrompt.substring(0,500)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
-    debugLog(logDataPerplexity);
-    // #endregion
     
     const fullSystemPrompt = dateContext + systemPrompt;
     
@@ -4034,7 +3990,6 @@ CRITICAL: Use these EXACT meeting times in your CTA.
       try {
         const jsonData = JSON.parse(content);
         
-        // #region agent log
         const hasResearchData = !!(researchContext?.recentActivityContext || researchContext?.linkedinContext || researchContext?.websiteContext);
         const hookLower = jsonData.opening_hook?.toLowerCase() || '';
         const researchInHook = hasResearchData && (
@@ -4047,8 +4002,6 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         const hasFirstNameCompanyPattern = recipient?.firstName && hookLower.includes(recipient.firstName.toLowerCase() + "'s company");
         const hasCompanyInSubject = companyName && (jsonData.subject?.toLowerCase().includes(companyName.toLowerCase()) || false);
         const hasNameInSubject = recipient?.firstName && (jsonData.subject?.toLowerCase().includes(recipient.firstName.toLowerCase()) || false);
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3696',message:'Generated email content (before validation)',data:{openingHook:jsonData.opening_hook?.substring(0,100),valueProp:jsonData.value_proposition?.substring(0,100),cta:jsonData.cta_text,subject:jsonData.subject,hasResearchData,hasTriggerEvents:!!researchContext?.triggerEvents,researchInHook,selectedAngleId:selectedAngle?.id,priorityUsed:hasResearchData||researchContext?.triggerEvents?'RESEARCH_FIRST':'ANGLE_FALLBACK',companyName,hasCompanyName:!!companyName,hasCompanyNameInHook,hasFirstNameCompanyPattern,companyNameIssue:hasFirstNameCompanyPattern&&!hasCompanyNameInHook,hasCompanyInSubject,hasNameInSubject,recipientFirstName:recipient?.firstName,subjectIssue:!hasCompanyInSubject&&!hasNameInSubject&&companyName},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
         
         // Validate value proposition completeness for cold emails
         if (templateType === 'cold_email' && jsonData.value_proposition) {
@@ -4123,13 +4076,6 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           
           const willOverrideCta = hasMultipleQuestions || hasMeetingRequest || hasTimeSlot || hasOldCta || (shouldUseAngleCta && !hasAngleCta);
 
-          // #region agent log
-          const ctaTextLower = String(jsonData.cta_text || '').toLowerCase();
-          const ctaHasContractExpire = /contract expire|renewal window|when does your contract expire/i.test(ctaTextLower);
-          const ctaHasConsolidat = /consolidat|multi-?site|multiple locations|bulk/i.test(ctaTextLower);
-          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:cta-override-check',message:'CTA validation summary (cold_email)',data:{selectedAngleId:selectedAngle?.id||null,shouldUseAngleCta:!!shouldUseAngleCta,hasAngleCta:!!hasAngleCta,hasMultipleQuestions,hasMeetingRequest,hasTimeSlot,hasOldCta,willOverrideCta,ctaLen:String(jsonData.cta_text||'').length,ctaHasContractExpire,ctaHasConsolidat},timestamp:Date.now(),sessionId:'debug-session',runId:'cta-1',hypothesisId:'CTA-OVERRIDE'})}).catch(()=>{});
-          // #endregion
-
           if (willOverrideCta) {
             // Use angle-based CTA if available
             if (shouldUseAngleCta) {
@@ -4189,9 +4135,6 @@ CRITICAL: Use these EXACT meeting times in your CTA.
               const restOfHook = jsonData.opening_hook.replace(/^wondering how [^?]+\?/i, '').trim();
               jsonData.opening_hook = naturalOpener + restOfHook;
             }
-            
-            // Log the replacement
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3586','message':'Wondering how replacement applied','data':{originalPreview:jsonData.opening_hook.substring(0,100),replacedWith:naturalOpener,toneOpener},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L'})}).catch(()=>{});
           }
         }
         
@@ -4254,10 +4197,6 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           const finalTotal = countWords(jsonData.greeting) + countWords(jsonData.opening_hook) + 
                              countWords(jsonData.value_proposition) + countWords(jsonData.cta_text);
           
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3850',message:'Word count check before truncation',data:{greetingCount,hookCount,valueCount,ctaCount,finalTotal,hasResearch:!!(recentActivityContext||linkedinContext||websiteContext),hasTriggerEvents:triggerEvents?.length>0,selectedAngleId:selectedAngle?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-          // #endregion
-          
           // Only truncate if truly rambling (over 125 words)
           if (finalTotal > 125) {
             // Remove "Most clients save X%" if present
@@ -4269,23 +4208,9 @@ CRITICAL: Use these EXACT meeting times in your CTA.
             // Recalculate after removal
             const newTotal = countWords(jsonData.greeting) + countWords(jsonData.opening_hook) + 
                              countWords(jsonData.value_proposition) + countWords(jsonData.cta_text);
-            
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3865',message:'Word count after truncation',data:{originalTotal:finalTotal,newTotal,truncated:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-            // #endregion
-          } else {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3870',message:'Word count within limits',data:{finalTotal,withinTarget:finalTotal>=75&&finalTotal<=115,withinMax:finalTotal<=125},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-            // #endregion
           }
           
           // Email length validation complete
-          
-          // #region agent log
-          const finalWordCount = countWords(jsonData.greeting) + countWords(jsonData.opening_hook) + 
-                                 countWords(jsonData.value_proposition) + countWords(jsonData.cta_text);
-          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3895',message:'Final email word count after validation',data:{finalWordCount,withinTarget:finalWordCount>=75&&finalWordCount<=115,withinMax:finalWordCount<=125,ctaText:jsonData.cta_text,hasContextWrappedCta:jsonData.cta_text?.includes('Given')||jsonData.cta_text?.includes('rising')||jsonData.cta_text?.includes('delivery costs')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-          // #endregion
         }
         
         // Fix "[name]'s company" pattern - replace with actual company name
@@ -4304,9 +4229,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
               .replace(nameCompanyPattern, companyName)
               .replace(yourCompanyPattern, companyName);
             if (beforeHook !== jsonData.opening_hook) {
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3990',message:'Fixed company name in opening_hook',data:{before:beforeHook.substring(0,100),after:jsonData.opening_hook.substring(0,100),companyName,firstName},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-              // #endregion
+              // Company name was fixed
             }
           }
           if (jsonData.value_proposition) {
@@ -4334,25 +4257,6 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         
         // Log angle usage for debugging (selectedAngle is passed in req.body, not recipient)
         const selectedAngleFromBody = req.body?.selectedAngle;
-        if (selectedAngleFromBody && typeof selectedAngleFromBody === 'object') {
-          const angleId = selectedAngleFromBody.id || null;
-          const angleFocus = selectedAngleFromBody.primaryMessage || selectedAngleFromBody.label || null;
-          const openingHookText = jsonData.opening_hook || '';
-          const hasDemandCharges = /(demand charges|delivery charges)/i.test(openingHookText);
-          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3530','message':'Angle usage in generated email','data':{angleId,angleFocus,company:recipient?.company,openingHookPreview:openingHookText.substring(0,150),hasDemandCharges,shouldHaveDemandCharges:angleId==='demand_efficiency'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'K'})}).catch(()=>{});
-        }
-        
-        // Log angle usage and opener variety for debugging
-        if (selectedAngle && typeof selectedAngle === 'object') {
-          const angleId = selectedAngle.id || null;
-          const angleFocus = selectedAngle.primaryMessage || selectedAngle.label || null;
-          const openingHookText = jsonData.opening_hook || '';
-          const hasDemandCharges = /(demand charges|delivery charges)/i.test(openingHookText);
-          const hasWonderingHow = /^wondering how/i.test(openingHookText.trim());
-          const selectedToneOpener = req.body?.toneOpener || null;
-          const usesSelectedOpener = selectedToneOpener && openingHookText.toLowerCase().includes(selectedToneOpener.toLowerCase().substring(0, 10));
-          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3530','message':'Angle and opener usage in generated email','data':{angleId,angleFocus,company:recipient?.company,openingHookPreview:openingHookText.substring(0,150),hasDemandCharges,shouldHaveDemandCharges:angleId==='demand_efficiency',selectedToneOpener,usesSelectedOpener,hasWonderingHow,openerVariety:hasWonderingHow?'low (defaulting to Wondering how)':'good (varied)'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'K'})}).catch(()=>{});
-        }
         
         // Helper function to sanitize percentages and fix "Default" references
         const sanitizePercentages = (text) => {
@@ -4424,9 +4328,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         .replace(yourCompanyPattern, companyNameStd);
       
       if (beforeContent !== content) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:4110',message:'Fixed company name in standard mode content',data:{before:beforeContent.substring(0,200),after:content.substring(0,200),companyName:companyNameStd,firstName:firstNameStd},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
+        // Company name was fixed
       }
     }
     
@@ -4438,13 +4340,6 @@ CRITICAL: Use these EXACT meeting times in your CTA.
       sizeCategory: sizeCategoryStd,
       job: recipient?.title || recipient?.job || recipient?.role || null
     };
-    // #region agent log
-    const companyNameFinal = recipient?.company || '';
-    const contentLower = content.toLowerCase();
-    const hasLowercaseCompanyName = companyNameFinal && contentLower.includes(companyNameFinal.toLowerCase()) && !content.includes(companyNameFinal);
-    const companyNameMatches = companyNameFinal ? content.match(new RegExp(companyNameFinal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')) : null;
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:4407','message':'Final email output - company name check','data':{companyName:companyNameFinal,contentPreview:content.substring(0,300),hasLowercaseCompanyName,companyNameMatches:companyNameMatches?.length||0,hasResearch:!!researchContext?.recentActivityContext},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
     // Sanitize percentages and personalize
     let polished = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(content, personalizeCtxStd)));
     polished = polished

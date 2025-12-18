@@ -359,13 +359,7 @@ async function generatePreviewEmail(emailData) {
   if (!recipientIndustry && (emailData.contactCompany || contactData.company)) {
     const companyName = emailData.contactCompany || contactData.company;
     industryDebug.inferredFromCompany = true;
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:before-industry-inference',message:'Before inferring industry from company name',data:{companyName},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'INDUSTRY-DETECTION'})}).catch(()=>{});
-    // #endregion
     recipientIndustry = IndustryDetection.inferIndustryFromCompanyName(companyName);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:after-industry-inference',message:'After inferring industry from company name',data:{companyName,inferredIndustry:recipientIndustry},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'INDUSTRY-DETECTION'})}).catch(()=>{});
-    // #endregion
   }
   if (!recipientIndustry) {
     const accountDesc = accountData.shortDescription || accountData.short_desc ||
@@ -420,15 +414,7 @@ async function generatePreviewEmail(emailData) {
   const usedAngles = Array.isArray(emailData.previousAngles) ? emailData.previousAngles.filter(Boolean) : [];
 
   // Select angle + tone opener
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:before-angle-selection',message:'Before angle selection - industry and recipient data',data:{recipientIndustry,recipientRole:recipient.title||recipient.role||'',recipientCompany:recipient.company||'',usedAnglesCount:Array.isArray(usedAngles)?usedAngles.length:0,usedAngles:usedAngles.slice(0,5)},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'ANGLE-SELECTION'})}).catch(()=>{});
-  // #endregion
-  
   const selectedAngle = selectRandomizedAngle(recipientIndustry, null, recipient, usedAngles);
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:after-angle-selection',message:'After angle selection - selected angle details',data:{selectedAngleId:selectedAngle?.id||null,selectedAngleLabel:selectedAngle?.label||null,selectedAnglePrimaryMessage:selectedAngle?.primaryMessage||null,selectedAngleOpeningTemplate:selectedAngle?.openingTemplate||null,selectedAngleIndustryContext:selectedAngle?.industryContext||null,selectedAngleProof:selectedAngle?.proof||null,openingTemplateType:typeof selectedAngle?.openingTemplate},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'ANGLE-SELECTION'})}).catch(()=>{});
-  // #endregion
   
   // CRITICAL: Remove any em dashes from tone opener immediately after selection
   const toneOpener = removeEmDashes(selectRandomToneOpener(selectedAngle?.id));
@@ -436,14 +422,6 @@ async function generatePreviewEmail(emailData) {
   // Get angle CTA data using new system (industry + role specific)
   const recipientRole = recipient.title || recipient.role || recipient.job || '';
   const angleCtaData = selectedAngle ? getAngleCta(selectedAngle, recipientIndustry.toLowerCase(), recipientRole, recipient.company || '') : null;
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:angle-cta-data',message:'Angle CTA data from getAngleCta',data:{hasAngleCtaData:!!angleCtaData,angleCtaOpening:angleCtaData?.opening?.substring(0,100)||null,angleCtaValue:angleCtaData?.value?.substring(0,100)||null,angleCtaFull:angleCtaData?.full?.substring(0,100)||null,angleCtaContextWhy:angleCtaData?.contextWhy||null,angleCtaRoleInfo:angleCtaData?.roleInfo||null,recipientIndustry:recipientIndustry.toLowerCase(),recipientRole},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'ANGLE-CTA'})}).catch(()=>{});
-  // #endregion
-
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:preview-angle-cta',message:'Preview angle + industry selection',data:{aiMode:(emailData.aiMode||'').toLowerCase()==='html'?'html':'standard',stepIndex:emailData.stepIndex,finalIndustry:recipientIndustry,industryDebug,usedAnglesCount:Array.isArray(usedAngles)?usedAngles.length:0,selectedAngleId:selectedAngle?.id||null,selectedAngleOpeningTemplate:selectedAngle?.openingTemplate||null,toneOpener,hasAngleCtaData:!!angleCtaData},timestamp:Date.now(),sessionId:'debug-session',runId:'cta-1',hypothesisId:'CTA-ANGLE'})}).catch(()=>{});
-  // #endregion
 
   const aiMode = (emailData.aiMode || '').toLowerCase() === 'html' ? 'html' : 'standard';
   const isColdStep = (
@@ -469,10 +447,6 @@ async function generatePreviewEmail(emailData) {
     emailPosition: emailPosition,
     previousAngles: usedAngles
   };
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:before-perplexity-call',message:'Payload being sent to perplexity-email',data:{mode:perplexityPayload.mode,templateType:perplexityPayload.templateType,hasSelectedAngle:!!perplexityPayload.selectedAngle,selectedAngleId:perplexityPayload.selectedAngle?.id||null,recipientIndustry:perplexityPayload.recipient?.industry||null,recipientRole:perplexityPayload.recipient?.title||perplexityPayload.recipient?.role||'',recipientCompany:perplexityPayload.recipient?.company||'',hasToneOpener:!!perplexityPayload.toneOpener,emailPosition:perplexityPayload.emailPosition},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'PERPLEXITY-PAYLOAD'})}).catch(()=>{});
-  // #endregion
 
   const perplexityResponse = await fetch(`${baseUrl}/api/perplexity-email`, {
     method: 'POST',
@@ -486,10 +460,6 @@ async function generatePreviewEmail(emailData) {
 
   const perplexityResult = await perplexityResponse.json();
   
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:perplexity-response',message:'Perplexity response received',data:{ok:perplexityResult.ok,hasSubject:!!perplexityResult.subject,subjectPreview:perplexityResult.subject?.substring(0,80)||null,hasHtml:!!perplexityResult.html,hasText:!!perplexityResult.text,textPreview:perplexityResult.text?.substring(0,200)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'PERPLEXITY-RESPONSE'})}).catch(()=>{});
-  // #endregion
-  
   if (!perplexityResult.ok) {
     throw new Error(`Perplexity email API failed: ${perplexityResult.error || 'Unknown error'}`);
   }
@@ -499,17 +469,8 @@ async function generatePreviewEmail(emailData) {
 
   if (aiMode === 'html') {
     const outputData = perplexityResult.output || {};
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:423',message:'HTML mode - JSON structure from AI',data:{hasOutput:!!outputData,outputKeys:Object.keys(outputData||{}),greeting:outputData?.greeting?.substring(0,50),openingHook:outputData?.opening_hook?.substring(0,50),valueProp:outputData?.value_proposition?.substring(0,50),ctaText:outputData?.cta_text?.substring(0,50),paragraph1:outputData?.paragraph1?.substring(0,50),paragraph2:outputData?.paragraph2?.substring(0,50),paragraph3:outputData?.paragraph3?.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'email-output-1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     htmlContent = buildColdEmailHtmlTemplate(outputData, recipient);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:426',message:'HTML mode - after template build',data:{htmlLength:htmlContent.length,htmlPreview:htmlContent.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'email-output-1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     textContent = removeEmDashes(buildTextVersionFromHtml(htmlContent)); // Remove em dashes from text version
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:427',message:'HTML mode - final text content',data:{textLength:textContent.length,textPreview:textContent.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'email-output-1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
   } else {
     // Standard mode: reuse production logic
     const raw = String(perplexityResult.output || '').trim();
@@ -546,16 +507,10 @@ async function generatePreviewEmail(emailData) {
     };
 
     if (jsonData && typeof jsonData === 'object') {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:462',message:'Standard mode - JSON structure from AI',data:{hasJsonData:!!jsonData,jsonKeys:Object.keys(jsonData||{}),greeting:jsonData?.greeting?.substring(0,50),openingHook:jsonData?.opening_hook?.substring(0,50),valueProp:jsonData?.value_proposition?.substring(0,50),ctaText:jsonData?.cta_text?.substring(0,50),paragraph1:jsonData?.paragraph1?.substring(0,50),paragraph2:jsonData?.paragraph2?.substring(0,50),paragraph3:jsonData?.paragraph3?.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'email-output-1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       if (jsonData.subject) subject = jsonData.subject;
       const parts = [];
       if (jsonData.greeting) {
         const cleanedGreeting = enforceFirstNameOnly(jsonData.greeting);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:465',message:'Standard mode - greeting processing',data:{originalGreeting:jsonData.greeting?.substring(0,50),cleanedGreeting:cleanedGreeting?.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'email-output-1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
         parts.push(cleanedGreeting);
       }
       
@@ -620,9 +575,6 @@ async function generatePreviewEmail(emailData) {
       const paragraph3 = jsonData.cta_text || jsonData.paragraph3 || '';
       if (paragraph2) parts.push(paragraph2);
       if (paragraph3) parts.push(paragraph3);
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:524',message:'Standard mode - parts assembly',data:{partsCount:parts.length,partsPreview:parts.map(p=>p?.substring(0,50)||'').join(' | ')},timestamp:Date.now(),sessionId:'debug-session',runId:'email-output-1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       if (jsonData.closing) {
         parts.push(jsonData.closing);
       } else {
@@ -630,9 +582,6 @@ async function generatePreviewEmail(emailData) {
         parts.push(`Best regards,\n${senderFirstName}`);
       }
       bodyText = parts.join('\n\n') || raw;
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:533',message:'Standard mode - bodyText after join',data:{bodyTextLength:bodyText.length,bodyTextPreview:bodyText.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'email-output-1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       
       // Clean up any trailing tone opener text that might have leaked into the output
       bodyText = bodyText.replace(/\s+(Curious|Curious if|Curious,|Curious—)$/gi, '').trim();
@@ -899,10 +848,6 @@ async function generatePreviewEmail(emailData) {
       .replace(/\u2014/g, ', ')  // Em dash → comma
       .replace(/\u00A0/g, ' ')   // Non-breaking space → regular space
       .trim();
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:773',message:'Preview path - final textContent before return',data:{textContentLength:textContent.length,textContentPreview:textContent.substring(0,400),firstLines:textContent.split('\n').slice(0,5).join(' | ')},timestamp:Date.now(),sessionId:'debug-session',runId:'email-output-1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
     
     emailData.generatedSubject = subject;
   }
@@ -1271,9 +1216,6 @@ function getRandomIntroSubject(roleRaw, firstName, company) {
 // Select randomized angle based on industry, with optional memory of recently used angles
 // NEW: Industry-weighted angle selection using centralized angle definitions
 function selectRandomizedAngle(industry, manualAngleOverride, accountData, usedAngles = []) {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:selectRandomizedAngle-entry',message:'selectRandomizedAngle function entry',data:{industry,hasManualOverride:!!manualAngleOverride,manualOverride:manualAngleOverride,usedAnglesCount:Array.isArray(usedAngles)?usedAngles.length:0,usedAngles:usedAngles.slice(0,5)},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SELECT-ANGLE'})}).catch(()=>{});
-  // #endregion
   
   // Map database industry values to weight map keys
   // Order matters: more specific matches first, then generic ones
@@ -1380,10 +1322,6 @@ function selectRandomizedAngle(industry, manualAngleOverride, accountData, usedA
     }
   }
   
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:selectRandomizedAngle-normalized',message:'Industry normalized for weight map',data:{originalIndustry:industry,normalizedIndustryLower:normalizedIndustry.toLowerCase(),normalizedIndustry,mappingMethod,matchedKey,hasDirectMatch:!!industryMap[(industry || '').toString().trim().toLowerCase()],mappedValue:normalizedIndustry},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SELECT-ANGLE'})}).catch(()=>{});
-  // #endregion
-  
   // Industry weight map - certain angles perform better for certain industries
   const industryAngleWeights = {
     Manufacturing: {
@@ -1461,10 +1399,6 @@ function selectRandomizedAngle(industry, manualAngleOverride, accountData, usedA
                            accountData?.taxExemptStatus === 'Healthcare';
   const shouldAllowExemptionAngle = isTaxExemptIndustry || accountTaxExempt;
   
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:selectRandomizedAngle-weights',message:'Industry weight map selected',data:{normalizedIndustry,usingDefault:!industryAngleWeights[normalizedIndustry],weightKeys:Object.keys(weights).slice(0,5),isTaxExemptIndustry,accountTaxExempt,shouldAllowExemptionAngle},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SELECT-ANGLE'})}).catch(()=>{});
-  // #endregion
-  
   // Manual override takes precedence - check if override angle exists in new system
   if (manualAngleOverride) {
     const overrideAngle = getAngleById(manualAngleOverride);
@@ -1493,10 +1427,6 @@ function selectRandomizedAngle(industry, manualAngleOverride, accountData, usedA
   const availableAngles = [];
   const recentAngles = Array.isArray(usedAngles) ? usedAngles.filter(Boolean) : [];
   
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:selectRandomizedAngle-before-pool',message:'Before creating weighted pool',data:{totalAngleIds:ANGLE_IDS.length,recentAnglesCount:recentAngles.length,recentAngles:recentAngles.slice(0,5)},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SELECT-ANGLE'})}).catch(()=>{});
-  // #endregion
-  
   ANGLE_IDS.forEach(angleId => {
     // Skip if recently used (avoid repetition)
     if (recentAngles.length > 0 && recentAngles.includes(angleId)) {
@@ -1523,10 +1453,6 @@ function selectRandomizedAngle(industry, manualAngleOverride, accountData, usedA
     }
   });
   
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:selectRandomizedAngle-pool-created',message:'Weighted pool created',data:{availableAnglesCount:availableAngles.length,uniqueAngles:Array.from(new Set(availableAngles.map(a => a.id))).slice(0,5)},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SELECT-ANGLE'})}).catch(()=>{});
-  // #endregion
-  
   // Pick random weighted angle
   if (availableAngles.length === 0) {
     // Fallback if all angles recently used
@@ -1537,10 +1463,6 @@ function selectRandomizedAngle(industry, manualAngleOverride, accountData, usedA
   }
   
   const selected = availableAngles[Math.floor(Math.random() * availableAngles.length)];
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:selectRandomizedAngle-selected',message:'Angle selected from weighted pool',data:{selectedAngleId:selected?.id||null,selectedAngleLabel:selected?.label||null,poolSize:availableAngles.length},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SELECT-ANGLE'})}).catch(()=>{});
-  // #endregion
   
   if (!selected) {
     // Ultimate fallback
@@ -1584,10 +1506,6 @@ function selectRandomizedAngle(industry, manualAngleOverride, accountData, usedA
     industryContext: normalizedIndustry,
     proof: proof
   };
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:selectRandomizedAngle-result',message:'selectRandomizedAngle returning result',data:{resultAngleId:result.id,resultLabel:result.label,resultPrimaryMessage:result.primaryMessage,resultOpeningTemplate:result.openingTemplate.substring(0,100),resultProof:result.proof?.substring(0,100),resultIndustryContext:result.industryContext},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SELECT-ANGLE'})}).catch(()=>{});
-  // #endregion
   
   return result;
 }
@@ -1932,21 +1850,11 @@ export default async function handler(req, res) {
           inferredFromDescription: null
         };
         
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:live-industry-detection-start',message:'Live generation - industry detection start',data:{hasAccountData:!!accountData,hasContactData:!!contactData,accountIndustry:accountData.industry||null,contactIndustry:contactData.industry||null,contactCompanyIndustry:contactData.companyIndustry||null,initialRecipientIndustry:recipientIndustry,contactCompany:emailData.contactCompany||contactData.company||null},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'LIVE-INDUSTRY-DETECTION'})}).catch(()=>{});
-        // #endregion
-        
         // Infer industry from company name if not set
         if (!recipientIndustry && (emailData.contactCompany || contactData.company)) {
           const companyName = emailData.contactCompany || contactData.company;
           industryDebug.inferredFromCompany = true;
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:live-before-industry-inference',message:'Live generation - before inferring industry from company name',data:{companyName},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'LIVE-INDUSTRY-DETECTION'})}).catch(()=>{});
-          // #endregion
           recipientIndustry = IndustryDetection.inferIndustryFromCompanyName(companyName);
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:live-after-industry-inference',message:'Live generation - after inferring industry from company name',data:{companyName,inferredIndustry:recipientIndustry},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'LIVE-INDUSTRY-DETECTION'})}).catch(()=>{});
-          // #endregion
         }
         
         // Infer from account description if still not set
@@ -1964,10 +1872,6 @@ export default async function handler(req, res) {
         if (!recipientIndustry) {
           recipientIndustry = 'Default';
         }
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:live-industry-detection-final',message:'Live generation - final industry detection result',data:{finalIndustry:recipientIndustry,industryDebug},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'LIVE-INDUSTRY-DETECTION'})}).catch(()=>{});
-        // #endregion
         
         // Build recipient object used for angle selection + prompt context
         // Include energy supplier and other energy fields from account
