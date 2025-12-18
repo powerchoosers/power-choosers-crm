@@ -411,3 +411,44 @@ export function getIndustryProof(angleId, industry) {
   
   return angle.industryProof[normalizedIndustry] || angle.industryProof.default || null;
 }
+
+// Helper to get complete angle CTA data (opening, proof, CTA) for a selected angle
+// This combines industry-specific opener, proof, and role-based CTA
+export function getAngleCta(selectedAngle, industry, role, company = '') {
+  if (!selectedAngle || !selectedAngle.id) return null;
+  
+  const angleId = selectedAngle.id;
+  const angle = getAngleById(angleId);
+  
+  if (!angle) return null;
+  
+  // Get industry-specific opener (normalize industry to lowercase for matching)
+  const normalizedIndustry = (industry || '').toLowerCase();
+  const industryOpener = getIndustryOpener(angleId, normalizedIndustry);
+  
+  // Get role-specific CTA (if available, otherwise use default)
+  const roleCta = getRoleCta(angleId, role);
+  
+  // Get industry-specific proof
+  const proof = getIndustryProof(angleId, normalizedIndustry);
+  
+  // If industryOpener.hook is a function, call it with company name
+  let openingHook = 'Question about your energy strategy:';
+  if (industryOpener && industryOpener.hook) {
+    if (typeof industryOpener.hook === 'function') {
+      openingHook = industryOpener.hook(company || 'your company');
+    } else {
+      openingHook = industryOpener.hook;
+    }
+  }
+  
+  // Build CTA object
+  return {
+    opening: openingHook,
+    value: proof || '',
+    full: roleCta?.cta || 'Worth a quick look?',
+    angleId: angleId,
+    contextWhy: industryOpener?.contextWhy || '',
+    roleInfo: roleCta?.why || ''
+  };
+}
