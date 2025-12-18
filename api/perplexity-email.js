@@ -7,6 +7,14 @@ import * as IndustryDetection from './_industry-detection.js';
 import { db } from './_firebase.js';
 import fs from 'fs';
 import path from 'path';
+import { 
+  ANGLES_DEFINITIONS, 
+  ANGLE_IDS, 
+  getAngleById, 
+  getIndustryOpener, 
+  getRoleCta, 
+  getIndustryProof 
+} from './_angle-definitions.js';
 
 // Debug logging helper - writes directly to file
 const DEBUG_LOG_PATH = path.join(process.cwd(), '.cursor', 'debug.log');
@@ -21,42 +29,59 @@ function debugLog(data) {
 }
 
 // ========== SUBJECT LINE VARIANTS ==========
-// Multiple subject line options that randomly select to reduce template-like appearance
+// NEW: Subject lines now based on angles + observable pain
+// This creates more specific, friction-generating subjects
 const SUBJECT_LINE_VARIANTS = {
   'cold-email': {
     ceo: [
-      '[contact_name], ERCOT 2026 risk?',
-      '[company] energy budget vs. market',
-      'Rate volatility strategy for [company]',
-      '[contact_name], quick question on margins'
+      '[company] – likely overpaying on demand charges',
+      '[contact_name], margin-hidden energy opportunity?',
+      '[company] energy cost review – ERCOT 2026 risk',
+      'Your [company] contract renewal window is closing'
     ],
     finance: [
-      '[contact_name], peak demand cost mitigation?',
-      'Sales tax audit for [company] meters',
-      'ERCOT forward curves vs. budget',
-      '[contact_name], rate lock timing check'
+      '[company] – potential $50K+ recovery opportunity',
+      '[contact_name], when\'s your contract renewal?',
+      'Budget variance alert: [company] energy exposure',
+      'Tax exemption audit for [company]?'
     ],
     operations: [
-      'Peak demand strategy for [company]?',
-      'Peak load management at [company]',
-      '[contact_name], TDU delivery charge audit',
-      'Facility power reliability question'
+      '[company] – peak demand structure question',
+      '[contact_name], optimizing before renewal?',
+      'Quick rate structure audit for [company]?',
+      '[company] – demand charge efficiency question'
+    ],
+    controller: [
+      '[company] – sales tax exemption recovery?',
+      '[contact_name], last exemption audit was when?',
+      'Compliance check: [company] tax exemptions',
+      '[company] – unclaimed exemptions audit'
     ],
     default: [
-      '[contact_name], question on ERCOT rates',
-      'Energy strategy for [company]',
-      'Cost mitigation / [company]',
-      '[contact_name], rate lock window?'
+      '[contact_name], contract renewal timing question',
+      '[company] – energy cost efficiency check',
+      'Quick question about [company]\'s energy strategy',
+      '[company] – are you leaving money on the table?'
     ]
   }
 };
 
+// Map role to subject variants (more granular than before)
+function getRoleForSubjects(title) {
+  if (!title) return 'default';
+  const lower = String(title).toLowerCase();
+  
+  if (lower.includes('ceo') || lower.includes('cfo') || lower.includes('president') || lower.includes('owner')) return 'ceo';
+  if (lower.includes('controller') || lower.includes('accounting') || lower.includes('director of accounting')) return 'controller';
+  if (lower.includes('finance') || lower.includes('financial') || lower.includes('treasurer')) return 'finance';
+  if (lower.includes('operations') || lower.includes('facilities') || lower.includes('logistics') || lower.includes('director')) return 'operations';
+  
+  return 'default';
+}
+
 // Get random subject line based on email type and role
 function getRandomSubjectLine(type = 'cold-email', role = 'default', firstName = '', company = '') {
-  const roleKey = role === 'ceo' || role === 'executive' || role === 'owner' ? 'ceo' :
-                  role === 'finance' || role === 'controller' || role === 'cfo' || role === 'accounting' ? 'finance' :
-                  role === 'operations' || role === 'facilities' || role === 'logistics' ? 'operations' :
-                  'default';
+  const roleKey = getRoleForSubjects(role);
   
   const variants = SUBJECT_LINE_VARIANTS[type]?.[roleKey] || SUBJECT_LINE_VARIANTS[type]?.default;
   if (!variants || variants.length === 0) {
@@ -72,65 +97,68 @@ function getRandomSubjectLine(type = 'cold-email', role = 'default', firstName =
 }
 
 // ========== ANGLE-BASED CTAs ==========
-// CTAs based on angle opening questions from ANGLES-DOCUMENTATION.md and cta-mastery-guide.md
-// Structure: [Opening Question] + [Value/Statistic] + [Low-friction closing question]
-const angleCtaMap = {
-  'timing_strategy': {
-    opening: 'The 2026 ERCOT capacity cliff is already pushing forward curves higher.',
-    value: 'Locking in 12-24 months early is currently saving clients 15-20% vs. waiting for the renewal window.',
-    full: 'Given rising electricity costs, does your current contract cover you through 2027?',
-    angleId: 'timing_strategy'
-  },
-  'exemption_recovery': {
-    opening: 'We find that 40% of Texas manufacturers are overpaying sales tax on electricity.',
-    value: 'A Predominant Use Study often uncovers $75k+ in refunds you can claim immediately.',
-    full: 'We find 40% of manufacturers overpay sales tax. Have you filed a Predominant Use Study in the last 4 years?',
-    angleId: 'exemption_recovery'
-  },
-  'consolidation': {
-    opening: 'Managing individual renewals for multiple meters is a recipe for missed windows and variable rates.',
-    value: 'Consolidating to a single master agreement prevents "orphan meters" from rolling onto 2x variable rates.',
-    full: 'Managing multiple meters individually usually leads to missed renewals. Have you looked at a master agreement?',
-    angleId: 'consolidation'
-  },
-  'demand_efficiency': {
-    opening: 'For many Texas businesses, peak demand charges can quietly make up 30% of your delivery bill.',
-    value: 'Curtailing usage during just a few critical hours a year can drop your TDU charges by thousands.',
-    full: 'Peak demand charges are rising. Do you have a notification system for peak days?',
-    angleId: 'demand_efficiency'
-  },
-  'cost_control': {
-    opening: 'Volatility in the Texas market is making budget predictability nearly impossible for unmanaged accounts.',
-    value: 'A strategic hedging layer can flatten your spend regardless of weather events.',
-    full: 'Market volatility is killing budget predictability. Are you 100% exposed to index pricing right now?',
-    angleId: 'cost_control'
-  },
-  'operational_simplicity': {
-    opening: 'Managing multiple energy suppliers creates administrative overhead and missed optimization opportunities.',
-    value: 'Single vendor, unified billing, and consolidated reporting simplify operations.',
-    full: 'Are you managing multiple suppliers? A master agreement could simplify this.',
-    angleId: 'operational_simplicity'
+// NEW: Replace with dynamic lookup from _angle-definitions.js
+function getAngleCta(selectedAngle, industry, role, company = '') {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:getAngleCta-entry',message:'getAngleCta function entry',data:{hasSelectedAngle:!!selectedAngle,selectedAngleId:selectedAngle?.id||null,industry,role,company},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'GET-ANGLE-CTA-FUNC'})}).catch(()=>{});
+  // #endregion
+  
+  if (!selectedAngle || !selectedAngle.id) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:getAngleCta-early-return',message:'getAngleCta early return - no selectedAngle',data:{hasSelectedAngle:!!selectedAngle,hasId:!!selectedAngle?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'GET-ANGLE-CTA-FUNC'})}).catch(()=>{});
+    // #endregion
+    return null;
   }
-};
-
-// Get CTA for selected angle (with creative control for Perplexity)
-function getAngleCta(selectedAngle) {
-  if (!selectedAngle || !selectedAngle.id) return null;
   
-  // Use angle's own openingTemplate and primaryValue if available (from angle object)
-  // Otherwise fall back to angleCtaMap
   const angleId = selectedAngle.id;
-  const ctaData = angleCtaMap[angleId];
+  const angle = getAngleById(angleId);
   
-  if (!ctaData) return null;
+  if (!angle) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:getAngleCta-no-angle',message:'getAngleCta - angle not found by ID',data:{angleId},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'GET-ANGLE-CTA-FUNC'})}).catch(()=>{});
+    // #endregion
+    return null;
+  }
   
-  // Return the full CTA structure for Perplexity to use as foundation
-  return {
-    opening: selectedAngle.openingTemplate || ctaData.opening,
-    value: selectedAngle.primaryValue || ctaData.value,
-    full: ctaData.full,
-    angleId: angleId
+  // Get industry-specific opener (normalize industry to lowercase for matching)
+  const normalizedIndustry = (industry || '').toLowerCase();
+  const industryOpener = getIndustryOpener(angleId, normalizedIndustry);
+  
+  // Get role-specific CTA (if available, otherwise use default)
+  const roleCta = getRoleCta(angleId, role);
+  
+  // Get industry-specific proof
+  const proof = getIndustryProof(angleId, normalizedIndustry);
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:getAngleCta-helpers',message:'getAngleCta - helper function results',data:{angleId,normalizedIndustry,hasIndustryOpener:!!industryOpener,industryOpenerHookType:typeof industryOpener?.hook,hasRoleCta:!!roleCta,hasProof:!!proof,proofLength:proof?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'GET-ANGLE-CTA-FUNC'})}).catch(()=>{});
+  // #endregion
+  
+  // If industryOpener.hook is a function, call it with company name
+  let openingHook = 'Question about your energy strategy:';
+  if (industryOpener && industryOpener.hook) {
+    if (typeof industryOpener.hook === 'function') {
+      openingHook = industryOpener.hook(company || 'your company');
+    } else {
+      openingHook = industryOpener.hook;
+    }
+  }
+  
+  // Build CTA object
+  const result = {
+    opening: openingHook,
+    value: proof || '',
+    full: roleCta?.cta || 'Worth a quick look?',
+    angleId: angleId,
+    contextWhy: industryOpener?.contextWhy || '',
+    roleInfo: roleCta?.why || ''
   };
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:getAngleCta-result',message:'getAngleCta function result',data:{angleId,openingHookPreview:result.opening.substring(0,100),valuePreview:result.value.substring(0,100),fullPreview:result.full.substring(0,100),hasContextWhy:!!result.contextWhy,hasRoleInfo:!!result.roleInfo},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'GET-ANGLE-CTA-FUNC'})}).catch(()=>{});
+  // #endregion
+  
+  return result;
 }
 
 // ========== EMAIL GENERATION MODES ==========
@@ -2598,24 +2626,45 @@ ${job?.toLowerCase().includes('president') || job?.toLowerCase().includes('ceo')
     const conditionalRules = buildConditionalRules(promptAnalysis, templateType);
 
     // Build optional angle + tone opener context for cold emails
+    // NEW: Get angle data with industry and role context
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:before-getAngleCta',message:'Before calling getAngleCta',data:{templateType,hasSelectedAngle:!!selectedAngle,selectedAngleId:selectedAngle?.id||null,industryLower,job,company},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'GET-ANGLE-CTA'})}).catch(()=>{});
+    // #endregion
+    
+    const angleData = templateType === 'cold_email' && selectedAngle && typeof selectedAngle === 'object'
+      ? getAngleCta(selectedAngle, industryLower, job, company)
+      : null;
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:after-getAngleCta',message:'After calling getAngleCta - angle data retrieved',data:{hasAngleData:!!angleData,angleDataOpening:angleData?.opening?.substring(0,150)||null,angleDataValue:angleData?.value?.substring(0,150)||null,angleDataFull:angleData?.full?.substring(0,150)||null,angleDataContextWhy:angleData?.contextWhy||null,angleDataRoleInfo:angleData?.roleInfo||null,angleDataAngleId:angleData?.angleId||null},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'GET-ANGLE-CTA'})}).catch(()=>{});
+    // #endregion
+    
     let angleContextBlock = '';
     if (templateType === 'cold_email' && selectedAngle && typeof selectedAngle === 'object') {
       const angleId = selectedAngle.id || 'primary_angle';
       const angleFocus = selectedAngle.primaryMessage || selectedAngle.label || 'primary focus';
-      const angleOpening = selectedAngle.openingTemplate || '';
-      const angleValue = selectedAngle.primaryValue || '';
+      const angleOpening = angleData?.opening || selectedAngle.openingTemplate || '';
+      const angleValue = angleData?.value || selectedAngle.primaryValue || '';
+      const angleCta = angleData?.full || '';
       const hasResearch = triggerEvents.length > 0 || recentActivityContext || linkedinContext || websiteContext;
       const angleUsageText = hasResearch 
         ? '**CRITICAL OVERRIDE:** Research data (trigger events, recent activity, LinkedIn, website) takes ABSOLUTE PRIORITY over this angle. If research exists, USE THE RESEARCH FIRST and ignore this angle if it doesn\'t fit. The news/research IS your angle. **IMPORTANT:** All research has been validated as relevant to energy/electricity procurement - irrelevant research (product launches, software releases, aviation operations, non-energy hiring) has been filtered out.'
         : `**USE THIS ANGLE:** Since no research data is available (or research was filtered out as irrelevant), structure the email around this specific angle (${angleFocus}).`;
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:angle-context-block',message:'Building angle context block for prompt',data:{angleId,angleFocus,angleOpening:angleOpening?.substring(0,100)||null,angleValue:angleValue?.substring(0,100)||null,angleCta:angleCta?.substring(0,100)||null,hasContextWhy:!!angleData?.contextWhy,hasRoleInfo:!!angleData?.roleInfo},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'ANGLE-CONTEXT-BLOCK'})}).catch(()=>{});
+      // #endregion
       
       angleContextBlock = `
 
 PRIMARY ANGLE FOR THIS EMAIL (USE WHEN NO RESEARCH DATA AVAILABLE):
 - Angle ID: ${angleId}
 - Focus: ${angleFocus}
-${angleOpening ? '- Example opening pattern: "' + angleOpening + '"' : ''}
-${angleValue ? '- Primary value proposition: "' + angleValue + '"' : ''}
+${angleOpening ? '- Opening hook (CRITICAL - use this or natural variation): "' + angleOpening + '"' : ''}
+${angleValue ? '- Proof point (include in email): "' + angleValue + '"' : ''}
+${angleCta ? '- High-friction CTA (use this): "' + angleCta + '"' : ''}
+${angleData?.contextWhy ? '- Industry context: ' + angleData.contextWhy : ''}
+${angleData?.roleInfo ? '- Role context: ' + angleData.roleInfo : ''}
 
 **ANGLE USAGE (BRONZE STANDARD - Only if no research):**
 ${angleUsageText}
@@ -2742,9 +2791,26 @@ Generate text for these fields:
 
       cold_email: `
 TEMPLATE: Cold Email Outreach
+${angleData ? `
+ANGLE-SPECIFIC INSTRUCTIONS (CRITICAL):
+- OPENING HOOK: ${angleData.opening ? `MUST use this opening hook or a natural variation: "${angleData.opening}"` : 'Use industry-specific opening hook with observable pain'}
+  * DO NOT use "Wondering how..." - this is forbidden and overused
+  * DO NOT use generic market commentary
+  * Must create COGNITIVE FRICTION - something they can't easily dismiss
+  * Example pattern: "Most [industry] we audit discover..."
+  * Example pattern: "Quick observation: [observable pain]..."
+- PROOF POINT: ${angleData.value ? `Include this proof point naturally in email body: "${angleData.value}"` : 'Include industry-specific proof point'}
+  * Make it specific to their industry (not generic "clients")
+  * Use numbers/percentages when possible
+- CTA: ${angleData.full ? `Use this high-friction CTA: "${angleData.full}"` : 'Use high-friction CTA that requires admission'}
+  * Should NOT be answerable with "we're fine" or "not needed"
+  * Should require them to admit lack of action or audit
+  * Examples: "Are you on peak-based or 4CP?" (Both imply problems), "When was your last demand audit?" (Implies they haven't done one)
+` : ''}
 Generate text for these fields:
 - greeting: MUST be exactly "Hello ${firstName}," - Use ONLY the first name "${firstName}", NEVER use the full name. This is mandatory.
 - opening_hook: **CREATIVE OPENER - VARY YOUR STYLE** (toneOpener "${toneOpener}" is stylistic inspiration only)
+${angleData?.opening ? `**CRITICAL**: The angle-specific opening hook is "${angleData.opening}" - use this or a natural variation. This creates observable pain they can't dismiss.` : ''}
   **FORBIDDEN**: "Wondering how [company] is handling..." is STRICTLY FORBIDDEN. This pattern is overused and will be rejected.
   **CREATIVE FREEDOM**: You have full creative freedom to craft a natural, conversational opener. The tone opener "${toneOpener}" is provided as INSPIRATION - use it as a stylistic guide, not a template. Feel free to rephrase it naturally or use a different but similar style.
   **VARIETY IS CRITICAL**: Vary your opener style across emails. Mix between (DO NOT use "Quick question" repeatedly):
@@ -2785,7 +2851,8 @@ IMPORTANT:
 Example: "We help manufacturing companies secure better rates before contracts expire. Early renewal often gives more optionality and can reduce renewal risk compared with waiting until the last window." Be concrete, not vague. NEVER end with incomplete phrase like "within [company]". ALWAYS include a complete value proposition - never skip this field. THIS FIELD IS MANDATORY - NEVER LEAVE BLANK. Use conditional language ("can", "often", "may") for unverified claims - do NOT assert specific percentages as facts unless you have verified data.
 - social_proof_optional: Brief credibility statement IF relevant (1 sentence, optional). Use conditional language for outcomes: "We've helped [similar company] reduce energy costs", "Our clients in [industry] often see cost reductions", "Companies like [company] have achieved savings". Only use specific percentages if you have verified data. NEVER use vague phrases like "similar companies" or "many businesses".
 ${(() => {
-  const angleCta = getAngleCta(selectedAngle);
+  // Use angleData if available, otherwise fall back to old method
+  const angleCta = angleData || (selectedAngle ? getAngleCta(selectedAngle, industryLower, job, company) : null);
   if (angleCta && templateType === 'cold_email') {
     // CTA Escalation based on email position
     let ctaEscalation = '';
