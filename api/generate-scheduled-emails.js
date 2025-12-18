@@ -1275,26 +1275,39 @@ function selectRandomizedAngle(industry, manualAngleOverride, accountData, usedA
   
   // Normalize industry to match weight map keys
   let normalizedIndustry = (industry || '').toString().trim().toLowerCase();
+  let mappingMethod = 'none';
+  let matchedKey = null;
+  
   if (!normalizedIndustry || normalizedIndustry === 'default') {
     normalizedIndustry = 'default';
+    mappingMethod = 'default';
   } else {
-    // Check if we have a mapping for this industry value
+    // Check if we have a direct mapping for this industry value
     if (industryMap[normalizedIndustry]) {
       normalizedIndustry = industryMap[normalizedIndustry];
+      mappingMethod = 'direct';
+      matchedKey = normalizedIndustry;
     } else {
-      // Try partial matches (e.g., "health" in "hospital & health care")
-      const matchedKey = Object.keys(industryMap).find(key => normalizedIndustry.includes(key) || key.includes(normalizedIndustry));
+      // Try partial matches - check if any map key is contained in the industry string
+      // e.g., "primary/secondary education" contains "education"
+      matchedKey = Object.keys(industryMap).find(key => {
+        // Check if industry string contains the map key, or map key contains industry
+        return normalizedIndustry.includes(key) || key.includes(normalizedIndustry);
+      });
+      
       if (matchedKey) {
         normalizedIndustry = industryMap[matchedKey];
+        mappingMethod = 'partial';
       } else {
         // Capitalize first letter as fallback
         normalizedIndustry = normalizedIndustry.charAt(0).toUpperCase() + normalizedIndustry.slice(1);
+        mappingMethod = 'fallback-capitalize';
       }
     }
   }
   
   // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:selectRandomizedAngle-normalized',message:'Industry normalized for weight map',data:{originalIndustry:industry,normalizedIndustry},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SELECT-ANGLE'})}).catch(()=>{});
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:selectRandomizedAngle-normalized',message:'Industry normalized for weight map',data:{originalIndustry:industry,normalizedIndustryLower:normalizedIndustry.toLowerCase(),normalizedIndustry,mappingMethod,matchedKey,hasDirectMatch:!!industryMap[(industry || '').toString().trim().toLowerCase()]},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SELECT-ANGLE'})}).catch(()=>{});
   // #endregion
   
   // Industry weight map - certain angles perform better for certain industries
