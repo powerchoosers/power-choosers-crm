@@ -56,6 +56,26 @@ export function inferIndustryFromCompanyName(companyName) {
     return 'Government';
   }
 
+  // Precision Manufacturing / Machine Shops
+  if (/\b(precision|machine\s+shop|fabrication|metalworking|cnc|machining|tooling)\b/i.test(name)) {
+    return 'Manufacturing';
+  }
+
+  // Water/Utilities (for potential B2B partnerships)
+  if (/\b(water|wastewater|utility|utilities|municipal)\b/i.test(name)) {
+    return 'Government';
+  }
+
+  // Food Processing / Beverage (subset of Manufacturing)
+  if (/\b(food\s+(processing|service)|beverage|brewery|distillery|bakery|meat\s+processing)\b/i.test(name)) {
+    return 'Manufacturing';
+  }
+
+  // Aviation / Aerospace (manufacturing subset)
+  if (/\b(aviation|aerospace|aircraft|airline|airport|charter)\b/i.test(name)) {
+    return 'Manufacturing';
+  }
+
   return '';
 }
 
@@ -117,6 +137,26 @@ export function inferIndustryFromDescription(description) {
   // Government
   if (/\b(government|municipality|public|state|county|federal|agency)\b/i.test(desc)) {
     return 'Government';
+  }
+
+  // Precision Manufacturing / Machine Shops
+  if (/\b(precision|machine\s+shop|fabrication|metalworking|cnc|machining|tooling)\b/i.test(desc)) {
+    return 'Manufacturing';
+  }
+
+  // Water/Utilities
+  if (/\b(water|wastewater|utility|utilities|municipal)\b/i.test(desc)) {
+    return 'Government';
+  }
+
+  // Food Processing / Beverage
+  if (/\b(food\s+(processing|service)|beverage|brewery|distillery|bakery|meat\s+processing)\b/i.test(desc)) {
+    return 'Manufacturing';
+  }
+
+  // Aviation / Aerospace
+  if (/\b(aviation|aerospace|aircraft|airline|airport|charter)\b/i.test(desc)) {
+    return 'Manufacturing';
   }
 
   return '';

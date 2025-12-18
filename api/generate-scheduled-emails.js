@@ -1,5 +1,12 @@
 import { db } from './_firebase.js';
 import * as IndustryDetection from './_industry-detection.js';
+import { 
+  getAngleCta, 
+  getIndustryOpener,
+  ANGLE_IDS,
+  getAngleById,
+  getIndustryProof
+} from './_angle-definitions.js';
 
 // ========== EM DASH REMOVAL ==========
 // Remove em dashes and hyphens from email content and replace with commas or natural flow
@@ -116,6 +123,42 @@ function validateNepqContent(subject, text, toneOpener) {
   ];
   if (forbidden.some(rx => rx.test(body))) {
     errors.push('Contains forbidden salesy phrasing (hope this finds you well, just following up, my name is, wanted to reach out).');
+  }
+
+  // Check for weak/generic opening patterns that don't create friction
+  const weakOpeningPatterns = [
+    /quick question about/i,
+    /wondering if/i,
+    /curious if/i,
+    /thought i'd reach out/i,
+    /noticed you might be/i
+  ];
+
+  const hasWeakOpening = weakOpeningPatterns.some(pattern => {
+    return pattern.test(body.substring(0, 200)); // Check first 200 chars
+  });
+
+  if (hasWeakOpening) {
+    // Don't error, but log for analysis: this opener could be stronger
+    console.log('[NEPQ] Weak opening detected - consider using industry-specific angle');
+  }
+
+  // Check for observable pain points (high friction CTAs)
+  const observablePainPatterns = [
+    /most.*we (audit|find|discover)/i,
+    /\d+%.*overpay/i,
+    /are you.*\?/i, // Questions that require admission
+    /when was (the|your) last/i
+  ];
+
+  const hasObservablePain = observablePainPatterns.some(pattern => {
+    return pattern.test(body);
+  });
+
+  // This is optional - just telemetry for now (check if it's a cold email by looking for cold email patterns)
+  const isColdStep = body.toLowerCase().includes('hello') && (body.toLowerCase().includes('question') || body.toLowerCase().includes('how are you') || body.toLowerCase().includes('are you'));
+  if (!hasObservablePain && isColdStep) {
+    console.log('[NEPQ] No observable pain point detected in cold email - consider adding specific pain');
   }
 
   // Tone opener pattern check - CREATIVE FREEDOM APPROACH
@@ -370,12 +413,29 @@ async function generatePreviewEmail(emailData) {
   const usedAngles = Array.isArray(emailData.previousAngles) ? emailData.previousAngles.filter(Boolean) : [];
 
   // Select angle + tone opener
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:before-angle-selection',message:'Before angle selection - industry and recipient data',data:{recipientIndustry,recipientRole:recipient.title||recipient.role||'',recipientCompany:recipient.company||'',usedAnglesCount:Array.isArray(usedAngles)?usedAngles.length:0,usedAngles:usedAngles.slice(0,5)},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'ANGLE-SELECTION'})}).catch(()=>{});
+  // #endregion
+  
   const selectedAngle = selectRandomizedAngle(recipientIndustry, null, recipient, usedAngles);
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:after-angle-selection',message:'After angle selection - selected angle details',data:{selectedAngleId:selectedAngle?.id||null,selectedAngleLabel:selectedAngle?.label||null,selectedAnglePrimaryMessage:selectedAngle?.primaryMessage||null,selectedAngleOpeningTemplate:selectedAngle?.openingTemplate||null,selectedAngleIndustryContext:selectedAngle?.industryContext||null,selectedAngleProof:selectedAngle?.proof||null,openingTemplateType:typeof selectedAngle?.openingTemplate},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'ANGLE-SELECTION'})}).catch(()=>{});
+  // #endregion
+  
   // CRITICAL: Remove any em dashes from tone opener immediately after selection
   const toneOpener = removeEmDashes(selectRandomToneOpener(selectedAngle?.id));
 
+  // Get angle CTA data using new system (industry + role specific)
+  const recipientRole = recipient.title || recipient.role || recipient.job || '';
+  const angleCtaData = selectedAngle ? getAngleCta(selectedAngle, recipientIndustry.toLowerCase(), recipientRole, recipient.company || '') : null;
+  
   // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:preview-angle-cta',message:'Preview angle + industry selection',data:{aiMode:(emailData.aiMode||'').toLowerCase()==='html'?'html':'standard',stepIndex:emailData.stepIndex,finalIndustry:recipientIndustry,industryDebug,usedAnglesCount:Array.isArray(usedAngles)?usedAngles.length:0,selectedAngleId:selectedAngle?.id||null,selectedAngleOpeningTemplate:selectedAngle?.openingTemplate||null,toneOpener},timestamp:Date.now(),sessionId:'debug-session',runId:'cta-1',hypothesisId:'CTA-ANGLE'})}).catch(()=>{});
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:angle-cta-data',message:'Angle CTA data from getAngleCta',data:{hasAngleCtaData:!!angleCtaData,angleCtaOpening:angleCtaData?.opening?.substring(0,100)||null,angleCtaValue:angleCtaData?.value?.substring(0,100)||null,angleCtaFull:angleCtaData?.full?.substring(0,100)||null,angleCtaContextWhy:angleCtaData?.contextWhy||null,angleCtaRoleInfo:angleCtaData?.roleInfo||null,recipientIndustry:recipientIndustry.toLowerCase(),recipientRole},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'ANGLE-CTA'})}).catch(()=>{});
+  // #endregion
+
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:preview-angle-cta',message:'Preview angle + industry selection',data:{aiMode:(emailData.aiMode||'').toLowerCase()==='html'?'html':'standard',stepIndex:emailData.stepIndex,finalIndustry:recipientIndustry,industryDebug,usedAnglesCount:Array.isArray(usedAngles)?usedAngles.length:0,selectedAngleId:selectedAngle?.id||null,selectedAngleOpeningTemplate:selectedAngle?.openingTemplate||null,toneOpener,hasAngleCtaData:!!angleCtaData},timestamp:Date.now(),sessionId:'debug-session',runId:'cta-1',hypothesisId:'CTA-ANGLE'})}).catch(()=>{});
   // #endregion
 
   const aiMode = (emailData.aiMode || '').toLowerCase() === 'html' ? 'html' : 'standard';
@@ -391,20 +451,26 @@ async function generatePreviewEmail(emailData) {
   const baseUrl = (process.env.PUBLIC_BASE_URL && process.env.PUBLIC_BASE_URL.replace(/\/$/, ''))
     || 'http://localhost:3000';
 
+  const perplexityPayload = {
+    prompt: emailData.aiPrompt || 'Write a professional follow-up email',
+    mode: aiMode,
+    templateType: 'cold_email',
+    recipient: recipient,
+    selectedAngle: selectedAngle,
+    toneOpener: toneOpener,
+    senderName: 'Lewis Patterson',
+    emailPosition: emailPosition,
+    previousAngles: usedAngles
+  };
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:before-perplexity-call',message:'Payload being sent to perplexity-email',data:{mode:perplexityPayload.mode,templateType:perplexityPayload.templateType,hasSelectedAngle:!!perplexityPayload.selectedAngle,selectedAngleId:perplexityPayload.selectedAngle?.id||null,recipientIndustry:perplexityPayload.recipient?.industry||null,recipientRole:perplexityPayload.recipient?.title||perplexityPayload.recipient?.role||'',recipientCompany:perplexityPayload.recipient?.company||'',hasToneOpener:!!perplexityPayload.toneOpener,emailPosition:perplexityPayload.emailPosition},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'PERPLEXITY-PAYLOAD'})}).catch(()=>{});
+  // #endregion
+
   const perplexityResponse = await fetch(`${baseUrl}/api/perplexity-email`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      prompt: emailData.aiPrompt || 'Write a professional follow-up email',
-      mode: aiMode,
-      templateType: 'cold_email',
-      recipient: recipient,
-      selectedAngle: selectedAngle,
-      toneOpener: toneOpener,
-      senderName: 'Lewis Patterson',
-      emailPosition: emailPosition,
-      previousAngles: usedAngles
-    })
+    body: JSON.stringify(perplexityPayload)
   });
 
   if (!perplexityResponse.ok) {
@@ -412,6 +478,10 @@ async function generatePreviewEmail(emailData) {
   }
 
   const perplexityResult = await perplexityResponse.json();
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:perplexity-response',message:'Perplexity response received',data:{ok:perplexityResult.ok,hasSubject:!!perplexityResult.subject,subjectPreview:perplexityResult.subject?.substring(0,80)||null,hasHtml:!!perplexityResult.html,hasText:!!perplexityResult.text,textPreview:perplexityResult.text?.substring(0,200)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'PERPLEXITY-RESPONSE'})}).catch(()=>{});
+  // #endregion
   
   if (!perplexityResult.ok) {
     throw new Error(`Perplexity email API failed: ${perplexityResult.error || 'Unknown error'}`);
@@ -1141,82 +1211,221 @@ function getRandomIntroSubject(roleRaw, firstName, company) {
 }
 
 // Select randomized angle based on industry, with optional memory of recently used angles
+// NEW: Industry-weighted angle selection using centralized angle definitions
 function selectRandomizedAngle(industry, manualAngleOverride, accountData, usedAngles = []) {
-  // Normalize industry
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:selectRandomizedAngle-entry',message:'selectRandomizedAngle function entry',data:{industry,hasManualOverride:!!manualAngleOverride,manualOverride:manualAngleOverride,usedAnglesCount:Array.isArray(usedAngles)?usedAngles.length:0,usedAngles:usedAngles.slice(0,5)},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SELECT-ANGLE'})}).catch(()=>{});
+  // #endregion
+  
+  // Normalize industry to match weight map keys
   let normalizedIndustry = (industry || '').toString().trim();
-  if (!normalizedIndustry) {
-    normalizedIndustry = 'Default';
+  if (!normalizedIndustry || normalizedIndustry === 'Default') {
+    normalizedIndustry = 'default';
+  } else {
+    // Capitalize first letter to match weight map keys (Manufacturing, Healthcare, etc.)
+    normalizedIndustry = normalizedIndustry.charAt(0).toUpperCase() + normalizedIndustry.slice(1).toLowerCase();
   }
   
-  // Get angles for this industry
-  const industryConfig = RANDOMIZED_ANGLES_BY_INDUSTRY[normalizedIndustry] || RANDOMIZED_ANGLES_BY_INDUSTRY.Default;
-  let availableAngles = industryConfig.angles || [];
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:selectRandomizedAngle-normalized',message:'Industry normalized for weight map',data:{originalIndustry:industry,normalizedIndustry},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SELECT-ANGLE'})}).catch(()=>{});
+  // #endregion
   
-  // Filter angles by conditions if accountData provided
-  if (accountData) {
-    availableAngles = availableAngles.filter(angle => {
-      if (angle.condition && typeof angle.condition === 'function') {
-        return angle.condition(accountData);
-      }
-      return true;
-    });
-  }
+  // Industry weight map - certain angles perform better for certain industries
+  const industryAngleWeights = {
+    Manufacturing: {
+      demand_efficiency: 3,    // Highest for mfg (peak patterns)
+      consolidation: 2,
+      timing_strategy: 2,
+      exemption_recovery: 1,
+      default: 0.5
+    },
+    Healthcare: {
+      demand_efficiency: 2.5,
+      exemption_recovery: 3,   // Healthcare = strong exemption case
+      consolidation: 2,
+      timing_strategy: 1.5,
+      default: 0.5
+    },
+    Education: {
+      exemption_recovery: 3,    // Education = strongest exemption
+      demand_efficiency: 2,
+      consolidation: 1.5,
+      timing_strategy: 1,
+      default: 0.5
+    },
+    Retail: {
+      consolidation: 3,         // Retail = multi-store + bulk discounts
+      demand_efficiency: 2,
+      timing_strategy: 1.5,
+      default: 0.5
+    },
+    Hospitality: {
+      consolidation: 2.5,
+      demand_efficiency: 2,
+      timing_strategy: 1.5,
+      default: 0.5
+    },
+    Nonprofit: {
+      exemption_recovery: 3,    // Nonprofit = tax-exempt focus
+      consolidation: 2,
+      demand_efficiency: 1.5,
+      default: 0.5
+    },
+    DataCenter: {
+      demand_efficiency: 3,     // Datacenters = load correlation
+      consolidation: 2,
+      timing_strategy: 1,
+      default: 0.5
+    },
+    Logistics: {
+      consolidation: 2.5,       // Logistics = multi-facility
+      demand_efficiency: 1.5,
+      timing_strategy: 1,
+      default: 0.5
+    },
+    default: {
+      demand_efficiency: 2,
+      timing_strategy: 2,
+      consolidation: 2,
+      exemption_recovery: 1.5,
+      operational_simplicity: 1.5,
+      budget_stability: 1,
+      default: 1
+    }
+  };
   
-  // If no angles available after filtering, use all angles
-  if (availableAngles.length === 0) {
-    availableAngles = industryConfig.angles || [];
-  }
+  // Get weight map for this industry
+  const weights = industryAngleWeights[normalizedIndustry] || industryAngleWeights.default;
   
-  // If still no angles, use Default
-  if (availableAngles.length === 0) {
-    availableAngles = RANDOMIZED_ANGLES_BY_INDUSTRY.Default.angles;
-  }
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:selectRandomizedAngle-weights',message:'Industry weight map selected',data:{normalizedIndustry,usingDefault:!industryAngleWeights[normalizedIndustry],weightKeys:Object.keys(weights).slice(0,5)},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SELECT-ANGLE'})}).catch(()=>{});
+  // #endregion
   
-  // Manual override takes precedence
+  // Manual override takes precedence - check if override angle exists in new system
   if (manualAngleOverride) {
-    const overrideAngle = availableAngles.find(a => a.id === manualAngleOverride);
-    if (overrideAngle) return overrideAngle;
-  }
-
-  // Avoid repeating angles that were just used in this sequence for this contact
-  const recentAngles = Array.isArray(usedAngles) ? usedAngles.filter(Boolean) : [];
-  if (recentAngles.length > 0) {
-    const freshAngles = availableAngles.filter(a => !recentAngles.includes(a.id));
-    if (freshAngles.length > 0) {
-      availableAngles = freshAngles;
+    const overrideAngle = getAngleById(manualAngleOverride);
+    if (overrideAngle) {
+      // Return in expected format
+      const normalizedIndustryLower = normalizedIndustry.toLowerCase();
+      const industryOpener = getIndustryOpener(manualAngleOverride, normalizedIndustryLower);
+      const hookValue = industryOpener?.hook;
+      // Handle hook as function or string
+      const openingTemplate = typeof hookValue === 'function' 
+        ? hookValue('your company') // Provide default company name
+        : hookValue || '';
+      
+      return {
+        id: overrideAngle.id,
+        label: overrideAngle.label,
+        primaryMessage: overrideAngle.primaryMessage,
+        openingTemplate: openingTemplate,
+        industryContext: normalizedIndustry,
+        proof: getIndustryProof(overrideAngle.id, normalizedIndustryLower)
+      };
     }
   }
-
-  // Apply optional news hook boosts to angle weights
-  if (ACTIVE_NEWS_HOOKS.length > 0) {
-    const boosted = [];
-    for (const angle of availableAngles) {
-      const hook = ACTIVE_NEWS_HOOKS.find(h => Array.isArray(h.angleAffinity) && h.angleAffinity.includes(angle.id));
+  
+  // Create weighted pool (avoid recently used angles)
+  const availableAngles = [];
+  const recentAngles = Array.isArray(usedAngles) ? usedAngles.filter(Boolean) : [];
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:selectRandomizedAngle-before-pool',message:'Before creating weighted pool',data:{totalAngleIds:ANGLE_IDS.length,recentAnglesCount:recentAngles.length,recentAngles:recentAngles.slice(0,5)},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SELECT-ANGLE'})}).catch(()=>{});
+  // #endregion
+  
+  ANGLE_IDS.forEach(angleId => {
+    // Skip if recently used (avoid repetition)
+    if (recentAngles.length > 0 && recentAngles.includes(angleId)) {
+      return; // Skip this angle
+    }
+    
+    const weight = weights[angleId] || weights.default || 1;
+    const angle = getAngleById(angleId);
+    
+    if (!angle) return;
+    
+    // Apply news hook boosts if applicable
+    let finalWeight = weight;
+    if (ACTIVE_NEWS_HOOKS && ACTIVE_NEWS_HOOKS.length > 0) {
+      const hook = ACTIVE_NEWS_HOOKS.find(h => Array.isArray(h.angleAffinity) && h.angleAffinity.includes(angleId));
       if (hook) {
-        boosted.push({
-          ...angle,
-          weight: (angle.weight || 0) * (hook.weight || 1)
-        });
-      } else {
-        boosted.push(angle);
+        finalWeight = weight * (hook.weight || 1);
       }
     }
-    availableAngles = boosted;
-  }
-
-  // Weighted random selection
-  const random = Math.random();
-  let cumulative = 0;
+    
+    // Add angle to pool multiple times based on weight
+    for (let i = 0; i < Math.ceil(finalWeight); i++) {
+      availableAngles.push(angle);
+    }
+  });
   
-  for (const angle of availableAngles) {
-    cumulative += angle.weight || 0;
-    if (random <= cumulative) {
-      return angle;
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:selectRandomizedAngle-pool-created',message:'Weighted pool created',data:{availableAnglesCount:availableAngles.length,uniqueAngles:Array.from(new Set(availableAngles.map(a => a.id))).slice(0,5)},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SELECT-ANGLE'})}).catch(()=>{});
+  // #endregion
+  
+  // Pick random weighted angle
+  if (availableAngles.length === 0) {
+    // Fallback if all angles recently used
+    const fallbackAngle = getAngleById('demand_efficiency');
+    if (fallbackAngle) {
+      availableAngles.push(fallbackAngle);
     }
   }
   
-  // Fallback to first angle
-  return availableAngles[0] || RANDOMIZED_ANGLES_BY_INDUSTRY.Default.angles[0];
+  const selected = availableAngles[Math.floor(Math.random() * availableAngles.length)];
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:selectRandomizedAngle-selected',message:'Angle selected from weighted pool',data:{selectedAngleId:selected?.id||null,selectedAngleLabel:selected?.label||null,poolSize:availableAngles.length},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SELECT-ANGLE'})}).catch(()=>{});
+  // #endregion
+  
+  if (!selected) {
+    // Ultimate fallback
+    const defaultAngle = getAngleById('demand_efficiency') || getAngleById(ANGLE_IDS[0]);
+    if (!defaultAngle) {
+      throw new Error('No angles available in angle definitions');
+    }
+    const normalizedIndustryLower = normalizedIndustry.toLowerCase();
+    const industryOpener = getIndustryOpener(defaultAngle.id, normalizedIndustryLower);
+    const hookValue = industryOpener?.hook;
+    const openingTemplate = typeof hookValue === 'function' 
+      ? hookValue('your company')
+      : hookValue || '';
+    
+    return {
+      id: defaultAngle.id,
+      label: defaultAngle.label,
+      primaryMessage: defaultAngle.primaryMessage,
+      openingTemplate: openingTemplate,
+      industryContext: normalizedIndustry,
+      proof: getIndustryProof(defaultAngle.id, normalizedIndustryLower)
+    };
+  }
+  
+  // Return in expected format
+  const normalizedIndustryLower = normalizedIndustry.toLowerCase();
+  const industryOpener = getIndustryOpener(selected.id, normalizedIndustryLower);
+  const hookValue = industryOpener?.hook;
+  // Handle hook as function or string
+  const openingTemplate = typeof hookValue === 'function' 
+    ? hookValue('your company') // Provide default company name - caller can replace
+    : hookValue || '';
+  
+  const proof = getIndustryProof(selected.id, normalizedIndustryLower);
+  
+  const result = {
+    id: selected.id,
+    label: selected.label,
+    primaryMessage: selected.primaryMessage,
+    openingTemplate: openingTemplate,
+    industryContext: normalizedIndustry,
+    proof: proof
+  };
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:selectRandomizedAngle-result',message:'selectRandomizedAngle returning result',data:{resultAngleId:result.id,resultLabel:result.label,resultPrimaryMessage:result.primaryMessage,resultOpeningTemplate:result.openingTemplate.substring(0,100),resultProof:result.proof?.substring(0,100),resultIndustryContext:result.industryContext},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SELECT-ANGLE'})}).catch(()=>{});
+  // #endregion
+  
+  return result;
 }
 
 // Select random tone opener (angle-aware)
