@@ -8357,6 +8357,16 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
               companyName = getAccountFieldFromContact(selectedContact, 'name') || '';
             }
             
+            // Extract industry using getAccountFieldFromContact (checks multiple sources)
+            let accountIndustry = '';
+            if (typeof getAccountFieldFromContact === 'function') {
+              accountIndustry = getAccountFieldFromContact(selectedContact, 'industry') || '';
+            }
+            // Fallback to account object if getAccountFieldFromContact didn't find it
+            if (!accountIndustry && account) {
+              accountIndustry = account.industry || '';
+            }
+            
             // Extract firstName from full name if needed
             let contactFirstName = selectedContact.firstName || selectedContact.first_name || '';
             if (!contactFirstName) {
@@ -8366,6 +8376,15 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
               }
             }
             
+            // Build accountData with industry included
+            const accountData = account || {};
+            if (accountIndustry) {
+              accountData.industry = accountIndustry;
+            }
+            
+            // Build contactData with industry if available
+            const contactIndustry = selectedContact.industry || selectedContact.companyIndustry || accountIndustry || '';
+            
             const emailPayload = {
               aiMode: mode,
               aiPrompt: substitutedPrompt,
@@ -8374,16 +8393,17 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
               contactData: {
                 ...selectedContact,
                 firstName: contactFirstName || selectedContact.firstName || selectedContact.first_name || '',
-                company: companyName || selectedContact.company || ''
+                company: companyName || selectedContact.company || '',
+                industry: contactIndustry
               },
-              accountData: account || {},
+              accountData: accountData,
               stepIndex: typeof step?.order === 'number' ? step.order : (typeof step?.sequenceIndex === 'number' ? step.sequenceIndex : 0),
               stepType: step?.type || step?.template || '',
               template: step?.template || ''
             };
 
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sequence-builder.js:preview-generate-standard',message:'Preview generate (standard/html) payload summary',data:{mode:emailPayload.aiMode,stepIndex:emailPayload.stepIndex,stepType:emailPayload.stepType,template:emailPayload.template,hasAccountIndustry:!!emailPayload.accountData?.industry,accountIndustry:emailPayload.accountData?.industry||null,hasContactIndustry:!!emailPayload.contactData?.industry,contactIndustry:emailPayload.contactData?.industry||null,contactRole:emailPayload.contactData?.title||emailPayload.contactData?.role||emailPayload.contactData?.job||null,contactCompany:emailPayload.contactCompany||emailPayload.contactData?.company||null,hasAccountDesc:!!(emailPayload.accountData?.shortDescription||emailPayload.accountData?.short_desc||emailPayload.accountData?.descriptionShort||emailPayload.accountData?.description),promptLength:String(emailPayload.aiPrompt||'').length,promptHasContractExpire:/when does your contract expire|contract expire|renewal window/i.test(String(emailPayload.aiPrompt||''))},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SEQUENCE-BUILDER-PAYLOAD'})}).catch(()=>{});
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sequence-builder.js:preview-generate-standard',message:'Preview generate (standard/html) payload summary',data:{mode:emailPayload.aiMode,stepIndex:emailPayload.stepIndex,stepType:emailPayload.stepType,template:emailPayload.template,hasAccountIndustry:!!emailPayload.accountData?.industry,accountIndustry:emailPayload.accountData?.industry||null,hasContactIndustry:!!emailPayload.contactData?.industry,contactIndustry:emailPayload.contactData?.industry||null,contactRole:emailPayload.contactData?.title||emailPayload.contactData?.role||emailPayload.contactData?.job||null,contactCompany:emailPayload.contactCompany||emailPayload.contactData?.company||null,hasAccountDesc:!!(emailPayload.accountData?.shortDescription||emailPayload.accountData?.short_desc||emailPayload.accountData?.descriptionShort||emailPayload.accountData?.description),promptLength:String(emailPayload.aiPrompt||'').length,promptHasContractExpire:/when does your contract expire|contract expire|renewal window/i.test(String(emailPayload.aiPrompt||'')),selectedContactIndustry:selectedContact.industry||null,selectedContactCompanyIndustry:selectedContact.companyIndustry||null,accountObjectIndustry:account?.industry||null},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SEQUENCE-BUILDER-PAYLOAD'})}).catch(()=>{});
             // #endregion
 
             const response = await fetch(`${base}/api/generate-scheduled-emails`, {
