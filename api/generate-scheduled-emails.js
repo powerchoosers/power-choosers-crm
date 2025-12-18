@@ -1224,13 +1224,73 @@ function selectRandomizedAngle(industry, manualAngleOverride, accountData, usedA
   fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:selectRandomizedAngle-entry',message:'selectRandomizedAngle function entry',data:{industry,hasManualOverride:!!manualAngleOverride,manualOverride:manualAngleOverride,usedAnglesCount:Array.isArray(usedAngles)?usedAngles.length:0,usedAngles:usedAngles.slice(0,5)},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SELECT-ANGLE'})}).catch(()=>{});
   // #endregion
   
+  // Map database industry values to weight map keys
+  const industryMap = {
+    // Healthcare variations
+    'hospital & health care': 'Healthcare',
+    'healthcare': 'Healthcare',
+    'health care': 'Healthcare',
+    'hospital': 'Healthcare',
+    'medical': 'Healthcare',
+    
+    // Education variations
+    'primary/secondary education': 'Education',
+    'education': 'Education',
+    'school': 'Education',
+    'university': 'Education',
+    'college': 'Education',
+    
+    // Manufacturing variations
+    'oil & energy': 'Manufacturing',
+    'manufacturing': 'Manufacturing',
+    'industrial': 'Manufacturing',
+    'aerospace': 'Manufacturing',
+    'aviation': 'Manufacturing',
+    
+    // Retail
+    'retail': 'Retail',
+    
+    // Hospitality
+    'hospitality': 'Hospitality',
+    'hotel': 'Hospitality',
+    'restaurant': 'Hospitality',
+    
+    // Nonprofit
+    'nonprofit': 'Nonprofit',
+    'non-profit': 'Nonprofit',
+    'charity': 'Nonprofit',
+    
+    // DataCenter
+    'datacenter': 'DataCenter',
+    'data center': 'DataCenter',
+    
+    // Logistics
+    'logistics': 'Logistics',
+    'transportation': 'Logistics',
+    
+    // Government
+    'government': 'Government',
+    'municipal': 'Government',
+  };
+  
   // Normalize industry to match weight map keys
-  let normalizedIndustry = (industry || '').toString().trim();
-  if (!normalizedIndustry || normalizedIndustry === 'Default') {
+  let normalizedIndustry = (industry || '').toString().trim().toLowerCase();
+  if (!normalizedIndustry || normalizedIndustry === 'default') {
     normalizedIndustry = 'default';
   } else {
-    // Capitalize first letter to match weight map keys (Manufacturing, Healthcare, etc.)
-    normalizedIndustry = normalizedIndustry.charAt(0).toUpperCase() + normalizedIndustry.slice(1).toLowerCase();
+    // Check if we have a mapping for this industry value
+    if (industryMap[normalizedIndustry]) {
+      normalizedIndustry = industryMap[normalizedIndustry];
+    } else {
+      // Try partial matches (e.g., "health" in "hospital & health care")
+      const matchedKey = Object.keys(industryMap).find(key => normalizedIndustry.includes(key) || key.includes(normalizedIndustry));
+      if (matchedKey) {
+        normalizedIndustry = industryMap[matchedKey];
+      } else {
+        // Capitalize first letter as fallback
+        normalizedIndustry = normalizedIndustry.charAt(0).toUpperCase() + normalizedIndustry.slice(1);
+      }
+    }
   }
   
   // #region agent log
