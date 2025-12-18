@@ -1381,7 +1381,7 @@ function selectRandomizedAngle(industry, manualAngleOverride, accountData, usedA
   }
   
   // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:selectRandomizedAngle-normalized',message:'Industry normalized for weight map',data:{originalIndustry:industry,normalizedIndustryLower:normalizedIndustry.toLowerCase(),normalizedIndustry,mappingMethod,matchedKey,hasDirectMatch:!!industryMap[(industry || '').toString().trim().toLowerCase()]},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SELECT-ANGLE'})}).catch(()=>{});
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:selectRandomizedAngle-normalized',message:'Industry normalized for weight map',data:{originalIndustry:industry,normalizedIndustryLower:normalizedIndustry.toLowerCase(),normalizedIndustry,mappingMethod,matchedKey,hasDirectMatch:!!industryMap[(industry || '').toString().trim().toLowerCase()],mappedValue:normalizedIndustry},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SELECT-ANGLE'})}).catch(()=>{});
   // #endregion
   
   // Industry weight map - certain angles perform better for certain industries
