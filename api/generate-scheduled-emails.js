@@ -357,8 +357,15 @@ async function generatePreviewEmail(emailData) {
     inferredFromDescription: null
   };
   if (!recipientIndustry && (emailData.contactCompany || contactData.company)) {
+    const companyName = emailData.contactCompany || contactData.company;
     industryDebug.inferredFromCompany = true;
-    recipientIndustry = IndustryDetection.inferIndustryFromCompanyName(emailData.contactCompany || contactData.company);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:before-industry-inference',message:'Before inferring industry from company name',data:{companyName},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'INDUSTRY-DETECTION'})}).catch(()=>{});
+    // #endregion
+    recipientIndustry = IndustryDetection.inferIndustryFromCompanyName(companyName);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:after-industry-inference',message:'After inferring industry from company name',data:{companyName,inferredIndustry:recipientIndustry},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'INDUSTRY-DETECTION'})}).catch(()=>{});
+    // #endregion
   }
   if (!recipientIndustry) {
     const accountDesc = accountData.shortDescription || accountData.short_desc ||
@@ -1758,11 +1765,31 @@ export default async function handler(req, res) {
         }
         
         // Detect industry and select angle (same logic as sequence-builder.js)
-        let recipientIndustry = accountData.industry || contactData.industry || '';
+        // Check multiple sources for industry (same priority as preview path)
+        let recipientIndustry = accountData.industry || contactData.industry || contactData.companyIndustry || '';
+        const industryDebug = {
+          accountIndustry: accountData.industry || null,
+          contactIndustry: contactData.industry || null,
+          contactCompanyIndustry: contactData.companyIndustry || null,
+          inferredFromCompany: null,
+          inferredFromDescription: null
+        };
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:live-industry-detection-start',message:'Live generation - industry detection start',data:{hasAccountData:!!accountData,hasContactData:!!contactData,accountIndustry:accountData.industry||null,contactIndustry:contactData.industry||null,contactCompanyIndustry:contactData.companyIndustry||null,initialRecipientIndustry:recipientIndustry,contactCompany:emailData.contactCompany||contactData.company||null},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'LIVE-INDUSTRY-DETECTION'})}).catch(()=>{});
+        // #endregion
         
         // Infer industry from company name if not set
-        if (!recipientIndustry && emailData.contactCompany) {
-          recipientIndustry = IndustryDetection.inferIndustryFromCompanyName(emailData.contactCompany);
+        if (!recipientIndustry && (emailData.contactCompany || contactData.company)) {
+          const companyName = emailData.contactCompany || contactData.company;
+          industryDebug.inferredFromCompany = true;
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:live-before-industry-inference',message:'Live generation - before inferring industry from company name',data:{companyName},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'LIVE-INDUSTRY-DETECTION'})}).catch(()=>{});
+          // #endregion
+          recipientIndustry = IndustryDetection.inferIndustryFromCompanyName(companyName);
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:live-after-industry-inference',message:'Live generation - after inferring industry from company name',data:{companyName,inferredIndustry:recipientIndustry},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'LIVE-INDUSTRY-DETECTION'})}).catch(()=>{});
+          // #endregion
         }
         
         // Infer from account description if still not set
@@ -1771,6 +1798,7 @@ export default async function handler(req, res) {
                              accountData.descriptionShort || accountData.description || 
                              accountData.companyDescription || accountData.accountDescription || '';
           if (accountDesc) {
+            industryDebug.inferredFromDescription = true;
             recipientIndustry = IndustryDetection.inferIndustryFromDescription(accountDesc);
           }
         }
@@ -1779,6 +1807,10 @@ export default async function handler(req, res) {
         if (!recipientIndustry) {
           recipientIndustry = 'Default';
         }
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:live-industry-detection-final',message:'Live generation - final industry detection result',data:{finalIndustry:recipientIndustry,industryDebug},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'LIVE-INDUSTRY-DETECTION'})}).catch(()=>{});
+        // #endregion
         
         // Build recipient object used for angle selection + prompt context
         // Include energy supplier and other energy fields from account
