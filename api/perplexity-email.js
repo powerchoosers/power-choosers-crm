@@ -2457,7 +2457,7 @@ async function buildSystemPrompt({
   const recipientContext = `
 RECIPIENT INFORMATION:
 - Name: ${firstName || 'there'} ${company ? 'at ' + company : ''}
-${company ? `- Company Name: ${company} (CRITICAL: ALWAYS use "${company}" in emails, NEVER use "${firstName}'s company" or "your company" - use the actual company name "${company}")` : '- Company Name: NOT PROVIDED'}
+${company ? `- Company Name: ${company} (CRITICAL: ALWAYS use "${company}" in emails with PROPER CAPITALIZATION - capitalize each word (e.g., "Promise Total Services, Inc." not "promise total services, inc", "Displayco US Inc" not "displayco us inc"). NEVER use "${firstName}'s company" or "your company" - use the actual company name "${company}" with proper capitalization)` : '- Company Name: NOT PROVIDED'}
 ${job ? '- Role: ' + job + ' (focus on ' + (roleContext?.language || 'business operations') + ')' : ''}
 ${tenure ? '- Tenure: ' + tenure + ' in current role (use naturally: "In your ' + tenure + ' as ' + job + '...")' : ''}
 ${r.seniority ? '- Seniority Level: ' + r.seniority : ''}
@@ -2750,6 +2750,13 @@ ANGLE-SPECIFIC INSTRUCTIONS (CRITICAL):
 Generate text for these fields:
 - greeting: MUST be exactly "Hello ${firstName}," - Use ONLY the first name "${firstName}", NEVER use the full name. This is mandatory.
 - opening_hook: **CREATIVE OPENER - VARY YOUR STYLE** (toneOpener "${toneOpener}" is stylistic inspiration only)
+  **CRITICAL CAPITALIZATION RULES:**
+  * Company names MUST be properly capitalized: "${company}" should appear as "${company}" (capitalize each word, preserve Inc/LLC/etc. as uppercase)
+  * Sentences MUST start with uppercase letters - never start a sentence with lowercase
+  * After periods, question marks, or exclamation marks, the next word MUST be capitalized
+  * After double line breaks (paragraph breaks), the next word MUST be capitalized
+  * Examples: "Promise Total Services, Inc." NOT "promise total services, inc", "Displayco US Inc" NOT "displayco us inc"
+  * Examples: "Managing facilities..." should be "With Promise Total Services managing facilities..." (sentence starts with capital)
 ${angleData?.opening ? `**CRITICAL**: The angle-specific opening hook is "${angleData.opening}" - use this or a natural variation. This creates observable pain they can't dismiss.` : ''}
   **FORBIDDEN**: "Wondering how [company] is handling..." is STRICTLY FORBIDDEN. This pattern is overused and will be rejected.
   **CREATIVE FREEDOM**: You have full creative freedom to craft a natural, conversational opener. The tone opener "${toneOpener}" is provided as INSPIRATION - use it as a stylistic guide, not a template. Feel free to rephrase it naturally or use a different but similar style.
@@ -2769,6 +2776,15 @@ ${angleData?.opening ? `**CRITICAL**: The angle-specific opening hook is "${angl
   
   ${selectedAngle && typeof selectedAngle === 'object' ? `**CRITICAL - USE THE SELECTED ANGLE**: This email MUST focus on "${selectedAngle.primaryMessage || selectedAngle.label || 'the selected angle'}". ${selectedAngle.id === 'demand_efficiency' ? 'You CAN mention demand charges since this angle is about demand efficiency.' : 'DO NOT mention "demand charges" or "delivery charges" - this angle is NOT about demand. Focus on ' + (selectedAngle.primaryMessage || selectedAngle.label) + ' instead. For example, if angle is "timing_strategy", focus on contract renewal timing. If angle is "cost_control", focus on rising electricity costs or budget pressure. If angle is "exemption_recovery", focus on tax exemptions. If angle is "consolidation", focus on multi-location management.'} ${selectedAngle.openingTemplate ? 'Use this angle\'s opening pattern as inspiration: "' + selectedAngle.openingTemplate + '"' : ''}` : '**DO NOT default to "demand charges"** - vary the pain points you mention.'} ${accountDescription ? `**CRITICAL - DO NOT USE THE BUSINESS FOCUS TEXT**: The "Business Focus" (${accountDescription}) is ONLY for you to understand their business type. DO NOT copy it, quote it, or reference it directly in the email. Instead, use industry-specific language naturally. GOOD: "Most ${industryLower || 'manufacturing'} companies I work with..." or "Companies like ${company} typically..." BAD: "${accountDescription}..." or "As a ${accountDescription}..." or any variation that includes the business focus text.` : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
   **CRITICAL PUNCTUATION RULE: NEVER use em dashes (—) or en dashes (–) in the opening_hook. Use commas or natural flow instead. Examples: "Curious, " (NOT "Curious—"), "Question for you, " (NOT "Question for you—"), "Real question, " (NOT "Real question—"). This is mandatory - em dashes will be rejected.**
+  **CRITICAL CAPITALIZATION RULES:**
+  * Company names MUST be properly capitalized: "${company}" should appear exactly as "${company}" (capitalize each word, preserve Inc/LLC/Ltd/Corp/Co/US as uppercase)
+  * NEVER write company names in lowercase: "${company.toLowerCase()}" is WRONG - always use "${company}"
+  * Sentences MUST start with uppercase letters - never start a sentence or paragraph with lowercase
+  * After periods (.), question marks (?), or exclamation marks (!), the next word MUST be capitalized
+  * After double line breaks (paragraph breaks), the next word MUST be capitalized
+  * Examples: "Promise Total Services, Inc." NOT "promise total services, inc", "Displayco US Inc" NOT "displayco us inc"
+  * Examples: "managing facilities..." should be "With ${company} managing facilities..." (sentence starts with capital)
+  * Examples: "as president of displayco us inc" should be "as President of Displayco US Inc"
   * Manufacturing: Production downtime, equipment reliability, energy-intensive operations
   * Healthcare: Budget constraints, regulatory compliance, patient care continuity
   * Retail: Multiple locations, unpredictable costs, seasonal demand

@@ -637,6 +637,57 @@ async function generatePreviewEmail(emailData) {
       // Clean up any trailing tone opener text that might have leaked into the output
       bodyText = bodyText.replace(/\s+(Curious|Curious if|Curious,|Curious—)$/gi, '').trim();
       
+      // Fix capitalization issues: company names and sentence starts
+      const companyName = recipient?.company || recipient?.accountName || '';
+      if (companyName) {
+        // Get properly capitalized company name (preserve original if it looks correct, otherwise capitalize)
+        const companyWords = companyName.split(' ');
+        const companyNameProper = companyWords.map(word => {
+          // Preserve common business suffixes as-is (Inc, LLC, Ltd, Corp, Co, US)
+          const cleanWord = word.replace(/[.,]/g, '').toLowerCase();
+          if (['inc', 'llc', 'ltd', 'corp', 'co', 'us'].includes(cleanWord)) {
+            return word.toUpperCase();
+          }
+          // Capitalize first letter of each word
+          return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        }).join(' ');
+        
+        // Replace lowercase company name with properly capitalized version (case-insensitive match)
+        const companyNameLower = companyName.toLowerCase();
+        // Escape special regex characters in company name
+        const escapedCompany = companyNameLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const companyNamePattern = new RegExp(`\\b${escapedCompany}\\b`, 'gi');
+        bodyText = bodyText.replace(companyNamePattern, companyNameProper);
+        
+        // Also fix common patterns like "president of [company]" or "as [company]" where company is lowercase
+        const roleCompanyPattern = /\b(president|ceo|cfo|director|manager|executive|administrator)\s+of\s+([a-z][^,.\n]+?)(?=[,.\n]|$)/gi;
+        bodyText = bodyText.replace(roleCompanyPattern, (match, role, companyPart) => {
+          // Check if this matches our company name (case-insensitive)
+          if (companyPart.toLowerCase().includes(companyNameLower) || companyNameLower.includes(companyPart.toLowerCase())) {
+            return `${role} of ${companyNameProper}`;
+          }
+          // Otherwise capitalize the company part
+          const capitalizedCompany = companyPart.split(' ').map(w => {
+            const cleanW = w.replace(/[.,]/g, '').toLowerCase();
+            if (['inc', 'llc', 'ltd', 'corp', 'co', 'us'].includes(cleanW)) {
+              return w.toUpperCase();
+            }
+            return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+          }).join(' ');
+          return `${role} of ${capitalizedCompany}`;
+        });
+      }
+      
+      // Fix sentence capitalization: ensure sentences start with uppercase after periods/question marks/exclamation
+      bodyText = bodyText.replace(/([.!?]\s+)([a-z])/g, (match, punct, letter) => {
+        return punct + letter.toUpperCase();
+      });
+      
+      // Fix paragraph starts (after double newlines) - ensure they start with uppercase
+      bodyText = bodyText.replace(/(\n\n)([a-z])/g, (match, newlines, letter) => {
+        return newlines + letter.toUpperCase();
+      });
+      
       // Normalize non-breaking hyphens and other special characters
       bodyText = bodyText
         .replace(/\u2011/g, '-')  // Non-breaking hyphen → regular hyphen
@@ -1274,6 +1325,20 @@ function selectRandomizedAngle(industry, manualAngleOverride, accountData, usedA
     // Government
     'government': 'Government',
     'municipal': 'Government',
+    
+    // Facilities Services / Janitorial Services (not tax-exempt, service-based)
+    // Map to default weights - facilities services is service-based, not manufacturing
+    // 'facilities services': Keep as-is, will use default weights
+    // 'facilities': Keep as-is, will use default weights
+    'janitorial services': 'default',
+    'janitorial': 'default',
+    'cleaning services': 'default',
+    'facility management': 'default',
+    
+    // Marketing & Advertising (not tax-exempt)
+    'marketing & advertising': 'Retail', // Map to Retail for angle weights
+    'marketing': 'Retail',
+    'advertising': 'Retail',
   };
   
   // Normalize industry to match weight map keys
@@ -1306,9 +1371,11 @@ function selectRandomizedAngle(industry, manualAngleOverride, accountData, usedA
         normalizedIndustry = industryMap[matchedKey];
         mappingMethod = 'partial';
       } else {
-        // Capitalize first letter as fallback
-        normalizedIndustry = normalizedIndustry.charAt(0).toUpperCase() + normalizedIndustry.slice(1);
-        mappingMethod = 'fallback-capitalize';
+        // For unmapped industries (like "facilities services", janitorial services, etc.)
+        // Use default weights instead of trying to capitalize and match
+        // This ensures service-based industries get appropriate default angle weights
+        normalizedIndustry = 'default';
+        mappingMethod = 'fallback-default';
       }
     }
   }
@@ -1384,8 +1451,18 @@ function selectRandomizedAngle(industry, manualAngleOverride, accountData, usedA
   // Get weight map for this industry
   const weights = industryAngleWeights[normalizedIndustry] || industryAngleWeights.default;
   
+  // Define tax-exempt industries that CAN use exemption_recovery angle
+  const taxExemptIndustries = ['Nonprofit', 'Education', 'Healthcare'];
+  const isTaxExemptIndustry = taxExemptIndustries.includes(normalizedIndustry);
+  
+  // Also check accountData for explicit tax-exempt status
+  const accountTaxExempt = accountData?.taxExemptStatus === 'Nonprofit' || 
+                           accountData?.taxExemptStatus === 'Education' || 
+                           accountData?.taxExemptStatus === 'Healthcare';
+  const shouldAllowExemptionAngle = isTaxExemptIndustry || accountTaxExempt;
+  
   // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:selectRandomizedAngle-weights',message:'Industry weight map selected',data:{normalizedIndustry,usingDefault:!industryAngleWeights[normalizedIndustry],weightKeys:Object.keys(weights).slice(0,5)},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SELECT-ANGLE'})}).catch(()=>{});
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:selectRandomizedAngle-weights',message:'Industry weight map selected',data:{normalizedIndustry,usingDefault:!industryAngleWeights[normalizedIndustry],weightKeys:Object.keys(weights).slice(0,5),isTaxExemptIndustry,accountTaxExempt,shouldAllowExemptionAngle},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SELECT-ANGLE'})}).catch(()=>{});
   // #endregion
   
   // Manual override takes precedence - check if override angle exists in new system
