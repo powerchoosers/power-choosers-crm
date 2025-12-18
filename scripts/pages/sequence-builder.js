@@ -8383,7 +8383,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
             };
 
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sequence-builder.js:preview-generate-standard',message:'Preview generate (standard/html) payload summary',data:{mode:emailPayload.aiMode,stepIndex:emailPayload.stepIndex,stepType:emailPayload.stepType,template:emailPayload.template,hasAccountIndustry:!!emailPayload.accountData?.industry,hasContactIndustry:!!emailPayload.contactData?.industry,hasAccountDesc:!!(emailPayload.accountData?.shortDescription||emailPayload.accountData?.short_desc||emailPayload.accountData?.descriptionShort||emailPayload.accountData?.description),promptLength:String(emailPayload.aiPrompt||'').length,promptHasContractExpire:/when does your contract expire|contract expire|renewal window/i.test(String(emailPayload.aiPrompt||''))},timestamp:Date.now(),sessionId:'debug-session',runId:'cta-1',hypothesisId:'CTA-PROMPT'})}).catch(()=>{});
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sequence-builder.js:preview-generate-standard',message:'Preview generate (standard/html) payload summary',data:{mode:emailPayload.aiMode,stepIndex:emailPayload.stepIndex,stepType:emailPayload.stepType,template:emailPayload.template,hasAccountIndustry:!!emailPayload.accountData?.industry,accountIndustry:emailPayload.accountData?.industry||null,hasContactIndustry:!!emailPayload.contactData?.industry,contactIndustry:emailPayload.contactData?.industry||null,contactRole:emailPayload.contactData?.title||emailPayload.contactData?.role||emailPayload.contactData?.job||null,contactCompany:emailPayload.contactCompany||emailPayload.contactData?.company||null,hasAccountDesc:!!(emailPayload.accountData?.shortDescription||emailPayload.accountData?.short_desc||emailPayload.accountData?.descriptionShort||emailPayload.accountData?.description),promptLength:String(emailPayload.aiPrompt||'').length,promptHasContractExpire:/when does your contract expire|contract expire|renewal window/i.test(String(emailPayload.aiPrompt||''))},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SEQUENCE-BUILDER-PAYLOAD'})}).catch(()=>{});
             // #endregion
 
             const response = await fetch(`${base}/api/generate-scheduled-emails`, {
@@ -8397,6 +8397,10 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
 
             if (response.ok) {
               const result = await response.json();
+              
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sequence-builder.js:preview-generate-response',message:'Preview generate response received',data:{hasSubject:!!result.subject,subjectPreview:result.subject?.substring(0,80)||null,hasHtml:!!result.html,hasText:!!result.text,textPreview:result.text?.substring(0,200)||null,htmlPreview:result.html?.substring(0,200)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'angle-test',hypothesisId:'SEQUENCE-BUILDER-RESPONSE'})}).catch(()=>{});
+              // #endregion
 
               // Update PREVIEW, not editor
               const previewBodyEl = card.querySelector('.preview-body');
