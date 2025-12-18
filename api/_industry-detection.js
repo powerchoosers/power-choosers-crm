@@ -72,7 +72,23 @@ export function inferIndustryFromCompanyName(companyName) {
   }
 
   // Aviation / Aerospace (manufacturing subset)
-  if (/\b(aviation|aerospace|aircraft|airline|airport|charter)\b/i.test(name)) {
+  // Match full words and also "aero" and "air" as standalone terms
+  if (/\b(aviation|aerospace|aircraft|airline|airport|charter|aero|air\s+(service|charter|base|operations?))\b/i.test(name)) {
+    return 'Manufacturing';
+  }
+
+  // Drilling / Oil & Gas (manufacturing subset)
+  if (/\b(drilling|oil\s+gas|petroleum|refining|exploration|rig|well)\b/i.test(name)) {
+    return 'Manufacturing';
+  }
+
+  // Tube / Pipe / Tubing (manufacturing)
+  if (/\b(tube|tubing|pipe|piping|conduit)\b/i.test(name)) {
+    return 'Manufacturing';
+  }
+
+  // Lifting / Crane / Heavy Equipment (manufacturing/construction)
+  if (/\b(lifting|crane|hoist|heavy\s+equipment|material\s+handling)\b/i.test(name)) {
     return 'Manufacturing';
   }
 
@@ -155,7 +171,22 @@ export function inferIndustryFromDescription(description) {
   }
 
   // Aviation / Aerospace
-  if (/\b(aviation|aerospace|aircraft|airline|airport|charter)\b/i.test(desc)) {
+  if (/\b(aviation|aerospace|aircraft|airline|airport|charter|aero|air\s+(service|charter|base|operations?))\b/i.test(desc)) {
+    return 'Manufacturing';
+  }
+
+  // Drilling / Oil & Gas
+  if (/\b(drilling|oil\s+gas|petroleum|refining|exploration|rig|well)\b/i.test(desc)) {
+    return 'Manufacturing';
+  }
+
+  // Tube / Pipe / Tubing
+  if (/\b(tube|tubing|pipe|piping|conduit)\b/i.test(desc)) {
+    return 'Manufacturing';
+  }
+
+  // Lifting / Crane / Heavy Equipment
+  if (/\b(lifting|crane|hoist|heavy\s+equipment|material\s+handling)\b/i.test(desc)) {
     return 'Manufacturing';
   }
 
