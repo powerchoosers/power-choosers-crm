@@ -985,10 +985,212 @@
   const WIDGET_ID = 'phone-widget';
   // OLD: const CALL_NOTIFY_ID = 'incoming-call-notification'; - REMOVED (using ToastManager now)
 
+  const CONTACT_PHONE_FIELDS = [
+    'phone', 'mobile', 'workDirectPhone', 'otherPhone', 'homePhone',
+    'directPhone', 'mainPhone', 'primaryPhone', 'cellPhone', 'officePhone'
+  ];
+  const ACCOUNT_PHONE_FIELDS = ['companyPhone', 'phone', 'primaryPhone', 'mainPhone', 'billingPhone'];
+
+  function extractDigits(value) {
+    return (value || '').toString().replace(/\D/g, '');
+  }
+
+  function normalizeCandidateDigits(candidates, fallback) {
+    const set = new Set();
+    (candidates || []).forEach((candidate) => {
+      const digits = extractDigits(candidate);
+      if (!digits) return;
+      set.add(digits);
+      if (digits.length > 10) {
+        set.add(digits.slice(-10));
+      }
+    });
+    if (fallback) {
+      const fallbackDigits = extractDigits(fallback);
+      if (fallbackDigits) {
+        set.add(fallbackDigits);
+        if (fallbackDigits.length > 10) {
+          set.add(fallbackDigits.slice(-10));
+        }
+      }
+    }
+    return Array.from(set);
+  }
+
+  function matchesCandidate(value, candidates) {
+    if (!value) return false;
+    const digits = extractDigits(value);
+    if (!digits || !candidates || !candidates.length) return false;
+    return candidates.some((candidate) => {
+      if (!candidate) return false;
+      if (digits === candidate) return true;
+      if (digits.endsWith(candidate)) return true;
+      if (candidate.endsWith(digits)) return true;
+      return false;
+    });
+  }
+
+  function getCRMData(getterName) {
+    try {
+      const getter = window[getterName];
+      if (typeof getter === 'function') {
+        const data = getter();
+        if (Array.isArray(data)) {
+          return data;
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  function getContactPhones(contact) {
+    if (!contact || typeof contact !== 'object') return [];
+    const phones = [];
+    CONTACT_PHONE_FIELDS.forEach((field) => {
+      const value = contact[field];
+      if (value) phones.push(value);
+    });
+    if (Array.isArray(contact.phoneNumbers)) {
+      contact.phoneNumbers.forEach((item) => {
+        if (item && typeof item === 'object' && item.phone) {
+          phones.push(item.phone);
+        } else if (typeof item === 'string') {
+          phones.push(item);
+        }
+      });
+    }
+    return Array.from(new Set(phones));
+  }
+
+  function getAccountPhones(account) {
+    if (!account || typeof account !== 'object') return [];
+    const phones = [];
+    ACCOUNT_PHONE_FIELDS.forEach((field) => {
+      const value = account[field];
+      if (value) phones.push(value);
+    });
+    if (Array.isArray(account.phoneNumbers)) {
+      account.phoneNumbers.forEach((item) => {
+        if (item && typeof item === 'object' && item.phone) {
+          phones.push(item.phone);
+        } else if (typeof item === 'string') {
+          phones.push(item);
+        }
+      });
+    }
+    return Array.from(new Set(phones));
+  }
+
+  function findAccountByContact(contact, accountsData) {
+    if (!contact || !accountsData || !accountsData.length) return null;
+    const candidateIds = new Set();
+    ['accountId', 'account_id', 'accountID', 'accountIdLegacy', 'account_id_legacy'].forEach((key) => {
+      const value = contact[key];
+      if (value) candidateIds.add(String(value).toLowerCase());
+    });
+    if (candidateIds.size) {
+      const match = accountsData.find((account) => {
+        const accountId = String(account.id || account.accountId || account._id || '').toLowerCase();
+        return accountId && candidateIds.has(accountId);
+      });
+      if (match) return match;
+    }
+    const accountNames = new Set();
+    ['accountName', 'company', 'account', 'name', 'companyName'].forEach((field) => {
+      const value = contact[field];
+      if (value) accountNames.add(String(value).trim().toLowerCase());
+    });
+    if (accountNames.size) {
+      return accountsData.find((account) => {
+        const candidate = String(account.accountName || account.name || account.company || account.companyName || '').trim().toLowerCase();
+        return candidate && accountNames.has(candidate);
+      });
+    }
+    return null;
+  }
+
+  function buildAccountBranding(account) {
+    if (!account || typeof account !== 'object') return { logoUrl: '', domain: '' };
+    const logo = account.logoUrl || account.iconUrl || account.logo || account.companyLogo || account.accountLogo || '';
+    let domain = account.domain || account.website || account.url || '';
+    if (domain) domain = domain.replace(/^https?:\/\//i, '').replace(/\/$/, '');
+    return { logoUrl: (logo || '').toString().trim(), domain };
+  }
+
+  function findMatchingAccount(candidateDigits, accountsData) {
+    if (!candidateDigits.length || !accountsData.length) return null;
+    for (const account of accountsData) {
+      const phones = getAccountPhones(account);
+      if (phones.some((phone) => matchesCandidate(phone, candidateDigits))) {
+        return account;
+      }
+    }
+    return null;
+  }
+
+  function buildContactMeta(contact, accountMatch) {
+    if (!contact) return null;
+    const nameParts = [contact.firstName, contact.lastName].filter(Boolean);
+    const name = contact.name || nameParts.join(' ').trim() || '';
+    const accountInfo = accountMatch || {};
+    const accountName = accountInfo.accountName || accountInfo.name || accountInfo.company || accountInfo.companyName || contact.accountName || contact.company || '';
+    const contactId = contact.id || contact.contactId || contact._id || contact.idValue || null;
+    const accountId = accountInfo.id || accountInfo.accountId || accountInfo._id || contact.accountId || null;
+    const branding = buildAccountBranding(accountInfo);
+    return {
+      name,
+      account: accountName,
+      accountId,
+      contactId,
+      title: contact.title || contact.jobTitle || contact.position || '',
+      city: contact.city || (accountInfo && (accountInfo.city || '')) || '',
+      state: contact.state || (accountInfo && (accountInfo.state || '')) || '',
+      domain: branding.domain || contact.domain || contact.website || '',
+      logoUrl: branding.logoUrl || ''
+    };
+  }
+
+  function buildAccountMeta(account) {
+    if (!account) return null;
+    const accountName = account.accountName || account.name || account.company || account.companyName || '';
+    const branding = buildAccountBranding(account);
+    return {
+      name: '',
+      account: accountName,
+      accountId: account.id || account.accountId || account._id || null,
+      title: '',
+      city: account.city || '',
+      state: account.state || '',
+      domain: branding.domain,
+      logoUrl: branding.logoUrl || '',
+      contactId: null
+    };
+  }
+
+  function findLocalCRMMeta(candidateDigits) {
+    if (!candidateDigits.length) return null;
+    const peopleData = getCRMData('getPeopleData');
+    const accountsData = getCRMData('getAccountsData');
+    for (const contact of peopleData) {
+      const phones = getContactPhones(contact);
+      if (!phones.length) continue;
+      if (phones.some((phone) => matchesCandidate(phone, candidateDigits))) {
+        const matchedAccount = findAccountByContact(contact, accountsData);
+        return buildContactMeta(contact, matchedAccount);
+      }
+    }
+    const directAccount = findMatchingAccount(candidateDigits, accountsData);
+    if (directAccount) {
+      return buildAccountMeta(directAccount);
+    }
+    return null;
+  }
+
   async function resolvePhoneMeta(number, preserveContext = null) {
     const digits = (number || '').replace(/\D/g, '');
     const e164 = digits && digits.length === 10 ? `+1${digits}` : (digits && digits.startsWith('1') && digits.length === 11 ? `+${digits}` : (String(number||'').startsWith('+') ? String(number) : ''));
     const candidates = Array.from(new Set([digits, e164.replace(/\D/g,'')] )).filter(Boolean);
+    const candidateDigits = normalizeCandidateDigits(candidates, number);
     
     // CRITICAL: If we have existing context with IDs/names, preserve it and only enrich missing fields
     // This prevents CRM lookup from overwriting context that was set by click-to-call
@@ -1057,6 +1259,11 @@
       callerIdImage: null 
     };
     
+    const localMeta = !hasExistingContext ? findLocalCRMMeta(candidateDigits) : null;
+    if (localMeta) {
+      return { ...meta, ...localMeta };
+    }
+
     // If we already have context, skip CRM lookup to prevent overwriting
     if (hasExistingContext) {
       return meta;

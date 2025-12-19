@@ -260,18 +260,26 @@ class ToastManager {
     showCallNotification(callData) {
         const { callerName, callerNumber, company, title, city, state, callerIdImage, carrierName, carrierType, nationalFormat } = callData;
         
-        let titleText = 'Incoming Call';
+        let hasCallerName = Boolean(callerName);
+        let titleText = callerName || company || 'Incoming Call';
         let messageText = nationalFormat || callerNumber;
         let detailsText = '';
         let icon = null;
 
-        if (callerName) {
-            titleText = callerName;
-            messageText = nationalFormat || callerNumber;
+        if (hasCallerName) {
             if (title) detailsText += title;
             if (company) detailsText += (detailsText ? ' at ' : '') + company;
-            if (city && state) detailsText += (detailsText ? ', ' : '') + `${city}, ${state}`;
-            
+        } else {
+            if (company && company !== titleText) {
+                detailsText += company;
+            }
+            if (title) detailsText += (detailsText ? ' at ' : '') + title;
+        }
+        if (city && state) {
+            detailsText += (detailsText ? ', ' : '') + `${city}, ${state}`;
+        }
+
+        if (callerName) {
             // Create initials from name
             const initials = callerName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
             icon = initials;
@@ -422,17 +430,45 @@ class ToastManager {
 
     // Call handling methods
     answerCall(callData) {
-        // Handle call acceptance
-        if (window.TwilioRTC && window.TwilioRTC.acceptCall) {
-            window.TwilioRTC.acceptCall();
+        if (!callData) return;
+
+        try {
+            if (window.Widgets && typeof window.Widgets.openPhone === 'function') {
+                window.Widgets.openPhone();
+            }
+        } catch (error) {
+            console.error('[ToastManager] Failed to open phone widget before accepting call:', error);
         }
-        
-        // Remove the toast
+
+        let accepted = false;
+
+        try {
+            if (window.TwilioRTC && typeof window.TwilioRTC.acceptCall === 'function') {
+                accepted = window.TwilioRTC.acceptCall() === true || accepted;
+            }
+        } catch (error) {
+            console.error('[ToastManager] TwilioRTC.acceptCall error:', error);
+        }
+
+        const connection = callData.connection;
+        if (!accepted && connection && typeof connection.accept === 'function') {
+            try {
+                connection.accept();
+                accepted = true;
+            } catch (error) {
+                console.error('[ToastManager] Connection.accept error:', error);
+            }
+        }
+
+        if (!accepted) {
+            this.showWarningNotification('Call Answer Failed', 'Unable to accept the incoming call. Please try again.');
+            return;
+        }
+
         if (callData.toastId) {
             this.removeToast(callData.toastId);
         }
-        
-        // Show call accepted notification
+
         this.showInfoNotification('Call Accepted', `Connected to ${callData.callerName || callData.callerNumber}`);
     }
 
