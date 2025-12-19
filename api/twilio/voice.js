@@ -2,6 +2,89 @@ import twilio from 'twilio';
 import logger from '../_logger.js';
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
+const DEFAULT_TWILIO_BUSINESS_NUMBER = '+18176630380';
+const INCOMING_NUMBERS_CACHE_TTL = 5 * 60 * 1000;
+let inboundNumbersCache = [];
+let inboundNumbersCacheUpdatedAt = 0;
+
+function normalizePhoneNumber(value) {
+    if (!value) return null;
+    const str = String(value).trim();
+    if (!str) return null;
+    const digits = str.replace(/\D/g, '');
+    if (!digits) return null;
+    if (str.startsWith('+')) return `+${digits}`;
+    if (digits.length === 10) return `+1${digits}`;
+    if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+    return `+${digits}`;
+}
+
+function digitsOnly(value) {
+    return (value || '').toString().replace(/\D/g, '');
+}
+
+function parseNumberList(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) {
+        return value.map(normalizePhoneNumber).filter(Boolean);
+    }
+    return value
+        .toString()
+        .split(/[\s,;|]+/)
+        .map(normalizePhoneNumber)
+        .filter(Boolean);
+}
+
+async function getTwilioIncomingNumbersList() {
+    const now = Date.now();
+    if (inboundNumbersCacheUpdatedAt && now - inboundNumbersCacheUpdatedAt < INCOMING_NUMBERS_CACHE_TTL && inboundNumbersCache.length) {
+        return inboundNumbersCache;
+    }
+
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    if (!accountSid || !authToken) {
+        return inboundNumbersCache;
+    }
+
+    try {
+        const client = twilio(accountSid, authToken);
+        const list = await client.incomingPhoneNumbers.list({ limit: 1000 });
+        inboundNumbersCache = list
+            .map((num) => normalizePhoneNumber(num.phoneNumber))
+            .filter(Boolean);
+        inboundNumbersCacheUpdatedAt = now;
+    } catch (error) {
+        logger.error('[Voice] Unable to refresh incoming numbers list:', error?.message || error);
+    }
+
+    return inboundNumbersCache;
+}
+
+async function resolveInboundPhoneNumbers() {
+    const fetched = await getTwilioIncomingNumbersList();
+    const candidates = [
+        ...fetched,
+        ...parseNumberList(process.env.TWILIO_PHONE_NUMBERS),
+        ...parseNumberList(process.env.TWILIO_INBOUND_NUMBERS),
+        ...parseNumberList(process.env.TWILIO_INBOUND_PHONE_NUMBERS),
+        ...parseNumberList(process.env.TWILIO_NUMBERS),
+        normalizePhoneNumber(process.env.TWILIO_PHONE_NUMBER),
+        normalizePhoneNumber(process.env.TWILIO_BUSINESS_NUMBER),
+        DEFAULT_TWILIO_BUSINESS_NUMBER
+    ].filter(Boolean);
+
+    const unique = [];
+    const seen = new Set();
+    candidates.forEach((candidate) => {
+        if (!seen.has(candidate)) {
+            seen.add(candidate);
+            unique.push(candidate);
+        }
+    });
+    return unique;
+}
+
 export default async function handler(req, res) {
     // Allow GET or POST (Twilio Console may be configured for either)
     if (req.method !== 'POST' && req.method !== 'GET') {
@@ -16,18 +99,16 @@ export default async function handler(req, res) {
         const To = src.To || src.to; // For inbound, this is typically your Twilio number
         const From = src.From || src.from; // For inbound, this is the caller's number; for outbound, this is the selected caller ID
         const CallSid = src.CallSid || src.callSid;
-        
-        // Dynamic caller ID: Use From parameter if provided (for outbound calls), otherwise use fallback
-        // For inbound calls, From will be the caller's number, so we'll use businessNumber as fallback
-        const businessNumber = process.env.TWILIO_PHONE_NUMBER || '+18176630380';
-        
-        // Determine caller ID: for outbound browser calls, From will be the selected Twilio number
-        // For inbound calls, From will be the caller's number, so we check if it matches our business number
-        const digits = (s) => (s || '').toString().replace(/\D/g, '');
-        const toDigits = digits(To);
-        const businessDigits = digits(businessNumber);
-        const isInboundToBusiness = toDigits && businessDigits && toDigits === businessDigits;
-        
+
+        const inboundPhoneNumbers = await resolveInboundPhoneNumbers();
+        const primaryBusinessNumber = inboundPhoneNumbers[0] || DEFAULT_TWILIO_BUSINESS_NUMBER;
+        const toDigits = digitsOnly(To);
+        const matchedInboundNumber = toDigits
+            ? inboundPhoneNumbers.find((num) => digitsOnly(num) === toDigits)
+            : null;
+        const isInboundToBusiness = Boolean(matchedInboundNumber);
+        const businessNumber = matchedInboundNumber || primaryBusinessNumber;
+
         // For outbound calls, use From as callerId (this is the selected Twilio number from settings)
         // For inbound calls, use businessNumber as callerId when dialing to browser client
         const callerIdForDial = isInboundToBusiness ? businessNumber : (From || businessNumber);
