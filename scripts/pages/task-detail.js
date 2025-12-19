@@ -2673,6 +2673,9 @@
   }
 
   async function loadTaskData(taskId) {
+    const pageEl = els.page;
+    pageEl?.classList.add('task-loading');
+    pageEl?.classList.remove('task-loaded');
     // CRITICAL FIX: Prevent race conditions - if already loading, wait or skip
     if (state.loadingTask) {
       console.warn('[TaskDetail] Task load already in progress, skipping duplicate call');
@@ -3103,6 +3106,8 @@
     } finally {
       // CRITICAL FIX: Always reset loading flag, even on error
       state.loadingTask = false;
+      pageEl?.classList.remove('task-loading');
+      pageEl?.classList.add('task-loaded');
     }
   }
 
