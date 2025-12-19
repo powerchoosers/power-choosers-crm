@@ -426,18 +426,18 @@
   function findAssociatedAccount(contact) {
     try {
       if (!contact) return null;
-      
+
       // Check state.account first (already loaded by loadContactAccountData)
       if (state.account) {
         const accountId = contact.accountId || contact.account_id || '';
         if (accountId && state.account.id === accountId) return state.account;
-        
+
         const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
         const contactCompany = norm(contact.companyName || contact.accountName || '');
         const stateAccountName = norm(state.account.accountName || state.account.name || state.account.companyName || '');
         if (contactCompany && stateAccountName && contactCompany === stateAccountName) return state.account;
       }
-      
+
       // Get accounts from multiple sources
       let accounts = [];
       if (typeof window.getAccountsData === 'function') {
@@ -446,9 +446,9 @@
       if (accounts.length === 0 && window.BackgroundAccountsLoader) {
         accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
       }
-      
+
       if (accounts.length === 0) return null;
-      
+
       // Prefer explicit accountId
       const accountId = contact.accountId || contact.account_id || '';
       if (accountId) {
@@ -470,13 +470,13 @@
       // Check state.account first (already loaded by loadContactAccountData)
       if (state.account) {
         if (accountId && state.account.id === accountId) return state.account;
-        
+
         const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
         const stateAccountName = norm(state.account.accountName || state.account.name || state.account.companyName || '');
         const searchName = norm(accountName || '');
         if (searchName && stateAccountName && searchName === stateAccountName) return state.account;
       }
-      
+
       // Get accounts from multiple sources
       let accounts = [];
       if (typeof window.getAccountsData === 'function') {
@@ -485,7 +485,7 @@
       if (accounts.length === 0 && window.BackgroundAccountsLoader) {
         accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
       }
-      
+
       if (accounts.length === 0) return null;
 
       // Try by ID first
@@ -701,7 +701,7 @@
         width: 1px;
         height: 24px;
         background: var(--border-light);
-        margin: 0 8px;
+        margin: 0;
       }
       
       /* Widgets Wrap */
@@ -837,7 +837,7 @@
       #task-detail-page .page-actions {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 8px;
         margin-left: auto;
       }
       
@@ -1202,7 +1202,7 @@
 
     // Get contact ID from task or state
     const contactId = task.contactId || state.contact?.id || state.contact?._id;
-    
+
     // Get account ID - prioritize state.account, then contact's linked account
     let accountId = state.account?.id || state.account?.accountId || state.account?._id;
     if (!accountId && state.contact) {
@@ -1599,7 +1599,7 @@
       try {
         window.BackgroundTasksLoader.removeTask(state.currentTask.id);
         console.log('[TaskDetail] Removed task from BackgroundTasksLoader cache');
-    } catch (e) {
+      } catch (e) {
         console.warn('[TaskDetail] Could not remove task from BackgroundTasksLoader:', e);
       }
     }
@@ -2094,7 +2094,7 @@
 
     // CRITICAL FIX: Invalidate cache BEFORE reloading to ensure fresh data
     if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
-      try { 
+      try {
         await window.CacheManager.invalidate('tasks');
         console.log('[TaskDetail] Invalidated tasks cache after reschedule');
       } catch (_) { }
@@ -2103,19 +2103,19 @@
     // CRITICAL FIX: Force reload BackgroundTasksLoader to get updated task with new dueDate/dueTime
     // Small delay to ensure Firebase update completes
     await new Promise(resolve => setTimeout(resolve, 150));
-    
+
     if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
-      try { 
+      try {
         await window.BackgroundTasksLoader.forceReload();
         console.log('[TaskDetail] BackgroundTasksLoader reloaded after reschedule');
-      } catch (e) { 
-        console.warn('[TaskDetail] Failed to refresh BackgroundTasksLoader after reschedule', e); 
+      } catch (e) {
+        console.warn('[TaskDetail] Failed to refresh BackgroundTasksLoader after reschedule', e);
       }
     }
 
     // CRITICAL FIX: Refresh Today's Tasks widget AFTER reload completes
     if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
-      try { 
+      try {
         // Small delay to ensure BackgroundTasksLoader reload completes
         setTimeout(() => {
           window.crm.loadTodaysTasks();
@@ -2166,7 +2166,7 @@
       const top = Math.round(window.scrollY + rect.bottom + 8);
       pop.style.left = `${clampedLeft}px`;
       pop.style.top = `${top}px`;
-      
+
       // Position arrow to point to the center of the anchor button
       const arrowLeft = Math.round(anchorCenter - clampedLeft);
       pop.style.setProperty('--arrow-left', `${arrowLeft}px`);
@@ -2325,11 +2325,11 @@
           const allTasksMap = new Map();
           allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
           firebaseTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
-          
+
           // CRITICAL FIX: Add LinkedIn sequence tasks (in case they weren't loaded earlier)
           const linkedInTasks = await getLinkedInTasksFromSequences();
           linkedInTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
-          
+
           allTasks = Array.from(allTasksMap.values());
         } catch (e) {
           console.warn('Could not load tasks from Firebase for navigation:', e);
@@ -2573,11 +2573,11 @@
           const allTasksMap = new Map();
           allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
           firebaseTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
-          
+
           // CRITICAL FIX: Add LinkedIn sequence tasks
           const linkedInTasks = await getLinkedInTasksFromSequences();
           linkedInTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
-          
+
           allTasks = Array.from(allTasksMap.values());
         } catch (e) {
           console.warn('Could not load tasks from Firebase for navigation buttons:', e);
@@ -3062,7 +3062,7 @@
 
       // Load contact/account data - AWAIT to ensure data is loaded before rendering
       await loadContactAccountData(task);
-      
+
       console.log('[TaskDetail] Contact/account data loading complete:', {
         hasContact: !!state.contact,
         hasAccount: !!state.account,
@@ -3230,7 +3230,7 @@
     if ((contactsData.length === 0 || accountsData.length === 0) && window.CacheManager) {
       console.log('[TaskDetail] Waiting for cache to populate...');
       await new Promise(resolve => setTimeout(resolve, 500));
-      
+
       try {
         if (contactsData.length === 0) {
           contactsData = await window.CacheManager.get('contacts').catch(() => []) || [];
@@ -3277,7 +3277,7 @@
                 console.log('[TaskDetail] ✓ Found contact via direct Firebase query by ID');
               }
             }
-            
+
             // If not found by ID, try by name (requires query)
             if (!contact && task.contact) {
               // Query by firstName + lastName combination
@@ -3346,7 +3346,7 @@
                 console.log('[TaskDetail] ✓ Found account via direct Firebase query by ID');
               }
             }
-            
+
             // If not found by ID, try by name (requires query)
             if (!account && task.account) {
               // Query by accountName field
@@ -3359,7 +3359,7 @@
                 account = { id: doc.id, ...doc.data() };
                 console.log('[TaskDetail] ✓ Found account via Firebase query by accountName');
               }
-              
+
               // Also try 'name' field as fallback
               if (!account) {
                 const snap2 = await window.firebaseDB.collection('accounts')
@@ -3510,6 +3510,7 @@
     titleSection.offsetHeight;
   }
 
+
   function renderTaskPage() {
     if (!state.currentTask) {
       console.error('[TaskDetail] Cannot render: no current task in state');
@@ -3592,10 +3593,23 @@
           companyIconHTML = `<div style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: var(--bg-item); border-radius: 6px; font-weight: 600; font-size: 18px; color: var(--text-secondary);">${fallbackLetter}</div>`;
         }
 
-        // Update title with company name link
+        // Update title with company name link and actions
         if (els.title && accountName) {
           const companyLinkHTML = `<a href="#account-details" class="company-link" data-account-id="${escapeHtml(accountId)}" data-account-name="${escapeHtml(accountName)}">${escapeHtml(accountName)}</a>`;
-          els.title.innerHTML = `Call ${companyLinkHTML}`;
+
+          const actionsHTML = `
+            <div class="title-actions" aria-hidden="true">
+              <button type="button" class="icon-btn-sm title-edit" title="Edit account" data-action="edit-account" data-id="${escapeHtml(accountId)}">${editIcon()}</button>
+              <button type="button" class="icon-btn-sm title-copy" title="Copy name" data-action="copy-name" data-text="${escapeHtml(accountName)}">${copyIcon()}</button>
+              <button type="button" class="icon-btn-sm title-clear" title="Delete" data-action="delete-account" data-id="${escapeHtml(accountId)}">${trashIcon()}</button>
+            </div>`;
+
+          els.title.innerHTML = `Call <span class="contact-title-row" style="display:inline-flex; align-items:center; gap:8px">${companyLinkHTML}${actionsHTML}</span>`;
+
+          // Ensure handlers are set up
+          if (!document._taskHeaderActionsBound) {
+            setupHeaderActions();
+          }
         }
 
         // Add company icon/favicon to header using retry helper
@@ -3745,7 +3759,20 @@
 
           // CRITICAL FIX: Always render the link, even without ID (handler will try to resolve it)
           const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(finalContactId || '')}" data-contact-name="${escapeHtml(contactName)}" style="cursor: pointer;">${escapeHtml(contactName)}</a>`;
-          els.title.innerHTML = `Call ${contactLinkHTML}`;
+
+          const actionsHTML = `
+            <div class="title-actions" aria-hidden="true">
+              <button type="button" class="icon-btn-sm title-edit" title="Edit contact" data-action="edit-contact" data-id="${escapeHtml(finalContactId || '')}">${editIcon()}</button>
+              <button type="button" class="icon-btn-sm title-copy" title="Copy name" data-action="copy-name" data-text="${escapeHtml(contactName)}">${copyIcon()}</button>
+              <button type="button" class="icon-btn-sm title-clear" title="Delete" data-action="delete-contact" data-id="${escapeHtml(finalContactId || '')}">${trashIcon()}</button>
+            </div>`;
+
+          els.title.innerHTML = `Call <span class="contact-title-row" style="display:inline-flex; align-items:center; gap:8px">${contactLinkHTML}${actionsHTML}</span>`;
+
+          // Ensure handlers are set up
+          if (!document._taskHeaderActionsBound) {
+            setupHeaderActions();
+          }
 
           // CRITICAL FIX: Test click immediately after render
           requestAnimationFrame(() => {
@@ -3789,12 +3816,12 @@
         // Create contact details content (no avatar here)
         // CRITICAL FIX: Match contact-detail.js format: "(title) at (company link)" or just "(title)" or just "(company link)"
         let contactDetailsHTML = '';
-        
+
         // CRITICAL FIX: Use state.account if available (already loaded by loadContactAccountData) for most reliable account data
         const linkedAccount = state.account || findAssociatedAccount(person);
         const accountId = linkedAccount?.id || '';
         const companyLink = company ? `<a href="#account-details" class="company-link" id="task-header-company-link" title="View account details" data-account-id="${escapeHtml(accountId)}" data-account-name="${escapeHtml(company)}">${escapeHtml(company)}</a>` : '';
-        
+
         // Match contact-detail.js format exactly: title + " at " + company link (if both exist)
         if (title && company) {
           contactDetailsHTML = `${escapeHtml(title)} at ${companyLink}`;
@@ -4013,13 +4040,13 @@
       // Create contact details content
       // CRITICAL FIX: Match contact-detail.js format: "(title) at (company link)" or just "(title)" or just "(company link)"
       let contactDetailsHTML = '';
-      
+
       // CRITICAL FIX: Use state.account if available (already loaded by loadContactAccountData) for most reliable account data
       // Don't use findAssociatedAccount if task's account was explicitly not found (prevents stale data)
       const linkedAccount = state.account || (state._taskAccountNotFound ? null : findAssociatedAccount(person)) || null;
       const accountId = linkedAccount?.id || '';
       const companyLink = company ? `<a href="#account-details" class="company-link" id="task-header-company-link" title="View account details" data-account-id="${escapeHtml(accountId)}" data-account-name="${escapeHtml(company)}">${escapeHtml(company)}</a>` : '';
-      
+
       // Match contact-detail.js format exactly: title + " at " + company link (if both exist)
       if (title && company) {
         contactDetailsHTML = `${escapeHtml(title)} at ${companyLink}`;
@@ -4154,6 +4181,11 @@
 
     // Handle company link clicks using event delegation (works after re-renders)
     document.addEventListener('click', (e) => {
+      // FIX: Skip navigation if click originated from a button inside the link
+      if (e.target.closest('button')) {
+        return;
+      }
+
       const companyLink = e.target.closest('#task-detail-page .company-link');
       if (!companyLink) return;
 
@@ -4598,11 +4630,11 @@
     // Get contact information
     const contactName = task.contact || '';
     const accountName = task.account || '';
-    
+
     // CRITICAL FIX: Use state.contact if available (already loaded by loadContactAccountData)
     // Only fall back to name-based lookup if state.contact is not set
     let person = state.contact || null;
-    
+
     if (!person && typeof window.getPeopleData === 'function') {
       const people = window.getPeopleData() || [];
       person = people.find(p => {
@@ -4610,7 +4642,7 @@
         return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
       });
     }
-    
+
     // Also try BackgroundContactsLoader if still not found
     if (!person && window.BackgroundContactsLoader) {
       try {
@@ -4621,7 +4653,7 @@
         });
       } catch (_) { /* noop */ }
     }
-    
+
     // Also try by contactId if name match fails
     if (!person && task.contactId) {
       if (typeof window.getPeopleData === 'function') {
@@ -4635,7 +4667,7 @@
         } catch (_) { /* noop */ }
       }
     }
-    
+
     person = person || {};
 
     // Get contact details for the sidebar
@@ -4926,11 +4958,11 @@
     // Get contact information (same as call tasks)
     const contactName = task.contact || '';
     const accountName = task.account || '';
-    
+
     // CRITICAL FIX: Use state.contact if available (already loaded by loadContactAccountData)
     // Only fall back to name-based lookup if state.contact is not set
     let person = state.contact || null;
-    
+
     if (!person && typeof window.getPeopleData === 'function') {
       const people = window.getPeopleData() || [];
       person = people.find(p => {
@@ -4938,7 +4970,7 @@
         return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
       });
     }
-    
+
     // Also try BackgroundContactsLoader if still not found
     if (!person && window.BackgroundContactsLoader) {
       try {
@@ -4949,7 +4981,7 @@
         });
       } catch (_) { /* noop */ }
     }
-    
+
     // Also try by contactId if name match fails
     if (!person && task.contactId) {
       if (typeof window.getPeopleData === 'function') {
@@ -4963,7 +4995,7 @@
         } catch (_) { /* noop */ }
       }
     }
-    
+
     person = person || {};
 
     // Get contact details for the sidebar
@@ -5382,7 +5414,7 @@
 
       // CRITICAL: Also try to get account from state.account if available (most reliable source, like account-detail.js)
       let account = state.account || null;
-      
+
       // If no state.account, try to find by accountId from data attributes
       if (!account && dataAccountId) {
         account = findAccountByIdOrName(dataAccountId, dataAccountName);
@@ -5411,10 +5443,10 @@
             const fromAccount = account.logoUrl || account.logo || account.companyLogo || account.iconUrl || account.companyIcon || account.imageUrl || account.companyImage;
             if (fromAccount) return String(fromAccount);
           }
-          
+
           // Priority 2: From data attribute
           if (dataLogoUrl) return String(dataLogoUrl);
-          
+
           // Priority 3: Try DOM elements (like account-detail.js does)
           const root = document.querySelector('#task-detail-page') || document;
           const imgSel = [
@@ -5426,7 +5458,7 @@
           ].join(',');
           const img = root.querySelector(imgSel);
           if (img && img.src) return img.src;
-          
+
           return '';
         } catch (_) { return ''; }
       })();
@@ -5802,6 +5834,11 @@
     console.log('[TaskDetail] Setting up contact link handlers');
 
     const contactLinkHandler = (e) => {
+      // FIX: Skip navigation if click originated from a button inside the link
+      if (e.target.closest('button')) {
+        return;
+      }
+
       // CRITICAL FIX: Check if click is within task-detail-page first
       const taskPage = e.target.closest('#task-detail-page');
       if (!taskPage) return;
@@ -6084,7 +6121,7 @@
       // Only refresh if the updated contact matches the task's contact
       if (id === taskContactId || id === stateContactId) {
         console.log('[TaskDetail] Contact updated, reloading contact data:', id);
-        
+
         try {
           // Reload contact data from Firestore to get latest changes
           if (window.firebaseDB && id) {
@@ -6093,15 +6130,15 @@
               const updatedContact = { id: contactDoc.id, ...contactDoc.data() };
               state.contact = updatedContact;
               console.log('[TaskDetail] ✓ Reloaded contact data:', updatedContact.firstName, updatedContact.lastName);
-              
+
               // Re-render the task page to show updated contact information
               renderTaskPage();
-              
+
               // Update cache if available
               if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
                 await window.CacheManager.updateRecord('contacts', id, updatedContact);
               }
-              
+
               // Update BackgroundContactsLoader cache if available (best-effort)
               try {
                 if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
@@ -6115,7 +6152,7 @@
               } catch (e) {
                 console.warn('[TaskDetail] Could not update BackgroundContactsLoader cache:', e);
               }
-              
+
               // Re-process click-to-call to ensure context is updated
               setTimeout(() => {
                 processClickToCallAndEmail();
@@ -6285,17 +6322,17 @@
 
   async function commitEdit(wrap, field, value) {
     let toSave = value;
-    
+
     // Convert contractEndDate to MM/DD/YYYY for storage
     if (field === 'contractEndDate') {
       toSave = toMDY(value);
     }
-    
+
     // Normalize phone numbers
     if (field === 'companyPhone') {
       toSave = normalizePhone(value);
     }
-    
+
     // If website updated, also compute and persist domain
     if (field === 'website') {
       try {
@@ -6344,7 +6381,7 @@
     }
 
     wrap.classList.remove('editing');
-    
+
     // Restore default actions
     const actionsEl = wrap.querySelector('.info-actions');
     if (!actionsEl) {
@@ -6369,7 +6406,7 @@
         id = state.contact?.id;
       }
     }
-    
+
     if (!id) {
       console.warn('[TaskDetail] Cannot save field: no entity ID for', entity);
       return;
@@ -6407,9 +6444,9 @@
     const textEl = wrap.querySelector('.info-value-text');
     const field = wrap.getAttribute('data-field');
     if (!textEl) return;
-    
+
     const val = value == null ? '' : String(value);
-    
+
     if (field === 'website' && val) {
       const url = /^https?:\/\//i.test(val) ? val : 'https://' + val;
       textEl.innerHTML = `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="website-link">${escapeHtml(val)}</a>`;
@@ -6477,7 +6514,7 @@
       // Only refresh if the updated account matches the task's account (any source)
       if (id === taskAccountId || id === contactAccountId || id === stateAccountId) {
         console.log('[TaskDetail] Account updated, reloading account data:', id);
-        
+
         try {
           // Reload account data from Firestore to get latest changes
           if (window.firebaseDB && id) {
@@ -6486,15 +6523,15 @@
               const updatedAccount = { id: accountDoc.id, ...accountDoc.data() };
               state.account = updatedAccount;
               console.log('[TaskDetail] ✓ Reloaded account data:', updatedAccount.accountName || updatedAccount.name);
-              
+
               // Re-render the task page to show updated account information
               renderTaskPage();
-              
+
               // Update cache if available
               if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
                 await window.CacheManager.updateRecord('accounts', id, updatedAccount);
               }
-              
+
               // Update BackgroundAccountsLoader cache if available (best-effort)
               try {
                 if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
@@ -6534,7 +6571,7 @@
       // Only refresh if the updated account matches the task's account (any source)
       if (id === taskAccountId || id === contactAccountId || id === stateAccountId) {
         console.log('[TaskDetail] Energy field updated:', field, 'for account:', id);
-        
+
         try {
           // Reload account data from Firestore to get latest energy fields
           if (window.firebaseDB && id) {
@@ -6543,10 +6580,10 @@
               const updatedAccount = { id: accountDoc.id, ...accountDoc.data() };
               state.account = updatedAccount;
               console.log('[TaskDetail] ✓ Reloaded account data after energy update');
-              
+
               // Re-render the task page to show updated energy information
               renderTaskPage();
-              
+
               // Update cache if available
               if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
                 await window.CacheManager.updateRecord('accounts', id, updatedAccount);
@@ -6643,6 +6680,7 @@
     window.TaskDetail.init();
   }
 
+
   // Process click-to-call and click-to-email when task detail page loads
   document.addEventListener('pc:page-loaded', function (e) {
     if (e.detail && e.detail.page === 'task-detail') {
@@ -6679,7 +6717,7 @@
       if (state.currentTask && state.account?.id) {
         const accountId = state.account.id;
         console.log('[TaskDetail] Returning from account-detail, refreshing account data:', accountId);
-        
+
         try {
           // Force reload account data from Firestore (bypass cache to get latest changes)
           if (window.firebaseDB && accountId) {
@@ -6688,10 +6726,10 @@
               const updatedAccount = { id: accountDoc.id, ...accountDoc.data() };
               state.account = updatedAccount;
               console.log('[TaskDetail] ✓ Reloaded account data after returning from account-detail');
-              
+
               // Re-render the task page to show updated account information
               renderTaskPage();
-              
+
               // Update cache with fresh data
               if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
                 await window.CacheManager.updateRecord('accounts', accountId, updatedAccount);
@@ -6708,5 +6746,65 @@
     document._taskDetailAccountDetailsRestoreHandler = onAccountDetailsRestore;
     document._taskDetailAccountDetailsRestoreBound = true;
   }
+
+  function setupHeaderActions() {
+    if (document._taskHeaderActionsBound) return;
+
+    document.addEventListener('click', (e) => {
+      // Only handle clicks inside task detail page header
+      if (!e.target.closest('#task-detail-header') && !e.target.closest('#task-detail-title')) return;
+
+      const btn = e.target.closest('button');
+      if (!btn) return;
+
+      const action = btn.dataset.action;
+      if (!action) return;
+
+      if (action === 'edit-account') {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = btn.dataset.id;
+        if (id && window.AccountDetail && window.AccountDetail.openEditModal) {
+          // Pass the current account state to the modal
+          const accountData = state.account || (state.currentTask && state.currentTask.account ? { id: state.currentTask.accountId, name: state.currentTask.account } : null);
+          window.AccountDetail.openEditModal(accountData);
+          console.log('[TaskDetail] Edit account clicked', id);
+        } else {
+          console.warn('[TaskDetail] AccountDetail.openEditModal not available');
+        }
+      } else if (action === 'edit-contact') {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = btn.dataset.id;
+        if (id && window.ContactDetail && window.ContactDetail.openEditModal) {
+          // Pass the current contact state to the modal
+          const contactData = state.contact || (state.currentTask && state.currentTask.contact ? { id: state.currentTask.contactId, name: state.currentTask.contact } : null);
+          window.ContactDetail.openEditModal(contactData);
+          console.log('[TaskDetail] Edit contact clicked', id);
+        } else {
+          console.warn('[TaskDetail] ContactDetail.openEditModal not available');
+        }
+      } else if (action === 'copy-name') {
+        e.preventDefault();
+        e.stopPropagation();
+        const text = btn.dataset.text;
+        if (text) {
+          navigator.clipboard.writeText(text).then(() => {
+            if (window.crm && window.crm.showToast) window.crm.showToast('Name copied to clipboard');
+          }).catch(err => console.error('Failed to copy:', err));
+        }
+      } else if (action === 'delete-account' || action === 'delete-contact') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (window.crm && window.crm.showToast) {
+          window.crm.showToast('Delete functionality is not yet fully implemented for this context.', 'info');
+        }
+      }
+    }, true);
+
+    document._taskHeaderActionsBound = true;
+    console.log('[TaskDetail] Header actions bound');
+  }
+
 })();
 
