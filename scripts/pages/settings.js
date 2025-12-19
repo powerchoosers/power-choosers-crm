@@ -49,7 +49,7 @@ class SettingsPage {
                     minSampleSize: 100,
                     testVariables: [
                         'subject_line',
-                        'opening_hook', 
+                        'opening_hook',
                         'value_prop_format',
                         'cta_type'
                     ],
@@ -134,7 +134,7 @@ class SettingsPage {
                     email: '',              // Read-only from Google
                     photoURL: '',           // Google avatar URL
                     hostedPhotoURL: '',     // Re-hosted to Imgur
-                    
+
                     // Editable professional info
                     jobTitle: 'Energy Strategist',
                     location: 'Fort Worth, TX',
@@ -142,7 +142,7 @@ class SettingsPage {
                     companyName: 'Power Choosers',
                     linkedIn: '',           // LinkedIn profile URL
                     bio: '',                // Author bio for blog posts
-                    
+
                     // Existing fields
                     agentName: 'Power Choosers',
                     autoSaveNotes: true,
@@ -154,7 +154,7 @@ class SettingsPage {
             },
             isDirty: false
         };
-        
+
         this.init();
     }
 
@@ -163,50 +163,52 @@ class SettingsPage {
         injectModernStyles();
         setupCollapseFunctionality();
         this.setupEventListeners();
-        
+
         // Initialize save button immediately (visible and styled, but disabled until changes)
         this.updateSaveButton();
-        
+
         // Set up auth state listener
         this.setupAuthStateListener();
-        
-        // CRITICAL: Populate profile info IMMEDIATELY from Google Auth (don't wait for settings)
-        // This ensures profile fields show right away for all users
-        this.ensureGoogleUserData().then(() => {
-            // Render settings UI immediately (even if data isn't loaded yet)
+
+        // CRITICAL: Populate profile info and ensure auth is ready BEFORE loading settings
+        // This prevents race conditions where settings load before auth is ready (causing "wiped" settings)
+        this.ensureGoogleUserData().then(async () => {
+            // Render settings UI immediately with Google data
             this.renderSettings();
-            
+
             // Force update profile fields right away
             this.forceUpdateProfileFields();
+
+            // Now load settings (safe because auth is ready)
+            try {
+                await this.loadSettings();
+
+                // After settings load, re-render to populate all other fields
+                this.renderSettings();
+
+                // Update profile fields one more time (in case settings had different values)
+                this.forceUpdateProfileFields();
+
+                // Convert data URL signatures (non-critical)
+                this.convertDataUrlSignature();
+            } catch (error) {
+                console.error('[Settings] Error during settings load:', error);
+                // Still render with defaults even if load fails
+                this.renderSettings();
+            }
         });
-        
-        // Load settings in background (non-blocking) and update when ready
-        this.loadSettings().then(() => {
-            // After settings load, re-render to populate all other fields
-            this.renderSettings();
-            
-            // Update profile fields one more time (in case settings had different values)
-            this.forceUpdateProfileFields();
-            
-            // Convert data URL signatures (non-critical)
-            this.convertDataUrlSignature();
-        }).catch(error => {
-            console.error('[Settings] Error during initialization:', error);
-            // Still render with defaults even if load fails
-            this.renderSettings();
-        });
-        
+
         // Force update profile fields after a delay (fallback to ensure they populate)
         setTimeout(() => {
             this.forceUpdateProfileFields();
         }, 500);
-        
+
         // One more update after everything should be ready (1 second)
         setTimeout(() => {
             this.forceUpdateProfileFields();
         }, 1000);
     }
-    
+
     setupAuthStateListener() {
         // Listen for Firebase Auth state changes - triggers immediately if user already logged in
         if (firebase && firebase.auth) {
@@ -218,7 +220,7 @@ class SettingsPage {
             });
         }
     }
-    
+
     cleanup() {
         // Remove auth state listener when settings page is destroyed
         if (this.authStateListener && firebase && firebase.auth) {
@@ -226,24 +228,24 @@ class SettingsPage {
             this.authStateListener = null;
         }
     }
-    
+
     async forceUpdateProfileFields() {
         // Get user from multiple sources with fallback strategy
         let user = null;
         let firstName = '';
         let lastName = '';
         let email = '';
-        
+
         // Strategy 1: Try authManager first (most reliable)
         if (window.authManager && window.authManager.getCurrentUser && typeof window.authManager.getCurrentUser === 'function') {
             user = window.authManager.getCurrentUser();
         }
-        
+
         // Strategy 2: Fallback to Firebase auth currentUser
         if (!user) {
             user = firebase.auth().currentUser;
         }
-        
+
         // Strategy 3: If still no user, wait and retry
         if (!user) {
             // Wait a bit for auth to initialize
@@ -255,17 +257,17 @@ class SettingsPage {
                 user = firebase.auth().currentUser;
             }
         }
-        
+
         if (user) {
             // Extract from user object
             email = (user.email || '').toLowerCase().trim();
             const displayName = user.displayName || '';
-            
+
             // Parse displayName
             const nameParts = displayName.trim().split(' ').filter(p => p);
             firstName = nameParts[0] || '';
             lastName = nameParts.slice(1).join(' ') || '';
-            
+
             // Strategy 4: If displayName is missing, try to get from users collection
             if (!firstName && email && window.firebaseDB) {
                 try {
@@ -283,7 +285,7 @@ class SettingsPage {
                     console.warn('[Settings] Could not fetch user profile from Firestore:', err);
                 }
             }
-            
+
             // Strategy 5: Last resort - parse from email
             if (!firstName && email) {
                 const emailPrefix = email.split('@')[0];
@@ -300,7 +302,7 @@ class SettingsPage {
             console.warn('[Settings] forceUpdateProfileFields: No user found after all attempts');
             return;
         }
-        
+
         // Update state
         if (firstName) {
             this.state.settings.general.firstName = firstName;
@@ -311,7 +313,7 @@ class SettingsPage {
         if (email) {
             this.state.settings.general.email = email;
         }
-        
+
         // Force update input fields directly (overrides placeholder)
         const firstNameEl = document.getElementById('user-first-name');
         if (firstNameEl && firstName) {
@@ -320,14 +322,14 @@ class SettingsPage {
             // Trigger input event to ensure UI updates
             firstNameEl.dispatchEvent(new Event('input', { bubbles: true }));
         }
-        
+
         const lastNameEl = document.getElementById('user-last-name');
         if (lastNameEl && lastName) {
             lastNameEl.value = lastName;
             lastNameEl.classList.remove('placeholder');
             lastNameEl.dispatchEvent(new Event('input', { bubbles: true }));
         }
-        
+
         const emailEl = document.getElementById('user-email');
         if (emailEl && email) {
             emailEl.value = email;
@@ -335,21 +337,21 @@ class SettingsPage {
             emailEl.dispatchEvent(new Event('input', { bubbles: true }));
         }
     }
-    
+
     async ensureGoogleUserData() {
         // Get user from multiple sources (auth manager or Firebase auth)
         let user = null;
-        
+
         // Try auth manager first (most reliable)
         if (window.authManager && window.authManager.getCurrentUser && typeof window.authManager.getCurrentUser === 'function') {
             user = window.authManager.getCurrentUser();
         }
-        
+
         // Fallback to Firebase auth currentUser
         if (!user) {
             user = firebase.auth().currentUser;
         }
-        
+
         // If still no user, wait for auth state to change (up to 2 seconds)
         if (!user) {
             let attempts = 0;
@@ -365,7 +367,7 @@ class SettingsPage {
                 attempts++;
             }
         }
-        
+
         if (user) {
             // Extract name and email from user object
             const displayName = user.displayName || '';
@@ -373,7 +375,7 @@ class SettingsPage {
             const nameParts = displayName.trim().split(' ').filter(p => p);
             const firstName = nameParts[0] || '';
             const lastName = nameParts.slice(1).join(' ') || '';
-            
+
             // ALWAYS populate from Google if available (even if settings were loaded)
             // This ensures profile info is always fresh from Google
             if (firstName) {
@@ -385,7 +387,7 @@ class SettingsPage {
             if (email) {
                 this.state.settings.general.email = email;
             }
-            
+
             // Check if photoURL changed and re-host if needed
             // BUT: Don't overwrite manually uploaded photos (hostedPhotoURL takes priority)
             if (user.photoURL) {
@@ -395,13 +397,13 @@ class SettingsPage {
                 const hostedFromState = this.state.settings.general.hostedPhotoURL || '';
                 const hostedFromLocalStorage = localStorage.getItem('pc-hosted-photo') || '';
                 const hasManualUpload = !!(hostedFromState || hostedFromLocalStorage);
-                
+
                 // If we found hostedPhotoURL in localStorage but not in state, restore it
                 if (hostedFromLocalStorage && !hostedFromState) {
                     this.state.settings.general.hostedPhotoURL = hostedFromLocalStorage;
                     console.log('[Settings] Restored hostedPhotoURL from localStorage in ensureGoogleUserData:', hostedFromLocalStorage);
                 }
-                
+
                 // Only auto-host if:
                 // 1. PhotoURL changed AND no manual upload exists, OR
                 // 2. PhotoURL matches but no hosted version exists at all
@@ -422,7 +424,7 @@ class SettingsPage {
                     console.log('[Settings] Manual upload exists, preserving hostedPhotoURL:', this.state.settings.general.hostedPhotoURL);
                 }
             }
-            
+
         } else {
             console.warn('[Settings] No current user found for Google data population after waiting');
         }
@@ -486,7 +488,7 @@ class SettingsPage {
                 this.renderSignatureSection();
             });
         }
-        
+
         // Custom HTML signature toggle
         const customSigToggle = document.getElementById('use-custom-html-signature');
         if (customSigToggle) {
@@ -523,7 +525,7 @@ class SettingsPage {
         const marketContextFields = document.getElementById('market-context-fields');
 
         if (marketContextCheckbox && marketContextFields) {
-            marketContextCheckbox.addEventListener('change', function() {
+            marketContextCheckbox.addEventListener('change', function () {
                 if (this.checked) {
                     marketContextFields.classList.remove('disabled');
                 } else {
@@ -531,15 +533,15 @@ class SettingsPage {
                 }
                 this.markDirty();
             }.bind(this));
-            
+
             // Add input listeners for market context fields
-            ['market-rate-increase', 'market-renewal-years', 'market-early-renewal', 
-             'market-client-savings', 'market-insights'].forEach(id => {
-                const field = document.getElementById(id);
-                if (field) {
-                    field.addEventListener('input', () => this.markDirty());
-                }
-            });
+            ['market-rate-increase', 'market-renewal-years', 'market-early-renewal',
+                'market-client-savings', 'market-insights'].forEach(id => {
+                    const field = document.getElementById(id);
+                    if (field) {
+                        field.addEventListener('input', () => this.markDirty());
+                    }
+                });
         }
 
         // NEW: Meeting Preferences Event Listeners
@@ -547,7 +549,7 @@ class SettingsPage {
         const meetingPreferencesFields = document.querySelector('.meeting-preferences-fields');
 
         if (meetingPreferencesCheckbox && meetingPreferencesFields) {
-            meetingPreferencesCheckbox.addEventListener('change', function() {
+            meetingPreferencesCheckbox.addEventListener('change', function () {
                 if (this.checked) {
                     meetingPreferencesFields.classList.remove('disabled');
                 } else {
@@ -555,16 +557,16 @@ class SettingsPage {
                 }
                 this.markDirty();
             }.bind(this));
-            
+
             // Add input listeners for meeting preferences fields
-            ['meeting-use-hardcoded', 'meeting-slot1-time', 'meeting-slot2-time', 
-             'meeting-call-duration', 'meeting-timezone'].forEach(id => {
-                const field = document.getElementById(id);
-                if (field) {
-                    field.addEventListener('input', () => this.markDirty());
-                    field.addEventListener('change', () => this.markDirty());
-                }
-            });
+            ['meeting-use-hardcoded', 'meeting-slot1-time', 'meeting-slot2-time',
+                'meeting-call-duration', 'meeting-timezone'].forEach(id => {
+                    const field = document.getElementById(id);
+                    if (field) {
+                        field.addEventListener('input', () => this.markDirty());
+                        field.addEventListener('change', () => this.markDirty());
+                    }
+                });
         }
 
         // Twilio phone numbers
@@ -598,7 +600,7 @@ class SettingsPage {
         // General settings checkboxes and selects
         const generalFields = [
             'auto-save-notes',
-            'email-notifications', 
+            'email-notifications',
             'call-recording-notifications',
             'items-per-page',
             'default-view'
@@ -632,7 +634,7 @@ class SettingsPage {
             if (!el) return;
             el.addEventListener('change', () => {
                 const v = el.type === 'checkbox' ? !!el.checked : el.value;
-                switch(id){
+                switch (id) {
                     case 'email-trk-enabled': this.state.settings.emailDeliverability.enableTracking = v; break;
                     case 'email-click-trk-enabled': this.state.settings.emailDeliverability.enableClickTracking = v; break;
                     case 'email-bulk-headers': this.state.settings.emailDeliverability.includeBulkHeaders = v; break;
@@ -670,24 +672,24 @@ class SettingsPage {
                 if (!this.state.settings.coldEmailSettings) {
                     this.state.settings.coldEmailSettings = {};
                 }
-                switch(id){
-                    case 'cold-email-industry-segment': 
-                        this.state.settings.coldEmailSettings.industrySegmentationEnabled = v; 
+                switch (id) {
+                    case 'cold-email-industry-segment':
+                        this.state.settings.coldEmailSettings.industrySegmentationEnabled = v;
                         break;
-                    case 'cold-email-observation': 
-                        this.state.settings.coldEmailSettings.requireObservationBased = v; 
+                    case 'cold-email-observation':
+                        this.state.settings.coldEmailSettings.requireObservationBased = v;
                         break;
-                    case 'cold-email-avoid-ai': 
-                        this.state.settings.coldEmailSettings.avoidAIPhrases = v; 
+                    case 'cold-email-avoid-ai':
+                        this.state.settings.coldEmailSettings.avoidAIPhrases = v;
                         break;
-                    case 'cold-email-vary-subject': 
-                        this.state.settings.coldEmailSettings.varySubjectLineFormat = v; 
+                    case 'cold-email-vary-subject':
+                        this.state.settings.coldEmailSettings.varySubjectLineFormat = v;
                         break;
-                    case 'cold-email-low-commitment': 
-                        this.state.settings.coldEmailSettings.requireLowCommitmentCTA = v; 
+                    case 'cold-email-low-commitment':
+                        this.state.settings.coldEmailSettings.requireLowCommitmentCTA = v;
                         break;
-                    case 'cold-email-max-length': 
-                        this.state.settings.coldEmailSettings.maxEmailLength = parseInt(v) || 120; 
+                    case 'cold-email-max-length':
+                        this.state.settings.coldEmailSettings.maxEmailLength = parseInt(v) || 120;
                         break;
                 }
                 this.markDirty();
@@ -704,7 +706,7 @@ class SettingsPage {
                 this.selectPhoneNumber(e.target.closest('.phone-number-item'));
             }
         });
-        
+
         // Bridge to mobile toggle (admin only)
         document.addEventListener('change', (e) => {
             if (e.target && e.target.classList.contains('bridge-to-mobile-toggle')) {
@@ -738,7 +740,7 @@ class SettingsPage {
                         return window.DataManager.getCurrentUserEmail();
                     }
                     return (window.currentUserEmail || '').toLowerCase();
-                } catch(_) {
+                } catch (_) {
                     return (window.currentUserEmail || '').toLowerCase();
                 }
             };
@@ -749,16 +751,28 @@ class SettingsPage {
                         return window.DataManager.isCurrentUserAdmin();
                     }
                     return window.currentUserRole === 'admin';
-                } catch(_) {
+                } catch (_) {
                     return window.currentUserRole === 'admin';
                 }
             };
-            
+
             // Current user context (used for cache + Firestore)
             const email = getUserEmail();
             const isAdminUser = isAdmin();
+
+            // Guard: Ensure we have a user context before loading settings
+            // This prevents loading/saving "empty" defaults if auth is still initializing
+            if (!email && !isAdminUser) {
+                // Try one more time to get user from auth directly
+                const currentUser = firebase.auth().currentUser;
+                if (!currentUser) {
+                    console.warn('[Settings] loadSettings: No user email found (and not admin), aborting load to prevent overwriting with defaults.');
+                    return;
+                }
+            }
+
             const docId = getDocId(email, isAdminUser);
-            
+
             // First try to load from CacheManager (cache-first)
             if (window.CacheManager) {
                 try {
@@ -775,8 +789,8 @@ class SettingsPage {
                                 console.warn('[Settings] Cached settings not owned by current user, skipping cache');
                             } else {
                                 // Merge settings, ensuring bridgeToMobile is preserved as boolean
-                                this.state.settings = { 
-                                    ...this.state.settings, 
+                                this.state.settings = {
+                                    ...this.state.settings,
                                     ...settingsData,
                                     bridgeToMobile: settingsData.bridgeToMobile === true // Ensure boolean
                                 };
@@ -788,8 +802,8 @@ class SettingsPage {
                             }
                         } else {
                             // Merge settings, ensuring bridgeToMobile is preserved as boolean
-                            this.state.settings = { 
-                                ...this.state.settings, 
+                            this.state.settings = {
+                                ...this.state.settings,
                                 ...settingsData,
                                 bridgeToMobile: settingsData.bridgeToMobile === true // Ensure boolean
                             };
@@ -814,7 +828,7 @@ class SettingsPage {
                             // Persist hosted photo locally for header fallback
                             const hosted = settingsData?.general?.hostedPhotoURL || this.state.settings.general.hostedPhotoURL;
                             if (hosted) {
-                                try { localStorage.setItem('pc-hosted-photo', hosted); } catch(_) {}
+                                try { localStorage.setItem('pc-hosted-photo', hosted); } catch (_) { }
                             }
                             console.log('[Settings] Loaded from CacheManager cache', { bridgeToMobile: this.state.settings.bridgeToMobile, hostedPhotoURL: this.state.settings.general.hostedPhotoURL });
                             // Sync header avatar after cache load
@@ -828,7 +842,7 @@ class SettingsPage {
                     console.warn('[Settings] CacheManager load failed:', error);
                 }
             }
-            
+
             // Fallback to Firebase if cache miss
             if (window.firebaseDB) {
                 try {
@@ -839,7 +853,7 @@ class SettingsPage {
                                 return window.DataManager.getCurrentUserEmail();
                             }
                             return (window.currentUserEmail || '').toLowerCase();
-                        } catch(_) {
+                        } catch (_) {
                             return (window.currentUserEmail || '').toLowerCase();
                         }
                     };
@@ -849,16 +863,16 @@ class SettingsPage {
                                 return window.DataManager.isCurrentUserAdmin();
                             }
                             return window.currentUserRole === 'admin';
-                        } catch(_) {
+                        } catch (_) {
                             return window.currentUserRole === 'admin';
                         }
                     };
-                    
+
                     const email = getUserEmail();
-                    
+
                     // Try per-user settings doc first (employees), then fallback to 'user-settings' (admin/legacy)
                     let settingsDoc = null;
-                    
+
                     if (!isAdminUser && email) {
                         try {
                             settingsDoc = await window.firebaseDB.collection('settings').doc(docId).get();
@@ -875,7 +889,7 @@ class SettingsPage {
                             settingsDoc = null; // Clear so we skip to defaults
                         }
                     }
-                    
+
                     // Fallback to legacy 'user-settings' if per-user doc doesn't exist or user is admin
                     if ((!settingsDoc || !settingsDoc.exists) && isAdminUser) {
                         try {
@@ -885,10 +899,10 @@ class SettingsPage {
                             settingsDoc = null;
                         }
                     }
-                    
+
                     if (settingsDoc && settingsDoc.exists) {
                         const firebaseSettings = settingsDoc.data();
-                        
+
                         // Check ownership for non-admin users (only for legacy 'user-settings' doc)
                         if (!isAdmin() && docId === 'user-settings') {
                             const email = getUserEmail();
@@ -900,8 +914,8 @@ class SettingsPage {
                                 // Continue to localStorage fallback
                             } else {
                                 // Merge settings, ensuring bridgeToMobile is preserved as boolean
-                                this.state.settings = { 
-                                    ...this.state.settings, 
+                                this.state.settings = {
+                                    ...this.state.settings,
                                     ...firebaseSettings,
                                     bridgeToMobile: firebaseSettings.bridgeToMobile === true // Ensure boolean
                                 };
@@ -923,7 +937,7 @@ class SettingsPage {
                                 } else if (!this.state.settings.emailSignature.imageSize) {
                                     this.state.settings.emailSignature.imageSize = { width: 200, height: 100 };
                                 }
-                                
+
                                 // Cache the settings for future use
                                 if (window.CacheManager) {
                                     try {
@@ -932,13 +946,13 @@ class SettingsPage {
                                         console.warn('[Settings] Failed to cache settings:', error);
                                     }
                                 }
-                                
+
                                 // Persist hosted photo locally for header fallback
                                 const hosted = firebaseSettings?.general?.hostedPhotoURL || this.state.settings.general.hostedPhotoURL;
                                 if (hosted) {
-                                    try { localStorage.setItem('pc-hosted-photo', hosted); } catch(_) {}
+                                    try { localStorage.setItem('pc-hosted-photo', hosted); } catch (_) { }
                                 }
-                                
+
                                 // Sync header avatar after load
                                 if (window.authManager?.refreshProfilePhoto) {
                                     setTimeout(() => window.authManager.refreshProfilePhoto(), 50);
@@ -947,8 +961,8 @@ class SettingsPage {
                             }
                         } else {
                             // Merge settings, ensuring bridgeToMobile is preserved as boolean
-                            this.state.settings = { 
-                                ...this.state.settings, 
+                            this.state.settings = {
+                                ...this.state.settings,
                                 ...firebaseSettings,
                                 bridgeToMobile: firebaseSettings.bridgeToMobile === true // Ensure boolean
                             };
@@ -971,7 +985,7 @@ class SettingsPage {
                                 this.state.settings.emailSignature.imageSize = { width: 200, height: 100 };
                             }
                             console.log('[Settings] Loaded from Firebase', { bridgeToMobile: this.state.settings.bridgeToMobile, hostedPhotoURL: this.state.settings.general.hostedPhotoURL });
-                            
+
                             // Cache the settings for future use
                             if (window.CacheManager) {
                                 try {
@@ -981,13 +995,13 @@ class SettingsPage {
                                     console.warn('[Settings] Failed to cache settings:', error);
                                 }
                             }
-                            
+
                             // Persist hosted photo locally for header fallback
                             const hosted = firebaseSettings?.general?.hostedPhotoURL;
                             if (hosted) {
-                                try { localStorage.setItem('pc-hosted-photo', hosted); } catch(_) {}
+                                try { localStorage.setItem('pc-hosted-photo', hosted); } catch (_) { }
                             }
-                            
+
                             // Sync header avatar after load
                             if (window.authManager?.refreshProfilePhoto) {
                                 setTimeout(() => window.authManager.refreshProfilePhoto(), 50);
@@ -1004,21 +1018,21 @@ class SettingsPage {
                     }
                 }
             }
-            
+
             // Fallback to localStorage if Firebase not available or no data
             if (!this.state.settings.general.firstName) {
-            const savedSettings = localStorage.getItem('crm-settings');
-            if (savedSettings) {
-                try {
-                    const parsed = JSON.parse(savedSettings);
-                    // Merge settings, ensuring bridgeToMobile is preserved as boolean
-                    this.state.settings = { 
-                        ...this.state.settings, 
-                        ...parsed,
-                        bridgeToMobile: parsed.bridgeToMobile === true // Ensure boolean
-                    };
-                } catch (error) {
-                    console.error('Error loading settings from localStorage:', error);
+                const savedSettings = localStorage.getItem('crm-settings');
+                if (savedSettings) {
+                    try {
+                        const parsed = JSON.parse(savedSettings);
+                        // Merge settings, ensuring bridgeToMobile is preserved as boolean
+                        this.state.settings = {
+                            ...this.state.settings,
+                            ...parsed,
+                            bridgeToMobile: parsed.bridgeToMobile === true // Ensure boolean
+                        };
+                    } catch (error) {
+                        console.error('Error loading settings from localStorage:', error);
                     }
                 }
             }
@@ -1030,8 +1044,8 @@ class SettingsPage {
                 try {
                     const parsed = JSON.parse(savedSettings);
                     // Merge settings, ensuring bridgeToMobile is preserved as boolean
-                    this.state.settings = { 
-                        ...this.state.settings, 
+                    this.state.settings = {
+                        ...this.state.settings,
                         ...parsed,
                         bridgeToMobile: parsed.bridgeToMobile === true // Ensure boolean
                     };
@@ -1040,7 +1054,7 @@ class SettingsPage {
                 }
             }
         }
-        
+
         // Auto-populate from Google login (force populate if empty or only has placeholder)
         const user = firebase.auth().currentUser;
         if (user) {
@@ -1048,12 +1062,12 @@ class SettingsPage {
             const firstName = nameParts[0] || '';
             const lastName = nameParts.slice(1).join(' ') || '';
             const userEmail = (user.email || '').toLowerCase().trim();
-            
+
             // Force populate if empty, whitespace-only, or placeholder text
             const currentFirstName = (this.state.settings.general.firstName || '').trim();
             const currentLastName = (this.state.settings.general.lastName || '').trim();
             const currentEmail = (this.state.settings.general.email || '').trim().toLowerCase();
-            
+
             // Always populate from Google if field is empty or has placeholder
             // ALWAYS populate from Google if available (overrides any stored values)
             // This ensures profile info always matches Google login
@@ -1073,19 +1087,19 @@ class SettingsPage {
                 if (!this.state.settings.general) {
                     this.state.settings.general = {};
                 }
-                
+
                 const currentPhotoURL = this.state.settings.general.photoURL || '';
                 // Check both state and localStorage for manually uploaded photo
                 const hostedFromState = this.state.settings.general.hostedPhotoURL || '';
                 const hostedFromLocalStorage = localStorage.getItem('pc-hosted-photo') || '';
                 const hasManualUpload = !!(hostedFromState || hostedFromLocalStorage);
-                
+
                 // If we found hostedPhotoURL in localStorage but not in state, restore it
                 if (hostedFromLocalStorage && !hostedFromState) {
                     this.state.settings.general.hostedPhotoURL = hostedFromLocalStorage;
                     console.log('[Settings] Restored hostedPhotoURL from localStorage:', hostedFromLocalStorage);
                 }
-                
+
                 // Only auto-host if:
                 // 1. PhotoURL changed AND no manual upload exists, OR
                 // 2. PhotoURL matches but no hosted version exists at all (and no localStorage backup)
@@ -1113,35 +1127,35 @@ class SettingsPage {
 
     async hostGoogleAvatar(googlePhotoURL, forceRefresh = false) {
         if (!googlePhotoURL) return;
-        
+
         // Check if photoURL changed - if it's different from stored photoURL, force re-host
         const currentPhotoURL = this.state.settings.general.photoURL || '';
         const photoChanged = googlePhotoURL !== currentPhotoURL;
-        
+
         // Check for manually uploaded photo (in state or localStorage)
         // This prevents overwriting user-uploaded photos with Google's photo
         const hostedFromState = this.state.settings.general.hostedPhotoURL || '';
         const hostedFromLocalStorage = localStorage.getItem('pc-hosted-photo') || '';
         const hasManualUpload = !!(hostedFromState || hostedFromLocalStorage);
-        
+
         // CRITICAL: Never overwrite manually uploaded photos unless explicitly forced
         if (hasManualUpload && !forceRefresh) {
             console.log('[Settings] Manual upload exists, skipping Google avatar hosting to preserve user upload');
             return;
         }
-        
+
         // Only skip if hostedPhotoURL exists AND photo hasn't changed AND not forcing refresh
         if (this.state.settings.general.hostedPhotoURL && !photoChanged && !forceRefresh) {
             console.log('[Settings] Avatar already hosted and photoURL unchanged, skipping re-host');
             return;
         }
-        
+
         // Update stored photoURL to track changes
         if (photoChanged) {
             console.log('[Settings] Google photoURL changed, re-hosting avatar...');
             this.state.settings.general.photoURL = googlePhotoURL;
         }
-        
+
         try {
             // Send Google URL to server to download and re-host
             const apiBase = 'https://power-choosers-crm-792458658491.us-south1.run.app';
@@ -1156,21 +1170,21 @@ class SettingsPage {
                 if (imageUrl) {
                     this.state.settings.general.hostedPhotoURL = imageUrl;
                     this.markDirty();
-                    
+
                     // Auto-save to persist the new hosted URL
                     await this.saveSettings();
-                    
+
                     // Trigger profile photo refresh in auth system
                     if (window.authManager && typeof window.authManager.refreshProfilePhoto === 'function') {
                         window.authManager.refreshProfilePhoto();
                     }
-                    
+
                     console.log('[Settings] Avatar hosted successfully:', imageUrl);
                 }
             } else {
                 console.warn('[Settings] Upload failed, using Google URL directly');
                 this.state.settings.general.hostedPhotoURL = googlePhotoURL;
-                
+
                 // Still trigger refresh even with fallback
                 if (window.authManager && typeof window.authManager.refreshProfilePhoto === 'function') {
                     window.authManager.refreshProfilePhoto();
@@ -1180,7 +1194,7 @@ class SettingsPage {
             console.error('[Settings] Error hosting Google avatar:', error);
             // Fallback to direct Google URL
             this.state.settings.general.hostedPhotoURL = googlePhotoURL;
-            
+
             // Still trigger refresh even with fallback
             if (window.authManager && typeof window.authManager.refreshProfilePhoto === 'function') {
                 window.authManager.refreshProfilePhoto();
@@ -1222,18 +1236,18 @@ class SettingsPage {
 
             // Get user email and determine docId (needed for both Firebase and cache)
             const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
-              ? window.DataManager.getCurrentUserEmail()
-              : ((window.currentUserEmail || '').toLowerCase());
-            
+                ? window.DataManager.getCurrentUserEmail()
+                : ((window.currentUserEmail || '').toLowerCase());
+
             const user = window.firebase && window.firebase.auth ? window.firebase.auth().currentUser : null;
             const userId = user ? user.uid : null;
-            
+
             // Use per-user doc ID so each employee has their own settings
             // Admin uses 'user-settings' (legacy), employees use 'user-settings-{email}'
             const isAdmin = (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function')
-              ? window.DataManager.isCurrentUserAdmin()
-              : (window.currentUserRole === 'admin');
-            
+                ? window.DataManager.isCurrentUserAdmin()
+                : (window.currentUserRole === 'admin');
+
             const docId = isAdmin ? 'user-settings' : `user-settings-${userEmail}`;
 
             // Save to Firebase first
@@ -1242,7 +1256,7 @@ class SettingsPage {
                     // Admin users can always save to 'user-settings' doc
                     // Non-admin users can save to their own 'user-settings-{email}' doc
                     let canUpdate = isAdmin; // Admin can always update
-                    
+
                     if (!isAdmin) {
                         // Check if document exists and if employee owns it (for update)
                         try {
@@ -1266,11 +1280,11 @@ class SettingsPage {
                             canUpdate = true;
                         }
                     }
-                    
+
                     if (!canUpdate) {
                         throw new Error('Permission denied: You do not have permission to update this settings document');
                     }
-                    
+
                     // Use set() which creates if doesn't exist, updates if it does
                     // Firestore rules will allow this if ownerId/userId matches
                     const settingsToSave = {
@@ -1281,10 +1295,10 @@ class SettingsPage {
                         lastUpdated: new Date().toISOString(),
                         updatedBy: 'user'
                     };
-                    
+
                     // Ensure bridgeToMobile is explicitly saved (boolean, not undefined)
                     settingsToSave.bridgeToMobile = this.state.settings.bridgeToMobile === true;
-                    
+
                     // CRITICAL: Ensure general.hostedPhotoURL is preserved (manually uploaded photos)
                     // This ensures each agent's uploaded photo is saved per-user
                     if (this.state.settings.general && this.state.settings.general.hostedPhotoURL) {
@@ -1294,11 +1308,11 @@ class SettingsPage {
                         settingsToSave.general.hostedPhotoURL = this.state.settings.general.hostedPhotoURL;
                         console.log('[Settings] Preserving hostedPhotoURL in saveSettings:', settingsToSave.general.hostedPhotoURL);
                     }
-                    
+
                     console.log('[Settings] Attempting to save settings to Firestore:', { docId, isAdmin, userEmail, userId });
                     await window.firebaseDB.collection('settings').doc(docId).set(settingsToSave, { merge: false });
                     console.log('[Settings] Successfully saved settings to Firestore');
-                    
+
                 } catch (firebaseError) {
                     console.error('[Settings] Firebase save error:', firebaseError);
                     console.error('[Settings] Error details:', {
@@ -1310,10 +1324,10 @@ class SettingsPage {
                     throw firebaseError;
                 }
             }
-            
+
             // Also save to localStorage as backup
             localStorage.setItem('crm-settings', JSON.stringify(this.state.settings));
-            
+
             // Cache for faster reloads (per-user doc id)
             if (window.CacheManager) {
                 try {
@@ -1322,40 +1336,40 @@ class SettingsPage {
                     console.warn('[Settings] Failed to cache settings after save:', cacheErr);
                 }
             }
-            
+
             // Save hosted photo locally for quick header fallback
             try {
                 const hosted = this.state.settings?.general?.hostedPhotoURL;
                 if (hosted) {
                     localStorage.setItem('pc-hosted-photo', hosted);
                 }
-            } catch(_) {}
-            
+            } catch (_) { }
+
             // Refresh header avatar immediately after save so it sticks across the UI
             if (window.authManager?.refreshProfilePhoto) {
                 setTimeout(() => window.authManager.refreshProfilePhoto(), 50);
             }
-            
+
             // Show success message
             if (window.showToast) {
                 window.showToast('Settings saved successfully!', 'success');
             }
-            
+
             this.state.isDirty = false;
             this.updateSaveButton();
-            
+
             // Dispatch event for other modules to react to settings changes
             document.dispatchEvent(new CustomEvent('pc:settings-updated', {
                 detail: { settings: this.state.settings }
             }));
-            
+
         } catch (error) {
             console.error('[Settings] Error saving settings:', error);
-            
+
             // Fallback to localStorage only if Firebase fails
             try {
                 localStorage.setItem('crm-settings', JSON.stringify(this.state.settings));
-                
+
                 if (window.showToast) {
                     window.showToast('Settings saved locally (Firebase unavailable)', 'warning');
                 }
@@ -1378,7 +1392,7 @@ class SettingsPage {
         if (window.SettingsPage && window.SettingsPage.instance) {
             return window.SettingsPage.instance.state.settings;
         }
-        
+
         // Fallback to localStorage if SettingsPage not available
         const savedSettings = localStorage.getItem('crm-settings');
         if (savedSettings) {
@@ -1388,7 +1402,7 @@ class SettingsPage {
                 console.error('Error parsing settings:', error);
             }
         }
-        
+
         return null;
     }
 
@@ -1396,7 +1410,7 @@ class SettingsPage {
     static getSetting(path) {
         const settings = this.getSettings();
         if (!settings) return null;
-        
+
         return path.split('.').reduce((obj, key) => obj?.[key], settings);
     }
 
@@ -1406,11 +1420,11 @@ class SettingsPage {
             // Always show button - orange when there are changes, greyed when saved
             saveBtn.disabled = !this.state.isDirty;
             saveBtn.textContent = this.state.isDirty ? 'Save Changes' : 'All Changes Saved';
-            
+
             // Ensure button is visible and styled correctly
             saveBtn.style.display = 'block';
             saveBtn.style.visibility = 'visible';
-            
+
             // Apply orange styling (should already be in CSS, but ensure it's applied)
             if (this.state.isDirty) {
                 saveBtn.classList.remove('disabled');
@@ -1498,10 +1512,10 @@ class SettingsPage {
 
         // Render profile information fields (Google login + editable)
         const g = this.state.settings.general || {};
-        
+
         // ALWAYS populate from Google user during render (ensures fields show even if loadSettings failed)
         let user = null;
-        
+
         // Try multiple sources for user object
         if (window.authManager && window.authManager.getCurrentUser && typeof window.authManager.getCurrentUser === 'function') {
             user = window.authManager.getCurrentUser();
@@ -1509,7 +1523,7 @@ class SettingsPage {
         if (!user) {
             user = firebase.auth().currentUser;
         }
-        
+
         if (user) {
             // Extract from user object (try displayName first, then email)
             const displayName = user.displayName || '';
@@ -1517,7 +1531,7 @@ class SettingsPage {
             const nameParts = displayName.trim().split(' ').filter(p => p);
             const firstName = nameParts[0] || '';
             const lastName = nameParts.slice(1).join(' ') || '';
-            
+
             // Force populate from Google (overrides any stored values and placeholders)
             if (firstName) {
                 g.firstName = firstName;
@@ -1535,8 +1549,8 @@ class SettingsPage {
             console.warn('[Settings] No user available during render for profile population');
             // Try one more time with a delay
             setTimeout(() => {
-                const retryUser = (window.authManager && window.authManager.getCurrentUser) 
-                    ? window.authManager.getCurrentUser() 
+                const retryUser = (window.authManager && window.authManager.getCurrentUser)
+                    ? window.authManager.getCurrentUser()
                     : firebase.auth().currentUser;
                 if (retryUser && (!g.firstName || !g.lastName || !g.email)) {
                     const nameParts = (retryUser.displayName || '').trim().split(' ').filter(p => p);
@@ -1561,7 +1575,7 @@ class SettingsPage {
                 }
             }, 500);
         }
-        
+
         const userFirstName = document.getElementById('user-first-name');
         if (userFirstName) {
             // Always set the actual value, never placeholder text
@@ -1572,7 +1586,7 @@ class SettingsPage {
                 this.state.settings.general.firstName = firstNameValue;
             }
         }
-        
+
         const userLastName = document.getElementById('user-last-name');
         if (userLastName) {
             // Always set the actual value, never placeholder text
@@ -1583,7 +1597,7 @@ class SettingsPage {
                 this.state.settings.general.lastName = lastNameValue;
             }
         }
-        
+
         const userEmail = document.getElementById('user-email');
         if (userEmail) {
             // Always set the actual value, never placeholder text
@@ -1594,37 +1608,37 @@ class SettingsPage {
                 this.state.settings.general.email = emailValue;
             }
         }
-        
+
         const userJobTitle = document.getElementById('user-job-title');
         if (userJobTitle) {
             userJobTitle.value = g.jobTitle || 'Energy Strategist';
         }
-        
+
         const userLocation = document.getElementById('user-location');
         if (userLocation) {
             userLocation.value = g.location || 'Fort Worth, TX';
         }
-        
+
         const userPhone = document.getElementById('user-phone');
         if (userPhone) {
             userPhone.value = g.phone || '';
         }
-        
+
         const companyName = document.getElementById('company-name');
         if (companyName) {
             companyName.value = g.companyName || 'Power Choosers';
         }
-        
+
         const userLinkedIn = document.getElementById('user-linkedin');
         if (userLinkedIn) {
             userLinkedIn.value = g.linkedIn || '';
         }
-        
+
         const userBio = document.getElementById('user-bio');
         if (userBio) {
             userBio.value = g.bio || '';
         }
-        
+
         // Render avatar preview if available (with editable hover effect)
         const avatarPreview = document.getElementById('user-avatar-preview');
         if (avatarPreview) {
@@ -1643,12 +1657,12 @@ class SettingsPage {
                         </div>
                     </div>
                 `;
-                
+
                 // Setup hover effect and click handler
                 const container = avatarPreview.querySelector('.editable-profile-pic-container');
                 const overlay = avatarPreview.querySelector('.profile-pic-overlay');
                 const pencilIcon = overlay.querySelector('svg');
-                
+
                 if (container && overlay && pencilIcon) {
                     container.addEventListener('mouseenter', () => {
                         overlay.style.background = 'rgba(0, 0, 0, 0.5)';
@@ -1656,14 +1670,14 @@ class SettingsPage {
                         overlay.style.pointerEvents = 'auto'; // Allow clicks on hover
                         pencilIcon.style.opacity = '1';
                     });
-                    
+
                     container.addEventListener('mouseleave', () => {
                         overlay.style.background = 'rgba(0, 0, 0, 0)';
                         overlay.style.opacity = '0';
                         overlay.style.pointerEvents = 'none'; // Block clicks when not hovering
                         pencilIcon.style.opacity = '0';
                     });
-                    
+
                     container.addEventListener('click', async (e) => {
                         e.stopPropagation();
                         e.preventDefault();
@@ -1685,12 +1699,12 @@ class SettingsPage {
                         </div>
                     </div>
                 `;
-                
+
                 // Setup hover effect and click handler for placeholder
                 const container = avatarPreview.querySelector('.editable-profile-pic-container');
                 const overlay = avatarPreview.querySelector('.profile-pic-overlay');
                 const pencilIcon = overlay?.querySelector('svg');
-                
+
                 if (container && overlay && pencilIcon) {
                     container.addEventListener('mouseenter', () => {
                         overlay.style.background = 'rgba(0, 0, 0, 0.5)';
@@ -1698,14 +1712,14 @@ class SettingsPage {
                         overlay.style.pointerEvents = 'auto';
                         pencilIcon.style.opacity = '1';
                     });
-                    
+
                     container.addEventListener('mouseleave', () => {
                         overlay.style.background = 'rgba(0, 0, 0, 0)';
                         overlay.style.opacity = '0';
                         overlay.style.pointerEvents = 'none';
                         pencilIcon.style.opacity = '0';
                     });
-                    
+
                     container.addEventListener('click', async (e) => {
                         e.stopPropagation();
                         e.preventDefault();
@@ -1748,13 +1762,13 @@ class SettingsPage {
 
         // Render deliverability settings (SendGrid optimized)
         const d = this.state.settings.emailDeliverability || {};
-        
+
         // Tracking
         const trk = document.getElementById('email-trk-enabled');
         if (trk) trk.checked = !!d.enableTracking;
         const clickTrk = document.getElementById('email-click-trk-enabled');
         if (clickTrk) clickTrk.checked = !!d.enableClickTracking;
-        
+
         // Headers
         const bulk = document.getElementById('email-bulk-headers');
         if (bulk) bulk.checked = !!d.includeBulkHeaders;
@@ -1762,13 +1776,13 @@ class SettingsPage {
         if (unsub) unsub.checked = !!d.includeListUnsubscribe;
         const pri = document.getElementById('email-priority-headers');
         if (pri) pri.checked = !!d.includePriorityHeaders;
-        
+
         // Content
         const html = document.getElementById('email-branded-html');
         if (html) html.checked = !!d.useBrandedHtmlTemplate;
         const sigimg = document.getElementById('email-sig-image-enabled');
         if (sigimg) sigimg.checked = !!d.signatureImageEnabled;
-        
+
         // SendGrid specific
         const sgEnabled = document.getElementById('sendgrid-enabled');
         if (sgEnabled) sgEnabled.checked = !!d.sendgridEnabled;
@@ -1778,7 +1792,7 @@ class SettingsPage {
         if (sandbox) sandbox.checked = !!d.sandboxMode;
         const ipPool = document.getElementById('ip-pool-name');
         if (ipPool) ipPool.value = d.ipPoolName || '';
-        
+
         // Compliance
         const physAddr = document.getElementById('include-physical-address');
         if (physAddr) physAddr.checked = !!d.includePhysicalAddress;
@@ -1791,19 +1805,19 @@ class SettingsPage {
         const cold = this.state.settings.coldEmailSettings || {};
         const industrySegment = document.getElementById('cold-email-industry-segment');
         if (industrySegment) industrySegment.checked = cold.industrySegmentationEnabled !== false; // Default true
-        
+
         const observation = document.getElementById('cold-email-observation');
         if (observation) observation.checked = cold.requireObservationBased !== false; // Default true
-        
+
         const avoidAI = document.getElementById('cold-email-avoid-ai');
         if (avoidAI) avoidAI.checked = cold.avoidAIPhrases !== false; // Default true
-        
+
         const varySubject = document.getElementById('cold-email-vary-subject');
         if (varySubject) varySubject.checked = cold.varySubjectLineFormat !== false; // Default true
-        
+
         const lowCommitment = document.getElementById('cold-email-low-commitment');
         if (lowCommitment) lowCommitment.checked = cold.requireLowCommitmentCTA !== false; // Default true
-        
+
         const maxLength = document.getElementById('cold-email-max-length');
         if (maxLength) maxLength.value = cold.maxEmailLength || 120;
 
@@ -1813,7 +1827,7 @@ class SettingsPage {
     // Render the email signature UI (text field value, image preview, button label, remove action)
     renderSignatureSection() {
         const signature = this.state.settings.emailSignature || {};
-        
+
 
         // Sync textarea value from state
         const signatureTextArea = document.getElementById('email-signature-text');
@@ -1855,7 +1869,7 @@ class SettingsPage {
                     </button>
                 </div>`;
         }
-        
+
         // Update image size input fields
         const widthInput = document.getElementById('signature-image-size-width');
         const heightInput = document.getElementById('signature-image-size-height');
@@ -1910,23 +1924,23 @@ class SettingsPage {
                 this.removeSignatureImage();
             });
         }
-        
+
         // Update custom HTML signature toggle and preview
         this.renderCustomSignaturePreview();
     }
-    
+
     // Render custom HTML signature preview
     renderCustomSignaturePreview() {
         const signature = this.state.settings.emailSignature || {};
         const toggle = document.getElementById('use-custom-html-signature');
         const previewContainer = document.getElementById('custom-signature-preview');
         const previewContent = document.getElementById('custom-signature-preview-content');
-        
+
         // Set toggle state
         if (toggle) {
             toggle.checked = signature.useCustomHtml === true || signature.customHtmlEnabled === true;
         }
-        
+
         // Show/hide preview based on toggle
         if (previewContainer && previewContent) {
             if (toggle && toggle.checked) {
@@ -1959,13 +1973,13 @@ class SettingsPage {
         const isAdmin = (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function')
             ? window.DataManager.isCurrentUserAdmin()
             : (window.currentUserRole === 'admin');
-        
+
         phoneList.innerHTML = this.state.settings.twilioNumbers.map((phone, index) => {
             const isSelected = this.state.settings.selectedPhoneNumber === phone.number;
             // Ensure bridgeToMobile is boolean (not undefined/null)
             const bridgeToMobile = this.state.settings.bridgeToMobile === true;
-            
-            
+
+
             return `
                 <div class="phone-number-item ${isSelected ? 'selected' : ''}" data-index="${index}">
                     <div class="phone-info">
@@ -2021,7 +2035,7 @@ class SettingsPage {
             if (window.showToast) {
                 window.showToast('Uploading signature image...', 'info');
             }
-            
+
             // Disable upload button during upload
             if (uploadBtn) {
                 uploadBtn.disabled = true;
@@ -2032,7 +2046,7 @@ class SettingsPage {
 
             // Convert file to base64 and upload as JSON
             const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
+                const reader = new FileReader();
                 reader.onload = () => {
                     const result = reader.result;
                     const base64Data = result.split(',')[1];
@@ -2048,18 +2062,18 @@ class SettingsPage {
             // Always use Vercel endpoint (works locally and deployed)
             const apiBase = 'https://power-choosers-crm-792458658491.us-south1.run.app';
             const uploadUrl = `${apiBase}/api/upload/signature-image`;
-            
+
             // Create AbortController for timeout (60 seconds to allow for large images and Imgur processing)
             const controller = new AbortController();
             const timeoutId = setTimeout(() => {
                 controller.abort();
             }, 60000); // 60 second timeout
-            
+
             let response;
             try {
                 response = await fetch(uploadUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ image: base64, type: 'signature' }),
                     signal: controller.signal
                 });
@@ -2097,39 +2111,39 @@ class SettingsPage {
 
             // Handle both response formats: { imageUrl } or { success, imageUrl }
             const imageUrl = responseData.imageUrl || (responseData.success && responseData.data?.link);
-            
+
             if (!imageUrl) {
                 console.error('[Signature] No imageUrl in response:', responseData);
                 throw new Error('Server did not return image URL');
             }
 
 
-                // Store the hosted image URL
+            // Store the hosted image URL
             if (!this.state.settings.emailSignature) {
                 this.state.settings.emailSignature = { text: '', image: null, imageSize: { width: 200, height: 100 } };
             }
-                this.state.settings.emailSignature.image = imageUrl;
-            
+            this.state.settings.emailSignature.image = imageUrl;
+
             // Mark as dirty and update UI
             this.markDirty();
             this.renderSignatureSection();
-            
+
             // Auto-save the settings immediately after successful upload
             await this.saveSettings();
-            
+
             // Reset file input to allow selecting the same file again
             fileInput.value = '';
-            
+
             // Re-enable upload button
             if (uploadBtn) {
                 uploadBtn.disabled = false;
                 uploadBtn.style.opacity = '1';
             }
-                
-                if (window.showToast) {
+
+            if (window.showToast) {
                 window.showToast('Signature image uploaded and saved successfully!', 'success');
-                }
-            
+            }
+
         } catch (error) {
             console.error('[Signature] Upload error:', error);
             console.error('[Signature] Error stack:', error.stack);
@@ -2138,10 +2152,10 @@ class SettingsPage {
                 message: error.message,
                 cause: error.cause
             });
-            
+
             // Reset file input on error
             fileInput.value = '';
-            
+
             // Re-enable upload button
             if (uploadBtn) {
                 uploadBtn.disabled = false;
@@ -2156,7 +2170,7 @@ class SettingsPage {
                         Upload Image`;
                 }
             }
-            
+
             const errorMessage = error.message || 'Failed to upload signature image. Please try again.';
             if (window.showToast) {
                 window.showToast(errorMessage, 'error');
@@ -2168,7 +2182,7 @@ class SettingsPage {
         try {
             // Always use Vercel endpoint for uploads (works locally and deployed)
             const apiBase = 'https://power-choosers-crm-792458658491.us-south1.run.app';
-            
+
             // Convert file to base64
             const base64 = await new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -2272,7 +2286,7 @@ class SettingsPage {
                     this.state.settings.general.photoURL = user.photoURL;
                 }
                 this.markDirty();
-                
+
                 // Save to Firestore immediately
                 await this.saveSettings();
 
@@ -2295,12 +2309,12 @@ class SettingsPage {
                                 </div>
                             </div>
                         `;
-                        
+
                         // Re-setup hover effect and click handler
                         const container = avatarPreview.querySelector('.editable-profile-pic-container');
                         const overlay = avatarPreview.querySelector('.profile-pic-overlay');
                         const pencilIcon = overlay?.querySelector('svg');
-                        
+
                         if (container && overlay && pencilIcon) {
                             container.addEventListener('mouseenter', () => {
                                 overlay.style.background = 'rgba(0, 0, 0, 0.5)';
@@ -2308,14 +2322,14 @@ class SettingsPage {
                                 overlay.style.pointerEvents = 'auto';
                                 pencilIcon.style.opacity = '1';
                             });
-                            
+
                             container.addEventListener('mouseleave', () => {
                                 overlay.style.background = 'rgba(0, 0, 0, 0)';
                                 overlay.style.opacity = '0';
                                 overlay.style.pointerEvents = 'none';
                                 pencilIcon.style.opacity = '0';
                             });
-                            
+
                             container.addEventListener('click', async (e) => {
                                 e.stopPropagation();
                                 e.preventDefault();
@@ -2355,7 +2369,7 @@ class SettingsPage {
                 const reader = new FileReader();
                 reader.onload = () => resolve(reader.result.split(',')[1]);
                 reader.onerror = reject;
-        reader.readAsDataURL(file);
+                reader.readAsDataURL(file);
             });
 
             const response = await fetch('https://api.imgur.com/3/image', {
@@ -2404,29 +2418,29 @@ class SettingsPage {
         }
 
         try {
-            
+
             // Convert data URL to file
             const base64Data = signature.image.split(',')[1];
             const mimeType = signature.image.split(',')[0].split(':')[1].split(';')[0];
             const byteCharacters = atob(base64Data);
             const byteNumbers = new Array(byteCharacters.length);
-            
+
             for (let i = 0; i < byteCharacters.length; i++) {
                 byteNumbers[i] = byteCharacters.charCodeAt(i);
             }
-            
+
             const byteArray = new Uint8Array(byteNumbers);
             const file = new File([byteArray], 'signature.png', { type: mimeType });
-            
+
             // Upload the converted file
             const hostedUrl = await this.uploadSignatureImage(file);
-            
+
             if (hostedUrl) {
                 this.state.settings.emailSignature.image = hostedUrl;
                 this.markDirty();
                 this.renderSignatureSection();
             }
-            
+
         } catch (error) {
             console.error('[Signature] Failed to convert data URL:', error);
         }
@@ -2573,7 +2587,7 @@ class SettingsPage {
     editPhoneNumber(phoneItem) {
         const index = parseInt(phoneItem.dataset.index);
         const phone = this.state.settings.twilioNumbers[index];
-        
+
         const newNumber = prompt('Enter new phone number:', phone.number);
         if (!newNumber) return;
 
@@ -2592,13 +2606,13 @@ class SettingsPage {
     removePhoneNumber(phoneItem) {
         const index = parseInt(phoneItem.dataset.index);
         const phone = this.state.settings.twilioNumbers[index];
-        
+
         if (confirm(`Are you sure you want to remove ${phone.label} (${phone.number})?`)) {
             // If removing the selected number, clear the selection
             if (this.state.settings.selectedPhoneNumber === phone.number) {
                 this.state.settings.selectedPhoneNumber = null;
             }
-            
+
             this.state.settings.twilioNumbers.splice(index, 1);
             this.renderPhoneNumbers();
             this.markDirty();
@@ -2610,41 +2624,41 @@ class SettingsPage {
         const isAdmin = (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function')
             ? window.DataManager.isCurrentUserAdmin()
             : (window.currentUserRole === 'admin');
-        
+
         if (!isAdmin) {
             console.warn('[Settings] Bridge to mobile toggle is admin-only');
             toggle.checked = false;
             return;
         }
-        
+
         const bridgeToMobile = toggle.checked;
         this.state.settings.bridgeToMobile = bridgeToMobile;
         this.markDirty();
-        
-        
+
+
         // Re-render phone numbers to update UI immediately
         this.renderPhoneNumbers();
-        
+
         // Show success message
         if (window.showToast) {
             window.showToast(
-                bridgeToMobile 
-                    ? 'Calls will be bridged to mobile phone (9728342317)' 
+                bridgeToMobile
+                    ? 'Calls will be bridged to mobile phone (9728342317)'
                     : 'Calls will use browser/desktop',
                 'success'
             );
         }
     }
-    
+
     selectPhoneNumber(phoneItem) {
         const index = parseInt(phoneItem.dataset.index);
         const phone = this.state.settings.twilioNumbers[index];
-        
+
         // Set this number as the selected one
         this.state.settings.selectedPhoneNumber = phone.number;
         this.renderPhoneNumbers();
         this.markDirty();
-        
+
         // Show success message
         if (window.showToast) {
             window.showToast(`${phone.label} (${phone.number}) is now your current number`, 'success');
@@ -2667,30 +2681,30 @@ class SettingsPage {
     // Public method to get formatted email signature
     getEmailSignature() {
         const signature = this.state.settings.emailSignature || {};
-        
+
         // Check if custom HTML signature is enabled
         if (signature.useCustomHtml || signature.customHtmlEnabled) {
             return this.getCustomHtmlSignature();
         }
-        
+
         let signatureHtml = '';
 
         if (signature.text || signature.image) {
             signatureHtml += '<div contenteditable="false" data-signature="true" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">';
-            
+
             if (signature.text) {
                 // Convert line breaks to HTML
                 const textHtml = signature.text.replace(/\n/g, '<br>');
                 signatureHtml += `<div style="font-family: inherit; font-size: 14px; color: #333; line-height: 1.4;">${textHtml}</div>`;
             }
-            
+
             if (signature.image) {
                 // Use imageSize from settings, with defaults if not set
                 const width = signature.imageSize?.width || 200;
                 const height = signature.imageSize?.height || 100;
                 signatureHtml += `<div style="margin-top: 10px;"><img src="${signature.image}" alt="Signature" style="max-width: ${width}px; max-height: ${height}px; border-radius: 4px;" /></div>`;
             }
-            
+
             signatureHtml += '</div>';
         }
 
@@ -2700,7 +2714,7 @@ class SettingsPage {
     // Public method to get signature text only (for plain text emails)
     getEmailSignatureText() {
         const signature = this.state.settings.emailSignature || {};
-        
+
         // For custom HTML signature, build plain text version
         if (signature.useCustomHtml || signature.customHtmlEnabled) {
             const g = this.state.settings.general || {};
@@ -2710,7 +2724,7 @@ class SettingsPage {
             const phone = g.phone || '';
             const email = g.email || '';
             const location = g.location || 'Fort Worth, TX';
-            
+
             let text = '\n\n---\n';
             text += `${name}\n`;
             text += `${title}\n`;
@@ -2721,18 +2735,18 @@ class SettingsPage {
             text += '\nChoose Wisely. Power Your Savings.\npowerchoosers.com';
             return text;
         }
-        
+
         if (signature.text) {
             return '\n\n' + signature.text;
         }
         return '';
     }
-    
+
     // Generate premium custom HTML signature using profile fields
     // Email-client compatible (table-based layout, inline styles, no CSS classes)
     getCustomHtmlSignature() {
         const g = this.state.settings.general || {};
-        
+
         // Get profile data with fallbacks
         const firstName = g.firstName || '';
         const lastName = g.lastName || '';
@@ -2744,7 +2758,7 @@ class SettingsPage {
         const location = g.location || 'Fort Worth, TX';
         const linkedIn = g.linkedIn || 'https://www.linkedin.com/company/power-choosers';
         const avatar = g.hostedPhotoURL || g.photoURL || '';
-        
+
         // Build email-compatible HTML signature (table-based for maximum compatibility)
         // Based on the premium perplexity signature design
         // Reduced spacing: margin-top 8px + padding-top 8px = 16px total (was 36px)
@@ -2908,17 +2922,17 @@ class SettingsPage {
         try {
             const appId = localStorage.getItem('algolia-app-id');
             const apiKey = localStorage.getItem('algolia-api-key');
-            
+
             const appIdInput = document.getElementById('algolia-app-id');
             const apiKeyInput = document.getElementById('algolia-api-key');
-            
+
             if (appIdInput && appId) appIdInput.value = appId;
             if (apiKeyInput && apiKey) apiKeyInput.value = apiKey;
-            
+
             // Set global variables for reindex functions
             if (appId) window.ALGOLIA_APP_ID = appId;
             if (apiKey) window.ALGOLIA_API_KEY = apiKey;
-            
+
             // Add input listeners to save credentials
             if (appIdInput) {
                 appIdInput.addEventListener('input', (e) => {
@@ -2926,7 +2940,7 @@ class SettingsPage {
                     window.ALGOLIA_APP_ID = e.target.value;
                 });
             }
-            
+
             if (apiKeyInput) {
                 apiKeyInput.addEventListener('input', (e) => {
                     localStorage.setItem('algolia-api-key', e.target.value);
@@ -2946,7 +2960,7 @@ class SettingsPage {
             // Get Algolia credentials from localStorage or prompt user
             const appId = window.ALGOLIA_APP_ID || prompt('Enter your Algolia Application ID:');
             const apiKey = window.ALGOLIA_API_KEY || prompt('Enter your Algolia Admin API Key:');
-            
+
             if (!appId || !apiKey) {
                 throw new Error('Algolia credentials required. Please enter your Application ID and Admin API Key.');
             }
@@ -3003,7 +3017,7 @@ class SettingsPage {
             // Get Algolia credentials from localStorage or prompt user
             const appId = window.ALGOLIA_APP_ID || prompt('Enter your Algolia Application ID:');
             const apiKey = window.ALGOLIA_API_KEY || prompt('Enter your Algolia Admin API Key:');
-            
+
             if (!appId || !apiKey) {
                 throw new Error('Algolia credentials required. Please enter your Application ID and Admin API Key.');
             }
@@ -3063,10 +3077,10 @@ function injectModernStyles() {
         }
         return;
     }
-    
+
     // Check if styles already injected
     if (document.getElementById('settings-modern-styles')) return;
-    
+
     // Create style element with scoped styles
     const style = document.createElement('style');
     style.id = 'settings-modern-styles';
@@ -3681,17 +3695,17 @@ function injectModernStyles() {
             transform: translateY(-1px);
         }
     `;
-    
+
     // Inject the styles into the head
     document.head.appendChild(style);
-    
+
     // Update section titles and add voicemail section (run immediately)
     updateSectionTitles();
     addVoicemailSection();
-    
+
     // Add collapse buttons immediately (with retry logic)
     addCollapseButtons();
-    
+
 }
 
 function updateSectionTitles() {
@@ -3717,11 +3731,11 @@ function addVoicemailSection() {
         return txt.includes('phone settings') || txt.includes('business phone numbers') || txt.includes('twilio');
     });
     if (!phoneSection) return;
-    
+
     // Target its content wrapper so our block sits under Business Phone Numbers
     const phoneContent = phoneSection.querySelector('.settings-content');
     if (!phoneContent) return;
-    
+
     // Add voicemail section after existing phone content
     const voicemailHTML = `
         <div class="settings-group">
@@ -3760,7 +3774,7 @@ function addVoicemailSection() {
     `;
     // Append to the end of the phone content so it appears beneath Business Phone Numbers
     phoneContent.insertAdjacentHTML('beforeend', voicemailHTML);
-    
+
     // Initialize voicemail functionality
     initVoicemailRecording();
 }
@@ -3774,11 +3788,11 @@ function addCollapseButtons() {
             setTimeout(tryAddButtons, 100);
             return;
         }
-        
+
         sectionTitles.forEach(title => {
             // Check if collapse button already exists
             if (title.querySelector('.collapse-btn')) return;
-            
+
             // Create collapse button
             const collapseBtn = document.createElement('button');
             collapseBtn.className = 'collapse-btn';
@@ -3788,13 +3802,13 @@ function addCollapseButtons() {
                 </svg>
             `;
             collapseBtn.setAttribute('aria-label', 'Collapse section');
-            
+
             // Insert at the beginning of the title
             title.insertBefore(collapseBtn, title.firstChild);
         });
-        
+
     };
-    
+
     // Try immediately, and if DOM not ready, retry
     tryAddButtons();
 }
@@ -3808,14 +3822,14 @@ function setupCollapseFunctionality() {
             setTimeout(trySetupCollapse, 100);
             return;
         }
-        
+
         sections.forEach(section => {
             // Skip if already set up
             if (section.dataset.collapseSetup === 'true') return;
-            
+
             const title = section.querySelector('.settings-section-title');
             let collapseBtn = section.querySelector('.collapse-btn');
-            
+
             // If collapse button doesn't exist yet, wait for it or create it
             if (!collapseBtn && title) {
                 // Wait a bit for addCollapseButtons to run
@@ -3831,34 +3845,34 @@ function setupCollapseFunctionality() {
                 section.dataset.collapseSetup = 'true';
             }
         });
-        
+
     };
-    
+
     const setupSectionCollapse = (section, title, collapseBtn) => {
         // Mark as initially rendered (no animation on first load)
         const content = section.querySelector('.settings-content');
         if (content) {
             content.dataset.initialRender = 'true';
         }
-        
+
         // Start all sections collapsed by default
         section.classList.add('collapsed');
         if (collapseBtn) {
             collapseBtn.setAttribute('aria-label', 'Expand section');
         }
-        
+
         // Make the entire title clickable
         title.addEventListener('click', () => {
             toggleSectionCollapse(section);
         });
-        
+
         // Prevent button click from bubbling to title
         collapseBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             toggleSectionCollapse(section);
         });
     };
-    
+
     // Try immediately, and if DOM not ready, retry
     trySetupCollapse();
 }
@@ -3866,20 +3880,20 @@ function setupCollapseFunctionality() {
 function toggleSectionCollapse(section) {
     const content = section.querySelector('.settings-content');
     if (!content) return;
-    
+
     const isCollapsed = section.classList.contains('collapsed');
     const collapseBtn = section.querySelector('.collapse-btn');
-    
+
     // Skip animation on initial render
     const isInitialRender = content.dataset.initialRender === 'true';
     if (isInitialRender) {
         content.dataset.initialRender = 'false';
     }
-    
+
     if (isCollapsed) {
         // Expand
         section.classList.remove('collapsed');
-        
+
         if (isInitialRender) {
             // No animation on initial render
             if (collapseBtn) {
@@ -3887,19 +3901,19 @@ function toggleSectionCollapse(section) {
             }
             return;
         }
-        
+
         // First, set height to 0 and remove collapsed class to get natural height
         content.style.height = '0';
         content.style.opacity = '0';
-        
+
         // Get the natural height
         const naturalHeight = content.scrollHeight;
         const naturalPaddingTop = window.getComputedStyle(content).paddingTop;
         const naturalPaddingBottom = window.getComputedStyle(content).paddingBottom;
-        
+
         // Force reflow
         void content.offsetHeight;
-        
+
         // Animate to natural height
         requestAnimationFrame(() => {
             content.style.transition = 'height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease, padding 0.4s ease';
@@ -3907,7 +3921,7 @@ function toggleSectionCollapse(section) {
             content.style.opacity = '1';
             content.style.paddingTop = naturalPaddingTop;
             content.style.paddingBottom = naturalPaddingBottom;
-            
+
             // Clean up after animation
             setTimeout(() => {
                 content.style.height = '';
@@ -3916,7 +3930,7 @@ function toggleSectionCollapse(section) {
                 content.style.paddingBottom = '';
             }, 400);
         });
-        
+
         if (collapseBtn) {
             collapseBtn.setAttribute('aria-label', 'Collapse section');
         }
@@ -3924,25 +3938,25 @@ function toggleSectionCollapse(section) {
         // Collapse
         if (isInitialRender) {
             // No animation on initial render
-        section.classList.add('collapsed');
-        if (collapseBtn) {
-            collapseBtn.setAttribute('aria-label', 'Expand section');
-        }
+            section.classList.add('collapsed');
+            if (collapseBtn) {
+                collapseBtn.setAttribute('aria-label', 'Expand section');
+            }
             return;
         }
-        
+
         const currentHeight = content.scrollHeight;
         const currentPaddingTop = window.getComputedStyle(content).paddingTop;
         const currentPaddingBottom = window.getComputedStyle(content).paddingBottom;
-        
+
         // Set explicit height before animating
         content.style.height = currentHeight + 'px';
         content.style.paddingTop = currentPaddingTop;
         content.style.paddingBottom = currentPaddingBottom;
-        
+
         // Force reflow
         void content.offsetHeight;
-        
+
         // Animate to 0
         requestAnimationFrame(() => {
             section.classList.add('collapsed');
@@ -3952,7 +3966,7 @@ function toggleSectionCollapse(section) {
             content.style.paddingTop = '0';
             content.style.paddingBottom = '0';
         });
-        
+
         if (collapseBtn) {
             collapseBtn.setAttribute('aria-label', 'Expand section');
         }
@@ -3965,9 +3979,9 @@ function initVoicemailRecording() {
     const deleteBtn = document.getElementById('delete-recording');
     const timeDisplay = document.getElementById('recording-time');
     const waveform = document.getElementById('waveform');
-    
+
     if (!recordBtn || !playBtn || !deleteBtn || !timeDisplay || !waveform) return;
-    
+
     let mediaRecorder = null;
     let audioChunks = [];
     let recordingStartTime = null;
@@ -3976,10 +3990,10 @@ function initVoicemailRecording() {
     let hasRecording = false;
     let audioBlob = null;
     let audioElement = null;
-    
+
     // Initialize waveform with static bars
     initWaveform(waveform);
-    
+
     recordBtn.addEventListener('click', () => {
         if (!isRecording) {
             startRecording();
@@ -3987,49 +4001,49 @@ function initVoicemailRecording() {
             stopRecording();
         }
     });
-    
+
     playBtn.addEventListener('click', () => {
         if (hasRecording && audioBlob) {
             playRecording();
         }
     });
-    
+
     deleteBtn.addEventListener('click', () => {
         deleteRecording();
     });
-    
+
     function startRecording() {
         navigator.mediaDevices.getUserMedia({ audio: true })
             .then(stream => {
                 mediaRecorder = new MediaRecorder(stream);
                 audioChunks = [];
-                
+
                 mediaRecorder.ondataavailable = event => {
                     audioChunks.push(event.data);
                 };
-                
+
                 mediaRecorder.onstop = () => {
                     audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
                     saveRecording(audioBlob);
                     stream.getTracks().forEach(track => track.stop());
                 };
-                
+
                 mediaRecorder.start();
                 isRecording = true;
                 recordingStartTime = Date.now();
-                
+
                 // Update UI for recording state - show stop icon
                 recordBtn.classList.add('recording');
                 recordBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>';
                 playBtn.style.display = 'none';
-                
+
                 // Start timer
                 recordingInterval = setInterval(() => {
                     const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
                     const minutes = Math.floor(elapsed / 60);
                     const seconds = elapsed % 60;
                     timeDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                    
+
                     // Animate waveform during recording
                     animateWaveform(waveform);
                 }, 100);
@@ -4039,43 +4053,43 @@ function initVoicemailRecording() {
                 alert('Could not access microphone. Please check permissions.');
             });
     }
-    
+
     function stopRecording() {
         if (mediaRecorder && isRecording) {
             mediaRecorder.stop();
             isRecording = false;
             hasRecording = true;
-            
+
             // Update UI for stopped recording state - show circle icon again
             recordBtn.classList.remove('recording');
             recordBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"></circle></svg>';
             playBtn.style.display = 'flex';
-            
+
             if (recordingInterval) {
                 clearInterval(recordingInterval);
                 recordingInterval = null;
             }
         }
     }
-    
+
     function playRecording() {
         if (audioBlob && !audioElement) {
             const audioUrl = URL.createObjectURL(audioBlob);
             audioElement = new Audio(audioUrl);
-            
+
             audioElement.onended = () => {
                 playBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"></polygon></svg>';
             };
-            
+
             audioElement.onplay = () => {
                 playBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><line x1="6" y1="4" x2="6" y2="20"></line><line x1="18" y1="4" x2="18" y2="20"></line></svg>';
             };
-            
+
             audioElement.onpause = () => {
                 playBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"></polygon></svg>';
             };
         }
-        
+
         if (audioElement) {
             if (audioElement.paused) {
                 audioElement.play();
@@ -4084,7 +4098,7 @@ function initVoicemailRecording() {
             }
         }
     }
-    
+
     function deleteRecording() {
         if (confirm('Delete this recording?')) {
             timeDisplay.textContent = '00:00';
@@ -4101,7 +4115,7 @@ function initVoicemailRecording() {
             }
         }
     }
-    
+
     function saveRecording(audioBlob) {
         // Store in localStorage for now (you can implement server storage later)
         const reader = new FileReader();
@@ -4111,7 +4125,7 @@ function initVoicemailRecording() {
         };
         reader.readAsDataURL(audioBlob);
     }
-    
+
     function initWaveform(waveform) {
         waveform.innerHTML = '';
         for (let i = 0; i < 50; i++) {
@@ -4121,7 +4135,7 @@ function initVoicemailRecording() {
             waveform.appendChild(bar);
         }
     }
-    
+
     function animateWaveform(waveform) {
         const bars = waveform.querySelectorAll('.waveform-bar');
         bars.forEach(bar => {
@@ -4152,10 +4166,10 @@ async function initSettings() {
                 }
             }
         }
-        
+
         window.SettingsPage = new SettingsPage();
         window.SettingsPage.instance = window.SettingsPage;
-        
+
         // Force update profile fields after initialization completes
         if (window.SettingsPage && typeof window.SettingsPage.forceUpdateProfileFields === 'function') {
             setTimeout(() => {

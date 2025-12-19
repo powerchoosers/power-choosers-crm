@@ -4212,8 +4212,8 @@
       }
     });
 
-    // Setup inline editing for Account Information and Energy & Contract sections
-    setupInlineEditing();
+    // Note: setupInlineEditing() is now called directly after renderTaskContent() 
+    // to ensure it runs after every DOM replacement, not just once
   }
 
   function renderTaskContent() {
@@ -4249,6 +4249,10 @@
     }
 
     els.content.innerHTML = contentHtml;
+
+    // CRITICAL FIX: Setup inline editing after every DOM replacement
+    // This must be called after each render since DOM elements are replaced
+    setupInlineEditing();
 
     // Attach event handlers for task-specific buttons after rendering
     setTimeout(() => {
@@ -6068,16 +6072,59 @@
     document.addEventListener('pc:contact-created', onContactCreated);
     document._taskDetailContactCreatedHandler = onContactCreated;
 
-    const onContactUpdated = (e) => {
-      if (state.currentTask && !isAccountTask(state.currentTask)) {
-        // Re-render the task page to reflect updated contact information
-        console.log('[Task Detail] Contact updated, refreshing task detail page');
-        renderTaskPage();
+    const onContactUpdated = async (e) => {
+      const { id, changes } = e.detail || {};
+      if (!id || !state.currentTask) return;
 
-        // Re-process click-to-call to ensure context is updated
-        setTimeout(() => {
-          processClickToCallAndEmail();
-        }, 100);
+      // Check if this contact update is relevant to the current task
+      // Contact can be linked via: task.contactId or state.contact.id
+      const taskContactId = state.currentTask?.contactId || '';
+      const stateContactId = state.contact?.id || '';
+
+      // Only refresh if the updated contact matches the task's contact
+      if (id === taskContactId || id === stateContactId) {
+        console.log('[TaskDetail] Contact updated, reloading contact data:', id);
+        
+        try {
+          // Reload contact data from Firestore to get latest changes
+          if (window.firebaseDB && id) {
+            const contactDoc = await window.firebaseDB.collection('contacts').doc(id).get();
+            if (contactDoc.exists) {
+              const updatedContact = { id: contactDoc.id, ...contactDoc.data() };
+              state.contact = updatedContact;
+              console.log('[TaskDetail] ✓ Reloaded contact data:', updatedContact.firstName, updatedContact.lastName);
+              
+              // Re-render the task page to show updated contact information
+              renderTaskPage();
+              
+              // Update cache if available
+              if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+                await window.CacheManager.updateRecord('contacts', id, updatedContact);
+              }
+              
+              // Update BackgroundContactsLoader cache if available (best-effort)
+              try {
+                if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+                  const contacts = window.BackgroundContactsLoader.getContactsData() || [];
+                  const contactIndex = contacts.findIndex(c => c && c.id === id);
+                  if (contactIndex !== -1) {
+                    contacts[contactIndex] = updatedContact;
+                    console.log('[TaskDetail] Updated contact in BackgroundContactsLoader cache');
+                  }
+                }
+              } catch (e) {
+                console.warn('[TaskDetail] Could not update BackgroundContactsLoader cache:', e);
+              }
+              
+              // Re-process click-to-call to ensure context is updated
+              setTimeout(() => {
+                processClickToCallAndEmail();
+              }, 100);
+            }
+          }
+        } catch (error) {
+          console.warn('[TaskDetail] Failed to reload contact data after update:', error);
+        }
       }
     };
 
