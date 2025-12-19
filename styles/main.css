@@ -20225,6 +20225,12 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
     pointer-events: none;
     z-index: 1;
+
+    transition: opacity 0.4s ease;
+}
+
+#task-detail-page.task-loaded::before {
+    opacity: 0;
 }
 
 #task-detail-page.task-loading::after {
@@ -20241,7 +20247,13 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     animation: skeleton-shimmer 1.5s linear infinite;
     pointer-events: none;
     z-index: 2;
+
+    transition: opacity 0.4s ease;
 }
+
+ #task-detail-page.task-loaded::after {
+    opacity: 0;
+ }
 
 @keyframes skeleton-shimmer {
     0% {
