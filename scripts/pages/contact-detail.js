@@ -102,9 +102,11 @@
 
       // Edit button click delegation (contact detail specific)
       const editBtn = e.target.closest('.title-edit');
-      if (editBtn && document.getElementById('contact-detail-header') && !document.getElementById('account-details-page')) {
+      // FIX: Only handle edit-contact buttons, not edit-account buttons
+      if (editBtn && editBtn.dataset.action === 'edit-contact' && document.getElementById('contact-detail-header') && !document.getElementById('account-details-page')) {
         e.preventDefault();
         e.stopPropagation();
+        console.log('[ContactDetail] Edit contact button clicked via delegation');
         openEditContactModal();
         return;
       }
@@ -545,8 +547,8 @@
   }
 
   // ===== Edit Contact Modal =====
-  function openEditContactModal() {
-    const overlay = createEditContactModal();
+  function openEditContactModal(contactOverride) {
+    const overlay = createEditContactModal(contactOverride);
     document.body.appendChild(overlay);
 
     // Open modal with animation (same as add modals)
@@ -567,8 +569,13 @@
     }, 0);
   }
 
-  function createEditContactModal() {
-    const c = state.currentContact || {};
+  function createEditContactModal(contactOverride) {
+    const c = contactOverride || state.currentContact || {};
+    // CRITICAL FIX: Update internal state if an override is provided
+    // This ensures form submission logic (which uses state.currentContact.id) works when reused as an overlay
+    if (contactOverride) {
+      state.currentContact = contactOverride;
+    }
     const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ').trim();
     const overlay = document.createElement('div');
     overlay.className = 'pc-modal';
@@ -2869,12 +2876,12 @@
           onAnyContactCallActivity();
         }
       });
-      
+
       // Listen for call insights ready (after transcript processing completes)
       document.addEventListener('pc:call-insights-ready', (event) => {
         const { callSid, call } = event.detail || {};
         console.log('[ContactDetail] Call insights ready:', callSid);
-        
+
         // Update the call in our local cache
         if (Array.isArray(state._rcCalls) && callSid) {
           const idMatch = String(callSid);
@@ -2883,12 +2890,12 @@
             const xid = String(x.id || x.twilioSid || x.callSid || '');
             if (xid === idMatch) {
               found = true;
-              return { 
-                ...x, 
-                transcript: call?.transcript || x.transcript, 
-                formattedTranscript: call?.formattedTranscript || x.formattedTranscript, 
-                aiInsights: call?.aiInsights || x.aiInsights, 
-                conversationalIntelligence: call?.conversationalIntelligence || x.conversationalIntelligence 
+              return {
+                ...x,
+                transcript: call?.transcript || x.transcript,
+                formattedTranscript: call?.formattedTranscript || x.formattedTranscript,
+                aiInsights: call?.aiInsights || x.aiInsights,
+                conversationalIntelligence: call?.conversationalIntelligence || x.conversationalIntelligence
               };
             }
             return x;
@@ -3615,15 +3622,15 @@
 
           try {
             const restore = window._callsReturn || {};
-            
+
             // Set restoration flag so Calls page knows to restore state
             window.__restoringCalls = true;
             window.__restoringCallsUntil = Date.now() + 15000;
-            
+
             // Navigate back to calls page
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
               window.crm.navigateToPage('calls');
-              
+
               // Dispatch restore event after short delay
               setTimeout(() => {
                 try {
@@ -3638,11 +3645,11 @@
                     }
                   });
                   document.dispatchEvent(ev);
-                  
+
                   // Clear navigation markers
                   window._contactNavigationSource = null;
                   window._callsReturn = null;
-                } catch (_) {}
+                } catch (_) { }
               }, 60);
             }
           } catch (_) {
@@ -3651,7 +3658,7 @@
               window.crm.navigateToPage('calls');
             }
           }
-          
+
           window._contactNavigationSource = null;
           window._contactNavigationContactId = null;
           return;
@@ -3719,7 +3726,7 @@
 
                     // Restore the full sequence and pagination state
                     const fullSequence = returnData.sequence || { id: sequenceId, name: sequenceName };
-                    
+
                     // Restore pagination state BEFORE showing
                     if (window.SequenceBuilder.state) {
                       if (returnData.stepsLoadedMembers) {
@@ -3739,14 +3746,14 @@
                       }
                       console.log(`[ContactDetail] Restored pagination state: page=${page}, loaded=${returnData.stepsLoadedMembers?.length || 0}`);
                     }
-                    
+
                     // Show the sequence with preserved state
                     window.SequenceBuilder.show(
                       fullSequence,
-                      { 
-                        preserveState: true, 
-                        view: view || 'builder', 
-                        page: page || 1 
+                      {
+                        preserveState: true,
+                        view: view || 'builder',
+                        page: page || 1
                       }
                     );
 
@@ -3769,17 +3776,17 @@
                           }
                         }
                       }
-                      
+
                       // Restore scroll positions
                       const savedScrollY = returnData.scrollY || 0;
                       const savedTableScroll = returnData.tableScrollTop || 0;
-                      
+
                       requestAnimationFrame(() => {
                         // Restore page scroll
                         if (savedScrollY > 0) {
                           window.scrollTo(0, savedScrollY);
                         }
-                        
+
                         // Restore table scroll
                         if (savedTableScroll > 0) {
                           const tableScroller = document.querySelector('#sequence-builder-page .table-scroll');
@@ -3787,7 +3794,7 @@
                             tableScroller.scrollTop = savedTableScroll;
                           }
                         }
-                        
+
                         console.log(`[ContactDetail] Restored scroll: pageY=${savedScrollY}, tableScroll=${savedTableScroll}`);
                       });
                     }, 300);
@@ -5076,11 +5083,11 @@
       const initials = (c.firstName.charAt(0) + (c.lastName ? c.lastName.charAt(0) : '')).toUpperCase();
       return `<div class="transcript-avatar-circle contact-avatar" aria-hidden="true">${initials}</div>`;
     }
-    
+
     // Get account info for logo and domain
     const accountInfo = cd_getAccountInfoForAvatar(call && (call.accountName || ''));
     const { logoUrl, domain } = accountInfo;
-    
+
     // Use favicon helper with logoUrl priority (per workspace rules)
     if (logoUrl || domain) {
       if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
@@ -5619,10 +5626,10 @@
       } catch (_) { }
       try { btn.innerHTML = svgEye(); btn.classList.remove('processing', 'not-processed'); btn.disabled = false; btn.title = 'View AI insights'; } catch (_) { }
       try { if (window.ToastManager) { window.ToastManager.showToast({ type: 'success', title: 'Insights Ready', message: 'Click the eye icon to view call insights.' }); } } catch (_) { }
-      
+
       // Re-render the recent calls list to show updated insights
       try { renderRecentCallsPage(); } catch (_) { }
-      
+
       // Also dispatch an event to notify other components
       try {
         document.dispatchEvent(new CustomEvent('pc:call-insights-ready', {
@@ -6649,13 +6656,13 @@
               .where('sequenceId', '==', sequenceId)
               .where('isSequenceTask', '==', true)
               .get();
-            
+
             if (!tasksSnapshot.empty) {
               const taskIds = [];
               tasksSnapshot.forEach(doc => {
                 taskIds.push(doc.id);
               });
-              
+
               // Delete tasks in batches (Firestore batch limit is 500)
               for (let i = 0; i < taskIds.length; i += 500) {
                 const taskBatch = db.batch();
@@ -6665,9 +6672,9 @@
                 });
                 await taskBatch.commit();
               }
-              
+
               console.log(`[ContactDetail] Deleted ${taskIds.length} sequence task(s) for contact ${contactId} in sequence ${sequenceId}`);
-              
+
               // Clean up caches
               taskIds.forEach(taskId => {
                 // Remove from BackgroundTasksLoader cache
@@ -6678,14 +6685,14 @@
                     if (idx >= 0) tasks.splice(idx, 1);
                   }
                 } catch (_) { /* best-effort cache cleanup */ }
-                
+
                 // Delete from CacheManager cache
                 try {
                   if (window.CacheManager?.deleteRecord) {
-                    window.CacheManager.deleteRecord('tasks', taskId).catch(() => {});
+                    window.CacheManager.deleteRecord('tasks', taskId).catch(() => { });
                   }
                 } catch (_) { /* ignore cache errors */ }
-                
+
                 // Dispatch task-deleted event for UI updates
                 try {
                   document.dispatchEvent(new CustomEvent('pc:task-deleted', {
@@ -8033,6 +8040,12 @@
       document.addEventListener('keydown', onEscape);
     });
   }
+
+
+  // Ensure global namespace exists
+  window.ContactDetail = window.ContactDetail || {};
+  // Expose edit modal for external use
+  window.ContactDetail.openEditModal = openEditContactModal;
 
 })();
 

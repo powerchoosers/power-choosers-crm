@@ -154,7 +154,8 @@ var console = {
 
       // Check if click is on edit account button (only on account detail page)
       const editBtn = e.target.closest('.title-edit');
-      if (editBtn && document.getElementById('account-details-page') && !document.getElementById('contact-detail-header')) {
+      // FIX: Only handle edit-account buttons, not edit-contact buttons
+      if (editBtn && editBtn.dataset.action === 'edit-account' && document.getElementById('account-details-page') && !document.getElementById('contact-detail-header')) {
         e.preventDefault();
         e.stopPropagation();
         console.log('[AccountDetail] Edit account button clicked via delegation');
@@ -1639,12 +1640,12 @@ var console = {
           onAnyAccountCallActivity();
         }
       });
-      
+
       // Listen for call insights ready (after transcript processing completes)
       document.addEventListener('pc:call-insights-ready', (event) => {
         const { callSid, call } = event.detail || {};
         console.log('[AccountDetail] Call insights ready:', callSid);
-        
+
         // Update the call in our local cache
         if (Array.isArray(state._arcCalls) && callSid) {
           const idMatch = String(callSid);
@@ -1653,12 +1654,12 @@ var console = {
             const xid = String(x.id || x.twilioSid || x.callSid || '');
             if (xid === idMatch) {
               found = true;
-              return { 
-                ...x, 
-                transcript: call?.transcript || x.transcript, 
-                formattedTranscript: call?.formattedTranscript || x.formattedTranscript, 
-                aiInsights: call?.aiInsights || x.aiInsights, 
-                conversationalIntelligence: call?.conversationalIntelligence || x.conversationalIntelligence 
+              return {
+                ...x,
+                transcript: call?.transcript || x.transcript,
+                formattedTranscript: call?.formattedTranscript || x.formattedTranscript,
+                aiInsights: call?.aiInsights || x.aiInsights,
+                conversationalIntelligence: call?.conversationalIntelligence || x.conversationalIntelligence
               };
             }
             return x;
@@ -1766,7 +1767,7 @@ var console = {
     // Get account info for logo and domain
     const accountInfo = ad_getAccountInfoForAvatar(call && (call.accountName || ''));
     const { logoUrl, domain } = accountInfo;
-    
+
     // Use favicon helper with logoUrl priority (per workspace rules)
     if (logoUrl || domain) {
       if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
@@ -2212,10 +2213,10 @@ var console = {
       } catch (_) { }
       try { btn.innerHTML = svgEye(); btn.classList.remove('processing', 'not-processed'); btn.disabled = false; btn.title = 'View AI insights'; } catch (_) { }
       try { if (window.ToastManager) { window.ToastManager.showToast({ type: 'success', title: 'Insights Ready', message: 'Click the eye icon to view call insights.' }); } } catch (_) { }
-      
+
       // Re-render the recent calls list to show updated insights
       try { arcRenderPage(); } catch (_) { }
-      
+
       // Also dispatch an event to notify other components
       try {
         document.dispatchEvent(new CustomEvent('pc:call-insights-ready', {
@@ -2772,10 +2773,14 @@ var console = {
     dropdownElement.style.display = 'none';
   }
 
-  // Edit Account modal (reuse Add Account modal styles)
   // Assign to variable declared at top for event delegation scope
-  openEditAccountModal = function () {
-    const a = state.currentAccount || {};
+  openEditAccountModal = function (accountOverride) {
+    const a = accountOverride || state.currentAccount || {};
+    // CRITICAL FIX: Update internal state if an override is provided
+    // This ensures form submission logic (which uses state.currentAccount.id) works when reused as an overlay
+    if (accountOverride) {
+      state.currentAccount = accountOverride;
+    }
     const overlay = document.createElement('div');
     overlay.className = 'pc-modal';
     overlay.tabIndex = -1;
@@ -3233,11 +3238,11 @@ var console = {
         if (window._accountNavigationSource === 'calls') {
           try {
             const restore = window._callsReturn || {};
-            
+
             // Set restoration flag
             window.__restoringCalls = true;
             window.__restoringCallsUntil = Date.now() + 15000;
-            
+
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
               window.crm.navigateToPage('calls');
               // Restore Calls state
@@ -3254,7 +3259,7 @@ var console = {
                     }
                   });
                   document.dispatchEvent(ev);
-                  
+
                   // Clear restoration data
                   window._callsReturn = null;
                 } catch (_) { }
@@ -6338,7 +6343,10 @@ var console = {
   window.AccountDetail.show = showAccountDetail;
   window.AccountDetail.renderAccountDetail = renderAccountDetail;
   window.AccountDetail.setupEnergyUpdateListener = setupEnergyUpdateListener;
+  window.AccountDetail.setupEnergyUpdateListener = setupEnergyUpdateListener;
   window.AccountDetail.setupParentCompanyAutocomplete = setupParentCompanyAutocomplete;
+  // Expose edit modal for external use (e.g. from Task Detail)
+  window.AccountDetail.openEditModal = openEditAccountModal;
 
   // Backward-compat global alias used by some modules
   try { window.showAccountDetail = showAccountDetail; } catch (_) { }
