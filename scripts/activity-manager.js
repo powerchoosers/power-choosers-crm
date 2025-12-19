@@ -16,11 +16,11 @@ class ActivityManager {
     this.maxFetchLimit = 200; // Safety cap for incremental fetches
     this.lastFetchLimitUsed = this.fetchLimitPerType;
     this.loadingPromises = new Map(); // Track in-flight requests to prevent duplicates
-    
+
     // Setup cache invalidation listeners for immediate updates when new activities are created
     this.setupCacheInvalidationListeners();
   }
-  
+
   /**
    * Setup event listeners to invalidate cache when new activities are created/updated
    * This ensures Recent Activities is immediately updated with new records
@@ -35,7 +35,7 @@ class ActivityManager {
       this.clearCache('global');
       if (id) this.clearCache('contact', id);
     });
-    
+
     // Invalidate global cache when accounts are created/updated (affects notes)
     document.addEventListener('pc:account-created', () => {
       this.clearCache('global');
@@ -45,7 +45,7 @@ class ActivityManager {
       this.clearCache('global');
       if (id) this.clearCache('account', id);
     });
-    
+
     // Invalidate global cache when tasks are created/updated/deleted
     document.addEventListener('tasksUpdated', (e) => {
       const { taskId } = e.detail || {};
@@ -55,7 +55,7 @@ class ActivityManager {
       const { taskId } = e.detail || {};
       this.clearCache('global');
     });
-    
+
     // Invalidate global cache when emails are updated (but debounce to avoid too frequent invalidations)
     let emailUpdateTimeout = null;
     document.addEventListener('pc:emails-updated', () => {
@@ -65,12 +65,12 @@ class ActivityManager {
         this.clearCache('global');
       }, 2000); // 2 second debounce
     });
-    
+
     // Invalidate global cache when calls are logged
     document.addEventListener('pc:call-logged', () => {
       this.clearCache('global');
     });
-    
+
     // Listen for explicit activity refresh requests
     document.addEventListener('pc:activities-refresh', (e) => {
       const { entityType, entityId, forceRefresh } = e.detail || {};
@@ -84,12 +84,12 @@ class ActivityManager {
   async getActivities(entityType = 'global', entityId = null, forceRefresh = false) {
     const cacheKey = `${entityType}-${entityId || 'global'}`;
     const now = Date.now();
-    
+
     // OPTIMIZATION: Prevent duplicate simultaneous calls for the same cache key
     if (!forceRefresh && this.loadingPromises.has(cacheKey)) {
       return this.loadingPromises.get(cacheKey);
     }
-    
+
     // Check cache first (unless force refresh)
     if (!forceRefresh && this.cache.has(cacheKey)) {
       const cacheTime = this.cacheTimestamp.get(cacheKey);
@@ -97,11 +97,11 @@ class ActivityManager {
         return this.cache.get(cacheKey);
       }
     }
-    
+
     // Create promise for this request and store it to prevent duplicates
     const fetchPromise = (async () => {
       const activities = [];
-      
+
       try {
         // OPTIMIZATION: Fetch all activity types in parallel instead of sequentially
         // This reduces total load time from sum of all fetches to max of all fetches
@@ -112,7 +112,7 @@ class ActivityManager {
           this.getEmailActivities(entityType, entityId, this.fetchLimitPerType),
           this.getTaskActivities(entityType, entityId, this.fetchLimitPerType)
         ]);
-        
+
         activities.push(...calls, ...notes, ...sequences, ...emails, ...tasks);
 
         // Sort by timestamp (most recent first) using robust timestamp parsing
@@ -136,10 +136,10 @@ class ActivityManager {
         this.loadingPromises.delete(cacheKey);
       }
     })();
-    
+
     // Store promise to prevent duplicate calls
     this.loadingPromises.set(cacheKey, fetchPromise);
-    
+
     return fetchPromise;
   }
 
@@ -148,14 +148,14 @@ class ActivityManager {
    */
   async getCallActivities(entityType, entityId, limit) {
     const activities = [];
-    
+
     try {
       // Get calls from Firebase or local storage
       const calls = await this.fetchCalls(limit);
-      
+
       for (const call of calls) {
         let shouldInclude = false;
-        
+
         if (entityType === 'global') {
           shouldInclude = true;
         } else if (entityType === 'contact' && entityId) {
@@ -193,13 +193,13 @@ class ActivityManager {
    */
   async getNoteActivities(entityType, entityId, limit) {
     const activities = [];
-    
+
     try {
       if (entityType === 'global') {
         // For global view, get notes from all contacts and accounts
         const contacts = await this.fetchContactsWithNotes(limit);
         const accounts = await this.fetchAccountsWithNotes(limit);
-        
+
         for (const contact of contacts) {
           if (contact.notes && contact.notes.trim()) {
             // Use proper timestamp priority: notesUpdatedAt > updatedAt > createdAt
@@ -215,7 +215,7 @@ class ActivityManager {
             });
           }
         }
-        
+
         for (const account of accounts) {
           if (account.notes && account.notes.trim()) {
             // Use proper timestamp priority: notesUpdatedAt > updatedAt > createdAt
@@ -276,13 +276,13 @@ class ActivityManager {
    */
   async getSequenceActivities(entityType, entityId, limit) {
     const activities = [];
-    
+
     try {
       const sequences = await this.fetchSequences(limit);
-      
+
       for (const sequence of sequences) {
         let shouldInclude = false;
-        
+
         if (entityType === 'global') {
           shouldInclude = true;
         } else if (entityType === 'contact' && entityId) {
@@ -319,10 +319,10 @@ class ActivityManager {
    */
   async getEmailActivities(entityType, entityId, limit) {
     const activities = [];
-    
+
     try {
       const emails = await this.fetchEmails(limit);
-      
+
       // OPTIMIZATION: fetchEmails already filtered emails to only include CRM contacts,
       // so we don't need to rebuild contactEmailsSet here. We only need contacts for entity-specific filtering.
       // Use BackgroundContactsLoader cached data if available (faster than getPeopleData)
@@ -333,10 +333,10 @@ class ActivityManager {
         allContacts = window.getPeopleData ? (window.getPeopleData() || []) : [];
       }
       const contactIdsSet = new Set(allContacts.map(c => c.id).filter(Boolean));
-      
+
       // NOTE: We don't need to build contactEmailsSet here since fetchEmails already filtered emails.
       // We only need allContacts for entity-specific filtering below.
-      
+
       // Helper to extract email addresses from string or array
       const extractEmails = (value) => {
         if (!value) return [];
@@ -346,21 +346,21 @@ class ActivityManager {
         const str = String(value || '');
         // Extract emails from "Name <email@domain.com>" format or plain email
         const matches = str.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
-          return matches.map(e => e.toLowerCase().trim());
+        return matches.map(e => e.toLowerCase().trim());
       };
-      
+
       // Helper to normalize email for comparison
       const normalizeEmail = (email) => String(email || '').toLowerCase().trim();
-      
+
       // NOTE: fetchEmails already filters emails to only include those from CRM contacts,
       // so we don't need to filter again here. We just process the pre-filtered emails.
       if (!emails || !Array.isArray(emails) || emails.length === 0) {
         return activities;
       }
-      
+
       for (const email of emails) {
         let shouldInclude = false;
-        
+
         if (entityType === 'global') {
           shouldInclude = true;
         } else if (entityType === 'contact' && entityId) {
@@ -387,45 +387,45 @@ class ActivityManager {
           } else {
             // Get account contacts from CRM
             const accountContacts = allContacts.filter(c => c.accountId === entityId);
-            
+
             // Match by contactId (must be in accountContacts from CRM)
             shouldInclude = accountContacts.some(c => c.id === email.contactId);
-            
+
             // Also match by contactCompany name (only if contact is in CRM)
             if (!shouldInclude && email.contactCompany) {
-              const account = window.getAccountsData ? 
+              const account = window.getAccountsData ?
                 (window.getAccountsData() || []).find(a => a.id === entityId) : null;
               if (account) {
                 const accountName = account.accountName || account.name || account.companyName || '';
                 const emailCompany = String(email.contactCompany || '').trim().toLowerCase();
                 const normalizedAccountName = accountName.trim().toLowerCase();
-                if (emailCompany && normalizedAccountName && 
-                    (emailCompany === normalizedAccountName || 
-                     emailCompany.includes(normalizedAccountName) || 
-                     normalizedAccountName.includes(emailCompany))) {
+                if (emailCompany && normalizedAccountName &&
+                  (emailCompany === normalizedAccountName ||
+                    emailCompany.includes(normalizedAccountName) ||
+                    normalizedAccountName.includes(emailCompany))) {
                   // Double-check: email must be from a contact in this account
                   const emailTo = extractEmails(email.to);
                   const emailFrom = extractEmails(email.from);
                   const accountContactEmails = accountContacts
                     .map(c => normalizeEmail(c.email))
                     .filter(e => e);
-                  shouldInclude = accountContactEmails.some(contactEmail => 
+                  shouldInclude = accountContactEmails.some(contactEmail =>
                     emailTo.includes(contactEmail) || emailFrom.includes(contactEmail)
                   );
                 }
               }
             }
-            
+
             // Also match by email address (only from accountContacts in CRM)
             if (!shouldInclude) {
               const accountContactEmails = accountContacts
                 .map(c => normalizeEmail(c.email))
                 .filter(e => e);
-              
+
               if (accountContactEmails.length > 0) {
                 const emailTo = extractEmails(email.to);
                 const emailFrom = extractEmails(email.from);
-                shouldInclude = accountContactEmails.some(contactEmail => 
+                shouldInclude = accountContactEmails.some(contactEmail =>
                   emailTo.includes(contactEmail) || emailFrom.includes(contactEmail)
                 );
               }
@@ -434,25 +434,23 @@ class ActivityManager {
         }
 
         if (shouldInclude) {
-          includedCount++;
           // Determine if email is sent or received
           const currentUserEmail = window.DataManager?.getCurrentUserEmail?.() || window.currentUserEmail || '';
           const emailFrom = extractEmails(email.from);
           const isSent = email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail;
-          const isReceived = email.type === 'received' || email.emailType === 'received' || 
-                            (emailFrom.length > 0 && !emailFrom.some(e => e.includes(currentUserEmail.toLowerCase())));
-          
+          const isReceived = email.type === 'received' || email.emailType === 'received' ||
+            (emailFrom.length > 0 && !emailFrom.some(e => e.includes(currentUserEmail.toLowerCase())));
+
           const emailType = isSent ? 'sent' : (isReceived ? 'received' : 'sent');
           const direction = isSent ? 'Sent' : 'Received';
-          
+
           // Get preview text
-          const previewText = email.text || email.snippet || 
-            (email.html ? this.stripHtml(email.html) : '') || 
-            email.content || email.body || '';
-          
+          const previewText = email.text || email.snippet ||
+            this.stripHtml(email.html || email.content || email.body || '') || '';
+
           // Get proper timestamp (handle both ISO strings and numbers)
           const emailTimestamp = email.timestamp || email.sentAt || email.receivedAt || email.date || email.createdAt;
-          
+
           activities.push({
             id: `email-${email.id}`,
             type: 'email',
@@ -472,7 +470,7 @@ class ActivityManager {
           });
         }
       }
-      
+
       return activities;
     } catch (error) {
       console.error('Error fetching email activities:', error);
@@ -485,13 +483,13 @@ class ActivityManager {
    */
   async getTaskActivities(entityType, entityId) {
     const activities = [];
-    
+
     try {
       const tasks = await this.fetchTasks();
-      
+
       for (const task of tasks) {
         let shouldInclude = false;
-        
+
         if (entityType === 'global') {
           shouldInclude = true;
         } else if (entityType === 'contact' && entityId) {
@@ -503,7 +501,7 @@ class ActivityManager {
         if (shouldInclude) {
           // Check if this is a guide download task
           const isGuideDownload = task.title && task.title.startsWith('Guide Download:');
-          
+
           activities.push({
             id: `task-${task.id}`,
             type: isGuideDownload ? 'guide-download' : 'task',
@@ -526,7 +524,7 @@ class ActivityManager {
    * Fetch calls from Firebase or local storage
    */
   async fetchCalls(limit = this.fetchLimitPerType) {
-    
+
     try {
       // Try Firebase first
       if (window.db) {
@@ -534,10 +532,10 @@ class ActivityManager {
           .orderBy('timestamp', 'desc')
           .limit(limit || this.fetchLimitPerType)
           .get();
-        
+
         return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).slice(0, limit || this.fetchLimitPerType);
       }
-      
+
       // Return empty array if no data available
       return [];
     } catch (error) {
@@ -558,7 +556,7 @@ class ActivityManager {
           .get();
         return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       }
-      
+
       return [];
     } catch (error) {
       console.error('Error fetching notes:', error);
@@ -570,10 +568,10 @@ class ActivityManager {
    * Fetch contacts with notes from Firebase and localStorage
    */
   async fetchContactsWithNotes(limit = this.fetchLimitPerType) {
-    
+
     try {
       let contacts = [];
-      
+
       // Helper functions
       const getUserEmail = () => {
         try {
@@ -581,7 +579,7 @@ class ActivityManager {
             return window.DataManager.getCurrentUserEmail();
           }
           return (window.currentUserEmail || '').toLowerCase();
-        } catch(_) {
+        } catch (_) {
           return (window.currentUserEmail || '').toLowerCase();
         }
       };
@@ -591,11 +589,11 @@ class ActivityManager {
             return window.DataManager.isCurrentUserAdmin();
           }
           return window.currentUserRole === 'admin';
-        } catch(_) {
+        } catch (_) {
           return window.currentUserRole === 'admin';
         }
       };
-      
+
       // OPTIMIZATION: Try BackgroundContactsLoader cached data first (zero Firestore reads, instant)
       if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
         const cachedContacts = window.BackgroundContactsLoader.getContactsData() || [];
@@ -608,11 +606,11 @@ class ActivityManager {
             return timeB - timeA;
           });
           const result = contactsWithNotes.slice(0, limit || this.fetchLimitPerType);
-          
+
           return result;
         }
       }
-      
+
       // Fallback to Firestore if cache empty
       if (window.firebaseDB) {
         if (!isAdmin()) {
@@ -639,7 +637,7 @@ class ActivityManager {
                   .limit(limit || this.fetchLimitPerType)
                   .get()
               ]);
-              
+
               // Merge results and deduplicate
               const contactsMap = new Map();
               ownedSnap.docs.forEach(doc => {
@@ -650,7 +648,7 @@ class ActivityManager {
                   contactsMap.set(doc.id, { id: doc.id, ...doc.data() });
                 }
               });
-              
+
               contacts = Array.from(contactsMap.values());
               // Sort by notesUpdatedAt desc (most recent first)
               contacts.sort((a, b) => {
@@ -660,7 +658,7 @@ class ActivityManager {
               });
               // Apply limit after merge
               contacts = contacts.slice(0, limit || this.fetchLimitPerType);
-              
+
             } catch (error) {
               // Detect missing Firestore index
               if (error.code === 'failed-precondition' || (error.message && error.message.includes('index'))) {
@@ -686,7 +684,7 @@ class ActivityManager {
           contacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         }
       }
-      
+
       // Also check localStorage for contacts with notes
       try {
         if (window.getPeopleData) {
@@ -700,7 +698,7 @@ class ActivityManager {
       } catch (error) {
         console.warn('Error loading contacts with notes from localStorage:', error);
       }
-      
+
       const result = contacts.slice(0, limit || this.fetchLimitPerType);
       return result;
     } catch (error) {
@@ -713,10 +711,10 @@ class ActivityManager {
    * Fetch accounts with notes from Firebase and localStorage
    */
   async fetchAccountsWithNotes(limit = this.fetchLimitPerType) {
-    
+
     try {
       let accounts = [];
-      
+
       // Helper functions
       const getUserEmail = () => {
         try {
@@ -724,7 +722,7 @@ class ActivityManager {
             return window.DataManager.getCurrentUserEmail();
           }
           return (window.currentUserEmail || '').toLowerCase();
-        } catch(_) {
+        } catch (_) {
           return (window.currentUserEmail || '').toLowerCase();
         }
       };
@@ -734,11 +732,11 @@ class ActivityManager {
             return window.DataManager.isCurrentUserAdmin();
           }
           return window.currentUserRole === 'admin';
-        } catch(_) {
+        } catch (_) {
           return window.currentUserRole === 'admin';
         }
       };
-      
+
       // OPTIMIZATION: Try BackgroundAccountsLoader cached data first (zero Firestore reads, instant)
       if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
         const cachedAccounts = window.BackgroundAccountsLoader.getAccountsData() || [];
@@ -751,11 +749,11 @@ class ActivityManager {
             return timeB - timeA;
           });
           const result = accountsWithNotes.slice(0, limit || this.fetchLimitPerType);
-          
+
           return result;
         }
       }
-      
+
       // Fallback to Firestore if cache empty
       if (window.firebaseDB) {
         if (!isAdmin()) {
@@ -782,7 +780,7 @@ class ActivityManager {
                   .limit(limit || this.fetchLimitPerType)
                   .get()
               ]);
-              
+
               // Merge results and deduplicate
               const accountsMap = new Map();
               ownedSnap.docs.forEach(doc => {
@@ -793,7 +791,7 @@ class ActivityManager {
                   accountsMap.set(doc.id, { id: doc.id, ...doc.data() });
                 }
               });
-              
+
               accounts = Array.from(accountsMap.values());
               // Sort by notesUpdatedAt desc (most recent first)
               accounts.sort((a, b) => {
@@ -803,7 +801,7 @@ class ActivityManager {
               });
               // Apply limit after merge
               accounts = accounts.slice(0, limit || this.fetchLimitPerType);
-              } catch (error) {
+            } catch (error) {
               // Detect missing Firestore index
               if (error.code === 'failed-precondition' || (error.message && error.message.includes('index'))) {
                 console.error('[ActivityManager] Firestore index required for accounts with notes query:', error.message);
@@ -828,7 +826,7 @@ class ActivityManager {
           accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         }
       }
-      
+
       // Also check localStorage for accounts with notes
       try {
         if (window.getAccountsData) {
@@ -842,9 +840,9 @@ class ActivityManager {
       } catch (error) {
         console.warn('Error loading accounts with notes from localStorage:', error);
       }
-      
+
       const result = accounts.slice(0, limit || this.fetchLimitPerType);
-      
+
       return result;
     } catch (error) {
       console.error('Error fetching accounts with notes:', error);
@@ -864,7 +862,7 @@ class ActivityManager {
           return { id: doc.id, ...doc.data() };
         }
       }
-      
+
       // Fallback to localStorage
       if (window.getPeopleData) {
         const contacts = window.getPeopleData() || [];
@@ -873,7 +871,7 @@ class ActivityManager {
           return contact;
         }
       }
-      
+
       return null;
     } catch (error) {
       console.error('Error fetching contact with notes:', error);
@@ -893,7 +891,7 @@ class ActivityManager {
           return { id: doc.id, ...doc.data() };
         }
       }
-      
+
       // Fallback to localStorage
       if (window.getAccountsData) {
         const accounts = window.getAccountsData() || [];
@@ -902,7 +900,7 @@ class ActivityManager {
           return account;
         }
       }
-      
+
       return null;
     } catch (error) {
       console.error('Error fetching account with notes:', error);
@@ -922,7 +920,7 @@ class ActivityManager {
           .get();
         return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).slice(0, limit || this.fetchLimitPerType);
       }
-      
+
       return [];
     } catch (error) {
       console.error('Error fetching sequences:', error);
@@ -934,10 +932,10 @@ class ActivityManager {
    * Fetch emails from Firebase or local storage
    */
   async fetchEmails(limit = this.fetchLimitPerType) {
-    
+
     try {
       let emails = [];
-      
+
       // Helper functions
       const getUserEmail = () => {
         try {
@@ -945,7 +943,7 @@ class ActivityManager {
             return window.DataManager.getCurrentUserEmail();
           }
           return (window.currentUserEmail || '').toLowerCase();
-        } catch(_) {
+        } catch (_) {
           return (window.currentUserEmail || '').toLowerCase();
         }
       };
@@ -955,11 +953,11 @@ class ActivityManager {
             return window.DataManager.isCurrentUserAdmin();
           }
           return window.currentUserRole === 'admin';
-        } catch(_) {
+        } catch (_) {
           return window.currentUserRole === 'admin';
         }
       };
-      
+
       // OPTIMIZATION: Try BackgroundEmailsLoader cached data first (zero Firestore reads, instant)
       if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.getEmailsData === 'function') {
         const cachedEmails = window.BackgroundEmailsLoader.getEmailsData() || [];
@@ -973,7 +971,7 @@ class ActivityManager {
             allContacts = window.getPeopleData ? (window.getPeopleData() || []) : [];
           }
           const contactIdsSet = new Set(allContacts.map(c => c.id).filter(Boolean));
-          
+
           // PERFORMANCE OPTIMIZATION: Sort FIRST, then filter only the most recent emails
           // This avoids filtering thousands of emails - we only filter the top 200-500 most recent
           const sortStartTime = performance.now();
@@ -984,7 +982,7 @@ class ActivityManager {
           });
           // Take top 500 most recent emails to filter (much faster than filtering all emails)
           const recentEmailsToFilter = sortedEmails.slice(0, Math.max(500, limit * 20));
-          
+
           // Build comprehensive set of all contact email addresses (main email + emails array)
           // Also build a map from email address to contact for quick lookup
           const contactEmailsSet = new Set();
@@ -996,7 +994,7 @@ class ActivityManager {
               contactEmailsSet.add(mainEmail);
               emailToContactMap.set(mainEmail, c);
             }
-            
+
             // Add emails from emails array (if it exists)
             if (Array.isArray(c.emails)) {
               c.emails.forEach(e => {
@@ -1008,7 +1006,7 @@ class ActivityManager {
               });
             }
           });
-          
+
           // Helper to extract email addresses from string or array
           const extractEmails = (value) => {
             if (!value) return [];
@@ -1019,48 +1017,47 @@ class ActivityManager {
             const matches = str.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
             return matches.map(e => e.toLowerCase().trim());
           };
-          
+
           // Filter emails to only include those from CRM contacts
           // CRITICAL: Only show emails where sender/recipient matches an existing contact's email address
-          
+
           // Helper to determine if email is from a contact
           const isEmailFromCrmContact = (email) => {
             // Check by contactId first (fastest)
             if (email.contactId && contactIdsSet.has(email.contactId)) {
               return true;
             }
-            
+
             // Determine if email is sent or received
             const currentUserEmail = window.DataManager?.getCurrentUserEmail?.() || window.currentUserEmail || '';
             const emailTo = extractEmails(email.to);
             const emailFrom = extractEmails(email.from);
             const isSent = email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail;
-            const isReceived = email.type === 'received' || email.emailType === 'received' || 
-                              (emailFrom.length > 0 && !emailFrom.some(e => e.toLowerCase().includes(currentUserEmail.toLowerCase())));
-            
+            const isReceived = email.type === 'received' || email.emailType === 'received' ||
+              (emailFrom.length > 0 && !emailFrom.some(e => e.toLowerCase().includes(currentUserEmail.toLowerCase())));
+
             // For received emails: sender (from) must be a contact
             if (isReceived && !isSent) {
               return emailFrom.some(addr => contactEmailsSet.has(addr));
             }
-            
+
             // For sent emails: recipient (to) must be a contact
             if (isSent) {
               return emailTo.some(addr => contactEmailsSet.has(addr));
             }
-            
+
             // Fallback: if we can't determine direction, check if sender is a contact
             return emailFrom.some(addr => contactEmailsSet.has(addr));
           };
-          
+
           // Now filter only the recent emails (much faster than filtering all emails)
           // Also set contactId on emails that match contacts by email address
-          const filterStartTime = performance.now();
           const filteredEmails = recentEmailsToFilter.filter(email => {
             // Check by contactId first (fastest)
             if (email.contactId && contactIdsSet.has(email.contactId)) {
               return true;
             }
-            
+
             // Check by email addresses using proper sent/received logic
             const matches = isEmailFromCrmContact(email);
             if (matches) {
@@ -1070,9 +1067,9 @@ class ActivityManager {
                 const emailTo = extractEmails(email.to);
                 const emailFrom = extractEmails(email.from);
                 const isSent = email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail;
-                const isReceived = email.type === 'received' || email.emailType === 'received' || 
-                                  (emailFrom.length > 0 && !emailFrom.some(e => e.toLowerCase().includes(currentUserEmail.toLowerCase())));
-                
+                const isReceived = email.type === 'received' || email.emailType === 'received' ||
+                  (emailFrom.length > 0 && !emailFrom.some(e => e.toLowerCase().includes(currentUserEmail.toLowerCase())));
+
                 // Find matching contact by email address
                 let matchingContact = null;
                 if (isReceived && !isSent) {
@@ -1094,7 +1091,7 @@ class ActivityManager {
                     if (matchingContact) break;
                   }
                 }
-                
+
                 if (matchingContact && matchingContact.id) {
                   email.contactId = matchingContact.id;
                 }
@@ -1103,17 +1100,17 @@ class ActivityManager {
             }
             return false;
           });
-          
+
           // Limit to final count needed (already sorted, so just slice)
           const result = filteredEmails.slice(0, limit || this.fetchLimitPerType);
-          
+
           return result;
         }
       }
-      
+
       // Fallback to Firestore if cache empty
       if (window.firebaseDB) {
-        
+
         if (!isAdmin()) {
           // Non-admin: filter by ownership
           const email = getUserEmail();
@@ -1122,7 +1119,7 @@ class ActivityManager {
             // DataManager.queryWithOwnership loads ALL emails (no limit), causing 7+ second delays
             // Query both ownerId and assignedTo in parallel, then merge and sort
             try {
-              
+
               const [ownedSnap, assignedSnap] = await Promise.all([
                 window.firebaseDB.collection('emails')
                   .where('ownerId', '==', email)
@@ -1135,7 +1132,7 @@ class ActivityManager {
                   .limit(limit || this.fetchLimitPerType)
                   .get()
               ]);
-              
+
               // Merge results and deduplicate
               const emailsMap = new Map();
               ownedSnap.docs.forEach(doc => {
@@ -1146,7 +1143,7 @@ class ActivityManager {
                   emailsMap.set(doc.id, { id: doc.id, ...doc.data() });
                 }
               });
-              
+
               emails = Array.from(emailsMap.values());
               // Sort by timestamp desc (most recent first)
               emails.sort((a, b) => {
@@ -1169,7 +1166,7 @@ class ActivityManager {
                     .limit(limit || this.fetchLimitPerType)
                     .get()
                 ]);
-                
+
                 // Merge results and deduplicate
                 const emailsMap = new Map();
                 ownedSnap.docs.forEach(doc => {
@@ -1180,7 +1177,7 @@ class ActivityManager {
                     emailsMap.set(doc.id, { id: doc.id, ...doc.data() });
                   }
                 });
-                
+
                 emails = Array.from(emailsMap.values());
                 // Sort client-side
                 emails.sort((a, b) => {
@@ -1216,11 +1213,11 @@ class ActivityManager {
           } catch (error) {
             // If orderBy fails, try without it and sort client-side
             try {
-              
+
               const snapshot = await window.firebaseDB.collection('emails')
                 .limit(limit || this.fetchLimitPerType)
                 .get();
-              
+
               emails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
               // Sort client-side
               emails.sort((a, b) => {
@@ -1242,19 +1239,19 @@ class ActivityManager {
           }
         }
       }
-      
+
       // CRITICAL: Filter emails to only include those from CRM contacts (even when from Firestore)
       // Get all contacts from CRM to filter emails
       const allContacts = window.getPeopleData ? (window.getPeopleData() || []) : [];
       const contactIdsSet = new Set(allContacts.map(c => c.id).filter(Boolean));
-      
+
       // Build comprehensive set of all contact email addresses (main email + emails array)
       const contactEmailsSet = new Set();
       allContacts.forEach(c => {
         // Add main email field
         const mainEmail = (c.email || '').toLowerCase().trim();
         if (mainEmail) contactEmailsSet.add(mainEmail);
-        
+
         // Add emails from emails array (if it exists)
         if (Array.isArray(c.emails)) {
           c.emails.forEach(e => {
@@ -1263,7 +1260,7 @@ class ActivityManager {
           });
         }
       });
-      
+
       // Helper to extract email addresses from string or array
       const extractEmails = (value) => {
         if (!value) return [];
@@ -1274,7 +1271,7 @@ class ActivityManager {
         const matches = str.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
         return matches.map(e => e.toLowerCase().trim());
       };
-      
+
       // Filter emails to only include those from CRM contacts
       // CRITICAL: Only show emails FROM contacts (received) or TO contacts (sent by user)
       // Helper to determine if email is from a contact
@@ -1283,50 +1280,50 @@ class ActivityManager {
         if (email.contactId && contactIdsSet.has(email.contactId)) {
           return true;
         }
-        
+
         // Determine if email is sent or received
         const currentUserEmail = window.DataManager?.getCurrentUserEmail?.() || window.currentUserEmail || '';
         const emailTo = extractEmails(email.to);
         const emailFrom = extractEmails(email.from);
         const isSent = email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail;
-        const isReceived = email.type === 'received' || email.emailType === 'received' || 
-                          (emailFrom.length > 0 && !emailFrom.some(e => e.toLowerCase().includes(currentUserEmail.toLowerCase())));
-        
+        const isReceived = email.type === 'received' || email.emailType === 'received' ||
+          (emailFrom.length > 0 && !emailFrom.some(e => e.toLowerCase().includes(currentUserEmail.toLowerCase())));
+
         // For received emails: sender (from) must be a contact
         if (isReceived && !isSent) {
           return emailFrom.some(addr => contactEmailsSet.has(addr));
         }
-        
+
         // For sent emails: recipient (to) must be a contact
         if (isSent) {
           return emailTo.some(addr => contactEmailsSet.has(addr));
         }
-        
+
         // Fallback: if we can't determine direction, check if sender is a contact
         return emailFrom.some(addr => contactEmailsSet.has(addr));
       };
-      
-      
-      
+
+
+
       emails = emails.filter(email => {
         // Check by contactId first (fastest)
         if (email.contactId && contactIdsSet.has(email.contactId)) {
-          
+
           return true;
         }
-        
+
         const matches = isEmailFromCrmContactFirestore(email);
         if (matches) {
-          
+
           return true;
         } else {
-          
+
           return false;
         }
       });
-      
-      
-      
+
+
+
       const result = emails.slice(0, limit || this.fetchLimitPerType);
       return result;
     } catch (error) {
@@ -1339,10 +1336,10 @@ class ActivityManager {
    * Fetch tasks from Firebase or local storage
    */
   async fetchTasks(limit = this.fetchLimitPerType) {
-    
+
     try {
       let tasks = [];
-      
+
       // Helper functions
       const getUserEmail = () => {
         try {
@@ -1350,7 +1347,7 @@ class ActivityManager {
             return window.DataManager.getCurrentUserEmail();
           }
           return (window.currentUserEmail || '').toLowerCase();
-        } catch(_) {
+        } catch (_) {
           return (window.currentUserEmail || '').toLowerCase();
         }
       };
@@ -1360,11 +1357,11 @@ class ActivityManager {
             return window.DataManager.isCurrentUserAdmin();
           }
           return window.currentUserRole === 'admin';
-        } catch(_) {
+        } catch (_) {
           return window.currentUserRole === 'admin';
         }
       };
-      
+
       // OPTIMIZATION: Try BackgroundTasksLoader cached data first (zero Firestore reads, instant)
       if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.getTasksData === 'function') {
         const cachedTasks = window.BackgroundTasksLoader.getTasksData() || [];
@@ -1376,11 +1373,11 @@ class ActivityManager {
             return timeB - timeA;
           });
           const result = cachedTasks.slice(0, limit || this.fetchLimitPerType);
-          
+
           return result;
         }
       }
-      
+
       // Fallback to Firestore if cache empty
       if (window.firebaseDB) {
         if (!isAdmin()) {
@@ -1411,16 +1408,16 @@ class ActivityManager {
           }
         } else {
           // Admin: unrestricted query
-          
+
           const snapshot = await window.firebaseDB.collection('tasks')
             .orderBy('timestamp', 'desc')
             .limit(limit || this.fetchLimitPerType)
             .get();
-          
+
           tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         }
       }
-      
+
       // Also check localStorage for additional tasks (CRITICAL: filter by ownership for non-admin)
       try {
         const localTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
@@ -1442,7 +1439,7 @@ class ActivityManager {
       } catch (error) {
         console.warn('Error loading tasks from localStorage:', error);
       }
-      
+
       const result = tasks.slice(0, limit || this.fetchLimitPerType);
       return result;
     } catch (error) {
@@ -1455,7 +1452,7 @@ class ActivityManager {
    * Render activities for a specific container
    */
   async renderActivities(containerId, entityType = 'global', entityId = null, forceRefresh = false) {
-    
+
     const container = document.getElementById(containerId);
     if (!container) return;
 
@@ -1470,13 +1467,13 @@ class ActivityManager {
     try {
       const activities = await this.getActivities(entityType, entityId, forceRefresh);
       clearTimeout(timeoutId); // Clear timeout since we got results
-      
+
       const totalPages = Math.ceil(activities.length / this.maxActivitiesPerPage);
       // Clamp page in case a prior page index (from dashboard) exceeds this view's page count
       if (this.currentPage < 0 || this.currentPage >= totalPages) {
         this.currentPage = 0;
       }
-      
+
       if (activities.length === 0) {
         container.innerHTML = this.renderEmptyState();
         return;
@@ -1485,7 +1482,7 @@ class ActivityManager {
       // Render current page immediately
       const paginatedActivities = this.getPageActivities(activities, this.currentPage);
       const activityHtml = this.renderActivityList(paginatedActivities);
-      
+
       // Always replace the loading state - with fallback
       if (activityHtml && activityHtml.trim().length > 0) {
         container.innerHTML = activityHtml;
@@ -1493,17 +1490,17 @@ class ActivityManager {
       } else {
         container.innerHTML = this.renderEmptyState();
       }
-      
+
       // CRITICAL: Ensure loading state is always cleared with a fallback
       setTimeout(() => {
         if (container.innerHTML.includes('loading-spinner')) {
           container.innerHTML = this.renderEmptyState();
         }
       }, 100);
-      
+
       // Show pagination if there are multiple pages
       this.updatePagination(containerId, totalPages);
-      
+
       // Only pre-render if there are multiple pages and we're not on the first load
       if (totalPages > 1) {
         // Pre-render adjacent pages in background (non-blocking) with a small delay
@@ -1525,7 +1522,7 @@ class ActivityManager {
    */
   async prerenderAdjacentPages(activities, entityType, entityId, totalPages) {
     const prerenderKey = `${entityType}-${entityId || 'global'}`;
-    
+
     // Pre-render previous page if it exists
     if (this.currentPage > 0) {
       const prevPage = this.currentPage - 1;
@@ -1536,7 +1533,7 @@ class ActivityManager {
         this.prerenderedPages.set(prevPageKey, prevHtml);
       }
     }
-    
+
     // Pre-render next page if it exists
     if (this.currentPage < totalPages - 1) {
       const nextPage = this.currentPage + 1;
@@ -1586,13 +1583,13 @@ class ActivityManager {
           } catch (error) {
             entityName = null;
           }
-          
+
           const titleWithEntity = entityName ? `${activity.title} • ${entityName}` : activity.title;
-          
+
           // Determine navigation target based on activity data
           let navigationTarget = null;
           let navigationType = null;
-          
+
           if (activity.data && activity.data.entityType === 'contact') {
             navigationTarget = activity.data.id;
             navigationType = 'contact';
@@ -1606,19 +1603,19 @@ class ActivityManager {
             navigationTarget = activity.data.accountId;
             navigationType = 'account';
           }
-          
+
           // Add click handler attributes if we have a navigation target
-          const clickAttributes = navigationTarget ? 
-            `onclick="window.ActivityManager.navigateToDetail('${navigationType}', '${navigationTarget}')" style="cursor: pointer;"` : 
+          const clickAttributes = navigationTarget ?
+            `onclick="window.ActivityManager.navigateToDetail('${navigationType}', '${navigationTarget}')" style="cursor: pointer;"` :
             '';
-          
-          
+
+
           // Get entity avatar for the activity
           const entityAvatar = this.getEntityAvatarForActivity(activity);
-          
+
           // Add emailId data attribute for email activities
           const emailIdAttr = activity.emailId ? `data-email-id="${activity.emailId}"` : '';
-          
+
           return `
             <div class="activity-item" data-activity-id="${activity.id}" data-activity-type="${activity.type}" ${emailIdAttr} ${clickAttributes}>
             <div class="activity-entity-avatar">
@@ -1652,7 +1649,7 @@ class ActivityManager {
           `;
         }
       }).join('');
-      
+
       return result;
     } catch (error) {
       console.error('[ActivityManager] Critical error in renderActivityList:', error);
@@ -1777,7 +1774,7 @@ class ActivityManager {
   openEmailDetail(activityId, entityType = null, entityId = null) {
     // Extract email ID from activity ID (format: "email-{emailId}")
     const emailId = activityId.replace(/^email-/, '');
-    
+
     // Store navigation source based on where we came from
     if (entityType === 'contact' && entityId) {
       window._emailNavigationSource = 'contact-detail';
@@ -1795,13 +1792,13 @@ class ActivityManager {
         window._emailNavigationSource = null;
       }
     }
-    
+
     // Navigate to email detail page with the email ID
     if (window.crm && typeof window.crm.navigateToPage === 'function') {
       window.crm.navigateToPage('email-detail', { emailId });
     } else if (window.EmailDetail && typeof window.EmailDetail.show === 'function') {
       // Fallback: direct call to EmailDetail module
-            window.EmailDetail.show(emailId);
+      window.EmailDetail.show(emailId);
     }
   }
 
@@ -1838,7 +1835,7 @@ class ActivityManager {
   async nextPage(containerId, entityType, entityId) {
     const activities = await this.ensureActivitiesForPage(this.currentPage + 1, entityType, entityId);
     const totalPages = Math.ceil(activities.length / this.maxActivitiesPerPage);
-    
+
     if (this.currentPage < totalPages - 1) {
       this.currentPage++;
       await this.renderPageWithPrerendering(containerId, entityType, entityId, activities, totalPages);
@@ -1867,7 +1864,7 @@ class ActivityManager {
   async goToPage(page, containerId, entityType, entityId) {
     const activities = await this.ensureActivitiesForPage(page, entityType, entityId);
     const totalPages = Math.ceil(activities.length / this.maxActivitiesPerPage);
-    
+
     if (page >= 0 && page < totalPages) {
       this.currentPage = page;
       await this.renderPageWithPrerendering(containerId, entityType, entityId, activities, totalPages);
@@ -1885,12 +1882,12 @@ class ActivityManager {
 
     const prerenderKey = `${entityType}-${entityId || 'global'}`;
     const pageKey = `${prerenderKey}-${this.currentPage}`;
-    
+
     // Check if we have pre-rendered content
     if (this.prerenderedPages.has(pageKey)) {
       container.innerHTML = this.prerenderedPages.get(pageKey);
       this.attachActivityEvents(container, entityType, entityId);
-      
+
       // Pre-render adjacent pages for next navigation (non-blocking)
       this.prerenderAdjacentPages(activities, entityType, entityId, totalPages).catch(error => {
         // Silent error handling
@@ -1900,7 +1897,7 @@ class ActivityManager {
       const paginatedActivities = this.getPageActivities(activities, this.currentPage);
       container.innerHTML = this.renderActivityList(paginatedActivities);
       this.attachActivityEvents(container, entityType, entityId);
-      
+
       // Pre-render adjacent pages (non-blocking)
       this.prerenderAdjacentPages(activities, entityType, entityId, totalPages).catch(error => {
         // Silent error handling
@@ -1952,7 +1949,7 @@ class ActivityManager {
         const contactName = fullName || contact.name || 'Unknown Contact';
         const title = contact.title || contact.jobTitle || '';
         const companyName = this.getCompanyNameForContact(contact);
-        
+
         // Build subtitle: Title at Company or just Company
         let subtitle = '';
         if (title && companyName) {
@@ -1962,7 +1959,7 @@ class ActivityManager {
         } else if (title) {
           subtitle = title;
         }
-        
+
         // Format: First Last • Subtitle (or just First Last if no subtitle)
         return subtitle ? `${contactName} • ${subtitle}` : contactName;
       };
@@ -1979,7 +1976,7 @@ class ActivityManager {
             } else if (window.getPeopleData && typeof window.getPeopleData === 'function') {
               contacts = window.getPeopleData() || [];
             }
-            
+
             const contact = contacts.find(c => c && c.id === activity.data.contactId);
             if (contact) {
               return formatContactName(contact);
@@ -2005,7 +2002,7 @@ class ActivityManager {
           } else if (window.getPeopleData && typeof window.getPeopleData === 'function') {
             contacts = window.getPeopleData() || [];
           }
-          
+
           const contact = contacts.find(c => c && c.id === activity.data.contactId);
           if (contact) {
             return formatContactName(contact);
@@ -2024,11 +2021,11 @@ class ActivityManager {
                 const matches = str.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
                 return matches.map(m => m.toLowerCase().trim());
               }).flat();
-              
+
               const isSent = email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail;
-              const isReceived = email.type === 'received' || email.emailType === 'received' || 
-                                (emailFrom.length > 0 && !emailFrom.some(e => e.includes(currentUserEmail.toLowerCase())));
-              
+              const isReceived = email.type === 'received' || email.emailType === 'received' ||
+                (emailFrom.length > 0 && !emailFrom.some(e => e.includes(currentUserEmail.toLowerCase())));
+
               // Find contact by email address
               let matchingContact = null;
               if (isReceived && !isSent) {
@@ -2064,7 +2061,7 @@ class ActivityManager {
                   if (matchingContact) break;
                 }
               }
-              
+
               if (matchingContact) {
                 return formatContactName(matchingContact);
               }
@@ -2082,7 +2079,7 @@ class ActivityManager {
           } else if (window.getPeopleData && typeof window.getPeopleData === 'function') {
             contacts = window.getPeopleData() || [];
           }
-          
+
           const email = activity.data;
           const currentUserEmail = window.DataManager?.getCurrentUserEmail?.() || window.currentUserEmail || '';
           const emailTo = (email.to ? (Array.isArray(email.to) ? email.to : [email.to]) : []).map(e => {
@@ -2095,11 +2092,11 @@ class ActivityManager {
             const matches = str.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
             return matches.map(m => m.toLowerCase().trim());
           }).flat();
-          
+
           const isSent = email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail;
-          const isReceived = email.type === 'received' || email.emailType === 'received' || 
-                            (emailFrom.length > 0 && !emailFrom.some(e => e.includes(currentUserEmail.toLowerCase())));
-          
+          const isReceived = email.type === 'received' || email.emailType === 'received' ||
+            (emailFrom.length > 0 && !emailFrom.some(e => e.includes(currentUserEmail.toLowerCase())));
+
           // Find contact by email address
           let matchingContact = null;
           if (isReceived && !isSent) {
@@ -2135,7 +2132,7 @@ class ActivityManager {
               if (matchingContact) break;
             }
           }
-          
+
           if (matchingContact) {
             return formatContactName(matchingContact);
           }
@@ -2151,7 +2148,7 @@ class ActivityManager {
           } else if (window.getAccountsData && typeof window.getAccountsData === 'function') {
             accounts = window.getAccountsData() || [];
           }
-          
+
           const account = accounts.find(a => a && a.id === activity.data.accountId);
           if (account) {
             return account.accountName || account.name || account.companyName || 'Unknown Account';
@@ -2176,8 +2173,8 @@ class ActivityManager {
       }
 
       // Check if this is a guide download activity
-      if (activity.type === 'guide-download' || 
-          (activity.type === 'task' && activity.title && activity.title.startsWith('Guide Download:'))) {
+      if (activity.type === 'guide-download' ||
+        (activity.type === 'task' && activity.title && activity.title.startsWith('Guide Download:'))) {
         return this.getGuideDownloadAvatar();
       }
 
@@ -2193,7 +2190,7 @@ class ActivityManager {
         const account = activity.data;
         const logoUrl = account.logoUrl || account.logo || account.companyLogo || account.iconUrl || account.companyIcon;
         const domain = account.domain || account.website;
-        
+
         if (logoUrl && window.__pcFaviconHelper) {
           return window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 40 });
         } else if (domain && window.__pcFaviconHelper) {
@@ -2226,7 +2223,7 @@ class ActivityManager {
             if (account) {
               const logoUrl = account.logoUrl || account.logo || account.companyLogo || account.iconUrl || account.companyIcon;
               const domain = account.domain || account.website;
-              
+
               if (logoUrl && window.__pcFaviconHelper) {
                 return window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 40 });
               } else if (domain && window.__pcFaviconHelper) {
@@ -2243,7 +2240,7 @@ class ActivityManager {
     } catch (error) {
       console.warn('[ActivityManager] Error getting entity avatar for activity:', error);
     }
-    
+
     return this.getDefaultEntityAvatar();
   }
 
@@ -2315,20 +2312,20 @@ class ActivityManager {
           console.warn('[ActivityManager] Error looking up account by ID:', error);
         }
       }
-      
+
       // Fallback to contact's company field
       if (contact.company) {
         return contact.company;
       }
-      
+
       // Try to find account by company name match
       if (contact.companyName) {
         try {
           if (window.getAccountsData && typeof window.getAccountsData === 'function') {
             const accounts = window.getAccountsData() || [];
             const account = accounts.find(a => a && (
-              a.accountName === contact.companyName || 
-              a.name === contact.companyName || 
+              a.accountName === contact.companyName ||
+              a.name === contact.companyName ||
               a.companyName === contact.companyName
             ));
             if (account) {
@@ -2397,21 +2394,21 @@ class ActivityManager {
    */
   stripHtml(html) {
     if (!html) return '';
-    
+
     // Remove style and script tags completely
     let cleaned = html
       .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
       .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
       .replace(/<!--[\s\S]*?-->/g, '');
-    
+
     // Extract text content from remaining HTML
     const tmp = document.createElement('div');
     tmp.innerHTML = cleaned;
     let text = tmp.textContent || tmp.innerText || '';
-    
+
     // Clean up the extracted text
     text = text.replace(/\s+/g, ' ').trim();
-    
+
     return text;
   }
 
@@ -2476,7 +2473,7 @@ class ActivityManager {
         <line x1="12" y1="15" x2="12" y2="3"></line>
       </svg>`
     };
-    
+
     return icons[type] || icons.note; // Default to note icon if type not found
   }
 
@@ -2498,7 +2495,7 @@ class ActivityManager {
       const cacheKey = `${entityType}-${entityId}`;
       this.cache.delete(cacheKey);
       this.cacheTimestamp.delete(cacheKey);
-      
+
       // Clear pre-rendered pages for this entity
       const prerenderKey = `${entityType}-${entityId}`;
       for (const [key] of this.prerenderedPages) {
@@ -2535,20 +2532,20 @@ class ActivityManager {
           return contact;
         }
       }
-      
+
       // If not found in cache, try to find in the activity data we already have
       // This handles cases where the contact ID doesn't match between Firebase and localStorage
       const allActivities = this.cache.get('global-timeline') || [];
-      
+
       for (const activity of allActivities) {
-        if (activity.type === 'note' && 
-            activity.data && 
-            activity.data.entityType === 'contact' && 
-            activity.data.id === contactId) {
+        if (activity.type === 'note' &&
+          activity.data &&
+          activity.data.entityType === 'contact' &&
+          activity.data.id === contactId) {
           return activity.data;
         }
       }
-      
+
       return null;
     } catch (error) {
       console.error('[ActivityManager] Error getting contact data for navigation:', error);
@@ -2562,7 +2559,7 @@ class ActivityManager {
   navigateToDetail(entityType, entityId) {
     // Store navigation source for back button restoration
     this.storeNavigationSource();
-    
+
     // Navigate to the appropriate detail page
     if (entityType === 'contact') {
       // Prefetch contact data before navigation (like account logic in main.js)
@@ -2570,7 +2567,7 @@ class ActivityManager {
       if (contactData) {
         window._prefetchedContactForDetail = contactData;
       }
-      
+
       // Navigate to people page first, then show contact detail (required for ContactDetail)
       if (window.crm && typeof window.crm.navigateToPage === 'function') {
         window.crm.navigateToPage('people');
@@ -2611,58 +2608,58 @@ class ActivityManager {
   updatePagination(containerId, totalPages) {
     const paginationContainer = document.getElementById(containerId.replace('-timeline', '-pagination'));
     if (!paginationContainer) return;
-    
-    
+
+
     if (totalPages <= 1) {
       // Hide pagination if only one page
       paginationContainer.style.display = 'none';
       return;
     }
-    
+
     // Show pagination
     paginationContainer.style.display = 'flex';
-    
+
     // Update pagination page button
     const pageButton = paginationContainer.querySelector('#home-activity-page');
     if (pageButton) {
       pageButton.textContent = this.currentPage + 1;
       pageButton.classList.toggle('active', true);
     }
-    
+
     // Update button states
     const prevButton = paginationContainer.querySelector('.activity-pagination-btn:first-child');
     const nextButton = paginationContainer.querySelector('.activity-pagination-btn:last-child');
-    
+
     if (prevButton) {
       prevButton.disabled = this.currentPage === 0;
     }
-    
+
     if (nextButton) {
       nextButton.disabled = this.currentPage >= totalPages - 1;
     }
-    
+
     // Attach event listeners
     this.attachPaginationEvents(containerId);
   }
-  
+
   /**
    * Attach pagination event listeners
    */
   attachPaginationEvents(containerId) {
     const paginationContainer = document.getElementById(containerId.replace('-timeline', '-pagination'));
     if (!paginationContainer) return;
-    
+
     // Remove existing listeners to prevent duplicates
     const prevButton = paginationContainer.querySelector('.activity-pagination-btn:first-child');
     const nextButton = paginationContainer.querySelector('.activity-pagination-btn:last-child');
-    
+
     if (prevButton) {
       prevButton.onclick = null; // Clear existing
       prevButton.onclick = () => {
         this.previousPage(containerId, 'global', null);
       };
     }
-    
+
     if (nextButton) {
       nextButton.onclick = null; // Clear existing
       nextButton.onclick = () => {
@@ -2679,16 +2676,16 @@ class ActivityManager {
       const currentPage = window.crm?.currentPage || '';
       const activePage = document.querySelector('.page.active');
       const pageId = activePage?.id || activePage?.getAttribute('data-page') || '';
-      
+
       // Determine actual current page
       const source = currentPage || pageId.replace('-page', '') || 'dashboard';
-      
+
       // For task-detail, store additional context
       if (source === 'task-detail' && window.__taskDetailRestoreData) {
         window._contactNavigationSource = 'task-detail';
         window._accountNavigationSource = 'task-detail';
       }
-      
+
       // For dashboard, store current pagination state
       if (source === 'dashboard') {
         window._dashboardNavigationSource = 'activities';

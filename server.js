@@ -25,8 +25,8 @@ dotenv.config();
 const isProduction = process.env.NODE_ENV === 'production';
 const verboseLogs = process.env.VERBOSE_LOGS === 'true';
 if (isProduction && !verboseLogs) {
-  console.log = () => {};
-  console.info = () => {};
+  console.log = () => { };
+  console.info = () => { };
 }
 
 // Simple logging function for Cloud Run cost optimization
@@ -684,6 +684,8 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Vary', 'Origin');
+  // Allow popups to communicate with opener (fixes Google Auth "window.closed" blocked error)
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
 
   // Parse the URL
   const parsedUrl = url.parse(req.url, true);
@@ -1069,7 +1071,7 @@ const server = http.createServer(async (req, res) => {
     const data = await fs.promises.readFile(filePath);
     const contentType = getContentType(filePath);
     logger.debug('Successfully served static file', 'Server', { filePath, contentType });
-    
+
     // Set cache headers - no cache for JS files to prevent stale code, short cache for others
     const headers = { 'Content-Type': contentType };
     const ext = path.extname(filePath).toLowerCase();
@@ -1082,7 +1084,7 @@ const server = http.createServer(async (req, res) => {
       // Short cache for other static files (CSS, images, etc.)
       headers['Cache-Control'] = 'public, max-age=300, must-revalidate';
     }
-    
+
     res.writeHead(200, headers);
     res.end(data);
   } catch (error) {
