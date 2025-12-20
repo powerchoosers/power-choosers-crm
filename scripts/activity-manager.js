@@ -27,54 +27,120 @@ class ActivityManager {
    */
   setupCacheInvalidationListeners() {
     // Invalidate global cache when contacts are created/updated (affects notes)
-    document.addEventListener('pc:contact-created', () => {
+    document.addEventListener('pc:contact-created', (e) => {
       this.clearCache('global');
+      this.refreshVisibleActivityContainers('global');
     });
     document.addEventListener('pc:contact-updated', (e) => {
       const { id } = e.detail || {};
       this.clearCache('global');
-      if (id) this.clearCache('contact', id);
+      if (id) {
+        this.clearCache('contact', id);
+        this.refreshVisibleActivityContainers('contact', id);
+      }
     });
 
     // Invalidate global cache when accounts are created/updated (affects notes)
     document.addEventListener('pc:account-created', () => {
       this.clearCache('global');
+      this.refreshVisibleActivityContainers('global');
     });
     document.addEventListener('pc:account-updated', (e) => {
       const { id } = e.detail || {};
       this.clearCache('global');
-      if (id) this.clearCache('account', id);
+      if (id) {
+        this.clearCache('account', id);
+        this.refreshVisibleActivityContainers('account', id);
+      }
     });
 
     // Invalidate global cache when tasks are created/updated/deleted
     document.addEventListener('tasksUpdated', (e) => {
-      const { taskId } = e.detail || {};
       this.clearCache('global');
+      this.refreshVisibleActivityContainers('global');
     });
     document.addEventListener('pc:task-deleted', (e) => {
-      const { taskId } = e.detail || {};
       this.clearCache('global');
+      this.refreshVisibleActivityContainers('global');
     });
 
-    // Invalidate global cache when emails are updated (but debounce to avoid too frequent invalidations)
-    let emailUpdateTimeout = null;
-    document.addEventListener('pc:emails-updated', () => {
-      // Debounce: only invalidate once per 2 seconds to avoid clearing cache too frequently
-      if (emailUpdateTimeout) clearTimeout(emailUpdateTimeout);
-      emailUpdateTimeout = setTimeout(() => {
-        this.clearCache('global');
-      }, 2000); // 2 second debounce
+    // Invalidate global cache when emails are updated - refresh immediately for better UX
+    document.addEventListener('pc:emails-updated', (e) => {
+      const { contactId, accountId } = e.detail || {};
+      // Clear global cache
+      this.clearCache('global');
+      this.refreshVisibleActivityContainers('global');
+      // Also refresh specific entity if provided
+      if (contactId) {
+        this.clearCache('contact', contactId);
+        this.refreshVisibleActivityContainers('contact', contactId);
+      }
+      if (accountId) {
+        this.clearCache('account', accountId);
+        this.refreshVisibleActivityContainers('account', accountId);
+      }
     });
 
     // Invalidate global cache when calls are logged
     document.addEventListener('pc:call-logged', () => {
       this.clearCache('global');
+      this.refreshVisibleActivityContainers('global');
     });
 
     // Listen for explicit activity refresh requests
     document.addEventListener('pc:activities-refresh', (e) => {
       const { entityType, entityId, forceRefresh } = e.detail || {};
       this.clearCache(entityType || 'global', entityId);
+      
+      // Auto-refresh any visible activity containers for this entity
+      this.refreshVisibleActivityContainers(entityType, entityId);
+    });
+  }
+
+  /**
+   * Automatically refresh any visible activity containers for a specific entity
+   */
+  refreshVisibleActivityContainers(entityType, entityId) {
+    // Find all potential activity containers in the DOM
+    const containers = [
+      { id: 'home-activity-timeline', type: 'global', eid: null },
+      { id: 'account-activity-timeline', type: 'account', eid: entityId },
+      { id: 'contact-activity-timeline', type: 'contact', eid: entityId },
+      { id: 'task-activities', type: 'task', eid: entityId },
+      { id: 'task-activity-timeline', type: entityType, eid: entityId } // Task detail page uses this ID
+    ];
+
+    containers.forEach(c => {
+      const el = document.getElementById(c.id);
+      // Only refresh if the container exists and the entity matches
+      if (el && (c.type === 'global' || c.type === entityType)) {
+        console.log(`[ActivityManager] Auto-refreshing container: ${c.id} for ${entityType}:${entityId}`);
+        // For task-activity-timeline, check current task to determine account vs contact
+        if (c.id === 'task-activity-timeline') {
+          // Check what type of task we're viewing by looking at the current task state
+          if (window.TaskDetail && window.TaskDetail.state && window.TaskDetail.state.currentTask) {
+            const task = window.TaskDetail.state.currentTask;
+            // Determine entity type from task - refresh if it matches the event
+            if (entityType === 'account' && task.accountId === entityId) {
+              this.renderActivities(c.id, 'account', task.accountId, true);
+            } else if (entityType === 'contact' && task.contactId === entityId) {
+              this.renderActivities(c.id, 'contact', task.contactId, true);
+            } else if (entityType === 'global') {
+              // For global events, refresh based on what the task is showing
+              if (task.accountId) {
+                this.renderActivities(c.id, 'account', task.accountId, true);
+              } else if (task.contactId) {
+                this.renderActivities(c.id, 'contact', task.contactId, true);
+              }
+            }
+          } else {
+            // Fallback: use the provided entityType and entityId
+            this.renderActivities(c.id, entityType, entityId, true);
+          }
+        } else {
+          this.renderActivities(c.id, c.type, c.eid, true);
+        }
+      }
     });
   }
 

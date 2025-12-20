@@ -1598,6 +1598,12 @@
         }
         // Notify Tasks page (and any listeners) to refresh its list from localStorage
         window.dispatchEvent(new CustomEvent('tasksUpdated', { detail: { source: 'contact-detail', task: newTask } }));
+        // Dispatch activity refresh for immediate UI update
+        try {
+          document.dispatchEvent(new CustomEvent('pc:activities-refresh', {
+            detail: { entityType: 'contact', entityId: state.currentContact?.id, forceRefresh: true }
+          }));
+        } catch (_) { }
       } catch (_) { }
       closeContactTaskPopover();
     });

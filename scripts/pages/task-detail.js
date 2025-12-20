@@ -18,6 +18,29 @@
 
   const els = {};
 
+  function markTaskLoading() {
+    const el = els.page;
+    if (!el) return;
+    // Fade out old content first
+    el.classList.add('task-fading-out');
+    setTimeout(() => {
+      el.classList.remove('task-fading-out');
+      el.classList.add('task-loading');
+      el.classList.remove('task-loaded');
+    }, 300);
+  }
+
+  function markTaskLoaded() {
+    const el = els.page;
+    if (!el) return;
+    // Add loaded class to trigger content fade-in
+    el.classList.add('task-loaded');
+    // Keep skeleton visible until content has fully faded in, then remove it
+    window.setTimeout(() => {
+      el.classList.remove('task-loading');
+    }, 600); // Wait for content fade-in (400ms) + buffer
+  }
+
   // Helper functions
   function getPriorityBackground(priority) {
     const p = (priority || '').toLowerCase().trim();
@@ -1190,6 +1213,26 @@
       });
       widgetsDrawer._bound = '1';
     }
+
+    // Listen for activity refresh events to update Recent Activity immediately
+    if (!document._taskDetailActivityRefreshBound) {
+      document.addEventListener('pc:activities-refresh', async (e) => {
+        const { entityType, entityId, forceRefresh } = e.detail || {};
+        if (!state.currentTask) return;
+
+        // Check if this refresh is relevant to the current task
+        const isRelevant = 
+          entityType === 'global' ||
+          (entityType === 'account' && state.currentTask.accountId === entityId) ||
+          (entityType === 'contact' && state.currentTask.contactId === entityId);
+
+        if (isRelevant && window.ActivityManager) {
+          console.log('[TaskDetail] Activity refresh event received, refreshing activities');
+          await loadRecentActivityForTask();
+        }
+      });
+      document._taskDetailActivityRefreshBound = true;
+    }
   }
 
   function handleWidgetAction(which) {
@@ -1494,6 +1537,16 @@
             document.dispatchEvent(new CustomEvent('pc:tasks-loaded', {
               detail: { source: 'sequenceTaskCompletion', newTaskCreated: true }
             }));
+
+            // Dispatch activity refresh for immediate UI update
+            try {
+              const task = state.currentTask;
+              const entityType = task.accountId ? 'account' : (task.contactId ? 'contact' : 'global');
+              const entityId = task.accountId || task.contactId;
+              document.dispatchEvent(new CustomEvent('pc:activities-refresh', {
+                detail: { entityType, entityId, forceRefresh: true }
+              }));
+            } catch (_) { }
           }
         } else {
           console.warn('[TaskDetail] Failed to create next step:', result.message || result.error);
@@ -2673,9 +2726,7 @@
   }
 
   async function loadTaskData(taskId) {
-    const pageEl = els.page;
-    pageEl?.classList.add('task-loading');
-    pageEl?.classList.remove('task-loaded');
+    markTaskLoading();
     // CRITICAL FIX: Prevent race conditions - if already loading, wait or skip
     if (state.loadingTask) {
       console.warn('[TaskDetail] Task load already in progress, skipping duplicate call');
@@ -3106,8 +3157,7 @@
     } finally {
       // CRITICAL FIX: Always reset loading flag, even on error
       state.loadingTask = false;
-      pageEl?.classList.remove('task-loading');
-      pageEl?.classList.add('task-loaded');
+      markTaskLoaded();
     }
   }
 
@@ -5556,7 +5606,7 @@
           }
 
           if (finalAccountId) {
-            await window.ActivityManager.renderActivities('task-activity-timeline', 'account', finalAccountId);
+            await window.ActivityManager.renderActivities('task-activity-timeline', 'account', finalAccountId, true);
             // Ensure activities know they're being clicked from task-detail
             window._activityClickSource = 'task-detail';
           } else {
@@ -5611,7 +5661,7 @@
           // Find the contact ID from the contact name
           const contactId = findContactIdByName(contactName);
           if (contactId) {
-            await window.ActivityManager.renderActivities('task-activity-timeline', 'contact', contactId);
+            await window.ActivityManager.renderActivities('task-activity-timeline', 'contact', contactId, true);
             // Ensure activities know they're being clicked from task-detail
             window._activityClickSource = 'task-detail';
           } else {

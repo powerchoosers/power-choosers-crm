@@ -20208,12 +20208,22 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     opacity: 0;
     transform: translateY(10px);
     pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 #task-detail-page.task-loaded .page-header,
 #task-detail-page.task-loaded .page-content {
     opacity: 1;
     transform: translateY(0);
+    transition: opacity 0.4s ease 0.1s, transform 0.4s ease 0.1s;
+}
+
+/* Fade out old content when switching tasks */
+#task-detail-page.task-fading-out .page-header,
+#task-detail-page.task-fading-out .page-content {
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 #task-detail-page.task-loading::before {
@@ -20225,12 +20235,8 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
     pointer-events: none;
     z-index: 1;
-
-    transition: opacity 0.4s ease;
-}
-
-#task-detail-page.task-loaded::before {
-    opacity: 0;
+    opacity: 1;
+    transition: opacity 0.5s ease;
 }
 
 #task-detail-page.task-loading::after {
@@ -20247,13 +20253,38 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     animation: skeleton-shimmer 1.5s linear infinite;
     pointer-events: none;
     z-index: 2;
-
-    transition: opacity 0.4s ease;
+    opacity: 1;
+    transition: opacity 0.5s ease;
 }
 
- #task-detail-page.task-loaded::after {
+#task-detail-page.task-loaded::before,
+#task-detail-page.task-loaded::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
     opacity: 0;
- }
+    transition: opacity 0.5s ease;
+}
+
+#task-detail-page.task-loaded::before {
+    inset: 0;
+    background: var(--bg-card);
+    border-radius: var(--border-radius-lg);
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
+    z-index: 1;
+}
+
+#task-detail-page.task-loaded::after {
+    inset: 12px;
+    border-radius: calc(var(--border-radius-lg) - 2px);
+    background: linear-gradient(
+        120deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.25) 50%,
+        rgba(255, 255, 255, 0)
+    );
+    z-index: 2;
+}
 
 @keyframes skeleton-shimmer {
     0% {
