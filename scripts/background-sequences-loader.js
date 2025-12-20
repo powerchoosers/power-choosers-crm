@@ -34,7 +34,6 @@
     }
     
     try {
-      console.log('[BackgroundSequencesLoader] Loading sequences...');
       if (window.currentUserRole !== 'admin') {
         let newSequences = [];
         if (window.DataManager && typeof window.DataManager.queryWithOwnership==='function') {
@@ -70,12 +69,10 @@
       
       // Pagination already handled above per role
       
-      console.log('[BackgroundSequencesLoader] ✓ Loaded', sequencesData.length, 'sequences from Firestore', hasMoreData ? '(more available)' : '(all loaded)');
       
       // Save to cache for future sessions
       if (window.CacheManager && typeof window.CacheManager.set === 'function') {
         await window.CacheManager.set('sequences', sequencesData);
-        console.log('[BackgroundSequencesLoader] ✓ Cached', sequencesData.length, 'sequences');
       }
       
       // Notify other modules
@@ -108,12 +105,10 @@
             });
             // If filter produced nothing but cache has data, trigger a background refresh now
             if (sequencesData.length === 0 && cached.length > 0) {
-              console.log('[BackgroundSequencesLoader] Cache had data but none matched user; refreshing from Firestore');
               await loadFromFirestore();
               return;
             }
           }
-          console.log('[BackgroundSequencesLoader] ✓ Loaded', sequencesData.length, 'sequences from cache', window.currentUserRole!=='admin' ? '(filtered)' : '(admin)');
           
           // Notify that cached data is available
           document.dispatchEvent(new CustomEvent('pc:sequences-loaded', { 
@@ -121,7 +116,6 @@
           }));
         } else {
           // Cache empty, load from Firestore
-          console.log('[BackgroundSequencesLoader] Cache empty, loading from Firestore');
           await loadFromFirestore();
         }
       } catch (e) {
@@ -152,7 +146,6 @@
                 return;
               }
             }
-            console.log('[BackgroundSequencesLoader] ✓ Loaded', sequencesData.length, 'sequences from cache (delayed)');
             document.dispatchEvent(new CustomEvent('pc:sequences-loaded', { 
               detail: { count: cached.length, cached: true } 
             }));
@@ -167,7 +160,6 @@
   // Load more sequences (next batch of 100)
   async function loadMoreSequences() {
     if (!hasMoreData) {
-      console.log('[BackgroundSequencesLoader] No more data to load');
       return { loaded: 0, hasMore: false };
     }
     
@@ -178,7 +170,6 @@
     
     try {
       if (window.currentUserRole !== 'admin') return { loaded: 0, hasMore: false };
-      console.log('[BackgroundSequencesLoader] Loading next batch...');
       let query = window.firebaseDB.collection('sequences')
         .orderBy('updatedAt', 'desc')
         .startAfter(lastLoadedDoc)
@@ -198,7 +189,6 @@
         hasMoreData = false;
       }
       
-      console.log('[BackgroundSequencesLoader] ✓ Loaded', newSequences.length, 'more sequences. Total:', sequencesData.length, hasMoreData ? '(more available)' : '(all loaded)');
       
       // Update cache
       if (window.CacheManager && typeof window.CacheManager.set === 'function') {
@@ -259,7 +249,6 @@
     getTotalCount: getTotalCount
   };
   
-  console.log('[BackgroundSequencesLoader] Module initialized');
 })();
 
 

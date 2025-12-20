@@ -36,7 +36,6 @@
     }
     
     try {
-      console.log('[BackgroundContactsLoader] Loading contacts...');
       if (window.currentUserRole !== 'admin') {
         // Employee: scope by ownership
         let newContacts = [];
@@ -83,12 +82,10 @@
         hasMoreData = false;
       }
       
-      console.log('[BackgroundContactsLoader] ✓ Loaded', contactsData.length, 'contacts from Firestore', hasMoreData ? '(more available)' : '(all loaded)');
       
       // Save to cache for future sessions
       if (window.CacheManager && typeof window.CacheManager.set === 'function') {
         await window.CacheManager.set('contacts', contactsData);
-        console.log('[BackgroundContactsLoader] ✓ Cached', contactsData.length, 'contacts');
       }
       
       // Notify other modules
@@ -109,7 +106,6 @@
           // CacheManager already handles scoped queries, so use cached data directly
           contactsData = cached;
           loadedFromCache = true; // Mark as loaded from cache
-          console.log('[BackgroundContactsLoader] ✓ Loaded', cached.length, 'contacts from cache');
           
           // Notify that cached data is available
           document.dispatchEvent(new CustomEvent('pc:contacts-loaded', { 
@@ -117,7 +113,6 @@
           }));
         } else {
           // Cache empty, load from Firestore
-          console.log('[BackgroundContactsLoader] Cache empty, loading from Firestore');
           await loadFromFirestore();
         }
       } catch (e) {
@@ -134,7 +129,6 @@
             // CacheManager already handles scoped queries, so use cached data directly
             contactsData = cached;
             loadedFromCache = true; // Mark as loaded from cache
-            console.log('[BackgroundContactsLoader] ✓ Loaded', cached.length, 'contacts from cache (delayed)');
             document.dispatchEvent(new CustomEvent('pc:contacts-loaded', { 
               detail: { count: cached.length, cached: true } 
             }));
@@ -149,7 +143,6 @@
   // Load more contacts (next batch of 100)
   async function loadMoreContacts() {
     if (!hasMoreData) {
-      console.log('[BackgroundContactsLoader] No more data to load');
       return { loaded: 0, hasMore: false };
     }
     
@@ -163,7 +156,6 @@
         // For employees, we already scoped and disabled pagination
         return { loaded: 0, hasMore: false };
       }
-      console.log('[BackgroundContactsLoader] Loading next batch...');
       let query = window.firebaseDB.collection('contacts')
         .orderBy('updatedAt', 'desc')
         .startAfter(lastLoadedDoc)
@@ -183,7 +175,6 @@
         hasMoreData = false;
       }
       
-      console.log('[BackgroundContactsLoader] ✓ Loaded', newContacts.length, 'more contacts. Total:', contactsData.length, hasMoreData ? '(more available)' : '(all loaded)');
       
       // Update cache
       if (window.CacheManager && typeof window.CacheManager.set === 'function') {
@@ -256,11 +247,9 @@
     if (existingIndex >= 0) {
       // Update existing contact
       contactsData[existingIndex] = { ...contactsData[existingIndex], ...contactData };
-      console.log('[BackgroundContactsLoader] Updated contact in cache:', contactData.id);
     } else {
       // Add new contact to the beginning of the array (most recent first)
       contactsData.unshift(contactData);
-      console.log('[BackgroundContactsLoader] Added new contact to cache:', contactData.id);
     }
     
     // Update the cache in IndexedDB
@@ -283,6 +272,5 @@
     isFromCache: () => loadedFromCache // Expose cache status
   };
   
-  console.log('[BackgroundContactsLoader] Module initialized');
 })();
 

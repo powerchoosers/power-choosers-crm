@@ -26,7 +26,6 @@
   
   async function loadFromAPI() {
     try {
-      console.log('[BackgroundCallsLoader] Loading from API...');
       const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
       const url = `${base}/api/calls?limit=100`; // Load 100 calls for efficiency
       // Attach ID token for secured endpoints
@@ -64,18 +63,15 @@
         lastLoadedOffset = data.calls.length;
         hasMoreData = data.calls.length === 100; // If we got less than 100, no more data
         isEnriched = false; // Mark as not enriched (raw API data)
-        console.log('[BackgroundCallsLoader] ✓ Loaded', callsData.length, 'calls from API', hasMoreData ? '(more available)' : '(all loaded)');
         
         // COST OPTIMIZATION: Do NOT cache raw data here - let calls.js enrich first, then cache
         // This avoids double cache writes (raw + enriched) and ensures we always cache enriched data
-        console.log('[BackgroundCallsLoader] Raw data loaded - calls.js will enrich and cache');
         
         // Notify other modules
         document.dispatchEvent(new CustomEvent('pc:calls-loaded', { 
           detail: { count: callsData.length, fromAPI: true, enriched: false } 
         }));
       } else {
-        console.log('[BackgroundCallsLoader] No calls data from API:', data);
       }
     } catch (error) {
       console.error('[BackgroundCallsLoader] Failed to load from API:', error);
@@ -104,7 +100,6 @@
           } catch(_) { callsData = cached; }
           // Check if data is enriched (has counterpartyPretty field)
           isEnriched = cached[0] && cached[0].hasOwnProperty('counterpartyPretty');
-          console.log('[BackgroundCallsLoader] ✓ Loaded', cached.length, 'calls from cache', isEnriched ? '(enriched)' : '(raw)');
           
           // Notify that cached data is available
           document.dispatchEvent(new CustomEvent('pc:calls-loaded', { 
@@ -112,7 +107,6 @@
           }));
         } else {
           // Cache empty, load from API
-          console.log('[BackgroundCallsLoader] Cache empty, loading from API');
           await loadFromAPI();
         }
       } catch (e) {
@@ -142,7 +136,6 @@
             } catch(_) { callsData = cached; }
             // Check if data is enriched
             isEnriched = cached[0] && cached[0].hasOwnProperty('counterpartyPretty');
-            console.log('[BackgroundCallsLoader] ✓ Loaded', callsData.length, 'calls from cache (delayed, filtered)', isEnriched ? '(enriched)' : '(raw)');
             document.dispatchEvent(new CustomEvent('pc:calls-loaded', { 
               detail: { count: cached.length, cached: true, enriched: isEnriched } 
             }));
@@ -157,12 +150,10 @@
   // Load more calls (pagination)
   async function loadMoreCalls() {
     if (!hasMoreData) {
-      console.log('[BackgroundCallsLoader] No more data to load');
       return { loaded: 0, hasMore: false };
     }
     
     try {
-      console.log('[BackgroundCallsLoader] Loading next batch...');
       const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
       const url = `${base}/api/calls?limit=100&offset=${lastLoadedOffset}`;
       // Attach ID token for secured endpoints
@@ -189,10 +180,8 @@
         hasMoreData = data.calls.length === 100;
         isEnriched = false; // New data is raw, needs enrichment
         
-        console.log('[BackgroundCallsLoader] ✓ Loaded', data.calls.length, 'more calls. Total:', callsData.length, hasMoreData ? '(more available)' : '(all loaded)');
         
         // COST OPTIMIZATION: Do NOT cache here - let calls.js enrich the combined data and cache once
-        console.log('[BackgroundCallsLoader] New data loaded - calls.js will enrich and cache updated dataset');
         
         // Notify listeners
         document.dispatchEvent(new CustomEvent('pc:calls-loaded-more', { 
@@ -300,7 +289,6 @@
     
     if (keysToInvalidate.length > 0) {
       invalidateCallStatusCache(keysToInvalidate);
-      console.log('[BackgroundCallsLoader] Invalidated cache for:', keysToInvalidate);
     }
   });
   
@@ -322,12 +310,10 @@
         isEnriched = true;
         if (window.CacheManager && typeof window.CacheManager.set === 'function') {
           await window.CacheManager.set('calls', enrichedData);
-          console.log('[BackgroundCallsLoader] ✓ Updated cache with', enrichedData.length, 'enriched calls');
         }
       }
     }
   };
   
-  console.log('[BackgroundCallsLoader] Module initialized');
 })();
 

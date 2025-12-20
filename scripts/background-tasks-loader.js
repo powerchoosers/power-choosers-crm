@@ -29,7 +29,6 @@
     }
 
     try {
-      console.log('[BackgroundTasksLoader] Loading tasks...', preserveExisting ? '(preserving existing)' : '');
       
       // CRITICAL FIX: Preserve existing tasks if this is a refresh (not initial load)
       const existingTasksMap = preserveExisting ? new Map() : null;
@@ -37,7 +36,6 @@
         tasksData.forEach(t => {
           if (t && t.id) existingTasksMap.set(t.id, t);
         });
-        console.log('[BackgroundTasksLoader] Preserving', existingTasksMap.size, 'existing tasks during reload');
       }
       
       if (window.currentUserRole !== 'admin') {
@@ -114,12 +112,10 @@
 
       // Pagination handled per role above
 
-      console.log('[BackgroundTasksLoader] ✓ Loaded', tasksData.length, 'tasks from Firestore', hasMoreData ? '(more available)' : '(all loaded)');
 
       // Save to cache for future sessions
       if (window.CacheManager && typeof window.CacheManager.set === 'function') {
         await window.CacheManager.set('tasks', tasksData);
-        console.log('[BackgroundTasksLoader] ✓ Cached', tasksData.length, 'tasks');
       }
 
       // Notify other modules
@@ -150,7 +146,6 @@
           } else {
             tasksData = cached;
           }
-          console.log('[BackgroundTasksLoader] ✓ Loaded', cached.length, 'tasks from cache');
 
           // Notify that cached data is available
           document.dispatchEvent(new CustomEvent('pc:tasks-loaded', {
@@ -158,7 +153,6 @@
           }));
         } else {
           // Cache empty, load from Firestore
-          console.log('[BackgroundTasksLoader] Cache empty, loading from Firestore');
           await loadFromFirestore();
         }
       } catch (e) {
@@ -185,7 +179,6 @@
             } else {
               tasksData = cached;
             }
-            console.log('[BackgroundTasksLoader] ✓ Loaded', tasksData.length, 'tasks from cache (delayed, filtered)');
             document.dispatchEvent(new CustomEvent('pc:tasks-loaded', {
               detail: { count: cached.length, cached: true }
             }));
@@ -200,7 +193,6 @@
   // Load more tasks (next batch of 100)
   async function loadMoreTasks() {
     if (!hasMoreData) {
-      console.log('[BackgroundTasksLoader] No more data to load');
       return { loaded: 0, hasMore: false };
     }
 
@@ -211,7 +203,6 @@
 
     try {
       if (window.currentUserRole !== 'admin') return { loaded: 0, hasMore: false };
-      console.log('[BackgroundTasksLoader] Loading next batch...');
       let query = window.firebaseDB.collection('tasks')
         .orderBy('timestamp', 'desc')
         .startAfter(lastLoadedDoc)
@@ -231,7 +222,6 @@
         hasMoreData = false;
       }
 
-      console.log('[BackgroundTasksLoader] ✓ Loaded', newTasks.length, 'more tasks. Total:', tasksData.length, hasMoreData ? '(more available)' : '(all loaded)');
 
       // Update cache
       if (window.CacheManager && typeof window.CacheManager.set === 'function') {
@@ -290,13 +280,11 @@
   // Listen for task updates and reload data
   window.addEventListener('tasksUpdated', async (event) => {
     const { source, taskId, deleted, newTaskCreated, rescheduled } = event.detail || {};
-    console.log('[BackgroundTasksLoader] Tasks updated from:', source, deleted ? '(deleted)' : '', newTaskCreated ? '(new task)' : '', rescheduled ? '(rescheduled)' : '');
 
     // CRITICAL FIX: If a task was deleted, remove it from local cache immediately
     if (deleted && taskId) {
       try {
         tasksData = tasksData.filter(t => t && t.id !== taskId);
-        console.log('[BackgroundTasksLoader] Removed deleted task from cache:', taskId);
         
         // Also update cache
         if (window.CacheManager && typeof window.CacheManager.set === 'function') {
@@ -314,7 +302,6 @@
       try {
         // Remove the old task from cache (with old dueDate/dueTime)
         tasksData = tasksData.filter(t => t && t.id !== taskId);
-        console.log('[BackgroundTasksLoader] Removed rescheduled task from cache (will reload with new date):', taskId);
         
         // Update cache immediately to remove old position
         if (window.CacheManager && typeof window.CacheManager.set === 'function') {
@@ -332,7 +319,6 @@
     try {
       if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
         await window.CacheManager.invalidate('tasks');
-        console.log('[BackgroundTasksLoader] Cache invalidated');
       }
       
       // Reload from Firestore if a new task was created OR if a task was rescheduled
@@ -364,7 +350,6 @@
       try {
         // Remove from local cache
         tasksData = tasksData.filter(t => t && t.id !== taskId);
-        console.log('[BackgroundTasksLoader] Removed deleted task from cache (cross-browser sync):', taskId, source ? `from ${source}` : '');
         
         // Update cache
         if (window.CacheManager && typeof window.CacheManager.set === 'function') {
@@ -388,7 +373,6 @@
   // Reload tasks when user returns to tab (to catch changes from other browsers)
   document.addEventListener('visibilitychange', async () => {
     if (!document.hidden) {
-      console.log('[BackgroundTasksLoader] Tab visible, checking for updates...');
 
       try {
         // Check cache age
@@ -402,7 +386,6 @@
 
         // If cache is older than expiry time, refresh
         if (age > tasksCacheExpiry) {
-          console.log('[BackgroundTasksLoader] Cache is stale (age: ' + Math.round(age / 1000) + 's, expiry: ' + Math.round(tasksCacheExpiry / 1000) + 's), refreshing...');
           
           // CRITICAL FIX: Preserve existing tasks during refresh to prevent loss
           const existingTasksMap = new Map();
@@ -442,7 +425,6 @@
             window.crm.loadTodaysTasks();
           }
         } else {
-          console.log('[BackgroundTasksLoader] Cache is fresh (age: ' + Math.round(age / 1000) + 's, expiry: ' + Math.round(tasksCacheExpiry / 1000) + 's)');
         }
       } catch (error) {
         console.error('[BackgroundTasksLoader] Error checking cache on visibility change:', error);
@@ -459,7 +441,6 @@
       const removed = tasksData.length < beforeCount;
       
       if (removed) {
-        console.log('[BackgroundTasksLoader] Removed task from cache:', taskId);
         
         // Update cache immediately
         if (window.CacheManager && typeof window.CacheManager.set === 'function') {
@@ -482,7 +463,6 @@
     reload: loadFromFirestore,
     forceReload: async () => {
       // Force cache invalidation and reload
-      console.log('[BackgroundTasksLoader] Force reload requested');
       try {
         // CRITICAL FIX: Preserve existing tasks during reload to prevent loss
         // Store current tasks before reloading
@@ -531,7 +511,6 @@
     getTotalCount: getTotalCount
   };
 
-  console.log('[BackgroundTasksLoader] Module initialized');
 })();
 
 
