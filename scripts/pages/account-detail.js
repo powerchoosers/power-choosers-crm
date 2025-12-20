@@ -3004,6 +3004,14 @@ var console = {
       try { Object.assign(state.currentAccount, updates); } catch (_) { }
       try { window.crm?.showToast && window.crm.showToast('Saved'); } catch (_) { }
       try { renderAccountDetail(); } catch (_) { }
+      try {
+        document.dispatchEvent(new CustomEvent('pc:account-updated', {
+          detail: {
+            id,
+            changes: { ...updates }
+          }
+        }));
+      } catch (_) { }
       close();
     });
   };  // End of openEditAccountModal assignment
@@ -3022,9 +3030,6 @@ var console = {
     });
 
     // Listen for account creation events (from CSV import, etc.)
-    // NOTE: We intentionally do NOT listen for generic `pc:account-updated` here
-    // to avoid full-page re-renders on every inline field save. Inline edits
-    // update the DOM directly; Apollo enrich now refreshes Account Detail itself.
     document.addEventListener('pc:account-created', (e) => {
       if (state.currentAccount && e.detail) {
         const { id, doc } = e.detail;
@@ -3039,6 +3044,15 @@ var console = {
           // Re-render the account detail to show updated fields
           renderAccountDetail();
         }
+      }
+    });
+
+    document.addEventListener('pc:account-updated', (e) => {
+      if (state.currentAccount && e.detail && e.detail.id === state.currentAccount.id) {
+        const changes = e.detail.changes || {};
+        state.currentAccount = { ...state.currentAccount, ...changes };
+        console.log('[AccountDetail] Updating view for recent changes', changes);
+        renderAccountDetail();
       }
     });
 
@@ -4440,6 +4454,12 @@ var console = {
       try { window.crm?.showToast && window.crm.showToast('Task created'); } catch (_) { }
       try { window.crm && typeof window.crm.loadTodaysTasks === 'function' && window.crm.loadTodaysTasks(); } catch (_) { }
       try { window.dispatchEvent(new CustomEvent('tasksUpdated', { detail: { source: 'account-detail', task: newTask } })); } catch (_) { }
+      // Dispatch activity refresh for immediate UI update
+      try {
+        document.dispatchEvent(new CustomEvent('pc:activities-refresh', {
+          detail: { entityType: 'account', entityId: state.currentAccount?.id, forceRefresh: true }
+        }));
+      } catch (_) { }
       try { pop.remove(); } catch (_) { }
     });
 

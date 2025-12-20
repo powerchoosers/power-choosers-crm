@@ -5122,6 +5122,33 @@
           // Clear metadata after tracking
           window._lastGeneratedMetadata = null;
         }
+
+        // Dispatch activity refresh event for immediate UI updates
+        try {
+          const bodyInput = document.querySelector('.body-input');
+          const contactId = bodyInput?.getAttribute('data-contact-id') || window._lastEmailContactId;
+          const accountId = bodyInput?.getAttribute('data-account-id') || window._lastEmailAccountId;
+
+          // Dispatch activities refresh
+          const refreshEvent = new CustomEvent('pc:activities-refresh', {
+            detail: {
+              entityType: contactId ? 'contact' : (accountId ? 'account' : 'global'),
+              entityId: contactId || accountId,
+              forceRefresh: true
+            }
+          });
+          document.dispatchEvent(refreshEvent);
+          console.log('[EmailCompose] Dispatched pc:activities-refresh for sent email');
+
+          // Also dispatch emails-updated for ActivityManager
+          const emailsUpdatedEvent = new CustomEvent('pc:emails-updated', {
+            detail: { contactId, accountId }
+          });
+          document.dispatchEvent(emailsUpdatedEvent);
+          console.log('[EmailCompose] Dispatched pc:emails-updated for sent email');
+        } catch (err) {
+          console.warn('[EmailCompose] Failed to dispatch activity events:', err);
+        }
       } catch (gmailError) {
         console.error('[EmailCompose] Gmail send failed:', gmailError);
         throw new Error(`Failed to send email: ${gmailError.message}`);

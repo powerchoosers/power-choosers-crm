@@ -1544,10 +1544,19 @@
     }
 
     // Update Today's Tasks widget
-    updateTodaysTasksWidget();
+    updateTodaysTasksWidget(newTask);
+
+    // Dispatch activity refresh for immediate UI update
+    try {
+      const entityType = newTask.accountId ? 'account' : (newTask.contactId ? 'contact' : 'global');
+      const entityId = newTask.accountId || newTask.contactId;
+      document.dispatchEvent(new CustomEvent('pc:activities-refresh', {
+        detail: { entityType, entityId, forceRefresh: true }
+      }));
+    } catch (_) { }
   }
 
-  function updateTodaysTasksWidget() {
+  function updateTodaysTasksWidget(newTask) {
     // Update the Today's Tasks widget
     if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
       window.crm.loadTodaysTasks();
@@ -1555,9 +1564,11 @@
 
     // Also trigger a custom event for other components that might need to know about task updates
     // CRITICAL FIX: Include task data so BackgroundTasksLoader can update cache in place
-    window.dispatchEvent(new CustomEvent('tasksUpdated', {
-      detail: { source: 'taskCreation', taskData: newTask }
-    }));
+    if (newTask) {
+      window.dispatchEvent(new CustomEvent('tasksUpdated', {
+        detail: { source: 'taskCreation', taskData: newTask }
+      }));
+    }
   }
 
   async function init() { if (!initDomRefs()) return; attachEvents(); injectTasksBulkStyles(); await loadData(); bindUpdates(); }
