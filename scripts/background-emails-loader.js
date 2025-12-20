@@ -17,6 +17,8 @@
   let _sentEmailsUnsubscribe = null; // Separate listener for sent email tracking updates
   let _scheduledEmailsUnsubscribe = null; // Separate listener for scheduled emails
   let _cacheWritePending = false;
+  let _emailsUpdatedLastDispatchAt = 0;
+  let _emailsUpdatedSuppressed = 0;
   let lastLoadedDoc = null; // For pagination
   let hasMoreData = true; // For pagination
   let _scheduledLoadedOnce = false; // Track if scheduled emails have been loaded
@@ -49,6 +51,25 @@
   const getUserEmail = () => {
     try { if (window.DataManager && typeof window.DataManager.getCurrentUserEmail==='function') return window.DataManager.getCurrentUserEmail(); return (window.currentUserEmail||'').toLowerCase(); } catch(_) { return (window.currentUserEmail||'').toLowerCase(); }
   };
+
+  // Coalesce noisy update bursts (multiple Firestore listeners fire near-simultaneously).
+  // This prevents downstream UI (Recent Activities) from re-rendering 2-5 times in <1s (visible flicker).
+  function emitEmailsUpdated(detail = {}, reason = 'unknown') {
+    try {
+      const now = Date.now();
+      // If updates fire in a burst, only emit one event per 1200ms window.
+      if (_emailsUpdatedLastDispatchAt && (now - _emailsUpdatedLastDispatchAt) < 1200) {
+        _emailsUpdatedSuppressed++;
+        return;
+      }
+      _emailsUpdatedLastDispatchAt = now;
+      const payload = Object.assign({}, detail, { source: reason, suppressed: _emailsUpdatedSuppressed });
+      _emailsUpdatedSuppressed = 0;
+      document.dispatchEvent(new CustomEvent('pc:emails-updated', { detail: payload }));
+    } catch (_) {
+      try { document.dispatchEvent(new CustomEvent('pc:emails-updated', { detail })); } catch (_) {}
+    }
+  }
   
   // Helper to normalize a Firestore email document into our standard shape
   function normalizeEmailDoc(id, data) {
@@ -139,7 +160,6 @@
         .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
       
       _scheduledLoadedOnce = true;
-      console.log('[BackgroundEmailsLoader] ✓ Ensured all scheduled emails loaded into memory (up to 200)');
     } catch (e) {
       console.warn('[BackgroundEmailsLoader] Failed to ensure all scheduled emails are loaded:', e);
     }
@@ -155,10 +175,7 @@
       // Clear old cache format (scheduledSendTime was string, now it's number)
       if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
         await window.CacheManager.invalidate('emails');
-        console.log('[BackgroundEmailsLoader] Cleared old email cache');
       }
-      
-      console.log('[BackgroundEmailsLoader] Loading from Firestore...');
       if (window.currentUserRole !== 'admin') {
         // Employee: scope by ownership
         let raw = [];
@@ -198,20 +215,15 @@
         } else {
           hasMoreData = false;
         }
-        
-        console.log('[BackgroundEmailsLoader] Admin loaded, date range:', 
-                    emailsData.length > 0 ? `${emailsData[emailsData.length-1].timestamp} to ${emailsData[0].timestamp}` : 'none');
+
       }
       
       // Ensure ALL scheduled emails (up to 200) are present in memory so the Scheduled tab is complete
       await ensureAllScheduledEmailsLoaded();
-      
-      console.log('[BackgroundEmailsLoader] ✓ Loaded', emailsData.length, 'emails from Firestore');
-      
+
       // Save to cache for future sessions
       if (window.CacheManager && typeof window.CacheManager.set === 'function') {
         await window.CacheManager.set('emails', emailsData);
-        console.log('[BackgroundEmailsLoader] ✓ Cached', emailsData.length, 'emails');
       }
       
       // Notify other modules
@@ -221,8 +233,7 @@
 
       // Start realtime listener after a delay to let the page render first (performance optimization)
       setTimeout(() => {
-        console.log('[BackgroundEmailsLoader] Starting real-time listener...');
-      if (window.currentUserRole !== 'admin') startRealtimeListenerScoped(window.currentUserEmail || ''); else startRealtimeListener();
+        if (window.currentUserRole !== 'admin') startRealtimeListenerScoped(window.currentUserEmail || ''); else startRealtimeListener();
       }, 2000); // 2 second delay
     } catch (error) {
       console.error('[BackgroundEmailsLoader] Failed to load from Firestore:', error);
@@ -232,7 +243,6 @@
   // Load more emails (pagination) - similar to background-contacts-loader.js
   async function loadMoreEmails() {
     if (!hasMoreData) {
-      console.log('[BackgroundEmailsLoader] No more data to load');
       return { loaded: 0, hasMore: false };
     }
     
@@ -251,8 +261,7 @@
         console.warn('[BackgroundEmailsLoader] No lastLoadedDoc, cannot paginate');
         return { loaded: 0, hasMore: false };
       }
-      
-      console.log('[BackgroundEmailsLoader] Loading next batch...');
+
       const snapshot = await window.firebaseDB.collection('emails')
         .orderBy('createdAt', 'desc')
         .startAfter(lastLoadedDoc)
@@ -293,7 +302,6 @@
         hasMoreData = false;
       }
       
-      console.log('[BackgroundEmailsLoader] ✓ Loaded', newEmails.length, 'more emails. Total:', emailsData.length, hasMoreData ? '(more available)' : '(all loaded)');
       
       // Update cache
       if (window.CacheManager && typeof window.CacheManager.set === 'function') {
@@ -472,15 +480,13 @@
     const cacheKey = `${folder}-${window.currentUserEmail || 'admin'}`;
     const cached = folderCountCache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp) < FOLDER_COUNT_EXPIRY) {
-      console.log(`[BackgroundEmailsLoader] Folder count cache HIT for ${folder}: ${cached.count}`);
       return cached.count;
     }
     
     // OPTIMIZATION: Use in-memory filtering first (instant, no Firestore cost)
     // This works well when we have data already loaded in memory
     const inMemoryCount = getInMemoryCountByFolder(folder);
-    console.log(`[BackgroundEmailsLoader] In-memory count for ${folder}: ${inMemoryCount}`);
-    
+
     // Cache the in-memory count
     folderCountCache.set(cacheKey, { count: inMemoryCount, timestamp: Date.now() });
     
@@ -493,7 +499,6 @@
   // Invalidate folder count cache (call when emails are updated)
   function invalidateFolderCountCache() {
     folderCountCache.clear();
-    console.log('[BackgroundEmailsLoader] Folder count cache cleared');
   }
 
   // Start a real-time listener for emails collection
@@ -550,14 +555,14 @@
             setTimeout(async () => {
               try {
                 await window.CacheManager.set('emails', emailsData);
-                document.dispatchEvent(new CustomEvent('pc:emails-updated', { detail: { count: emailsData.length } }));
+                emitEmailsUpdated({ count: emailsData.length }, 'realtime-main-cachewrite');
               } finally {
                 _cacheWritePending = false;
               }
             }, 500);
           } else {
             // Still notify listeners of updated list
-            document.dispatchEvent(new CustomEvent('pc:emails-updated', { detail: { count: emailsData.length } }));
+            emitEmailsUpdated({ count: emailsData.length }, 'realtime-main');
           }
         }, (error) => {
           console.error('[BackgroundEmailsLoader] Realtime listener error:', error);
@@ -572,7 +577,6 @@
           }
         });
 
-      console.log('[BackgroundEmailsLoader] Realtime listener started');
       
       // ADDITIONAL LISTENER: Watch for updates to sent emails (for tracking badges)
       // This catches webhook updates to emails that might not be in the top 100 by createdAt
@@ -619,9 +623,8 @@
                 .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
 
               // Dispatch update event so emails-redesigned.js refreshes
-              document.dispatchEvent(new CustomEvent('pc:emails-updated', { detail: { count: emailsData.length } }));
+              emitEmailsUpdated({ count: emailsData.length }, 'realtime-sent');
               
-              console.log('[BackgroundEmailsLoader] Sent emails listener updated', updated.length, 'emails');
             }, (error) => {
               console.error('[BackgroundEmailsLoader] Sent emails listener error:', error);
               // If index is missing, log a helpful message
@@ -630,7 +633,6 @@
               }
             });
           
-          console.log('[BackgroundEmailsLoader] Sent emails tracking listener started');
         } catch (e) {
           console.warn('[BackgroundEmailsLoader] Failed to start sent emails listener:', e);
         }
@@ -681,9 +683,8 @@
               invalidateFolderCountCache();
 
               // Dispatch update event so emails-redesigned.js refreshes
-              document.dispatchEvent(new CustomEvent('pc:emails-updated', { detail: { count: emailsData.length } }));
+              emitEmailsUpdated({ count: emailsData.length }, 'realtime-scheduled');
               
-              console.log('[BackgroundEmailsLoader] Scheduled emails listener updated', updated.length, 'emails');
             }, (error) => {
               console.error('[BackgroundEmailsLoader] Scheduled emails listener error:', error);
               // If index is missing, log a helpful message
@@ -692,7 +693,6 @@
               }
             });
           
-          console.log('[BackgroundEmailsLoader] Scheduled emails listener started');
         } catch (e) {
           console.warn('[BackgroundEmailsLoader] Failed to start scheduled emails listener:', e);
         }
@@ -735,11 +735,11 @@
           setTimeout(async () => {
             try {
               await window.CacheManager.set('emails', emailsData);
-              document.dispatchEvent(new CustomEvent('pc:emails-updated', { detail: { count: emailsData.length } }));
+              emitEmailsUpdated({ count: emailsData.length }, 'realtime-scoped-cachewrite');
             } finally { _cacheWritePending = false; }
           }, 500);
         } else {
-          document.dispatchEvent(new CustomEvent('pc:emails-updated', { detail: { count: emailsData.length } }));
+          emitEmailsUpdated({ count: emailsData.length }, 'realtime-scoped');
         }
       };
       const handleError = (e, type) => {
@@ -777,7 +777,6 @@
           .onSnapshot(handleSnapshot, (e) => handleError(e, 'scheduled-assigned'))
       );
       _unsubscribe = () => { try { listeners.forEach(u=>u && u()); } catch(_) {} };
-      console.log('[BackgroundEmailsLoader] Scoped realtime listeners started (including scheduled emails)');
     } catch (e) {
       console.warn('[BackgroundEmailsLoader] Failed to start scoped realtime listeners:', e);
     }
@@ -804,7 +803,6 @@
               emailsData = cached;
             }
           } catch(_) { emailsData = cached; }
-          console.log('[BackgroundEmailsLoader] ✓ Loaded', cached.length, 'emails from cache');
           
           // Check if there are more emails in Firestore (even if we loaded from cache)
           // For admin users: if we have 100 emails (batch size), assume there might be more
@@ -828,7 +826,6 @@
                   const docSnap = await docRef.get();
                   if (docSnap.exists) {
                     lastLoadedDoc = docSnap;
-                    console.log('[BackgroundEmailsLoader] Set lastLoadedDoc from cache (oldest email ID)');
                   }
                 }
               } catch (error) {
@@ -836,12 +833,10 @@
                 // If we can't set it now, loadMore will try to reload from Firestore
                 lastLoadedDoc = null;
               }
-              console.log('[BackgroundEmailsLoader] Cache has 100+ emails, assuming more available. hasMoreData:', hasMoreData);
             } else {
               // Less than 100, probably all data
               hasMoreData = false;
               lastLoadedDoc = null;
-              console.log('[BackgroundEmailsLoader] Cache has <100 emails, assuming all loaded');
             }
           } else {
             // For non-admin users, assume cache has all their data (they have limited access)
@@ -870,7 +865,6 @@
         loadFromFirestore().catch(e => console.warn('[BackgroundEmailsLoader] Background refresh after cache load failed:', e));
         } else {
           // Cache empty, load from Firestore
-          console.log('[BackgroundEmailsLoader] Cache empty, loading from Firestore');
           await loadFromFirestore();
         }
       } catch (e) {
@@ -899,7 +893,6 @@
                 emailsData = cached;
               }
             } catch(_) { emailsData = cached; }
-            console.log('[BackgroundEmailsLoader] ✓ Loaded', emailsData.length, 'emails from cache (delayed, filtered)');
             
             // Ensure scheduled emails are present even when served from cache (delayed path)
             await ensureAllScheduledEmailsLoaded();
@@ -927,7 +920,6 @@
                   console.warn('[BackgroundEmailsLoader] Could not set lastLoadedDoc from cache (delayed):', error);
                   lastLoadedDoc = null;
                 }
-                console.log('[BackgroundEmailsLoader] Cache has 100+ emails (delayed), assuming more available');
               } else {
                 hasMoreData = false;
                 lastLoadedDoc = null;
@@ -961,7 +953,6 @@
   // Load more emails (pagination)
   async function loadMoreEmails() {
     if (!hasMoreData) {
-      console.log('[BackgroundEmailsLoader] No more data to load');
       return { loaded: 0, hasMore: false };
     }
     
@@ -981,7 +972,6 @@
         return { loaded: 0, hasMore: false };
       }
       
-      console.log('[BackgroundEmailsLoader] Loading next batch...');
       const snapshot = await window.firebaseDB.collection('emails')
         .orderBy('createdAt', 'desc')
         .startAfter(lastLoadedDoc)
@@ -1022,7 +1012,6 @@
         hasMoreData = false;
       }
       
-      console.log('[BackgroundEmailsLoader] ✓ Loaded', newEmails.length, 'more emails. Total:', emailsData.length, hasMoreData ? '(more available)' : '(all loaded)');
       
       // Update cache
       if (window.CacheManager && typeof window.CacheManager.set === 'function') {
@@ -1047,7 +1036,6 @@
     const index = emailsData.findIndex(e => e.id === emailId);
     if (index !== -1) {
       emailsData.splice(index, 1);
-      console.log('[BackgroundEmailsLoader] Removed email from memory:', emailId);
       invalidateFolderCountCache();
       return true;
     }
@@ -1061,7 +1049,6 @@
     if (email) {
       email.status = newStatus;
       email.updatedAt = new Date().toISOString();
-      console.log('[BackgroundEmailsLoader] Updated email status in memory:', emailId, newStatus);
       invalidateFolderCountCache();
       return true;
     }
@@ -1090,5 +1077,4 @@
     updateEmailStatus: updateEmailStatus
   };
   
-  console.log('[BackgroundEmailsLoader] Module initialized');
 })();

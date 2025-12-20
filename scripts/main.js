@@ -300,7 +300,18 @@ class PowerChoosersCRM {
         if (this._activityListenersSetup) return;
         this._activityListenersSetup = true;
 
-        const refreshActivities = () => {
+        // Track when page first loaded to prevent immediate refreshes
+        const pageLoadTime = Date.now();
+        const COOLDOWN_PERIOD = 5000; // 5 second cooldown after page load
+
+        const refreshActivities = (eventType) => {
+            // Prevent refreshes immediately after page load (cooldown period)
+            const timeSincePageLoad = Date.now() - pageLoadTime;
+            if (timeSincePageLoad < COOLDOWN_PERIOD) {
+                console.log(`[CRM] Skipping activity refresh - too soon after page load (${timeSincePageLoad}ms < ${COOLDOWN_PERIOD}ms)`);
+                return;
+            }
+
             // Debounce the refresh
             if (this._activityRefreshTimer) clearTimeout(this._activityRefreshTimer);
             this._activityRefreshTimer = setTimeout(() => {
@@ -311,11 +322,11 @@ class PowerChoosersCRM {
         };
 
         // Listen for updates from background loaders
-        window.addEventListener('pc:emails-updated', refreshActivities);
-        window.addEventListener('tasksUpdated', refreshActivities);
+        window.addEventListener('pc:emails-updated', () => refreshActivities('pc:emails-updated'));
+        window.addEventListener('tasksUpdated', () => refreshActivities('tasksUpdated'));
         // Also listen for contact updates as they affect email filtering
-        window.addEventListener('pc:contacts-updated', refreshActivities);
-        window.addEventListener('pc:contact-created', refreshActivities);
+        window.addEventListener('pc:contacts-updated', () => refreshActivities('pc:contacts-updated'));
+        window.addEventListener('pc:contact-created', () => refreshActivities('pc:contact-created'));
     }
 
     // Observe first render of dashboard containers and animate height once

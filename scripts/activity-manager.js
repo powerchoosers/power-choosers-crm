@@ -16,6 +16,10 @@ class ActivityManager {
     this.maxFetchLimit = 200; // Safety cap for incremental fetches
     this.lastFetchLimitUsed = this.fetchLimitPerType;
     this.loadingPromises = new Map(); // Track in-flight requests to prevent duplicates
+    this.renderPromises = new Map(); // Track in-flight renders to prevent DOM flicker
+    this.lastRenderedSignatures = new Map(); // Track last rendered activity IDs to avoid unnecessary DOM replacement
+    this.pageLoadTime = Date.now(); // Track when ActivityManager was initialized
+    this.refreshCooldown = 5000; // 5 second cooldown after page load to prevent flickering
 
     // Setup cache invalidation listeners for immediate updates when new activities are created
     this.setupCacheInvalidationListeners();
@@ -29,62 +33,63 @@ class ActivityManager {
     // Invalidate global cache when contacts are created/updated (affects notes)
     document.addEventListener('pc:contact-created', (e) => {
       this.clearCache('global');
-      this.refreshVisibleActivityContainers('global');
+      this.refreshVisibleActivityContainers('global', null, { source: 'pc:contact-created' });
     });
     document.addEventListener('pc:contact-updated', (e) => {
       const { id } = e.detail || {};
       this.clearCache('global');
       if (id) {
         this.clearCache('contact', id);
-        this.refreshVisibleActivityContainers('contact', id);
+        this.refreshVisibleActivityContainers('contact', id, { source: 'pc:contact-updated' });
       }
     });
 
     // Invalidate global cache when accounts are created/updated (affects notes)
     document.addEventListener('pc:account-created', () => {
       this.clearCache('global');
-      this.refreshVisibleActivityContainers('global');
+      this.refreshVisibleActivityContainers('global', null, { source: 'pc:account-created' });
     });
     document.addEventListener('pc:account-updated', (e) => {
       const { id } = e.detail || {};
       this.clearCache('global');
       if (id) {
         this.clearCache('account', id);
-        this.refreshVisibleActivityContainers('account', id);
+        this.refreshVisibleActivityContainers('account', id, { source: 'pc:account-updated' });
       }
     });
 
     // Invalidate global cache when tasks are created/updated/deleted
     document.addEventListener('tasksUpdated', (e) => {
       this.clearCache('global');
-      this.refreshVisibleActivityContainers('global');
+      this.refreshVisibleActivityContainers('global', null, { source: 'tasksUpdated' });
     });
     document.addEventListener('pc:task-deleted', (e) => {
       this.clearCache('global');
-      this.refreshVisibleActivityContainers('global');
+      this.refreshVisibleActivityContainers('global', null, { source: 'pc:task-deleted' });
     });
 
     // Invalidate global cache when emails are updated - refresh immediately for better UX
     document.addEventListener('pc:emails-updated', (e) => {
-      const { contactId, accountId } = e.detail || {};
+      const { contactId, accountId, source } = e.detail || {};
+      const eventSource = source ? `pc:emails-updated:${String(source)}` : 'pc:emails-updated';
       // Clear global cache
       this.clearCache('global');
-      this.refreshVisibleActivityContainers('global');
+      this.refreshVisibleActivityContainers('global', null, { source: eventSource });
       // Also refresh specific entity if provided
       if (contactId) {
         this.clearCache('contact', contactId);
-        this.refreshVisibleActivityContainers('contact', contactId);
+        this.refreshVisibleActivityContainers('contact', contactId, { source: eventSource });
       }
       if (accountId) {
         this.clearCache('account', accountId);
-        this.refreshVisibleActivityContainers('account', accountId);
+        this.refreshVisibleActivityContainers('account', accountId, { source: eventSource });
       }
     });
 
     // Invalidate global cache when calls are logged
     document.addEventListener('pc:call-logged', () => {
       this.clearCache('global');
-      this.refreshVisibleActivityContainers('global');
+      this.refreshVisibleActivityContainers('global', null, { source: 'pc:call-logged' });
     });
 
     // Listen for explicit activity refresh requests
@@ -93,14 +98,22 @@ class ActivityManager {
       this.clearCache(entityType || 'global', entityId);
       
       // Auto-refresh any visible activity containers for this entity
-      this.refreshVisibleActivityContainers(entityType, entityId);
+      this.refreshVisibleActivityContainers(entityType, entityId, { source: 'pc:activities-refresh', forceRefresh: !!forceRefresh });
     });
   }
 
   /**
    * Automatically refresh any visible activity containers for a specific entity
    */
-  refreshVisibleActivityContainers(entityType, entityId) {
+  refreshVisibleActivityContainers(entityType, entityId, opts = {}) {
+    const source = (opts && opts.source) ? String(opts.source) : 'unknown';
+    const forceRefresh = !!(opts && opts.forceRefresh);
+    // Prevent refreshes immediately after page load (cooldown period to prevent flickering)
+    const timeSincePageLoad = Date.now() - this.pageLoadTime;
+    if (timeSincePageLoad < this.refreshCooldown) {
+      return;
+    }
+
     // Find all potential activity containers in the DOM
     const containers = [
       { id: 'home-activity-timeline', type: 'global', eid: null },
@@ -114,7 +127,6 @@ class ActivityManager {
       const el = document.getElementById(c.id);
       // Only refresh if the container exists and the entity matches
       if (el && (c.type === 'global' || c.type === entityType)) {
-        console.log(`[ActivityManager] Auto-refreshing container: ${c.id} for ${entityType}:${entityId}`);
         // For task-activity-timeline, check current task to determine account vs contact
         if (c.id === 'task-activity-timeline') {
           // Check what type of task we're viewing by looking at the current task state
@@ -122,23 +134,23 @@ class ActivityManager {
             const task = window.TaskDetail.state.currentTask;
             // Determine entity type from task - refresh if it matches the event
             if (entityType === 'account' && task.accountId === entityId) {
-              this.renderActivities(c.id, 'account', task.accountId, true);
+              this.renderActivities(c.id, 'account', task.accountId, forceRefresh);
             } else if (entityType === 'contact' && task.contactId === entityId) {
-              this.renderActivities(c.id, 'contact', task.contactId, true);
+              this.renderActivities(c.id, 'contact', task.contactId, forceRefresh);
             } else if (entityType === 'global') {
               // For global events, refresh based on what the task is showing
               if (task.accountId) {
-                this.renderActivities(c.id, 'account', task.accountId, true);
+                this.renderActivities(c.id, 'account', task.accountId, forceRefresh);
               } else if (task.contactId) {
-                this.renderActivities(c.id, 'contact', task.contactId, true);
+                this.renderActivities(c.id, 'contact', task.contactId, forceRefresh);
               }
             }
           } else {
             // Fallback: use the provided entityType and entityId
-            this.renderActivities(c.id, entityType, entityId, true);
+            this.renderActivities(c.id, entityType, entityId, forceRefresh);
           }
         } else {
-          this.renderActivities(c.id, c.type, c.eid, true);
+          this.renderActivities(c.id, c.type, c.eid, forceRefresh);
         }
       }
     });
@@ -250,7 +262,6 @@ class ActivityManager {
     } catch (error) {
       console.error('Error fetching call activities:', error);
     }
-
     return activities;
   }
 
@@ -547,11 +558,11 @@ class ActivityManager {
   /**
    * Get task activities
    */
-  async getTaskActivities(entityType, entityId) {
+  async getTaskActivities(entityType, entityId, limit) {
     const activities = [];
 
     try {
-      const tasks = await this.fetchTasks();
+      const tasks = await this.fetchTasks(limit);
 
       for (const task of tasks) {
         let shouldInclude = false;
@@ -582,7 +593,6 @@ class ActivityManager {
     } catch (error) {
       console.error('Error fetching task activities:', error);
     }
-
     return activities;
   }
 
@@ -672,7 +682,6 @@ class ActivityManager {
             return timeB - timeA;
           });
           const result = contactsWithNotes.slice(0, limit || this.fetchLimitPerType);
-
           return result;
         }
       }
@@ -777,7 +786,6 @@ class ActivityManager {
    * Fetch accounts with notes from Firebase and localStorage
    */
   async fetchAccountsWithNotes(limit = this.fetchLimitPerType) {
-
     try {
       let accounts = [];
 
@@ -815,7 +823,6 @@ class ActivityManager {
             return timeB - timeA;
           });
           const result = accountsWithNotes.slice(0, limit || this.fetchLimitPerType);
-
           return result;
         }
       }
@@ -908,7 +915,6 @@ class ActivityManager {
       }
 
       const result = accounts.slice(0, limit || this.fetchLimitPerType);
-
       return result;
     } catch (error) {
       console.error('Error fetching accounts with notes:', error);
@@ -984,7 +990,8 @@ class ActivityManager {
           .orderBy('timestamp', 'desc')
           .limit(limit || this.fetchLimitPerType)
           .get();
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).slice(0, limit || this.fetchLimitPerType);
+        const result = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).slice(0, limit || this.fetchLimitPerType);
+        return result;
       }
 
       return [];
@@ -998,7 +1005,6 @@ class ActivityManager {
    * Fetch emails from Firebase or local storage
    */
   async fetchEmails(limit = this.fetchLimitPerType) {
-
     try {
       let emails = [];
 
@@ -1169,7 +1175,6 @@ class ActivityManager {
 
           // Limit to final count needed (already sorted, so just slice)
           const result = filteredEmails.slice(0, limit || this.fetchLimitPerType);
-
           return result;
         }
       }
@@ -1308,7 +1313,13 @@ class ActivityManager {
 
       // CRITICAL: Filter emails to only include those from CRM contacts (even when from Firestore)
       // Get all contacts from CRM to filter emails
-      const allContacts = window.getPeopleData ? (window.getPeopleData() || []) : [];
+      // OPTIMIZATION: Use BackgroundContactsLoader cached data if available (faster than getPeopleData)
+      let allContacts = [];
+      if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+        allContacts = window.BackgroundContactsLoader.getContactsData() || [];
+      } else {
+        allContacts = window.getPeopleData ? (window.getPeopleData() || []) : [];
+      }
       const contactIdsSet = new Set(allContacts.map(c => c.id).filter(Boolean));
 
       // Build comprehensive set of all contact email addresses (main email + emails array)
@@ -1402,9 +1413,9 @@ class ActivityManager {
    * Fetch tasks from Firebase or local storage
    */
   async fetchTasks(limit = this.fetchLimitPerType) {
-
     try {
       let tasks = [];
+      let cachedTasks = [];
 
       // Helper functions
       const getUserEmail = () => {
@@ -1430,7 +1441,7 @@ class ActivityManager {
 
       // OPTIMIZATION: Try BackgroundTasksLoader cached data first (zero Firestore reads, instant)
       if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.getTasksData === 'function') {
-        const cachedTasks = window.BackgroundTasksLoader.getTasksData() || [];
+        cachedTasks = window.BackgroundTasksLoader.getTasksData() || [];
         if (cachedTasks.length > 0) {
           // Sort by timestamp desc and limit
           cachedTasks.sort((a, b) => {
@@ -1439,7 +1450,6 @@ class ActivityManager {
             return timeB - timeA;
           });
           const result = cachedTasks.slice(0, limit || this.fetchLimitPerType);
-
           return result;
         }
       }
@@ -1455,10 +1465,45 @@ class ActivityManager {
             // Direct queries with limits are much faster and use fewer Firestore reads
             // Fallback: two separate queries and merge client-side
             try {
-              const [ownedSnap, assignedSnap] = await Promise.all([
-                window.firebaseDB.collection('tasks').where('ownerId', '==', email).orderBy('timestamp', 'desc').limit(limit || this.fetchLimitPerType).get(),
-                window.firebaseDB.collection('tasks').where('assignedTo', '==', email).orderBy('timestamp', 'desc').limit(limit || this.fetchLimitPerType).get()
-              ]);
+              // CRITICAL: Add timeout to prevent 17+ second hangs (missing index causes slow queries)
+              // Use Promise.race with timeout, but catch timeout and use fallback query
+              const queryTimeout = 5000; // 5 second timeout
+              let queryResult;
+              try {
+                const queryPromise = Promise.all([
+                  window.firebaseDB.collection('tasks').where('ownerId', '==', email).orderBy('timestamp', 'desc').limit(limit || this.fetchLimitPerType).get(),
+                  window.firebaseDB.collection('tasks').where('assignedTo', '==', email).orderBy('timestamp', 'desc').limit(limit || this.fetchLimitPerType).get()
+                ]);
+                const timeoutPromise = new Promise((_, reject) => 
+                  setTimeout(() => reject(new Error('Query timeout - likely missing Firestore index')), queryTimeout)
+                );
+                queryResult = await Promise.race([queryPromise, timeoutPromise]);
+              } catch (timeoutError) {
+                // Query timed out - likely missing index, use fallback query without orderBy
+                console.warn('[ActivityManager] Tasks query timed out - using fallback query without orderBy. Create Firestore index for optimal performance.');
+                // Fallback: query without orderBy, sort client-side
+                const [ownedSnap, assignedSnap] = await Promise.all([
+                  window.firebaseDB.collection('tasks').where('ownerId', '==', email).limit(limit || this.fetchLimitPerType).get(),
+                  window.firebaseDB.collection('tasks').where('assignedTo', '==', email).limit(limit || this.fetchLimitPerType).get()
+                ]);
+                const tasksMap = new Map();
+                ownedSnap.docs.forEach(doc => tasksMap.set(doc.id, { id: doc.id, ...doc.data() }));
+                assignedSnap.docs.forEach(doc => {
+                  if (!tasksMap.has(doc.id)) tasksMap.set(doc.id, { id: doc.id, ...doc.data() });
+                });
+                tasks = Array.from(tasksMap.values());
+                // Sort client-side
+                tasks.sort((a, b) => {
+                  const timeA = this.getTimestampMs(a.timestamp || a.createdAt || a.updatedAt);
+                  const timeB = this.getTimestampMs(b.timestamp || b.createdAt || b.updatedAt);
+                  return timeB - timeA;
+                });
+                tasks = tasks.slice(0, limit || this.fetchLimitPerType);
+                // Skip to end of try block
+                const result = tasks.slice(0, limit || this.fetchLimitPerType);
+                return result;
+              }
+              const [ownedSnap, assignedSnap] = queryResult;
               const tasksMap = new Map();
               ownedSnap.docs.forEach(doc => tasksMap.set(doc.id, { id: doc.id, ...doc.data() }));
               assignedSnap.docs.forEach(doc => {
@@ -1467,19 +1512,48 @@ class ActivityManager {
               tasks = Array.from(tasksMap.values());
             } catch (error) {
               console.warn('Error fetching tasks (non-admin query):', error);
-              return [];
+              // Detect missing Firestore index
+              if (error.code === 'failed-precondition' || (error.message && error.message.includes('index'))) {
+                console.error('[ActivityManager] Firestore index required for tasks query:', error.message);
+                if (error.message && error.message.includes('https://console.firebase.google.com')) {
+                  console.error('[ActivityManager] Create index at:', error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]+/)?.[0]);
+                }
+                // Fallback: try query without orderBy (slower but works without index)
+                try {
+                  const [ownedSnap, assignedSnap] = await Promise.all([
+                    window.firebaseDB.collection('tasks').where('ownerId', '==', email).limit(limit || this.fetchLimitPerType).get(),
+                    window.firebaseDB.collection('tasks').where('assignedTo', '==', email).limit(limit || this.fetchLimitPerType).get()
+                  ]);
+                  const tasksMap = new Map();
+                  ownedSnap.docs.forEach(doc => tasksMap.set(doc.id, { id: doc.id, ...doc.data() }));
+                  assignedSnap.docs.forEach(doc => {
+                    if (!tasksMap.has(doc.id)) tasksMap.set(doc.id, { id: doc.id, ...doc.data() });
+                  });
+                  tasks = Array.from(tasksMap.values());
+                  // Sort client-side
+                  tasks.sort((a, b) => {
+                    const timeA = this.getTimestampMs(a.timestamp || a.createdAt || a.updatedAt);
+                    const timeB = this.getTimestampMs(b.timestamp || b.createdAt || b.updatedAt);
+                    return timeB - timeA;
+                  });
+                  tasks = tasks.slice(0, limit || this.fetchLimitPerType);
+                } catch (fallbackError) {
+                  console.error('[ActivityManager] Fallback query also failed:', fallbackError);
+                  return [];
+                }
+              } else {
+                return [];
+              }
             }
           } else {
             return [];
           }
         } else {
           // Admin: unrestricted query
-
           const snapshot = await window.firebaseDB.collection('tasks')
             .orderBy('timestamp', 'desc')
             .limit(limit || this.fetchLimitPerType)
             .get();
-
           tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         }
       }
@@ -1518,68 +1592,93 @@ class ActivityManager {
    * Render activities for a specific container
    */
   async renderActivities(containerId, entityType = 'global', entityId = null, forceRefresh = false) {
-
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    // Show loading state first
-    container.innerHTML = this.renderLoadingState();
+    const renderKey = `${containerId}::${entityType}::${entityId || ''}`;
+    if (!forceRefresh && this.renderPromises && this.renderPromises.has(renderKey)) {
+      return this.renderPromises.get(renderKey);
+    }
 
-    // Add timeout fallback to prevent infinite loading
-    const timeoutId = setTimeout(() => {
-      container.innerHTML = this.renderEmptyState();
-    }, 30000); // 30 second timeout
-
-    try {
-      const activities = await this.getActivities(entityType, entityId, forceRefresh);
-      clearTimeout(timeoutId); // Clear timeout since we got results
-
-      const totalPages = Math.ceil(activities.length / this.maxActivitiesPerPage);
-      // Clamp page in case a prior page index (from dashboard) exceeds this view's page count
-      if (this.currentPage < 0 || this.currentPage >= totalPages) {
-        this.currentPage = 0;
-      }
-
-      if (activities.length === 0) {
-        container.innerHTML = this.renderEmptyState();
-        return;
-      }
-
-      // Render current page immediately
-      const paginatedActivities = this.getPageActivities(activities, this.currentPage);
-      const activityHtml = this.renderActivityList(paginatedActivities);
-
-      // Always replace the loading state - with fallback
-      if (activityHtml && activityHtml.trim().length > 0) {
-        container.innerHTML = activityHtml;
-        this.attachActivityEvents(container, entityType, entityId);
+    const renderPromise = (async () => {
+      // Avoid flicker: only show loading spinner when container is empty or forceRefresh
+      const hasExistingContent = container && container.children && container.children.length > 0 && !container.querySelector('.loading-spinner');
+      if (!forceRefresh && hasExistingContent) {
       } else {
-        container.innerHTML = this.renderEmptyState();
+        container.innerHTML = this.renderLoadingState();
       }
 
-      // CRITICAL: Ensure loading state is always cleared with a fallback
-      setTimeout(() => {
-        if (container.innerHTML.includes('loading-spinner')) {
+      // Add timeout fallback to prevent infinite loading
+      const timeoutId = setTimeout(() => {
+        container.innerHTML = this.renderEmptyState();
+      }, 30000); // 30 second timeout
+
+      try {
+        const activities = await this.getActivities(entityType, entityId, forceRefresh);
+        clearTimeout(timeoutId); // Clear timeout since we got results
+
+        const totalPages = Math.ceil(activities.length / this.maxActivitiesPerPage);
+        // Clamp page in case a prior page index (from dashboard) exceeds this view's page count
+        if (this.currentPage < 0 || this.currentPage >= totalPages) {
+          this.currentPage = 0;
+        }
+
+        if (activities.length === 0) {
+          container.innerHTML = this.renderEmptyState();
+          return;
+        }
+
+        // Render current page immediately
+        const paginatedActivities = this.getPageActivities(activities, this.currentPage);
+        const activityHtml = this.renderActivityList(paginatedActivities);
+        const sigKey = `${containerId}::${entityType}::${entityId || ''}::page:${this.currentPage}`;
+        const newSignature = (paginatedActivities || []).map(a => a && a.id ? String(a.id) : '').join('|');
+        const prevSignature = this.lastRenderedSignatures ? this.lastRenderedSignatures.get(sigKey) : null;
+
+        // Always replace the loading state - with fallback
+        if (activityHtml && activityHtml.trim().length > 0) {
+          // If we already rendered the same items, skip DOM replacement (prevents icon/glyph flicker)
+          if (!forceRefresh && hasExistingContent && prevSignature && prevSignature === newSignature) {
+          } else {
+            container.innerHTML = activityHtml;
+            this.attachActivityEvents(container, entityType, entityId);
+            try { if (this.lastRenderedSignatures) this.lastRenderedSignatures.set(sigKey, newSignature); } catch (_) { /* noop */ }
+          }
+        } else {
           container.innerHTML = this.renderEmptyState();
         }
-      }, 100);
 
-      // Show pagination if there are multiple pages
-      this.updatePagination(containerId, totalPages);
-
-      // Only pre-render if there are multiple pages and we're not on the first load
-      if (totalPages > 1) {
-        // Pre-render adjacent pages in background (non-blocking) with a small delay
+        // CRITICAL: Ensure loading state is always cleared with a fallback
         setTimeout(() => {
-          this.prerenderAdjacentPages(activities, entityType, entityId, totalPages).catch(error => {
-            // Silent error handling
-          });
+          if (container.innerHTML.includes('loading-spinner')) {
+            container.innerHTML = this.renderEmptyState();
+          }
         }, 100);
+
+        // Show pagination if there are multiple pages
+        this.updatePagination(containerId, totalPages);
+
+        // Only pre-render if there are multiple pages and we're not on the first load
+        if (totalPages > 1) {
+          // Pre-render adjacent pages in background (non-blocking) with a small delay
+          setTimeout(() => {
+            this.prerenderAdjacentPages(activities, entityType, entityId, totalPages).catch(error => {
+              // Silent error handling
+            });
+          }, 100);
+        }
+      } catch (error) {
+        clearTimeout(timeoutId); // Clear timeout since we got an error
+        console.error('Error rendering activities:', error);
+        container.innerHTML = this.renderErrorState();
       }
-    } catch (error) {
-      clearTimeout(timeoutId); // Clear timeout since we got an error
-      console.error('Error rendering activities:', error);
-      container.innerHTML = this.renderErrorState();
+    })();
+
+    try {
+      if (this.renderPromises) this.renderPromises.set(renderKey, renderPromise);
+      return await renderPromise;
+    } finally {
+      try { if (this.renderPromises) this.renderPromises.delete(renderKey); } catch (_) { /* noop */ }
     }
   }
 

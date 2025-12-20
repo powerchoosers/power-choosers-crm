@@ -2411,28 +2411,6 @@
       const result = await response.json();
       console.log('[EmailsPage] Generated scheduled emails:', result);
 
-      // #region agent log - Frontend API response
-      const frontendLog1 = {
-        location: 'emails-redesigned.js:2411',
-        message: 'Generate API response received',
-        data: {
-          success: result.success,
-          count: result.count,
-          errors: result.errors,
-          errorDetails: result.errorDetails?.slice(0, 3) || []
-        },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        runId: 'run1',
-        hypothesisId: 'G'
-      };
-      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(frontendLog1)
-      }).catch(() => console.log('[DEBUG]', JSON.stringify(frontendLog1)));
-      // #endregion
-
       // Show email generation notification
       if (window.ToastManager && result.success && result.count > 0) {
         window.ToastManager.showEmailGeneratedNotification({

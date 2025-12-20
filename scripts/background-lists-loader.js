@@ -25,7 +25,6 @@
     }
     
     try {
-      console.log('[BackgroundListsLoader] Loading lists...');
       if (window.currentUserRole !== 'admin') {
         let newLists = [];
         if (window.DataManager && typeof window.DataManager.queryWithOwnership==='function') {
@@ -67,12 +66,10 @@
         }
       }
       
-      console.log('[BackgroundListsLoader] ✓ Loaded', listsData.length, 'lists from Firestore', hasMoreData ? '(more available)' : '(all loaded)');
       
       // Save to cache for future sessions
       if (window.CacheManager && typeof window.CacheManager.set === 'function') {
         await window.CacheManager.set('lists', listsData);
-        console.log('[BackgroundListsLoader] ✓ Cached', listsData.length, 'lists');
       }
       
       // Notify other modules
@@ -92,7 +89,6 @@
         if (cached && Array.isArray(cached) && cached.length > 0) {
           // CacheManager already handles scoped queries, so use cached data directly
           listsData = cached;
-          console.log('[BackgroundListsLoader] ✓ Loaded', listsData.length, 'lists from cache');
           
           // Notify that cached data is available
           document.dispatchEvent(new CustomEvent('pc:lists-loaded', { 
@@ -100,7 +96,6 @@
           }));
         } else {
           // Cache empty, load from Firestore
-          console.log('[BackgroundListsLoader] Cache empty, loading from Firestore');
           await loadFromFirestore();
         }
       } catch (e) {
@@ -116,7 +111,6 @@
           if (cached && Array.isArray(cached) && cached.length > 0) {
             // CacheManager already handles scoped queries, so use cached data directly
             listsData = cached;
-            console.log('[BackgroundListsLoader] ✓ Loaded', listsData.length, 'lists from cache (delayed)');
             document.dispatchEvent(new CustomEvent('pc:lists-loaded', { 
               detail: { count: cached.length, cached: true } 
             }));
@@ -131,7 +125,6 @@
   // Load more lists (next batch of 100)
   async function loadMoreLists() {
     if (!hasMoreData) {
-      console.log('[BackgroundListsLoader] No more data to load');
       return { loaded: 0, hasMore: false };
     }
     
@@ -142,7 +135,6 @@
     
     try {
       if (window.currentUserRole !== 'admin') return { loaded: 0, hasMore: false };
-      console.log('[BackgroundListsLoader] Loading next batch...');
       let query = window.firebaseDB.collection('lists')
         .orderBy('updatedAt', 'desc')
         .startAfter(lastLoadedDoc)
@@ -162,7 +154,6 @@
         hasMoreData = false;
       }
       
-      console.log('[BackgroundListsLoader] ✓ Loaded', newLists.length, 'more lists. Total:', listsData.length, hasMoreData ? '(more available)' : '(all loaded)');
       
       // Update cache
       if (window.CacheManager && typeof window.CacheManager.set === 'function') {
@@ -225,7 +216,6 @@
       list.recordCount = newCount;
       list.count = newCount;
       list.updatedAt = new Date();
-      console.log(`[BackgroundListsLoader] ✓ Updated local count for ${listId}: ${newCount}`);
       
       // Update cache if available (cost-effective)
       if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
@@ -253,11 +243,9 @@
     if (existingIndex >= 0) {
       // Update existing list
       listsData[existingIndex] = newList;
-      console.log(`[BackgroundListsLoader] ✓ Updated list ${newList.id} in cache`);
     } else {
       // Add new list at the beginning (most recent first)
       listsData = [newList, ...listsData];
-      console.log(`[BackgroundListsLoader] ✓ Added list ${newList.id} to cache`);
     }
     
     // Update CacheManager cache (cost-effective - IndexedDB write only)
@@ -275,7 +263,6 @@
     const index = listsData.findIndex(l => l.id === listId);
     if (index >= 0) {
       listsData.splice(index, 1);
-      console.log(`[BackgroundListsLoader] ✓ Removed list ${listId} from cache`);
       
       // Remove from CacheManager cache (cost-effective)
       if (window.CacheManager && typeof window.CacheManager.deleteRecord === 'function') {
@@ -309,7 +296,6 @@
     removeListLocally: removeListLocally
   };
   
-  console.log('[BackgroundListsLoader] Module initialized');
 })();
 
 
