@@ -378,8 +378,15 @@
       .task-popover .tp-header { font-weight: 600; margin: 4px 4px 10px 4px; color: var(--text-primary); }
       .task-popover .tp-body { margin-bottom: 8px; }
       .task-popover .tp-header { display:flex; align-items:center; justify-content:space-between; }
-      .task-popover .close-btn { appearance:none; background:transparent; border:0; color: var(--text-secondary); font-size: 18px; line-height:1; padding: 2px 6px; border-radius: 6px; }
-      .task-popover .close-btn:hover { background: var(--grey-700); color: var(--text-inverse); }
+      .task-popover .close-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 28px; height: 28px; min-width: 28px; min-height: 28px; padding: 0;
+        background: var(--bg-item) !important; color: var(--grey-300) !important;
+        border: 1px solid var(--border-light); border-radius: var(--border-radius-sm);
+        line-height: 1; font-size: 16px; font-weight: 600; cursor: pointer;
+        transition: var(--transition-fast); box-sizing: border-box;
+      }
+      .task-popover .close-btn:hover { background: var(--grey-600) !important; color: var(--text-inverse) !important; }
       .task-popover .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
       .task-popover label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-secondary); position: relative; }
       .task-popover label:has(.dropdown-toggle-btn) { z-index: 10; }
@@ -400,15 +407,17 @@
       .task-popover .btn-text { height: 32px; padding: 0 12px; border-radius: var(--border-radius-sm); background: transparent; color: var(--text-secondary); border: 1px solid transparent; }
       .task-popover .btn-text:hover { background: var(--grey-700); border-color: var(--border-light); color: var(--text-inverse); }
       .task-popover .arrow { position: absolute; top: -8px; width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 8px solid var(--bg-card); filter: drop-shadow(0 -1px 0 var(--border-light)); }
-      .task-popover .tp-footer { border-top: 1px solid var(--border-light); margin-top: 0; padding-top: 8px; }
-      .task-popover .tp-empty { color: var(--text-secondary); font-size: 12px; }
-      .task-popover .tp-subtitle { font-size: 12px; color: var(--text-secondary); margin: 0 0 6px 0; }
-      .task-popover .tp-task { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; }
-      .task-popover .tp-task-title { font-size: 13px; color: var(--text-primary); }
-      .task-popover .tp-badge { font-size: 11px; text-transform: uppercase; letter-spacing: 0.02em; padding: 2px 6px; border-radius: 10px; border: 1px solid var(--border-light); }
+      .task-popover .tp-footer { border-top: 1px solid var(--border-light); margin-top: 12px; padding-top: 8px; }
+      .task-popover .tp-empty { color: var(--text-secondary); font-size: 12px; padding: 4px 0; }
+      .task-popover .tp-subtitle { font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); margin: 0 0 8px 0; letter-spacing: 0.05em; }
+      .task-popover .tp-task { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 4px; border-bottom: 1px solid var(--border-light); transition: background 0.2s; }
+      .task-popover .tp-task:last-child { border-bottom: none; }
+      .task-popover .tp-task:hover { background: var(--bg-item); }
+      .task-popover .tp-task-title { font-size: 13px; color: var(--text-primary); font-weight: 500; }
+      .task-popover .tp-badge { font-size: 10px; text-transform: uppercase; letter-spacing: 0.02em; padding: 1px 5px; border-radius: 4px; border: 1px solid var(--border-light); }
       .task-popover .tp-badge.pending { background: var(--bg-subtle); color: var(--text-secondary); }
       .task-popover .tp-badge.completed { background: var(--green-muted); color: var(--text-inverse); border-color: var(--green-subtle); }
-      .task-popover .tp-task-due { font-size: 11px; color: var(--text-secondary); margin-left: 6px; }
+      .task-popover .tp-task-due { font-size: 11px; color: var(--text-muted); margin-left: 6px; }
       
       /* Dropdown Toggle Button Styles */
       .task-popover .dropdown-toggle-btn {
@@ -884,6 +893,7 @@
   }
 
   function openContactTaskPopover(anchorEl) {
+    injectTaskPopoverStyles();
     closeContactTaskPopover();
     if (!anchorEl) return;
 
@@ -6153,9 +6163,9 @@
     style.id = 'contact-detail-header-styles';
     style.textContent = `
       /* Contact Detail: header action divider and alignment */
-      #contact-detail-header .contact-header-profile { display: inline-flex; align-items: center; gap: var(--spacing-sm); }
+      #contact-detail-header .contact-header-profile { display: inline-flex; align-items: center; gap: 8px; }
       /* Reset margin added globally so spacing is controlled here */
-      #contact-detail-header .linkedin-header-btn { margin-left: 0; }
+      #contact-detail-header .linkedin-header-btn { margin-left: 0; margin-right: 0; }
       /* Vertical divider between LinkedIn and the List/Sequence group */
       #contact-detail-header .header-action-divider {
         width: 1px;
@@ -6163,11 +6173,11 @@
         background: var(--border-light);
         opacity: 0.9;
         display: inline-block;
-        margin: 0 var(--spacing-sm);
+        margin: 0;
         border-radius: 1px;
       }
       #contact-detail-header .list-header-btn svg { display: block; }
-      #contact-detail-header .list-seq-group { display: inline-flex; align-items: center; gap: var(--spacing-sm); }
+      #contact-detail-header .list-seq-group { display: inline-flex; align-items: center; gap: 8px; }
     `;
     // Append to head so rules actually apply
     document.head.appendChild(style);
@@ -6225,7 +6235,7 @@
     setTimeout(cleanup, 120);
   }
 
-  function openContactSequencesPanel() {
+  function openContactSequencesPanel(anchorOverride) {
     if (document.getElementById('contact-sequences-panel')) return;
     // Reuse styles from lists modal
     injectContactListsStyles();
@@ -6241,6 +6251,15 @@
       <button type="button" class="close-btn" id="contact-sequences-close" aria-label="Close">×</button>
     </div>
     <div class="list-body" id="contact-sequences-body">
+      <!-- Sequences dynamic content -->
+    </div>`;
+
+    document.body.appendChild(panel);
+
+    // Initial load
+    const body = panel.querySelector('#contact-sequences-body');
+    // Add the "Create new sequence" item and loading item dynamically
+    body.innerHTML = `
       <div class="list-item" tabindex="0" data-action="create">
         <div>
           <div class="list-name">Create new sequence…</div>
@@ -6248,8 +6267,7 @@
         </div>
       </div>
       <div class="list-item" tabindex="-1" aria-disabled="true"><div><div class="list-name">Loading sequences…</div><div class="list-meta">Please wait</div></div></div>
-    </div>`;
-    document.body.appendChild(panel);
+    `;
 
     // Close button
     const closeBtn = panel.querySelector('#contact-sequences-close');
@@ -6263,9 +6281,10 @@
     populateContactSequencesPanel(container);
 
     // Position and show
-    _positionContactSequencesPanel = function position() {
-      const btn = document.getElementById('add-contact-to-sequences');
-      const rect = btn ? btn.getBoundingClientRect() : null;
+    _positionContactSequencesPanel = () => {
+      const btn = anchorOverride || document.getElementById('add-contact-to-sequences') || document.getElementById('task-add-to-sequence');
+      if (!btn || !panel) return;
+      const rect = btn.getBoundingClientRect();
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       const pad = 8;
@@ -6989,12 +7008,15 @@
     setTimeout(cleanup, 120);
   }
 
-  function openContactListsPanel() {
+  function openContactListsPanel(anchorOverride) {
     if (document.getElementById('contact-lists-panel')) return;
 
-    // Comprehensive validation: ensure contact detail page is fully ready
+    // Comprehensive validation: ensure page is fully ready (support ContactDetail or TaskDetail)
     const isContactDetailReady = () => {
-      // Check if critical DOM elements exist
+      // If we're on task-detail-page, we're ready if the task page exists
+      if (document.getElementById('task-detail-page')) return true;
+
+      // Check if critical DOM elements exist for contact-detail page
       const header = document.getElementById('contact-detail-header');
       const view = document.getElementById('contact-detail-view');
       const addToListBtn = document.getElementById('add-contact-to-list');
@@ -7002,16 +7024,7 @@
       if (!header || !view || !addToListBtn) return false;
 
       // Check if data-contact-id attributes are set
-      const headerId = header.getAttribute('data-contact-id');
-      const viewId = view.getAttribute('data-contact-id');
-
-      if (!headerId || !viewId) return false;
-
-      // Check if state has contact ID
-      if (!state.currentContact?.id) return false;
-
-      // All validations passed
-      return true;
+      return !!(state.currentContact?.id || header.getAttribute('data-contact-id') || view.getAttribute('data-contact-id'));
     };
 
     // If not ready, show loading state and retry
@@ -7065,9 +7078,10 @@
     document.body.appendChild(panel);
 
     // Position anchored to the Add-to-List icon with pointer
-    _positionContactListsPanel = function position() {
-      const btn = document.getElementById('add-contact-to-list');
-      const rect = btn ? btn.getBoundingClientRect() : null;
+    _positionContactListsPanel = () => {
+      const btn = anchorOverride || document.getElementById('add-contact-to-list') || document.getElementById('task-add-to-list');
+      if (!btn || !panel) return;
+      const rect = btn.getBoundingClientRect();
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       const pad = 8;  // viewport padding
@@ -8050,8 +8064,12 @@
 
   // Ensure global namespace exists
   window.ContactDetail = window.ContactDetail || {};
-  // Expose edit modal for external use
+  // Expose state and functions for external use (e.g., from TaskDetail)
+  window.ContactDetail.state = state;
   window.ContactDetail.openEditModal = openEditContactModal;
+  window.ContactDetail.openContactListsPanel = openContactListsPanel;
+  window.ContactDetail.openContactSequencesPanel = openContactSequencesPanel;
+  window.ContactDetail.openContactTaskPopover = openContactTaskPopover;
 
 })();
 

@@ -1,11 +1,198 @@
 'use strict';
 (function () {
   const state = {
-    currentEmail: null
+    currentEmail: null,
+    loadingEmail: false
   };
   const els = {};
   let senderNameClickHandler = null;
   let senderNameKeyHandler = null;
+
+  function markEmailLoading() {
+    const el = els.page;
+    if (!el) return;
+    // Fade out old content first
+    el.classList.add('email-fading-out');
+    setTimeout(() => {
+      el.classList.remove('email-fading-out');
+      el.classList.add('email-loading');
+      el.classList.remove('email-loaded');
+    }, 300);
+  }
+
+  function markEmailLoaded() {
+    const el = els.page;
+    if (!el) return;
+    // Add loaded class to trigger content fade-in
+    el.classList.add('email-loaded');
+    // Keep skeleton visible until content has fully faded in, then remove it
+    window.setTimeout(() => {
+      el.classList.remove('email-loading');
+    }, 600); // Wait for content fade-in (400ms) + buffer
+  }
+
+  // Favicon and Account caches - Using shared cache from main.js if available
+  const domainAccountInfoCache = window.__pcFaviconHelper?.discoveredAccounts || new Map();
+  const accountLookupPromises = new Map();
+  const accountLookupFailures = new Set();
+
+  function normalizeDomainString(value) {
+    if (!value) return '';
+    try {
+      let candidate = String(value || '').trim().toLowerCase();
+      if (/^https?:\/\//.test(candidate)) {
+        candidate = new URL(candidate).hostname;
+      }
+      candidate = candidate.replace(/^www\./, '').split('/')[0];
+      return candidate.replace(/:\d+$/, '');
+    } catch (_) {
+      return String(value || '').trim().toLowerCase().replace(/^www\./, '').split('/')[0];
+    }
+  }
+
+  function buildAccountInfo(account, normalizedDomain, fallbackDomain, source) {
+    const logoUrl = account.logoUrl || account.logo || account.companyLogo || account.iconUrl || account.companyIcon || null;
+    const domain = account.domain || account.website || fallbackDomain || normalizedDomain;
+    const accountId = account.id || account.accountId || account._id || null;
+    return {
+      logoUrl,
+      domain,
+      normalizedDomain,
+      matchedSource: source || 'domain',
+      accountId
+    };
+  }
+
+  async function scheduleAccountLookup(normalizedDomain, fallbackDomain) {
+    if (!normalizedDomain) return;
+    if (accountLookupPromises.has(normalizedDomain) || accountLookupFailures.has(normalizedDomain)) {
+      return accountLookupPromises.get(normalizedDomain);
+    }
+
+    const dbAvailable = !!window.firebaseDB && typeof window.firebaseDB.collection === 'function';
+    
+    if (!dbAvailable) {
+      accountLookupFailures.add(normalizedDomain);
+      return;
+    }
+
+    const searchValues = [
+      normalizedDomain,
+      `www.${normalizedDomain}`,
+      `https://${normalizedDomain}`,
+      `http://${normalizedDomain}`,
+      normalizedDomain.replace(/^www\./, ''),
+      normalizedDomain.split('.')[0]
+    ];
+    const nameSlug = normalizedDomain.split('.')[0];
+    const fields = ['domain', 'website'];
+
+    const promise = (async () => {
+      try {
+        // Step 1: Search by domain/website in parallel
+        const queryPromises = [];
+        for (const field of fields) {
+          for (const value of searchValues) {
+            queryPromises.push(
+              window.firebaseDB
+                .collection('accounts')
+                .where(field, '==', value)
+                .limit(1)
+                .get()
+                .then(snapshot => {
+                  if (snapshot && !snapshot.empty) {
+                    return { snapshot, field, value };
+                  }
+                  return null;
+                })
+            );
+          }
+        }
+
+        const results = await Promise.all(queryPromises);
+        const hit = results.find(r => r !== null);
+
+        if (hit) {
+          const doc = hit.snapshot.docs[0];
+          const account = doc.data();
+          const info = buildAccountInfo(account, normalizedDomain, fallbackDomain, 'firestore-domain');
+          domainAccountInfoCache.set(normalizedDomain, info);
+
+          if (state.currentEmail) {
+            requestAnimationFrame(() => populateLogos(state.currentEmail));
+          }
+          return;
+        }
+
+        // Step 2: Fallback search by name
+        if (nameSlug && nameSlug.length > 2) {
+          try {
+            const searchNames = [nameSlug];
+            if (nameSlug === 'ttiinc') searchNames.push('TTI');
+            if (nameSlug === 'google') searchNames.push('Google');
+
+            for (const baseName of searchNames) {
+              const slugUpper = baseName.toUpperCase();
+              const slugTitle = baseName.charAt(0).toUpperCase() + baseName.slice(1);
+              
+              const nameQueries = [baseName, slugUpper, slugTitle].map(namePrefix => 
+                window.firebaseDB
+                  .collection('accounts')
+                  .where('name', '>=', namePrefix)
+                  .where('name', '<=', namePrefix + '\uf8ff')
+                  .limit(5)
+                  .get()
+              );
+
+              const nameSnapshots = await Promise.all(nameQueries);
+              const nameHit = nameSnapshots.find(s => s && !s.empty);
+
+              if (nameHit) {
+                const docs = nameHit.docs.map(d => ({ id: d.id, ...d.data() }));
+                const bestMatch = docs.find(d => d.logoUrl || d.logo || d.companyLogo) || docs[0];
+                
+                const info = buildAccountInfo(bestMatch, normalizedDomain, fallbackDomain, 'firestore-name');
+                domainAccountInfoCache.set(normalizedDomain, info);
+
+                if (state.currentEmail) {
+                  requestAnimationFrame(() => populateLogos(state.currentEmail));
+                }
+                return;
+              }
+            }
+          } catch (error) {
+            console.warn('[EmailDetail] Firestore name-based lookup failed for', nameSlug, error);
+          }
+        }
+
+        accountLookupFailures.add(normalizedDomain);
+      } finally {
+        accountLookupPromises.delete(normalizedDomain);
+      }
+    })();
+
+    accountLookupPromises.set(normalizedDomain, promise);
+    return promise;
+  }
+
+  function findAccountAndSource(normalizedDomain, backgroundAccounts, essentialAccounts) {
+    if (!normalizedDomain) return { account: null, source: 'none' };
+
+    const matchesDomain = (account) => {
+      if (!account) return false;
+      const accountDomain = normalizeDomainString(account.domain);
+      const accountWebsite = normalizeDomainString(account.website);
+      return accountDomain === normalizedDomain || accountWebsite === normalizedDomain;
+    };
+
+    const backgroundMatch = backgroundAccounts.find(matchesDomain);
+    if (backgroundMatch) return { account: backgroundMatch, source: 'background' };
+
+    const essentialMatch = essentialAccounts.find(matchesDomain);
+    if (essentialMatch) return { account: essentialMatch, source: 'essential' };
+
+    return { account: null, source: 'none' };
+  }
 
   // Initialize DOM references
   function initDomRefs() {
@@ -74,6 +261,13 @@
   async function show(emailId) {
     if (!initDomRefs()) return;
 
+    // CRITICAL: Prevent race conditions
+    if (state.loadingEmail) return;
+    state.loadingEmail = true;
+
+    // Trigger loading animation
+    markEmailLoading();
+
     // CRITICAL: Clean up any existing scheduled email buttons and tracking icons BEFORE loading new email
     // This prevents duplicate buttons when navigating between emails
     if (els.actionBar) {
@@ -87,6 +281,7 @@
 
       if (!emailDoc.exists) {
         console.error('Email not found:', emailId);
+        state.loadingEmail = false;
         goBack();
         return;
       }
@@ -121,7 +316,16 @@
         isSentEmail: emailData.isSentEmail || emailData.type === 'sent' || emailData.status === 'sent'
       };
 
-      // Populate email details
+      // PRE-FETCH LOGO: Trigger account info/logo lookup non-blockingly
+      const isSent = state.currentEmail.isSentEmail || state.currentEmail.type === 'sent' || state.currentEmail.type === 'scheduled';
+      const emailAddr = isSent ? (Array.isArray(state.currentEmail.to) ? state.currentEmail.to[0] : state.currentEmail.to) : state.currentEmail.from;
+      // scheduleAccountLookup synchronously checks in-memory caches and triggers Firestore if needed (non-blockingly)
+      const domain = extractDomain(emailAddr || '');
+      if (domain) {
+        scheduleAccountLookup(normalizeDomainString(domain), domain);
+      }
+
+      // Populate email details immediately
       populateEmailDetails(state.currentEmail);
 
       // Add tracking icons for sent emails (before scheduled email actions)
@@ -137,49 +341,113 @@
       // Mark as read
       await markAsRead(emailId);
 
+      // Trigger loaded animation
+      markEmailLoaded();
+      state.loadingEmail = false;
+
     } catch (error) {
       console.error('Failed to load email:', error);
+      state.loadingEmail = false;
       goBack();
     }
   }
 
   // Populate email details in the UI
+  let populateTimeout = null;
+  let logoPopulateTimeout = null;
+  let lastPopulatedEmailId = '';
+  
   function populateEmailDetails(email) {
+    if (populateTimeout) clearTimeout(populateTimeout);
+    populateTimeout = setTimeout(() => {
+      actuallyPopulateEmailDetails(email);
+    }, 150); // Fast initial render
+  }
+
+  // Specialized populate for when logos are discovered
+  function populateLogos(email) {
+    if (!email) return;
+    if (logoPopulateTimeout) clearTimeout(logoPopulateTimeout);
+    logoPopulateTimeout = setTimeout(() => {
+      actuallyPopulateEmailDetails(email);
+    }, 1000); // Batch logo updates
+  }
+
+  // Helper function to get account logoUrl from recipient email
+  function getRecipientAccountInfo(recipientEmail) {
+    if (!recipientEmail) return { logoUrl: null, domain: null, matchedSource: 'none' };
+
+    try {
+      const recipientDomain = extractDomain(recipientEmail);
+      if (!recipientDomain) return { logoUrl: null, domain: null, matchedSource: 'none' };
+
+      const normalizedRecipientDomain = normalizeDomainString(recipientDomain);
+      const backgroundAccounts = (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function')
+        ? window.BackgroundAccountsLoader.getAccountsData() || []
+        : [];
+      const essentialAccounts = window.getAccountsData ? window.getAccountsData() : [];
+
+      const cachedInfo = domainAccountInfoCache.get(normalizedRecipientDomain);
+      if (cachedInfo) {
+        return cachedInfo;
+      }
+
+      const { account, source } = findAccountAndSource(normalizedRecipientDomain, backgroundAccounts, essentialAccounts);
+      let accountInfo;
+      if (account) {
+        accountInfo = buildAccountInfo(account, normalizedRecipientDomain, recipientDomain, source);
+        domainAccountInfoCache.set(normalizedRecipientDomain, accountInfo);
+      } else {
+        scheduleAccountLookup(normalizedRecipientDomain, recipientDomain);
+        accountInfo = {
+          logoUrl: null,
+          domain: recipientDomain,
+          normalizedDomain: normalizedRecipientDomain,
+          matchedSource: 'none'
+        };
+      }
+
+      return accountInfo;
+    } catch (_) {
+      return { logoUrl: null, domain: extractDomain(recipientEmail), matchedSource: 'none' };
+    }
+  }
+
+  function actuallyPopulateEmailDetails(email) {
+    if (!email) return;
+
+    // Avoid redundant populates if the email hasn't changed AND the logo state hasn't changed
+    const emailTimestamp = email.updatedAt || email.timestamp || '';
+    
+    // Check if we have a discovered logo for this email's recipient/sender
+    const isSentEmail = email.isSentEmail || email.type === 'sent' || email.type === 'scheduled';
+    const emailAddress = isSentEmail ? (Array.isArray(email.to) ? email.to[0] : email.to) : email.from;
+    const domain = extractDomain(emailAddress || '');
+    const normalizedDomain = normalizeDomainString(domain);
+    const discoveredInfo = domainAccountInfoCache.get(normalizedDomain);
+    const logoUrl = discoveredInfo ? (discoveredInfo.logoUrl || 'no-logo') : 'pending';
+
+    // Include displayName in the hash so we re-render when a name lookup completes
+    const isSent = isSentEmail; // from line 344
+    const recipientEmail = isSent ? (Array.isArray(email.to) ? email.to[0] : email.to) : email.from;
+    const displayName = extractName(recipientEmail || '');
+
+    const stateKey = `${email.id}-${emailTimestamp}-${logoUrl}-${displayName}`;
+    
+    // Only skip if the detail view already has content and the state is identical
+    if (stateKey === lastPopulatedEmailId && els.emailContent?.innerHTML?.trim()) {
+      return;
+    }
+    lastPopulatedEmailId = stateKey;
+
     // Set title
     if (els.title) {
       els.title.textContent = email.subject || '(No Subject)';
     }
 
     // Check if this is a sent or scheduled email (show recipient instead of sender)
-    const isSentEmail = email.isSentEmail || email.type === 'sent' || email.type === 'scheduled';
-
-    // Helper function to get account logoUrl from recipient email
-    function getRecipientAccountInfo(recipientEmail) {
-      if (!recipientEmail) return { logoUrl: null, domain: null };
-
-      try {
-        const recipientDomain = extractDomain(recipientEmail);
-        if (!recipientDomain) return { logoUrl: null, domain: null };
-
-        // Try to find account by domain
-        const accounts = window.getAccountsData ? window.getAccountsData() : [];
-        const account = accounts.find(a => {
-          const accountDomain = (a.domain || '').toLowerCase().replace(/^www\./, '');
-          const accountWebsite = (a.website || '').toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
-          const domainLower = recipientDomain.toLowerCase();
-          return accountDomain === domainLower || accountWebsite === domainLower;
-        });
-
-        if (account) {
-          const logoUrl = account.logoUrl || account.logo || account.companyLogo || account.iconUrl || account.companyIcon;
-          return { logoUrl: logoUrl || null, domain: account.domain || account.website || recipientDomain };
-        }
-
-        return { logoUrl: null, domain: recipientDomain };
-      } catch (_) {
-        return { logoUrl: null, domain: extractDomain(recipientEmail) };
-      }
-    }
+    // isSentEmail is already declared above for the state key calculation
+    // const isSentEmail = email.isSentEmail || email.type === 'sent' || email.type === 'scheduled';
 
     // Set sender/recipient info
     const contactId = email.contactId || email.contact_id || null;
@@ -251,7 +519,8 @@
         const faviconHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
           logoUrl: accountInfo.logoUrl,
           domain: accountInfo.domain,
-          size: 40
+          size: 40,
+          idSuffix: email.id
         });
         els.senderAvatar.innerHTML = faviconHtml;
       } else {
@@ -259,7 +528,8 @@
         const domain = extractDomain(email.from);
         const faviconHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
           domain: domain,
-          size: 40
+          size: 40,
+          idSuffix: email.id
         });
         els.senderAvatar.innerHTML = faviconHtml;
       }

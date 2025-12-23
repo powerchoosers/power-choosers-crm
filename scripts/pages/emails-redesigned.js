@@ -39,9 +39,9 @@
 
         // Show/hide Generate Now button
         updateGenerateButtonVisibility();
-
-        applyFilters();
-        render();
+        
+        // applyFilters calls render() internally, so no need for double call
+        applyFilters().catch(err => console.error('[Emails] applyFilters failed:', err));
 
         if (typeof d.scroll === 'number') {
           setTimeout(() => {
@@ -128,7 +128,7 @@
           // Show/hide Generate Now button
           updateGenerateButtonVisibility();
 
-          applyFilters();
+          applyFilters().catch(err => console.error('[Emails] applyFilters failed:', err));
         });
         tab._emailTabBound = true;
       }
@@ -138,7 +138,7 @@
     if (els.searchInput) {
       els.searchInput.addEventListener('input', debounce(() => {
         state.currentPage = 1;
-        applyFilters();
+        applyFilters().catch(err => console.error('[Emails] applyFilters failed:', err));
       }, 300));
     }
 
@@ -147,7 +147,7 @@
       els.clearBtn.addEventListener('click', () => {
         if (els.searchInput) els.searchInput.value = '';
         state.currentPage = 1;
-        applyFilters();
+        applyFilters().catch(err => console.error('[Emails] applyFilters failed:', err));
       });
     }
 
@@ -210,98 +210,54 @@
         state.hasMore = window.BackgroundEmailsLoader.hasMore ? window.BackgroundEmailsLoader.hasMore() : false;
         console.log('[EmailsPage] Got', emailsData.length, 'emails from BackgroundEmailsLoader', state.hasMore ? '(more available)' : '(all loaded)');
 
-        // OPTIMIZATION: If we have data, process and show immediately (don't wait for cache/Firestore)
         if (emailsData.length > 0) {
           processAndSetData(emailsData);
-          if (showImmediately) {
-            // CRITICAL: Always refresh when showImmediately is true (for real-time updates)
-            // This ensures sent emails are removed from scheduled tab immediately
-            applyFilters();
-            render();
-            console.log('[EmailsPage] Refreshed display (showImmediately=true)');
-          }
         }
 
-        // Get total count (non-blocking) for reference, but we'll use filtered count for display
-        state.totalCount = emailsData.length;
+        // Get total count (non-blocking)
         if (typeof window.BackgroundEmailsLoader.getTotalCount === 'function') {
-          window.BackgroundEmailsLoader.getTotalCount()
-            .then((cnt) => {
-              state.totalCount = cnt;
-              // Note: We keep totalCount for reference but display filtered count per folder
-            })
-            .catch((error) => {
-              console.warn('[EmailsPage] Failed to get total count, keeping loaded count:', error);
-            });
+          window.BackgroundEmailsLoader.getTotalCount().then((cnt) => {
+            state.totalCount = cnt;
+          }).catch(() => {});
         }
       }
 
-      // Priority 2: Fallback to CacheManager if background loader empty (non-blocking for UI)
-      if (emailsData.length === 0 && window.CacheManager && typeof window.CacheManager.get === 'function') {
-        console.log('[EmailsPage] Background loader empty, falling back to CacheManager...');
-        // Don't await - load in background and update when ready
-        window.CacheManager.get('emails').then(cached => {
-          if (cached && cached.length > 0 && state.data.length === 0) {
-            processAndSetData(cached);
-            applyFilters();
-            render();
-          }
-        }).catch(() => { });
+      // Priority 2: Fallback to CacheManager
+      if (emailsData.length === 0 && window.CacheManager?.get) {
+        const cached = await window.CacheManager.get('emails').catch(() => []);
+        if (cached?.length > 0 && state.data.length === 0) {
+          processAndSetData(cached);
+        }
       }
 
-      // Priority 3: Load from Firebase if cache is empty (only if no data at all)
-      if (emailsData.length === 0 && state.data.length === 0) {
-        console.log('[EmailsPage] Cache empty, loading from Firebase...');
-        // Load in background - don't block UI
-        firebase.firestore().collection('emails')
+      // Priority 3: Firebase fallback
+      if (state.data.length === 0) {
+        const firestoreData = await firebase.firestore().collection('emails')
           .orderBy('createdAt', 'desc')
           .limit(100)
           .get()
-          .then(emailsSnapshot => {
-            const firestoreData = emailsSnapshot.docs.map(doc => {
-              const data = doc.data();
-              return {
-                id: doc.id,
-                ...data,
-                timestamp: data.sentAt || data.receivedAt || data.createdAt,
-                emailType: data.type || (data.provider === 'sendgrid_inbound' || data.provider === 'gmail_api' ? 'received' : 'sent')
-              };
-            });
+          .then(snap => snap.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            timestamp: doc.data().sentAt || doc.data().receivedAt || doc.data().createdAt,
+            emailType: doc.data().type || (doc.data().provider === 'sendgrid_inbound' || doc.data().provider === 'gmail_api' ? 'received' : 'sent')
+          })))
+          .catch(() => []);
 
-            if (firestoreData.length > 0) {
-              processAndSetData(firestoreData);
-              applyFilters();
-              render();
-            }
-
-            // Cache for future visits
-            if (window.CacheManager && typeof window.CacheManager.set === 'function') {
-              window.CacheManager.set('emails', firestoreData).catch(() => { });
-            }
-          })
-          .catch(error => {
-            console.error('[EmailsPage] Failed to load from Firestore:', error);
-          });
+        if (firestoreData.length > 0) {
+          processAndSetData(firestoreData);
+          if (window.CacheManager?.set) {
+            window.CacheManager.set('emails', firestoreData).catch(() => {});
+          }
+        }
       }
 
-      // If we didn't show immediately, apply filters now
-      // CRITICAL: Always apply filters when showImmediately is false to ensure data is filtered
-      if (!showImmediately && state.data.length > 0) {
-        applyFilters();
-        render(); // Also render to ensure UI is updated
-      }
-
-      // CRITICAL: If showImmediately was true but we didn't have data initially,
-      // make sure we still refresh once data is loaded
-      if (showImmediately && state.data.length > 0) {
-        // Double-check: ensure filters are applied and rendered
-        applyFilters();
-        render();
-      }
+      // Single point of update for the UI
+      await applyFilters();
     } catch (error) {
       console.error('[EmailsPage] Failed to load emails:', error);
       state.data = [];
-      applyFilters();
+      await applyFilters();
     } finally {
       state.isLoading = false;
     }
@@ -367,7 +323,7 @@
   }
 
   // Apply filters based on current folder and search
-  function applyFilters() {
+  async function applyFilters(skipRender = false) {
     // OPTIMIZATION: Sort data once if not already sorted (lazy sort for scheduled tab)
     // Only sort if we have data and it's not the scheduled tab (scheduled tab sorts in getPageItems)
     if (state.data.length > 0 && state.currentFolder !== 'scheduled') {
@@ -384,15 +340,7 @@
 
     console.log('[EmailsPage] Filtering emails. Total:', state.data.length, 'Current folder:', state.currentFolder);
 
-    // Log sample email types for debugging
-    if (state.data.length > 0) {
-      const typeCounts = {};
-      state.data.forEach(email => {
-        typeCounts[email.type] = (typeCounts[email.type] || 0) + 1;
-      });
-      console.log('[EmailsPage] Email types:', typeCounts);
-    }
-
+    // ... existing filter logic ...
     // Filter by folder
     if (state.currentFolder === 'inbox') {
       filtered = filtered.filter(email => {
@@ -510,6 +458,19 @@
 
     state.filtered = filtered;
 
+    // PRE-FETCH LOGOS: Scans the first page of emails to trigger lookups
+    // This is non-blocking to ensure the UI feels fast.
+    const start = (state.currentPage - 1) * state.pageSize;
+    const initialEmails = state.filtered.slice(start, start + state.pageSize);
+    if (initialEmails.length > 0) {
+      initialEmails.forEach(email => {
+        const isSent = email.isSentEmail || email.type === 'sent' || email.type === 'scheduled';
+        const emailAddr = isSent ? (Array.isArray(email.to) ? email.to[0] : email.to) : email.from;
+        // This synchronously checks in-memory caches and triggers Firestore if needed (non-blockingly)
+        getRecipientAccountInfo(emailAddr || '');
+      });
+    }
+
     // Check if we need to load more data to fill the current page
     const neededForPage = state.currentPage * state.pageSize;
     console.log('[EmailsPage] Filter check - filtered:', state.filtered.length, 'needed:', neededForPage, 'hasMore:', state.hasMore, 'loader available:', !!window.BackgroundEmailsLoader);
@@ -533,7 +494,7 @@
       console.log('[EmailsPage] Not enough filtered results, loading more...');
       // Load more data until we have enough filtered results
       loadMoreUntilEnough();
-    } else {
+    } else if (!skipRender) {
       if (state.filtered.length < neededForPage) {
         console.log('[EmailsPage] Not enough results but cannot load more:', {
           filtered: state.filtered.length,
@@ -602,140 +563,11 @@
 
         // Reload data from background loader with deduplication
         const updatedData = window.BackgroundEmailsLoader.getEmailsData() || [];
-        const emailMap = new Map();
-
-        // Deduplicate by email ID
-        updatedData.forEach(email => {
-          if (!emailMap.has(email.id)) {
-            let normalizedTo = '';
-            if (Array.isArray(email.to)) {
-              normalizedTo = email.to.length > 0 ? email.to[0] : '';
-            } else {
-              normalizedTo = email.to || '';
-            }
-
-            emailMap.set(email.id, {
-              ...email,
-              type: email.type || 'received',
-              from: email.from || 'Unknown',
-              to: normalizedTo,
-              subject: email.subject || '(No Subject)',
-              date: email.date || email.timestamp || email.createdAt || new Date(),
-              html: email.html || '',
-              text: email.text || '',
-              content: email.content || '',
-              originalContent: email.originalContent || '',
-              openCount: email.openCount || 0,
-              clickCount: email.clickCount || 0,
-              lastOpened: email.lastOpened,
-              lastClicked: email.lastClicked,
-              isSentEmail: email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail,
-              starred: email.starred || false,
-              deleted: email.deleted || false,
-              unread: email.unread !== false
-            });
-          }
-        });
-
-        state.data = Array.from(emailMap.values());
-        state.data.sort((a, b) => new Date(b.date) - new Date(a.date));
+        processAndSetData(updatedData);
         state.hasMore = result.hasMore || false;
 
-        // Re-apply filters to update filtered array
-        let filtered = [...state.data];
-
-        // Filter by folder
-        if (state.currentFolder === 'inbox') {
-          filtered = filtered.filter(email => {
-            return (email.type === 'received' ||
-              email.emailType === 'received' ||
-              email.provider === 'sendgrid_inbound' ||
-              email.provider === 'gmail_api' ||
-              (!email.type && !email.emailType && !email.isSentEmail)) &&
-              !email.deleted;
-          });
-        } else if (state.currentFolder === 'sent') {
-          filtered = filtered.filter(email => {
-            const isSent = (
-              email.type === 'sent' ||
-              email.emailType === 'sent' ||
-              email.isSentEmail === true ||
-              email.status === 'sent' ||
-              email.provider === 'sendgrid'
-            );
-            return isSent && !email.deleted;
-          });
-        } else if (state.currentFolder === 'scheduled') {
-          // OPTIMIZATION: Match the optimized filter from applyFilters()
-          const now = Date.now();
-          const oneMinuteAgo = now - 60000;
-          filtered = filtered.filter(email => {
-            // CRITICAL: Exclude sent emails immediately (multiple checks for robustness)
-            // Check type first (most reliable indicator)
-            if (email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail === true) {
-              return false;
-            }
-
-            // Exclude deleted emails
-            if (email.deleted) return false;
-
-            // Only show emails that are actually scheduled
-            if (email.type !== 'scheduled') return false;
-
-            const status = email.status || '';
-
-            // Fast path: exclude already sent emails (multiple status indicators)
-            // CRITICAL: Check status to catch emails that were sent but type wasn't updated
-            if (status === 'sent' || status === 'delivered' || status === 'error') return false;
-
-            // Exclude emails stuck in 'sending' state if send time has passed (likely already sent)
-            if (status === 'sending') {
-              const sendTime = email.scheduledSendTime;
-              if (sendTime && typeof sendTime === 'number' && sendTime < (now - 5 * 60 * 1000)) {
-                return false;
-              }
-            }
-
-            if (status === 'not_generated' || status === 'pending_approval' || status === 'generating') return true;
-            if (status === 'approved') {
-              const sendTime = email.scheduledSendTime;
-              return sendTime && typeof sendTime === 'number' && sendTime >= oneMinuteAgo;
-            }
-
-            // Exclude emails with missing/null status and no scheduledSendTime (orphaned records)
-            if (!status && !email.scheduledSendTime) return false;
-
-            // Exclude emails with past send times and no valid status (likely already sent)
-            const sendTime = email.scheduledSendTime;
-            if (sendTime && typeof sendTime === 'number' && sendTime < oneMinuteAgo && !status) {
-              return false;
-            }
-
-            return false;
-          });
-          // Lazy sort - will happen in getPageItems()
-          filtered.sort((a, b) => {
-            const aTime = a.scheduledSendTime || Number.MAX_SAFE_INTEGER;
-            const bTime = b.scheduledSendTime || Number.MAX_SAFE_INTEGER;
-            return aTime - bTime;
-          });
-        } else if (state.currentFolder === 'starred') {
-          filtered = filtered.filter(email => email.starred && !email.deleted);
-        } else if (state.currentFolder === 'trash') {
-          filtered = filtered.filter(email => email.deleted);
-        }
-
-        // Filter by search
-        const searchTerm = els.searchInput?.value?.toLowerCase() || '';
-        if (searchTerm) {
-          filtered = filtered.filter(email =>
-            email.subject?.toLowerCase().includes(searchTerm) ||
-            email.from?.toLowerCase().includes(searchTerm) ||
-            email.to?.toLowerCase().includes(searchTerm)
-          );
-        }
-
-        state.filtered = filtered;
+        // Re-apply filters to update filtered array (this is now async and handles pre-fetch)
+        await applyFilters(true);
 
         // If we have enough now, break
         if (state.filtered.length >= targetCount || !state.hasMore) {
@@ -748,8 +580,6 @@
 
       // Update folder count after loading more (especially important for scheduled)
       updateFolderCount().catch(() => { });
-
-      render();
     } finally {
       state.isLoadingMore = false;
     }
@@ -798,8 +628,59 @@
   }
 
   // Render email table
+  let renderTimeout = null;
+  let logoRenderTimeout = null;
+  let lastRenderedDataHash = '';
+  
   function render() {
     if (!els.tbody) return;
+
+    // Debounce render to prevent flickering/multiple rapid calls
+    if (renderTimeout) {
+      clearTimeout(renderTimeout);
+    }
+    renderTimeout = setTimeout(() => {
+      actuallyRender();
+    }, 300); // Increased back to 300ms to better batch Firestore logo discoveries
+  }
+
+  // Specialized render for when logos are discovered to minimize flickering
+  function renderLogos() {
+    if (!els.tbody) return;
+    if (logoRenderTimeout) clearTimeout(logoRenderTimeout);
+    logoRenderTimeout = setTimeout(() => {
+      actuallyRender();
+    }, 1000); // Wait 1 second to batch all logo hits together
+  }
+
+  // Rename original render to actuallyRender
+  function actuallyRender() {
+    if (!els.tbody) return;
+
+    const rows = getPageItems();
+    
+    // Simple hash to see if we actually need to update the DOM
+    // Include logoUrl from the discovered cache so we re-render when a logo is found
+    const currentDataHash = rows.map(r => {
+      const recipientEmail = Array.isArray(r.to) ? r.to[0] : (r.to || r.from || '');
+      const domain = extractDomain(recipientEmail);
+      const normalizedDomain = normalizeDomainString(domain);
+      const discoveredInfo = domainAccountInfoCache.get(normalizedDomain);
+      const logoPart = discoveredInfo ? (discoveredInfo.logoUrl || 'no-logo') : 'pending';
+      
+      // Include displayName in the hash so we re-render when a name lookup completes
+      const displayName = extractName(recipientEmail);
+      
+      return `${r.id}-${r.updatedAt || r.timestamp}-${r.status}-${r.unread}-${r.starred}-${logoPart}-${displayName}`;
+    }).join('|');
+    const isSearchActive = !!(els.searchInput?.value?.trim());
+    
+    // Only skip if data is identical AND we aren't in a state that requires fresh render (like search)
+    // and if we already have content in the tbody
+    if (currentDataHash === lastRenderedDataHash && els.tbody.children.length > 0 && !isSearchActive) {
+      return;
+    }
+    lastRenderedDataHash = currentDataHash;
 
     // Update table header to show "To" for sent emails, "From" for others
     const table = document.getElementById('emails-table');
@@ -810,7 +691,6 @@
       }
     }
 
-    const rows = getPageItems();
     els.tbody.innerHTML = rows.map(email => rowHtml(email)).join('');
 
     // Update summary and count
@@ -846,33 +726,205 @@
   }
 
   // Favicon cache to prevent regeneration on each render
-  const faviconCache = new Map();
+  const faviconCache = window.__pcFaviconHelper?.faviconMetadata || new Map();
+  // Using shared cache from main.js if available
+  const domainAccountInfoCache = window.__pcFaviconHelper?.discoveredAccounts || new Map();
+  const accountLookupPromises = new Map();
+  const accountLookupFailures = new Set();
 
-  // Helper function to get account logoUrl from recipient email
+  function normalizeDomainString(value) {
+    if (!value) return '';
+    try {
+      let candidate = String(value || '').trim().toLowerCase();
+      if (/^https?:\/\//.test(candidate)) {
+        candidate = new URL(candidate).hostname;
+      }
+      candidate = candidate.replace(/^www\./, '').split('/')[0];
+      return candidate.replace(/:\d+$/, '');
+    } catch (_) {
+      return String(value || '').trim().toLowerCase().replace(/^www\./, '').split('/')[0];
+    }
+  }
+
+  function buildAccountInfo(account, normalizedDomain, fallbackDomain, source) {
+    const logoUrl = account.logoUrl || account.logo || account.companyLogo || account.iconUrl || account.companyIcon || null;
+    const domain = account.domain || account.website || fallbackDomain || normalizedDomain;
+    const accountId = account.id || account.accountId || account._id || null;
+    return {
+      logoUrl,
+      domain,
+      normalizedDomain,
+      matchedSource: source || 'domain',
+      accountId
+    };
+  }
+
+  async function scheduleAccountLookup(normalizedDomain, fallbackDomain) {
+    if (!normalizedDomain) return;
+    if (accountLookupPromises.has(normalizedDomain) || accountLookupFailures.has(normalizedDomain)) {
+      return accountLookupPromises.get(normalizedDomain);
+    }
+
+    const dbAvailable = !!window.firebaseDB && typeof window.firebaseDB.collection === 'function';
+
+    const promise = (async () => {
+      try {
+        if (!dbAvailable) {
+          accountLookupFailures.add(normalizedDomain);
+          return;
+        }
+
+        const searchValues = [
+          normalizedDomain,
+          `www.${normalizedDomain}`,
+          `https://${normalizedDomain}`,
+          `http://${normalizedDomain}`,
+          normalizedDomain.replace(/^www\./, ''),
+          normalizedDomain.split('.')[0] // e.g. "ttiinc" from "ttiinc.com"
+        ];
+        const nameSlug = normalizedDomain.split('.')[0];
+        const fields = ['domain', 'website'];
+
+        // Step 1: Search by domain/website in parallel
+        const queryPromises = [];
+        for (const field of fields) {
+          for (const value of searchValues) {
+            queryPromises.push(
+              window.firebaseDB
+                .collection('accounts')
+                .where(field, '==', value)
+                .limit(1)
+                .get()
+                .then(snapshot => {
+                  if (snapshot && !snapshot.empty) {
+                    return { snapshot, field, value };
+                  }
+                  return null;
+                })
+            );
+          }
+        }
+
+        const results = await Promise.all(queryPromises);
+        const hit = results.find(r => r !== null);
+
+        if (hit) {
+          const doc = hit.snapshot.docs[0];
+          const account = doc.data();
+          const info = buildAccountInfo(account, normalizedDomain, fallbackDomain, 'firestore-domain');
+          domainAccountInfoCache.set(normalizedDomain, info);
+
+          if (els.page && els.page.style.display !== 'none') {
+            requestAnimationFrame(() => renderLogos());
+          }
+          return;
+        }
+
+        // Step 2: Fallback search by name if domain fails
+        if (nameSlug && nameSlug.length > 2) {
+          try {
+            const searchNames = [nameSlug];
+            
+            // Special cases for known companies
+            if (nameSlug === 'ttiinc') searchNames.push('TTI');
+            if (nameSlug === 'google') searchNames.push('Google');
+            
+            for (const baseName of searchNames) {
+              const slugUpper = baseName.toUpperCase();
+              const slugTitle = baseName.charAt(0).toUpperCase() + baseName.slice(1);
+              
+              for (const namePrefix of [baseName, slugUpper, slugTitle]) {
+                const snapshot = await window.firebaseDB
+                  .collection('accounts')
+                  .where('name', '>=', namePrefix)
+                  .where('name', '<=', namePrefix + '\uf8ff')
+                  .limit(5)
+                  .get();
+
+                if (snapshot && !snapshot.empty) {
+                  // Find the best match
+                  const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                  const bestMatch = docs.find(d => d.logoUrl || d.logo || d.companyLogo) || docs[0];
+                  
+                  const info = buildAccountInfo(bestMatch, normalizedDomain, fallbackDomain, 'firestore-name');
+                  domainAccountInfoCache.set(normalizedDomain, info);
+
+                  if (els.page && els.page.style.display !== 'none') {
+                    requestAnimationFrame(() => renderLogos());
+                  }
+                  return;
+                }
+              }
+            }
+          } catch (error) {
+            console.warn('[EmailsPage] Firestore name-based lookup failed for', nameSlug, error);
+          }
+        }
+
+        accountLookupFailures.add(normalizedDomain);
+      } finally {
+        accountLookupPromises.delete(normalizedDomain);
+      }
+    })();
+
+    accountLookupPromises.set(normalizedDomain, promise);
+    return promise;
+  }
+  function findAccountAndSource(normalizedDomain, backgroundAccounts, essentialAccounts) {
+    if (!normalizedDomain) return { account: null, source: 'none' };
+
+    const matchesDomain = (account) => {
+      if (!account) return false;
+      const accountDomain = normalizeDomainString(account.domain);
+      const accountWebsite = normalizeDomainString(account.website);
+      return accountDomain === normalizedDomain || accountWebsite === normalizedDomain;
+    };
+
+    const backgroundMatch = backgroundAccounts.find(matchesDomain);
+    if (backgroundMatch) return { account: backgroundMatch, source: 'background' };
+
+    const essentialMatch = essentialAccounts.find(matchesDomain);
+    if (essentialMatch) return { account: essentialMatch, source: 'essential' };
+
+    return { account: null, source: 'none' };
+  }
+
   function getRecipientAccountInfo(recipientEmail) {
-    if (!recipientEmail) return { logoUrl: null, domain: null };
+    if (!recipientEmail) return { logoUrl: null, domain: null, matchedSource: 'none' };
 
     try {
       const recipientDomain = extractDomain(recipientEmail);
-      if (!recipientDomain) return { logoUrl: null, domain: null };
+      if (!recipientDomain) return { logoUrl: null, domain: null, matchedSource: 'none' };
 
-      // Try to find account by domain
-      const accounts = window.getAccountsData ? window.getAccountsData() : [];
-      const account = accounts.find(a => {
-        const accountDomain = (a.domain || '').toLowerCase().replace(/^www\./, '');
-        const accountWebsite = (a.website || '').toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
-        const domainLower = recipientDomain.toLowerCase();
-        return accountDomain === domainLower || accountWebsite === domainLower;
-      });
+      const normalizedRecipientDomain = normalizeDomainString(recipientDomain);
+      const backgroundAccounts = (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function')
+        ? window.BackgroundAccountsLoader.getAccountsData() || []
+        : [];
+      const essentialAccounts = window.getAccountsData ? window.getAccountsData() : [];
 
-      if (account) {
-        const logoUrl = account.logoUrl || account.logo || account.companyLogo || account.iconUrl || account.companyIcon;
-        return { logoUrl: logoUrl || null, domain: account.domain || account.website || recipientDomain };
+      const cachedInfo = domainAccountInfoCache.get(normalizedRecipientDomain);
+      if (cachedInfo) {
+        return cachedInfo;
       }
 
-      return { logoUrl: null, domain: recipientDomain };
+      const { account, source } = findAccountAndSource(normalizedRecipientDomain, backgroundAccounts, essentialAccounts);
+      let accountInfo;
+      if (account) {
+        accountInfo = buildAccountInfo(account, normalizedRecipientDomain, recipientDomain, source);
+        domainAccountInfoCache.set(normalizedRecipientDomain, accountInfo);
+      } else {
+        scheduleAccountLookup(normalizedRecipientDomain, recipientDomain);
+        accountInfo = {
+          logoUrl: null,
+          domain: recipientDomain,
+          normalizedDomain: normalizedRecipientDomain,
+          matchedSource: 'none'
+        };
+      }
+
+      return accountInfo;
     } catch (_) {
-      return { logoUrl: null, domain: extractDomain(recipientEmail) };
+      return { logoUrl: null, domain: extractDomain(recipientEmail), matchedSource: 'none' };
     }
   }
 
@@ -899,34 +951,65 @@
 
       // Get account info for recipient
       const accountInfo = getRecipientAccountInfo(recipientEmail);
-      const cacheKey = `favicon-${accountInfo.logoUrl || accountInfo.domain || recipientEmail}-28`;
-
-      // Use cached favicon HTML if available
-      if (faviconCache.has(cacheKey)) {
-        avatarHtml = faviconCache.get(cacheKey);
+      
+      // STABLE CACHE KEY: Use the recipient email address only.
+      // This is the most stable identifier we have for a row's recipient.
+      // It ensures that even if domains or logos are discovered later, 
+      // we don't switch cache entries and cause flickering.
+      const cacheKey = `favicon-${recipientEmail.toLowerCase()}-28`;
+      
+      const cachedEntry = faviconCache.get(cacheKey);
+      
+      // SMART CACHE CHECK: If we have a cached entry, but it lacks a logo and we just found one, 
+      // we MUST regenerate to show the new logo.
+      const shouldForceRegenerate = cachedEntry && !cachedEntry.logoUrl && accountInfo.logoUrl;
+      
+      if (cachedEntry && !shouldForceRegenerate) {
+        avatarHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
+          logoUrl: cachedEntry.logoUrl,
+          domain: cachedEntry.domain,
+          size: 28,
+          idSuffix: email.id
+        });
       } else {
         avatarHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
           logoUrl: accountInfo.logoUrl,
           domain: accountInfo.domain,
-          size: 28
+          size: 28,
+          idSuffix: email.id
         });
-        faviconCache.set(cacheKey, avatarHtml);
+        faviconCache.set(cacheKey, {
+          logoUrl: accountInfo.logoUrl || null,
+          domain: accountInfo.domain || null
+        });
       }
     } else {
       // For received emails, show sender with domain favicon
-      const senderDomain = extractDomain(email.from);
-      displayName = extractName(email.from) || 'Unknown';
-      const cacheKey = `favicon-${senderDomain}-28`;
+      const senderEmail = email.from;
+      const senderDomain = extractDomain(senderEmail);
+      displayName = extractName(senderEmail) || 'Unknown';
+      
+      // STABLE CACHE KEY for received emails
+      const cacheKey = `favicon-${(senderEmail || senderDomain || 'unknown').toLowerCase()}-28`;
 
-      // Use cached favicon HTML if available
-      if (faviconCache.has(cacheKey)) {
-        avatarHtml = faviconCache.get(cacheKey);
+      const cachedEntry = faviconCache.get(cacheKey);
+      if (cachedEntry) {
+        avatarHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
+          logoUrl: cachedEntry.logoUrl,
+          domain: cachedEntry.domain,
+          size: 28,
+          idSuffix: email.id
+        });
       } else {
         avatarHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
           domain: senderDomain,
-          size: 28
+          size: 28,
+          idSuffix: email.id
         });
-        faviconCache.set(cacheKey, avatarHtml);
+        faviconCache.set(cacheKey, {
+          logoUrl: null,
+          domain: senderDomain || null
+        });
       }
     }
 
@@ -1555,7 +1638,6 @@
     const totalPages = Math.max(1, Math.ceil(totalRecords / state.pageSize));
     const currentPage = Math.min(state.currentPage, totalPages);
 
-    // Use unified pagination component
     if (window.crm && window.crm.createPagination) {
       window.crm.createPagination(currentPage, totalPages, async (page) => {
         state.currentPage = page;
@@ -1603,11 +1685,11 @@
             });
             state.data.sort((a, b) => new Date(b.date) - new Date(a.date));
             state.hasMore = result.hasMore || false;
-            applyFilters(); // Re-apply filters with new data
+            await applyFilters(); // Re-apply filters with new data (handles pre-fetch)
           }
+        } else {
+          render();
         }
-
-        render();
       }, els.pagination.id);
     }
   }
@@ -2135,7 +2217,7 @@
       }
 
       state.selected.clear();
-      applyFilters();
+      applyFilters().catch(err => console.error('[Emails] applyFilters failed:', err));
       hideBulkBar();
       if (els.selectAll) {
         els.selectAll.checked = false;
@@ -2245,7 +2327,7 @@
         }
       }
       state.selected.clear();
-      applyFilters();
+      await applyFilters();
     });
 
     barContainer.querySelector('#bulk-star').addEventListener('click', async () => {
@@ -2268,7 +2350,7 @@
         }
       }
       state.selected.clear();
-      applyFilters();
+      await applyFilters();
     });
 
     barContainer.querySelector('#bulk-export').addEventListener('click', () => {
@@ -2457,8 +2539,7 @@
     }
 
     // Render whatever we have (may be empty on very first cold start)
-    applyFilters();
-    render();
+    applyFilters().catch(err => console.error('[Emails] Initial applyFilters failed:', err));
 
     console.log('[EmailsPage] Initialization complete (non-blocking)');
   }

@@ -8,21 +8,144 @@ class ActivityManager {
     this.activities = [];
     this.maxActivitiesPerPage = 4;
     this.currentPage = 0;
-    this.cache = new Map(); // Cache for activities by entity type and ID
-    this.cacheTimestamp = new Map(); // Cache timestamps for expiration
-    this.cacheExpiry = 5 * 60 * 1000; // 5 minutes cache expiry
+    // PERSIST CACHE ACROSS PAGE LOADS using sessionStorage
+    this.processedActivitiesCache = this.loadPersistedCache('activityManager_processedActivities') || new Map();
+    this.processedEmailsCache = this.loadPersistedCache('activityManager_processedEmails') || new Map();
     this.prerenderedPages = new Map(); // Cache for pre-rendered pages
+    this.pageCache = this.loadPersistedCache('activityManager_pageCache') || new Map();
+    this.currentActivities = null; // Store current activities to avoid cache invalidation issues
     this.fetchLimitPerType = 25; // Smaller initial fetch to speed cold start
     this.maxFetchLimit = 200; // Safety cap for incremental fetches
     this.lastFetchLimitUsed = this.fetchLimitPerType;
     this.loadingPromises = new Map(); // Track in-flight requests to prevent duplicates
     this.renderPromises = new Map(); // Track in-flight renders to prevent DOM flicker
+    this.getActivitiesPromises = new Map(); // Track in-flight getActivities calls to prevent duplicate processing
     this.lastRenderedSignatures = new Map(); // Track last rendered activity IDs to avoid unnecessary DOM replacement
     this.pageLoadTime = Date.now(); // Track when ActivityManager was initialized
     this.refreshCooldown = 5000; // 5 second cooldown after page load to prevent flickering
 
     // Setup cache invalidation listeners for immediate updates when new activities are created
     this.setupCacheInvalidationListeners();
+
+    // Add method to invalidate activity cache
+    this.invalidateActivityCache = (entityType = 'global', entityId = null) => {
+      const cacheKey = `${entityType}-${entityId || 'global'}`;
+      this.processedActivitiesCache.delete(cacheKey);
+
+      // Also clear page caches for this entity
+      const pageCacheKeys = Array.from(this.pageCache.keys()).filter(key => key.startsWith(cacheKey));
+      pageCacheKeys.forEach(key => this.pageCache.delete(key));
+
+      // #region agent log - Hypothesis F: Cache invalidation tracking
+      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          sessionId: 'cache-debug-session',
+          runId: 'activity-cache-fix',
+          hypothesisId: 'F',
+          location: 'activity-manager.js:invalidateActivityCache',
+          message: 'Invalidated activity cache',
+          data: { cacheKey, clearedPages: pageCacheKeys.length },
+          timestamp: Date.now()
+        })
+      }).catch(() => {});
+      // #endregion
+
+      console.log(`[ActivityManager] Invalidated activity cache for ${cacheKey}`);
+    };
+
+    // Setup memory monitoring
+    this.setupMemoryMonitoring();
+
+    // Save cache on page unload
+    this.setupCachePersistence();
+  }
+
+  /**
+   * Load persisted cache from sessionStorage
+   */
+  loadPersistedCache(key) {
+    try {
+      const stored = sessionStorage.getItem(key);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Convert back to Map
+        return new Map(Object.entries(parsed));
+      }
+    } catch (e) {
+      console.warn(`[ActivityManager] Failed to load persisted cache ${key}:`, e);
+    }
+    return null;
+  }
+
+  /**
+   * Save cache to sessionStorage
+   */
+  savePersistedCache(key, cache) {
+    try {
+      // Convert Map to object for JSON storage
+      const obj = Object.fromEntries(cache);
+      sessionStorage.setItem(key, JSON.stringify(obj));
+    } catch (e) {
+      console.warn(`[ActivityManager] Failed to save persisted cache ${key}:`, e);
+    }
+  }
+
+  /**
+   * Setup cache persistence on page unload
+   */
+  setupCachePersistence() {
+    const saveCache = () => {
+      // Only save if we have meaningful cache data
+      if (this.processedActivitiesCache.size > 0) {
+        this.savePersistedCache('activityManager_processedActivities', this.processedActivitiesCache);
+      }
+      if (this.processedEmailsCache.size > 0) {
+        this.savePersistedCache('activityManager_processedEmails', this.processedEmailsCache);
+      }
+      if (this.pageCache.size > 0) {
+        this.savePersistedCache('activityManager_pageCache', this.pageCache);
+      }
+    };
+
+    // Save on page unload
+    window.addEventListener('beforeunload', saveCache);
+
+    // Also save periodically every 30 seconds
+    setInterval(saveCache, 30000);
+  }
+
+  /**
+   * Setup memory monitoring for cache performance tracking
+   */
+  setupMemoryMonitoring() {
+    // Monitor memory usage every 30 seconds
+    setInterval(() => {
+      this.logMemoryUsage();
+    }, 30000);
+
+    // Log initial memory state
+    this.logMemoryUsage();
+  }
+
+  /**
+   * Log current memory usage and cache statistics
+   */
+  logMemoryUsage() {
+    const activitiesCacheSize = this.processedActivitiesCache.size;
+    const emailsCacheSize = this.processedEmailsCache.size;
+    const prerenderedPagesSize = this.prerenderedPages.size;
+    const pageCacheSize = this.pageCache.size;
+
+    // Estimate memory usage (rough approximation)
+    const estimatedMemoryMB = Math.round(
+      (activitiesCacheSize * 2) + // ~2KB per activity
+      (emailsCacheSize * 1.5) +   // ~1.5KB per email
+      (prerenderedPagesSize * 5) + // ~5KB per prerendered page
+      (pageCacheSize * 2)          // ~2KB per cached page
+    ) / 1024;
+
   }
 
   /**
@@ -30,73 +153,140 @@ class ActivityManager {
    * This ensures Recent Activities is immediately updated with new records
    */
   setupCacheInvalidationListeners() {
-    // Invalidate global cache when contacts are created/updated (affects notes)
+    // Invalidate relevant caches when contacts are created/updated (affects notes)
     document.addEventListener('pc:contact-created', (e) => {
-      this.clearCache('global');
+      if (window.CacheManager) window.CacheManager.invalidate('contacts');
+      this.invalidateActivityCache('global', null); // Invalidate global activities
+      this.processedEmailsCache.clear(); // Clear processed emails cache
       this.refreshVisibleActivityContainers('global', null, { source: 'pc:contact-created' });
     });
     document.addEventListener('pc:contact-updated', (e) => {
       const { id } = e.detail || {};
-      this.clearCache('global');
+      if (window.CacheManager) {
+        window.CacheManager.invalidate('contacts');
+        if (id) {
+          // Note: individual contact invalidation would require more complex logic
+          // For now, invalidate the whole contacts collection
+        }
+      }
+      this.invalidateActivityCache('global', null); // Invalidate global activities
       if (id) {
-        this.clearCache('contact', id);
+        this.invalidateActivityCache('contact', id); // Invalidate specific contact activities
+      }
+      this.processedEmailsCache.clear(); // Clear processed emails cache
+      if (id) {
         this.refreshVisibleActivityContainers('contact', id, { source: 'pc:contact-updated' });
       }
     });
 
-    // Invalidate global cache when accounts are created/updated (affects notes)
+    // Invalidate relevant caches when accounts are created/updated (affects notes)
     document.addEventListener('pc:account-created', () => {
-      this.clearCache('global');
+      if (window.CacheManager) window.CacheManager.invalidate('accounts');
+      this.invalidateActivityCache('global', null); // Invalidate global activities
+      this.processedEmailsCache.clear(); // Clear processed emails cache
       this.refreshVisibleActivityContainers('global', null, { source: 'pc:account-created' });
     });
     document.addEventListener('pc:account-updated', (e) => {
       const { id } = e.detail || {};
-      this.clearCache('global');
+      if (window.CacheManager) window.CacheManager.invalidate('accounts');
+      this.invalidateActivityCache('global', null); // Invalidate global activities
       if (id) {
-        this.clearCache('account', id);
+        this.invalidateActivityCache('account', id); // Invalidate specific account activities
+      }
+      this.processedEmailsCache.clear(); // Clear processed emails cache
+      if (id) {
         this.refreshVisibleActivityContainers('account', id, { source: 'pc:account-updated' });
       }
     });
 
-    // Invalidate global cache when tasks are created/updated/deleted
+    // Invalidate task cache when tasks are created/updated/deleted
     document.addEventListener('tasksUpdated', (e) => {
-      this.clearCache('global');
+      if (window.CacheManager) window.CacheManager.invalidate('tasks');
+      this.invalidateActivityCache('global', null); // Invalidate global activities
+      this.processedEmailsCache.clear(); // Clear processed emails cache
       this.refreshVisibleActivityContainers('global', null, { source: 'tasksUpdated' });
     });
     document.addEventListener('pc:task-deleted', (e) => {
-      this.clearCache('global');
+      if (window.CacheManager) window.CacheManager.invalidate('tasks');
+      this.invalidateActivityCache('global', null); // Invalidate global activities
+      this.processedEmailsCache.clear(); // Clear processed emails cache
       this.refreshVisibleActivityContainers('global', null, { source: 'pc:task-deleted' });
     });
 
-    // Invalidate global cache when emails are updated - refresh immediately for better UX
+    // Invalidate email cache when emails are updated - refresh immediately for better UX
     document.addEventListener('pc:emails-updated', (e) => {
       const { contactId, accountId, source } = e.detail || {};
       const eventSource = source ? `pc:emails-updated:${String(source)}` : 'pc:emails-updated';
-      // Clear global cache
-      this.clearCache('global');
+      // Clear email cache
+      if (window.CacheManager) window.CacheManager.invalidate('emails');
+      this.invalidateActivityCache('global', null); // Invalidate global activities
+      this.processedEmailsCache.clear(); // Clear processed emails cache
       this.refreshVisibleActivityContainers('global', null, { source: eventSource });
       // Also refresh specific entity if provided
       if (contactId) {
-        this.clearCache('contact', contactId);
+        this.invalidateActivityCache('contact', contactId); // Invalidate specific contact activities
         this.refreshVisibleActivityContainers('contact', contactId, { source: eventSource });
       }
       if (accountId) {
-        this.clearCache('account', accountId);
+        this.invalidateActivityCache('account', accountId); // Invalidate specific account activities
         this.refreshVisibleActivityContainers('account', accountId, { source: eventSource });
       }
     });
 
-    // Invalidate global cache when calls are logged
+    // Invalidate call cache when calls are logged
     document.addEventListener('pc:call-logged', () => {
-      this.clearCache('global');
+      if (window.CacheManager) window.CacheManager.invalidate('calls');
+      this.invalidateActivityCache('global', null); // Only invalidate global activities for calls
+      this.processedEmailsCache.clear(); // Clear processed emails cache
       this.refreshVisibleActivityContainers('global', null, { source: 'pc:call-logged' });
     });
 
     // Listen for explicit activity refresh requests
     document.addEventListener('pc:activities-refresh', (e) => {
-      const { entityType, entityId, forceRefresh } = e.detail || {};
-      this.clearCache(entityType || 'global', entityId);
-      
+      const { entityType, entityId, forceRefresh, source } = e.detail || {};
+      // Invalidate relevant caches based on entity type
+      if (window.CacheManager) {
+        if (entityType === 'contact') {
+          window.CacheManager.invalidate('contacts');
+        } else if (entityType === 'account') {
+          window.CacheManager.invalidate('accounts');
+        } else if (entityType === 'task') {
+          window.CacheManager.invalidate('tasks');
+        } else {
+          // For global or unknown types, invalidate all activity-related caches
+          // But don't invalidate emails if this refresh was triggered by email updates (prevents cache invalidation cycle)
+          window.CacheManager.invalidate('contacts');
+          window.CacheManager.invalidate('accounts');
+          window.CacheManager.invalidate('calls');
+          window.CacheManager.invalidate('tasks');
+          window.CacheManager.invalidate('sequences');
+          if (!source || !source.includes('emails-updated')) {
+            window.CacheManager.invalidate('emails');
+          }
+        }
+      }
+
+      // TARGETED CACHE CLEARING: Only clear specific entity caches instead of all
+      if (entityType && entityId) {
+        // Clear specific entity cache
+        const entityCacheKey = `${entityType}-${entityId}`;
+        this.processedActivitiesCache.delete(entityCacheKey);
+        // Clear page caches for this entity
+        const pageKeys = Array.from(this.pageCache.keys()).filter(key => key.startsWith(entityCacheKey));
+        pageKeys.forEach(key => this.pageCache.delete(key));
+      } else if (entityType === 'global') {
+        // Clear only global cache
+        this.processedActivitiesCache.delete('global-global');
+        const globalPageKeys = Array.from(this.pageCache.keys()).filter(key => key.startsWith('global-global'));
+        globalPageKeys.forEach(key => this.pageCache.delete(key));
+      } else {
+        // Fallback: clear all only for unknown entity types
+        this.processedActivitiesCache.clear();
+        this.pageCache.clear();
+      }
+
+      this.processedEmailsCache.clear(); // Clear processed emails cache
+      this.currentActivities = null; // Clear stored activities on data changes
       // Auto-refresh any visible activity containers for this entity
       this.refreshVisibleActivityContainers(entityType, entityId, { source: 'pc:activities-refresh', forceRefresh: !!forceRefresh });
     });
@@ -159,77 +349,205 @@ class ActivityManager {
   /**
    * Get all activities for a specific entity (account, contact, or global)
    */
-  async getActivities(entityType = 'global', entityId = null, forceRefresh = false) {
+
+  /**
+   * Get activities with caching to prevent re-fetching underlying data
+   */
+  async getActivities(entityType = 'global', entityId = null, forceRefresh = false, page = null) {
     const cacheKey = `${entityType}-${entityId || 'global'}`;
-    const now = Date.now();
 
-    // OPTIMIZATION: Prevent duplicate simultaneous calls for the same cache key
-    if (!forceRefresh && this.loadingPromises.has(cacheKey)) {
-      return this.loadingPromises.get(cacheKey);
+    // DEDUPE: Prevent multiple simultaneous getActivities() calls for the same entity/page
+    const requestKey = `${cacheKey}::page:${page === null ? 'all' : page}`;
+    if (!forceRefresh && this.getActivitiesPromises && this.getActivitiesPromises.has(requestKey)) {
+      return this.getActivitiesPromises.get(requestKey);
     }
 
-    // Check cache first (unless force refresh)
-    if (!forceRefresh && this.cache.has(cacheKey)) {
-      const cacheTime = this.cacheTimestamp.get(cacheKey);
-      if (cacheTime && (now - cacheTime) < this.cacheExpiry) {
-        return this.cache.get(cacheKey);
+    const inFlightPromise = (async () => {
+
+    // #region agent log - Hypothesis F: Check activity cache first
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        sessionId: 'cache-debug-session',
+        runId: 'activity-cache-fix',
+        hypothesisId: 'F',
+        location: 'activity-manager.js:getActivities',
+        message: 'Checking activity cache before fetching underlying data',
+        data: { cacheKey, forceRefresh, page, cacheSize: this.processedActivitiesCache.size, coordinatorLoading: window.BackgroundLoaderCoordinator?.loading, pageLoadTime: Date.now() - this.pageLoadTime },
+        timestamp: Date.now()
+      })
+    }).catch(() => {});
+    // #endregion
+
+    // NOTE: Avoid artificial delays; rely on background loading coordination and caching instead.
+
+    // WAIT FOR BACKGROUND LOADING TO COMPLETE BEFORE PROCESSING ACTIVITIES
+    if (window.BackgroundLoaderCoordinator && window.BackgroundLoaderCoordinator.loading) {
+      // #region agent log - Hypothesis F: Waiting for background loading
+      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          sessionId: 'cache-debug-session',
+          runId: 'activity-cache-fix',
+          hypothesisId: 'F',
+          location: 'activity-manager.js:getActivities',
+          message: 'Waiting for background loading to complete',
+          data: { cacheKey },
+          timestamp: Date.now()
+        })
+      }).catch(() => {});
+      // #endregion
+
+      await window.BackgroundLoaderCoordinator.coordinateLoading();
+    }
+
+    // If page is specified, check page cache first
+    if (page !== null) {
+      const pageCacheKey = `${cacheKey}:page:${page}`;
+      if (!forceRefresh && this.pageCache.has(pageCacheKey)) {
+        // #region agent log - Hypothesis F: Page cache hit
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            sessionId: 'cache-debug-session',
+            runId: 'activity-cache-fix',
+            hypothesisId: 'F',
+            location: 'activity-manager.js:getActivities',
+            message: 'Page cache hit - avoiding data refetch',
+            data: { pageCacheKey, page },
+            timestamp: Date.now()
+          })
+        }).catch(() => {});
+        // #endregion
+        return this.pageCache.get(pageCacheKey);
       }
     }
 
-    // Create promise for this request and store it to prevent duplicates
-    const fetchPromise = (async () => {
-      const activities = [];
+    // Check full activities cache first (avoids re-processing)
+    if (!forceRefresh && this.processedActivitiesCache.has(cacheKey)) {
+      // #region agent log - Hypothesis F: Activity cache hit
+      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          sessionId: 'cache-debug-session',
+          runId: 'activity-cache-fix',
+          hypothesisId: 'F',
+          location: 'activity-manager.js:getActivities',
+          message: 'Activity cache hit - avoiding data refetch',
+          data: { cacheKey, cachedActivities: this.processedActivitiesCache.get(cacheKey).length },
+          timestamp: Date.now()
+        })
+      }).catch(() => {});
+      // #endregion
+      return this.processedActivitiesCache.get(cacheKey);
+    }
 
-      try {
-        // OPTIMIZATION: Fetch all activity types in parallel instead of sequentially
-        // This reduces total load time from sum of all fetches to max of all fetches
-        const [calls, notes, sequences, emails, tasks] = await Promise.all([
-          this.getCallActivities(entityType, entityId, this.fetchLimitPerType),
-          this.getNoteActivities(entityType, entityId, this.fetchLimitPerType),
-          this.getSequenceActivities(entityType, entityId, this.fetchLimitPerType),
-          this.getEmailActivities(entityType, entityId, this.fetchLimitPerType),
-          this.getTaskActivities(entityType, entityId, this.fetchLimitPerType)
-        ]);
+    // #region agent log - Hypothesis F: Cache miss - will fetch underlying data
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        sessionId: 'cache-debug-session',
+        runId: 'activity-cache-fix',
+        hypothesisId: 'F',
+        location: 'activity-manager.js:getActivities',
+        message: 'Activity cache miss - fetching underlying data',
+        data: { cacheKey, forceRefresh },
+        timestamp: Date.now()
+      })
+    }).catch(() => {});
+    // #endregion
 
-        activities.push(...calls, ...notes, ...sequences, ...emails, ...tasks);
+    const activities = [];
+    const startTime = performance.now();
 
-        // Sort by timestamp (most recent first) using robust timestamp parsing
-        activities.sort((a, b) => {
-          const timeA = this.getTimestampMs(a.timestamp);
-          const timeB = this.getTimestampMs(b.timestamp);
-          return timeB - timeA;
-        });
+    try {
+      // OPTIMIZATION: Fetch all activity types in parallel using CacheManager
+      // This reduces total load time from sum of all fetches to max of all fetches
 
-        // Cache the results
-        this.cache.set(cacheKey, activities);
-        this.cacheTimestamp.set(cacheKey, now);
-        this.lastFetchLimitUsed = this.fetchLimitPerType;
+      const [calls, notes, sequences, emails, tasks] = await Promise.all([
+        this.getCallActivities(entityType, entityId, this.fetchLimitPerType, forceRefresh),
+        this.getNoteActivities(entityType, entityId, this.fetchLimitPerType, forceRefresh),
+        this.getSequenceActivities(entityType, entityId, this.fetchLimitPerType, forceRefresh),
+        this.getEmailActivities(entityType, entityId, this.fetchLimitPerType, forceRefresh),
+        this.getTaskActivities(entityType, entityId, this.fetchLimitPerType, forceRefresh)
+      ]);
 
-        return activities;
-      } catch (error) {
-        console.error('Error fetching activities:', error);
-        return [];
-      } finally {
-        // Clean up loading promise when done
-        this.loadingPromises.delete(cacheKey);
+      activities.push(...calls, ...notes, ...sequences, ...emails, ...tasks);
+
+      // Sort by timestamp (most recent first) using robust timestamp parsing
+      activities.sort((a, b) => {
+        const timeA = this.getTimestampMs(a.timestamp);
+        const timeB = this.getTimestampMs(b.timestamp);
+        return timeB - timeA;
+      });
+
+      this.lastFetchLimitUsed = this.fetchLimitPerType;
+
+      // Handle page-specific processing (lazy loading optimization)
+      if (page !== null) {
+        // Extract only the activities for this page
+        const startIndex = page * this.maxActivitiesPerPage;
+        const endIndex = startIndex + this.maxActivitiesPerPage;
+        const pageActivities = activities.slice(startIndex, endIndex);
+
+        // Cache the page activities
+        const pageCacheKey = `${cacheKey}:page:${page}`;
+        this.pageCache.set(pageCacheKey, activities); // Cache full activities for this page request
+
+        return activities; // Return full activities so pagination works with existing logic
       }
+
+      const endTime = performance.now();
+
+      // Cache the processed activities to avoid re-processing on pagination
+      this.processedActivitiesCache.set(cacheKey, activities);
+
+      // #region agent log - Hypothesis F: Cached processed activities
+      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          sessionId: 'cache-debug-session',
+          runId: 'activity-cache-fix',
+          hypothesisId: 'F',
+          location: 'activity-manager.js:getActivities',
+          message: 'Cached processed activities',
+          data: { cacheKey, activityCount: activities.length, processingTime: endTime - startTime },
+          timestamp: Date.now()
+        })
+      }).catch(() => {});
+      // #endregion
+
+      return activities;
+    } catch (error) {
+      console.error('Error fetching activities:', error);
+      return [];
+    }
     })();
 
-    // Store promise to prevent duplicate calls
-    this.loadingPromises.set(cacheKey, fetchPromise);
-
-    return fetchPromise;
+    try {
+      if (!forceRefresh && this.getActivitiesPromises) this.getActivitiesPromises.set(requestKey, inFlightPromise);
+      return await inFlightPromise;
+    } finally {
+      try { if (!forceRefresh && this.getActivitiesPromises) this.getActivitiesPromises.delete(requestKey); } catch (_) { /* noop */ }
+    }
   }
 
   /**
    * Get call activities
    */
-  async getCallActivities(entityType, entityId, limit) {
+  async getCallActivities(entityType, entityId, limit, forceRefresh = false) {
+    const startTime = performance.now();
     const activities = [];
 
     try {
-      // Get calls from Firebase or local storage
-      const calls = await this.fetchCalls(limit);
+      // Get calls from CacheManager (includes Firebase and localStorage fallback)
+      const calls = await (window.CacheManager ? window.CacheManager.get('calls', forceRefresh) : this.fetchCalls(limit));
 
       for (const call of calls) {
         let shouldInclude = false;
@@ -247,7 +565,9 @@ class ActivityManager {
           }
         }
 
-        if (shouldInclude) {
+        // Skip completed calls - don't show them in recent activities
+        const callStatus = (call.status || '').toLowerCase();
+        if (shouldInclude && callStatus !== 'completed' && callStatus !== 'ended' && callStatus !== 'finished') {
           activities.push({
             id: `call-${call.id}`,
             type: 'call',
@@ -268,49 +588,65 @@ class ActivityManager {
   /**
    * Get note activities
    */
-  async getNoteActivities(entityType, entityId, limit) {
+  async getNoteActivities(entityType, entityId, limit, forceRefresh = false) {
     const activities = [];
 
     try {
       if (entityType === 'global') {
         // For global view, get notes from all contacts and accounts
-        const contacts = await this.fetchContactsWithNotes(limit);
-        const accounts = await this.fetchAccountsWithNotes(limit);
+        const [allContacts, allAccounts] = await Promise.all([
+          window.CacheManager ? window.CacheManager.get('contacts', forceRefresh) : this.fetchContactsWithNotes(limit),
+          window.CacheManager ? window.CacheManager.get('accounts', forceRefresh) : this.fetchAccountsWithNotes(limit)
+        ]);
 
-        for (const contact of contacts) {
-          if (contact.notes && contact.notes.trim()) {
-            // Use proper timestamp priority: notesUpdatedAt > updatedAt > createdAt
-            const timestamp = contact.notesUpdatedAt || contact.updatedAt || contact.createdAt;
-            activities.push({
-              id: `note-contact-${contact.id}`,
-              type: 'note',
-              title: 'Note Added',
-              description: this.truncateText(contact.notes, 100),
-              timestamp: timestamp,
-              icon: 'note',
-              data: { ...contact, entityType: 'contact' }
-            });
-          }
+        // Filter contacts and accounts with notes, then sort by timestamp and limit
+        const contactsWithNotes = (allContacts || []).filter(c => c && c.notes && c.notes.trim())
+          .sort((a, b) => {
+            const timeA = this.getTimestampMs(a.notesUpdatedAt || a.updatedAt || a.createdAt);
+            const timeB = this.getTimestampMs(b.notesUpdatedAt || b.updatedAt || b.createdAt);
+            return timeB - timeA;
+          })
+          .slice(0, limit);
+
+        const accountsWithNotes = (allAccounts || []).filter(a => a && a.notes && a.notes.trim())
+          .sort((a, b) => {
+            const timeA = this.getTimestampMs(a.notesUpdatedAt || a.updatedAt || a.createdAt);
+            const timeB = this.getTimestampMs(b.notesUpdatedAt || b.updatedAt || b.createdAt);
+            return timeB - timeA;
+          })
+          .slice(0, limit);
+
+        for (const contact of contactsWithNotes) {
+          // Use proper timestamp priority: notesUpdatedAt > updatedAt > createdAt
+          const timestamp = contact.notesUpdatedAt || contact.updatedAt || contact.createdAt;
+          activities.push({
+            id: `note-contact-${contact.id}`,
+            type: 'note',
+            title: 'Note Added',
+            description: this.truncateText(contact.notes, 100),
+            timestamp: timestamp,
+            icon: 'note',
+            data: { ...contact, entityType: 'contact' }
+          });
         }
 
-        for (const account of accounts) {
-          if (account.notes && account.notes.trim()) {
-            // Use proper timestamp priority: notesUpdatedAt > updatedAt > createdAt
-            const timestamp = account.notesUpdatedAt || account.updatedAt || account.createdAt;
-            activities.push({
-              id: `note-account-${account.id}`,
-              type: 'note',
-              title: 'Note Added',
-              description: this.truncateText(account.notes, 100),
-              timestamp: timestamp,
-              icon: 'note',
-              data: { ...account, entityType: 'account' }
-            });
-          }
+        for (const account of accountsWithNotes) {
+          // Use proper timestamp priority: notesUpdatedAt > updatedAt > createdAt
+          const timestamp = account.notesUpdatedAt || account.updatedAt || account.createdAt;
+          activities.push({
+            id: `note-account-${account.id}`,
+            type: 'note',
+            title: 'Note Added',
+            description: this.truncateText(account.notes, 100),
+            timestamp: timestamp,
+            icon: 'note',
+            data: { ...account, entityType: 'account' }
+          });
         }
       } else if (entityType === 'contact' && entityId) {
-        // For specific contact, get notes from that contact
-        const contact = await this.fetchContactWithNotes(entityId);
+        // For specific contact, find the contact and check if it has notes
+        const contacts = await (window.CacheManager ? window.CacheManager.get('contacts', forceRefresh) : []);
+        const contact = contacts.find(c => c && c.id === entityId);
         if (contact && contact.notes && contact.notes.trim()) {
           // Use proper timestamp priority: notesUpdatedAt > updatedAt > createdAt
           const timestamp = contact.notesUpdatedAt || contact.updatedAt || contact.createdAt;
@@ -325,8 +661,9 @@ class ActivityManager {
           });
         }
       } else if (entityType === 'account' && entityId) {
-        // For specific account, get notes from that account
-        const account = await this.fetchAccountWithNotes(entityId);
+        // For specific account, find the account and check if it has notes
+        const accounts = await (window.CacheManager ? window.CacheManager.get('accounts', forceRefresh) : []);
+        const account = accounts.find(a => a && a.id === entityId);
         if (account && account.notes && account.notes.trim()) {
           // Use proper timestamp priority: notesUpdatedAt > updatedAt > createdAt
           const timestamp = account.notesUpdatedAt || account.updatedAt || account.createdAt;
@@ -351,11 +688,11 @@ class ActivityManager {
   /**
    * Get sequence activities
    */
-  async getSequenceActivities(entityType, entityId, limit) {
+  async getSequenceActivities(entityType, entityId, limit, forceRefresh = false) {
     const activities = [];
 
     try {
-      const sequences = await this.fetchSequences(limit);
+      const sequences = await (window.CacheManager ? window.CacheManager.get('sequences', forceRefresh) : this.fetchSequences(limit));
 
       for (const sequence of sequences) {
         let shouldInclude = false;
@@ -394,15 +731,66 @@ class ActivityManager {
   /**
    * Get email activities
    */
-  async getEmailActivities(entityType, entityId, limit) {
+  async getEmailActivities(entityType, entityId, limit, forceRefresh = false) {
+    const startTime = performance.now();
     const activities = [];
 
     try {
-      const emails = await this.fetchEmails(limit);
+      // #region agent log - Hypothesis D: Check if contacts are loaded before email filtering
+      const contactsLoaded = window.BackgroundLoaderCoordinator ?
+        window.BackgroundLoaderCoordinator.isLoaded('contacts') :
+        (window.BackgroundContactsLoader && window.BackgroundContactsLoader.getContactsData);
 
-      // OPTIMIZATION: fetchEmails already filtered emails to only include CRM contacts,
-      // so we don't need to rebuild contactEmailsSet here. We only need contacts for entity-specific filtering.
-      // Use BackgroundContactsLoader cached data if available (faster than getPeopleData)
+      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          sessionId: 'cache-debug-session',
+          runId: 'initial-run',
+          hypothesisId: 'D',
+          location: 'activity-manager.js:getEmailActivities',
+          message: 'Checking contacts availability before email filtering',
+          data: { entityType, entityId, contactsLoaded, forceRefresh },
+          timestamp: Date.now()
+        })
+      }).catch(() => {});
+      // #endregion
+
+      // ENSURE CONTACTS ARE LOADED BEFORE EMAIL FILTERING
+      if (!contactsLoaded) {
+        console.log('[ActivityManager] Waiting for contacts to load before filtering emails...');
+
+        // #region agent log - Hypothesis D: Waiting for contacts to load
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            sessionId: 'cache-debug-session',
+            runId: 'initial-run',
+            hypothesisId: 'D',
+            location: 'activity-manager.js:getEmailActivities',
+            message: 'Contacts not loaded - waiting for coordinator or fallback',
+            data: { entityType, entityId },
+            timestamp: Date.now()
+          })
+        }).catch(() => {});
+        // #endregion
+
+        if (window.BackgroundLoaderCoordinator && typeof window.BackgroundLoaderCoordinator.loadCollection === 'function') {
+          await window.BackgroundLoaderCoordinator.loadCollection('contacts');
+        } else {
+          // Fallback: try to load contacts directly if coordinator not available
+          console.log('[ActivityManager] Coordinator not available, trying direct contacts load...');
+          if (window.CacheManager) {
+            await window.CacheManager.get('contacts');
+          }
+        }
+      }
+
+      const emails = await (window.CacheManager ? window.CacheManager.get('emails', forceRefresh) : this.fetchEmails(limit));
+
+      // CRITICAL: Filter emails to only include those from CRM contacts
+      // CacheManager.get('emails') returns ALL emails for the user, but we only want emails from CRM contacts
       let allContacts = [];
       if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
         allContacts = window.BackgroundContactsLoader.getContactsData() || [];
@@ -411,8 +799,28 @@ class ActivityManager {
       }
       const contactIdsSet = new Set(allContacts.map(c => c.id).filter(Boolean));
 
-      // NOTE: We don't need to build contactEmailsSet here since fetchEmails already filtered emails.
-      // We only need allContacts for entity-specific filtering below.
+      // Build comprehensive set of all contact email addresses (main email + emails array)
+      const contactEmailsSet = new Set();
+      const emailToContactMap = new Map(); // Map email address -> contact object
+      allContacts.forEach(c => {
+        // Add main email field
+        const mainEmail = (c.email || '').toLowerCase().trim();
+        if (mainEmail) {
+          contactEmailsSet.add(mainEmail);
+          emailToContactMap.set(mainEmail, c);
+        }
+
+        // Add emails from emails array (if it exists)
+        if (Array.isArray(c.emails)) {
+          c.emails.forEach(e => {
+            const emailAddr = (e.address || e.email || e || '').toLowerCase().trim();
+            if (emailAddr) {
+              contactEmailsSet.add(emailAddr);
+              emailToContactMap.set(emailAddr, c);
+            }
+          });
+        }
+      });
 
       // Helper to extract email addresses from string or array
       const extractEmails = (value) => {
@@ -429,124 +837,178 @@ class ActivityManager {
       // Helper to normalize email for comparison
       const normalizeEmail = (email) => String(email || '').toLowerCase().trim();
 
-      // NOTE: fetchEmails already filters emails to only include those from CRM contacts,
-      // so we don't need to filter again here. We just process the pre-filtered emails.
+      // CRITICAL: Filter emails to only include those from CRM contacts
       if (!emails || !Array.isArray(emails) || emails.length === 0) {
         return activities;
       }
 
-      for (const email of emails) {
+
+      // Filter emails to only include those from CRM contacts
+      const crmEmails = emails.filter(email => {
+        // Check by contactId first (fastest)
+        if (email.contactId && contactIdsSet.has(email.contactId)) {
+          return true;
+        }
+
+        // Check by email addresses using proper sent/received logic
+        const currentUserEmail = window.DataManager?.getCurrentUserEmail?.() || window.currentUserEmail || '';
+        const emailTo = extractEmails(email.to);
+        const emailFrom = extractEmails(email.from);
+        const isSent = email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail;
+        const isReceived = email.type === 'received' || email.emailType === 'received' ||
+          (emailFrom.length > 0 && !emailFrom.some(e => e.includes(currentUserEmail.toLowerCase())));
+
+        // For received emails: sender (from) must be a contact
+        if (isReceived && !isSent) {
+          return emailFrom.some(addr => contactEmailsSet.has(addr));
+        }
+
+        // For sent emails: recipient (to) must be a contact
+        if (isSent) {
+          return emailTo.some(addr => contactEmailsSet.has(addr));
+        }
+
+        // Fallback: if we can't determine direction, check if sender is a contact
+        return emailFrom.some(addr => contactEmailsSet.has(addr));
+      });
+
+      // Process emails - use cache for already processed emails
+      const processedEmails = [];
+      const emailsToProcess = [];
+
+      // Separate cached vs uncached emails
+      crmEmails.forEach(email => {
+        const cached = this.processedEmailsCache.get(email.id);
+        if (cached) {
+          processedEmails.push(cached);
+        } else {
+          emailsToProcess.push(email);
+        }
+      });
+
+
+      // Process uncached emails in batches to avoid blocking the UI thread
+      const currentUserEmail = window.DataManager?.getCurrentUserEmail?.() || window.currentUserEmail || '';
+      const emailProcessingStartTime = performance.now();
+
+      // Batch processing function to avoid blocking UI
+      const processEmailBatch = async (emails, startIndex = 0, batchSize = 50) => {
+        const endIndex = Math.min(startIndex + batchSize, emails.length);
+        const batch = emails.slice(startIndex, endIndex);
+
+        // Process this batch synchronously
+        batch.forEach(email => {
+        // Set contactId if not already set
+        if (!email.contactId) {
+          const emailTo = extractEmails(email.to);
+          const emailFrom = extractEmails(email.from);
+
+          // Find matching contact by email address
+          let matchingContact = null;
+          // Check all email addresses for this contact
+          for (const addr of [...emailTo, ...emailFrom]) {
+            matchingContact = emailToContactMap.get(addr);
+            if (matchingContact) break;
+          }
+
+          if (matchingContact && matchingContact.id) {
+            email.contactId = matchingContact.id;
+          }
+        }
+
+        // Determine if email is sent or received
+        const emailFrom = extractEmails(email.from);
+        const emailTo = extractEmails(email.to);
+        const isSent = email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail;
+        const isReceived = email.type === 'received' || email.emailType === 'received' ||
+          (emailFrom.length > 0 && !emailFrom.some(e => e.includes(currentUserEmail.toLowerCase())));
+
+        // Use more reliable email direction detection based on current user email
+        // Prioritize the currentUserEmail check over unreliable type fields
+        const isFromCurrentUser = emailFrom.some(addr => addr.includes(currentUserEmail.toLowerCase()));
+        const isToCurrentUser = emailTo.some(addr => addr.includes(currentUserEmail.toLowerCase()));
+
+        let direction = 'Sent'; // Default to sent
+        if (isFromCurrentUser && !isToCurrentUser) {
+          direction = 'Sent';
+        } else if (!isFromCurrentUser && isToCurrentUser) {
+          direction = 'Received';
+        } else if (isFromCurrentUser && isToCurrentUser) {
+          // Email to self or complex scenario - check original logic as fallback
+          direction = isSent ? 'Sent' : (isReceived ? 'Received' : 'Sent');
+        }
+
+        const emailType = direction.toLowerCase();
+
+        // Get preview text
+        const previewText = email.text || email.snippet ||
+          this.stripHtml(email.html || email.content || email.body || '') || '';
+
+        // Get proper timestamp (handle both ISO strings and numbers)
+        const emailTimestamp = email.timestamp || email.sentAt || email.receivedAt || email.date || email.createdAt;
+
+        // Create processed email activity
+        const processedEmail = {
+          id: `email-${email.id}`,
+          type: 'email',
+          title: email.subject || `${direction} Email`,
+          description: this.truncateText(previewText, 100),
+          timestamp: emailTimestamp,
+          icon: 'email',
+          data: {
+            ...email,
+            // Ensure entityType is set for proper avatar rendering
+            entityType: email.contactId ? 'contact' : (email.accountId ? 'account' : null),
+            // Preserve contactId and accountId for navigation
+            contactId: email.contactId || null,
+            accountId: email.accountId || null
+          },
+          emailId: email.id // Store email ID for navigation
+        };
+
+        // Cache the processed email
+        this.processedEmailsCache.set(email.id, processedEmail);
+        processedEmails.push(processedEmail);
+
+        });
+
+        // If there are more emails to process, yield control and continue
+        if (endIndex < emails.length) {
+          await new Promise(resolve => setTimeout(resolve, 0)); // Yield control to browser
+          return processEmailBatch(emails, endIndex, batchSize);
+        }
+      };
+
+      // Start batch processing
+      await processEmailBatch(emailsToProcess);
+
+
+      // Filter processed emails by entity type
+      processedEmails.forEach(emailActivity => {
         let shouldInclude = false;
 
         if (entityType === 'global') {
           shouldInclude = true;
         } else if (entityType === 'contact' && entityId) {
           // Match by contactId if available
-          if (email.contactId === entityId) {
+          if (emailActivity.data.contactId === entityId) {
             shouldInclude = true;
-          } else {
-            // Match by email address - get contact's email from CRM
-            const contact = allContacts.find(c => c.id === entityId);
-            if (contact) {
-              const contactEmail = normalizeEmail(contact.email);
-              if (contactEmail) {
-                // Check if contact email matches email's to/from fields
-                const emailTo = extractEmails(email.to);
-                const emailFrom = extractEmails(email.from);
-                shouldInclude = emailTo.includes(contactEmail) || emailFrom.includes(contactEmail);
-              }
-            }
           }
         } else if (entityType === 'account' && entityId) {
-          // First check if email has accountId directly
-          if (email.accountId === entityId) {
+          // Match by accountId if available
+          if (emailActivity.data.accountId === entityId) {
             shouldInclude = true;
           } else {
-            // Get account contacts from CRM
+            // Match by contactId for contacts in this account
             const accountContacts = allContacts.filter(c => c.accountId === entityId);
-
-            // Match by contactId (must be in accountContacts from CRM)
-            shouldInclude = accountContacts.some(c => c.id === email.contactId);
-
-            // Also match by contactCompany name (only if contact is in CRM)
-            if (!shouldInclude && email.contactCompany) {
-              const account = window.getAccountsData ?
-                (window.getAccountsData() || []).find(a => a.id === entityId) : null;
-              if (account) {
-                const accountName = account.accountName || account.name || account.companyName || '';
-                const emailCompany = String(email.contactCompany || '').trim().toLowerCase();
-                const normalizedAccountName = accountName.trim().toLowerCase();
-                if (emailCompany && normalizedAccountName &&
-                  (emailCompany === normalizedAccountName ||
-                    emailCompany.includes(normalizedAccountName) ||
-                    normalizedAccountName.includes(emailCompany))) {
-                  // Double-check: email must be from a contact in this account
-                  const emailTo = extractEmails(email.to);
-                  const emailFrom = extractEmails(email.from);
-                  const accountContactEmails = accountContacts
-                    .map(c => normalizeEmail(c.email))
-                    .filter(e => e);
-                  shouldInclude = accountContactEmails.some(contactEmail =>
-                    emailTo.includes(contactEmail) || emailFrom.includes(contactEmail)
-                  );
-                }
-              }
-            }
-
-            // Also match by email address (only from accountContacts in CRM)
-            if (!shouldInclude) {
-              const accountContactEmails = accountContacts
-                .map(c => normalizeEmail(c.email))
-                .filter(e => e);
-
-              if (accountContactEmails.length > 0) {
-                const emailTo = extractEmails(email.to);
-                const emailFrom = extractEmails(email.from);
-                shouldInclude = accountContactEmails.some(contactEmail =>
-                  emailTo.includes(contactEmail) || emailFrom.includes(contactEmail)
-                );
-              }
-            }
+            shouldInclude = accountContacts.some(c => c.id === emailActivity.data.contactId);
           }
         }
 
         if (shouldInclude) {
-          // Determine if email is sent or received
-          const currentUserEmail = window.DataManager?.getCurrentUserEmail?.() || window.currentUserEmail || '';
-          const emailFrom = extractEmails(email.from);
-          const isSent = email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail;
-          const isReceived = email.type === 'received' || email.emailType === 'received' ||
-            (emailFrom.length > 0 && !emailFrom.some(e => e.includes(currentUserEmail.toLowerCase())));
-
-          const emailType = isSent ? 'sent' : (isReceived ? 'received' : 'sent');
-          const direction = isSent ? 'Sent' : 'Received';
-
-          // Get preview text
-          const previewText = email.text || email.snippet ||
-            this.stripHtml(email.html || email.content || email.body || '') || '';
-
-          // Get proper timestamp (handle both ISO strings and numbers)
-          const emailTimestamp = email.timestamp || email.sentAt || email.receivedAt || email.date || email.createdAt;
-
-          activities.push({
-            id: `email-${email.id}`,
-            type: 'email',
-            title: email.subject || `${direction} Email`,
-            description: this.truncateText(previewText, 100),
-            timestamp: emailTimestamp,
-            icon: 'email',
-            data: {
-              ...email,
-              // Ensure entityType is set for proper avatar rendering
-              entityType: email.contactId ? 'contact' : (email.accountId ? 'account' : null),
-              // Preserve contactId and accountId for navigation
-              contactId: email.contactId || null,
-              accountId: email.accountId || null
-            },
-            emailId: email.id // Store email ID for navigation
-          });
+          activities.push(emailActivity);
         }
-      }
+      });
 
       return activities;
     } catch (error) {
@@ -558,11 +1020,11 @@ class ActivityManager {
   /**
    * Get task activities
    */
-  async getTaskActivities(entityType, entityId, limit) {
+  async getTaskActivities(entityType, entityId, limit, forceRefresh = false) {
     const activities = [];
 
     try {
-      const tasks = await this.fetchTasks(limit);
+      const tasks = await (window.CacheManager ? window.CacheManager.get('tasks', forceRefresh) : this.fetchTasks(limit));
 
       for (const task of tasks) {
         let shouldInclude = false;
@@ -1592,11 +2054,60 @@ class ActivityManager {
    * Render activities for a specific container
    */
   async renderActivities(containerId, entityType = 'global', entityId = null, forceRefresh = false) {
+
+    // #region agent log - Hypothesis J: renderActivities entry
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        sessionId: 'cache-debug-session',
+        runId: 'activity-render-fix',
+        hypothesisId: 'J',
+        location: 'activity-manager.js:renderActivities',
+        message: 'renderActivities function entered',
+        data: { containerId, entityType, entityId, forceRefresh, hasContainer: !!document.getElementById(containerId) },
+        timestamp: Date.now()
+      })
+    }).catch(() => {});
+    // #endregion
+
     const container = document.getElementById(containerId);
-    if (!container) return;
+    if (!container) {
+      // #region agent log - Hypothesis J: No container found
+      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          sessionId: 'cache-debug-session',
+          runId: 'activity-render-fix',
+          hypothesisId: 'J',
+          location: 'activity-manager.js:renderActivities',
+          message: 'Container not found - exiting early',
+          data: { containerId },
+          timestamp: Date.now()
+        })
+      }).catch(() => {});
+      // #endregion
+      return;
+    }
 
     const renderKey = `${containerId}::${entityType}::${entityId || ''}`;
     if (!forceRefresh && this.renderPromises && this.renderPromises.has(renderKey)) {
+      // #region agent log - Hypothesis J: Using cached render promise
+      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          sessionId: 'cache-debug-session',
+          runId: 'activity-render-fix',
+          hypothesisId: 'J',
+          location: 'activity-manager.js:renderActivities',
+          message: 'Using cached render promise - returning early',
+          data: { renderKey },
+          timestamp: Date.now()
+        })
+      }).catch(() => {});
+      // #endregion
       return this.renderPromises.get(renderKey);
     }
 
@@ -1614,10 +2125,40 @@ class ActivityManager {
       }, 30000); // 30 second timeout
 
       try {
-        const activities = await this.getActivities(entityType, entityId, forceRefresh);
+        let activities = await this.getActivities(entityType, entityId, forceRefresh);
+
+        // #region agent log - Hypothesis J: After getActivities returns
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            sessionId: 'cache-debug-session',
+            runId: 'activity-render-fix',
+            hypothesisId: 'J',
+            location: 'activity-manager.js:renderActivities',
+            message: 'getActivities returned - about to render',
+            data: { containerId, activitiesCount: activities ? activities.length : 0, forceRefresh },
+            timestamp: Date.now()
+          })
+        }).catch(() => {});
+        // #endregion
+
+        // OPTIMIZATION: Limit activities for home screen to 10 pages (40 activities) for better performance
+        // Since home screen shows "Recent Activities", we don't need all historical data
+        if (containerId === 'home-activity-timeline' && activities.length > 40) {
+          activities = activities.slice(0, 40); // 10 pages * 4 activities per page
+        }
+
+        // Store activities for pagination to avoid cache invalidation issues
+        // For home screen, ensure we always use the limited set
+        if (containerId === 'home-activity-timeline' && activities.length > 40) {
+          activities = activities.slice(0, 40);
+        }
+        this.currentActivities = activities;
         clearTimeout(timeoutId); // Clear timeout since we got results
 
         const totalPages = Math.ceil(activities.length / this.maxActivitiesPerPage);
+
         // Clamp page in case a prior page index (from dashboard) exceeds this view's page count
         if (this.currentPage < 0 || this.currentPage >= totalPages) {
           this.currentPage = 0;
@@ -1635,16 +2176,124 @@ class ActivityManager {
         const newSignature = (paginatedActivities || []).map(a => a && a.id ? String(a.id) : '').join('|');
         const prevSignature = this.lastRenderedSignatures ? this.lastRenderedSignatures.get(sigKey) : null;
 
+        // #region agent log - Hypothesis I: Activity HTML check
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            sessionId: 'cache-debug-session',
+            runId: 'activity-render-fix',
+            hypothesisId: 'I',
+            location: 'activity-manager.js:renderActivities',
+            message: 'Checking activity HTML before render',
+            data: {
+              containerId,
+              hasActivityHtml: !!activityHtml,
+              activityHtmlLength: activityHtml ? activityHtml.length : 0,
+              activityHtmlTrimmedLength: activityHtml ? activityHtml.trim().length : 0,
+              hasExistingContent,
+              forceRefresh,
+              activitiesCount: activities.length,
+              paginatedCount: paginatedActivities ? paginatedActivities.length : 0
+            },
+            timestamp: Date.now()
+          })
+        }).catch(() => {});
+        // #endregion
+
         // Always replace the loading state - with fallback
         if (activityHtml && activityHtml.trim().length > 0) {
+          // #region agent log - Hypothesis I: Activity rendering debug
+          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              sessionId: 'cache-debug-session',
+              runId: 'activity-render-fix',
+              hypothesisId: 'I',
+              location: 'activity-manager.js:renderActivities',
+              message: 'Rendering activities - replacing loading state',
+              data: {
+                containerId,
+                activityHtmlLength: activityHtml.length,
+                hasExistingContent,
+                forceRefresh,
+                activitiesCount: activities.length,
+                prevSignature,
+                newSignature,
+                signaturesMatch: prevSignature === newSignature
+              },
+              timestamp: Date.now()
+            })
+          }).catch(() => {});
+          // #endregion
+
           // If we already rendered the same items, skip DOM replacement (prevents icon/glyph flicker)
           if (!forceRefresh && hasExistingContent && prevSignature && prevSignature === newSignature) {
+            // #region agent log - Hypothesis I: Skipping duplicate render
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                sessionId: 'cache-debug-session',
+                runId: 'activity-render-fix',
+                hypothesisId: 'I',
+                location: 'activity-manager.js:renderActivities',
+                message: 'Skipping duplicate render - content unchanged',
+                data: { containerId },
+                timestamp: Date.now()
+              })
+            }).catch(() => {});
+            // #endregion
           } else {
+            // Smooth height transition logic
+            const currentHeight = container.offsetHeight;
+            container.style.height = currentHeight + 'px';
+
+            // #region agent log - Hypothesis I: Setting innerHTML
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                sessionId: 'cache-debug-session',
+                runId: 'activity-render-fix',
+                hypothesisId: 'I',
+                location: 'activity-manager.js:renderActivities',
+                message: 'Setting container.innerHTML with activity content',
+                data: { containerId, contentLength: activityHtml.length },
+                timestamp: Date.now()
+              })
+            }).catch(() => {});
+            // #endregion
+
             container.innerHTML = activityHtml;
             this.attachActivityEvents(container, entityType, entityId);
+
+            // Measure new height
+            requestAnimationFrame(() => {
+              container.style.height = container.scrollHeight + 'px';
+              // Reset height after transition
+              setTimeout(() => { container.style.height = ''; }, 450);
+            });
+
             try { if (this.lastRenderedSignatures) this.lastRenderedSignatures.set(sigKey, newSignature); } catch (_) { /* noop */ }
           }
         } else {
+          // #region agent log - Hypothesis I: Activity HTML empty - setting empty state
+          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              sessionId: 'cache-debug-session',
+              runId: 'activity-render-fix',
+              hypothesisId: 'I',
+              location: 'activity-manager.js:renderActivities',
+              message: 'Activity HTML empty - setting empty state instead',
+              data: { containerId, activitiesCount: activities.length, paginatedCount: paginatedActivities ? paginatedActivities.length : 0 },
+              timestamp: Date.now()
+            })
+          }).catch(() => {});
+          // #endregion
           container.innerHTML = this.renderEmptyState();
         }
 
@@ -1734,12 +2383,13 @@ class ActivityManager {
    * Render activity list HTML
    */
   renderActivityList(activities) {
+
     if (!activities || activities.length === 0) {
       return '';
     }
 
     try {
-      const result = activities.map(activity => {
+      const result = activities.map((activity, index) => {
         try {
           // Add entity name for global activities - with error handling
           let entityName = null;
@@ -1771,7 +2421,7 @@ class ActivityManager {
 
           // Add click handler attributes if we have a navigation target
           const clickAttributes = navigationTarget ?
-            `onclick="window.ActivityManager.navigateToDetail('${navigationType}', '${navigationTarget}')" style="cursor: pointer;"` :
+            `onclick="window.ActivityManager.navigateToDetail('${navigationType}', '${navigationTarget}'); event.stopPropagation();" style="cursor: pointer;"` :
             '';
 
 
@@ -1781,8 +2431,12 @@ class ActivityManager {
           // Add emailId data attribute for email activities
           const emailIdAttr = activity.emailId ? `data-email-id="${activity.emailId}"` : '';
 
+          // Add staggered delay for modern reveal
+          const delay = (index * 0.05).toFixed(2);
+          const revealStyle = `style="animation-delay: ${delay}s; cursor: pointer;"`;
+
           return `
-            <div class="activity-item" data-activity-id="${activity.id}" data-activity-type="${activity.type}" ${emailIdAttr} ${clickAttributes}>
+            <div class="activity-item modern-reveal" data-activity-id="${activity.id}" data-activity-type="${activity.type}" ${emailIdAttr} ${clickAttributes} ${revealStyle}>
             <div class="activity-entity-avatar">
               ${entityAvatar}
             </div>
@@ -1799,9 +2453,11 @@ class ActivityManager {
           `;
         } catch (error) {
           console.error('[ActivityManager] Error rendering individual activity:', error);
+          // Add staggered delay for modern reveal even on error item
+          const delay = (index * 0.05).toFixed(2);
           // Return a fallback activity item if individual activity fails
           return `
-            <div class="activity-item" data-activity-id="${activity.id || 'unknown'}" data-activity-type="${activity.type || 'unknown'}">
+            <div class="activity-item modern-reveal" data-activity-id="${activity.id || 'unknown'}" data-activity-type="${activity.type || 'unknown'}" style="animation-delay: ${delay}s;">
             <div class="activity-icon">
               ${this.getActivityIcon(activity.type || 'note')}
             </div>
@@ -1827,9 +2483,22 @@ class ActivityManager {
    */
   renderLoadingState() {
     return `
-      <div class="activity-placeholder">
-        <div class="loading-spinner"></div>
-        <div class="placeholder-text">Loading activities...</div>
+      <div class="activity-skeletons">
+        ${Array(4).fill(0).map(() => `
+          <div class="activity-item" style="border: 1px solid rgba(255,255,255,0.05); margin-bottom: 10px; opacity: 0.6; pointer-events: none; display: flex; align-items: center; gap: 12px; padding: 12px 16px; min-height: 85px;">
+            <div class="activity-entity-avatar">
+              <div class="skeleton-shimmer" style="width: 36px; height: 36px; border-radius: 50%;"></div>
+            </div>
+            <div class="activity-content" style="flex: 1;">
+              <div class="skeleton-text medium skeleton-shimmer" style="margin-bottom: 8px; height: 16px;"></div>
+              <div class="skeleton-text skeleton-shimmer" style="margin-bottom: 6px; height: 12px; width: 90%;"></div>
+              <div class="skeleton-text short skeleton-shimmer" style="height: 10px;"></div>
+            </div>
+            <div class="activity-icon">
+              <div class="skeleton-shimmer" style="width: 24px; height: 24px; border-radius: 4px;"></div>
+            </div>
+          </div>
+        `).join('')}
       </div>
     `;
   }
@@ -1983,6 +2652,16 @@ class ActivityManager {
    */
   async ensureActivitiesForPage(page, entityType, entityId) {
     const needed = (page + 1) * this.maxActivitiesPerPage;
+    const cacheKey = `${entityType}-${entityId || 'global'}`;
+
+    // Check cache first - avoid re-processing all activities for pagination
+    if (this.processedActivitiesCache.has(cacheKey)) {
+      const cachedActivities = this.processedActivitiesCache.get(cacheKey);
+      if (cachedActivities.length >= needed) {
+        return cachedActivities;
+      }
+    }
+
     let activities = await this.getActivities(entityType, entityId);
     if (activities.length >= needed) return activities;
 
@@ -1998,7 +2677,16 @@ class ActivityManager {
    * Navigate to next page of activities
    */
   async nextPage(containerId, entityType, entityId) {
-    const activities = await this.ensureActivitiesForPage(this.currentPage + 1, entityType, entityId);
+
+    // Use stored activities from initial render to avoid cache invalidation issues
+    let activities = this.currentActivities;
+
+    if (!activities) {
+      // Fallback: fetch activities if not stored
+      activities = await this.getActivities(entityType, entityId);
+      this.currentActivities = activities; // Store for future use
+    }
+
     const totalPages = Math.ceil(activities.length / this.maxActivitiesPerPage);
 
     if (this.currentPage < totalPages - 1) {
@@ -2015,7 +2703,15 @@ class ActivityManager {
   async previousPage(containerId, entityType, entityId) {
     if (this.currentPage > 0) {
       this.currentPage--;
-      const activities = await this.getActivities(entityType, entityId);
+      // Use stored activities from initial render to avoid cache invalidation issues
+      let activities = this.currentActivities;
+
+      if (!activities) {
+        // Fallback: fetch activities if not stored
+        activities = await this.getActivities(entityType, entityId);
+        this.currentActivities = activities; // Store for future use
+      }
+
       const totalPages = Math.ceil(activities.length / this.maxActivitiesPerPage);
       await this.renderPageWithPrerendering(containerId, entityType, entityId, activities, totalPages);
       // Update pagination controls
@@ -2027,7 +2723,15 @@ class ActivityManager {
    * Go to specific page
    */
   async goToPage(page, containerId, entityType, entityId) {
-    const activities = await this.ensureActivitiesForPage(page, entityType, entityId);
+    // Use stored activities from initial render to avoid cache invalidation issues
+    let activities = this.currentActivities;
+
+    if (!activities) {
+      // Fallback: fetch activities if not stored
+      activities = await this.getActivities(entityType, entityId);
+      this.currentActivities = activities; // Store for future use
+    }
+
     const totalPages = Math.ceil(activities.length / this.maxActivitiesPerPage);
 
     if (page >= 0 && page < totalPages) {
@@ -2060,8 +2764,13 @@ class ActivityManager {
     } else {
       // Fallback to normal rendering
       const paginatedActivities = this.getPageActivities(activities, this.currentPage);
-      container.innerHTML = this.renderActivityList(paginatedActivities);
-      this.attachActivityEvents(container, entityType, entityId);
+
+      if (paginatedActivities.length === 0) {
+        container.innerHTML = this.renderEmptyState();
+      } else {
+        container.innerHTML = this.renderActivityList(paginatedActivities);
+        this.attachActivityEvents(container, entityType, entityId);
+      }
 
       // Pre-render adjacent pages (non-blocking)
       this.prerenderAdjacentPages(activities, entityType, entityId, totalPages).catch(error => {
@@ -2652,35 +3361,29 @@ class ActivityManager {
     return div.innerHTML;
   }
 
-  /**
-   * Clear cache for specific entity or all cache
-   */
-  clearCache(entityType = null, entityId = null) {
-    if (entityType && entityId) {
-      const cacheKey = `${entityType}-${entityId}`;
-      this.cache.delete(cacheKey);
-      this.cacheTimestamp.delete(cacheKey);
-
-      // Clear pre-rendered pages for this entity
-      const prerenderKey = `${entityType}-${entityId}`;
-      for (const [key] of this.prerenderedPages) {
-        if (key.startsWith(prerenderKey)) {
-          this.prerenderedPages.delete(key);
-        }
-      }
-    } else {
-      // Clear all cache
-      this.cache.clear();
-      this.cacheTimestamp.clear();
-      this.prerenderedPages.clear();
-    }
-  }
 
   /**
-   * Force refresh activities (bypass cache)
+   * Force refresh activities (invalidate relevant caches)
    */
   async forceRefresh(containerId, entityType = 'global', entityId = null) {
-    this.clearCache(entityType, entityId);
+    // Invalidate relevant caches based on entity type
+    if (window.CacheManager) {
+      if (entityType === 'contact') {
+        window.CacheManager.invalidate('contacts');
+      } else if (entityType === 'account') {
+        window.CacheManager.invalidate('accounts');
+      } else if (entityType === 'task') {
+        window.CacheManager.invalidate('tasks');
+      } else {
+        // For global or unknown types, invalidate all activity-related caches
+        window.CacheManager.invalidate('contacts');
+        window.CacheManager.invalidate('accounts');
+        window.CacheManager.invalidate('calls');
+        window.CacheManager.invalidate('tasks');
+        window.CacheManager.invalidate('sequences');
+        window.CacheManager.invalidate('emails');
+      }
+    }
     await this.renderActivities(containerId, entityType, entityId);
   }
 
@@ -2771,6 +3474,7 @@ class ActivityManager {
    * Update pagination controls
    */
   updatePagination(containerId, totalPages) {
+
     const paginationContainer = document.getElementById(containerId.replace('-timeline', '-pagination'));
     if (!paginationContainer) return;
 

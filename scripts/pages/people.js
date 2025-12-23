@@ -2671,7 +2671,6 @@
     renderPagination();
     updateBulkActionsBar();
   }
-
   function safe(val) {
     return (val == null ? '' : String(val));
   }
@@ -4755,3 +4754,5 @@
     console.log('[People] UI state cleaned (preserving data for back navigation)');
   };
 })();
+
+

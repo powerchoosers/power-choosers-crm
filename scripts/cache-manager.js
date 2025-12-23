@@ -6,11 +6,19 @@ class CacheManager {
     this.dbName = 'PowerChoosersCRM';
     this.dbVersion = 4; // Bumped for tasks, sequences, lists collections
     this.db = null;
-    this.cacheExpiry = 15 * 60 * 1000; // 15 minutes in milliseconds (default for most collections)
-    this.tasksCacheExpiry = 3 * 60 * 1000; // 3 minutes for tasks (high volatility - frequently created/completed/deleted)
+    // INCREASED CACHE EXPIRY: 4-8 hours instead of 45 minutes for better performance
+    this.cacheExpiry = 8 * 60 * 60 * 1000; // 8 hours in milliseconds (default for most collections)
+    this.tasksCacheExpiry = 2 * 60 * 60 * 1000; // 2 hours for tasks (still volatile but reasonable)
+    this.emailsCacheExpiry = 4 * 60 * 60 * 1000; // 4 hours for emails (moderate volatility)
     this.collections = ['contacts', 'accounts', 'calls', 'calls-raw', 'tasks', 'sequences', 'lists', 'deals', 'settings', 'badge-data', 'emails', 'agents', 'agent_activities'];
     this.listMembersExpiry = 10 * 60 * 1000; // 10 minutes for list members
     this.initPromise = null;
+
+    // REQUEST DEDUPLICATION: Prevent multiple simultaneous fetches for same collection
+    this.activeRequests = new Map(); // collection -> Promise
+
+    // DEBUGGING: Track cache performance
+    this.requestStats = new Map(); // collection -> {hits: 0, misses: 0, duplicates: 0}
   }
 
   // Initialize IndexedDB
@@ -147,7 +155,7 @@ class CacheManager {
     }
   }
 
-  // Check if cache data is fresh (less than 5 minutes old)
+  // UPDATED FRESHNESS CHECK WITH COLLECTION-SPECIFIC EXPIRY
   async isFresh(collection) {
     try {
       await this.init();
@@ -171,9 +179,40 @@ class CacheManager {
           }
 
           // Use collection-specific expiry
-          const expiry = collection === 'tasks' ? this.tasksCacheExpiry : this.cacheExpiry;
+          let expiry;
+          if (collection === 'tasks') {
+            expiry = this.tasksCacheExpiry;
+          } else if (collection === 'emails') {
+            expiry = this.emailsCacheExpiry;
+          } else {
+            expiry = this.cacheExpiry;
+          }
+
           const age = Date.now() - meta.timestamp;
           const fresh = age < expiry;
+
+          // #region agent log - Hypothesis B: Track cache freshness decisions
+          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              sessionId: 'cache-debug-session',
+              runId: 'initial-run',
+              hypothesisId: 'B',
+              location: 'cache-manager.js:isFresh',
+              message: 'Cache freshness check result',
+              data: {
+                collection,
+                fresh,
+                ageSeconds: Math.round(age / 1000),
+                expirySeconds: Math.round(expiry / 1000),
+                timestamp: meta.timestamp
+              },
+              timestamp: Date.now()
+            })
+          }).catch(() => {});
+          // #endregion
+
           console.log(`[CacheManager] Cache for ${collection}: ${fresh ? 'FRESH' : 'EXPIRED'} (${Math.round(age / 1000)}s old, expiry: ${Math.round(expiry / 1000)}s)`);
           resolve(fresh);
         };
@@ -186,14 +225,67 @@ class CacheManager {
     }
   }
 
-  // Get data from cache or Firestore
+  // OPTIMIZED GET WITH DEDUPLICATION AND DEBUGGING
   async get(collection) {
+    // #region agent log - Hypothesis A, C, E: Track request patterns
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        sessionId: 'cache-debug-session',
+        runId: 'initial-run',
+        hypothesisId: 'A,C,E',
+        location: 'cache-manager.js:get',
+        message: 'CacheManager.get() called',
+        data: { collection, activeRequests: Array.from(this.activeRequests.keys()) },
+        timestamp: Date.now()
+      })
+    }).catch(() => {});
+    // #endregion
+
     // Emergency fallback: bypass cache if disabled
     if (window.DISABLE_CACHE) {
       console.warn('[CacheManager] Cache disabled, fetching from Firestore');
       return this.fetchFromFirestore(collection);
     }
 
+    // REQUEST DEDUPLICATION: If another request for this collection is in flight, wait for it
+    if (this.activeRequests.has(collection)) {
+      // #region agent log - Hypothesis A: Duplicate request detected
+      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          sessionId: 'cache-debug-session',
+          runId: 'initial-run',
+          hypothesisId: 'A',
+          location: 'cache-manager.js:get',
+          message: 'Duplicate request detected - waiting for existing request',
+          data: { collection, duplicateDetected: true },
+          timestamp: Date.now()
+        })
+      }).catch(() => {});
+      // #endregion
+
+      console.log(`[CacheManager] Waiting for in-flight ${collection} request...`);
+      this._incrementStat(collection, 'duplicates');
+      return this.activeRequests.get(collection);
+    }
+
+    // Create and track the request
+    const requestPromise = this._performGet(collection);
+    this.activeRequests.set(collection, requestPromise);
+
+    try {
+      return await requestPromise;
+    } finally {
+      // Always clean up, even on error
+      this.activeRequests.delete(collection);
+    }
+  }
+
+  // Internal get implementation
+  async _performGet(collection) {
     try {
       await this.init();
 
@@ -204,13 +296,47 @@ class CacheManager {
         // Return cached data
         const cached = await this.getFromCache(collection);
         if (cached && cached.length > 0) {
+          // #region agent log - Hypothesis B: Cache hit tracking
+          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              sessionId: 'cache-debug-session',
+              runId: 'initial-run',
+              hypothesisId: 'B',
+              location: 'cache-manager.js:_performGet',
+              message: 'Cache hit - returning cached data',
+              data: { collection, recordCount: cached.length },
+              timestamp: Date.now()
+            })
+          }).catch(() => {});
+          // #endregion
+
           console.log(`[CacheManager] ✓ Returning ${cached.length} ${collection} from cache`);
+          this._incrementStat(collection, 'hits');
           return cached;
         }
       }
 
+      // #region agent log - Hypothesis B: Cache miss tracking
+      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          sessionId: 'cache-debug-session',
+          runId: 'initial-run',
+          hypothesisId: 'B',
+          location: 'cache-manager.js:_performGet',
+          message: 'Cache miss - will fetch from Firestore',
+          data: { collection, wasFresh: fresh },
+          timestamp: Date.now()
+        })
+      }).catch(() => {});
+      // #endregion
+
       // Cache miss or expired - fetch from Firestore
       console.log(`[CacheManager] Cache miss for ${collection}, fetching from Firestore...`);
+      this._incrementStat(collection, 'misses');
       const data = await this.fetchFromFirestore(collection);
 
       // Store in cache
@@ -224,8 +350,19 @@ class CacheManager {
     }
   }
 
+  // Helper to track statistics
+  _incrementStat(collection, type) {
+    if (!this.requestStats.has(collection)) {
+      this.requestStats.set(collection, { hits: 0, misses: 0, duplicates: 0 });
+    }
+    const stats = this.requestStats.get(collection);
+    stats[type]++;
+  }
+
   // Fetch data from Firestore
   async fetchFromFirestore(collection) {
+    const startTime = performance.now();
+
     if (!window.firebaseDB) {
       console.warn('[CacheManager] Firestore not initialized');
       return [];
@@ -343,6 +480,7 @@ class CacheManager {
           const snapshot = await window.firebaseDB.collection(collection).limit(5000).get();
           const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           console.log(`[CacheManager] Fetched ${data.length} ${collection} from Firestore (admin, limited)`);
+          const endTime = performance.now();
           return data;
         }
       }
@@ -362,6 +500,8 @@ class CacheManager {
       console.error(`[CacheManager] Error fetching ${collection} from Firestore:`, error);
       return [];
     }
+
+    const endTime = performance.now();
   }
 
   // Get data from IndexedDB cache
@@ -546,7 +686,7 @@ class CacheManager {
     console.log('[CacheManager] ✓ All caches invalidated');
   }
 
-  // Get cache statistics
+  // Get cache statistics with debugging info
   async getStats() {
     try {
       await this.init();
@@ -555,13 +695,33 @@ class CacheManager {
       for (const collection of this.collections) {
         const data = await this.getFromCache(collection);
         const meta = await this.getMeta(collection);
+        const requestStats = this.requestStats.get(collection) || { hits: 0, misses: 0, duplicates: 0 };
+
         stats[collection] = {
           count: data.length,
           timestamp: meta?.timestamp || null,
           age: meta?.timestamp ? Math.round((Date.now() - meta.timestamp) / 1000) : null,
-          fresh: await this.isFresh(collection)
+          fresh: await this.isFresh(collection),
+          requests: requestStats,
+          activeRequest: this.activeRequests.has(collection)
         };
       }
+
+      // #region agent log - Hypothesis A,B,C,E: Report comprehensive cache stats
+      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          sessionId: 'cache-debug-session',
+          runId: 'initial-run',
+          hypothesisId: 'A,B,C,E',
+          location: 'cache-manager.js:getStats',
+          message: 'Cache statistics report',
+          data: stats,
+          timestamp: Date.now()
+        })
+      }).catch(() => {});
+      // #endregion
 
       return stats;
     } catch (error) {
