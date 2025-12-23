@@ -412,10 +412,7 @@
                                 <div class="dashboard-card">
                                     <h3 class="card-title">Recent Activities</h3>
                                     <div class="activities-list" id="home-activity-timeline">
-                                        <div class="activity-placeholder">
-                                            <div class="loading-spinner"></div>
-                                            <div class="placeholder-text">Loading activities...</div>
-                                        </div>
+                                        <!-- Populated by ActivityManager.renderActivities() -->
                                     </div>
                                     <div class="activity-pagination" id="home-activity-pagination"
                                         style="display: none;">
@@ -3449,7 +3446,7 @@
                             <!-- Task Detail Page -->
                             <div class="page" id="task-detail-page" data-page="task-detail">
                                 <div class="page-container">
-                                    <div class="page-header">
+                                    <div class="page-header" id="task-detail-header">
                                         <button class="back-btn back-btn--icon" id="task-detail-back-btn"
                                             aria-label="Back to Tasks">
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -4465,19 +4462,23 @@
         window.loadScript = function (src) {
             return new Promise((resolve, reject) => {
                 // Check if already loaded
-                if (document.querySelector(`script[src="${src}"]`)) {
+                const baseSrc = String(src || '');
+                const alreadyLoaded = Array.from(document.querySelectorAll('script[data-src-base]'))
+                    .some(s => s.getAttribute('data-src-base') === baseSrc);
+                if (alreadyLoaded) {
                     resolve();
                     return;
                 }
 
                 const script = document.createElement('script');
-                script.src = src;
+                script.src = baseSrc;
+                script.setAttribute('data-src-base', baseSrc);
                 script.onload = () => {
-                    console.log('[LazyLoad] ✓ Loaded:', src);
+                    console.log('[LazyLoad] ✓ Loaded:', baseSrc);
                     resolve();
                 };
                 script.onerror = () => {
-                    console.warn('[LazyLoad] Failed to load:', src);
+                    console.warn('[LazyLoad] Failed to load:', baseSrc);
                     resolve(); // Continue even if one fails
                 };
                 document.body.appendChild(script);
@@ -4521,14 +4522,8 @@
                 'scripts/pages/task-detail.js',    // NEW - load task-detail for Today's Tasks clicks
                 'scripts/pages/account-detail.js', // NEW - load account-detail for account navigation
                 'scripts/pages/contact-detail.js', // NEW - load contact-detail for contact navigation
-                'scripts/background-calls-loader.js', // NEW - background calls loading for badges
-                'scripts/background-contacts-loader.js', // NEW - background contacts loading for instant access
-                'scripts/background-accounts-loader.js', // NEW - background accounts loading for instant access
-                'scripts/background-emails-loader.js', // NEW - background emails loading for instant access
+                'scripts/background-loader-coordinator.js', // COORDINATED - replaces individual background loaders for better performance
                 'scripts/gmail-inbox-sync.js', // Client-side Gmail inbox sync (FREE - no server costs)
-                'scripts/background-tasks-loader.js', // NEW - background tasks loading for instant access
-                'scripts/background-sequences-loader.js', // NEW - background sequences loading for instant access
-                'scripts/background-lists-loader.js', // NEW - background lists loading for instant access
                 'scripts/email-compose-global.js', // NEW - Global email compose functionality
                 // 'scripts/pages/emails.js',         // REMOVED - replaced with emails-redesigned.js
                 'scripts/contact-merger.js',
