@@ -101,9 +101,28 @@ class PowerChoosersCRM {
                     console.warn('[CRM] Could not clean up deleted task from localStorage:', err);
                 }
 
-                // Refresh Today's Tasks widget
+                // Refresh Today's Tasks widget with debouncing
                 if (typeof this.loadTodaysTasks === 'function') {
-                    this.loadTodaysTasks();
+                    // #region agent log - Hypothesis G: Widget re-rendering tracking
+                    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+                      method: 'POST',
+                      headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify({
+                        sessionId: 'cache-debug-session',
+                        runId: 'widget-rerender-fix',
+                        hypothesisId: 'G',
+                        location: 'main.js:taskDeleted',
+                        message: 'Task deleted - refreshing Today\'s Tasks widget',
+                        data: { taskId },
+                        timestamp: Date.now()
+                      })
+                    }).catch(() => {});
+                    // #endregion
+
+                    clearTimeout(this._taskRefreshTimer);
+                    this._taskRefreshTimer = setTimeout(() => {
+                        this.loadTodaysTasks();
+                    }, 500); // Debounce for 500ms
                 }
             }
         });
@@ -113,9 +132,28 @@ class PowerChoosersCRM {
             const { taskId, deleted } = e.detail || {};
             if (deleted && taskId) {
                 console.log('[CRM] Task deleted via tasksUpdated event, refreshing Today\'s Tasks widget:', taskId);
-                // Refresh Today's Tasks widget
+                // Refresh Today's Tasks widget with debouncing
                 if (typeof this.loadTodaysTasks === 'function') {
-                    this.loadTodaysTasks();
+                    // #region agent log - Hypothesis G: Widget re-rendering tracking
+                    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+                      method: 'POST',
+                      headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify({
+                        sessionId: 'cache-debug-session',
+                        runId: 'widget-rerender-fix',
+                        hypothesisId: 'G',
+                        location: 'main.js:tasksUpdated',
+                        message: 'Task updated/deleted - refreshing Today\'s Tasks widget',
+                        data: { taskId, deleted },
+                        timestamp: Date.now()
+                      })
+                    }).catch(() => {});
+                    // #endregion
+
+                    clearTimeout(this._taskRefreshTimer);
+                    this._taskRefreshTimer = setTimeout(() => {
+                        this.loadTodaysTasks();
+                    }, 500); // Debounce for 500ms
                 }
             }
         });
@@ -161,6 +199,17 @@ class PowerChoosersCRM {
     // Initialize dashboard data and widgets in correct order
     async initializeDashboardData() {
         console.log('[CRM] Initializing dashboard data...');
+
+        // STEP 0: Show skeletons immediately before any data loading
+        const taskLists = document.querySelectorAll('.tasks-list');
+        const newsList = document.querySelector('.news-list');
+        const activityTimeline = document.getElementById('home-activity-timeline');
+
+        if (taskLists.length) taskLists.forEach(list => list.innerHTML = this.renderTaskSkeletons());
+        if (newsList) newsList.innerHTML = this.renderNewsSkeletons();
+        if (activityTimeline && window.ActivityManager) {
+            activityTimeline.innerHTML = window.ActivityManager.renderLoadingState();
+        }
 
         // STEP 1: Pre-load essential data and WAIT for completion
         await this.preloadEssentialData();
@@ -269,17 +318,25 @@ class PowerChoosersCRM {
     loadDashboardWidgets() {
         console.log('[CRM] Loading dashboard widgets...');
 
-        // Setup one-time animation handlers to prevent re-animation
-        this.setupOneTimeAnimations();
-        // Observe dashboard containers and animate height once when real content arrives
-        this.setupEntranceObservers();
+        // STEP 1: Immediately render skeletons for all widgets
+        const taskLists = document.querySelectorAll('.tasks-list');
+        const newsList = document.querySelector('.news-list');
+        const activityTimeline = document.getElementById('home-activity-timeline');
 
-        // Progressive Loading: Start activities immediately
-        // We don't wait for all background loaders. ActivityManager will render what it can (fallback)
-        // and then we refresh when background data arrives.
+        if (taskLists.length) taskLists.forEach(list => list.innerHTML = this.renderTaskSkeletons());
+        if (newsList) newsList.innerHTML = this.renderNewsSkeletons();
+        if (activityTimeline && window.ActivityManager) {
+            activityTimeline.innerHTML = window.ActivityManager.renderLoadingState();
+        }
+
+        // STEP 2: Start loading real data
+        this.loadTodaysTasks();
+        this.loadEnergyNews();
+        
+        // Load activities with a small delay to ensure initial skeleton is seen if load is instant
         setTimeout(() => {
             this.loadHomeActivities();
-        }, 100);
+        }, 50);
 
         // Setup listeners to refresh activities when background data becomes available
         this.setupActivityRefreshListeners();
@@ -327,116 +384,6 @@ class PowerChoosersCRM {
         // Also listen for contact updates as they affect email filtering
         window.addEventListener('pc:contacts-updated', () => refreshActivities('pc:contacts-updated'));
         window.addEventListener('pc:contact-created', () => refreshActivities('pc:contact-created'));
-    }
-
-    // Observe first render of dashboard containers and animate height once
-    setupEntranceObservers() {
-        const widgetConfigs = [
-            { containerSelector: '.tasks-list', itemSelector: '.task-item' },
-            { containerSelector: '.news-list', itemSelector: '.news-item' }
-        ];
-
-        const activitiesConfig = { containerSelector: '.activities-list', itemSelector: '.activity-item' };
-
-        const animateHeightOnce = (el) => {
-            if (!el || el.dataset.heightAnimated === '1') return;
-            el.dataset.heightAnimated = '1';
-
-            const startHeight = el.offsetHeight;
-            const targetHeight = el.scrollHeight;
-            el.style.overflow = 'hidden';
-            el.style.maxHeight = startHeight + 'px';
-            el.style.transition = 'max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
-
-            if (getComputedStyle(el).opacity === '0') el.style.opacity = '1';
-
-            requestAnimationFrame(() => {
-                el.style.maxHeight = Math.max(targetHeight, startHeight) + 'px';
-                setTimeout(() => {
-                    el.style.maxHeight = '';
-                    el.style.overflow = '';
-                }, 600);
-            });
-        };
-
-        // Check if BOTH tasks and news are ready before animating either
-        const checkBothWidgetsReady = () => {
-            const tasksContainer = document.querySelector('.tasks-list');
-            const newsContainer = document.querySelector('.news-list');
-
-            const tasksReady = tasksContainer && tasksContainer.querySelector('.task-item');
-            const newsReady = newsContainer && newsContainer.querySelector('.news-item');
-
-            // Only animate when BOTH are ready
-            if (tasksReady && newsReady) {
-                console.log('[CRM] Both tasks and news ready - animating together');
-                animateHeightOnce(tasksContainer);
-                animateHeightOnce(newsContainer);
-                return true;
-            }
-            return false;
-        };
-
-        // Watch both containers and animate together when both have content
-        widgetConfigs.forEach(({ containerSelector }) => {
-            const container = document.querySelector(containerSelector);
-            if (!container) return;
-            if (container.dataset.observerAttached === '1') return;
-            container.dataset.observerAttached = '1';
-
-            // Check if both are ready on initial load
-            if (checkBothWidgetsReady()) return;
-
-            // Observe for content arrival
-            const mo = new MutationObserver(() => {
-                if (checkBothWidgetsReady()) {
-                    mo.disconnect();
-                }
-            });
-            mo.observe(container, { childList: true });
-        });
-
-        // Activities animate independently
-        const activitiesContainer = document.querySelector(activitiesConfig.containerSelector);
-        if (activitiesContainer && !activitiesContainer.dataset.observerAttached) {
-            activitiesContainer.dataset.observerAttached = '1';
-
-            if (activitiesContainer.querySelector(activitiesConfig.itemSelector)) {
-                animateHeightOnce(activitiesContainer);
-            } else {
-                const mo = new MutationObserver(() => {
-                    if (activitiesContainer.querySelector(activitiesConfig.itemSelector)) {
-                        animateHeightOnce(activitiesContainer);
-                        mo.disconnect();
-                    }
-                });
-                mo.observe(activitiesContainer, { childList: true });
-            }
-        }
-    }
-
-    // Setup one-time animations - prevents re-animation on content updates
-    setupOneTimeAnimations() {
-        const containers = [
-            { selector: '.activities-list', items: '.activity-item' },
-            { selector: '.tasks-list', items: '.task-item' },
-            { selector: '.news-list', items: '.news-item' },
-            { selector: '.quick-actions', items: '.action-btn' }
-        ];
-
-        containers.forEach(({ selector, items }) => {
-            const container = document.querySelector(selector);
-            if (container && !container.classList.contains('animated')) {
-                // Mark container as animated immediately to prevent re-triggers
-                setTimeout(() => {
-                    container.classList.add('animated');
-                    // Also mark all items as animated
-                    container.querySelectorAll(items).forEach(item => {
-                        item.classList.add('animated');
-                    });
-                }, 1500); // After all animations complete
-            }
-        });
     }
 
     // Pre-load essential data for widgets and navigation
@@ -1397,13 +1344,12 @@ class PowerChoosersCRM {
     }
 
     async navigateToPage(pageName, params = {}) {
-        // Clean up previous page memory BEFORE navigating
-        if (this.currentPage && this.currentPage !== pageName) {
-            this.cleanupPageMemory(this.currentPage);
-        }
+        const fromPage = this.currentPage;
 
-        // Update current page tracking
-        this.currentPage = pageName;
+        // Clean up previous page memory BEFORE navigating
+        if (fromPage && fromPage !== pageName) {
+            this.cleanupPageMemory(fromPage);
+        }
 
         // Handle URL parameters for specific pages
         if (pageName === 'email-detail' && params.emailId) {
@@ -1412,14 +1358,19 @@ class PowerChoosersCRM {
             window.history.pushState({}, '', url);
         }
 
-        // Lazy load page scripts if needed
-        if (window.loadPageScripts && typeof window.loadPageScripts === 'function') {
-            try {
-                await window.loadPageScripts(pageName);
-            } catch (error) {
-                console.error(`[CRM] Error loading scripts for ${pageName}:`, error);
-            }
-        }
+        let scriptsLoaded = false;
+        const scriptsPromise = (window.loadPageScripts && typeof window.loadPageScripts === 'function')
+            ? Promise.resolve()
+                .then(() => window.loadPageScripts(pageName))
+                .catch((error) => {
+                    console.error(`[CRM] Error loading scripts for ${pageName}:`, error);
+                })
+                .finally(() => {
+                    scriptsLoaded = true;
+                })
+            : Promise.resolve().finally(() => {
+                scriptsLoaded = true;
+            });
 
         // Use View Transitions API for smooth page transitions
         const performNavigation = () => {
@@ -1454,7 +1405,7 @@ class PowerChoosersCRM {
         if (document.startViewTransition) {
             // Determine transition scope based on page type
             const isSettingsPage = pageName === 'settings';
-            const isFromSettingsPage = this.currentPage === 'settings';
+            const isFromSettingsPage = fromPage === 'settings';
 
             if (isSettingsPage || isFromSettingsPage) {
                 // Settings page: whole screen transition (since it takes up full screen)
@@ -1483,98 +1434,153 @@ class PowerChoosersCRM {
             performNavigation();
         }
 
+        this.updateWidgetPanel(pageName);
+
+        let skeletonTbody = null;
+        let hadSkeleton = false;
+        const shouldShowTableSkeleton = (name) => {
+            if (!name) return false;
+            if (!window._loadedPageScripts || typeof window._loadedPageScripts.has !== 'function') return false;
+            if (window._loadedPageScripts.has(name)) return false;
+            return name === 'people' || name === 'accounts' || name === 'emails' || name === 'list-detail';
+        };
+
+        const resolveSkeletonTbody = (name) => {
+            if (name === 'people') return document.querySelector('#people-page #people-table tbody');
+            if (name === 'accounts') return document.querySelector('#accounts-page #accounts-table tbody');
+            if (name === 'emails') return document.querySelector('#emails-page #emails-tbody');
+            if (name === 'list-detail') return document.querySelector('#list-detail-page #list-detail-table tbody');
+            return null;
+        };
+
+        const renderTableSkeleton = (tbody, count = 12) => {
+            if (!tbody) return;
+            const table = tbody.closest('table');
+            let cols = 1;
+            if (table) {
+                const ths = table.querySelectorAll('thead th');
+                if (ths && ths.length) cols = ths.length;
+            }
+            const safeCols = Math.max(1, Math.min(cols, 24));
+            // Estimate rows needed to fill visible viewport
+            const containerHeight = tbody.closest('.table-scroll')?.offsetHeight || window.innerHeight - 300;
+            const rowHeightEstimate = 56; // min-height we set in CSS
+            const rowsNeeded = Math.ceil(containerHeight / rowHeightEstimate);
+            const finalCount = Math.max(6, Math.min(count, rowsNeeded, 30));
+            const rows = Array.from({ length: finalCount }).map(() => {
+                const cells = Array.from({ length: safeCols }).map((i) => {
+                    if (i === 0) {
+                        return '<td><div class="skeleton-text skeleton-shimmer"></div></td>';
+                    } else {
+                        const variant = (i % 3 === 0) ? 'short' : ((i % 3 === 1) ? 'medium' : '');
+                        return `<td><div class="skeleton-text skeleton-shimmer ${variant}"></div></td>`;
+                    }
+                }).join('');
+                return `<tr>${cells}</tr>`;
+            }).join('');
+            tbody.setAttribute('data-skeleton', '1');
+            tbody.innerHTML = rows;
+        };
+
+        const clearTableSkeleton = (tbody) => {
+            if (!tbody) return;
+            if (tbody.getAttribute('data-skeleton') !== '1') return;
+            tbody.removeAttribute('data-skeleton');
+            tbody.innerHTML = '';
+        };
+
+        if (shouldShowTableSkeleton(pageName)) {
+            requestAnimationFrame(() => {
+                if (scriptsLoaded) return;
+                skeletonTbody = resolveSkeletonTbody(pageName);
+                if (skeletonTbody) {
+                    renderTableSkeleton(skeletonTbody);
+                    hadSkeleton = true;
+                }
+            });
+        }
+
+        await scriptsPromise;
+
+        if (hadSkeleton) {
+            clearTableSkeleton(skeletonTbody);
+        }
+
         // Special handling for specific pages
         if (pageName === 'people' && window.peopleModule) {
-            setTimeout(() => {
-                if (typeof window.peopleModule.rebindDynamic === 'function') {
-                    window.peopleModule.rebindDynamic();
-                }
-            }, 50);
+            if (typeof window.peopleModule.rebindDynamic === 'function') {
+                window.peopleModule.rebindDynamic();
+            }
         }
 
         if (pageName === 'accounts' && window.accountsModule) {
-            setTimeout(() => {
-                if (typeof window.accountsModule.init === 'function') {
-                    window.accountsModule.init();
-                }
-            }, 50);
+            if (typeof window.accountsModule.init === 'function') {
+                window.accountsModule.init();
+            }
         }
 
         // Load activities for home page
         if (pageName === 'dashboard' && window.ActivityManager) {
-            setTimeout(() => {
-                this.loadHomeActivities();
-            }, 50);
+            this.loadHomeActivities();
         }
 
         // Tasks page - ensure data is loaded from Firebase and localStorage
         if (pageName === 'tasks') {
-            setTimeout(() => {
-                // Trigger a refresh of tasks data when navigating to tasks page
-                if (window.dispatchEvent) {
-                    window.dispatchEvent(new CustomEvent('tasksUpdated', {
-                        detail: { source: 'navigation' }
-                    }));
-                }
-            }, 50);
+            // Trigger a refresh of tasks data when navigating to tasks page
+            if (window.dispatchEvent) {
+                window.dispatchEvent(new CustomEvent('tasksUpdated', {
+                    detail: { source: 'navigation' }
+                }));
+            }
         }
 
         // Task detail page - initialize task detail functionality
         if (pageName === 'task-detail') {
-            setTimeout(() => {
-                if (window.TaskDetail && typeof window.TaskDetail.init === 'function') {
-                    window.TaskDetail.init();
-                }
-            }, 100);
+            if (window.TaskDetail && typeof window.TaskDetail.init === 'function') {
+                window.TaskDetail.init();
+            }
         }
 
         // Contact detail page - initialize contact detail functionality
         if (pageName === 'contact-detail') {
-            setTimeout(() => {
-                if (window.ContactDetail && typeof window.ContactDetail.init === 'function') {
-                    window.ContactDetail.init();
-                }
-            }, 100);
+            if (window.ContactDetail && typeof window.ContactDetail.init === 'function') {
+                window.ContactDetail.init();
+            }
         }
 
         // Lists page - ensure overview is shown by default
         if (pageName === 'lists') {
-            // Make sure we show the overview, not any detail view
-            setTimeout(() => {
-                // Hide any detail views that might be showing
-                const listDetail = document.getElementById('lists-detail');
-                if (listDetail) {
-                    listDetail.hidden = true;
-                    listDetail.style.display = 'none';
-                }
+            // Hide any detail views that might be showing
+            const listDetail = document.getElementById('lists-detail');
+            if (listDetail) {
+                listDetail.hidden = true;
+                listDetail.style.display = 'none';
+            }
 
-                // Show the main lists content (overview)
-                const listsContent = document.querySelector('#lists-page .page-content');
-                if (listsContent) {
-                    listsContent.style.display = 'block';
-                    listsContent.classList.add('lists-grid');
-                }
+            // Show the main lists content (overview)
+            const listsContent = document.querySelector('#lists-page .page-content');
+            if (listsContent) {
+                listsContent.style.display = 'block';
+                listsContent.classList.add('lists-grid');
+            }
 
-                // Ensure lists overview module is initialized
-                if (window.ListsOverview && typeof window.ListsOverview.refreshCounts === 'function') {
-                    window.ListsOverview.refreshCounts();
-                }
-            }, 50);
+            // Ensure lists overview module is initialized
+            if (window.ListsOverview && typeof window.ListsOverview.refreshCounts === 'function') {
+                window.ListsOverview.refreshCounts();
+            }
         }
 
         // Client Management page - initialize client management dashboard
         if (pageName === 'client-management') {
-            setTimeout(() => {
-                if (window.ClientManagement && typeof window.ClientManagement.show === 'function') {
-                    window.ClientManagement.show();
-                }
-            }, 50);
+            if (window.ClientManagement && typeof window.ClientManagement.show === 'function') {
+                window.ClientManagement.show();
+            }
         }
 
         // Call Scripts page - store navigation source and initialize the module
         if (pageName === 'call-scripts') {
             // Store navigation source for back button functionality
-            const currentPage = this.currentPage;
+            const currentPage = fromPage;
             if (currentPage && currentPage !== 'call-scripts') {
                 // Get current page state for restoration
                 let returnState = {};
@@ -1605,75 +1611,64 @@ class PowerChoosersCRM {
 
             // Initialize the module
             if (window.callScriptsModule) {
-                setTimeout(() => {
-                    try {
-                        if (typeof window.callScriptsModule.init === 'function') {
-                            window.callScriptsModule.init();
-                        }
-                    } catch (_) { /* noop */ }
-                }, 50);
+                try {
+                    if (typeof window.callScriptsModule.init === 'function') {
+                        window.callScriptsModule.init();
+                    }
+                } catch (_) { /* noop */ }
             }
         }
 
         // List Detail page - initialize the detail view
         if (pageName === 'list-detail') {
-            setTimeout(() => {
-                // DON'T re-init if we're restoring from back navigation
-                if (window.__restoringListDetail) {
-                    console.log('[Main] Skipping ListDetail.init() - restoring from back navigation');
-                    return;
-                }
+            // DON'T re-init if we're restoring from back navigation
+            if (window.__restoringListDetail) {
+                console.log('[Main] Skipping ListDetail.init() - restoring from back navigation');
+                return;
+            }
 
-                // Initialize the list detail module if needed
-                if (window.ListDetail && typeof window.ListDetail.init === 'function') {
-                    // Use context passed from the lists overview
-                    const context = window.listDetailContext || {
-                        listId: null,
-                        listName: 'List',
-                        listKind: 'people'
-                    };
-                    window.ListDetail.init(context);
-                }
-            }, 50);
+            // Initialize the list detail module if needed
+            if (window.ListDetail && typeof window.ListDetail.init === 'function') {
+                // Use context passed from the lists overview
+                const context = window.listDetailContext || {
+                    listId: null,
+                    listName: 'List',
+                    listKind: 'people'
+                };
+                window.ListDetail.init(context);
+            }
         }
 
         // Email Detail page - initialize email detail functionality
         if (pageName === 'email-detail') {
-            setTimeout(() => {
-                if (window.EmailDetail && typeof window.EmailDetail.init === 'function') {
-                    window.EmailDetail.init();
-                }
+            if (window.EmailDetail && typeof window.EmailDetail.init === 'function') {
+                window.EmailDetail.init();
+            }
 
-                // Check if we have an emailId parameter to show
-                const urlParams = new URLSearchParams(window.location.search);
-                const emailId = urlParams.get('emailId');
-                if (emailId && window.EmailDetail && typeof window.EmailDetail.show === 'function') {
-                    window.EmailDetail.show(emailId);
-                }
-            }, 100);
+            // Check if we have an emailId parameter to show
+            const urlParams = new URLSearchParams(window.location.search);
+            const emailId = urlParams.get('emailId');
+            if (emailId && window.EmailDetail && typeof window.EmailDetail.show === 'function') {
+                window.EmailDetail.show(emailId);
+            }
         }
 
         // Emails page - initialize emails functionality
         if (pageName === 'emails') {
-            setTimeout(() => {
-                if (window.EmailsPage && typeof window.EmailsPage.init === 'function') {
-                    window.EmailsPage.init();
-                }
-            }, 50);
+            if (window.EmailsPage && typeof window.EmailsPage.init === 'function') {
+                window.EmailsPage.init();
+            }
         }
 
         if (pageName === 'calls' && window.callsModule) {
-            setTimeout(() => {
-                if (typeof window.callsModule.startAutoRefresh === 'function') {
-                    window.callsModule.startAutoRefresh();
-                }
-            }, 50);
+            if (typeof window.callsModule.startAutoRefresh === 'function') {
+                window.callsModule.startAutoRefresh();
+            }
         } else if (window.callsModule && typeof window.callsModule.stopAutoRefresh === 'function') {
             window.callsModule.stopAutoRefresh();
         }
 
         this.currentPage = pageName;
-        this.updateWidgetPanel(pageName);
     }
 
     // Setup Refresh Data Button
@@ -1761,6 +1756,7 @@ class PowerChoosersCRM {
             // Pointer-based hover inside the sidebar (passive for better performance)
             sidebar.addEventListener('pointerenter', () => {
                 this.sidebarPointerInside = true;
+                
                 if (this.sidebarLockCollapse) return; // Don't open if locked
                 if (this.sidebarCloseTimer) clearTimeout(this.sidebarCloseTimer);
                 // Small show delay to avoid accidental flicker
@@ -5045,6 +5041,15 @@ class PowerChoosersCRM {
     // Load Initial Data
     loadInitialData() {
         this.updateLivePrice();
+
+        // START COORDINATED BACKGROUND LOADING
+        if (window.BackgroundLoaderCoordinator) {
+            console.log('[CRM] Starting coordinated background data loading...');
+            window.BackgroundLoaderCoordinator.coordinateLoading().catch(error => {
+                console.error('[CRM] Background loading failed:', error);
+            });
+        }
+
         // Load tasks and news together to prevent re-renders
         Promise.all([
             this.loadTodaysTasks(),
@@ -5328,13 +5333,183 @@ class PowerChoosersCRM {
         return linkedInTasks;
     }
 
+    renderTaskSkeletons(count = 3) {
+        return Array(count).fill(0).map(() => `
+            <div class="task-item" style="opacity: 0.6; pointer-events: none; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 10px; display: flex; align-items: center; min-height: 60px; padding: 12px 16px;">
+                <div class="task-info" style="flex: 1;">
+                    <div class="skeleton-text medium skeleton-shimmer" style="margin-bottom: 8px; height: 14px;"></div>
+                    <div class="skeleton-text short skeleton-shimmer" style="height: 12px;"></div>
+                </div>
+                <div class="skeleton-shimmer" style="width: 65px; height: 18px; border-radius: 12px; margin-left: 12px;"></div>
+            </div>
+        `).join('');
+    }
+
+    renderNewsSkeletons(count = 3) {
+        return Array(count).fill(0).map(() => `
+            <div class="news-item" style="opacity: 0.6; pointer-events: none; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 10px; min-height: 84px; display: flex; flex-direction: column; justify-content: center; padding: 12px 16px;">
+                <div class="news-title skeleton-text skeleton-shimmer" style="width: 95%; margin-bottom: 12px; height: 16px;"></div>
+                <div class="news-time skeleton-text short skeleton-shimmer" style="height: 12px;"></div>
+            </div>
+        `).join('');
+    }
+
+    renderTasksSkeletons(count = 4) {
+        return Array(count).fill(0).map((_, index) => {
+            const delay = (index * 0.1).toFixed(2);
+            return `
+                <div class="task-item skeleton-task" style="opacity: 0.6; pointer-events: none; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 8px; min-height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; animation-delay: ${delay}s;">
+                    <div class="task-info" style="flex: 1;">
+                        <div class="task-name skeleton-text skeleton-shimmer" style="width: 85%; margin-bottom: 6px; height: 14px;"></div>
+                        <div class="task-time skeleton-text short skeleton-shimmer" style="height: 12px; width: 60%;"></div>
+                    </div>
+                    <span class="priority-badge skeleton-shimmer" style="width: 60px; height: 20px; border-radius: 10px;"></span>
+                </div>
+            `;
+        }).join('');
+    }
+
     async loadTodaysTasks(skipFirebase = false) {
+        const startTime = performance.now();
+
+        // #region agent log - Hypothesis G: Function entry
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            sessionId: 'cache-debug-session',
+            runId: 'widget-entry-debug',
+            hypothesisId: 'G',
+            location: 'main.js:loadTodaysTasks',
+            message: 'loadTodaysTasks function called',
+            data: { skipFirebase, startTime },
+            timestamp: Date.now()
+          })
+        }).catch(() => {});
+        // #endregion
+
+        // DEBOUNCING: Prevent multiple calls within 2 seconds
+        const currentTime = Date.now();
+        if (this._lastTasksLoad && (currentTime - this._lastTasksLoad) < 2000) {
+            console.log('[CRM] Tasks load debounced - too soon since last load');
+
+            // #region agent log - Hypothesis G: Debounced call
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                sessionId: 'cache-debug-session',
+                runId: 'widget-debouncing-fix',
+                hypothesisId: 'G',
+                location: 'main.js:loadTodaysTasks',
+                message: 'loadTodaysTasks debounced - too soon since last call',
+                data: { timeSinceLastLoad: currentTime - this._lastTasksLoad },
+                timestamp: Date.now()
+              })
+            }).catch(() => {});
+            // #endregion
+
+            return;
+        }
+        this._lastTasksLoad = currentTime;
+
+        // Track this invocation so we can correlate unexpected late re-renders
+        this._todaysTasksInvocationId = `tt_${currentTime}_${Math.random().toString(16).slice(2, 8)}`;
+        // #region agent log - Hypothesis G3: loadTodaysTasks invocation identity + role branch (no PII)
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            sessionId: 'cache-debug-session',
+            runId: 'tasks-invocation-debug',
+            hypothesisId: 'G3',
+            location: 'main.js:loadTodaysTasks',
+            message: 'loadTodaysTasks invocation created',
+            data: { tasksInvocationId: this._todaysTasksInvocationId, skipFirebase: !!skipFirebase, currentUserRole: String(window.currentUserRole || ''), isAdmin: String(window.currentUserRole || '') === 'admin' },
+            timestamp: Date.now()
+          })
+        }).catch(() => {});
+        // #endregion
+
+        // #region agent log - Hypothesis G: Track widget loading starts
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            sessionId: 'cache-debug-session',
+            runId: 'widget-debouncing-fix',
+            hypothesisId: 'G',
+            location: 'main.js:loadTodaysTasks',
+            message: 'loadTodaysTasks called (after debouncing)',
+            data: { skipFirebase, alreadyLoading: this._tasksLoading },
+            timestamp: Date.now()
+          })
+        }).catch(() => {});
+        // #endregion
+
         const taskLists = Array.from(document.querySelectorAll('.tasks-list'));
-        if (!taskLists.length) return;
+        
+        // #region agent log - Hypothesis G: Task lists check
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            sessionId: 'cache-debug-session',
+            runId: 'widget-render-debug',
+            hypothesisId: 'G',
+            location: 'main.js:loadTodaysTasks',
+            message: 'Checking for task lists',
+            data: { taskListsCount: taskLists.length, _tasksLoading: this._tasksLoading },
+            timestamp: Date.now()
+          })
+        }).catch(() => {});
+        // #endregion
+
+        if (!taskLists.length) {
+            // #region agent log - Hypothesis G: No task lists found
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                sessionId: 'cache-debug-session',
+                runId: 'widget-debouncing-fix',
+                hypothesisId: 'G',
+                location: 'main.js:loadTodaysTasks',
+                message: 'No task lists found - exiting early',
+                data: {},
+                timestamp: Date.now()
+              })
+            }).catch(() => {});
+            // #endregion
+            return;
+        }
+
+        // SHOW SKELETON LOADING IMMEDIATELY
+        const tasksList = taskLists[0]; // Use first tasks list
+        if (tasksList && !this._tasksLoading) {
+            tasksList.innerHTML = this.renderTasksSkeletons();
+        }
 
         // Prevent double-rendering - only skip if currently loading
         if (this._tasksLoading) {
             console.log('[CRM] Tasks already loading, skipping duplicate call');
+
+            // #region agent log - Hypothesis G: Duplicate call prevented
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                sessionId: 'cache-debug-session',
+                runId: 'widget-debouncing-fix',
+                hypothesisId: 'G',
+                location: 'main.js:loadTodaysTasks',
+                message: 'Duplicate loadTodaysTasks call prevented',
+                data: {},
+                timestamp: Date.now()
+              })
+            }).catch(() => {});
+            // #endregion
+
             return;
         }
         this._tasksLoading = true;
@@ -5393,23 +5568,22 @@ class PowerChoosersCRM {
             }
         };
 
-        // Load localStorage tasks first for immediate rendering
-        // CRITICAL FIX: Use namespaced key to match task-detail.js and avoid stale data
+        // Always render skeletons immediately to prevent layout shift
+        taskLists.forEach(list => { list.innerHTML = this.renderTaskSkeletons(); });
+
+        // Load localStorage tasks for immediate rendering after skeletons (non-admin only)
+        // NOTE: localStorage is per-browser and can be stale across browsers; Firebase/CacheManager are source-of-truth.
         let localTasks = [];
         try {
-            // Try namespaced key first (matches task-detail.js)
+            // Admin users should NOT use localStorage as a source (it causes stale cross-browser confusion and flicker)
+            if (isAdmin()) {
+                localTasks = [];
+            } else {
+            // Try namespaced key first (matches tasks.js/task-detail.js patterns)
             const email = getUserEmail();
             const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
             const namespacedTasks = JSON.parse(localStorage.getItem(namespacedKey) || '[]');
-
-            // Also check legacy key for cross-browser compatibility
-            const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
-
-            // Merge both sources, preferring namespaced key
-            const tasksMap = new Map();
-            namespacedTasks.forEach(t => { if (t && t.id) tasksMap.set(t.id, t); });
-            legacyTasks.forEach(t => { if (t && t.id && !tasksMap.has(t.id)) tasksMap.set(t.id, t); });
-            localTasks = Array.from(tasksMap.values());
+            localTasks = Array.isArray(namespacedTasks) ? namespacedTasks : [];
 
             // CRITICAL: Filter by ownership for non-admin users (localStorage bypasses Firestore rules)
             if (!isAdmin() && localTasks.length > 0) {
@@ -5422,36 +5596,28 @@ class PowerChoosersCRM {
                 });
             }
 
-            // CRITICAL FIX: Filter out completed tasks from localStorage cache (they shouldn't show in Today's Tasks)
-            // This prevents stale completed tasks from showing when switching browsers
-            localTasks = localTasks.filter(t => (t.status || 'pending') !== 'completed');
+            // CRITICAL: Filter out completed tasks from localStorage cache (they shouldn't show in Today's Tasks)
+            // Use broader completion markers than just status to avoid schema drift.
+            localTasks = localTasks.filter(t => {
+                if (!t) return false;
+                const status = String(t.status || 'pending').toLowerCase();
+                if (status === 'completed' || status === 'done') return false;
+                if (t.completed === true || t.isCompleted === true) return false;
+                if (t.completedAt || t.completed_at) return false;
+                return true;
+            });
+            }
         } catch (_) { localTasks = []; }
 
-        // CRITICAL FIX: Also check BackgroundTasksLoader cache and filter out completed tasks
-        // This prevents stale completed tasks from BackgroundTasksLoader cache from appearing
-        try {
-            if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.getTasksData === 'function') {
-                const backgroundTasks = window.BackgroundTasksLoader.getTasksData() || [];
-                // Filter out completed tasks and merge with localTasks (prefer localTasks for duplicates)
-                const backgroundTasksMap = new Map();
-                backgroundTasks.forEach(t => {
-                    if (t && t.id && (t.status || 'pending') !== 'completed') {
-                        // Only add if not already in localTasks (localStorage is more recent)
-                        if (!localTasks.some(lt => lt.id === t.id)) {
-                            backgroundTasksMap.set(t.id, t);
-                        }
-                    }
-                });
-                // Add non-duplicate background tasks to localTasks
-                localTasks = [...localTasks, ...Array.from(backgroundTasksMap.values())];
-                console.log('[CRM] Loaded', backgroundTasksMap.size, 'pending tasks from BackgroundTasksLoader for Today\'s Tasks widget');
-            }
-        } catch (e) {
-            console.warn('[CRM] Could not load tasks from BackgroundTasksLoader for Today\'s Tasks widget:', e);
-        }
+        // NOTE: BackgroundTasksLoader is legacy and can introduce stale data; do not mix it into Today's Tasks.
 
-        // Always render immediately from localStorage cache first
-        this.renderTodaysTasks(localTasks, parseDateStrict, parseTimeToMinutes, today);
+        // If we have local tasks, only render them for non-admin users AND only if coordinator tasks aren't loaded yet.
+        try {
+            const coordinatorReady = !!(window.BackgroundLoaderCoordinator && window.BackgroundLoaderCoordinator.isLoaded && window.BackgroundLoaderCoordinator.isLoaded('tasks'));
+            if (!isAdmin() && !coordinatorReady && localTasks.length > 0) {
+                this.renderTodaysTasks(localTasks, parseDateStrict, parseTimeToMinutes, today);
+            }
+        } catch (_) {}
 
         // If not skipping Firebase, fetch Firebase data in background and update
         if (!skipFirebase) {
@@ -5466,33 +5632,34 @@ class PowerChoosersCRM {
                             // Use DataManager helper if available
                             const firebaseTasks = await window.DataManager.queryWithOwnership('tasks');
 
-                            // CRITICAL FIX: Always prefer Firebase as the source of truth
-                            // Firebase tasks override any stale local copies with the same ID
-                            // CRITICAL: Filter out completed tasks from Firebase results
+                            // CRITICAL: Firebase is the source of truth once available.
+                            // Do NOT re-introduce stale local tasks that are missing from Firebase results.
                             const mergedTasksMap = new Map();
                             firebaseTasks.forEach(t => {
-                                if (t && t.id && (t.status || 'pending') !== 'completed') {
-                                    mergedTasksMap.set(t.id, t);
-                                }
-                            });
-                            localTasks.forEach(t => {
-                                if (t && t.id && (t.status || 'pending') !== 'completed' && !mergedTasksMap.has(t.id)) {
-                                    mergedTasksMap.set(t.id, t);
-                                }
+                                const status = String(t?.status || 'pending').toLowerCase();
+                                const isCompleted = status === 'completed' || status === 'done' || t?.completed === true || t?.isCompleted === true || t?.completedAt || t?.completed_at;
+                                if (t && t.id && !isCompleted) mergedTasksMap.set(t.id, t);
                             });
 
                             // CRITICAL FIX: Add LinkedIn sequence tasks (only pending ones)
                             const linkedInTasks = await this.getLinkedInTasksFromSequences();
                             linkedInTasks.forEach(t => {
-                                if (t && t.id && (t.status || 'pending') !== 'completed' && !mergedTasksMap.has(t.id)) {
-                                    mergedTasksMap.set(t.id, t);
-                                }
+                                const status = String(t?.status || 'pending').toLowerCase();
+                                const isCompleted = status === 'completed' || status === 'done' || t?.completed === true || t?.isCompleted === true || t?.completedAt || t?.completed_at;
+                                if (t && t.id && !isCompleted && !mergedTasksMap.has(t.id)) mergedTasksMap.set(t.id, t);
                             });
 
                             const mergedTasks = Array.from(mergedTasksMap.values());
 
-                            // CRITICAL FIX: Final safety check - ensure no completed tasks are saved to localStorage
-                            const finalMergedTasks = mergedTasks.filter(t => t && t.id && (t.status || 'pending') !== 'completed');
+                            // Final safety check - ensure no completed tasks are saved to localStorage
+                            const finalMergedTasks = mergedTasks.filter(t => {
+                                if (!t || !t.id) return false;
+                                const status = String(t.status || 'pending').toLowerCase();
+                                if (status === 'completed' || status === 'done') return false;
+                                if (t.completed === true || t.isCompleted === true) return false;
+                                if (t.completedAt || t.completed_at) return false;
+                                return true;
+                            });
 
                             // CRITICAL FIX: Save to both namespaced and legacy keys for compatibility
                             try {
@@ -5527,32 +5694,34 @@ class PowerChoosersCRM {
                             });
                             const firebaseTasks = Array.from(tasksMap.values());
 
-                            // CRITICAL FIX: Always prefer Firebase as the source of truth
-                            // CRITICAL: Filter out completed tasks from Firebase results
+                            // CRITICAL: Firebase is the source of truth once available.
+                            // Do NOT re-introduce stale local tasks that are missing from Firebase results.
                             const mergedTasksMap = new Map();
                             firebaseTasks.forEach(t => {
-                                if (t && t.id && (t.status || 'pending') !== 'completed') {
-                                    mergedTasksMap.set(t.id, t);
-                                }
-                            });
-                            localTasks.forEach(t => {
-                                if (t && t.id && (t.status || 'pending') !== 'completed' && !mergedTasksMap.has(t.id)) {
-                                    mergedTasksMap.set(t.id, t);
-                                }
+                                const status = String(t?.status || 'pending').toLowerCase();
+                                const isCompleted = status === 'completed' || status === 'done' || t?.completed === true || t?.isCompleted === true || t?.completedAt || t?.completed_at;
+                                if (t && t.id && !isCompleted) mergedTasksMap.set(t.id, t);
                             });
 
                             // CRITICAL FIX: Add LinkedIn sequence tasks (only pending ones)
                             const linkedInTasks = await this.getLinkedInTasksFromSequences();
                             linkedInTasks.forEach(t => {
-                                if (t && t.id && (t.status || 'pending') !== 'completed' && !mergedTasksMap.has(t.id)) {
-                                    mergedTasksMap.set(t.id, t);
-                                }
+                                const status = String(t?.status || 'pending').toLowerCase();
+                                const isCompleted = status === 'completed' || status === 'done' || t?.completed === true || t?.isCompleted === true || t?.completedAt || t?.completed_at;
+                                if (t && t.id && !isCompleted && !mergedTasksMap.has(t.id)) mergedTasksMap.set(t.id, t);
                             });
 
                             const mergedTasks = Array.from(mergedTasksMap.values());
 
-                            // CRITICAL FIX: Final safety check - ensure no completed tasks are saved to localStorage
-                            const finalMergedTasks = mergedTasks.filter(t => t && t.id && (t.status || 'pending') !== 'completed');
+                            // Final safety check - ensure no completed tasks are saved to localStorage
+                            const finalMergedTasks = mergedTasks.filter(t => {
+                                if (!t || !t.id) return false;
+                                const status = String(t.status || 'pending').toLowerCase();
+                                if (status === 'completed' || status === 'done') return false;
+                                if (t.completed === true || t.isCompleted === true) return false;
+                                if (t.completedAt || t.completed_at) return false;
+                                return true;
+                            });
 
                             // CRITICAL FIX: Save to both namespaced and legacy keys for compatibility
                             try {
@@ -5569,51 +5738,192 @@ class PowerChoosersCRM {
                         }
                     }
 
+                    // OPTIMIZATION: Try to use cached data from BackgroundLoaderCoordinator first
+                    // This avoids expensive Firebase queries when data is already cached
+                    const coordinatorExists = !!window.BackgroundLoaderCoordinator;
+                    const tasksLoaded = coordinatorExists ? window.BackgroundLoaderCoordinator.isLoaded('tasks') : false;
+                    const coordinatorStatus = coordinatorExists ? window.BackgroundLoaderCoordinator.getStatus() : null;
+
+                    // #region agent log - Hypothesis G: Debug cached tasks check
+                    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+                      method: 'POST',
+                      headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify({
+                        sessionId: 'cache-debug-session',
+                        runId: 'widget-debouncing-fix',
+                        hypothesisId: 'G',
+                        location: 'main.js:loadTodaysTasks',
+                        message: 'Checking cached tasks availability',
+                        data: { coordinatorExists, tasksLoaded, coordinatorStatus },
+                        timestamp: Date.now()
+                      })
+                    }).catch(() => {});
+                    // #endregion
+
+                    if (tasksLoaded) {
+                        try {
+                            // #region agent log - Hypothesis G: Using cached tasks data
+                            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+                              method: 'POST',
+                              headers: {'Content-Type': 'application/json'},
+                              body: JSON.stringify({
+                                sessionId: 'cache-debug-session',
+                                runId: 'widget-rerender-fix',
+                                hypothesisId: 'G',
+                                location: 'main.js:loadTodaysTasks',
+                                message: 'Using cached tasks from BackgroundLoaderCoordinator',
+                                data: {},
+                                timestamp: Date.now()
+                              })
+                            }).catch(() => {});
+                            // #endregion
+
+                            const cachedTasks = await window.CacheManager.get('tasks');
+                            const filteredTasks = cachedTasks.filter(task => {
+                                if (!task || (task.status || 'pending') === 'completed') return false;
+                                // CRITICAL FIX: Include today AND overdue tasks (same logic as renderTodaysTasks)
+                                const taskDate = parseDateStrict(task.dueDate || task.date || task.createdAt);
+                                return taskDate && taskDate.getTime() <= today.getTime();
+                            });
+
+                            // Process cached tasks for today's tasks format
+                            const processedTasks = filteredTasks.map(task => ({
+                                ...task,
+                                time: task.time || '',
+                                priority: task.priority || 'medium',
+                                type: task.type || 'task'
+                            }));
+
+                            // #region agent log - Hypothesis G: Successfully loaded cached tasks
+                            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+                              method: 'POST',
+                              headers: {'Content-Type': 'application/json'},
+                              body: JSON.stringify({
+                                sessionId: 'cache-debug-session',
+                                runId: 'widget-render-fix',
+                                hypothesisId: 'G',
+                                location: 'main.js:loadTodaysTasks',
+                                message: 'Successfully loaded cached tasks',
+                                data: { tasksRendered: processedTasks.length, tasksLoadingCleared: true, cachedTasksTotal: cachedTasks.length },
+                                timestamp: Date.now()
+                              })
+                            }).catch(() => {});
+                            // #endregion
+
+                            // Render cached tasks quickly if available.
+                            // IMPORTANT: For admins, cached tasks can be stale across browsers (2h expiry),
+                            // so we still revalidate against Firebase when skipFirebase === false.
+                            if (processedTasks.length > 0) {
+                                this.renderTodaysTasks(processedTasks, parseDateStrict, parseTimeToMinutes, today);
+
+                                // #region agent log - Hypothesis G5: Cached tasks rendered; decide whether to revalidate with Firebase
+                                fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+                                  method: 'POST',
+                                  headers: {'Content-Type': 'application/json'},
+                                  body: JSON.stringify({
+                                    sessionId: 'cache-debug-session',
+                                    runId: 'tasks-revalidate-debug',
+                                    hypothesisId: 'G5',
+                                    location: 'main.js:loadTodaysTasks',
+                                    message: 'Rendered cached tasks; revalidate decision',
+                                    data: { cachedRendered: processedTasks.length, skipFirebase: !!skipFirebase, isAdmin: String(window.currentUserRole || '') === 'admin' },
+                                    timestamp: Date.now()
+                                  })
+                                }).catch(() => {});
+                                // #endregion
+
+                                if (!skipFirebase && String(window.currentUserRole || '') !== 'admin') {
+                                    // Non-admin users: keep current behavior to avoid extra reads; cached is typically fine + ownership filtered.
+                                    this._tasksLoading = false;
+
+                                    const endTime = performance.now();
+                                    // #region agent log - Hypothesis G: Cached tasks load completed quickly
+                                    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+                                      method: 'POST',
+                                      headers: {'Content-Type': 'application/json'},
+                                      body: JSON.stringify({
+                                        sessionId: 'cache-debug-session',
+                                        runId: 'widget-rerender-fix',
+                                        hypothesisId: 'G',
+                                        location: 'main.js:loadTodaysTasks',
+                                        message: 'loadTodaysTasks completed using cached data',
+                                        data: { duration: endTime - startTime, tasksLoaded: processedTasks.length },
+                                        timestamp: Date.now()
+                                      })
+                                    }).catch(() => {});
+                                    // #endregion
+
+                                    return;
+                                }
+                                // Admin users: continue to Firebase path to revalidate.
+                            }
+                            // If cached returned 0 tasks, fall through to Firebase path
+                        } catch (error) {
+                            console.warn('[CRM] Failed to load cached tasks, falling back to Firebase:', error);
+                            // Continue to Firebase fallback
+                        }
+                    }
+
                     // Admin path: unrestricted query
                     const snapshot = await query
                         .orderBy('timestamp', 'desc')
                         .limit(200)
                         .get();
+                    // #region agent log - Hypothesis G6: Firebase admin query returned
+                    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+                      method: 'POST',
+                      headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify({
+                        sessionId: 'cache-debug-session',
+                        runId: 'tasks-revalidate-debug',
+                        hypothesisId: 'G6',
+                        location: 'main.js:loadTodaysTasks',
+                        message: 'Firebase admin tasks snapshot returned',
+                        data: { docCount: snapshot?.docs ? snapshot.docs.length : 0 },
+                        timestamp: Date.now()
+                      })
+                    }).catch(() => {});
+                    // #endregion
                     const firebaseTasks = snapshot.docs.map(doc => {
                         const data = doc.data() || {};
                         const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
                         return { ...data, id: (data.id || doc.id), createdAt, status: data.status || 'pending' };
                     });
 
-                    // CRITICAL FIX: Always prefer Firebase as the source of truth
-                    // Firebase tasks override any stale local copies with the same ID
-                    // CRITICAL: Filter out completed tasks from Firebase results
+                    // CRITICAL: Admin path still treats Firebase as source of truth.
+                    // Do NOT merge in stale localTasks after Firebase load.
                     const allTasksMap = new Map();
                     firebaseTasks.forEach(t => {
-                        if (t && t.id && (t.status || 'pending') !== 'completed') {
-                            allTasksMap.set(t.id, t);
-                        }
-                    });
-                    localTasks.forEach(t => {
-                        if (t && t.id && (t.status || 'pending') !== 'completed' && !allTasksMap.has(t.id)) {
-                            allTasksMap.set(t.id, t);
-                        }
+                        const status = String(t?.status || 'pending').toLowerCase();
+                        const isCompleted = status === 'completed' || status === 'done' || t?.completed === true || t?.isCompleted === true || t?.completedAt || t?.completed_at;
+                        if (t && t.id && !isCompleted) allTasksMap.set(t.id, t);
                     });
 
                     // CRITICAL FIX: Add LinkedIn sequence tasks (only pending ones)
                     const linkedInTasks = await this.getLinkedInTasksFromSequences();
                     linkedInTasks.forEach(t => {
-                        if (t && t.id && (t.status || 'pending') !== 'completed' && !allTasksMap.has(t.id)) {
-                            allTasksMap.set(t.id, t);
-                        }
+                        const status = String(t?.status || 'pending').toLowerCase();
+                        const isCompleted = status === 'completed' || status === 'done' || t?.completed === true || t?.isCompleted === true || t?.completedAt || t?.completed_at;
+                        if (t && t.id && !isCompleted && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t);
                     });
 
                     const mergedTasks = Array.from(allTasksMap.values());
 
-                    // CRITICAL FIX: Final safety check - ensure no completed tasks are saved to localStorage
-                    const finalMergedTasks = mergedTasks.filter(t => t && t.id && (t.status || 'pending') !== 'completed');
+                    // Final safety check - ensure no completed tasks are saved to localStorage
+                    const finalMergedTasks = mergedTasks.filter(t => {
+                        if (!t || !t.id) return false;
+                        const status = String(t.status || 'pending').toLowerCase();
+                        if (status === 'completed' || status === 'done') return false;
+                        if (t.completed === true || t.isCompleted === true) return false;
+                        if (t.completedAt || t.completed_at) return false;
+                        return true;
+                    });
 
-                    // CRITICAL FIX: Save to both namespaced and legacy keys for compatibility
+                    // Save only to namespaced key (avoid cross-user/browser mixing)
                     try {
                         const email = getUserEmail();
                         const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
                         localStorage.setItem(namespacedKey, JSON.stringify(finalMergedTasks));
-                        localStorage.setItem('userTasks', JSON.stringify(finalMergedTasks)); // Legacy key for compatibility
                     } catch (e) {
                         console.warn('Could not save merged tasks to localStorage cache:', e);
                     }
@@ -5631,27 +5941,137 @@ class PowerChoosersCRM {
             // CRITICAL FIX: Reset loading flag if skipping Firebase
             this._tasksLoading = false;
         }
+
+        const endTime = performance.now();
+        // #region agent log - Hypothesis G: Track widget loading completion
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            sessionId: 'cache-debug-session',
+            runId: 'widget-rerender-fix',
+            hypothesisId: 'G',
+            location: 'main.js:loadTodaysTasks',
+            message: 'loadTodaysTasks completed',
+            data: { duration: endTime - startTime, skipFirebase },
+            timestamp: Date.now()
+          })
+        }).catch(() => {});
+        // #endregion
     }
 
     renderTodaysTasks(allTasks, parseDateStrict, parseTimeToMinutes, today) {
+        // #region agent log - Hypothesis G: renderTodaysTasks called
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            sessionId: 'cache-debug-session',
+            runId: 'widget-render-debug',
+            hypothesisId: 'G',
+            location: 'main.js:renderTodaysTasks',
+            message: 'renderTodaysTasks function called',
+            data: { allTasksCount: allTasks ? allTasks.length : 0, hasTasksList: !!document.querySelector('.tasks-list') },
+            timestamp: Date.now()
+          })
+        }).catch(() => {});
+        // #endregion
+
+        // #region agent log - Hypothesis G2: Identify unexpected re-renders/callers (no PII)
+        try {
+            const stackTop = (new Error().stack || '').split('\n').slice(0, 4).map(s => String(s).trim());
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                sessionId: 'cache-debug-session',
+                runId: 'tasks-caller-debug',
+                hypothesisId: 'G2',
+                location: 'main.js:renderTodaysTasks',
+                message: 'renderTodaysTasks caller trace (top frames)',
+                data: { allTasksCount: allTasks ? allTasks.length : 0, tasksInvocationId: this?._todaysTasksInvocationId || null, stackTop },
+                timestamp: Date.now()
+              })
+            }).catch(() => {});
+        } catch (_) {}
+        // #endregion
+
         const tasksList = document.querySelector('.tasks-list');
-        if (!tasksList) return;
+        if (!tasksList) {
+            // #region agent log - Hypothesis G: No tasks list element found
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                sessionId: 'cache-debug-session',
+                runId: 'widget-render-debug',
+                hypothesisId: 'G',
+                location: 'main.js:renderTodaysTasks',
+                message: 'No .tasks-list element found - exiting early',
+                data: {},
+                timestamp: Date.now()
+              })
+            }).catch(() => {});
+            // #endregion
+            return;
+        }
 
         // allTasks is already merged and deduped by the caller (local first, then Firebase)
 
         // Filter to today's and overdue pending tasks
         // CRITICAL FIX: Filter out completed tasks and tasks without valid due dates
         let todaysTasks = allTasks.filter(task => {
-            // Exclude completed tasks
-            if ((task.status || 'pending') === 'completed') return false;
+            // Exclude completed tasks (broad markers)
+            const status = String(task?.status || 'pending').toLowerCase();
+            if (status === 'completed' || status === 'done') return false;
+            if (task?.completed === true || task?.isCompleted === true) return false;
+            if (task?.completedAt || task?.completed_at) return false;
             // Only include pending tasks
-            if ((task.status || 'pending') !== 'pending') return false;
+            if (status !== 'pending') return false;
             // Must have a valid due date
             const d = parseDateStrict(task.dueDate);
             if (!d) return false;
             // Include today and overdue tasks
             return d.getTime() <= today.getTime();
         });
+
+        // #region agent log - Hypothesis G4: Completion marker stats (counts only, no PII)
+        try {
+            let cStatusCompleted = 0, cStatusDone = 0, cCompletedTrue = 0, cIsCompletedTrue = 0, cCompletedAt = 0, cNoStatus = 0;
+            (Array.isArray(allTasks) ? allTasks : []).forEach(t => {
+                const stRaw = t && t.status != null ? String(t.status) : '';
+                const st = stRaw.toLowerCase();
+                if (!stRaw) cNoStatus++;
+                if (st === 'completed') cStatusCompleted++;
+                if (st === 'done') cStatusDone++;
+                if (t && t.completed === true) cCompletedTrue++;
+                if (t && t.isCompleted === true) cIsCompletedTrue++;
+                if (t && (t.completedAt || t.completed_at)) cCompletedAt++;
+            });
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                sessionId: 'cache-debug-session',
+                runId: 'tasks-completion-stats',
+                hypothesisId: 'G4',
+                location: 'main.js:renderTodaysTasks',
+                message: 'Task completion marker stats (input vs rendered)',
+                data: {
+                    inputCount: allTasks ? allTasks.length : 0,
+                    renderedCandidateCount: todaysTasks ? todaysTasks.length : 0,
+                    statusCompleted: cStatusCompleted,
+                    statusDone: cStatusDone,
+                    completedTrue: cCompletedTrue,
+                    isCompletedTrue: cIsCompletedTrue,
+                    completedAtPresent: cCompletedAt,
+                    missingStatus: cNoStatus
+                },
+                timestamp: Date.now()
+              })
+            }).catch(() => {});
+        } catch (_) {}
+        // #endregion
 
         // Sort by due date/time (earliest to latest)
         todaysTasks.sort((a, b) => {
@@ -5711,14 +6131,19 @@ class PowerChoosersCRM {
                 </div>
             `;
         } else {
-            tasksHtml = pageTasks.map(task => {
+            tasksHtml = pageTasks.map((task, index) => {
                 const timeText = this.getTaskTimeText(task);
                 const displayTitle = this.updateTaskTitle(task);
                 // CRITICAL FIX: Set priority to 'sequence' for sequence tasks (matches tasks.js logic)
                 const isSequenceTask = !!task.isSequenceTask || !!task.isLinkedInTask;
                 const priorityValue = isSequenceTask ? 'sequence' : (task.priority || '');
+                
+                // Add staggered delay for modern reveal
+                const delay = (index * 0.05).toFixed(2);
+                const revealStyle = `style="animation-delay: ${delay}s;"`;
+
                 return `
-                    <div class="task-item" data-task-id="${task.id}" style="cursor: pointer;">
+                    <div class="task-item modern-reveal" data-task-id="${task.id}" style="cursor: pointer;" ${revealStyle}>
                         <div class="task-info">
                             <div class="task-name" style="color: var(--grey-400); font-weight: 400; transition: var(--transition-fast);">${this.escapeHtml(displayTitle)}</div>
                             <div class="task-time">${timeText}</div>
@@ -5733,7 +6158,7 @@ class PowerChoosersCRM {
         const totalPages = Math.ceil(todaysTasks.length / this.todaysTasksPagination.pageSize);
         if (totalPages > 1) {
             tasksHtml += `
-                <div class="tasks-pagination">
+                <div class="tasks-pagination modern-reveal" style="animation-delay: ${(pageTasks.length * 0.05).toFixed(2)}s;">
                     <button class="pagination-btn prev-btn" ${this.todaysTasksPagination.currentPage === 1 ? 'disabled' : ''} data-action="prev">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="15,18 9,12 15,6"></polyline>
@@ -5749,7 +6174,37 @@ class PowerChoosersCRM {
             `;
         }
 
-        document.querySelectorAll('.tasks-list').forEach(list => { list.innerHTML = tasksHtml; });
+        document.querySelectorAll('.tasks-list').forEach(list => { 
+            // #region agent log - Hypothesis G: Setting tasks innerHTML
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                sessionId: 'cache-debug-session',
+                runId: 'widget-render-debug',
+                hypothesisId: 'G',
+                location: 'main.js:renderTodaysTasks',
+                message: 'Setting tasks list innerHTML',
+                data: { tasksHtmlLength: tasksHtml.length, pageTasksCount: pageTasks.length, totalTasks: todaysTasks.length },
+                timestamp: Date.now()
+              })
+            }).catch(() => {});
+            // #endregion
+
+            // Smooth height transition logic
+            const currentHeight = list.offsetHeight;
+            list.style.height = currentHeight + 'px';
+            
+            // Set new content
+            list.innerHTML = tasksHtml;
+            
+            // Measure new height
+            requestAnimationFrame(() => {
+                list.style.height = list.scrollHeight + 'px';
+                // Reset height after transition
+                setTimeout(() => { list.style.height = ''; }, 450);
+            });
+        });
 
         // Attach task click event listeners
         document.querySelectorAll('.tasks-list').forEach(list => {
@@ -5989,12 +6444,132 @@ class PowerChoosersCRM {
     }
 
     async loadEnergyNews() {
+        // #region agent log - Hypothesis N1: loadEnergyNews entry (no PII)
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            sessionId: 'cache-debug-session',
+            runId: 'energy-news-debug',
+            hypothesisId: 'N1',
+            location: 'main.js:loadEnergyNews',
+            message: 'loadEnergyNews entered',
+            data: { hasCached: !!this._cachedNews, newsLoading: !!this._newsLoading, hasNewsList: !!document.querySelector('.news-list') },
+            timestamp: Date.now()
+          })
+        }).catch(() => {});
+        // #endregion
+
+        // DEBOUNCING: Prevent multiple calls within 5 seconds
+        const now = Date.now();
+        if (this._lastNewsLoad && (now - this._lastNewsLoad) < 5000) {
+            console.log('[CRM] News load debounced - too soon since last load');
+            // #region agent log - Hypothesis N2: Debounced
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                sessionId: 'cache-debug-session',
+                runId: 'energy-news-debug',
+                hypothesisId: 'N2',
+                location: 'main.js:loadEnergyNews',
+                message: 'loadEnergyNews debounced',
+                data: { deltaMs: now - this._lastNewsLoad },
+                timestamp: Date.now()
+              })
+            }).catch(() => {});
+            // #endregion
+            return;
+        }
+        this._lastNewsLoad = now;
+
         const newsList = document.querySelector('.news-list');
         const lastRef = document.getElementById('news-last-refreshed');
+
+        // CHECK CACHE FIRST: Use cached news if available and recent (< 10 minutes)
+        if (this._cachedNews && this._cachedNews.timestamp && (now - this._cachedNews.timestamp) < (10 * 60 * 1000)) {
+            console.log('[CRM] Using cached energy news');
+            // #region agent log - Hypothesis N3: Cache hit render
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                sessionId: 'cache-debug-session',
+                runId: 'energy-news-debug',
+                hypothesisId: 'N3',
+                location: 'main.js:loadEnergyNews',
+                message: 'Using cached energy news',
+                data: { ageMs: now - this._cachedNews.timestamp, cachedItems: Array.isArray(this._cachedNews.items) ? this._cachedNews.items.length : 0, hasNewsList: !!newsList },
+                timestamp: Date.now()
+              })
+            }).catch(() => {});
+            // #endregion
+
+            // Render cached news immediately
+            if (newsList && this._cachedNews.items) {
+                const newsHtml = this._cachedNews.items.map((it, index) => {
+                    const title = this.escapeHtml(it.title || '');
+                    const url = (it.url || '').trim();
+                    const when = it.publishedAt ? this.formatTimeAgo(it.publishedAt) : '';
+                    const time = when || (it.publishedAt ? new Date(it.publishedAt).toLocaleString() : '');
+                    const safeHref = this.escapeHtml(url);
+                    const delay = (index * 0.05).toFixed(2);
+                    const revealStyle = `style="animation-delay: ${delay}s;"`;
+
+                    return `
+                        <a class="news-item modern-reveal" href="${safeHref}" target="_blank" rel="noopener noreferrer" ${revealStyle}>
+                            <div class="news-title">${title}</div>
+                            <div class="news-time">${this.escapeHtml(time)}</div>
+                        </a>
+                    `;
+                }).join('');
+
+                newsList.innerHTML = newsHtml;
+                // #region agent log - Hypothesis N8: Rendered cached HTML
+                fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+                  method: 'POST',
+                  headers: {'Content-Type': 'application/json'},
+                  body: JSON.stringify({
+                    sessionId: 'cache-debug-session',
+                    runId: 'energy-news-debug',
+                    hypothesisId: 'N8',
+                    location: 'main.js:loadEnergyNews',
+                    message: 'Rendered cached energy news to DOM',
+                    data: { htmlLength: String(newsList.innerHTML || '').length },
+                    timestamp: Date.now()
+                  })
+                }).catch(() => {});
+                // #endregion
+
+                if (lastRef && this._cachedNews.lastRefreshed) {
+                    const dt = new Date(this._cachedNews.lastRefreshed);
+                    lastRef.textContent = `Last updated: ${dt.toLocaleTimeString()}`;
+                }
+            }
+            return;
+        }
+
+        // Render skeletons immediately
+        if (newsList) newsList.innerHTML = this.renderNewsSkeletons();
 
         // Prevent double-rendering - only skip if currently loading
         if (this._newsLoading) {
             console.log('[CRM] News already loading, skipping duplicate call');
+            // #region agent log - Hypothesis N4: Already loading
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                sessionId: 'cache-debug-session',
+                runId: 'energy-news-debug',
+                hypothesisId: 'N4',
+                location: 'main.js:loadEnergyNews',
+                message: 'News already loading; skipping',
+                data: {},
+                timestamp: Date.now()
+              })
+            }).catch(() => {});
+            // #endregion
             return;
         }
         this._newsLoading = true;
@@ -6020,6 +6595,21 @@ class PowerChoosersCRM {
             for (const u of urls) {
                 try {
                     const resp = await fetch(u, { cache: 'no-store' });
+                    // #region agent log - Hypothesis N5: Fetch response status
+                    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+                      method: 'POST',
+                      headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify({
+                        sessionId: 'cache-debug-session',
+                        runId: 'energy-news-debug',
+                        hypothesisId: 'N5',
+                        location: 'main.js:loadEnergyNews',
+                        message: 'Energy news fetch response',
+                        data: { url: u, ok: !!resp.ok, status: resp.status },
+                        timestamp: Date.now()
+                      })
+                    }).catch(() => {});
+                    // #endregion
                     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                     data = await resp.json();
                     break;
@@ -6030,33 +6620,129 @@ class PowerChoosersCRM {
             if (!data) throw lastError || new Error('No response');
 
             const items = (Array.isArray(data.items) ? data.items : []).slice(0, 4);
+            // #region agent log - Hypothesis N6: Successful data parse
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                sessionId: 'cache-debug-session',
+                runId: 'energy-news-debug',
+                hypothesisId: 'N6',
+                location: 'main.js:loadEnergyNews',
+                message: 'Energy news loaded successfully',
+                data: { itemsCount: items.length, hasNewsList: !!newsList, hasLastRef: !!lastRef, hasBase: !!base },
+                timestamp: Date.now()
+              })
+            }).catch(() => {});
+            // #endregion
 
             if (lastRef && data.lastRefreshed) {
                 const dt = new Date(data.lastRefreshed);
                 lastRef.textContent = `Last updated: ${dt.toLocaleTimeString()}`;
             }
 
+            // CACHE SUCCESSFUL RESPONSE
+            this._cachedNews = {
+                items: items,
+                lastRefreshed: data.lastRefreshed,
+                timestamp: Date.now()
+            };
+
             if (newsList) {
-                newsList.innerHTML = items.map(it => {
+                // Smooth height transition logic
+                const currentHeight = newsList.offsetHeight;
+                newsList.style.height = currentHeight + 'px';
+
+                const newsHtml = items.map((it, index) => {
                     const title = escapeHtml(it.title || '');
                     const url = (it.url || '').trim();
                     const when = it.publishedAt ? this.formatTimeAgo(it.publishedAt) : '';
                     const time = when || (it.publishedAt ? new Date(it.publishedAt).toLocaleString() : '');
                     const safeHref = escapeHtml(url);
 
+                    // Add staggered delay for modern reveal
+                    const delay = (index * 0.05).toFixed(2);
+                    const revealStyle = `style="animation-delay: ${delay}s;"`;
+
                     return `
-                        <a class="news-item" href="${safeHref}" target="_blank" rel="noopener noreferrer">
+                        <a class="news-item modern-reveal" href="${safeHref}" target="_blank" rel="noopener noreferrer" ${revealStyle}>
                             <div class="news-title">${title}</div>
                             <div class="news-time">${escapeHtml(time)}</div>
                         </a>
                     `;
                 }).join('');
+
+                newsList.innerHTML = newsHtml;
+                // #region agent log - Hypothesis N9: Rendered fetched HTML
+                fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+                  method: 'POST',
+                  headers: {'Content-Type': 'application/json'},
+                  body: JSON.stringify({
+                    sessionId: 'cache-debug-session',
+                    runId: 'energy-news-debug',
+                    hypothesisId: 'N9',
+                    location: 'main.js:loadEnergyNews',
+                    message: 'Rendered fetched energy news to DOM',
+                    data: { htmlLength: String(newsList.innerHTML || '').length, itemsCount: items.length },
+                    timestamp: Date.now()
+                  })
+                }).catch(() => {});
+                // #endregion
+
+                // #region agent log - Hypothesis N10: Energy News visibility/layout diagnostics (no PII)
+                try {
+                    const cs = window.getComputedStyle(newsList);
+                    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+                      method: 'POST',
+                      headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify({
+                        sessionId: 'cache-debug-session',
+                        runId: 'energy-news-debug',
+                        hypothesisId: 'N10',
+                        location: 'main.js:loadEnergyNews',
+                        message: 'Energy News layout after render',
+                        data: {
+                            offsetH: newsList.offsetHeight,
+                            scrollH: newsList.scrollHeight,
+                            inlineH: String(newsList.style.height || ''),
+                            display: cs.display,
+                            visibility: cs.visibility,
+                            opacity: cs.opacity,
+                            overflow: cs.overflowY || cs.overflow
+                        },
+                        timestamp: Date.now()
+                      })
+                    }).catch(() => {});
+                } catch (_) {}
+                // #endregion
+
+                // Measure new height
+                requestAnimationFrame(() => {
+                    newsList.style.height = newsList.scrollHeight + 'px';
+                    // Reset height after transition
+                    setTimeout(() => { newsList.style.height = ''; }, 450);
+                });
             }
 
             // Reset loading flag after successful load
             this._newsLoading = false;
         } catch (err) {
             console.error('Failed to load energy news', err);
+            // #region agent log - Hypothesis N7: Error path
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                sessionId: 'cache-debug-session',
+                runId: 'energy-news-debug',
+                hypothesisId: 'N7',
+                location: 'main.js:loadEnergyNews',
+                message: 'Energy news failed',
+                data: { error: String(err && err.message ? err.message : err) },
+                timestamp: Date.now()
+              })
+            }).catch(() => {});
+            // #endregion
             if (lastRef) lastRef.textContent = 'Last updated: failed to refresh';
             if (newsList) {
                 newsList.innerHTML = `
@@ -6077,25 +6763,26 @@ class PowerChoosersCRM {
         if (!window.ActivityManager) return;
 
         // Check if we already have activities loaded and don't need to refresh
+        // CRITICAL FIX: Check for skeleton animations too, not just loading-spinner
         const container = document.getElementById('home-activity-timeline');
-        if (!forceRefresh && container?.children.length > 0 && !container.querySelector('.loading-spinner')) {
-            // Activities are already loaded, just setup pagination
+        const hasSkeletonOrLoading = container?.querySelector('.loading-spinner') || container?.querySelector('.activity-skeletons') || container?.querySelector('.skeleton-shimmer');
+        if (!forceRefresh && container?.children.length > 0 && !hasSkeletonOrLoading) {
+            // Activities are already loaded (not skeleton), just setup pagination
             console.log('[CRM] Activities already loaded, skipping duplicate render');
             this.setupHomeActivityPagination();
             return;
         }
 
-        // Load global activities for home page
-        if (forceRefresh) {
-            // Clear cache and force refresh
-            window.ActivityManager.clearCache('global');
-            window.ActivityManager.renderActivities('home-activity-timeline', 'global');
-        } else {
-            window.ActivityManager.renderActivities('home-activity-timeline', 'global');
-        }
+        // Load global activities for home page, then setup pagination AFTER render completes
+        const renderPromise = forceRefresh
+            ? (window.ActivityManager.clearCache('global'), window.ActivityManager.renderActivities('home-activity-timeline', 'global'))
+            : window.ActivityManager.renderActivities('home-activity-timeline', 'global');
 
-        // Setup pagination
-        this.setupHomeActivityPagination();
+        Promise.resolve(renderPromise).then(() => {
+            this.setupHomeActivityPagination();
+        }).catch(() => {
+            // Keep silent - ActivityManager handles its own error UI
+        });
     }
 
 
@@ -6108,7 +6795,8 @@ class PowerChoosersCRM {
         const updatePagination = async () => {
             if (!window.ActivityManager) return;
 
-            const activities = await window.ActivityManager.getActivities('global');
+            // Prefer activities already loaded by renderActivities to avoid duplicate getActivities calls
+            const activities = window.ActivityManager.currentActivities || await window.ActivityManager.getActivities('global');
             const totalPages = Math.ceil(activities.length / window.ActivityManager.maxActivitiesPerPage);
 
             if (totalPages > 1) {
@@ -6161,12 +6849,18 @@ window.__pcAccountsIcon = () => {
 
 // Enhanced favicon system with multiple fallback sources
 window.__pcFaviconHelper = {
+    // Shared cache for accounts discovered during the current session
+    discoveredAccounts: new Map(),
+    // Shared cache for generated favicon metadata to ensure stable IDs across pages
+    faviconMetadata: new Map(),
+
     // Prefer explicit account/company logo URL; fallback to computed favicon chain
     generateCompanyIconHTML: function (opts) {
         try {
             const size = parseInt((opts && opts.size) || 64, 10) || 64;
             const logoUrl = (opts && opts.logoUrl) ? String(opts.logoUrl).trim() : '';
             const domain = (opts && opts.domain) ? String(opts.domain).trim().replace(/^https?:\/\//, '').replace(/\/$/, '') : '';
+            const idSuffix = (opts && opts.idSuffix) ? String(opts.idSuffix) : '';
 
 
             if (logoUrl) {
@@ -6180,33 +6874,37 @@ window.__pcFaviconHelper = {
                 // Only use favicon fallback for bare domains, not for URLs
                 if (looksLikeBareDomain) {
                     const clean = String(logoUrl).replace(/^www\./i, '');
-                    if (clean) return this.generateFaviconHTML(clean, size);
+                    if (clean) return this.generateFaviconHTML(clean, size, idSuffix);
                 }
                 // Otherwise treat as a direct image URL; fallback to favicon on error
                 const cleanDomain = domain || (parsed ? parsed.hostname.replace(/^www\./i, '') : '');
-                const containerId = `logo-${(cleanDomain || 'x').replace(/[^a-z0-9]/gi, '')}-${Date.now()}`;
+                
+                // Use a stable ID based on logo URL and an optional suffix to ensure uniqueness across rows
+                const urlHash = String(logoUrl).split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0);
+                const containerId = `logo-${(cleanDomain || 'x').replace(/[^a-z0-9]/gi, '')}-${Math.abs(urlHash)}${idSuffix ? '-' + idSuffix : ''}`;
+                
                 return `<img class="company-favicon" 
                              id="${containerId}"
                              src="${logoUrl}" 
                              alt="" 
                              referrerpolicy="no-referrer" 
                              loading="lazy"
-                             style="width:${size}px;height:${size}px;object-fit:cover;border-radius:6px;flex-shrink:0;pointer-events:none;"
-                             onerror="window.__pcFaviconHelper.onLogoError('${containerId}','${cleanDomain}',${size})">`;
+                             style="width:${size}px;height:${size}px;object-fit:cover;border-radius:6px;flex-shrink:0;pointer-events:none;background-color:rgba(255,255,255,0.05);"
+                             onerror="window.__pcFaviconHelper.onLogoError('${containerId}','${cleanDomain}',${size},'${idSuffix}')">`;
             }
             if (domain) {
-                return this.generateFaviconHTML(domain, size);
+                return this.generateFaviconHTML(domain, size, idSuffix);
             }
             return window.__pcAccountsIcon();
         } catch (_) { return window.__pcAccountsIcon(); }
     },
-    onLogoError: function (containerId, domain, size) {
+    onLogoError: function (containerId, domain, size, idSuffix = '') {
         try {
             const img = document.getElementById(containerId);
             if (!img) return;
             const parent = img.parentNode;
             const doReplace = () => {
-                const html = this.generateFaviconHTML(domain, size);
+                const html = this.generateFaviconHTML(domain, size, idSuffix);
                 const div = document.createElement('div');
                 div.innerHTML = html;
                 const replacement = div.firstElementChild;
@@ -6219,7 +6917,7 @@ window.__pcFaviconHelper = {
         } catch (_) { }
     },
     // Generate favicon HTML with multiple fallback sources
-    generateFaviconHTML: function (domain, size = 64) {
+    generateFaviconHTML: function (domain, size = 64, idSuffix = '') {
         if (!domain) {
             return window.__pcAccountsIcon();
         }
@@ -6238,8 +6936,10 @@ window.__pcFaviconHelper = {
             `https://${cleanDomain}/favicon.ico` // Direct favicon
         ];
 
-        // Create a unique ID for this favicon container
-        const containerId = `favicon-${cleanDomain.replace(/[^a-zA-Z0-9]/g, '')}-${Date.now()}`;
+        // Create a stable ID for this favicon container based on domain, size and optional suffix
+        // This prevents flickering repaints during re-renders if the domain hasn't changed
+        // but ensures uniqueness across rows if a suffix is provided.
+        const containerId = `favicon-${cleanDomain.replace(/[^a-zA-Z0-9]/g, '')}-${size}${idSuffix ? '-' + idSuffix : ''}`;
 
         return `
             <img class="company-favicon" 
@@ -6248,7 +6948,7 @@ window.__pcFaviconHelper = {
                  alt="" 
                  referrerpolicy="no-referrer" 
                  loading="lazy"
-                 style="width:${size}px;height:${size}px;object-fit:cover;border-radius:6px;flex-shrink:0;pointer-events:none;"
+                 style="width:${size}px;height:${size}px;object-fit:cover;border-radius:6px;flex-shrink:0;pointer-events:none;background-color:rgba(255,255,255,0.05);"
                  onload="window.__pcFaviconHelper.onFaviconLoad('${containerId}')"
                  onerror="window.__pcFaviconHelper.onFaviconError('${containerId}', '${cleanDomain}', ${size})" />
         `;

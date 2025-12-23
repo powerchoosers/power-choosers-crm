@@ -160,7 +160,14 @@
         </div>
         <div id="maps-container" class="maps-container">
           <div class="maps-loading">
-            <div class="loading-spinner"></div>
+            <div class="maps-skeleton">
+              <div class="skeleton-header skeleton-shimmer"></div>
+              <div class="skeleton-map skeleton-shimmer"></div>
+              <div class="skeleton-controls">
+                <div class="skeleton-button skeleton-shimmer"></div>
+                <div class="skeleton-button skeleton-shimmer"></div>
+              </div>
+            </div>
             <p>Loading Google Maps...</p>
           </div>
         </div>

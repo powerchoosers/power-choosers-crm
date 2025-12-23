@@ -784,9 +784,9 @@ var console = {
     style.id = 'account-detail-header-styles';
     style.textContent = `
       /* Account Detail: header action divider and alignment */
-      #account-detail-header .contact-header-profile { display: inline-flex; align-items: center; gap: var(--spacing-sm); }
+      #account-detail-header .contact-header-profile { display: inline-flex; align-items: center; gap: 8px; }
       /* Reset margin added globally so spacing is controlled here */
-      #account-detail-header .linkedin-header-btn { margin-left: 0; }
+      #account-detail-header .linkedin-header-btn { margin-left: 0; margin-right: 0; }
       /* Vertical divider between LinkedIn and the List/Sequence group */
       #account-detail-header .header-action-divider {
         width: 1px;
@@ -794,11 +794,11 @@ var console = {
         background: var(--border-light);
         opacity: 0.9;
         display: inline-block;
-        margin: 0 var(--spacing-sm);
+        margin: 0;
         border-radius: 1px;
       }
       #account-detail-header .list-header-btn svg { display: block; }
-      #account-detail-header .list-seq-group { display: inline-flex; align-items: center; gap: var(--spacing-sm); }
+      #account-detail-header .list-seq-group { display: inline-flex; align-items: center; gap: 8px; }
     `;
     // Append to head so rules actually apply
     document.head.appendChild(style);
@@ -5275,17 +5275,20 @@ var console = {
     _onAccountListsKeydown = null; _positionAccountListsPanel = null; _onAccountListsOutside = null;
   }
 
-  function openAccountListsPanel() {
+  function openAccountListsPanel(anchorOverride) {
     if (document.getElementById('account-lists-panel')) return;
 
     // Comprehensive validation: ensure account detail page is fully ready
     const isAccountDetailReady = () => {
+      // If we're on task-detail-page, we're ready if the task page exists
+      if (document.getElementById('task-detail-page')) return true;
+
       // Check if critical DOM elements exist
       const header = document.getElementById('account-detail-header');
       const view = document.getElementById('account-detail-view');
-      const addToListBtn = document.getElementById('add-account-to-list');
+      // const addToListBtn = document.getElementById('add-account-to-list');
 
-      if (!header || !view || !addToListBtn) return false;
+      if (!header || !view) return false;
 
       // Check if state has account ID
       if (!state.currentAccount?.id) return false;
@@ -5296,102 +5299,86 @@ var console = {
 
     // If not ready, show loading state and retry
     if (!isAccountDetailReady()) {
-      console.log('[AccountDetail] Account detail not fully ready, showing loading state');
-      // Show a brief loading message to the user
-      if (window.crm && typeof window.crm.showToast === 'function') {
-        window.crm.showToast('Loading account information...');
-      }
-
-      // Retry after a short delay
-      setTimeout(() => {
-        if (isAccountDetailReady()) {
-          openAccountListsPanel(); // Recursive call when ready
-        } else {
-          if (window.crm && typeof window.crm.showToast === 'function') {
-            window.crm.showToast('Account information not ready. Please try again.');
-          }
-        }
-      }, 200);
+      console.warn('[AccountDetail] Account detail DOM or state not ready for list panel.');
       return;
     }
 
     injectAccountListsStyles();
+
     const panel = document.createElement('div');
     panel.id = 'account-lists-panel';
     panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-label', 'Add to list');
+
     const a = state.currentAccount || {};
-    const companyName = a.accountName || a.name || a.companyName || 'this company';
+    const companyName = a.accountName || a.name || a.companyName || 'this account';
+
     panel.innerHTML = `
-      <div class="list-header">
-        <div class="list-title">Add ${escapeHtml(companyName)} to list</div>
-        <button type="button" class="close-btn" id="account-lists-close" aria-label="Close">×</button>
-      </div>
-      <div class="list-body" id="account-lists-body">
-        <div class="list-item" tabindex="0" data-action="create">
-          <div>
-            <div class="list-name">Create new list…</div>
-            <div class="list-meta">Create a company list</div>
-          </div>
+    <div class="list-header">
+      <div class="list-title">Add ${escapeHtml(companyName)} to list</div>
+      <button type="button" class="list-close" id="account-lists-close" aria-label="Close panel">×</button>
+    </div>
+    <div class="list-search">
+      <input type="text" class="search-input" id="list-search-input" placeholder="Search lists..." aria-label="Search lists">
+    </div>
+    <div class="list-body" id="account-lists-body">
+      <!-- Lists dynamic content -->
+      <div class="list-item" tabindex="0" data-action="create">
+        <div>
+          <div class="list-name">Create new list…</div>
+          <div class="list-meta">Add to a search or smart list</div>
         </div>
-      </div>`;
+      </div>
+      <div class="list-item" tabindex="-1" aria-disabled="true"><div><div class="list-name">Loading lists…</div><div class="list-meta">Please wait</div></div></div>
+    </div>`;
+
     document.body.appendChild(panel);
 
+    // Initial load
+    const body = panel.querySelector('#account-lists-body');
+    populateAccountListsPanel(body);
+
     // Position anchored to the Add-to-List icon with pointer
-    _positionAccountListsPanel = function position() {
-      const btn = document.getElementById('add-account-to-list');
-      const rect = btn ? btn.getBoundingClientRect() : null;
+    _positionAccountListsPanel = () => {
+      const btn = anchorOverride || document.getElementById('add-account-to-list') || document.getElementById('task-add-to-list');
+      if (!btn || !panel) return;
+      const rect = btn.getBoundingClientRect();
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      const pad = 8;  // viewport padding
-      const gap = 8;  // space between button and panel
+      const pad = 8;
+
+      const panelWidth = Math.min(560, vw * 0.92);
+      let left = rect.left + (rect.width / 2) - (panelWidth / 2);
+      let top = rect.bottom + 12;
       let placement = 'bottom';
-      let top = Math.max(pad, 72);
-      let left = Math.max(pad, (vw - panel.offsetWidth) / 2);
 
-      if (rect) {
-        const panelW = panel.offsetWidth;
-        const panelH = panel.offsetHeight || 320; // fallback before content paints
-        const fitsBottom = rect.bottom + gap + panelH + pad <= vh;
-        const fitsTop = rect.top - gap - panelH - pad >= 0;
-        placement = fitsBottom || !fitsTop ? 'bottom' : 'top';
+      // Horizontal bounds
+      if (left < pad) left = pad;
+      if (left + panelWidth > vw - pad) left = vw - panelWidth - pad;
 
-        if (placement === 'bottom') {
-          top = Math.min(vh - panelH - pad, rect.bottom + gap);
-        } else {
-          top = Math.max(pad, rect.top - gap - panelH);
-        }
-
-        // Prefer centering under the icon while keeping within viewport
-        left = Math.round(
-          Math.min(
-            Math.max(pad, rect.left + (rect.width / 2) - (panelW / 2)),
-            vw - panelW - pad
-          )
-        );
-
-        // Arrow horizontal offset relative to panel's left edge
-        const arrowLeft = Math.round(rect.left + rect.width / 2 - left);
-        panel.style.setProperty('--arrow-left', `${arrowLeft}px`);
-        panel.setAttribute('data-placement', placement);
+      // Vertical flip if no room below
+      const panelHeight = 400; // estimated max
+      if (top + panelHeight > vh - pad && rect.top > panelHeight + pad) {
+        top = rect.top - panelHeight - 12;
+        placement = 'top';
       }
 
-      panel.style.top = `${Math.round(top)}px`;
-      panel.style.left = `${Math.round(left)}px`;
+      panel.style.left = `${left}px`;
+      panel.style.top = `${top}px`;
+      panel.style.setProperty('--arrow-left', `${rect.left + (rect.width / 2) - left}px`);
+      panel.setAttribute('data-placement', placement);
     };
+
     _positionAccountListsPanel();
-    window.addEventListener('resize', _positionAccountListsPanel, true);
-    window.addEventListener('scroll', _positionAccountListsPanel, true);
+
+    window.addEventListener('resize', _positionAccountListsPanel, { passive: true });
+    window.addEventListener('scroll', _positionAccountListsPanel, { passive: true, capture: true });
 
     // Animate in
     requestAnimationFrame(() => { panel.classList.add('--show'); });
 
     // Mark trigger expanded
-    try { document.getElementById('add-account-to-list')?.setAttribute('aria-expanded', 'true'); } catch (_) { }
-
-    // Load lists and memberships
-    Promise.resolve(populateAccountListsPanel(panel.querySelector('#account-lists-body')))
-      .then(() => { try { _positionAccountListsPanel && _positionAccountListsPanel(); } catch (_) { } });
+    try { (anchorOverride || document.getElementById('add-account-to-list')).setAttribute('aria-expanded', 'true'); } catch (_) { }
 
     // Close button
     panel.querySelector('#account-lists-close')?.addEventListener('click', closeAccountListsPanel);
@@ -5408,10 +5395,18 @@ var console = {
     // Click-away
     _onAccountListsOutside = (e) => {
       const inside = panel.contains(e.target);
-      const onAnchor = !!(e.target.closest && e.target.closest('#add-account-to-list'));
-      if (!inside && !onAnchor) closeAccountListsPanel();
+      const btn = anchorOverride || document.getElementById('add-account-to-list') || document.getElementById('task-add-to-list');
+      const onAnchor = btn && btn.contains(e.target);
+      const isSearchBar = e.target.classList && e.target.classList.contains('search-input');
+
+      if (!inside && !onAnchor) {
+        closeAccountListsPanel();
+        if (isSearchBar && typeof e.target.focus === 'function') {
+          setTimeout(() => e.target.focus(), 120);
+        }
+      }
     };
-    document.addEventListener('mousedown', _onAccountListsOutside, true);
+    setTimeout(() => { document.addEventListener('mousedown', _onAccountListsOutside, true); }, 0);
   }
 
   async function populateAccountListsPanel(body) {
@@ -6359,14 +6354,17 @@ var console = {
     });
   }
 
-  // Set actual function references (object already created at module top)
+  // Ensure global namespace exists
+  window.AccountDetail = window.AccountDetail || {};
+  // Expose state and functions for external use (e.g., from TaskDetail)
+  window.AccountDetail.state = state;
   window.AccountDetail.show = showAccountDetail;
   window.AccountDetail.renderAccountDetail = renderAccountDetail;
   window.AccountDetail.setupEnergyUpdateListener = setupEnergyUpdateListener;
-  window.AccountDetail.setupEnergyUpdateListener = setupEnergyUpdateListener;
   window.AccountDetail.setupParentCompanyAutocomplete = setupParentCompanyAutocomplete;
-  // Expose edit modal for external use (e.g. from Task Detail)
   window.AccountDetail.openEditModal = openEditAccountModal;
+  window.AccountDetail.openAccountListsPanel = openAccountListsPanel;
+  window.AccountDetail.openAccountTaskPopover = openAccountTaskPopover;
 
   // Backward-compat global alias used by some modules
   try { window.showAccountDetail = showAccountDetail; } catch (_) { }

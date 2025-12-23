@@ -757,11 +757,30 @@ class FreeSequenceAutomation {
     if (!contactSearchResults) return;
 
     try {
-      // Show loading state
+      // Show skeleton loading state
       contactSearchResults.innerHTML = `
         <div class="search-loading">
-          <div class="loading-spinner"></div>
-          <span>Searching contacts...</span>
+          <div class="contact-skeleton">
+            <div class="skeleton-avatar skeleton-shimmer"></div>
+            <div class="skeleton-content">
+              <div class="skeleton-text skeleton-shimmer"></div>
+              <div class="skeleton-text short skeleton-shimmer"></div>
+            </div>
+          </div>
+          <div class="contact-skeleton">
+            <div class="skeleton-avatar skeleton-shimmer"></div>
+            <div class="skeleton-content">
+              <div class="skeleton-text skeleton-shimmer"></div>
+              <div class="skeleton-text short skeleton-shimmer"></div>
+            </div>
+          </div>
+          <div class="contact-skeleton">
+            <div class="skeleton-avatar skeleton-shimmer"></div>
+            <div class="skeleton-content">
+              <div class="skeleton-text skeleton-shimmer"></div>
+              <div class="skeleton-text short skeleton-shimmer"></div>
+            </div>
+          </div>
         </div>
       `;
       contactSearchResults.hidden = false;

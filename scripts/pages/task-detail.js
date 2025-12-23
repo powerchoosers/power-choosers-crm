@@ -535,6 +535,216 @@
     return task.account && (!task.contact || task.contact.trim() === '');
   }
 
+  // Handle quick actions for task detail header buttons (website, LinkedIn)
+  function handleTaskDetailQuickAction(action) {
+    try {
+      const task = state.currentTask;
+      if (!task) return;
+
+      const isAcctTask = isAccountTask(task);
+      const toast = (msg, type = 'info') => { if (window.crm && typeof window.crm.showToast === 'function') window.crm.showToast(msg, type); };
+
+      if (action === 'website') {
+        // For account tasks, use account website; for contact tasks, try contact/account
+        let url = '';
+        if (isAcctTask && state.account) {
+          url = state.account.website || state.account.site || state.account.domain || '';
+        } else if (state.contact) {
+          // Try contact's account website
+          const linkedAccount = state.account || findAssociatedAccount(state.contact);
+          url = linkedAccount?.website || linkedAccount?.site || linkedAccount?.domain || '';
+        }
+
+        if (url) {
+          if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+          try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ }
+        } else {
+          toast('No website available for this account', 'info');
+        }
+      } else if (action === 'linkedin') {
+        //  For account tasks, use account LinkedIn; for contact tasks, use contact LinkedIn
+        let url = '';
+        if (isAcctTask && state.account) {
+          url = state.account.linkedin || state.account.linkedinUrl || state.account.linkedin_url || '';
+          // Fallback to company search
+          if (!url) {
+            const companyName = state.account.accountName || state.account.name || state.account.companyName || '';
+            if (companyName) {
+              url = `https://www.linkedin.com/search/results/companies/?keywords=${encodeURIComponent(companyName)}`;
+            }
+          }
+        } else if (state.contact) {
+          url = state.contact.linkedin || state.contact.linkedinUrl || state.contact.linkedin_url || '';
+          // Fallback to person search
+          if (!url) {
+            const fullName = [state.contact.firstName, state.contact.lastName].filter(Boolean).join(' ') || state.contact.name || '';
+            if (fullName) {
+              url = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(fullName)}`;
+            }
+          }
+        }
+
+        if (url) {
+          try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ }
+        } else {
+          const type = isAcctTask ? 'account' : 'contact';
+          toast(`No LinkedIn profile or name available for this ${type}`, 'info');
+        }
+      }
+    } catch (error) {
+      console.error('[TaskDetail] Error in handleTaskDetailQuickAction:', error);
+    }
+  }
+
+  // Inject header button styles (LinkedIn, Website, divider, action buttons)
+  function injectTaskHeaderStyles() {
+    if (document.getElementById('task-detail-header-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'task-detail-header-styles';
+    style.textContent = `
+      /* Task Detail: header layout and alignment */
+      #task-detail-page .contact-header-profile { 
+        display: inline-flex; 
+        align-items: center; 
+        gap: 8px;
+      }
+      /* Move only the action buttons up to align with Complete Task button */
+      #task-detail-page .contact-header-profile > .quick-action-btn,
+      #task-detail-page .contact-header-profile > .header-action-divider,
+      #task-detail-page .contact-header-profile > .list-seq-group {
+        position: relative;
+        top: -8px;
+        z-index: 10;
+      }
+      /* Center the text content vertically */
+      #task-detail-page .contact-header-text {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      /* Reset margin added globally so spacing is controlled here */
+      #task-detail-page .linkedin-header-btn { margin-left: 0; margin-right: 0; }
+      /* Vertical divider between LinkedIn and the List/Sequence group */
+      #task-detail-page .header-action-divider {
+        width: 1px;
+        height: 24px;
+        background: var(--border-light);
+        opacity: 0.9;
+        display: inline-block;
+        margin: 0;
+        border-radius: 1px;
+      }
+      #task-detail-page .list-header-btn svg { display: block; }
+      #task-detail-page .list-seq-group { display: inline-flex; align-items: center; gap: 8px; }
+    /* Ensure all quick action buttons are same size and clickable */
+    #task-detail-page .quick-action-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      cursor: pointer !important;
+      pointer-events: auto !important;
+      background: var(--bg-item);
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      color: var(--text-primary);
+      transition: all var(--transition-fast);
+    }
+    #task-detail-page .quick-action-btn:hover {
+      background: var(--bg-hover) !important;
+      color: var(--text-primary) !important;
+      border-color: var(--border-medium) !important;
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-sm);
+    }
+    `;
+    // Append to head so rules actually apply
+    document.head.appendChild(style);
+  }
+
+  // Generate header buttons HTML for task detail page
+  function renderTaskHeaderButtons() {
+    const task = state.currentTask;
+    if (!task) return '';
+
+    const isAcctTask = isAccountTask(task);
+
+    // Website button SVG
+    const websiteSvg = `\u003csvg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"\u003e
+      \u003ccircle cx=\"12\" cy=\"12\" r=\"10\"/\u003e
+      \u003cline x1=\"2\" y1=\"12\" x2=\"22\" y2=\"12\"/\u003e
+      \u003cpath d=\"M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z\"/\u003e
+    \u003c/svg\u003e`;
+
+    // LinkedIn button SVG
+    const linkedInSvg = `\u003csvg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"\u003e
+      \u003cpath d=\"M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z\"/\u003e
+      \u003crect x=\"2\" y=\"9\" width=\"4\" height=\"12\"/\u003e
+      \u003ccircle cx=\"4\" cy=\"4\" r=\"2\"/\u003e
+    \u003c/svg\u003e`;
+
+    //  List button SVG
+    const listSvg = `\u003csvg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\" focusable=\"false\"\u003e
+      \u003ccircle cx=\"4\" cy=\"6\" r=\"1\"\u003e\u003c/circle\u003e
+      \u003ccircle cx=\"4\" cy=\"12\" r=\"1\"\u003e\u003c/circle\u003e
+      \u003ccircle cx=\"4\" cy=\"18\" r=\"1\"\u003e\u003c/circle\u003e
+      \u003cline x1=\"8\" y1=\"6\" x2=\"20\" y2=\"6\"\u003e\u003c/line\u003e
+      \u003cline x1=\"8\" y1=\"12\" x2=\"20\" y2=\"12\"\u003e\u003c/line\u003e
+      \u003cline x1=\"8\" y1=\"18\" x2=\"20\" y2=\"18\"\u003e\u003c/line\u003e
+    \u003c/svg\u003e`;
+
+    // Sequence button SVG
+    const sequenceSvg = `\u003csvg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"\u003e
+      \u003cpolygon points=\"7 4 20 12 7 20 7 4\"\u003e\u003c/polygon\u003e
+    \u003c/svg\u003e`;
+
+    // Task button SVG
+    const taskSvg = `\u003csvg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\" focusable=\"false\"\u003e
+      \u003cpolyline points=\"9,11 12,14 22,4\"\u003e\u003c/polyline\u003e
+      \u003cpath d=\"M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11\"\u003e\u003c/path\u003e
+    \u003c/svg\u003e`;
+
+    // Build action buttons HTML based on task type
+    let actionButtonsHTML = '';
+    if (isAcctTask) {
+      // Account task: only "Add to List" and "Add Task" buttons
+      actionButtonsHTML = `
+        \u003cbutton class=\"quick-action-btn list-header-btn\" id=\"task-add-to-list\" title=\"Add to list\" aria-label=\"Add to list\" aria-haspopup=\"dialog\"\u003e
+          ${listSvg}
+        \u003c/button\u003e
+        \u003cbutton class=\"quick-action-btn task-header-btn\" id=\"task-add-task\" title=\"Add task\" aria-label=\"Add task\" aria-haspopup=\"dialog\"\u003e
+          ${taskSvg}
+        \u003c/button\u003e`;
+    } else {
+      // Contact task: "Add to List", "Add to Sequence", and "Add Task" buttons
+      actionButtonsHTML = `
+        \u003cbutton class=\"quick-action-btn list-header-btn\" id=\"task-add-to-list\" title=\"Add to list\" aria-label=\"Add to list\" aria-haspopup=\"dialog\"\u003e
+          ${listSvg}
+        \u003c/button\u003e
+        \u003cbutton class=\"quick-action-btn sequence-header-btn\" id=\"task-add-to-sequence\" title=\"Add to sequence\" aria-label=\"Add to sequence\" aria-haspopup=\"dialog\"\u003e
+          ${sequenceSvg}
+        \u003c/button\u003e
+        \u003cbutton class=\"quick-action-btn task-header-btn\" id=\"task-add-task\" title=\"Add task\" aria-label=\"Add task\" aria-haspopup=\"dialog\"\u003e
+          ${taskSvg}
+        \u003c/button\u003e`;
+    }
+
+    // Complete header buttons HTML
+    return `
+      \u003cbutton class=\"quick-action-btn website-header-btn\" data-action=\"website\" title=\"Visit website\" aria-label=\"Visit website\"\u003e
+        ${websiteSvg}
+      \u003c/button\u003e
+      \u003cbutton class=\"quick-action-btn linkedin-header-btn\" data-action=\"linkedin\" title=\"View on LinkedIn\" aria-label=\"View on LinkedIn\"\u003e
+        ${linkedInSvg}
+      \u003c/button\u003e
+      \u003cspan class=\"header-action-divider\" aria-hidden=\"true\"\u003e\u003c/span\u003e
+      \u003cdiv class=\"list-seq-group\"\u003e
+        ${actionButtonsHTML}
+      \u003c/div\u003e`;
+  }
+
   function injectTaskDetailStyles() {
     const id = 'task-detail-inline-styles';
     if (document.getElementById(id)) return;
@@ -1221,7 +1431,7 @@
         if (!state.currentTask) return;
 
         // Check if this refresh is relevant to the current task
-        const isRelevant = 
+        const isRelevant =
           entityType === 'global' ||
           (entityType === 'account' && state.currentTask.accountId === entityId) ||
           (entityType === 'contact' && state.currentTask.contactId === entityId);
@@ -1232,6 +1442,25 @@
         }
       });
       document._taskDetailActivityRefreshBound = true;
+    }
+
+    // CRITICAL: Listen for task deletion events (e.g. sequence removal) to auto-navigate
+    if (!document._taskDetailDeletionBound) {
+      document.addEventListener('pc:task-deleted', async (e) => {
+        const { taskId } = e.detail || {};
+        if (state.currentTask && taskId === state.currentTask.id && !state.navigating) {
+          console.log('[TaskDetail] Current task was deleted (e.g. sequence removal), navigating to next task...');
+          try {
+            // Small delay to ensure any prior state transitions complete
+            await new Promise(resolve => setTimeout(resolve, 200));
+            await navigateToAdjacentTask('next');
+          } catch (err) {
+            console.warn('[TaskDetail] Auto-navigation after task deletion failed:', err);
+            handleBackNavigation();
+          }
+        }
+      });
+      document._taskDetailDeletionBound = true;
     }
   }
 
@@ -3002,7 +3231,7 @@
             console.warn('[TaskDetail] Task not found in Firebase after all strategies:', taskId);
           }
         } catch (error) {
-          console.error('[TaskDetail] Error loading task from Firebase:', error);
+          console.error('[TaskDetail] Error loading task data:', error);
         }
       }
 
@@ -3565,6 +3794,29 @@
     titleSection.offsetHeight;
   }
 
+  // Inject header buttons into the task detail page header
+  function injectTaskHeaderButtonsIntoDOM() {
+    // Find the header container (should be .contact-header-profile or .page-title-section)
+    const header = document.querySelector('#task-detail-page .contact-header-profile') ||
+      document.querySelector('#task-detail-page .page-title-section');
+
+    if (!header) {
+      console.warn('[TaskDetail] Header container not found for button injection');
+      return;
+    }
+
+    // Remove existing action buttons if any
+    const existingButtons = header.querySelectorAll('.website-header-btn, .linkedin-header-btn, .header-action-divider, .list-seq-group');
+    existingButtons.forEach(el => el.remove());
+
+    // Generate and inject the header buttons HTML
+    const buttonsHTML = renderTaskHeaderButtons();
+    if (buttonsHTML) {
+      header.insertAdjacentHTML('beforeend', buttonsHTML);
+      console.log('[TaskDetail] Header action buttons injected successfully');
+    }
+  }
+
 
   function renderTaskPage() {
     if (!state.currentTask) {
@@ -3599,6 +3851,7 @@
     cleanupExistingAvatarsAndIcons();
 
     injectTaskDetailStyles();
+    injectTaskHeaderStyles(); // CRITICAL: Inject header button styles
 
     // CRITICAL FIX: Always update subtitle first to clear "Loading task..." message
     if (els.subtitle) {
@@ -4173,6 +4426,16 @@
       setupPhoneClickHandlers();
     }
 
+    // CRITICAL FIX: Inject header action buttons after header is rendered
+    // This ensures buttons appear for both contact and account tasks
+    requestAnimationFrame(() => {
+      injectTaskHeaderButtonsIntoDOM();
+      // Ensure header button handlers are set up
+      if (!document._taskDetailHeaderButtonsHandlersBound) {
+        setupTaskHeaderButtonHandlers();
+      }
+    });
+
     // Verify links exist (for debugging)
     const companyLinks = document.querySelectorAll('#task-detail-page .company-link');
     const contactLinks = document.querySelectorAll('#task-detail-page .contact-link');
@@ -4227,6 +4490,166 @@
         await handleTaskComplete();
       });
     }
+  }
+
+  // Setup event delegation for task detail header action buttons
+  function setupTaskHeaderButtonHandlers() {
+    if (document._taskDetailHeaderButtonsHandlersBound) return;
+    document._taskDetailHeaderButtonsHandlersBound = true;
+
+    document.addEventListener('click', (e) => {
+      // Only handle clicks within task-detail-page
+      const taskPage = e.target.closest('#task-detail-page');
+      if (!taskPage) return;
+
+      // Double check if we're actually inside the header for these buttons
+      const isHeaderClick = e.target.closest('#task-detail-header') || e.target.closest('.contact-header-profile');
+
+
+      // Website button click
+      const websiteBtn = e.target.closest('.website-header-btn');
+      if (websiteBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleTaskDetailQuickAction('website');
+        return;
+      }
+
+      // LinkedIn button click
+      const linkedinBtn = e.target.closest('.linkedin-header-btn');
+      if (linkedinBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleTaskDetailQuickAction('linkedin');
+        return;
+      }
+
+      // Add to List button
+      const addToListBtn = e.target.closest('#task-add-to-list');
+      if (addToListBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Determine if account task or contact task, then open appropriate panel
+        const isAcctTask = isAccountTask(state.currentTask);
+        if (isAcctTask && state.account) {
+          // Open account lists panel
+          if (window.AccountDetail && typeof window.AccountDetail.openAccountListsPanel === 'function') {
+            // Temporarily set AccountDetail state for the panel
+            const prevAccount = window.AccountDetail.state?.currentAccount;
+            if (window.AccountDetail.state) {
+              window.AccountDetail.state.currentAccount = state.account;
+            }
+            window.AccountDetail.openAccountListsPanel(addToListBtn);
+            // Restore previous state after a delay
+            setTimeout(() => {
+              if (window.AccountDetail.state && prevAccount !== undefined) {
+                window.AccountDetail.state.currentAccount = prevAccount;
+              }
+            }, 100);
+          } else {
+            console.warn('[TaskDetail] AccountDetail.openAccountListsPanel not available');
+          }
+        } else if (state.contact) {
+          // Open contact lists panel
+          if (window.ContactDetail && typeof window.ContactDetail.openContactListsPanel === 'function') {
+            // Temporarily set ContactDetail state for the panel
+            const prevContact = window.ContactDetail.state?.currentContact;
+            if (window.ContactDetail.state) {
+              window.ContactDetail.state.currentContact = state.contact;
+            }
+            window.ContactDetail.openContactListsPanel(addToListBtn);
+            // Restore previous state after a delay
+            setTimeout(() => {
+              if (window.ContactDetail.state && prevContact !== undefined) {
+                window.ContactDetail.state.currentContact = prevContact;
+              }
+            }, 100);
+          } else {
+            console.warn('[TaskDetail] ContactDetail.openContactListsPanel not available');
+          }
+        }
+        return;
+      }
+
+      // Add to Sequence button (contact tasks only)
+      const addToSequenceBtn = e.target.closest('#task-add-to-sequence');
+      if (addToSequenceBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Only for contact tasks
+        if (state.contact) {
+          if (window.ContactDetail && typeof window.ContactDetail.openContactSequencesPanel === 'function') {
+            // Temporarily set ContactDetail state for the panel
+            const prevContact = window.ContactDetail.state?.currentContact;
+            if (window.ContactDetail.state) {
+              window.ContactDetail.state.currentContact = state.contact;
+            }
+            window.ContactDetail.openContactSequencesPanel(addToSequenceBtn);
+            // Restore previous state after a delay
+            setTimeout(() => {
+              if (window.ContactDetail.state && prevContact !== undefined) {
+                window.ContactDetail.state.currentContact = prevContact;
+              }
+            }, 100);
+          } else {
+            console.warn('[TaskDetail] ContactDetail.openContactSequencesPanel not available');
+          }
+        }
+        return;
+      }
+
+      // Add Task button
+      const addTaskBtn = e.target.closest('#task-add-task');
+      if (addTaskBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Determine if account task or contact task, then open appropriate popover
+        const isAcctTask = isAccountTask(state.currentTask);
+        if (isAcctTask && state.account) {
+          // Open account task popover
+          if (window.AccountDetail && typeof window.AccountDetail.openAccountTaskPopover === 'function') {
+            // Temporarily set AccountDetail state for the popover
+            const prevAccount = window.AccountDetail.state?.currentAccount;
+            if (window.AccountDetail.state) {
+              window.AccountDetail.state.currentAccount = state.account;
+            }
+            window.AccountDetail.openAccountTaskPopover(addTaskBtn);
+            // Restore previous state after a delay
+            setTimeout(() => {
+              if (window.AccountDetail.state && prevAccount !== undefined) {
+                window.AccountDetail.state.currentAccount = prevAccount;
+              }
+            }, 100);
+          } else {
+            console.warn('[TaskDetail] AccountDetail.openAccountTaskPopover not available');
+          }
+        } else if (state.contact) {
+          // Open contact task popover
+          if (window.ContactDetail && typeof window.ContactDetail.openContactTaskPopover === 'function') {
+            // Temporarily set ContactDetail state for the popover
+            const prevContact = window.ContactDetail.state?.currentContact;
+            if (window.ContactDetail.state) {
+              window.ContactDetail.state.currentContact = state.contact;
+            }
+            window.ContactDetail.openContactTaskPopover(addTaskBtn);
+            // Restore previous state after a delay
+            setTimeout(() => {
+              if (window.ContactDetail.state && prevContact !== undefined) {
+                window.ContactDetail.state.currentContact = prevContact;
+              }
+            }, 100);
+          } else {
+            console.warn('[TaskDetail] ContactDetail.openContactTaskPopover not available');
+          }
+        }
+        return;
+      }
+    }, { capture: true });
+
+    console.log('[TaskDetail] Header button handlers bound via event delegation');
   }
 
   function setupCompanyLinkHandlers() {
