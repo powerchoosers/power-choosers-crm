@@ -4,7 +4,7 @@
  * Used for the Prospecting page to find new accounts
  */
 
-import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL } from './_utils.js';
+import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL, formatLocation } from './_utils.js';
 import logger from '../_logger.js';
 
 export default async function handler(req, res) {
@@ -73,22 +73,34 @@ export default async function handler(req, res) {
     const searchData = await searchResp.json();
     
     // Map response to a clean format for the frontend
-    const organizations = (searchData.organizations || []).map(org => ({
-      id: org.id,
-      name: org.name,
-      domain: org.primary_domain || org.domain,
-      website: org.website_url,
-      linkedin: org.linkedin_url,
-      logoUrl: org.logo_url,
-      description: org.short_description || org.seo_description,
-      location: org.location?.city ? `${org.location.city}, ${org.location.state || ''}, ${org.location.country || ''}` : (org.raw_address || ''),
-      employees: org.estimated_num_employees,
-      industry: org.industry || (org.industries || [])[0],
-      keywords: org.keywords,
-      phone: org.phone,
-      facebook: org.facebook_url,
-      twitter: org.twitter_url
-    }));
+    const organizations = (searchData.organizations || []).map(org => {
+      // Robust location extraction
+      let location = '';
+      if (org.location?.city || org.location?.state || org.location?.country) {
+        location = formatLocation(org.location.city, org.location.state, org.location.country);
+      } else if (org.city || org.state || org.country) {
+        location = formatLocation(org.city, org.state, org.country);
+      } else {
+        location = org.raw_address || '';
+      }
+
+      return {
+        id: org.id,
+        name: org.name,
+        domain: org.primary_domain || org.domain,
+        website: org.website_url,
+        linkedin: org.linkedin_url,
+        logoUrl: org.logo_url,
+        description: org.short_description || org.seo_description,
+        location: location,
+        employees: org.estimated_num_employees || org.employee_count,
+        industry: org.industry || (org.industries || [])[0] || org.industry_category,
+        keywords: org.keywords,
+        phone: org.phone,
+        facebook: org.facebook_url,
+        twitter: org.twitter_url
+      };
+    });
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({

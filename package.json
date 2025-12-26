@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
+    "clear-logs": "powershell -Command \"Clear-Content .cursor/debug.log\"",
     "build": "echo 'No build step required'",
     "test": "echo 'No tests configured'"
   },
