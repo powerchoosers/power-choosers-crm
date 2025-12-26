@@ -4,7 +4,7 @@
  * Used for the Prospecting page to find new contacts
  */
 
-import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL } from './_utils.js';
+import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL, formatLocation } from './_utils.js';
 import logger from '../_logger.js';
 
 export default async function handler(req, res) {
@@ -79,29 +79,41 @@ export default async function handler(req, res) {
     const searchData = await searchResp.json();
     
     // Map response to a clean format for the frontend
-    const people = (searchData.people || []).map(person => ({
-      id: person.id,
-      name: person.name || `${person.first_name} ${person.last_name}`,
-      firstName: person.first_name,
-      lastName: person.last_name,
-      title: person.title || person.headline,
-      company: person.organization?.name,
-      companyId: person.organization_id,
-      domain: person.organization?.primary_domain,
-      location: person.city ? `${person.city}, ${person.state || ''}, ${person.country || ''}` : (person.country || ''),
-      linkedin: person.linkedin_url,
-      email: person.email, // Note: Often masked/null until enriched
-      emailStatus: person.email_status,
-      photoUrl: person.photo_url,
-      seniority: person.seniority,
-      departments: person.departments,
-      organization: {
-        id: person.organization?.id,
-        name: person.organization?.name,
-        domain: person.organization?.primary_domain,
-        logoUrl: person.organization?.logo_url
+    const people = (searchData.people || []).map(person => {
+      // Robust location extraction
+      let location = '';
+      if (person.city || person.state || person.country) {
+        location = formatLocation(person.city, person.state, person.country);
+      } else if (person.organization?.city || person.organization?.state || person.organization?.country) {
+        location = formatLocation(person.organization.city, person.organization.state, person.organization.country);
+      } else {
+        location = person.country || '';
       }
-    }));
+
+      return {
+        id: person.id,
+        name: person.name || `${person.first_name} ${person.last_name}`,
+        firstName: person.first_name,
+        lastName: person.last_name,
+        title: person.title || person.headline,
+        company: person.organization?.name,
+        companyId: person.organization_id,
+        domain: person.organization?.primary_domain,
+        location: location,
+        linkedin: person.linkedin_url,
+        email: person.email, // Note: Often masked/null until enriched
+        emailStatus: person.email_status,
+        photoUrl: person.photo_url,
+        seniority: person.seniority,
+        departments: person.departments,
+        organization: {
+          id: person.organization?.id,
+          name: person.organization?.name,
+          domain: person.organization?.primary_domain,
+          logoUrl: person.organization?.logo_url,
+        }
+      };
+    });
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
