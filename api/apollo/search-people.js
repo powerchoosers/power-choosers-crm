@@ -116,7 +116,7 @@ export default async function handler(req, res) {
         title: person.title || person.headline,
         company: person.organization?.name,
         companyId: person.organization_id,
-        domain: person.organization?.primary_domain,
+        domain: person.organization?.primary_domain || person.organization?.domain,
         location: location,
         linkedin: person.linkedin_url,
         email: person.email, // Note: Often masked/null until enriched
@@ -127,8 +127,11 @@ export default async function handler(req, res) {
         organization: {
           id: person.organization?.id,
           name: person.organization?.name,
-          domain: person.organization?.primary_domain,
+          domain: person.organization?.primary_domain || person.organization?.domain,
           logoUrl: person.organization?.logo_url,
+          industry: person.organization?.industry || (person.organization?.industries || [])[0],
+          employees: person.organization?.estimated_num_employees || person.organization?.employee_count,
+          location: person.organization ? formatLocation(person.organization.city, person.organization.state, person.organization.country) : null
         }
       };
     });
