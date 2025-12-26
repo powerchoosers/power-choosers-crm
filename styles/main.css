@@ -12217,7 +12217,7 @@ body {
     position: absolute;
     top: 60px;
     left: 50%;
-    transform: translateX(-50%);
+    transform: translate(-50%, -10px);
     width: 600px;
     max-width: 90vw;
     background: #3a3f47;
@@ -12227,6 +12227,15 @@ body {
     z-index: 2000;
     max-height: 500px;
     overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: none; /* Prevent clicks when hidden/fading out */
+}
+
+.global-search-modal.open {
+    opacity: 1;
+    transform: translate(-50%, 0);
+    pointer-events: auto;
 }
 
 .search-modal-content {
@@ -12255,9 +12264,9 @@ body {
     justify-content: center;
 }
 
-/* When container is showing empty state, remove padding from search-empty */
+/* When container is showing empty state, use consistent padding */
 .search-results-container.showing-empty .search-empty {
-    padding: 80px 40px;
+    padding: 60px 20px;
     width: 100%;
     box-sizing: border-box;
     display: flex;
@@ -12268,32 +12277,129 @@ body {
 }
 
 .search-loading {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    padding: 20px;
-    min-height: 120px;
-    color: var(--color-text-secondary);
+    display: none; /* Hidden by default, replaced by skeleton */
 }
 
 .loading-spinner {
-    width: 20px;
-    height: 20px;
-    border: 2px solid var(--color-border);
-    border-top: 2px solid var(--color-primary);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
+    display: none;
 }
 
-@keyframes spin {
-    0% {
-        transform: rotate(0deg);
-    }
+/* Skeleton Loader Styles */
+.search-skeleton {
+    padding: 12px;
+    box-sizing: border-box;
+    width: 100%;
+}
 
+.skeleton-category {
+    background: var(--bg-item, #2f343a);
+    border: 1px solid var(--grey-700, #3a3f45);
+    border-radius: var(--border-radius, 8px);
+    margin-bottom: 16px;
+    overflow: hidden;
+    padding-bottom: 4px; /* Add slight padding inside card at bottom */
+}
+
+.skeleton-header {
+    height: 37px;
+    padding: 0 12px;
+    background: rgba(0, 0, 0, 0.15);
+    border-bottom: 1px solid var(--grey-700, #3a3f45);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.skeleton-item {
+    height: 53px;
+    padding: 0 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.25);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.skeleton-item:last-child {
+    border-bottom: none;
+}
+
+.skeleton-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    flex-shrink: 0;
+}
+
+.skeleton-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.skeleton-line {
+    height: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.title-line {
+    width: 100px;
+    height: 12px;
+}
+
+.text-line-long {
+    width: 60%;
+}
+
+.text-line-short {
+    width: 40%;
+}
+
+/* Shimmer Animation */
+.skeleton-shimmer {
+    position: relative;
+    overflow: hidden;
+}
+
+.skeleton-shimmer::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0,
+        rgba(255, 255, 255, 0.05) 20%,
+        rgba(255, 255, 255, 0.1) 60%,
+        rgba(255, 255, 255, 0)
+    );
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
     100% {
-        transform: rotate(360deg);
+        transform: translateX(100%);
     }
+}
+
+/* Smooth Dropdown Animation */
+.search-results-container {
+    transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+}
+
+.search-results-container.expanded {
+    max-height: 80vh; /* Large enough to fit results but fits in viewport */
+    opacity: 1;
+    overflow-y: auto; /* Allow scrolling if content exceeds max-height */
+    padding-bottom: 24px; /* Ensure last item is not cut off */
 }
 
 .search-results {
@@ -12435,27 +12541,54 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 60px 40px;
+    padding: 40px 20px;
     text-align: center;
 }
 
-.empty-icon {
-    font-size: 48px;
+.prospect-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    width: 100%;
+    /* Add padding to separate from results/skeleton */
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-light);
     margin-bottom: 16px;
-    opacity: 0.5;
 }
 
-.empty-text {
+.prospect-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 13px;
     font-weight: 600;
-    color: var(--color-text-primary);
-    margin: 0 0 8px 0;
-    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.empty-subtext {
-    color: var(--color-text-secondary);
-    font-size: 14px;
-    margin: 0;
+.prospect-btn:hover {
+    background: var(--grey-700);
+    border-color: white;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.prospect-btn svg {
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+}
+
+.prospect-btn:hover svg {
+    opacity: 1;
 }
 
 /* Deals Board Styles */
