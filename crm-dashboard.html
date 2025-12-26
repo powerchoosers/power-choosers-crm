@@ -2063,7 +2063,7 @@
                                         </div>
                                     </div>
                                     <div class="page-content lists-grid">
-                                        <div id="lists-empty-state" class="empty-state">
+                                        <div id="lists-empty-state" class="empty-state" hidden>
                                             <div class="empty-title">No lists added</div>
                                             <div class="empty-desc">Get started by creating your first list to organize
                                                 people or companies. Click the "Create List" button above or use the
@@ -4522,6 +4522,13 @@
                 'scripts/pages/task-detail.js',    // NEW - load task-detail for Today's Tasks clicks
                 'scripts/pages/account-detail.js', // NEW - load account-detail for account navigation
                 'scripts/pages/contact-detail.js', // NEW - load contact-detail for contact navigation
+                'scripts/background-contacts-loader.js', 
+                'scripts/background-accounts-loader.js',
+                'scripts/background-calls-loader.js',
+                'scripts/background-emails-loader.js',
+                'scripts/background-tasks-loader.js',
+                'scripts/background-sequences-loader.js',
+                'scripts/background-lists-loader.js',
                 'scripts/background-loader-coordinator.js', // COORDINATED - replaces individual background loaders for better performance
                 'scripts/gmail-inbox-sync.js', // Client-side Gmail inbox sync (FREE - no server costs)
                 'scripts/email-compose-global.js', // NEW - Global email compose functionality
@@ -4539,6 +4546,28 @@
             }, Promise.resolve()).then(() => {
                 window.crmScriptsLoaded = true;
                 console.log('[LazyLoad] ✓ Core CRM scripts loaded!');
+                
+                // Pre-warm commonly used page scripts in the background
+                // Uses requestIdleCallback to avoid blocking the main thread
+                if ('requestIdleCallback' in window) {
+                    requestIdleCallback(() => {
+                        console.log('[LazyLoad] Pre-warming People & Accounts scripts...');
+                        // Pre-fetch scripts without executing init
+                        window._loadedPageScripts = window._loadedPageScripts || new Set();
+                        const prewarmScripts = [
+                            'scripts/pages/people.js',
+                            'scripts/pages/accounts.js',
+                            'scripts/pages/emails-redesigned.js'
+                        ];
+                        prewarmScripts.forEach(src => {
+                            const link = document.createElement('link');
+                            link.rel = 'prefetch';
+                            link.href = src;
+                            link.as = 'script';
+                            document.head.appendChild(link);
+                        });
+                    }, { timeout: 3000 });
+                }
             });
         };
 
@@ -4547,11 +4576,9 @@
             // Map of page names to their required scripts
             const pageScriptMap = {
                 people: [
-                    'scripts/pages/contact-detail.js',
                     'scripts/pages/people.js'
                 ],
                 accounts: [
-                    'scripts/pages/account-detail.js',
                     'scripts/pages/accounts.js'
                 ],
                 calls: [

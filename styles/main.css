@@ -5196,24 +5196,26 @@ body {
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     border-right: 1px solid rgba(255, 255, 255, 0.06);
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.2);
-    transition: width var(--transition-smooth), background 0.3s ease;
-    will-change: width;
-    z-index: 9999 !important; /* Extremely high to stay above all content */
+    transition: width var(--transition-smooth), background var(--transition-fast);
+    will-change: width, transform; /* Force GPU layer */
+    z-index: 9999 !important;
     position: relative;
-    transform: translateZ(0); /* Force GPU layer */
+    transform: translateZ(0); /* Hardware acceleration */
+    backface-visibility: hidden; /* Prevent flickering */
+    contain: strict; /* Highest performance isolation */
+    overflow: visible;
 }
 
 .sidebar.expanded {
     width: var(--sidebar-expanded);
-    overflow: visible !important;
 }
 
 .sidebar-content {
     padding: var(--spacing-base) 0;
     height: 100%;
-    /* No scrollbars when collapsed */
+    width: 100%; /* Ensure content stays within strict container */
     overflow-y: hidden;
-    overflow-x: visible; /* Allow labels to show during expansion */
+    overflow-x: visible;
 }
 
 /* Enable scrolling only when expanded (JS-controlled) */
@@ -5224,7 +5226,6 @@ body {
 .sidebar:hover {
     background: rgba(24, 24, 27, 0.85); /* Slightly more solid on hover */
     z-index: 10000 !important; /* Force extremely high z-index on hover */
-    backdrop-filter: blur(25px) saturate(200%); /* Enhanced blur on hover */
     box-shadow: 10px 0 40px rgba(0, 0, 0, 0.4); /* Stronger shadow to overlay content */
     transform: translateZ(1px); /* Ensure it's above the base layer */
 }
@@ -5240,20 +5241,22 @@ body {
     white-space: nowrap;
     border-left: 3px solid transparent;
     font-size: 0.875rem;
-    margin: 4px 12px; /* Margin for floating item feel */
-    border-radius: 8px; /* Rounded items */
+    margin: 4px 12px;
+    border-radius: 8px;
+    will-change: transform, background; /* Performance: pre-calculate GPU layer */
+    backface-visibility: hidden; /* Fix potential jitter */
 }
 
 .nav-item:hover {
     background: rgba(255, 255, 255, 0.05);
     color: #fff;
-    transform: translateX(4px); /* Subtle slide right on hover */
+    transform: translateX(4px) translateZ(0); /* Hardware accelerated move */
 }
 
 .nav-item.active {
     background: rgba(255, 107, 53, 0.1);
     color: #fff;
-    border-left: none; /* Move away from solid left border */
+    border-left: none;
     box-shadow: inset 0 0 0 1px rgba(255, 107, 53, 0.2);
     font-weight: 600;
 }
@@ -5264,14 +5267,17 @@ body {
 
 .nav-item svg {
     min-width: 20px;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
     margin-right: var(--spacing-md);
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar:not(.expanded) .nav-item {
     justify-content: center;
     padding: var(--spacing-md) 0;
-    margin: 4px 10px; /* Centered items in 60px sidebar */
+    margin: 4px 10px;
 }
 
 .sidebar:not(.expanded) .nav-item svg {
@@ -5282,24 +5288,46 @@ body {
     opacity: 0;
     visibility: hidden;
     width: 0;
+    max-width: 0;
     overflow: hidden;
-    transition: opacity var(--transition-fast), visibility var(--transition-fast), width var(--transition-smooth);
     white-space: nowrap;
+    transform: translateX(-10px); /* Performance: Slide-in text for better feel */
+    transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: opacity, transform;
 }
 
-/* Expanded state (via class or hover): show labels */
-.sidebar.expanded .nav-text,
-.sidebar:hover .nav-text {
+/* Expanded state: show labels */
+.sidebar.expanded .nav-text {
     opacity: 1;
     visibility: visible;
     width: auto;
-    transition-delay: 0.1s; /* Slight delay for labels to appear as sidebar widens */
+    max-width: 200px;
+    transform: translateX(0);
+    transition-delay: 0.05s;
+}
+
+/* FIX: Hide labels immediately if the sidebar is click-locked or not expanded */
+.sidebar.click-locked .nav-text,
+.sidebar:not(.expanded) .nav-text {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    max-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    pointer-events: none;
 }
 
 .nav-divider {
     height: 1px;
     background: var(--grey-700);
     margin: var(--spacing-base) var(--spacing-md);
+    transition: opacity 0.3s ease;
+}
+
+.sidebar:not(.expanded) .nav-divider {
+    opacity: 0;
+    margin: var(--spacing-md) 0;
 }
 
 /* Fine‑tune: Lists icon appears slightly right-shifted. Make it a bit larger and nudge left when collapsed */
@@ -19788,22 +19816,22 @@ input.row-select[type="checkbox"]:focus-visible {
  }
 
  .table-container tbody[data-skeleton="1"] td {
-     padding-top: 14px;
-     padding-bottom: 14px;
+     padding-top: 16px;
+     padding-bottom: 16px;
  }
 
 .table-container tbody[data-skeleton="1"] tr {
-    min-height: 56px;
+    min-height: 60px;
 }
 
 .table-container tbody[data-skeleton="1"] .skeleton-text {
-    height: 14px;
+    height: 16px;
 }
 
 .table-container tbody[data-skeleton="1"] td:first-child .skeleton-text {
-    width: 16px;
-    height: 16px;
-    border-radius: 2px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
 }
 
 .table-container tbody[data-skeleton="1"] td:not(:first-child) .skeleton-text.short {
