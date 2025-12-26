@@ -455,16 +455,33 @@
   // Helper: find account by domain (preferred) or exact normalized name
   function findAccountByDomainOrName(domain, name, accountsData = null) {
     const list = accountsData || ((typeof window !== 'undefined' && typeof window.getAccountsData === 'function') ? window.getAccountsData() : []);
+    
+    // Build/Update Lookup Map (O(N) built once, then O(1) lookups)
+    const listHash = `${list.length}-${list[0]?.id || ''}`;
+    if (!window._accountLookupCache || window._accountLookupCache.hash !== listHash) {
+      const dMap = new Map();
+      const nMap = new Map();
+      list.forEach(a => {
+        if (!a) return;
+        const d = normalizeDomain(a.domain || a.website || a.site);
+        if (d) dMap.set(d, a);
+        const n = String(a.accountName || a.name || a.companyName || '').trim().toLowerCase();
+        if (n) nMap.set(n, a);
+      });
+      window._accountLookupCache = { hash: listHash, domainMap: dMap, nameMap: nMap };
+      console.log(`[People] Rebuilt account lookup cache for ${list.length} accounts`);
+    }
+
     const normDomain = normalizeDomain(domain);
-    if (normDomain) {
-      const byDom = list.find((a) => normalizeDomain(a && (a.domain || a.website || a.site)) === normDomain);
-      if (byDom) return byDom;
+    if (normDomain && window._accountLookupCache.domainMap.has(normDomain)) {
+      return window._accountLookupCache.domainMap.get(normDomain);
     }
+
     const normName = String(name || '').trim().toLowerCase();
-    if (normName) {
-      const byName = list.find((a) => String((a && (a.accountName || a.name || a.companyName)) || '').trim().toLowerCase() === normName);
-      if (byName) return byName;
+    if (normName && window._accountLookupCache.nameMap.has(normName)) {
+      return window._accountLookupCache.nameMap.get(normName);
     }
+
     return null;
   }
 
@@ -555,6 +572,7 @@
         });
       });
       obs.observe(root, { childList: true, subtree: true });
+      window._peopleMutationObserver = obs;
     } catch (e) {
     }
   }
@@ -583,6 +601,7 @@
           }
         });
         resizeObserver.observe(cityContainer);
+        window._peopleResizeObserver1 = resizeObserver;
         
         // Also observe the input field
         const inputField = cityContainer.querySelector('.chip-input-field');
@@ -1470,6 +1489,7 @@
         }
       });
       resizeObserver.observe(els.fCity);
+      window._peopleResizeObserver2 = resizeObserver;
     }
     // Company chip behaviors
     if (els.fCompany) {
@@ -1879,18 +1899,8 @@
       
       // Store full dataset for pagination
       state.allContactsCache = contactsData;
-      
-      // Get total count (non-blocking). Use loaded count for immediate UI.
+      // Total count = full cache length (all records from cache/Firestore)
       state.totalCount = contactsData.length;
-      if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getTotalCount === 'function') {
-        window.BackgroundContactsLoader.getTotalCount()
-          .then((cnt) => { 
-            state.totalCount = cnt; 
-            // Re-render pagination when total count is updated
-            renderPagination();
-          })
-          .catch((error) => { console.warn('[People] Failed to get total count, keeping loaded count:', error); });
-      }
       
       // SMART LAZY LOADING: 
       // - If from cache (no cost): Load ALL contacts immediately
@@ -1960,14 +1970,18 @@
       });
 
       // Determine initial batch and render immediately
+      // UI renders first 100 for speed, but allContactsCache has ALL records for pagination
       const initialBatchSize = 100;
       const initialBatch = contactsArray.slice(0, initialBatchSize);
       const enrichedInitial = enrichBatch(initialBatch);
       state.data = enrichedInitial;
       state.filtered = enrichedInitial.slice();
+      
+      // hasMore is true if cache has more records beyond the initial batch
       state.hasMore = contactsArray.length > initialBatchSize;
+      
       state.loaded = true;
-      console.log('[People] Initial render with', state.data.length, 'contacts from', contactsArray.length);
+      console.log('[People] Initial render with', state.data.length, 'of', contactsArray.length, 'contacts (hasMore:', state.hasMore, ')');
       
       // Check if we're restoring from back navigation
       if (window.__restoringPeople && window._peopleReturn) {
@@ -2624,8 +2638,27 @@
   function hideCompanySuggestions() { if (els.companySuggest) { els.companySuggest.setAttribute('hidden', ''); els.companySuggest.innerHTML = ''; } }
 
   
+  // Debounce mechanism to prevent multiple rapid renders
+  let renderPending = false;
+  let lastRenderPage = null;
 
   async function render() {
+    // Skip if same page and already rendered (prevents triple-render)
+    if (lastRenderPage === state.currentPage && renderPending) return;
+    
+    // Debounce: if a render is already pending, skip
+    if (renderPending) return;
+    renderPending = true;
+    
+    // Use requestAnimationFrame for smooth rendering
+    requestAnimationFrame(() => {
+      renderPending = false;
+      lastRenderPage = state.currentPage;
+      _doRender();
+    });
+  }
+  
+  function _doRender() {
     if (!els.tbody) return;
     
     const pageItems = getPageItems();
@@ -3223,7 +3256,29 @@
         state, 
         rebindDynamic, 
         getCurrentState, 
-        getState: function() { return state; } 
+        getState: function() { return state; },
+        cleanup: function() {
+          console.log('[People] Cleaning up UI state...');
+          
+          // 1. Unsubscribe from Firestore (CRITICAL)
+          if (typeof _unsubscribePeople === 'function') {
+            try { _unsubscribePeople(); _unsubscribePeople = null; } catch(_) {}
+            console.log('[People] Unsubscribed from Firestore');
+          }
+
+          // 2. Disconnect observers (CRITICAL)
+          try {
+            if (window._peopleMutationObserver) { window._peopleMutationObserver.disconnect(); window._peopleMutationObserver = null; }
+            if (window._peopleResizeObserver1) { window._peopleResizeObserver1.disconnect(); window._peopleResizeObserver1 = null; }
+            if (window._peopleResizeObserver2) { window._peopleResizeObserver2.disconnect(); window._peopleResizeObserver2 = null; }
+          } catch (_) {}
+
+          // 3. Clear data to free memory
+          state.data = [];      // Clear paginated view
+          state.filtered = [];  // Clear filtered view
+          // Keep allContactsCache - it's needed for navigation back
+          console.log('[People] UI state cleaned');
+        }
       };
       // Export contacts data for contact-detail module
       // Return the FULL dataset (allContactsCache), not just the paginated view (state.data)
@@ -3535,93 +3590,102 @@
           updateBulkActionsBar();
         }
       });
-      els.tbody.addEventListener('click', async (e) => {
-        // Company name click -> open Account Detail by matching domain or name
-        const companyLink = e.target.closest && e.target.closest('.company-link');
-        if (companyLink) {
-          e.preventDefault();
-          // Capture return state so Account Detail can send us back here
-          try {
-            window._accountNavigationSource = 'people';
-            window._peopleReturn = {
-              page: state.currentPage,
-              scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0
-            };
-          } catch (_) {}
-          const dom = (companyLink.getAttribute('data-domain') || '').trim();
-          const comp = (companyLink.getAttribute('data-company') || companyLink.textContent || '').trim();
-          
-          // RETRY MECHANISM: Wait for BackgroundAccountsLoader if needed
-          let accountsData = window.BackgroundAccountsLoader ? window.BackgroundAccountsLoader.getAccountsData() : [];
-          if (accountsData.length === 0) {
-            accountsData = window.getAccountsData ? window.getAccountsData() : [];
-          }
-          if (accountsData.length === 0 && window.BackgroundAccountsLoader) {
-            // console.log('[People] No accounts yet, waiting for BackgroundAccountsLoader...');
+      if (!els.tbody._boundClick) {
+        els.tbody.addEventListener('click', async (e) => {
+          // Company name click -> open Account Detail by matching domain or name
+          const companyLink = e.target.closest && e.target.closest('.company-link');
+          if (companyLink) {
+            e.preventDefault();
+            e.stopPropagation(); // Stop bubbling to prevent multiple handlers if any
+
+            if (window._openingAccountDetail) return;
+            window._openingAccountDetail = true;
+
+            const dom = (companyLink.getAttribute('data-domain') || '').trim();
+            const comp = (companyLink.getAttribute('data-company') || companyLink.textContent || '').trim();
+
+
+            // Capture return state so Account Detail can send us back here
+            try {
+              window._accountNavigationSource = 'people';
+              window._peopleReturn = {
+                page: state.currentPage,
+                scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0
+              };
+            } catch (_) {}
             
-            // Wait up to 3 seconds (30 attempts x 100ms)
-            for (let attempt = 0; attempt < 30; attempt++) {
-              await new Promise(resolve => setTimeout(resolve, 100));
-              accountsData = window.BackgroundAccountsLoader.getAccountsData() || [];
-              
-              if (accountsData.length > 0) {
-                // console.log('[People] ✓ BackgroundAccountsLoader ready after', (attempt + 1) * 100, 'ms with', accountsData.length, 'accounts');
-                break;
-              }
-            }
-            
+            // RETRY MECHANISM: Wait for BackgroundAccountsLoader if needed
+            let accountsData = window.BackgroundAccountsLoader ? window.BackgroundAccountsLoader.getAccountsData() : [];
             if (accountsData.length === 0) {
-              console.warn('[People] ⚠ Timeout waiting for accounts after 3 seconds');
+              accountsData = window.getAccountsData ? window.getAccountsData() : [];
             }
-          }
-          
-          const acct = findAccountByDomainOrName(dom, comp, accountsData);
-          if (acct && acct.id && window.AccountDetail && typeof window.AccountDetail.show === 'function') {
-            try { window.AccountDetail.show(acct.id); } catch (_) { /* noop */ }
-          } else {
-            if (window.crm && typeof window.crm.showToast === 'function') {
-              try { window.crm.showToast(`No matching account found for ${comp}`); } catch (_) { /* noop */ }
+            if (accountsData.length === 0 && window.BackgroundAccountsLoader) {
+              // Wait up to 3 seconds (30 attempts x 100ms)
+              for (let attempt = 0; attempt < 30; attempt++) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                accountsData = window.BackgroundAccountsLoader.getAccountsData() || [];
+                if (accountsData.length > 0) break;
+              }
+            }
+            
+            const acct = findAccountByDomainOrName(dom, comp, accountsData);
+            if (acct && acct.id && window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+              try { await window.AccountDetail.show(acct.id); } catch (_) { /* noop */ }
             } else {
-              console.warn('No matching account found for', comp);
-            }
-          }
-          return;
-        }
-        const nameCell = e.target.closest('.name-cell');
-        if (nameCell) {
-          const contactId = nameCell.getAttribute('data-contact-id');
-          if (contactId && window.ContactDetail) {
-            // Store navigation source for back button
-            window._contactNavigationSource = 'people';
-            window._peopleReturn = {
-              page: state.currentPage,
-              scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
-              searchTerm: els.quickSearch?.value || '',
-              sortColumn: state.sortColumn || '',
-              sortDirection: state.sortDirection || 'asc',
-              filters: {
-                titleTokens: [...state.titleTokens],
-                companyTokens: [...state.companyTokens],
-                statusTokens: [...state.statusTokens]
-              }
-            };
-            // Prefetch contact data from cache (FREE)
-            if (window.getPeopleData) {
-              const peopleData = window.getPeopleData();
-              const contact = peopleData.find(c => c.id === contactId);
-              if (contact) {
-                window._prefetchedContactForDetail = contact;
+              if (window.crm && typeof window.crm.showToast === 'function') {
+                try { window.crm.showToast(`No matching account found for ${comp}`); } catch (_) { /* noop */ }
+              } else {
+                console.warn('No matching account found for', comp);
               }
             }
-            window.ContactDetail.show(contactId);
+            window._openingAccountDetail = false;
+            return;
           }
-          return;
-        }
-        const btn = e.target.closest && e.target.closest('.qa-btn');
-        if (!btn) return;
-        e.preventDefault();
-        handleQuickAction(btn);
-      });
+          const nameCell = e.target.closest('.name-cell');
+          if (nameCell) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (window._openingContactDetail) return;
+            window._openingContactDetail = true;
+
+            const contactId = nameCell.getAttribute('data-contact-id');
+            if (contactId && window.ContactDetail) {
+              // Store navigation source for back button
+              window._contactNavigationSource = 'people';
+              window._peopleReturn = {
+                page: state.currentPage,
+                scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
+                searchTerm: els.quickSearch?.value || '',
+                sortColumn: state.sortColumn || '',
+                sortDirection: state.sortDirection || 'asc',
+                filters: {
+                  titleTokens: [...state.titleTokens],
+                  companyTokens: [...state.companyTokens],
+                  statusTokens: [...state.statusTokens]
+                }
+              };
+              // Prefetch contact data from cache (FREE)
+              if (window.getPeopleData) {
+                const peopleData = window.getPeopleData();
+                const contact = peopleData.find(c => c.id === contactId);
+                if (contact) {
+                  window._prefetchedContactForDetail = contact;
+                }
+              }
+              try { await window.ContactDetail.show(contactId); } catch (_) {}
+            }
+            window._openingContactDetail = false;
+            return;
+          }
+          const btn = e.target.closest && e.target.closest('.qa-btn');
+          if (!btn) return;
+          e.preventDefault();
+          e.stopPropagation();
+          handleQuickAction(btn);
+        });
+        els.tbody._boundClick = true;
+      }
       els.tbody.dataset.bound = '1';
     }
 
@@ -4664,24 +4728,15 @@
   }
 
   function getPageItems() {
-    // In search mode, use filtered results; in browse mode, use loaded data
-    const total = state.searchMode ? state.filtered.length : state.data.length;
+    // In search mode, use filtered results; in browse mode, use allContactsCache (full dataset)
+    const sourceData = state.searchMode ? state.filtered : (state.allContactsCache || state.data);
+    const total = sourceData.length;
     const totalPages = getTotalPages();
     if (state.currentPage > totalPages) state.currentPage = totalPages;
     const start = (state.currentPage - 1) * state.pageSize;
     const end = Math.min(total, start + state.pageSize);
     
-    // Check if we need to load more data for this page
-    const neededIndex = (state.currentPage - 1) * state.pageSize + state.pageSize - 1;
-    if (neededIndex >= state.data.length && state.hasMore && !state.searchMode) {
-      // Trigger data loading (but don't await to keep function synchronous)
-      loadMoreContacts().then(() => {
-        // Re-render after data is loaded
-        render();
-      });
-    }
-    
-    return state.searchMode ? state.filtered.slice(start, end) : state.data.slice(start, end);
+    return sourceData.slice(start, end);
   }
 
   function renderPagination() {

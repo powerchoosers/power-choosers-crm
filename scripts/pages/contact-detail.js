@@ -2,6 +2,10 @@
 
 // Contact Detail page module: displays individual contact information Apollo-style
 (function () {
+  // Prevent duplicate initialization
+  if (window._contactDetailModuleInitialized) return;
+  window._contactDetailModuleInitialized = true;
+
   // Clean up previous module instance if it exists (for hot reload support)
   if (window.ContactDetail && window.ContactDetail._cleanup) {
     try {
@@ -2844,8 +2848,14 @@
 
     // Load activities
     loadContactActivities();
-    // Load recent calls
-    try { loadRecentCallsForContact(); } catch (_) { /* noop */ }
+    // Load recent calls with timeout to prevent blocking page load
+    try {
+      setTimeout(() => {
+        loadRecentCallsForContact().catch(error => {
+          console.warn('[ContactDetail] Recent calls load failed:', error);
+        });
+      }, 100); // Small delay to ensure page is fully rendered first
+    } catch (_) { /* noop */ }
     try { promotePageContent(); } catch (_) { }
   }
 
@@ -5163,19 +5173,48 @@
   async function loadRecentCallsForContact() {
     const list = document.getElementById('contact-recent-calls-list');
     if (!list || !state.currentContact) return;
+
+    // CRITICAL: Check if page is still visible before doing heavy work
+    const contactPage = document.getElementById('contact-detail-page');
+    const isVisible = contactPage && contactPage.classList.contains('active') && !contactPage.hidden;
+    if (!isVisible) {
+      console.log('[ContactDetail] Skipping calls load - page not visible');
+      return;
+    }
+
     const contactId = state.currentContact.id;
     const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
 
     // Loading recent calls for contact
 
     try {
+      // FIX: Add timeout to prevent hanging on slow API calls
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.warn('[ContactDetail] Recent calls API timeout - aborting after 5 seconds');
+        controller.abort();
+      }, 5000); // 5 second timeout
+
       // Use new targeted API endpoint for much better performance
       const token = (window.firebase && window.firebase.auth && window.firebase.auth().currentUser)
         ? await window.firebase.auth().currentUser.getIdToken()
         : null;
-      const r = await fetch(`${base}/api/calls/contact/${contactId}?limit=50`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      });
+
+      let r;
+      try {
+        r = await fetch(`${base}/api/calls/contact/${contactId}?limit=20`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+          signal: controller.signal
+        });
+      } catch (fetchError) {
+        if (fetchError.name === 'AbortError') {
+          console.warn('[ContactDetail] Recent calls API aborted due to timeout');
+          return;
+        }
+        throw fetchError;
+      }
+
+      clearTimeout(timeoutId);
       const j = await r.json().catch(() => ({}));
       const calls = (j && j.ok && Array.isArray(j.calls)) ? j.calls : [];
 

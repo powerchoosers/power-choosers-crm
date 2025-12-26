@@ -724,42 +724,45 @@ var console = {
         handleQuickAction(btn);
       });
       // Account name click -> open Account Detail
-      els.tbody.addEventListener('click', (e) => {
-        const link = e.target.closest && e.target.closest('.acct-link');
-        if (!link) return;
-        e.preventDefault();
-        const id = link.getAttribute('data-id');
-        if (id && window.AccountDetail && typeof window.AccountDetail.show === 'function') {
-          // Capture return state so Account Detail can restore Accounts on back
-          try {
-            window._accountNavigationSource = 'accounts';
-            
-            // Capture comprehensive state snapshot
-            const currentState = {
-              page: state.currentPage,
-              currentPage: state.currentPage, // Include both for compatibility
-              scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
-              searchTerm: els.quickSearch ? els.quickSearch.value : '',
-              sortColumn: state.sortColumn,
-              sortDirection: state.sortDirection,
-              filters: getCurrentFilters ? getCurrentFilters() : {},
-              selectedItems: getSelectedItems ? getSelectedItems() : [],
-              timestamp: Date.now() // Add timestamp for debugging
-            };
-            
-            // Prefer module API to capture a consistent snapshot
-            if (window.accountsModule && typeof window.accountsModule.getCurrentState === 'function') {
-              const moduleState = window.accountsModule.getCurrentState();
-              window._accountsReturn = { ...currentState, ...moduleState };
-            } else {
-              window._accountsReturn = currentState;
-            }
-            
-            console.log('[Accounts] Captured state for back navigation:', window._accountsReturn);
-          } catch (_) { /* noop */ }
-          window.AccountDetail.show(id);
-        }
-      });
+      if (!els.tbody._boundAccountClick) {
+        els.tbody.addEventListener('click', (e) => {
+          const link = e.target.closest && e.target.closest('.acct-link');
+          if (!link) return;
+          e.preventDefault();
+          const id = link.getAttribute('data-id');
+          if (id && window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+            // Capture return state so Account Detail can restore Accounts on back
+            try {
+              window._accountNavigationSource = 'accounts';
+              
+              // Capture comprehensive state snapshot
+              const currentState = {
+                page: state.currentPage,
+                currentPage: state.currentPage, // Include both for compatibility
+                scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
+                searchTerm: els.quickSearch ? els.quickSearch.value : '',
+                sortColumn: state.sortColumn,
+                sortDirection: state.sortDirection,
+                filters: getCurrentFilters ? getCurrentFilters() : {},
+                selectedItems: getSelectedItems ? getSelectedItems() : [],
+                timestamp: Date.now() // Add timestamp for debugging
+              };
+              
+              // Prefer module API to capture a consistent snapshot
+              if (window.accountsModule && typeof window.accountsModule.getCurrentState === 'function') {
+                const moduleState = window.accountsModule.getCurrentState();
+                window._accountsReturn = { ...currentState, ...moduleState };
+              } else {
+                window._accountsReturn = currentState;
+              }
+              
+              console.log('[Accounts] Captured state for back navigation:', window._accountsReturn);
+            } catch (_) { /* noop */ }
+            window.AccountDetail.show(id);
+          }
+        });
+        els.tbody._boundAccountClick = true;
+      }
     }
 
     // Pagination click handling
@@ -886,8 +889,8 @@ var console = {
         moreAccounts = nextBatch;
         state.hasMore = state.data.length + nextBatch.length < state.allAccountsCache.length;
         console.log(`[Accounts] Loaded ${nextBatch.length} more accounts from cache`);
-      } else if (state.lastDoc) {
-        // Load from Firestore using background loader
+      } else if (state.lastDoc || (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.loadMore === 'function')) {
+        // Load from Firestore using background loader (if available) or direct query
         if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.loadMore === 'function') {
           const result = await window.BackgroundAccountsLoader.loadMore();
           if (result.loaded > 0) {
@@ -898,7 +901,7 @@ var console = {
           } else {
             state.hasMore = false;
           }
-        } else {
+        } else if (state.lastDoc) {
           // Fallback to direct Firestore query
           const snapshot = await window.firebaseDB.collection('accounts')
             .startAfter(state.lastDoc)
@@ -964,19 +967,8 @@ var console = {
       
       // Store full dataset for pagination
       state.allAccountsCache = accountsData;
-      
-      // Get total count (non-blocking). Use loaded count immediately for UI.
+      // Total count = full cache length (all records from cache/Firestore)
       state.totalCount = accountsData.length;
-      if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getTotalCount === 'function') {
-        window.BackgroundAccountsLoader.getTotalCount()
-          .then((cnt) => { 
-            state.totalCount = cnt; 
-            console.log('[Accounts] Total accounts (async):', cnt);
-            // Re-render pagination when total count is updated
-            renderPagination();
-          })
-          .catch((error) => { console.warn('[Accounts] Failed to get total count, keeping loaded count:', error); });
-      }
       
       // Check if we're restoring from back navigation
       let targetPage = 1;
@@ -992,21 +984,12 @@ var console = {
         ? window.BackgroundAccountsLoader.isFromCache() 
         : false;
       
-      if (isFromCache) {
-        // Display-first: show only the first batch immediately; paginate the rest
-        const initialBatchSize = 100;
-        state.data = accountsData.slice(0, initialBatchSize);
-        state.filtered = state.data.slice();
-        state.hasMore = accountsData.length > initialBatchSize;
-        console.log('[Accounts] Initial render with', state.data.length, 'of', accountsData.length, 'accounts from cache');
-      } else {
-        // Firestore costs money - lazy load in batches of 100
-        const initialBatchSize = 100;
-        state.data = accountsData.slice(0, initialBatchSize);
-        state.filtered = state.data.slice();
-        state.hasMore = accountsData.length > initialBatchSize;
-        console.log('[Accounts] Loaded first', initialBatchSize, 'accounts from Firestore (lazy loading enabled)');
-      }
+      // UI renders first 100 for speed, but allAccountsCache has ALL records for pagination
+      const initialBatchSize = 100;
+      state.data = accountsData.slice(0, initialBatchSize);
+      state.filtered = state.data.slice();
+      state.hasMore = accountsData.length > initialBatchSize;
+      console.log('[Accounts] Initial render with', state.data.length, 'of', accountsData.length, 'accounts (hasMore:', state.hasMore, ')');
       
       state.loaded = true;
       state.errorMsg = '';
@@ -1298,7 +1281,27 @@ var console = {
     applyFilters();
   }
 
+  // Debounce mechanism to prevent multiple rapid renders
+  let renderPending = false;
+  let lastRenderPage = null;
+
   async function render() {
+    // Skip if same page and already rendered (prevents triple-render)
+    if (lastRenderPage === state.currentPage && renderPending) return;
+    
+    // Debounce: if a render is already pending, skip
+    if (renderPending) return;
+    renderPending = true;
+    
+    // Use requestAnimationFrame for smooth rendering
+    requestAnimationFrame(() => {
+      renderPending = false;
+      lastRenderPage = state.currentPage;
+      _doRender();
+    });
+  }
+  
+  function _doRender() {
     if (!els.tbody) return;
     
     ensureSelected();
@@ -2556,24 +2559,15 @@ var console = {
   }
 
   function getPageItems() {
-    // In search mode, use filtered results; in browse mode, use loaded data
-    const total = state.searchMode ? state.filtered.length : state.data.length;
+    // In search mode, use filtered results; in browse mode, use allAccountsCache (full dataset)
+    const sourceData = state.searchMode ? state.filtered : (state.allAccountsCache || state.data);
+    const total = sourceData.length;
     const totalPages = getTotalPages();
     if (state.currentPage > totalPages) state.currentPage = totalPages;
     const start = (state.currentPage - 1) * state.pageSize;
     const end = Math.min(total, start + state.pageSize);
     
-    // Check if we need to load more data for this page
-    const neededIndex = (state.currentPage - 1) * state.pageSize + state.pageSize - 1;
-    if (neededIndex >= state.data.length && state.hasMore && !state.searchMode) {
-      // Trigger data loading (but don't await to keep function synchronous)
-      loadMoreAccounts().then(() => {
-        // Re-render after data is loaded
-        render();
-      });
-    }
-    
-    return state.searchMode ? state.filtered.slice(start, end) : state.data.slice(start, end);
+    return sourceData.slice(start, end);
   }
 
   function renderPagination() {

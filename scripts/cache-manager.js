@@ -11,7 +11,9 @@ class CacheManager {
     this.tasksCacheExpiry = 2 * 60 * 60 * 1000; // 2 hours for tasks (still volatile but reasonable)
     this.emailsCacheExpiry = 4 * 60 * 60 * 1000; // 4 hours for emails (moderate volatility)
     this.collections = ['contacts', 'accounts', 'calls', 'calls-raw', 'tasks', 'sequences', 'lists', 'deals', 'settings', 'badge-data', 'emails', 'agents', 'agent_activities'];
-    this.listMembersExpiry = 10 * 60 * 1000; // 10 minutes for list members
+    // List members change relatively often, but we also have explicit invalidation events
+    // (bulk import complete, remove from list, etc). Increase to reduce Firestore reads/cost.
+    this.listMembersExpiry = 60 * 60 * 1000; // 60 minutes for list members
     this.initPromise = null;
 
     // REQUEST DEDUPLICATION: Prevent multiple simultaneous fetches for same collection
@@ -190,29 +192,6 @@ class CacheManager {
 
           const age = Date.now() - meta.timestamp;
           const fresh = age < expiry;
-
-          // #region agent log - Hypothesis B: Track cache freshness decisions
-          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-              sessionId: 'cache-debug-session',
-              runId: 'initial-run',
-              hypothesisId: 'B',
-              location: 'cache-manager.js:isFresh',
-              message: 'Cache freshness check result',
-              data: {
-                collection,
-                fresh,
-                ageSeconds: Math.round(age / 1000),
-                expirySeconds: Math.round(expiry / 1000),
-                timestamp: meta.timestamp
-              },
-              timestamp: Date.now()
-            })
-          }).catch(() => {});
-          // #endregion
-
           console.log(`[CacheManager] Cache for ${collection}: ${fresh ? 'FRESH' : 'EXPIRED'} (${Math.round(age / 1000)}s old, expiry: ${Math.round(expiry / 1000)}s)`);
           resolve(fresh);
         };
@@ -227,22 +206,6 @@ class CacheManager {
 
   // OPTIMIZED GET WITH DEDUPLICATION AND DEBUGGING
   async get(collection) {
-    // #region agent log - Hypothesis A, C, E: Track request patterns
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        sessionId: 'cache-debug-session',
-        runId: 'initial-run',
-        hypothesisId: 'A,C,E',
-        location: 'cache-manager.js:get',
-        message: 'CacheManager.get() called',
-        data: { collection, activeRequests: Array.from(this.activeRequests.keys()) },
-        timestamp: Date.now()
-      })
-    }).catch(() => {});
-    // #endregion
-
     // Emergency fallback: bypass cache if disabled
     if (window.DISABLE_CACHE) {
       console.warn('[CacheManager] Cache disabled, fetching from Firestore');
@@ -251,22 +214,6 @@ class CacheManager {
 
     // REQUEST DEDUPLICATION: If another request for this collection is in flight, wait for it
     if (this.activeRequests.has(collection)) {
-      // #region agent log - Hypothesis A: Duplicate request detected
-      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          sessionId: 'cache-debug-session',
-          runId: 'initial-run',
-          hypothesisId: 'A',
-          location: 'cache-manager.js:get',
-          message: 'Duplicate request detected - waiting for existing request',
-          data: { collection, duplicateDetected: true },
-          timestamp: Date.now()
-        })
-      }).catch(() => {});
-      // #endregion
-
       console.log(`[CacheManager] Waiting for in-flight ${collection} request...`);
       this._incrementStat(collection, 'duplicates');
       return this.activeRequests.get(collection);
@@ -296,44 +243,11 @@ class CacheManager {
         // Return cached data
         const cached = await this.getFromCache(collection);
         if (cached && cached.length > 0) {
-          // #region agent log - Hypothesis B: Cache hit tracking
-          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-              sessionId: 'cache-debug-session',
-              runId: 'initial-run',
-              hypothesisId: 'B',
-              location: 'cache-manager.js:_performGet',
-              message: 'Cache hit - returning cached data',
-              data: { collection, recordCount: cached.length },
-              timestamp: Date.now()
-            })
-          }).catch(() => {});
-          // #endregion
-
           console.log(`[CacheManager] ✓ Returning ${cached.length} ${collection} from cache`);
           this._incrementStat(collection, 'hits');
           return cached;
         }
       }
-
-      // #region agent log - Hypothesis B: Cache miss tracking
-      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          sessionId: 'cache-debug-session',
-          runId: 'initial-run',
-          hypothesisId: 'B',
-          location: 'cache-manager.js:_performGet',
-          message: 'Cache miss - will fetch from Firestore',
-          data: { collection, wasFresh: fresh },
-          timestamp: Date.now()
-        })
-      }).catch(() => {});
-      // #endregion
-
       // Cache miss or expired - fetch from Firestore
       console.log(`[CacheManager] Cache miss for ${collection}, fetching from Firestore...`);
       this._incrementStat(collection, 'misses');
@@ -706,23 +620,6 @@ class CacheManager {
           activeRequest: this.activeRequests.has(collection)
         };
       }
-
-      // #region agent log - Hypothesis A,B,C,E: Report comprehensive cache stats
-      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          sessionId: 'cache-debug-session',
-          runId: 'initial-run',
-          hypothesisId: 'A,B,C,E',
-          location: 'cache-manager.js:getStats',
-          message: 'Cache statistics report',
-          data: stats,
-          timestamp: Date.now()
-        })
-      }).catch(() => {});
-      // #endregion
-
       return stats;
     } catch (error) {
       console.error('[CacheManager] Error getting stats:', error);
@@ -1039,4 +936,6 @@ if (typeof window !== 'undefined') {
     return stats;
   };
 }
+
+
 

@@ -44,6 +44,7 @@
       department: [],
     },
     flags: { hasEmail: false, hasPhone: false },
+    _initToken: 0,
   };
 
   const els = {};
@@ -192,6 +193,50 @@
   }
 
   function qs(id) { return document.getElementById(id); }
+
+  // Render table skeleton rows (same system used by People/Accounts during load)
+  function renderTableSkeleton(tbody, columnsCount, count = 12) {
+    try {
+      if (!tbody) return;
+      const safeCols = Math.max(3, Math.min(24, parseInt(columnsCount || 0, 10) || 10));
+
+      // Choose a reasonable number of rows based on container height (avoid huge DOM)
+      let finalCount = Math.max(6, Math.min(count || 12, 30));
+      try {
+        const container = tbody.closest('.table-container');
+        if (container) {
+          const containerHeight = container.clientHeight || 0;
+          const rowHeightEstimate = 60; // should match skeleton row min-height
+          const rowsNeeded = Math.ceil(containerHeight / rowHeightEstimate);
+          if (rowsNeeded > 0) finalCount = Math.max(6, Math.min(rowsNeeded, 30));
+        }
+      } catch (_) { }
+
+      const rows = Array.from({ length: finalCount }).map(() => {
+        const cells = Array.from({ length: safeCols }).map((_, i) => {
+          if (i === 0) {
+            return '<td><div class="skeleton-text skeleton-shimmer"></div></td>';
+          } else {
+            const variant = (i % 3 === 0) ? 'short' : ((i % 3 === 1) ? 'medium' : '');
+            return `<td><div class="skeleton-text skeleton-shimmer ${variant}"></div></td>`;
+          }
+        }).join('');
+        return `<tr>${cells}</tr>`;
+      }).join('');
+
+      tbody.setAttribute('data-skeleton', '1');
+      tbody.innerHTML = rows;
+    } catch (_) { }
+  }
+
+  function clearTableSkeleton(tbody) {
+    try {
+      if (!tbody) return;
+      if (tbody.getAttribute('data-skeleton') !== '1') return;
+      tbody.removeAttribute('data-skeleton');
+      tbody.innerHTML = '';
+    } catch (_) { }
+  }
 
   function initDomRefs() {
     // Scope to the detail page
@@ -1137,6 +1182,17 @@
 
     if (console.time) console.time(`[ListDetail] fetchMembers ${listId}`);
 
+    // 0) FAST PATH: in-memory listMembersCache (updated by other pages; zero cost)
+    try {
+      const mem = window.listMembersCache && window.listMembersCache[listId];
+      if (mem && mem.loaded && (mem.people instanceof Set || Array.isArray(mem.people))) {
+        state.membersPeople = mem.people instanceof Set ? new Set(mem.people) : new Set(mem.people || []);
+        state.membersAccounts = mem.accounts instanceof Set ? new Set(mem.accounts) : new Set(mem.accounts || []);
+        if (console.timeEnd) console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
+        return;
+      }
+    } catch (_) { }
+
     // 1) Check IndexedDB cache first (10-minute expiry) - COST-EFFECTIVE: zero Firestore reads
     try {
       const cached = await window.CacheManager.getCachedListMembers(listId);
@@ -1176,6 +1232,7 @@
 
       // Priority 1: Top-level listMembers collection (where all new additions go)
       try {
+        const __q0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
         const lmSnap = await window.firebaseDB.collection('listMembers').where('listId', '==', listId).limit(5000).get();
         if (lmSnap && lmSnap.docs && lmSnap.docs.length > 0) {
           lmSnap.docs.forEach(d => {
@@ -1193,7 +1250,20 @@
 
       // Priority 2: Also check subcollection for any legacy data (merge with top-level results)
       try {
+        // Optimization: only query the legacy subcollection once per listId per session.
+        // If it's empty, we skip forever for that list to avoid redundant reads/cost.
+        window._listDetailLegacyMemberCheck = window._listDetailLegacyMemberCheck || {};
+        const legacyCheck = window._listDetailLegacyMemberCheck[listId];
+        if (legacyCheck && legacyCheck.checked && legacyCheck.hasDocs === false) {
+        } else {
+        const __s0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
         const subSnap = await window.firebaseDB.collection('lists').doc(listId).collection('members').get();
+        try {
+          window._listDetailLegacyMemberCheck[listId] = {
+            checked: true,
+            hasDocs: !!(subSnap && subSnap.docs && subSnap.docs.length > 0)
+          };
+        } catch (_) { }
         if (subSnap && subSnap.docs && subSnap.docs.length > 0) {
           const beforePeople = state.membersPeople.size;
           const beforeAccounts = state.membersAccounts.size;
@@ -1209,6 +1279,7 @@
           if (addedPeople > 0 || addedAccounts > 0) {
             console.log(`[ListDetail] ✓ Merged ${addedPeople} people, ${addedAccounts} accounts from subcollection (legacy data)`);
           }
+        }
         }
       } catch (subErr) {
         console.warn('[ListDetail] Subcollection query failed (non-critical):', subErr);
@@ -2092,14 +2163,38 @@
     // Load column order from localStorage
     loadColumnOrder();
 
+    // Token to prevent stale async completions from previous list overwriting current list UI
+    state._initToken = (state._initToken || 0) + 1;
+    const initToken = state._initToken;
+
     // Set context
     if (context) {
       state.listId = context.listId;
       state.listName = context.listName;
       state.listKind = context.listKind;
       state.view = context.listKind || 'people';
-      // Avoid clearing tbody immediately to prevent flicker; it will be replaced on first render
     }
+
+    // Reset view-specific state immediately so we don't show previous list content
+    state.filtered = [];
+    state.currentPage = 1;
+    state.selectedPeople = new Set();
+    state.selectedAccounts = new Set();
+    state.membersPeople = new Set();
+    state.membersAccounts = new Set();
+    state.loadedPeople = false;
+    state.loadedAccounts = false;
+
+    // Always show skeleton immediately on list switch (prevents "previous list" flicker)
+    try {
+      if (els.tbody) {
+        // Determine expected columns count based on current view
+        const colsCount = (state.view === 'people') ? peopleColumnOrder.length : accountsColumnOrder.length;
+        renderTableSkeleton(els.tbody, colsCount, 12);
+        els.tbody.style.transition = 'opacity 0.25s ease';
+        els.tbody.style.opacity = '1';
+      }
+    } catch (_) { }
 
     // Check if we're restoring from back navigation
     if (window.__restoringListDetail && window._listDetailReturn) {
@@ -2319,6 +2414,11 @@
       fetchMembers(state.listId)
     ]);
 
+    // If user already switched lists, abort (prevents stale render/flicker)
+    if (initToken !== state._initToken) {
+      return;
+    }
+
     // CRITICAL FIX: If list recordCount doesn't match fetched members, invalidate cache and re-fetch
     // This handles cases where cache is stale or incomplete (e.g., only showing 12 out of 174 contacts)
     if (state.listId) {
@@ -2416,6 +2516,8 @@
 
     // Apply filters and render table body, then fade it in smoothly
     // CRITICAL: Members are now guaranteed to be loaded before filtering
+    // Clear skeleton right before real render
+    try { clearTableSkeleton(els.tbody); } catch (_) { }
     applyFilters();
 
     // Only fade in if table was hidden (fresh load)
@@ -3502,9 +3604,12 @@ function hideBulkActionsBar() {
 }
 
 // ===== Sequence dropdown panel =====
-let _onListDetailSequenceKeydown = null;
-let _positionListDetailSequencePanel = null;
-let _onListDetailSequenceOutside = null;
+// IMPORTANT: this page script can be evaluated more than once (navigation / hot reload).
+// Do NOT use top-level `let` for globals (it throws "Identifier has already been declared").
+// Store handler references on `window` so we can safely remove listeners across reloads.
+var _onListDetailSequenceKeydown = window.__pcListDetailSequenceKeydown || null;
+var _positionListDetailSequencePanel = window.__pcListDetailSequencePosition || null;
+var _onListDetailSequenceOutside = window.__pcListDetailSequenceOutside || null;
 
 function escapeHtmlForSequence(text) {
   if (text == null) return '';
@@ -3528,15 +3633,18 @@ function closeListDetailSequencePanel() {
     if (_onListDetailSequenceKeydown) {
       document.removeEventListener('keydown', _onListDetailSequenceKeydown, true);
       _onListDetailSequenceKeydown = null;
+      window.__pcListDetailSequenceKeydown = null;
     }
     if (_onListDetailSequenceOutside) {
       document.removeEventListener('mousedown', _onListDetailSequenceOutside, true);
       _onListDetailSequenceOutside = null;
+      window.__pcListDetailSequenceOutside = null;
     }
     if (_positionListDetailSequencePanel) {
       window.removeEventListener('resize', _positionListDetailSequencePanel, true);
       window.removeEventListener('scroll', _positionListDetailSequencePanel, true);
       _positionListDetailSequencePanel = null;
+      window.__pcListDetailSequencePosition = null;
     }
   } catch (_) { }
 }
@@ -3614,6 +3722,7 @@ function openListDetailSequencePanel(triggerBtn) {
     panel.setAttribute('data-placement', placement);
     panel.style.setProperty('--arrow-left', `${triggerRect.left + (triggerRect.width / 2) - left}px`);
   };
+  window.__pcListDetailSequencePosition = _positionListDetailSequencePanel;
 
   _positionListDetailSequencePanel();
   window.addEventListener('resize', _positionListDetailSequencePanel, true);
@@ -3644,7 +3753,18 @@ function openListDetailSequencePanel(triggerBtn) {
       handleListDetailSequenceChoose(document.activeElement, view);
     }
   };
+  window.__pcListDetailSequenceKeydown = _onListDetailSequenceKeydown;
   document.addEventListener('keydown', _onListDetailSequenceKeydown, true);
+
+  _onListDetailSequenceOutside = (e) => {
+    try {
+      if (!panel) return;
+      if (panel.contains(e.target) || e.target === triggerBtn) return;
+      closeListDetailSequencePanel();
+    } catch (_) { }
+  };
+  window.__pcListDetailSequenceOutside = _onListDetailSequenceOutside;
+  document.addEventListener('mousedown', _onListDetailSequenceOutside, true);
 
   // Click outside to close
   _onListDetailSequenceOutside = (e) => {

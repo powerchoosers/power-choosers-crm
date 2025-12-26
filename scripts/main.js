@@ -103,57 +103,28 @@ class PowerChoosersCRM {
 
                 // Refresh Today's Tasks widget with debouncing
                 if (typeof this.loadTodaysTasks === 'function') {
-                    // #region agent log - Hypothesis G: Widget re-rendering tracking
-                    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-                      method: 'POST',
-                      headers: {'Content-Type': 'application/json'},
-                      body: JSON.stringify({
-                        sessionId: 'cache-debug-session',
-                        runId: 'widget-rerender-fix',
-                        hypothesisId: 'G',
-                        location: 'main.js:taskDeleted',
-                        message: 'Task deleted - refreshing Today\'s Tasks widget',
-                        data: { taskId },
-                        timestamp: Date.now()
-                      })
-                    }).catch(() => {});
-                    // #endregion
-
-                    clearTimeout(this._taskRefreshTimer);
-                    this._taskRefreshTimer = setTimeout(() => {
-                        this.loadTodaysTasks();
-                    }, 500); // Debounce for 500ms
+                    this.loadTodaysTasks();
                 }
             }
         });
 
-        // CRITICAL FIX: Listen for tasksUpdated events with deleted flag
+        // CRITICAL FIX: Listen for tasksUpdated events (creation, deletion, or page loads)
         window.addEventListener('tasksUpdated', async (e) => {
-            const { taskId, deleted } = e.detail || {};
-            if (deleted && taskId) {
-                console.log('[CRM] Task deleted via tasksUpdated event, refreshing Today\'s Tasks widget:', taskId);
-                // Refresh Today's Tasks widget with debouncing
-                if (typeof this.loadTodaysTasks === 'function') {
-                    // #region agent log - Hypothesis G: Widget re-rendering tracking
-                    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-                      method: 'POST',
-                      headers: {'Content-Type': 'application/json'},
-                      body: JSON.stringify({
-                        sessionId: 'cache-debug-session',
-                        runId: 'widget-rerender-fix',
-                        hypothesisId: 'G',
-                        location: 'main.js:tasksUpdated',
-                        message: 'Task updated/deleted - refreshing Today\'s Tasks widget',
-                        data: { taskId, deleted },
-                        timestamp: Date.now()
-                      })
-                    }).catch(() => {});
-                    // #endregion
+            const { taskId, deleted, source } = e.detail || {};
+            const dashboardActive = !!document.getElementById('dashboard-page')?.classList.contains('active');
 
-                    clearTimeout(this._taskRefreshTimer);
-                    this._taskRefreshTimer = setTimeout(() => {
-                        this.loadTodaysTasks();
-                    }, 500); // Debounce for 500ms
+            // If we're not on the dashboard, don't spam-load Today's Tasks.
+            // This event often fires from the Tasks page (source: tasksPageLoad) and isn't needed
+            // when the widget isn't visible.
+            if (!dashboardActive) {
+                return;
+            }
+
+            // Handle both deletions and general updates (like when tasks page loads fresh data)
+            if ((deleted && taskId) || source === 'tasksPageLoad' || source === 'taskCreation') {
+                console.log('[CRM] Tasks updated via tasksUpdated event, refreshing Today\'s Tasks widget:', { taskId, deleted, source });
+                if (typeof this.loadTodaysTasks === 'function') {
+                    this.loadTodaysTasks();
                 }
             }
         });
@@ -324,13 +295,24 @@ class PowerChoosersCRM {
         const activityTimeline = document.getElementById('home-activity-timeline');
 
         if (taskLists.length) taskLists.forEach(list => list.innerHTML = this.renderTaskSkeletons());
-        if (newsList) newsList.innerHTML = this.renderNewsSkeletons();
+        if (newsList) {
+            // Do NOT overwrite real news content with skeletons on repeated widget refreshes.
+            // This was causing "perma-skeleton" when loadEnergyNews debounced shortly after.
+            const hasRealNews = !!(newsList.querySelector('a.news-item') || newsList.querySelector('.modern-reveal'));
+            const hasSkeleton = !!newsList.querySelector('.skeleton-shimmer');
+            if (!hasRealNews && !hasSkeleton) {
+                newsList.innerHTML = this.renderNewsSkeletons();
+            }
+        }
         if (activityTimeline && window.ActivityManager) {
             activityTimeline.innerHTML = window.ActivityManager.renderLoadingState();
         }
 
         // STEP 2: Start loading real data
-        this.loadTodaysTasks();
+        // Avoid double-triggering Today's Tasks from multiple startup paths (loadInitialData + dashboard widgets).
+        if (!this._tasksLoading && !(this._lastTasksLoad && (Date.now() - this._lastTasksLoad) < 2000)) {
+            this.loadTodaysTasks();
+        }
         this.loadEnergyNews();
         
         // Load activities with a small delay to ensure initial skeleton is seen if load is instant
@@ -1732,11 +1714,18 @@ class PowerChoosersCRM {
         const sidebar = this.sidebar;
         if (!sidebar) return;
 
+        // Create an invisible trigger zone for better performance than a global move listener
+        if (!document.getElementById('sidebar-trigger-zone')) {
+            const trigger = document.createElement('div');
+            trigger.id = 'sidebar-trigger-zone';
+            trigger.style.cssText = 'position:fixed;top:0;left:0;width:12px;height:100vh;z-index:9998;pointer-events:auto;';
+            document.body.appendChild(trigger);
+            this.sidebarTriggerZone = trigger;
+        }
+
         // Helpers with requestAnimationFrame for smooth animations
         const openSidebar = () => {
-            // Only open if not locked AND mouse has moved (prevents accidental reopening)
-            if (!this.sidebarLockCollapse && this.sidebarMouseMoved) {
-                // Use requestAnimationFrame for smoother animation
+            if (!this.sidebarLockCollapse) {
                 requestAnimationFrame(() => {
                     sidebar.classList.add('expanded');
                 });
@@ -1745,7 +1734,6 @@ class PowerChoosersCRM {
 
         const closeSidebar = () => {
             if (!this.sidebarPointerInside) {
-                // Use requestAnimationFrame for smoother animation
                 requestAnimationFrame(() => {
                     sidebar.classList.remove('expanded');
                 });
@@ -1753,61 +1741,38 @@ class PowerChoosersCRM {
         };
 
         if (!sidebar._hoverBound) {
-            // Pointer-based hover inside the sidebar (passive for better performance)
+            // Pointer enters the sidebar itself
             sidebar.addEventListener('pointerenter', () => {
                 this.sidebarPointerInside = true;
-                
-                if (this.sidebarLockCollapse) return; // Don't open if locked
-                if (this.sidebarCloseTimer) clearTimeout(this.sidebarCloseTimer);
-                // Small show delay to avoid accidental flicker
-                this.sidebarOpenTimer = setTimeout(openSidebar, 90);
+                if (this.sidebarLockCollapse) return;
+                this.clearSidebarTimers();
+                this.sidebarOpenTimer = setTimeout(openSidebar, 50); // Faster response when inside
             }, { passive: true });
 
             sidebar.addEventListener('pointerleave', () => {
                 this.sidebarPointerInside = false;
                 if (!this.sidebarLockCollapse) {
-                    // Small hide delay for smoother exit
+                    this.clearSidebarTimers();
                     this.sidebarCloseTimer = setTimeout(closeSidebar, 150);
                 }
             }, { passive: true });
 
-            // Track mouse movement globally for movement detection (passive for better performance)
+            // The Trigger Zone: only wake up when approaching the left edge
+            if (this.sidebarTriggerZone) {
+                this.sidebarTriggerZone.addEventListener('pointerenter', () => {
+                    if (this.sidebarLockCollapse || sidebar.classList.contains('expanded')) return;
+                    this.clearSidebarTimers();
+                    this.sidebarOpenTimer = setTimeout(openSidebar, 80);
+                }, { passive: true });
+            }
+
+            // Global move listener is now ONLY used for basic activity tracking, not heavy coordinate math
             document.addEventListener('pointermove', (e) => {
-                // Throttle edge detection for performance (every 50ms max)
-                const now = Date.now();
-                const shouldCheckEdge = now - this.sidebarLastEdgeCheck >= 50;
+                this.sidebarMouseMoved = true;
+                this.sidebarLastMouseX = e.clientX;
+                this.sidebarLastMouseY = e.clientY;
+            }, { passive: true });
 
-                // Check if mouse has moved significantly (5px threshold)
-                const movedX = Math.abs(e.clientX - this.sidebarLastMouseX);
-                const movedY = Math.abs(e.clientY - this.sidebarLastMouseY);
-                if (movedX > 5 || movedY > 5) {
-                    this.sidebarMouseMoved = true;
-                    this.sidebarLastMouseX = e.clientX;
-                    this.sidebarLastMouseY = e.clientY;
-                }
-
-                // Edge-trigger: open when pointer approaches left edge (throttled)
-                if (shouldCheckEdge) {
-                    this.sidebarLastEdgeCheck = now;
-
-                    if (this.sidebarLockCollapse || sidebar.classList.contains('click-locked')) return;
-
-                    const edgeWidth = 12; // px
-                    if (e.clientX <= edgeWidth) {
-                        if (this.sidebarCloseTimer) clearTimeout(this.sidebarCloseTimer);
-                        if (!sidebar.classList.contains('expanded')) {
-                            if (this.sidebarOpenTimer) clearTimeout(this.sidebarOpenTimer);
-                            this.sidebarOpenTimer = setTimeout(openSidebar, 90);
-                        }
-                    } else if (!this.sidebarPointerInside) {
-                        if (this.sidebarOpenTimer) clearTimeout(this.sidebarOpenTimer);
-                        // Debounced close when pointer moves away from edge and not inside
-                        this.sidebarCloseTimer = setTimeout(closeSidebar, 150);
-                    }
-                }
-            }, { passive: true }); // Passive listener prevents blocking the main thread
-
-            // Collapse on hashchange/navigation to ensure closed state during page load
             window.addEventListener('hashchange', () => {
                 this.collapseSidebarAndLock(1200);
             });
@@ -2473,7 +2438,9 @@ class PowerChoosersCRM {
         quickActionBtns.forEach(btn => {
             if (!btn._quickActionBound) {
                 btn.addEventListener('click', () => {
-                    const action = btn.textContent.trim();
+                    const rawText = btn.textContent;
+                    // Normalize text: remove line breaks/tabs and collapse multiple spaces
+                    const action = rawText.replace(/[\n\r\t]+/g, ' ').replace(/\s+/g, ' ').trim();
                     this.handleQuickAction(action);
                 });
                 btn._quickActionBound = true;
@@ -5050,11 +5017,18 @@ class PowerChoosersCRM {
             });
         }
 
-        // Load tasks and news together to prevent re-renders
-        Promise.all([
-            this.loadTodaysTasks(),
+        // Load tasks and news together to prevent re-renders.
+        // IMPORTANT: Gate loadTodaysTasks here because loadDashboardWidgets() also triggers it.
+        const shouldStartTodaysTasks = (typeof this.loadTodaysTasks === 'function')
+            && !this._tasksLoading
+            && !(this._lastTasksLoad && (Date.now() - this._lastTasksLoad) < 2000);
+
+
+        const loaders = [
+            ...(shouldStartTodaysTasks ? [this.loadTodaysTasks()] : []),
             this.loadEnergyNews()
-        ]).then(() => {
+        ];
+        Promise.all(loaders).then(() => {
             console.log('[CRM] Tasks and News loaded together');
         });
 
@@ -5372,147 +5346,44 @@ class PowerChoosersCRM {
     async loadTodaysTasks(skipFirebase = false) {
         const startTime = performance.now();
 
-        // #region agent log - Hypothesis G: Function entry
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            sessionId: 'cache-debug-session',
-            runId: 'widget-entry-debug',
-            hypothesisId: 'G',
-            location: 'main.js:loadTodaysTasks',
-            message: 'loadTodaysTasks function called',
-            data: { skipFirebase, startTime },
-            timestamp: Date.now()
-          })
-        }).catch(() => {});
-        // #endregion
-
-        // DEBOUNCING: Prevent multiple calls within 2 seconds
+        // Prevent multiple calls within 2 seconds AND while actively loading
         const currentTime = Date.now();
         if (this._lastTasksLoad && (currentTime - this._lastTasksLoad) < 2000) {
             console.log('[CRM] Tasks load debounced - too soon since last load');
-
-            // #region agent log - Hypothesis G: Debounced call
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({
-                sessionId: 'cache-debug-session',
-                runId: 'widget-debouncing-fix',
-                hypothesisId: 'G',
-                location: 'main.js:loadTodaysTasks',
-                message: 'loadTodaysTasks debounced - too soon since last call',
-                data: { timeSinceLastLoad: currentTime - this._lastTasksLoad },
-                timestamp: Date.now()
-              })
-            }).catch(() => {});
-            // #endregion
-
             return;
         }
+
+        // If already loading, queue this request but don't start a new one
+        if (this._tasksLoading) {
+            console.log('[CRM] Tasks already loading, queuing request...');
+            // Queue the request to run after current load completes
+            if (!this._queuedTasksLoad) {
+                this._queuedTasksLoad = () => this.loadTodaysTasks(skipFirebase);
+            }
+            return;
+        }
+
         this._lastTasksLoad = currentTime;
-
-        // Track this invocation so we can correlate unexpected late re-renders
-        this._todaysTasksInvocationId = `tt_${currentTime}_${Math.random().toString(16).slice(2, 8)}`;
-        // #region agent log - Hypothesis G3: loadTodaysTasks invocation identity + role branch (no PII)
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            sessionId: 'cache-debug-session',
-            runId: 'tasks-invocation-debug',
-            hypothesisId: 'G3',
-            location: 'main.js:loadTodaysTasks',
-            message: 'loadTodaysTasks invocation created',
-            data: { tasksInvocationId: this._todaysTasksInvocationId, skipFirebase: !!skipFirebase, currentUserRole: String(window.currentUserRole || ''), isAdmin: String(window.currentUserRole || '') === 'admin' },
-            timestamp: Date.now()
-          })
-        }).catch(() => {});
-        // #endregion
-
-        // #region agent log - Hypothesis G: Track widget loading starts
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            sessionId: 'cache-debug-session',
-            runId: 'widget-debouncing-fix',
-            hypothesisId: 'G',
-            location: 'main.js:loadTodaysTasks',
-            message: 'loadTodaysTasks called (after debouncing)',
-            data: { skipFirebase, alreadyLoading: this._tasksLoading },
-            timestamp: Date.now()
-          })
-        }).catch(() => {});
-        // #endregion
+        this._tasksLoading = true;
+        this._hasRenderedForCurrentLoad = false; // Track if we've rendered for this load cycle
 
         const taskLists = Array.from(document.querySelectorAll('.tasks-list'));
-        
-        // #region agent log - Hypothesis G: Task lists check
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            sessionId: 'cache-debug-session',
-            runId: 'widget-render-debug',
-            hypothesisId: 'G',
-            location: 'main.js:loadTodaysTasks',
-            message: 'Checking for task lists',
-            data: { taskListsCount: taskLists.length, _tasksLoading: this._tasksLoading },
-            timestamp: Date.now()
-          })
-        }).catch(() => {});
-        // #endregion
 
         if (!taskLists.length) {
-            // #region agent log - Hypothesis G: No task lists found
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({
-                sessionId: 'cache-debug-session',
-                runId: 'widget-debouncing-fix',
-                hypothesisId: 'G',
-                location: 'main.js:loadTodaysTasks',
-                message: 'No task lists found - exiting early',
-                data: {},
-                timestamp: Date.now()
-              })
-            }).catch(() => {});
-            // #endregion
+            this._tasksLoading = false;
             return;
         }
 
-        // SHOW SKELETON LOADING IMMEDIATELY
+        // SHOW SKELETON LOADING (first load only)
+        // If tasks are already rendered, keep them visible during refresh to avoid "stuck loading" UX.
         const tasksList = taskLists[0]; // Use first tasks list
-        if (tasksList && !this._tasksLoading) {
-            tasksList.innerHTML = this.renderTasksSkeletons();
+        if (tasksList) {
+            const hasExistingContent = (tasksList.innerHTML || '').trim().length > 0;
+            const isCurrentlySkeleton = !!tasksList.querySelector('.skeleton-task, .skeleton-text, .skeleton-shimmer');
+            if (!hasExistingContent || isCurrentlySkeleton) {
+                tasksList.innerHTML = this.renderTasksSkeletons();
+            }
         }
-
-        // Prevent double-rendering - only skip if currently loading
-        if (this._tasksLoading) {
-            console.log('[CRM] Tasks already loading, skipping duplicate call');
-
-            // #region agent log - Hypothesis G: Duplicate call prevented
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({
-                sessionId: 'cache-debug-session',
-                runId: 'widget-debouncing-fix',
-                hypothesisId: 'G',
-                location: 'main.js:loadTodaysTasks',
-                message: 'Duplicate loadTodaysTasks call prevented',
-                data: {},
-                timestamp: Date.now()
-              })
-            }).catch(() => {});
-            // #endregion
-
-            return;
-        }
-        this._tasksLoading = true;
 
         // Helpers (scoped to this method)
         const parseDateStrict = (dateStr) => {
@@ -5568,8 +5439,14 @@ class PowerChoosersCRM {
             }
         };
 
-        // Always render skeletons immediately to prevent layout shift
-        taskLists.forEach(list => { list.innerHTML = this.renderTaskSkeletons(); });
+        // Render skeletons for first load only; on refresh keep current content visible.
+        taskLists.forEach(list => {
+            const hasExistingContent = (list.innerHTML || '').trim().length > 0;
+            const isCurrentlySkeleton = !!list.querySelector('.skeleton-task, .skeleton-text, .skeleton-shimmer');
+            if (!hasExistingContent || isCurrentlySkeleton) {
+                list.innerHTML = this.renderTaskSkeletons();
+            }
+        });
 
         // Load localStorage tasks for immediate rendering after skeletons (non-admin only)
         // NOTE: localStorage is per-browser and can be stale across browsers; Firebase/CacheManager are source-of-truth.
@@ -5578,6 +5455,7 @@ class PowerChoosersCRM {
             // Admin users should NOT use localStorage as a source (it causes stale cross-browser confusion and flicker)
             if (isAdmin()) {
                 localTasks = [];
+
             } else {
             // Try namespaced key first (matches tasks.js/task-detail.js patterns)
             const email = getUserEmail();
@@ -5585,8 +5463,10 @@ class PowerChoosersCRM {
             const namespacedTasks = JSON.parse(localStorage.getItem(namespacedKey) || '[]');
             localTasks = Array.isArray(namespacedTasks) ? namespacedTasks : [];
 
+
             // CRITICAL: Filter by ownership for non-admin users (localStorage bypasses Firestore rules)
             if (!isAdmin() && localTasks.length > 0) {
+                const beforeCount = localTasks.length;
                 localTasks = localTasks.filter(t => {
                     if (!t) return false;
                     const ownerId = (t.ownerId || '').toLowerCase();
@@ -5594,10 +5474,12 @@ class PowerChoosersCRM {
                     const createdBy = (t.createdBy || '').toLowerCase();
                     return ownerId === email || assignedTo === email || createdBy === email;
                 });
+
             }
 
             // CRITICAL: Filter out completed tasks from localStorage cache (they shouldn't show in Today's Tasks)
             // Use broader completion markers than just status to avoid schema drift.
+            const beforeCompletionFilter = localTasks.length;
             localTasks = localTasks.filter(t => {
                 if (!t) return false;
                 const status = String(t.status || 'pending').toLowerCase();
@@ -5606,6 +5488,8 @@ class PowerChoosersCRM {
                 if (t.completedAt || t.completed_at) return false;
                 return true;
             });
+
+
             }
         } catch (_) { localTasks = []; }
 
@@ -5616,7 +5500,7 @@ class PowerChoosersCRM {
             const coordinatorReady = !!(window.BackgroundLoaderCoordinator && window.BackgroundLoaderCoordinator.isLoaded && window.BackgroundLoaderCoordinator.isLoaded('tasks'));
             if (!isAdmin() && !coordinatorReady && localTasks.length > 0) {
                 this.renderTodaysTasks(localTasks, parseDateStrict, parseTimeToMinutes, today);
-            }
+        }
         } catch (_) {}
 
         // If not skipping Firebase, fetch Firebase data in background and update
@@ -5628,9 +5512,12 @@ class PowerChoosersCRM {
                     // CRITICAL: Add ownership filters for non-admin users
                     if (!isAdmin()) {
                         const email = getUserEmail();
+
+
                         if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
                             // Use DataManager helper if available
                             const firebaseTasks = await window.DataManager.queryWithOwnership('tasks');
+
 
                             // CRITICAL: Firebase is the source of truth once available.
                             // Do NOT re-introduce stale local tasks that are missing from Firebase results.
@@ -5743,116 +5630,38 @@ class PowerChoosersCRM {
                     const coordinatorExists = !!window.BackgroundLoaderCoordinator;
                     const tasksLoaded = coordinatorExists ? window.BackgroundLoaderCoordinator.isLoaded('tasks') : false;
                     const coordinatorStatus = coordinatorExists ? window.BackgroundLoaderCoordinator.getStatus() : null;
-
-                    // #region agent log - Hypothesis G: Debug cached tasks check
-                    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-                      method: 'POST',
-                      headers: {'Content-Type': 'application/json'},
-                      body: JSON.stringify({
-                        sessionId: 'cache-debug-session',
-                        runId: 'widget-debouncing-fix',
-                        hypothesisId: 'G',
-                        location: 'main.js:loadTodaysTasks',
-                        message: 'Checking cached tasks availability',
-                        data: { coordinatorExists, tasksLoaded, coordinatorStatus },
-                        timestamp: Date.now()
-                      })
-                    }).catch(() => {});
-                    // #endregion
-
                     if (tasksLoaded) {
                         try {
-                            // #region agent log - Hypothesis G: Using cached tasks data
-                            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-                              method: 'POST',
-                              headers: {'Content-Type': 'application/json'},
-                              body: JSON.stringify({
-                                sessionId: 'cache-debug-session',
-                                runId: 'widget-rerender-fix',
-                                hypothesisId: 'G',
-                                location: 'main.js:loadTodaysTasks',
-                                message: 'Using cached tasks from BackgroundLoaderCoordinator',
-                                data: {},
-                                timestamp: Date.now()
-                              })
-                            }).catch(() => {});
-                            // #endregion
-
                             const cachedTasks = await window.CacheManager.get('tasks');
-                            const filteredTasks = cachedTasks.filter(task => {
-                                if (!task || (task.status || 'pending') === 'completed') return false;
-                                // CRITICAL FIX: Include today AND overdue tasks (same logic as renderTodaysTasks)
-                                const taskDate = parseDateStrict(task.dueDate || task.date || task.createdAt);
-                                return taskDate && taskDate.getTime() <= today.getTime();
-                            });
-
-                            // Process cached tasks for today's tasks format
-                            const processedTasks = filteredTasks.map(task => ({
+                            // IMPORTANT: Do NOT pre-filter cached tasks with custom logic here.
+                            // That "early filtering" was producing a smaller list (e.g. 123) and then
+                            // the later Firebase/loader path produced a different list (e.g. 236),
+                            // which looks like the widget is battling/flipping.
+                            // Instead, only remove completed tasks here and let renderTodaysTasks()
+                            // apply the exact same due-date filtering every time.
+                            const processedTasks = (cachedTasks || []).filter(task => {
+                                if (!task) return false;
+                                const status = String(task.status || 'pending').toLowerCase();
+                                if (status === 'completed' || status === 'done') return false;
+                                if (task.completed === true || task.isCompleted === true) return false;
+                                if (task.completedAt || task.completed_at) return false;
+                                return true;
+                            }).map(task => ({
                                 ...task,
                                 time: task.time || '',
                                 priority: task.priority || 'medium',
                                 type: task.type || 'task'
                             }));
-
-                            // #region agent log - Hypothesis G: Successfully loaded cached tasks
-                            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-                              method: 'POST',
-                              headers: {'Content-Type': 'application/json'},
-                              body: JSON.stringify({
-                                sessionId: 'cache-debug-session',
-                                runId: 'widget-render-fix',
-                                hypothesisId: 'G',
-                                location: 'main.js:loadTodaysTasks',
-                                message: 'Successfully loaded cached tasks',
-                                data: { tasksRendered: processedTasks.length, tasksLoadingCleared: true, cachedTasksTotal: cachedTasks.length },
-                                timestamp: Date.now()
-                              })
-                            }).catch(() => {});
-                            // #endregion
-
                             // Render cached tasks quickly if available.
                             // IMPORTANT: For admins, cached tasks can be stale across browsers (2h expiry),
                             // so we still revalidate against Firebase when skipFirebase === false.
                             if (processedTasks.length > 0) {
                                 this.renderTodaysTasks(processedTasks, parseDateStrict, parseTimeToMinutes, today);
-
-                                // #region agent log - Hypothesis G5: Cached tasks rendered; decide whether to revalidate with Firebase
-                                fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-                                  method: 'POST',
-                                  headers: {'Content-Type': 'application/json'},
-                                  body: JSON.stringify({
-                                    sessionId: 'cache-debug-session',
-                                    runId: 'tasks-revalidate-debug',
-                                    hypothesisId: 'G5',
-                                    location: 'main.js:loadTodaysTasks',
-                                    message: 'Rendered cached tasks; revalidate decision',
-                                    data: { cachedRendered: processedTasks.length, skipFirebase: !!skipFirebase, isAdmin: String(window.currentUserRole || '') === 'admin' },
-                                    timestamp: Date.now()
-                                  })
-                                }).catch(() => {});
-                                // #endregion
-
                                 if (!skipFirebase && String(window.currentUserRole || '') !== 'admin') {
                                     // Non-admin users: keep current behavior to avoid extra reads; cached is typically fine + ownership filtered.
                                     this._tasksLoading = false;
 
                                     const endTime = performance.now();
-                                    // #region agent log - Hypothesis G: Cached tasks load completed quickly
-                                    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-                                      method: 'POST',
-                                      headers: {'Content-Type': 'application/json'},
-                                      body: JSON.stringify({
-                                        sessionId: 'cache-debug-session',
-                                        runId: 'widget-rerender-fix',
-                                        hypothesisId: 'G',
-                                        location: 'main.js:loadTodaysTasks',
-                                        message: 'loadTodaysTasks completed using cached data',
-                                        data: { duration: endTime - startTime, tasksLoaded: processedTasks.length },
-                                        timestamp: Date.now()
-                                      })
-                                    }).catch(() => {});
-                                    // #endregion
-
                                     return;
                                 }
                                 // Admin users: continue to Firebase path to revalidate.
@@ -5865,25 +5674,10 @@ class PowerChoosersCRM {
                     }
 
                     // Admin path: unrestricted query
-                    const snapshot = await query
-                        .orderBy('timestamp', 'desc')
-                        .limit(200)
-                        .get();
-                    // #region agent log - Hypothesis G6: Firebase admin query returned
-                    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-                      method: 'POST',
-                      headers: {'Content-Type': 'application/json'},
-                      body: JSON.stringify({
-                        sessionId: 'cache-debug-session',
-                        runId: 'tasks-revalidate-debug',
-                        hypothesisId: 'G6',
-                        location: 'main.js:loadTodaysTasks',
-                        message: 'Firebase admin tasks snapshot returned',
-                        data: { docCount: snapshot?.docs ? snapshot.docs.length : 0 },
-                        timestamp: Date.now()
-                      })
-                    }).catch(() => {});
-                    // #endregion
+                    // CRITICAL FIX: Admin query must not rely on `timestamp` ordering.
+                    // Many tasks do not have timestamp set, which silently drops them and causes
+                    // the widget to render a partial list (often ~123).
+                    const snapshot = await window.firebaseDB.collection('tasks').get();
                     const firebaseTasks = snapshot.docs.map(doc => {
                         const data = doc.data() || {};
                         const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
@@ -5928,93 +5722,58 @@ class PowerChoosersCRM {
                         console.warn('Could not save merged tasks to localStorage cache:', e);
                     }
 
-                    // Re-render with complete merged data
+                    // FINAL RENDER: Re-render with complete merged data (this will be the stable final render)
+                    console.log('[CRM] Final render with merged Firebase data');
                     this.renderTodaysTasks(finalMergedTasks, parseDateStrict, parseTimeToMinutes, today);
                 }
             } catch (e) {
                 console.warn("Could not load tasks from Firebase for Today's Tasks widget:", e);
             } finally {
-                // CRITICAL FIX: Always reset loading flag, even if there was an error
+                // CRITICAL FIX: Always reset loading flag and render flag, even if there was an error
                 this._tasksLoading = false;
+                this._hasRenderedForCurrentLoad = false; // Reset for next load cycle
             }
         } else {
-            // CRITICAL FIX: Reset loading flag if skipping Firebase
+            // CRITICAL FIX: Reset loading flag and render flag if skipping Firebase
             this._tasksLoading = false;
+            this._hasRenderedForCurrentLoad = false;
         }
 
         const endTime = performance.now();
-        // #region agent log - Hypothesis G: Track widget loading completion
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            sessionId: 'cache-debug-session',
-            runId: 'widget-rerender-fix',
-            hypothesisId: 'G',
-            location: 'main.js:loadTodaysTasks',
-            message: 'loadTodaysTasks completed',
-            data: { duration: endTime - startTime, skipFirebase },
-            timestamp: Date.now()
-          })
-        }).catch(() => {});
-        // #endregion
+
+        // CRITICAL FIX: Handle queued requests after loading completes
+        if (this._queuedTasksLoad) {
+            console.log('[CRM] Processing queued tasks load request...');
+            const queuedRequest = this._queuedTasksLoad;
+            this._queuedTasksLoad = null;
+            // Do NOT use timeouts; use microtask queue to avoid re-entrancy without artificial delays.
+            try {
+                queueMicrotask(queuedRequest);
+            } catch (_) {
+                Promise.resolve().then(queuedRequest);
+            }
+        }
     }
 
     renderTodaysTasks(allTasks, parseDateStrict, parseTimeToMinutes, today) {
-        // #region agent log - Hypothesis G: renderTodaysTasks called
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            sessionId: 'cache-debug-session',
-            runId: 'widget-render-debug',
-            hypothesisId: 'G',
-            location: 'main.js:renderTodaysTasks',
-            message: 'renderTodaysTasks function called',
-            data: { allTasksCount: allTasks ? allTasks.length : 0, hasTasksList: !!document.querySelector('.tasks-list') },
-            timestamp: Date.now()
-          })
-        }).catch(() => {});
-        // #endregion
-
-        // #region agent log - Hypothesis G2: Identify unexpected re-renders/callers (no PII)
-        try {
-            const stackTop = (new Error().stack || '').split('\n').slice(0, 4).map(s => String(s).trim());
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({
-                sessionId: 'cache-debug-session',
-                runId: 'tasks-caller-debug',
-                hypothesisId: 'G2',
-                location: 'main.js:renderTodaysTasks',
-                message: 'renderTodaysTasks caller trace (top frames)',
-                data: { allTasksCount: allTasks ? allTasks.length : 0, tasksInvocationId: this?._todaysTasksInvocationId || null, stackTop },
-                timestamp: Date.now()
-              })
-            }).catch(() => {});
-        } catch (_) {}
-        // #endregion
 
         const tasksList = document.querySelector('.tasks-list');
         if (!tasksList) {
-            // #region agent log - Hypothesis G: No tasks list element found
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({
-                sessionId: 'cache-debug-session',
-                runId: 'widget-render-debug',
-                hypothesisId: 'G',
-                location: 'main.js:renderTodaysTasks',
-                message: 'No .tasks-list element found - exiting early',
-                data: {},
-                timestamp: Date.now()
-              })
-            }).catch(() => {});
-            // #endregion
+return;
+        }
+
+        // Pagination navigation should not replay entry animations or trigger re-fetch/skeletons.
+        // This flag is set by the pagination click handler below.
+        const isPaginationNav = !!this._todaysTasksPaginationNav;
+        this._todaysTasksPaginationNav = false;
+
+
+        // CRITICAL FIX: Prevent multiple renders within the same load cycle
+        if (this._hasRenderedForCurrentLoad) {
+            console.log('[CRM] Already rendered for current load cycle, skipping duplicate render');
             return;
         }
+        this._hasRenderedForCurrentLoad = true;
 
         // allTasks is already merged and deduped by the caller (local first, then Firebase)
 
@@ -6035,43 +5794,6 @@ class PowerChoosersCRM {
             return d.getTime() <= today.getTime();
         });
 
-        // #region agent log - Hypothesis G4: Completion marker stats (counts only, no PII)
-        try {
-            let cStatusCompleted = 0, cStatusDone = 0, cCompletedTrue = 0, cIsCompletedTrue = 0, cCompletedAt = 0, cNoStatus = 0;
-            (Array.isArray(allTasks) ? allTasks : []).forEach(t => {
-                const stRaw = t && t.status != null ? String(t.status) : '';
-                const st = stRaw.toLowerCase();
-                if (!stRaw) cNoStatus++;
-                if (st === 'completed') cStatusCompleted++;
-                if (st === 'done') cStatusDone++;
-                if (t && t.completed === true) cCompletedTrue++;
-                if (t && t.isCompleted === true) cIsCompletedTrue++;
-                if (t && (t.completedAt || t.completed_at)) cCompletedAt++;
-            });
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({
-                sessionId: 'cache-debug-session',
-                runId: 'tasks-completion-stats',
-                hypothesisId: 'G4',
-                location: 'main.js:renderTodaysTasks',
-                message: 'Task completion marker stats (input vs rendered)',
-                data: {
-                    inputCount: allTasks ? allTasks.length : 0,
-                    renderedCandidateCount: todaysTasks ? todaysTasks.length : 0,
-                    statusCompleted: cStatusCompleted,
-                    statusDone: cStatusDone,
-                    completedTrue: cCompletedTrue,
-                    isCompletedTrue: cIsCompletedTrue,
-                    completedAtPresent: cCompletedAt,
-                    missingStatus: cNoStatus
-                },
-                timestamp: Date.now()
-              })
-            }).catch(() => {});
-        } catch (_) {}
-        // #endregion
 
         // Sort by due date/time (earliest to latest)
         todaysTasks.sort((a, b) => {
@@ -6138,12 +5860,13 @@ class PowerChoosersCRM {
                 const isSequenceTask = !!task.isSequenceTask || !!task.isLinkedInTask;
                 const priorityValue = isSequenceTask ? 'sequence' : (task.priority || '');
                 
-                // Add staggered delay for modern reveal
+                // Add staggered delay for modern reveal (skip on pagination clicks for "clean" page turns)
                 const delay = (index * 0.05).toFixed(2);
-                const revealStyle = `style="animation-delay: ${delay}s;"`;
+                const revealStyle = isPaginationNav ? '' : `style="animation-delay: ${delay}s;"`;
+                const revealClass = isPaginationNav ? '' : 'modern-reveal';
 
                 return `
-                    <div class="task-item modern-reveal" data-task-id="${task.id}" style="cursor: pointer;" ${revealStyle}>
+                    <div class="task-item ${revealClass}" data-task-id="${task.id}" style="cursor: pointer;" ${revealStyle}>
                         <div class="task-info">
                             <div class="task-name" style="color: var(--grey-400); font-weight: 400; transition: var(--transition-fast);">${this.escapeHtml(displayTitle)}</div>
                             <div class="task-time">${timeText}</div>
@@ -6157,8 +5880,10 @@ class PowerChoosersCRM {
         // Add pagination if needed
         const totalPages = Math.ceil(todaysTasks.length / this.todaysTasksPagination.pageSize);
         if (totalPages > 1) {
+            const paginationRevealStyle = isPaginationNav ? '' : `style="animation-delay: ${(pageTasks.length * 0.05).toFixed(2)}s;"`;
+            const paginationRevealClass = isPaginationNav ? '' : 'modern-reveal';
             tasksHtml += `
-                <div class="tasks-pagination modern-reveal" style="animation-delay: ${(pageTasks.length * 0.05).toFixed(2)}s;">
+                <div class="tasks-pagination ${paginationRevealClass}" ${paginationRevealStyle}>
                     <button class="pagination-btn prev-btn" ${this.todaysTasksPagination.currentPage === 1 ? 'disabled' : ''} data-action="prev">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="15,18 9,12 15,6"></polyline>
@@ -6175,22 +5900,6 @@ class PowerChoosersCRM {
         }
 
         document.querySelectorAll('.tasks-list').forEach(list => { 
-            // #region agent log - Hypothesis G: Setting tasks innerHTML
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({
-                sessionId: 'cache-debug-session',
-                runId: 'widget-render-debug',
-                hypothesisId: 'G',
-                location: 'main.js:renderTodaysTasks',
-                message: 'Setting tasks list innerHTML',
-                data: { tasksHtmlLength: tasksHtml.length, pageTasksCount: pageTasks.length, totalTasks: todaysTasks.length },
-                timestamp: Date.now()
-              })
-            }).catch(() => {});
-            // #endregion
-
             // Smooth height transition logic
             const currentHeight = list.offsetHeight;
             list.style.height = currentHeight + 'px';
@@ -6339,15 +6048,16 @@ class PowerChoosersCRM {
                     e.preventDefault();
                     const action = btn.getAttribute('data-action');
                     const totalPages = Math.ceil(this.todaysTasksPagination.totalTasks / this.todaysTasksPagination.pageSize);
+                    const fromPage = this.todaysTasksPagination.currentPage;
 
                     if (action === 'prev' && this.todaysTasksPagination.currentPage > 1) {
                         this.todaysTasksPagination.currentPage--;
-                        this._tasksLoading = false; // Reset flag before pagination reload
-                        this.loadTodaysTasks();
+                        this._todaysTasksPaginationNav = true;
+this.renderTodaysTasks(allTasks, parseDateStrict, parseTimeToMinutes, today);
                     } else if (action === 'next' && this.todaysTasksPagination.currentPage < totalPages) {
                         this.todaysTasksPagination.currentPage++;
-                        this._tasksLoading = false; // Reset flag before pagination reload
-                        this.loadTodaysTasks();
+                        this._todaysTasksPaginationNav = true;
+this.renderTodaysTasks(allTasks, parseDateStrict, parseTimeToMinutes, today);
                     }
                 });
             });
@@ -6444,68 +6154,23 @@ class PowerChoosersCRM {
     }
 
     async loadEnergyNews() {
-        // #region agent log - Hypothesis N1: loadEnergyNews entry (no PII)
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            sessionId: 'cache-debug-session',
-            runId: 'energy-news-debug',
-            hypothesisId: 'N1',
-            location: 'main.js:loadEnergyNews',
-            message: 'loadEnergyNews entered',
-            data: { hasCached: !!this._cachedNews, newsLoading: !!this._newsLoading, hasNewsList: !!document.querySelector('.news-list') },
-            timestamp: Date.now()
-          })
-        }).catch(() => {});
-        // #endregion
-
-        // DEBOUNCING: Prevent multiple calls within 5 seconds
+// DEBOUNCING: Prevent multiple calls within 5 seconds
         const now = Date.now();
-        if (this._lastNewsLoad && (now - this._lastNewsLoad) < 5000) {
-            console.log('[CRM] News load debounced - too soon since last load');
-            // #region agent log - Hypothesis N2: Debounced
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({
-                sessionId: 'cache-debug-session',
-                runId: 'energy-news-debug',
-                hypothesisId: 'N2',
-                location: 'main.js:loadEnergyNews',
-                message: 'loadEnergyNews debounced',
-                data: { deltaMs: now - this._lastNewsLoad },
-                timestamp: Date.now()
-              })
-            }).catch(() => {});
-            // #endregion
-            return;
-        }
-        this._lastNewsLoad = now;
-
         const newsList = document.querySelector('.news-list');
         const lastRef = document.getElementById('news-last-refreshed');
+        const hasSkeleton = !!newsList?.querySelector('.skeleton-shimmer');
+
+        // If the UI is currently skeletons, do NOT debounce; otherwise the list can get stuck.
+        if (this._lastNewsLoad && (now - this._lastNewsLoad) < 5000 && !hasSkeleton) {
+            console.log('[CRM] News load debounced - too soon since last load');
+return;
+        }
+        this._lastNewsLoad = now;
 
         // CHECK CACHE FIRST: Use cached news if available and recent (< 10 minutes)
         if (this._cachedNews && this._cachedNews.timestamp && (now - this._cachedNews.timestamp) < (10 * 60 * 1000)) {
             console.log('[CRM] Using cached energy news');
-            // #region agent log - Hypothesis N3: Cache hit render
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({
-                sessionId: 'cache-debug-session',
-                runId: 'energy-news-debug',
-                hypothesisId: 'N3',
-                location: 'main.js:loadEnergyNews',
-                message: 'Using cached energy news',
-                data: { ageMs: now - this._cachedNews.timestamp, cachedItems: Array.isArray(this._cachedNews.items) ? this._cachedNews.items.length : 0, hasNewsList: !!newsList },
-                timestamp: Date.now()
-              })
-            }).catch(() => {});
-            // #endregion
-
-            // Render cached news immediately
+// Render cached news immediately
             if (newsList && this._cachedNews.items) {
                 const newsHtml = this._cachedNews.items.map((it, index) => {
                     const title = this.escapeHtml(it.title || '');
@@ -6525,23 +6190,7 @@ class PowerChoosersCRM {
                 }).join('');
 
                 newsList.innerHTML = newsHtml;
-                // #region agent log - Hypothesis N8: Rendered cached HTML
-                fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-                  method: 'POST',
-                  headers: {'Content-Type': 'application/json'},
-                  body: JSON.stringify({
-                    sessionId: 'cache-debug-session',
-                    runId: 'energy-news-debug',
-                    hypothesisId: 'N8',
-                    location: 'main.js:loadEnergyNews',
-                    message: 'Rendered cached energy news to DOM',
-                    data: { htmlLength: String(newsList.innerHTML || '').length },
-                    timestamp: Date.now()
-                  })
-                }).catch(() => {});
-                // #endregion
-
-                if (lastRef && this._cachedNews.lastRefreshed) {
+if (lastRef && this._cachedNews.lastRefreshed) {
                     const dt = new Date(this._cachedNews.lastRefreshed);
                     lastRef.textContent = `Last updated: ${dt.toLocaleTimeString()}`;
                 }
@@ -6549,30 +6198,15 @@ class PowerChoosersCRM {
             return;
         }
 
-        // Render skeletons immediately
-        if (newsList) newsList.innerHTML = this.renderNewsSkeletons();
-
         // Prevent double-rendering - only skip if currently loading
         if (this._newsLoading) {
             console.log('[CRM] News already loading, skipping duplicate call');
-            // #region agent log - Hypothesis N4: Already loading
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({
-                sessionId: 'cache-debug-session',
-                runId: 'energy-news-debug',
-                hypothesisId: 'N4',
-                location: 'main.js:loadEnergyNews',
-                message: 'News already loading; skipping',
-                data: {},
-                timestamp: Date.now()
-              })
-            }).catch(() => {});
-            // #endregion
             return;
         }
         this._newsLoading = true;
+
+        // Render skeletons only when we are actually starting a new fetch
+        if (newsList) newsList.innerHTML = this.renderNewsSkeletons();
 
         const escapeHtml = (str) => {
             if (window.escapeHtml) return window.escapeHtml(str);
@@ -6595,21 +6229,6 @@ class PowerChoosersCRM {
             for (const u of urls) {
                 try {
                     const resp = await fetch(u, { cache: 'no-store' });
-                    // #region agent log - Hypothesis N5: Fetch response status
-                    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-                      method: 'POST',
-                      headers: {'Content-Type': 'application/json'},
-                      body: JSON.stringify({
-                        sessionId: 'cache-debug-session',
-                        runId: 'energy-news-debug',
-                        hypothesisId: 'N5',
-                        location: 'main.js:loadEnergyNews',
-                        message: 'Energy news fetch response',
-                        data: { url: u, ok: !!resp.ok, status: resp.status },
-                        timestamp: Date.now()
-                      })
-                    }).catch(() => {});
-                    // #endregion
                     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                     data = await resp.json();
                     break;
@@ -6620,22 +6239,6 @@ class PowerChoosersCRM {
             if (!data) throw lastError || new Error('No response');
 
             const items = (Array.isArray(data.items) ? data.items : []).slice(0, 4);
-            // #region agent log - Hypothesis N6: Successful data parse
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({
-                sessionId: 'cache-debug-session',
-                runId: 'energy-news-debug',
-                hypothesisId: 'N6',
-                location: 'main.js:loadEnergyNews',
-                message: 'Energy news loaded successfully',
-                data: { itemsCount: items.length, hasNewsList: !!newsList, hasLastRef: !!lastRef, hasBase: !!base },
-                timestamp: Date.now()
-              })
-            }).catch(() => {});
-            // #endregion
-
             if (lastRef && data.lastRefreshed) {
                 const dt = new Date(data.lastRefreshed);
                 lastRef.textContent = `Last updated: ${dt.toLocaleTimeString()}`;
@@ -6673,49 +6276,6 @@ class PowerChoosersCRM {
                 }).join('');
 
                 newsList.innerHTML = newsHtml;
-                // #region agent log - Hypothesis N9: Rendered fetched HTML
-                fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-                  method: 'POST',
-                  headers: {'Content-Type': 'application/json'},
-                  body: JSON.stringify({
-                    sessionId: 'cache-debug-session',
-                    runId: 'energy-news-debug',
-                    hypothesisId: 'N9',
-                    location: 'main.js:loadEnergyNews',
-                    message: 'Rendered fetched energy news to DOM',
-                    data: { htmlLength: String(newsList.innerHTML || '').length, itemsCount: items.length },
-                    timestamp: Date.now()
-                  })
-                }).catch(() => {});
-                // #endregion
-
-                // #region agent log - Hypothesis N10: Energy News visibility/layout diagnostics (no PII)
-                try {
-                    const cs = window.getComputedStyle(newsList);
-                    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-                      method: 'POST',
-                      headers: {'Content-Type': 'application/json'},
-                      body: JSON.stringify({
-                        sessionId: 'cache-debug-session',
-                        runId: 'energy-news-debug',
-                        hypothesisId: 'N10',
-                        location: 'main.js:loadEnergyNews',
-                        message: 'Energy News layout after render',
-                        data: {
-                            offsetH: newsList.offsetHeight,
-                            scrollH: newsList.scrollHeight,
-                            inlineH: String(newsList.style.height || ''),
-                            display: cs.display,
-                            visibility: cs.visibility,
-                            opacity: cs.opacity,
-                            overflow: cs.overflowY || cs.overflow
-                        },
-                        timestamp: Date.now()
-                      })
-                    }).catch(() => {});
-                } catch (_) {}
-                // #endregion
-
                 // Measure new height
                 requestAnimationFrame(() => {
                     newsList.style.height = newsList.scrollHeight + 'px';
@@ -6728,21 +6288,6 @@ class PowerChoosersCRM {
             this._newsLoading = false;
         } catch (err) {
             console.error('Failed to load energy news', err);
-            // #region agent log - Hypothesis N7: Error path
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({
-                sessionId: 'cache-debug-session',
-                runId: 'energy-news-debug',
-                hypothesisId: 'N7',
-                location: 'main.js:loadEnergyNews',
-                message: 'Energy news failed',
-                data: { error: String(err && err.message ? err.message : err) },
-                timestamp: Date.now()
-              })
-            }).catch(() => {});
-            // #endregion
             if (lastRef) lastRef.textContent = 'Last updated: failed to refresh';
             if (newsList) {
                 newsList.innerHTML = `
@@ -6779,7 +6324,7 @@ class PowerChoosersCRM {
             : window.ActivityManager.renderActivities('home-activity-timeline', 'global');
 
         Promise.resolve(renderPromise).then(() => {
-            this.setupHomeActivityPagination();
+        this.setupHomeActivityPagination();
         }).catch(() => {
             // Keep silent - ActivityManager handles its own error UI
         });
@@ -7575,3 +7120,7 @@ if (document.readyState === 'loading') {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = PowerChoosersCRM;
 }
+
+
+
+

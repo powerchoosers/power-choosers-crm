@@ -22,10 +22,19 @@ var console = {
 
 // Account Detail page module
 (function () {
+  // Prevent duplicate initialization
+  if (window._accountDetailModuleInitialized) return;
+  window._accountDetailModuleInitialized = true;
+
   const state = {
     currentAccount: null,
     loaded: false
   };
+
+  // CRITICAL: Debounce and mutex to prevent multiple rapid showAccountDetail calls
+  let _showAccountDetailInProgress = false;
+  let _lastRequestedAccountId = null;
+  let _lastShowAccountDetailTime = 0;
 
   // Batch update system for individual field edits
   let updateBatch = {};
@@ -258,11 +267,40 @@ var console = {
   }
 
   async function showAccountDetail(accountId) {
+
+    // CRITICAL: Debounce rapid-fire calls (prevents event listener pile-up)
+    const now = Date.now();
+    if (_lastRequestedAccountId === accountId && (now - _lastShowAccountDetailTime) < 500) {
+      console.log('[AccountDetail] Debouncing duplicate call for same account within 500ms:', accountId);
+      return;
+    }
+    _lastShowAccountDetailTime = now;
+
+    // CRITICAL: Prevent multiple simultaneous calls (causes parallel Firestore queries + event listener pile-up)
+    if (_showAccountDetailInProgress) {
+      // If same account is already loading, skip this call entirely
+      if (_lastRequestedAccountId === accountId) {
+        console.log('[AccountDetail] Skipping duplicate call - already in progress:', accountId);
+        return;
+      }
+      // If different account, wait for current to finish (but don't block forever)
+      console.log('[AccountDetail] Waiting for previous load to complete...');
+      let waitCount = 0;
+      while (_showAccountDetailInProgress && waitCount < 50) {
+        await new Promise(r => setTimeout(r, 100));
+        waitCount++;
+      }
+    }
+    
+    _showAccountDetailInProgress = true;
+    _lastRequestedAccountId = accountId;
+
+    try {
     // Ensure page exists and navigate to it
     if (window.crm && typeof window.crm.navigateToPage === 'function') {
       try { window.crm.navigateToPage('account-details'); } catch (e) { /* noop */ }
     }
-    if (!initDomRefs()) return;
+    if (!initDomRefs()) { _showAccountDetailInProgress = false; return; }
 
     // Set loading state but don't clear DOM (prevents flicker)
     state.currentAccount = null;
@@ -372,13 +410,27 @@ var console = {
 
     // Setup energy update listener for real-time sync with Health Widget (ONCE)
     if (!window._accountDetailEnergyListenerBound) {
-      try {
-        if (window.AccountDetail && window.AccountDetail.setupEnergyUpdateListener) {
-          window.AccountDetail.setupEnergyUpdateListener();
+      try { window.AccountDetail.setupEnergyUpdateListener(); } catch (_) {}
           window._accountDetailEnergyListenerBound = true;
-          console.log('[AccountDetail] Energy listener initialized (one-time)');
-        }
-      } catch (_) { }
+    }
+
+    // TRIGGER BACKGROUND DATA LOADING (NON-BLOCKING)
+    console.log('[AccountDetail] Triggering background activities and calls load');
+    loadAccountActivities();
+    try {
+      injectRecentCallsStyles();
+      // FIX: Make recent calls load asynchronously to prevent page freeze
+      // Defer the call to avoid blocking page load if API is slow
+      setTimeout(() => {
+        loadRecentCallsForAccount().catch(error => {
+          console.warn('[AccountDetail] Recent calls load failed:', error);
+        });
+      }, 100); // Small delay to ensure page is fully rendered first
+    } catch (_) {}
+
+    } finally {
+      // CRITICAL: Always release the mutex
+      _showAccountDetailInProgress = false;
     }
   }
 
@@ -859,8 +911,45 @@ var console = {
     const accountName = account.accountName || account.name || account.companyName;
     const accountId = account.id;
 
-    // Try to query Firestore directly for this account's contacts
-    if (window.firebaseDB) {
+
+    // OPTIMIZATION: Check cache first to avoid slow Firestore queries
+    if (window._accountContactsCache && window._accountContactsCache[accountId]) {
+      allContacts = window._accountContactsCache[accountId];
+      log('[AccountDetail] Using cached contacts for account:', accountId, 'count:', allContacts.length);
+    } else if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+      // OPTIMIZATION: Use BackgroundContactsLoader (instant) instead of Firestore (15+ seconds)
+      const allCachedContacts = window.BackgroundContactsLoader.getContactsData() || [];
+      log('[AccountDetail] Using BackgroundContactsLoader for fast filtering, total:', allCachedContacts.length);
+      
+      // Filter client-side (much faster than Firestore query)
+      const norm = (s) => String(s || '').toLowerCase()
+        .replace(/\(usa\)|\(u\.s\.a\.\)|\(us\)/g, '')
+        .replace(/\b(inc|llc|ltd|corp|corporation|company|co|incorporated)\b/g, '')
+        .replace(/[^a-z0-9]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      const normalizedAccountName = norm(accountName);
+      allContacts = allCachedContacts.filter(contact => {
+        if (contact.accountId === accountId || contact.account_id === accountId) return true;
+        const contactCompany = contact.companyName || contact.accountName || '';
+        return norm(contactCompany) === normalizedAccountName;
+      });
+      
+      // Cache for future use (even if 0 contacts - prevents re-querying)
+      if (!window._accountContactsCache) window._accountContactsCache = {};
+      window._accountContactsCache[accountId] = allContacts;
+      
+      log('[AccountDetail] Filtered to', allContacts.length, 'contacts from BackgroundContactsLoader');
+      
+      // CRITICAL: Skip Firestore query if BackgroundContactsLoader was available
+      // Even if 0 contacts found, we trust the loader (prevents 16+ second freeze)
+      // Return early - don't fall through to Firestore
+    }
+    
+    // Only query Firestore if BackgroundContactsLoader is NOT available (rare fallback)
+    // This should almost never happen since BackgroundContactsLoader loads on app init
+    if (allContacts.length === 0 && !window.BackgroundContactsLoader && window.firebaseDB) {
       try {
         log('[AccountDetail] Querying Firestore for contacts of account:', accountName);
 
@@ -912,8 +1001,6 @@ var console = {
           log('[AccountDetail] Fallback: Filtered to', allContacts.length, 'contacts');
         }
       }
-    } else {
-      log('[AccountDetail] ERROR: firebaseDB not available');
     }
 
     log('[AccountDetail] renderAccountContacts: account=', accountName, 'contacts found=', allContacts.length);
@@ -1081,6 +1168,7 @@ var console = {
 
   function renderAccountDetail() {
     if (!state.currentAccount || !els.mainContent) return;
+
 
     // Inject header styles for divider and button layout
     injectAccountHeaderStyles();
@@ -1425,6 +1513,7 @@ var console = {
     attachAccountDetailEvents();
     startAccountRecentCallsLiveHooks();
 
+
     // Render contacts list now that DOM is ready (async)
     (async () => {
       const contactsList = document.getElementById('account-contacts-list');
@@ -1451,6 +1540,11 @@ var console = {
     const startPeriodicRefresh = () => {
       if (refreshInterval) clearInterval(refreshInterval);
       refreshInterval = setInterval(() => {
+        // Only refresh if page is active/visible
+        const accountPage = document.getElementById('account-details-page');
+        const isActive = accountPage && accountPage.classList.contains('active') && !accountPage.hidden;
+        if (!isActive) return;
+
         // Only refresh if we're not already refreshing, not scrolling, no insights are open, and enough time has passed
         const hasOpenInsights = state._arcOpenIds && state._arcOpenIds.size > 0;
         const now = Date.now();
@@ -1479,9 +1573,8 @@ var console = {
     try { window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements(); } catch (_) { /* noop */ }
 
     // Load activities
-    loadAccountActivities();
-    // Load account recent calls and styles
-    try { injectRecentCallsStyles(); loadRecentCallsForAccount(); } catch (_) { /* noop */ }
+    // Data loading moved to showAccountDetail
+  }
 
     // DEBUG: Add test function to manually trigger Conversational Intelligence
     window.testConversationalIntelligence = async function (callSid) {
@@ -1499,7 +1592,6 @@ var console = {
         return { error: error.message };
       }
     };
-  }
 
   // ===== Recent Calls (Account) =====
   function injectRecentCallsStyles() {
@@ -1833,23 +1925,50 @@ var console = {
       const token = (window.firebase && window.firebase.auth && window.firebase.auth().currentUser)
         ? await window.firebase.auth().currentUser.getIdToken()
         : null;
-      const r = await fetch(`${base}/api/calls/account/${accountId}?limit=50`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      });
+      // FIX: Add timeout to prevent hanging on slow API calls
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.warn('[AccountDetail] Recent calls API timeout - aborting after 5 seconds');
+        controller.abort();
+      }, 5000); // 5 second timeout
+
+      let r;
+      try {
+        r = await fetch(`${base}/api/calls/account/${accountId}?limit=20`, { // Reduced limit from 50 to 20
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+          signal: controller.signal
+        });
+      } catch (fetchError) {
+        if (fetchError.name === 'AbortError') {
+          console.warn('[AccountDetail] Recent calls API aborted due to timeout');
+          // Fall back to empty calls list instead of freezing
+          arcUpdateListAnimated(list, '<div class="rc-empty">Recent calls loading...</div>');
+          return;
+        }
+        throw fetchError;
+      }
+
+      clearTimeout(timeoutId);
       const j = await r.json().catch(() => ({}));
       const calls = (j && j.ok && Array.isArray(j.calls)) ? j.calls : [];
 
       console.log(`[Account Detail] Loaded ${calls.length} targeted calls for account ${accountId}`);
 
-      // Calls are already filtered and sorted by the API
-      const filtered = calls;
+      // FIX: Limit calls to prevent massive DOM rendering
+      const limited = calls.length > 20 ? calls.slice(0, 20) : calls;
+      const filtered = limited;
 
-      if (!filtered.length) { arcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>'); return; }
+      if (!filtered.length) { 
+        arcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>'); 
+        return; 
+      }
 
       // Enrich for direction/number like Calls page for consistent UI
       const bizList = Array.isArray(window.CRM_BUSINESS_NUMBERS) ? window.CRM_BUSINESS_NUMBERS.map(n => String(n || '').replace(/\D/g, '').slice(-10)).filter(Boolean) : [];
       const isBiz = (p) => bizList.includes(p);
       const norm = (s) => String(s || '').replace(/\D/g, '').slice(-10);
+
+
       filtered.forEach(c => {
         if (!c.id) c.id = c.twilioSid || c.callSid || c.sid || `${c.to || ''}_${c.from || ''}_${c.timestamp || c.callTime || ''}`;
         const to10 = norm(c.to);
@@ -1870,6 +1989,8 @@ var console = {
           }
         } catch (_) { }
       });
+
+
       // Save to state and render first page
       try { state._arcCalls = filtered; } catch (_) { }
       try { if (typeof state._arcPage !== 'number' || !state._arcPage) state._arcPage = 1; } catch (_) { }
@@ -1913,6 +2034,8 @@ var console = {
   function arcGetSlice() { const a = Array.isArray(state._arcCalls) ? state._arcCalls : []; const p = Math.max(1, parseInt(state._arcPage || 1, 10)); const s = (p - 1) * ARC_PAGE_SIZE; return a.slice(s, s + ARC_PAGE_SIZE); }
   function arcRenderPage() {
     const list = document.getElementById('account-recent-calls-list'); if (!list) return;
+
+
     const total = Array.isArray(state._arcCalls) ? state._arcCalls.length : 0;
     if (!total) {
       arcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>');
@@ -1947,6 +2070,7 @@ var console = {
     });
     const totalPages = Math.max(1, Math.ceil(total / ARC_PAGE_SIZE));
     arcUpdatePager(state._arcPage || 1, totalPages);
+
   }
   function arcBindPager() { const pager = document.getElementById('account-rc-pager'); if (!pager || pager._bound) return; const prev = document.getElementById('arc-prev'); const next = document.getElementById('arc-next'); prev?.addEventListener('click', (e) => { e.preventDefault(); const total = Math.ceil((state._arcCalls || []).length / ARC_PAGE_SIZE) || 1; state._arcPage = Math.max(1, (state._arcPage || 1) - 1); arcRenderPage(); arcUpdatePager(state._arcPage, total); }); next?.addEventListener('click', (e) => { e.preventDefault(); const total = Math.ceil((state._arcCalls || []).length / ARC_PAGE_SIZE) || 1; state._arcPage = Math.min(total, (state._arcPage || 1) + 1); arcRenderPage(); arcUpdatePager(state._arcPage, total); }); pager._bound = '1'; }
   function arcUpdatePager(current, total) { const pager = document.getElementById('account-rc-pager'); const info = document.getElementById('arc-info'); const prev = document.getElementById('arc-prev'); const next = document.getElementById('arc-next'); if (!pager || !info || !prev || !next) return; const show = total > 1; pager.style.display = show ? 'flex' : 'none'; info.textContent = `${Math.max(1, parseInt(current || 1, 10))} of ${Math.max(1, parseInt(total || 1, 10))}`; prev.disabled = (current <= 1); next.disabled = (current >= total); }
@@ -1954,6 +2078,8 @@ var console = {
   function arcSetLoading(list) { try { let ov = list.querySelector('.rc-loading-overlay'); if (!ov) { ov = document.createElement('div'); ov.className = 'rc-loading-overlay'; ov.innerHTML = arcSpinnerHtml(); ov.style.position = 'absolute'; ov.style.inset = '0'; ov.style.display = 'flex'; ov.style.alignItems = 'center'; ov.style.justifyContent = 'center'; ov.style.pointerEvents = 'none'; list.appendChild(ov); } ov.style.display = 'flex'; } catch (_) { } }
   function arcUpdateListAnimated(list, html) {
     try {
+
+
       const avoidAnim = !!(state._isScrolling || (state._arcOpenIds && state._arcOpenIds.size > 0));
       if (avoidAnim) {
         list.innerHTML = html;
@@ -1977,10 +2103,14 @@ var console = {
           setTimeout(() => { list.style.height = ''; list.style.transition = ''; list.style.overflow = ''; }, 260);
         });
       });
+
+
     } catch (_) {
       list.innerHTML = html;
       // Remove any lingering loading overlay after content update
       try { const ov = list.querySelector('.rc-loading-overlay'); if (ov) ov.remove(); } catch (_) { }
+
+
     }
   }
 
@@ -3017,6 +3147,14 @@ var console = {
   };  // End of openEditAccountModal assignment
 
   function attachAccountDetailEvents() {
+if (!window._adEventsAttachCount) window._adEventsAttachCount = 0;
+window._adEventsAttachCount++;
+
+    // === DOCUMENT-LEVEL LISTENERS (attach ONCE - they persist across DOM changes) ===
+    if (!window._accountDetailDocEventsBound) {
+      window._accountDetailDocEventsBound = true;
+      console.log('[AccountDetail] Attaching document-level event listeners (one-time)');
+
     // Listen for activity refresh events
     document.addEventListener('pc:activities-refresh', (e) => {
       const { entityType, entityId, forceRefresh } = e.detail || {};
@@ -3199,9 +3337,12 @@ var console = {
         }
       }
     });
+    } // End of document-level listeners (one-time)
 
+    // === DOM ELEMENT HANDLERS (re-attach on each render - elements are recreated) ===
     const backBtn = document.getElementById('back-to-accounts');
-    if (backBtn) {
+    if (backBtn && !backBtn._boundClick) {
+      backBtn._boundClick = true; // Mark to avoid duplicates on this specific element
       backBtn.addEventListener('click', async () => {
         // Force save any pending batch updates before navigating away
         await forceSaveBatch();
@@ -3603,7 +3744,8 @@ var console = {
     // Widgets dropdown functionality
     const widgetsBtn = document.getElementById('open-widgets');
     const widgetsWrap = document.querySelector('#account-detail-header .widgets-wrap');
-    if (widgetsBtn && widgetsWrap) {
+    if (widgetsBtn && widgetsWrap && !widgetsBtn._bound) {
+      widgetsBtn._bound = true;
       // Click toggles open state (also support keyboard)
       widgetsBtn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -3638,7 +3780,8 @@ var console = {
 
     // Add contact button
     const addContactBtn = document.getElementById('add-contact-to-account');
-    if (addContactBtn) {
+    if (addContactBtn && !addContactBtn._bound) {
+      addContactBtn._bound = true;
       addContactBtn.addEventListener('click', (e) => {
         e.preventDefault();
         openAddContactModal();
@@ -3993,6 +4136,14 @@ var console = {
 
   function loadAccountActivities() {
     if (!window.ActivityManager || !state.currentAccount) return;
+
+    // CRITICAL: Check if page is still visible before doing heavy work
+    const accountPage = document.getElementById('account-details-page');
+    const isVisible = accountPage && accountPage.classList.contains('active') && !accountPage.hidden;
+    if (!isVisible) {
+      console.log('[AccountDetail] Skipping activity load - page not visible');
+      return;
+    }
 
     const accountId = state.currentAccount.id;
     window.ActivityManager.renderActivities('account-activity-timeline', 'account', accountId);
