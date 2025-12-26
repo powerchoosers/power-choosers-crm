@@ -125,6 +125,7 @@ import algoliaReindexHandler from './api/algolia/reindex.js';
 import mapsConfigHandler from './api/maps/config.js';
 import debugCallHandler from './api/debug/call.js';
 import debugHealthHandler from './api/debug/health.js';
+import debugLogHandler from './api/debug/log.js';
 import twilioStatusHandler from './api/twilio/status.js';
 import twilioDialStatusHandler from './api/twilio/dial-status.js';
 import twilioHangupHandler from './api/twilio/hangup.js';
@@ -737,6 +738,7 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/maps/config' ||
     pathname === '/api/debug/call' ||
     pathname === '/api/debug/health' ||
+    pathname === '/api/debug/log' ||
     pathname === '/api/email/sendgrid-send' ||
     pathname.startsWith('/api/email/track/') ||
     pathname.startsWith('/api/email/click/') ||
@@ -928,6 +930,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/debug/health') {
     return handleApiDebugHealth(req, res);
+  }
+  if (pathname === '/api/debug/log') {
+    return handleApiDebugLog(req, res);
   }
   if (pathname === '/api/debug/firestore') {
     return handleApiDebugFirestore(req, res);
@@ -1470,6 +1475,13 @@ async function handleApiDebugCall(req, res) {
 
 async function handleApiDebugHealth(req, res) {
   return await debugHealthHandler(req, res);
+}
+
+async function handleApiDebugLog(req, res) {
+  if (req.method === 'POST') {
+    req.body = await parseRequestBody(req);
+  }
+  return await debugLogHandler(req, res);
 }
 
 async function handleApiDebugFirestore(req, res) {
