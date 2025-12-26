@@ -78,6 +78,24 @@ export default async function handler(req, res) {
 
     const searchData = await searchResp.json();
     
+    // DEBUG: Log the keys and a sample to see what we're getting
+    logger.warn('[Apollo Search People] Response Keys:', Object.keys(searchData));
+    if (searchData.people && searchData.people.length > 0) {
+      logger.warn('[Apollo Search People] Sample Person:', JSON.stringify({
+        id: searchData.people[0].id,
+        name: searchData.people[0].name,
+        title: searchData.people[0].title,
+        organization: searchData.people[0].organization ? {
+          name: searchData.people[0].organization.name,
+          industry: searchData.people[0].organization.industry,
+          location: searchData.people[0].organization.location
+        } : null,
+        city: searchData.people[0].city,
+        state: searchData.people[0].state,
+        country: searchData.people[0].country
+      }, null, 2));
+    }
+    
     // Map response to a clean format for the frontend
     const people = (searchData.people || []).map(person => {
       // Robust location extraction

@@ -72,6 +72,26 @@ export default async function handler(req, res) {
 
     const searchData = await searchResp.json();
     
+    // DEBUG: Log the keys and a sample to see what we're getting
+    logger.warn('[Apollo Search Orgs] Response Keys:', Object.keys(searchData));
+    if (searchData.organizations && searchData.organizations.length > 0) {
+      logger.warn('[Apollo Search Orgs] Sample Org:', JSON.stringify({
+        id: searchData.organizations[0].id,
+        name: searchData.organizations[0].name,
+        industry: searchData.organizations[0].industry,
+        industries: searchData.organizations[0].industries,
+        industry_category: searchData.organizations[0].industry_category,
+        location: searchData.organizations[0].location,
+        city: searchData.organizations[0].city,
+        state: searchData.organizations[0].state,
+        country: searchData.organizations[0].country,
+        estimated_num_employees: searchData.organizations[0].estimated_num_employees,
+        employee_count: searchData.organizations[0].employee_count
+      }, null, 2));
+    } else if (searchData.accounts && searchData.accounts.length > 0) {
+       logger.warn('[Apollo Search Orgs] Found "accounts" instead of "organizations":', searchData.accounts.length);
+    }
+    
     // Map response to a clean format for the frontend
     const organizations = (searchData.organizations || []).map(org => {
       // Robust location extraction
