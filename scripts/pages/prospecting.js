@@ -185,6 +185,7 @@ const ProspectingPage = (function() {
             if (!response.ok) throw new Error('Search failed');
 
             const data = await response.json();
+            console.warn('[Prospecting] Search Data Received:', data);
             
             if (state.view === 'people') {
                 renderPeople(data.people || []);
