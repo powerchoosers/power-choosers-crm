@@ -86,8 +86,46 @@ export default async function handler(req, res) {
     }
     
     // Map response to a clean format for the frontend
-    const organizations = (searchData.organizations || []).map(org => {
-      // Robust location extraction
+    const rawOrgs = searchData.organizations || [];
+    const rawAccounts = searchData.accounts || [];
+
+    // Use accounts as the base if organizations is empty, otherwise try to merge or use both
+    const combinedData = [];
+    const seenDomains = new Set();
+
+    // Map Accounts first (often richer data in mixed search)
+    rawAccounts.forEach(acc => {
+      const domain = acc.domain;
+      if (domain) seenDomains.add(domain.toLowerCase());
+
+      let location = formatLocation(acc.organization_city, acc.organization_state, acc.organization_country);
+      if (!location) location = acc.formatted_address || '';
+
+      combinedData.push({
+        id: acc.id,
+        name: acc.name,
+        domain: domain,
+        website: acc.website_url,
+        linkedin: acc.linkedin_url,
+        logoUrl: acc.logo_url,
+        description: acc.short_description,
+        location: location,
+        employees: acc.employee_count || acc.estimated_num_employees,
+        industry: acc.industry || acc.industry_category,
+        keywords: acc.keywords,
+        phone: acc.phone,
+        facebook: acc.facebook_url,
+        twitter: acc.twitter_url,
+        source: 'account'
+      });
+    });
+
+    // Map Organizations (if not already in combinedData by domain)
+    rawOrgs.forEach(org => {
+      const domain = org.primary_domain || org.domain;
+      if (domain && seenDomains.has(domain.toLowerCase())) return;
+      if (domain) seenDomains.add(domain.toLowerCase());
+
       let location = '';
       if (org.location?.city || org.location?.state || org.location?.country) {
         location = formatLocation(org.location.city, org.location.state, org.location.country);
@@ -97,10 +135,10 @@ export default async function handler(req, res) {
         location = org.raw_address || '';
       }
 
-      return {
+      combinedData.push({
         id: org.id,
         name: org.name,
-        domain: org.primary_domain || org.domain,
+        domain: domain,
         website: org.website_url,
         linkedin: org.linkedin_url,
         logoUrl: org.logo_url,
@@ -111,9 +149,12 @@ export default async function handler(req, res) {
         keywords: org.keywords,
         phone: org.phone,
         facebook: org.facebook_url,
-        twitter: org.twitter_url
-      };
+        twitter: org.twitter_url,
+        source: 'organization'
+      });
     });
+
+    const organizations = combinedData;
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
