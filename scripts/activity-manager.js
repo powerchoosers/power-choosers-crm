@@ -35,23 +35,6 @@ class ActivityManager {
       // Also clear page caches for this entity
       const pageCacheKeys = Array.from(this.pageCache.keys()).filter(key => key.startsWith(cacheKey));
       pageCacheKeys.forEach(key => this.pageCache.delete(key));
-
-      // #region agent log - Hypothesis F: Cache invalidation tracking
-      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          sessionId: 'cache-debug-session',
-          runId: 'activity-cache-fix',
-          hypothesisId: 'F',
-          location: 'activity-manager.js:invalidateActivityCache',
-          message: 'Invalidated activity cache',
-          data: { cacheKey, clearedPages: pageCacheKeys.length },
-          timestamp: Date.now()
-        })
-      }).catch(() => {});
-      // #endregion
-
       console.log(`[ActivityManager] Invalidated activity cache for ${cacheKey}`);
     };
 
@@ -60,6 +43,31 @@ class ActivityManager {
 
     // Save cache on page unload
     this.setupCachePersistence();
+  }
+
+  /**
+   * Clear activity caches
+   * @param {string} entityType - Optional entity type to clear (e.g., 'global', 'contact', 'account')
+   * @param {string} entityId - Optional entity ID to clear
+   */
+  clearCache(entityType = null, entityId = null) {
+    if (entityType) {
+      this.invalidateActivityCache(entityType, entityId);
+    } else {
+      // Clear everything
+      this.processedActivitiesCache.clear();
+      this.processedEmailsCache.clear();
+      this.pageCache.clear();
+      this.prerenderedPages.clear();
+      this.currentActivities = null;
+      
+      // Also clear sessionStorage persisted caches
+      sessionStorage.removeItem('activityManager_processedActivities');
+      sessionStorage.removeItem('activityManager_processedEmails');
+      sessionStorage.removeItem('activityManager_pageCache');
+      
+      console.log('[ActivityManager] Cleared all activity caches');
+    }
   }
 
   /**
@@ -363,105 +371,22 @@ class ActivityManager {
     }
 
     const inFlightPromise = (async () => {
-
-    // #region agent log - Hypothesis F: Check activity cache first
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        sessionId: 'cache-debug-session',
-        runId: 'activity-cache-fix',
-        hypothesisId: 'F',
-        location: 'activity-manager.js:getActivities',
-        message: 'Checking activity cache before fetching underlying data',
-        data: { cacheKey, forceRefresh, page, cacheSize: this.processedActivitiesCache.size, coordinatorLoading: window.BackgroundLoaderCoordinator?.loading, pageLoadTime: Date.now() - this.pageLoadTime },
-        timestamp: Date.now()
-      })
-    }).catch(() => {});
-    // #endregion
-
-    // NOTE: Avoid artificial delays; rely on background loading coordination and caching instead.
-
-    // WAIT FOR BACKGROUND LOADING TO COMPLETE BEFORE PROCESSING ACTIVITIES
-    if (window.BackgroundLoaderCoordinator && window.BackgroundLoaderCoordinator.loading) {
-      // #region agent log - Hypothesis F: Waiting for background loading
-      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          sessionId: 'cache-debug-session',
-          runId: 'activity-cache-fix',
-          hypothesisId: 'F',
-          location: 'activity-manager.js:getActivities',
-          message: 'Waiting for background loading to complete',
-          data: { cacheKey },
-          timestamp: Date.now()
-        })
-      }).catch(() => {});
-      // #endregion
-
-      await window.BackgroundLoaderCoordinator.coordinateLoading();
-    }
+      // NOTE: Avoid artificial delays; rely on background loading coordination and caching instead.
+      // REMOVED BLOCKING WAIT: Background loading should not block UI activity rendering.
+      // Data will be fetched from cache/Firestore incrementally via getCallActivities, etc.
 
     // If page is specified, check page cache first
     if (page !== null) {
       const pageCacheKey = `${cacheKey}:page:${page}`;
       if (!forceRefresh && this.pageCache.has(pageCacheKey)) {
-        // #region agent log - Hypothesis F: Page cache hit
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            sessionId: 'cache-debug-session',
-            runId: 'activity-cache-fix',
-            hypothesisId: 'F',
-            location: 'activity-manager.js:getActivities',
-            message: 'Page cache hit - avoiding data refetch',
-            data: { pageCacheKey, page },
-            timestamp: Date.now()
-          })
-        }).catch(() => {});
-        // #endregion
         return this.pageCache.get(pageCacheKey);
       }
     }
 
     // Check full activities cache first (avoids re-processing)
     if (!forceRefresh && this.processedActivitiesCache.has(cacheKey)) {
-      // #region agent log - Hypothesis F: Activity cache hit
-      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          sessionId: 'cache-debug-session',
-          runId: 'activity-cache-fix',
-          hypothesisId: 'F',
-          location: 'activity-manager.js:getActivities',
-          message: 'Activity cache hit - avoiding data refetch',
-          data: { cacheKey, cachedActivities: this.processedActivitiesCache.get(cacheKey).length },
-          timestamp: Date.now()
-        })
-      }).catch(() => {});
-      // #endregion
       return this.processedActivitiesCache.get(cacheKey);
     }
-
-    // #region agent log - Hypothesis F: Cache miss - will fetch underlying data
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        sessionId: 'cache-debug-session',
-        runId: 'activity-cache-fix',
-        hypothesisId: 'F',
-        location: 'activity-manager.js:getActivities',
-        message: 'Activity cache miss - fetching underlying data',
-        data: { cacheKey, forceRefresh },
-        timestamp: Date.now()
-      })
-    }).catch(() => {});
-    // #endregion
-
     const activities = [];
     const startTime = performance.now();
 
@@ -506,23 +431,6 @@ class ActivityManager {
 
       // Cache the processed activities to avoid re-processing on pagination
       this.processedActivitiesCache.set(cacheKey, activities);
-
-      // #region agent log - Hypothesis F: Cached processed activities
-      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          sessionId: 'cache-debug-session',
-          runId: 'activity-cache-fix',
-          hypothesisId: 'F',
-          location: 'activity-manager.js:getActivities',
-          message: 'Cached processed activities',
-          data: { cacheKey, activityCount: activities.length, processingTime: endTime - startTime },
-          timestamp: Date.now()
-        })
-      }).catch(() => {});
-      // #endregion
-
       return activities;
     } catch (error) {
       console.error('Error fetching activities:', error);
@@ -736,91 +644,74 @@ class ActivityManager {
     const activities = [];
 
     try {
-      // #region agent log - Hypothesis D: Check if contacts are loaded before email filtering
-      const contactsLoaded = window.BackgroundLoaderCoordinator ?
-        window.BackgroundLoaderCoordinator.isLoaded('contacts') :
-        (window.BackgroundContactsLoader && window.BackgroundContactsLoader.getContactsData);
-
-      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          sessionId: 'cache-debug-session',
-          runId: 'initial-run',
-          hypothesisId: 'D',
-          location: 'activity-manager.js:getEmailActivities',
-          message: 'Checking contacts availability before email filtering',
-          data: { entityType, entityId, contactsLoaded, forceRefresh },
-          timestamp: Date.now()
-        })
-      }).catch(() => {});
-      // #endregion
-
       // ENSURE CONTACTS ARE LOADED BEFORE EMAIL FILTERING
-      if (!contactsLoaded) {
-        console.log('[ActivityManager] Waiting for contacts to load before filtering emails...');
-
-        // #region agent log - Hypothesis D: Waiting for contacts to load
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            sessionId: 'cache-debug-session',
-            runId: 'initial-run',
-            hypothesisId: 'D',
-            location: 'activity-manager.js:getEmailActivities',
-            message: 'Contacts not loaded - waiting for coordinator or fallback',
-            data: { entityType, entityId },
-            timestamp: Date.now()
-          })
-        }).catch(() => {});
-        // #endregion
-
-        if (window.BackgroundLoaderCoordinator && typeof window.BackgroundLoaderCoordinator.loadCollection === 'function') {
-          await window.BackgroundLoaderCoordinator.loadCollection('contacts');
-        } else {
-          // Fallback: try to load contacts directly if coordinator not available
-          console.log('[ActivityManager] Coordinator not available, trying direct contacts load...');
-          if (window.CacheManager) {
-            await window.CacheManager.get('contacts');
-          }
-        }
-      }
-
-      const emails = await (window.CacheManager ? window.CacheManager.get('emails', forceRefresh) : this.fetchEmails(limit));
-
-      // CRITICAL: Filter emails to only include those from CRM contacts
-      // CacheManager.get('emails') returns ALL emails for the user, but we only want emails from CRM contacts
       let allContacts = [];
       if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
         allContacts = window.BackgroundContactsLoader.getContactsData() || [];
       } else {
         allContacts = window.getPeopleData ? (window.getPeopleData() || []) : [];
       }
-      const contactIdsSet = new Set(allContacts.map(c => c.id).filter(Boolean));
+      
+      const contactsLoaded = allContacts.length > 0;
+      
+      // OPTIMIZATION: Cache contact email sets to avoid O(N) loop on every refresh (~400ms save)
+      const contactsHash = `${allContacts.length}-${allContacts[0]?.updatedAt || ''}`;
+      if (!this._contactsEmailCache || this._contactsEmailCache.hash !== contactsHash) {
+        const contactEmailsSet = new Set();
+        const emailToContactMap = new Map();
+        allContacts.forEach(c => {
+          const mainEmail = (c.email || '').toLowerCase().trim();
+          if (mainEmail) {
+            contactEmailsSet.add(mainEmail);
+            emailToContactMap.set(mainEmail, c);
+          }
+          if (Array.isArray(c.emails)) {
+            c.emails.forEach(e => {
+              const emailAddr = (e.address || e.email || e || '').toLowerCase().trim();
+              if (emailAddr) {
+                contactEmailsSet.add(emailAddr);
+                emailToContactMap.set(emailAddr, c);
+              }
+            });
+          }
+        });
+        this._contactsEmailCache = {
+          hash: contactsHash,
+          emailsSet: contactEmailsSet,
+          contactMap: emailToContactMap,
+          idsSet: new Set(allContacts.map(c => c.id).filter(Boolean))
+        };
+        console.log(`[ActivityManager] Rebuilt contact email cache for ${allContacts.length} contacts`);
+      }
 
-      // Build comprehensive set of all contact email addresses (main email + emails array)
-      const contactEmailsSet = new Set();
-      const emailToContactMap = new Map(); // Map email address -> contact object
-      allContacts.forEach(c => {
-        // Add main email field
-        const mainEmail = (c.email || '').toLowerCase().trim();
-        if (mainEmail) {
-          contactEmailsSet.add(mainEmail);
-          emailToContactMap.set(mainEmail, c);
-        }
+      const { emailsSet: contactEmailsSet, contactMap: emailToContactMap, idsSet: contactIdsSet } = this._contactsEmailCache;
 
-        // Add emails from emails array (if it exists)
-        if (Array.isArray(c.emails)) {
-          c.emails.forEach(e => {
-            const emailAddr = (e.address || e.email || e || '').toLowerCase().trim();
-            if (emailAddr) {
-              contactEmailsSet.add(emailAddr);
-              emailToContactMap.set(emailAddr, c);
-            }
-          });
+
+      if (!contactsLoaded) {
+        console.log('[ActivityManager] Waiting for contacts to load before filtering emails...');
+        if (window.BackgroundLoaderCoordinator && typeof window.BackgroundLoaderCoordinator.loadCollection === 'function') {
+          await window.BackgroundLoaderCoordinator.loadCollection('contacts');
+        } else if (window.CacheManager) {
+          await window.CacheManager.get('contacts');
         }
-      });
+        
+        // Refresh allContacts after waiting
+        if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+          allContacts = window.BackgroundContactsLoader.getContactsData() || [];
+        } else {
+          allContacts = window.getPeopleData ? (window.getPeopleData() || []) : [];
+        }
+      }
+
+      // FETCH EMAILS
+      let emails = [];
+      if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.getEmailsData === 'function') {
+        emails = window.BackgroundEmailsLoader.getEmailsData() || [];
+      }
+      if (emails.length === 0) {
+        emails = await (window.CacheManager ? window.CacheManager.get('emails', forceRefresh) : this.fetchEmails(limit));
+      }
+
 
       // Helper to extract email addresses from string or array
       const extractEmails = (value) => {
@@ -871,6 +762,7 @@ class ActivityManager {
         // Fallback: if we can't determine direction, check if sender is a contact
         return emailFrom.some(addr => contactEmailsSet.has(addr));
       });
+
 
       // Process emails - use cache for already processed emails
       const processedEmails = [];
@@ -1009,6 +901,7 @@ class ActivityManager {
           activities.push(emailActivity);
         }
       });
+
 
       return activities;
     } catch (error) {
@@ -2054,60 +1947,22 @@ class ActivityManager {
    * Render activities for a specific container
    */
   async renderActivities(containerId, entityType = 'global', entityId = null, forceRefresh = false) {
-
-    // #region agent log - Hypothesis J: renderActivities entry
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        sessionId: 'cache-debug-session',
-        runId: 'activity-render-fix',
-        hypothesisId: 'J',
-        location: 'activity-manager.js:renderActivities',
-        message: 'renderActivities function entered',
-        data: { containerId, entityType, entityId, forceRefresh, hasContainer: !!document.getElementById(containerId) },
-        timestamp: Date.now()
-      })
-    }).catch(() => {});
-    // #endregion
-
     const container = document.getElementById(containerId);
     if (!container) {
-      // #region agent log - Hypothesis J: No container found
-      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          sessionId: 'cache-debug-session',
-          runId: 'activity-render-fix',
-          hypothesisId: 'J',
-          location: 'activity-manager.js:renderActivities',
-          message: 'Container not found - exiting early',
-          data: { containerId },
-          timestamp: Date.now()
-        })
-      }).catch(() => {});
-      // #endregion
+      return;
+    }
+
+
+    // OPTIMIZATION: Don't render if container is not visible (saves heavy processing for hidden dashboard widgets)
+    const page = container.closest('.page');
+    const isVisible = page && page.classList.contains('active') && !page.hidden;
+    if (!isVisible && !forceRefresh) {
+      // console.log(`[ActivityManager] Skipping render for hidden container: ${containerId}`);
       return;
     }
 
     const renderKey = `${containerId}::${entityType}::${entityId || ''}`;
     if (!forceRefresh && this.renderPromises && this.renderPromises.has(renderKey)) {
-      // #region agent log - Hypothesis J: Using cached render promise
-      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          sessionId: 'cache-debug-session',
-          runId: 'activity-render-fix',
-          hypothesisId: 'J',
-          location: 'activity-manager.js:renderActivities',
-          message: 'Using cached render promise - returning early',
-          data: { renderKey },
-          timestamp: Date.now()
-        })
-      }).catch(() => {});
-      // #endregion
       return this.renderPromises.get(renderKey);
     }
 
@@ -2126,23 +1981,6 @@ class ActivityManager {
 
       try {
         let activities = await this.getActivities(entityType, entityId, forceRefresh);
-
-        // #region agent log - Hypothesis J: After getActivities returns
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            sessionId: 'cache-debug-session',
-            runId: 'activity-render-fix',
-            hypothesisId: 'J',
-            location: 'activity-manager.js:renderActivities',
-            message: 'getActivities returned - about to render',
-            data: { containerId, activitiesCount: activities ? activities.length : 0, forceRefresh },
-            timestamp: Date.now()
-          })
-        }).catch(() => {});
-        // #endregion
-
         // OPTIMIZATION: Limit activities for home screen to 10 pages (40 activities) for better performance
         // Since home screen shows "Recent Activities", we don't need all historical data
         if (containerId === 'home-activity-timeline' && activities.length > 40) {
@@ -2175,97 +2013,15 @@ class ActivityManager {
         const sigKey = `${containerId}::${entityType}::${entityId || ''}::page:${this.currentPage}`;
         const newSignature = (paginatedActivities || []).map(a => a && a.id ? String(a.id) : '').join('|');
         const prevSignature = this.lastRenderedSignatures ? this.lastRenderedSignatures.get(sigKey) : null;
-
-        // #region agent log - Hypothesis I: Activity HTML check
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            sessionId: 'cache-debug-session',
-            runId: 'activity-render-fix',
-            hypothesisId: 'I',
-            location: 'activity-manager.js:renderActivities',
-            message: 'Checking activity HTML before render',
-            data: {
-              containerId,
-              hasActivityHtml: !!activityHtml,
-              activityHtmlLength: activityHtml ? activityHtml.length : 0,
-              activityHtmlTrimmedLength: activityHtml ? activityHtml.trim().length : 0,
-              hasExistingContent,
-              forceRefresh,
-              activitiesCount: activities.length,
-              paginatedCount: paginatedActivities ? paginatedActivities.length : 0
-            },
-            timestamp: Date.now()
-          })
-        }).catch(() => {});
-        // #endregion
-
         // Always replace the loading state - with fallback
         if (activityHtml && activityHtml.trim().length > 0) {
-          // #region agent log - Hypothesis I: Activity rendering debug
-          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-              sessionId: 'cache-debug-session',
-              runId: 'activity-render-fix',
-              hypothesisId: 'I',
-              location: 'activity-manager.js:renderActivities',
-              message: 'Rendering activities - replacing loading state',
-              data: {
-                containerId,
-                activityHtmlLength: activityHtml.length,
-                hasExistingContent,
-                forceRefresh,
-                activitiesCount: activities.length,
-                prevSignature,
-                newSignature,
-                signaturesMatch: prevSignature === newSignature
-              },
-              timestamp: Date.now()
-            })
-          }).catch(() => {});
-          // #endregion
-
           // If we already rendered the same items, skip DOM replacement (prevents icon/glyph flicker)
           if (!forceRefresh && hasExistingContent && prevSignature && prevSignature === newSignature) {
-            // #region agent log - Hypothesis I: Skipping duplicate render
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({
-                sessionId: 'cache-debug-session',
-                runId: 'activity-render-fix',
-                hypothesisId: 'I',
-                location: 'activity-manager.js:renderActivities',
-                message: 'Skipping duplicate render - content unchanged',
-                data: { containerId },
-                timestamp: Date.now()
-              })
-            }).catch(() => {});
-            // #endregion
+            // Already rendered this exact content; skip DOM replacement
           } else {
             // Smooth height transition logic
             const currentHeight = container.offsetHeight;
             container.style.height = currentHeight + 'px';
-
-            // #region agent log - Hypothesis I: Setting innerHTML
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({
-                sessionId: 'cache-debug-session',
-                runId: 'activity-render-fix',
-                hypothesisId: 'I',
-                location: 'activity-manager.js:renderActivities',
-                message: 'Setting container.innerHTML with activity content',
-                data: { containerId, contentLength: activityHtml.length },
-                timestamp: Date.now()
-              })
-            }).catch(() => {});
-            // #endregion
-
             container.innerHTML = activityHtml;
             this.attachActivityEvents(container, entityType, entityId);
 
@@ -2279,21 +2035,6 @@ class ActivityManager {
             try { if (this.lastRenderedSignatures) this.lastRenderedSignatures.set(sigKey, newSignature); } catch (_) { /* noop */ }
           }
         } else {
-          // #region agent log - Hypothesis I: Activity HTML empty - setting empty state
-          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-              sessionId: 'cache-debug-session',
-              runId: 'activity-render-fix',
-              hypothesisId: 'I',
-              location: 'activity-manager.js:renderActivities',
-              message: 'Activity HTML empty - setting empty state instead',
-              data: { containerId, activitiesCount: activities.length, paginatedCount: paginatedActivities ? paginatedActivities.length : 0 },
-              timestamp: Date.now()
-            })
-          }).catch(() => {});
-          // #endregion
           container.innerHTML = this.renderEmptyState();
         }
 
@@ -2316,6 +2057,8 @@ class ActivityManager {
             });
           }, 100);
         }
+
+
       } catch (error) {
         clearTimeout(timeoutId); // Clear timeout since we got an error
         console.error('Error rendering activities:', error);
@@ -3575,4 +3318,6 @@ class ActivityManager {
 if (!window.ActivityManager || !(window.ActivityManager instanceof ActivityManager)) {
   window.ActivityManager = new ActivityManager();
 }
+
+
 

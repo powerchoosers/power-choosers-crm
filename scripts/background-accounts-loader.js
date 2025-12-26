@@ -59,20 +59,16 @@
         lastLoadedDoc = null;
         hasMoreData = false;
       } else {
-        // Admin path: original unfiltered query
+        // Admin path: original unfiltered query - load ALL accounts (no limit)
         let query = window.firebaseDB.collection('accounts')
-          .orderBy('updatedAt', 'desc')
-          .limit(100);
+          .orderBy('updatedAt', 'desc');
         const snapshot = await query.get();
         const newAccounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         accountsData = newAccounts;
-        // Track admin pagination
-        if (snapshot.docs.length > 0) {
-          lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
-          hasMoreData = snapshot.docs.length === 100; // If we got less than 100, no more data
-        } else {
+
+        // No pagination needed for admin - all data loaded
+        lastLoadedDoc = null;
           hasMoreData = false;
-        }
       }
       
       // Pagination handled per role above
@@ -198,39 +194,10 @@
   
   // OPTIMIZED: Get total count using Firestore aggregation (no document loads!)
   // This reduces Firestore reads from thousands to just 1-2 per count query
+  // Get total count - simply return the loaded/cached data length
+  // Firestore aggregation (.count()) is not supported in the compat SDK
   async function getTotalCount() {
-    if (!window.firebaseDB) return accountsData.length;
-    
-    try {
-      const email = window.currentUserEmail || '';
-      if (window.currentUserRole !== 'admin' && email) {
-        // Non-admin: use aggregation count for owned/assigned accounts
-        try {
-          const [ownedCount, assignedCount] = await Promise.all([
-            window.firebaseDB.collection('accounts').where('ownerId','==',email).count().get(),
-            window.firebaseDB.collection('accounts').where('assignedTo','==',email).count().get()
-          ]);
-          const owned = ownedCount.data().count || 0;
-          const assigned = assignedCount.data().count || 0;
-          return Math.max(owned, assigned, accountsData.length);
-        } catch (aggError) {
-          console.warn('[BackgroundAccountsLoader] Aggregation not supported, using loaded count');
           return accountsData.length;
-        }
-      } else {
-        // Admin: use aggregation count for all accounts
-        try {
-          const countSnap = await window.firebaseDB.collection('accounts').count().get();
-          return countSnap.data().count || accountsData.length;
-        } catch (aggError) {
-          console.warn('[BackgroundAccountsLoader] Aggregation not supported, using loaded count');
-          return accountsData.length;
-        }
-      }
-    } catch (error) {
-      console.error('[BackgroundAccountsLoader] Failed to get total count:', error);
-      return accountsData.length; // Fallback to loaded count
-    }
   }
 
   // Add new account to cache

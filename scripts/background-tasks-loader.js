@@ -23,6 +23,7 @@
   };
 
   async function loadFromFirestore(preserveExisting = false) {
+
     if (!window.firebaseDB && !(window.DataManager && typeof window.DataManager.queryWithOwnership === 'function')) {
       console.warn('[BackgroundTasksLoader] firebaseDB not available');
       return;
@@ -42,6 +43,8 @@
         let newTasks = [];
         if (window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
           newTasks = await window.DataManager.queryWithOwnership('tasks');
+
+
         } else {
           const email = window.currentUserEmail || '';
           const db = window.firebaseDB;
@@ -53,10 +56,12 @@
           ownedSnap.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
           assignedSnap.forEach(d => { if (!map.has(d.id)) map.set(d.id, { id: d.id, ...d.data() }); });
           newTasks = Array.from(map.values());
+
+
         }
         // Sort by updatedAt/timestamp desc similar to original
         newTasks.sort((a, b) => new Date(b.updatedAt || b.timestamp || 0) - new Date(a.updatedAt || a.timestamp || 0));
-        
+
         // Merge with existing tasks if preserving
         if (preserveExisting && existingTasksMap) {
           const newTasksMap = new Map();
@@ -71,23 +76,22 @@
           });
           tasksData = Array.from(newTasksMap.values());
           tasksData.sort((a, b) => new Date(b.updatedAt || b.timestamp || 0) - new Date(a.updatedAt || a.timestamp || 0));
+
+
         } else {
         tasksData = newTasks;
+
+
         }
         lastLoadedDoc = null;
         hasMoreData = false;
       } else {
         // Admin path: original unfiltered query
-        // COST-EFFECTIVE FIX: Use 200 limit + task preservation to prevent disappearing
-        // Task preservation ensures tasks loaded via loadMore() are kept during cache refresh
-        // 200 is a good balance: covers most use cases while keeping costs reasonable
-        // (500 reads every 3 min = $4.20/month, 200 reads = $1.68/month per admin)
-        let query = window.firebaseDB.collection('tasks')
-          .orderBy('timestamp', 'desc')
-          .limit(200);
-        const snapshot = await query.get();
+        // Admin path: load ALL tasks (source of truth). This avoids 123/200/245 drift.
+        const snapshot = await window.firebaseDB.collection('tasks').get();
         const newTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
+
+
         // Merge with existing tasks if preserving
         if (preserveExisting && existingTasksMap) {
           const newTasksMap = new Map();
@@ -102,12 +106,17 @@
           });
           tasksData = Array.from(newTasksMap.values());
           tasksData.sort((a, b) => new Date(b.updatedAt || b.timestamp || 0) - new Date(a.updatedAt || a.timestamp || 0));
+
+
         } else {
         tasksData = newTasks;
+
+
         }
-        
-        // Admin pagination
-        if (snapshot.docs.length > 0) { lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1]; hasMoreData = snapshot.docs.length === 200; } else { hasMoreData = false; }
+
+        // Admin pagination disabled (we load all tasks in one go)
+        lastLoadedDoc = null;
+        hasMoreData = false;
       }
 
       // Pagination handled per role above
@@ -135,6 +144,7 @@
         if (cached && Array.isArray(cached) && cached.length > 0) {
           if (window.currentUserRole !== 'admin') {
             const email = (window.currentUserEmail || '').toLowerCase();
+            const cachedCount = (cached || []).length;
             // CRITICAL FIX: Include createdBy field in ownership check to match filterTasksByOwnership()
             tasksData = (cached || []).filter(t => {
               if (!t) return false;
@@ -143,8 +153,12 @@
               const createdBy = (t.createdBy || '').toLowerCase();
               return ownerId === email || assignedTo === email || createdBy === email;
             });
+
+
           } else {
             tasksData = cached;
+
+
           }
 
           // Notify that cached data is available
@@ -331,12 +345,13 @@
         await loadFromFirestore(true); // Preserve existing tasks during refresh
       }
 
-      // Trigger Today's Tasks widget to refresh (but only if not already loading)
+      // Trigger Today's Tasks widget to refresh (only when dashboard is visible).
+      // Do NOT use timeouts; CRM-side logic already debounces/queues as needed.
       if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
-        // Small delay to ensure Firebase operations complete
-        setTimeout(() => {
-        window.crm.loadTodaysTasks();
-        }, 100);
+        const dashboardActive = !!document.getElementById('dashboard-page')?.classList.contains('active');
+        if (dashboardActive) {
+          window.crm.loadTodaysTasks();
+        }
       }
     } catch (error) {
       console.error('[BackgroundTasksLoader] Error handling tasksUpdated event:', error);
@@ -359,10 +374,10 @@
         // CRITICAL FIX: Only trigger refresh if not from task-detail (which handles its own refresh)
         // This prevents duplicate refreshes and race conditions
         if (source !== 'task-detail' && window.crm && typeof window.crm.loadTodaysTasks === 'function') {
-          // Small delay to ensure Firebase operations complete
-          setTimeout(() => {
-          window.crm.loadTodaysTasks();
-          }, 100);
+          const dashboardActive = !!document.getElementById('dashboard-page')?.classList.contains('active');
+          if (dashboardActive) {
+            window.crm.loadTodaysTasks();
+          }
         }
       } catch (e) {
         console.warn('[BackgroundTasksLoader] Could not remove deleted task from cache:', e);
@@ -422,7 +437,14 @@
 
           // Trigger Today's Tasks widget to refresh
           if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
-            window.crm.loadTodaysTasks();
+            // Avoid redundant widget refreshes if we just refreshed recently.
+            // (Keeps Home from feeling like it is "battling" in the background.)
+            const last = window.crm._lastTasksLoad || 0;
+            const deltaMs = Date.now() - last;
+            if (!last || deltaMs > 5000) {
+              window.crm.loadTodaysTasks();
+            } else {
+            }
           }
         } else {
         }

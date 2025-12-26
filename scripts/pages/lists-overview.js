@@ -362,6 +362,9 @@
   }
 
   async function ensureLoadedThenRender() {
+    // Force an initial render to hide the empty state and potentially show skeletons
+    applyFilters();
+
     // COST-EFFECTIVE: Use BackgroundListsLoader cache first (zero Firestore reads)
     if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.getListsData === 'function') {
       const allLists = window.BackgroundListsLoader.getListsData() || [];
@@ -955,22 +958,31 @@
   }
 
   function renderFilteredItems(items) {
+    const isPeopleView = state.kind === 'people';
+    const isLoading = isPeopleView ? !state.loadedPeople : !state.loadedAccounts;
     const hasAny = Array.isArray(items) && items.length > 0;
-    const isLoading = state.kind === 'people' ? !state.loadedPeople : !state.loadedAccounts;
 
     if (!els.listContainer || !els.emptyState) return;
 
-    // Instant paint: if we already have cached lists from a prior view, render them even while reloading
+    // Show skeletons while loading if no data yet
     if (isLoading) {
-      const cached = state.kind === 'people' ? state.peopleLists : state.accountLists;
+      const cached = isPeopleView ? state.peopleLists : state.accountLists;
       if (Array.isArray(cached) && cached.length) {
-        // Fall through to normal render using cached items
+        // We have cached data, fall through to render it (no flicker)
       } else {
+        // No data yet, show skeletons
         els.emptyState.hidden = true;
-        // Keep previous UI; avoid heavy loading card that causes flash
-        els.listContainer.innerHTML = els.listContainer.innerHTML || '';
+        els.listContainer.classList.add('--loading');
+        
+        let skeletons = '';
+        for (let i = 0; i < 6; i++) {
+          skeletons += listSkeletonHtml();
+        }
+        els.listContainer.innerHTML = skeletons;
         return;
       }
+    } else {
+      els.listContainer.classList.remove('--loading');
     }
 
     // Show/hide empty state
@@ -1169,6 +1181,26 @@
           <button class="btn-secondary" data-action="Open" data-id="${id}" data-kind="${type}">Open</button>
           <button class="btn-text" data-action="Rename" data-id="${id}" data-kind="${type}">Rename</button>
           <button class="btn-text" data-action="Delete" data-id="${id}" data-kind="${type}">Delete</button>
+        </div>
+      </div>`;
+  }
+
+  function listSkeletonHtml() {
+    return `
+      <div class="list-card skeleton-card">
+        <div class="list-card-header">
+          <div class="skeleton-text skeleton-title"></div>
+          <div class="skeleton-text skeleton-count"></div>
+        </div>
+        <div class="list-card-meta">
+          <div class="skeleton-text skeleton-meta-item"></div>
+          <div class="skeleton-text skeleton-meta-item"></div>
+          <div class="skeleton-text skeleton-meta-item"></div>
+        </div>
+        <div class="list-card-actions">
+          <div class="skeleton-btn"></div>
+          <div class="skeleton-btn"></div>
+          <div class="skeleton-btn"></div>
         </div>
       </div>`;
   }
@@ -1726,6 +1758,82 @@
       #lists-view-toggle .toggle-btn:hover:not(.active) {
         background: transparent;
         color: var(--text-primary);
+      }
+
+      /* Skeleton styles */
+      .skeleton-card {
+        pointer-events: none;
+        position: relative;
+        overflow: hidden;
+      }
+      .skeleton-text {
+        background: var(--grey-600);
+        border-radius: 4px;
+        position: relative;
+        overflow: hidden;
+      }
+      .skeleton-text::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        transform: translateX(-100%);
+        background: linear-gradient(
+          90deg,
+          rgba(255, 255, 255, 0) 0,
+          rgba(255, 255, 255, 0.05) 20%,
+          rgba(255, 255, 255, 0.1) 60%,
+          rgba(255, 255, 255, 0)
+        );
+        animation: shimmer 2s infinite;
+      }
+      @keyframes shimmer {
+        100% {
+          transform: translateX(100%);
+        }
+      }
+      .skeleton-title {
+        height: 20px;
+        width: 60%;
+        margin-bottom: 8px;
+      }
+      .skeleton-count {
+        height: 16px;
+        width: 30%;
+      }
+      .skeleton-meta-item {
+        height: 14px;
+        width: 80%;
+        margin-bottom: 6px;
+      }
+      .skeleton-btn {
+        height: 32px;
+        width: 60px;
+        background: var(--grey-600);
+        border-radius: 4px;
+        display: inline-block;
+        margin-right: 8px;
+        position: relative;
+        overflow: hidden;
+      }
+      .skeleton-btn::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        transform: translateX(-100%);
+        background: linear-gradient(
+          90deg,
+          rgba(255, 255, 255, 0) 0,
+          rgba(255, 255, 255, 0.05) 20%,
+          rgba(255, 255, 255, 0.1) 60%,
+          rgba(255, 255, 255, 0)
+        );
+        animation: shimmer 2s infinite;
       }
     `;
     document.head.appendChild(style);

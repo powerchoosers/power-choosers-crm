@@ -269,8 +269,11 @@
   }
 
   async function loadData() {
+
     // Build from real sources: BackgroundTasksLoader + localStorage tasks + LinkedIn sequence tasks
     const linkedInTasks = await getLinkedInTasksFromSequences();
+
+
     let userTasks = [];
     let firebaseTasks = [];
 
@@ -311,6 +314,7 @@
       // CRITICAL: Filter by ownership for non-admin users (localStorage bypasses Firestore rules)
       if (!isAdmin() && userTasks.length > 0) {
         const email = getUserEmail();
+        const beforeCount = userTasks.length;
         userTasks = userTasks.filter(t => {
           if (!t) return false;
           const ownerId = (t.ownerId || '').toLowerCase();
@@ -324,9 +328,15 @@
     // Load from BackgroundTasksLoader (cache-first)
     try {
       if (window.BackgroundTasksLoader) {
+        // CRITICAL FIX: Force reload BackgroundTasksLoader to ensure we have latest data
+        // This matches what Today's Tasks widget does to get all 236 tasks
+        console.log('[Tasks] Force reloading BackgroundTasksLoader to get complete task list...');
+        await window.BackgroundTasksLoader.forceReload();
         firebaseTasks = window.BackgroundTasksLoader.getTasksData() || [];
         state.hasMore = window.BackgroundTasksLoader.hasMore();
-        console.log('[Tasks] Loaded', firebaseTasks.length, 'tasks from BackgroundTasksLoader');
+
+
+        console.log('[Tasks] Loaded', firebaseTasks.length, 'tasks from BackgroundTasksLoader after force reload');
       } else {
         // Fallback to direct Firestore query if background loader not available (with ownership filters)
         if (window.firebaseDB) {
@@ -396,26 +406,50 @@
     // Firebase tasks override any stale local copies with the same ID
     const allTasksMap = new Map();
     firebaseTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
-    // CRITICAL FIX: Only merge local tasks if they are recent (< 5 mins) to avoid resurrecting deleted tasks
+
+
+    // CRITICAL FIX: For admins, include all localStorage tasks since they should see everything
+    // For non-admins, only include recent tasks (< 1 hour) to avoid resurrecting deleted tasks
     const nowMs = Date.now();
+    const cutoffMs = isAdmin() ? 0 : 3600000; // 0ms for admins (no cutoff), 1 hour for non-admins
+    let localTasksAdded = 0;
+    let localTasksSkipped = 0;
     userTasks.forEach(t => {
       if (t && t.id && !allTasksMap.has(t.id)) {
         const created = t.createdAt || (t.timestamp && typeof t.timestamp.toMillis === 'function' ? t.timestamp.toMillis() : t.timestamp) || 0;
-        if (nowMs - created < 300000) {
+        if (cutoffMs === 0 || nowMs - created < cutoffMs) {
           allTasksMap.set(t.id, t);
+          localTasksAdded++;
+        } else {
+          localTasksSkipped++;
         }
       }
     });
+
     const allTasks = Array.from(allTasksMap.values());
 
     // Add LinkedIn tasks that aren't duplicates
     const nonDupLinkedIn = linkedInTasks.filter(li => !allTasks.some(t => t.id === li.id));
+
     const rows = [...allTasks, ...nonDupLinkedIn];
 
     state.data = rows;
     state.filtered = sortTasksChronologically(rows);
     console.log(`[Tasks] Total tasks loaded: ${rows.length}`);
     render();
+
+    // CRITICAL FIX: Notify Today's Tasks widget and other components that tasks have been updated
+    try {
+      window.dispatchEvent(new CustomEvent('tasksUpdated', {
+        detail: {
+          source: 'tasksPageLoad',
+          taskCount: rows.length,
+          filteredCount: state.filtered.length
+        }
+      }));
+    } catch (e) {
+      console.warn('[Tasks] Failed to dispatch tasksUpdated event:', e);
+    }
   }
 
   // Load more tasks from background loader
@@ -441,6 +475,8 @@
   }
 
   async function getLinkedInTasksFromSequences() {
+    // FIX: Instead of querying Firebase again (causing duplication), filter the existing firebaseTasks
+    // This eliminates the duplicate loading issue where LinkedIn tasks were loaded twice
     const linkedInTasks = [];
 
     // Get current user email for ownership
@@ -457,25 +493,19 @@
     const userEmail = getUserEmail();
 
     try {
-      if (!window.firebaseDB) {
-        console.warn('[Tasks] Firebase not available for sequence tasks');
+      // CRITICAL FIX: Filter existing Firebase tasks for LinkedIn sequence tasks instead of querying again
+      // This prevents duplication since firebaseTasks already contains all sequence tasks from BackgroundTasksLoader
+      // Filter from BackgroundTasksLoader's in-memory tasks (no extra Firestore query).
+      const allFirebaseTasks = window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.getTasksData === 'function'
+        ? (window.BackgroundTasksLoader.getTasksData() || [])
+        : [];
+      if (!Array.isArray(allFirebaseTasks) || allFirebaseTasks.length === 0) {
+        console.warn('[Tasks] BackgroundTasksLoader not ready, skipping LinkedIn sequence filtering');
         return linkedInTasks;
       }
 
-      // CRITICAL FIX: Only query existing tasks from Firebase that were created by the progressive system
-      // Do NOT create tasks here - that's the job of the API endpoints
-      // Query tasks collection for sequence tasks (isSequenceTask: true or isLinkedInTask: true)
-      const tasksQuery = window.firebaseDB.collection('tasks')
-        .where('sequenceId', '!=', null)
-        .get();
 
-      const tasksSnapshot = await tasksQuery;
-
-      if (tasksSnapshot.empty) {
-        return linkedInTasks;
-      }
-
-      // Filter tasks by ownership and task type
+      // Filter by ownership and task type
       const isAdmin = () => {
         try {
           if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') {
@@ -487,61 +517,50 @@
         }
       };
 
-      tasksSnapshot.forEach(doc => {
-        const taskData = doc.data();
+      // Log all sequence task types found in the database
+      const allTaskTypes = [];
+      allFirebaseTasks.forEach(task => {
+        if (task && task.sequenceId) {
+          const taskType = String(task.type || '').toLowerCase();
+          if (!allTaskTypes.includes(taskType)) {
+            allTaskTypes.push(taskType);
+          }
+        }
+      });
+
+
+      allFirebaseTasks.forEach(task => {
+        if (!task || !task.sequenceId) return; // Skip non-sequence tasks
 
         // Only include LinkedIn task types
-        const taskType = String(taskData.type || '').toLowerCase();
+        const taskType = String(task.type || '').toLowerCase();
         if (!taskType.includes('linkedin') && !taskType.includes('li-')) {
           return; // Skip non-LinkedIn tasks
         }
 
         // Filter by ownership (non-admin users)
         if (!isAdmin()) {
-          const ownerId = (taskData.ownerId || '').toLowerCase();
-          const assignedTo = (taskData.assignedTo || '').toLowerCase();
-          const createdBy = (taskData.createdBy || '').toLowerCase();
+          const ownerId = (task.ownerId || '').toLowerCase();
+          const assignedTo = (task.assignedTo || '').toLowerCase();
+          const createdBy = (task.createdBy || '').toLowerCase();
           if (ownerId !== userEmail && assignedTo !== userEmail && createdBy !== userEmail) {
             return; // Skip if user doesn't own this task
           }
         }
 
         // Only include pending tasks (completed tasks shouldn't show)
-        if (taskData.status === 'completed') {
+        if (task.status === 'completed') {
           return;
         }
 
-        // Convert Firestore data to task format
-        const task = {
-          id: taskData.id || doc.id,
-          title: taskData.title || '',
-          contact: taskData.contact || '',
-          account: taskData.account || '',
-          type: taskData.type || 'linkedin',
-          priority: taskData.priority || 'sequence',
-          dueDate: taskData.dueDate || '',
-          dueTime: taskData.dueTime || '',
-          status: taskData.status || 'pending',
-          sequenceId: taskData.sequenceId || '',
-          contactId: taskData.contactId || '',
-          accountId: taskData.accountId || '',
-          stepId: taskData.stepId || '',
-          stepIndex: taskData.stepIndex !== undefined ? taskData.stepIndex : -1,
-          isLinkedInTask: true,
-          isSequenceTask: taskData.isSequenceTask || true,
-          ownerId: taskData.ownerId || '',
-          assignedTo: taskData.assignedTo || '',
-          createdBy: taskData.createdBy || '',
-          createdAt: taskData.createdAt || (taskData.timestamp && taskData.timestamp.toDate ? taskData.timestamp.toDate().getTime() : taskData.timestamp) || Date.now(),
-          timestamp: taskData.timestamp && taskData.timestamp.toDate ? taskData.timestamp.toDate().getTime() : (taskData.timestamp || Date.now())
-        };
-
+        // Task is already in the correct format from Firebase
         linkedInTasks.push(task);
       });
 
-      console.log('[Tasks] Loaded', linkedInTasks.length, 'sequence tasks from Firebase (progressive system)');
+
+      console.log('[Tasks] Filtered', linkedInTasks.length, 'LinkedIn sequence tasks from existing Firebase tasks');
     } catch (error) {
-      console.error('[Tasks] Error loading sequence tasks from Firebase:', error);
+      console.error('[Tasks] Error filtering LinkedIn sequence tasks:', error);
     }
 
     return linkedInTasks;
@@ -572,7 +591,58 @@
 
   function getPageItems() { const s = (state.currentPage - 1) * state.pageSize; return state.filtered.slice(s, s + state.pageSize); }
 
-  function paginate() { if (!els.pag) return; const total = state.filtered.length; const pages = Math.max(1, Math.ceil(total / state.pageSize)); state.currentPage = Math.min(state.currentPage, pages); if (els.summary) { const st = total === 0 ? 0 : (state.currentPage - 1) * state.pageSize + 1; const en = Math.min(state.currentPage * state.pageSize, total); els.summary.textContent = `${st}-${en} of ${total}`; } let html = ''; const btn = (l, d, p) => `<button class="page-btn" ${d ? 'disabled' : ''} data-page="${p}">${l}</button>`; html += btn('Prev', state.currentPage === 1, state.currentPage - 1); for (let p = 1; p <= pages; p++) { html += `<button class="page-btn ${p === state.currentPage ? 'active' : ''}" data-page="${p}">${p}</button>`; } html += btn('Next', state.currentPage === pages, state.currentPage + 1); els.pag.innerHTML = html; els.pag.querySelectorAll('.page-btn').forEach(b => b.addEventListener('click', () => { const n = parseInt(b.getAttribute('data-page') || '1', 10); if (!isNaN(n) && n >= 1 && n <= pages) { state.currentPage = n; render(); } })); }
+  function getTotalPages() { return Math.max(1, Math.ceil(state.filtered.length / state.pageSize)); }
+
+  function renderPagination() {
+    if (!els.pag) return;
+    const totalPages = getTotalPages();
+    const current = Math.min(state.currentPage, totalPages);
+    state.currentPage = current;
+    const total = state.filtered.length;
+    const start = total === 0 ? 0 : (current - 1) * state.pageSize + 1;
+    const end = total === 0 ? 0 : Math.min(total, current * state.pageSize);
+
+    // Use unified pagination component
+    if (window.crm && window.crm.createPagination) {
+      window.crm.createPagination(current, totalPages, (page) => {
+        state.currentPage = page;
+        render();
+        // Scroll to top after page change via unified paginator
+        try {
+          requestAnimationFrame(() => {
+            const scroller = (els.page && els.page.querySelector) ? els.page.querySelector('.table-scroll') : null;
+            if (scroller && typeof scroller.scrollTo === 'function') scroller.scrollTo({ top: 0, behavior: 'auto' });
+            else if (scroller) scroller.scrollTop = 0;
+            const main = document.getElementById('main-content');
+            if (main && typeof main.scrollTo === 'function') main.scrollTo({ top: 0, behavior: 'auto' });
+            const contentArea = document.querySelector('.content-area');
+            if (contentArea && typeof contentArea.scrollTo === 'function') contentArea.scrollTo({ top: 0, behavior: 'auto' });
+            window.scrollTo(0, 0);
+          });
+        } catch (_) { /* noop */ }
+      }, els.pag.id);
+    } else {
+      // Fallback to simple pagination if unified component not available
+      let html = '';
+      const btn = (l, d, p) => `<button class="pagination-arrow" ${d ? 'disabled' : ''} data-page="${p}">${l}</button>`;
+      html += btn('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"></polyline></svg>', current <= 1, current - 1);
+      html += `<div class="pagination-current">${current}</div>`;
+      html += btn('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,18 15,12 9,6"></polyline></svg>', current >= totalPages, current + 1);
+      
+      els.pag.innerHTML = `<div class="unified-pagination">${html}</div>`;
+      els.pag.querySelectorAll('button[data-page]').forEach(b => b.addEventListener('click', () => {
+        const n = parseInt(b.getAttribute('data-page') || '1', 10);
+        if (!isNaN(n) && n >= 1 && n <= totalPages) {
+          state.currentPage = n;
+          render();
+        }
+      }));
+    }
+
+    if (els.summary) {
+      els.summary.textContent = `Showing ${start}\u2013${end} of ${total} tasks`;
+    }
+  }
 
   function render() {
     if (!els.tbody) return; state.filtered = sortTasksChronologically(state.filtered); const rows = getPageItems(); els.tbody.innerHTML = rows.map(r => rowHtml(r)).join('');
@@ -702,7 +772,7 @@
     }));
     // Header select state
     if (els.selectAll) { const pageIds = new Set(rows.map(r => r.id)); const allSelected = [...pageIds].every(id => state.selected.has(id)); els.selectAll.checked = allSelected && rows.length > 0; }
-    paginate(); updateBulkBar();
+    renderPagination(); updateBulkBar();
   }
 
   // Update task titles to descriptive format
@@ -1576,7 +1646,17 @@
   // Listen for cross-page task updates and refresh immediately
   function bindUpdates() {
     window.addEventListener('tasksUpdated', async (event) => {
-      const { taskId, deleted, newTaskCreated, nextStepType, rescheduled } = event.detail || {};
+      const detail = (event && event.detail) || {};
+      const { taskId, deleted, newTaskCreated, nextStepType, rescheduled, source } = detail;
+
+      // CRITICAL FIX: Avoid infinite refresh loops on the Tasks page.
+      // The Tasks page dispatches `tasksUpdated` (e.g. source: 'tasksPageLoad' / 'taskCreation'),
+      // and without this guard we end up calling loadData() repeatedly, causing 123 -> 245 flicker
+      // and multiple Today's Tasks widget refreshes.
+      const isMeaningfulUpdate = !!(deleted && taskId) || !!(rescheduled && taskId) || !!newTaskCreated;
+      if (!isMeaningfulUpdate) {
+        return;
+      }
 
       // CRITICAL FIX: If a task was deleted, clean it up from localStorage immediately
       if (deleted && taskId) {
@@ -1679,20 +1759,31 @@
 
     // Listen for background tasks loader events
     document.addEventListener('pc:tasks-loaded', async (event) => {
-      const { newTaskCreated } = event.detail || {};
-      console.log('[Tasks] Background tasks loaded, refreshing data...', { newTaskCreated });
+      const { newTaskCreated, count, cached, fromFirestore } = (event && event.detail) || {};
+      console.log('[Tasks] Background tasks loaded, checking for updates...', { newTaskCreated });
       
+      // If the Tasks page rendered from localStorage (123) before the loader was ready (245),
+      // re-run loadData once to hydrate the table with the full loader set.
+      try {
+        const currentCount = Array.isArray(state.data) ? state.data.length : 0;
+        if (!newTaskCreated && typeof count === 'number' && count > currentCount) {
+          await loadData();
+          return;
+        }
+      } catch (_) { }
+
       // If a new task was created, force reload BackgroundTasksLoader first
       if (newTaskCreated && window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
         try {
           console.log('[Tasks] New task created, forcing BackgroundTasksLoader refresh...');
           await window.BackgroundTasksLoader.forceReload();
+          // Only reload if we're on the tasks page and a new task was actually created
+          await loadData();
         } catch (e) {
           console.warn('[Tasks] Failed to force reload BackgroundTasksLoader:', e);
         }
       }
-      
-      await loadData();
+      // NOTE: Removed automatic loadData() call to prevent loops with tasksUpdated events
     });
 
     // CRITICAL FIX: Listen for task deletion events for cross-browser sync

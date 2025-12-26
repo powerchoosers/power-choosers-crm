@@ -27,7 +27,10 @@
     searchModal: null,
     searchResults: null,
     searchLoading: null,
-    searchEmpty: null
+    searchEmpty: null,
+    searchSkeleton: null,
+    prospectPeopleBtn: null,
+    prospectAccountsBtn: null
   };
   let stylesInjected = false;
 
@@ -38,6 +41,10 @@
     elements.searchResults = document.getElementById('search-results');
     elements.searchLoading = document.getElementById('search-loading');
     elements.searchEmpty = document.getElementById('search-empty');
+    elements.searchSkeleton = document.getElementById('search-skeleton');
+    elements.prospectPeopleBtn = document.getElementById('prospect-people-btn');
+    elements.prospectAccountsBtn = document.getElementById('prospect-accounts-btn');
+    
     // Make sure modal is hidden on load
     if (elements.searchModal) {
       elements.searchModal.hidden = true;
@@ -45,6 +52,7 @@
     }
     if (elements.searchResults) elements.searchResults.innerHTML = '';
     if (elements.searchLoading) elements.searchLoading.hidden = true;
+    if (elements.searchSkeleton) elements.searchSkeleton.hidden = true;
     if (elements.searchEmpty) elements.searchEmpty.hidden = true;
 
     if (!elements.searchInput || !elements.searchModal) {
@@ -62,26 +70,40 @@
     const style = document.createElement('style');
     style.id = 'global-search-enhanced-styles';
     style.textContent = `
-      .search-results-container .search-category {
-        border-top: 1px solid var(--grey-700, #3a3f45);
-        padding-top: 8px;
-        margin-top: 8px;
+      .search-results-container {
+        padding: 12px 12px 24px 12px;
+        box-sizing: border-box;
       }
-      .search-results-container .search-category:first-of-type {
-        border-top: none;
-        padding-top: 0;
-        margin-top: 0;
+      .search-results-container .search-category {
+        background: var(--bg-item, #2f343a);
+        border: 1px solid var(--grey-700, #3a3f45);
+        border-radius: var(--border-radius, 8px);
+        margin-bottom: 16px;
+        margin-left: 0;
+        margin-right: 0;
+        overflow: hidden;
+      }
+      .search-results-container .search-category:last-child {
+        margin-bottom: 0;
       }
       .search-results-container .search-category .category-header {
-        padding: 4px 0 6px;
+        padding: 10px 12px;
+        background: rgba(0, 0, 0, 0.15);
         border-bottom: 1px solid var(--grey-700, #3a3f45);
+        margin: 0;
       }
       .search-results-container .search-result-item {
-        border-bottom: 1px solid var(--grey-700, #3a3f45);
-        padding: 10px 8px;
+        padding: 10px 12px;
+        margin: 0;
+        background: transparent;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.25);
+        transition: background 0.15s ease;
       }
       .search-results-container .search-result-item:last-child {
         border-bottom: none;
+      }
+      .search-results-container .search-result-item:hover {
+        background: rgba(255, 255, 255, 0.03);
       }
       .search-result-item .result-main {
         display: flex;
@@ -140,6 +162,63 @@
       .search-result-item .result-actions {
         gap: 6px;
       }
+
+      .search-results-container .search-all-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--bg-item, #2f343a);
+        border: 1px solid var(--grey-700, #3a3f45);
+        border-radius: var(--border-radius, 8px);
+        padding: 6px 10px;
+        color: var(--text-secondary, rgba(255, 255, 255, 0.8));
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+      }
+
+      .search-results-container .search-all-btn:hover {
+        background: var(--bg-hover, #3a3f45);
+        border-color: var(--border-medium, #4a4f55);
+        color: var(--text-primary, #fff);
+        transform: translateY(-1px);
+      }
+
+      .search-results-container .search-all-btn svg {
+        width: 14px;
+        height: 14px;
+        display: block;
+      }
+
+      .search-results-container .result-action-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: var(--border-radius, 8px);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--grey-700, #3a3f45);
+        color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .search-results-container .result-action-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.3);
+        color: #ffffff;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      }
+
+      .search-results-container .result-action-btn svg {
+        width: 16px;
+        height: 16px;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -162,10 +241,33 @@
         hideSearchModal();
       }
     });
+
+    // Handle prospect button clicks
+    if (elements.prospectPeopleBtn) {
+      elements.prospectPeopleBtn.addEventListener('click', () => {
+        console.log('[Global Search] Prospect People clicked');
+        // Future: wire to api/apollo/contacts.js
+        window.location.hash = '#people'; // Placeholder navigation
+        hideSearchModal();
+      });
+    }
+
+    if (elements.prospectAccountsBtn) {
+      elements.prospectAccountsBtn.addEventListener('click', () => {
+        console.log('[Global Search] Prospect Accounts clicked');
+        // Future: wire to api/apollo/company.js
+        window.location.hash = '#accounts'; // Placeholder navigation
+        hideSearchModal();
+      });
+    }
   }
 
   function showSearchModal() {
     elements.searchModal.hidden = false;
+    // Force reflow to enable transition
+    elements.searchModal.offsetHeight;
+    elements.searchModal.classList.add('open');
+    
     const query = elements.searchInput.value.trim();
     if (query) {
       // Loading state will be toggled by input handler
@@ -179,7 +281,18 @@
   }
 
   function hideSearchModal() {
-    elements.searchModal.hidden = true;
+    elements.searchModal.classList.remove('open');
+    
+    // Wait for transition to finish before hiding
+    setTimeout(() => {
+      if (!elements.searchModal.classList.contains('open')) {
+        elements.searchModal.hidden = true;
+      }
+    }, 200);
+
+    const container = document.querySelector('.search-results-container');
+    if (container) container.classList.remove('expanded');
+
     if (pendingResultsTimeout) {
       clearTimeout(pendingResultsTimeout);
       pendingResultsTimeout = null;
@@ -231,33 +344,47 @@
   }
 
   function showLoadingState() {
-    if (elements.searchLoading) elements.searchLoading.hidden = false;
+    if (elements.searchLoading) elements.searchLoading.hidden = true;
+    if (elements.searchSkeleton) elements.searchSkeleton.hidden = false;
     elements.searchResults.innerHTML = '';
     if (elements.searchEmpty) elements.searchEmpty.hidden = true;
     if (elements.searchModal) elements.searchModal.classList.add('is-loading');
+    
+    // Expand container
+    const container = document.querySelector('.search-results-container');
+    if (container) container.classList.add('expanded');
+
     loadingStartAt = Date.now();
   }
 
   // Hide all states helper
   function hideAllSearchStates() {
-    elements.searchLoading.hidden = true;
+    if (elements.searchLoading) elements.searchLoading.hidden = true;
+    if (elements.searchSkeleton) elements.searchSkeleton.hidden = true;
     elements.searchEmpty.hidden = true;
   }
 
   function showEmptyState() {
     if (elements.searchLoading) elements.searchLoading.hidden = true;
+    if (elements.searchSkeleton) elements.searchSkeleton.hidden = true;
     elements.searchResults.innerHTML = '';
-    if (elements.searchEmpty) elements.searchEmpty.hidden = false;
+    
+    // We no longer show a separate empty container since buttons are always at top
+    // Just ensure the container class is set for consistent styling if needed
+    if (elements.searchEmpty) elements.searchEmpty.hidden = true;
     if (elements.searchModal) elements.searchModal.classList.remove('is-loading');
     
-    // Add class to center the empty state
     const container = document.querySelector('.search-results-container');
-    if (container) container.classList.add('showing-empty');
+    if (container) {
+        container.classList.add('showing-empty');
+        container.classList.add('expanded');
+    }
   }
 
   function showResults(results) {
     const applyResults = () => {
       if (elements.searchLoading) elements.searchLoading.hidden = true;
+      if (elements.searchSkeleton) elements.searchSkeleton.hidden = true;
       if (elements.searchEmpty) elements.searchEmpty.hidden = true;
       let totalResults = 0;
       if (results && typeof results === 'object') {
@@ -284,7 +411,10 @@
       
       // Remove class to restore normal scrolling
       const container = document.querySelector('.search-results-container');
-      if (container) container.classList.remove('showing-empty');
+      if (container) {
+          container.classList.remove('showing-empty');
+          container.classList.add('expanded');
+      }
     };
 
     const elapsed = Date.now() - loadingStartAt;
@@ -319,6 +449,9 @@
     } finally {
       if (elements.searchLoading) {
         elements.searchLoading.hidden = true;
+      }
+      if (elements.searchSkeleton) {
+        elements.searchSkeleton.hidden = true;
       }
     }
   }
@@ -850,7 +983,8 @@
           <div class="category-header" style="display:flex; align-items:center; justify-content:space-between;">
             <div class="category-title">${categoryNames[category]} (${items.length})</div>
             <button class="search-all-btn btn-text" data-category="${category}" aria-label="Search all ${categoryNames[category]}">
-              Search all &rarr;
+              <span>SEARCH ALL</span>
+              ${getArrowRightIcon()}
             </button>
           </div>
           <div class="category-results">
@@ -866,18 +1000,23 @@
   function renderResultItem(item) {
     const actions = getActionsForType(item.type);
     const { iconHTML, initialsHTML } = buildVisualsForItem(item);
+    const isPerson = item.type === 'person';
     
     return `
       <div class="search-result-item clickable" data-id="${item.id}" data-type="${item.type}" title="Click to view ${item.title}">
         <div class="result-main">
           <div class="result-main-left">
-            <div class="result-favicon" aria-hidden="true">${iconHTML}</div>
+            ${
+              isPerson
+                ? `<div class="result-avatar" aria-hidden="true">${initialsHTML || '?'}</div>`
+                : `<div class="result-favicon" aria-hidden="true">${iconHTML}</div>`
+            }
             <div class="result-text">
               <div class="result-title">${escapeHtml(item.title)}</div>
               <div class="result-subtitle">${escapeHtml(item.subtitle)}</div>
             </div>
           </div>
-          ${initialsHTML ? `<div class="result-avatar" aria-hidden="true">${initialsHTML}</div>` : ''}
+          ${!isPerson && initialsHTML ? `<div class="result-avatar" aria-hidden="true">${initialsHTML}</div>` : ''}
         </div>
         <div class="result-actions" onclick="event.stopPropagation()">
           ${actions.filter(action => action.key !== 'view').map(action => renderActionButton(action, item)).join('')}
@@ -1278,6 +1417,15 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
         <polyline points="22,6 12,13 2,6"></polyline>
+      </svg>
+    `;
+  }
+
+  function getArrowRightIcon() {
+    return `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M5 12h12"></path>
+        <path d="M13 6l6 6-6 6"></path>
       </svg>
     `;
   }
