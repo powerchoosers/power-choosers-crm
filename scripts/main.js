@@ -1359,6 +1359,7 @@ class PowerChoosersCRM {
             // Hide all pages
             document.querySelectorAll('.page').forEach(page => {
                 page.classList.remove('active');
+                page.hidden = true;
             });
 
             // Remove active class from all nav items
@@ -1369,6 +1370,7 @@ class PowerChoosersCRM {
             // Show target page
             const targetPage = document.getElementById(`${pageName}-page`);
             if (targetPage) {
+                targetPage.hidden = false;
                 targetPage.classList.add('active');
             }
 
@@ -1489,6 +1491,12 @@ class PowerChoosersCRM {
         }
 
         // Special handling for specific pages
+        if (pageName === 'prospecting') {
+            if (window.ProspectingPage && typeof window.ProspectingPage.init === 'function') {
+                window.ProspectingPage.init();
+            }
+        }
+
         if (pageName === 'people' && window.peopleModule) {
             if (typeof window.peopleModule.rebindDynamic === 'function') {
                 window.peopleModule.rebindDynamic();

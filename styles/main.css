@@ -551,6 +551,19 @@ button:hover:not(:disabled):not(.step-option):not(.calendar-toggle-btn):not(.dro
     transition: all 0.2s ease !important;
 }
 
+/* Prospecting table: name cell layout to match Accounts/People */
+#prospecting-table .name-cell .company-cell__wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: fit-content;
+    width: fit-content;
+}
+#prospecting-table .name-cell .name-text {
+    display: inline-block;
+    line-height: 1.4;
+}
+
 /* Orange buttons (call buttons, etc.) */
 .call-btn:hover:not(:disabled) {
     background: #e55a2b !important;
@@ -8441,6 +8454,36 @@ body {
 
 #news-table .name-cell .name-text {
     display: inline-block;
+}
+
+/* === PROSPECTING PAGE TABLE LAYOUT (pin footer to bottom) === */
+#prospecting-page .page-container {
+    display: flex;
+    flex-direction: column;
+    padding-bottom: var(--spacing-base);
+    overflow: visible;
+}
+
+#prospecting-page .page-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding-bottom: 0;
+    overflow: visible;
+}
+
+#prospecting-page .table-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    margin-bottom: 0;
+    overflow: visible;
+}
+
+#prospecting-page .table-container .table-footer {
+    margin-top: auto;
 }
 
 /* === CALLS PAGE TABLE LAYOUT (pin footer to bottom) === */
