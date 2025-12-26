@@ -115,6 +115,8 @@ import apolloContactsHandler from './api/apollo/contacts.js';
 import apolloEnrichHandler from './api/apollo/enrich.js';
 import apolloUsageHandler from './api/apollo/usage.js';
 import apolloHealthHandler from './api/apollo/health.js';
+import apolloSearchPeopleHandler from './api/apollo/search-people.js';
+import apolloSearchOrganizationsHandler from './api/apollo/search-organizations.js';
 import uploadHostGoogleAvatarHandler from './api/upload/host-google-avatar.js';
 import uploadSignatureImageHandler from './api/upload/signature-image.js';
 import generateStaticPostHandler from './api/posts/generate-static.js';
@@ -125,6 +127,7 @@ import algoliaReindexHandler from './api/algolia/reindex.js';
 import mapsConfigHandler from './api/maps/config.js';
 import debugCallHandler from './api/debug/call.js';
 import debugHealthHandler from './api/debug/health.js';
+import debugLogHandler from './api/debug/log.js';
 import twilioStatusHandler from './api/twilio/status.js';
 import twilioDialStatusHandler from './api/twilio/dial-status.js';
 import twilioHangupHandler from './api/twilio/hangup.js';
@@ -729,6 +732,8 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/apollo/enrich' ||
     pathname === '/api/apollo/usage' ||
     pathname === '/api/apollo/health' ||
+    pathname === '/api/apollo/search/people' ||
+    pathname === '/api/apollo/search/organizations' ||
     pathname === '/api/upload/host-google-avatar' ||
     pathname === '/api/upload/signature-image' ||
     pathname === '/api/posts/generate-ai' ||
@@ -737,6 +742,7 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/maps/config' ||
     pathname === '/api/debug/call' ||
     pathname === '/api/debug/health' ||
+    pathname === '/api/debug/log' ||
     pathname === '/api/email/sendgrid-send' ||
     pathname.startsWith('/api/email/track/') ||
     pathname.startsWith('/api/email/click/') ||
@@ -902,6 +908,12 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/apollo/health') {
     return handleApiApolloHealth(req, res, parsedUrl);
   }
+  if (pathname === '/api/apollo/search/people') {
+    return handleApiApolloSearchPeople(req, res);
+  }
+  if (pathname === '/api/apollo/search/organizations') {
+    return handleApiApolloSearchOrganizations(req, res);
+  }
   if (pathname === '/api/upload/host-google-avatar') {
     return handleApiUploadHostGoogleAvatar(req, res);
   }
@@ -928,6 +940,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/debug/health') {
     return handleApiDebugHealth(req, res);
+  }
+  if (pathname === '/api/debug/log') {
+    return handleApiDebugLog(req, res);
   }
   if (pathname === '/api/debug/firestore') {
     return handleApiDebugFirestore(req, res);
@@ -1382,6 +1397,20 @@ async function handleApiApolloHealth(req, res, parsedUrl) {
   return await apolloHealthHandler(req, res);
 }
 
+async function handleApiApolloSearchPeople(req, res) {
+  if (req.method === 'POST') {
+    req.body = await parseRequestBody(req);
+  }
+  return await apolloSearchPeopleHandler(req, res);
+}
+
+async function handleApiApolloSearchOrganizations(req, res) {
+  if (req.method === 'POST') {
+    req.body = await parseRequestBody(req);
+  }
+  return await apolloSearchOrganizationsHandler(req, res);
+}
+
 // Upload handlers
 async function handleApiUploadHostGoogleAvatar(req, res) {
   if (req.method === 'POST') {
@@ -1470,6 +1499,13 @@ async function handleApiDebugCall(req, res) {
 
 async function handleApiDebugHealth(req, res) {
   return await debugHealthHandler(req, res);
+}
+
+async function handleApiDebugLog(req, res) {
+  if (req.method === 'POST') {
+    req.body = await parseRequestBody(req);
+  }
+  return await debugLogHandler(req, res);
 }
 
 async function handleApiDebugFirestore(req, res) {
