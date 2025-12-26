@@ -4,6 +4,7 @@
  * Used for the Prospecting page to find new accounts
  */
 
+import fs from 'fs';
 import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL, formatLocation } from './_utils.js';
 import logger from '../_logger.js';
 
@@ -72,24 +73,16 @@ export default async function handler(req, res) {
 
     const searchData = await searchResp.json();
     
+    // DEBUG: Write to a file we can definitely read
+    fs.writeFileSync('./apollo-debug.json', JSON.stringify(searchData, null, 2));
+    
     // DEBUG: Log the keys and a sample to see what we're getting
     logger.warn('[Apollo Search Orgs] Response Keys:', Object.keys(searchData));
     if (searchData.organizations && searchData.organizations.length > 0) {
-      logger.warn('[Apollo Search Orgs] Sample Org:', JSON.stringify({
-        id: searchData.organizations[0].id,
-        name: searchData.organizations[0].name,
-        industry: searchData.organizations[0].industry,
-        industries: searchData.organizations[0].industries,
-        industry_category: searchData.organizations[0].industry_category,
-        location: searchData.organizations[0].location,
-        city: searchData.organizations[0].city,
-        state: searchData.organizations[0].state,
-        country: searchData.organizations[0].country,
-        estimated_num_employees: searchData.organizations[0].estimated_num_employees,
-        employee_count: searchData.organizations[0].employee_count
-      }, null, 2));
-    } else if (searchData.accounts && searchData.accounts.length > 0) {
-       logger.warn('[Apollo Search Orgs] Found "accounts" instead of "organizations":', searchData.accounts.length);
+      logger.warn('[Apollo Search Orgs] Full Sample Org:', JSON.stringify(searchData.organizations[0], null, 2));
+    }
+    if (searchData.accounts && searchData.accounts.length > 0) {
+       logger.warn('[Apollo Search Orgs] Full Sample Account:', JSON.stringify(searchData.accounts[0], null, 2));
     }
     
     // Map response to a clean format for the frontend
