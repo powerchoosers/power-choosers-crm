@@ -7,6 +7,38 @@
 import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL, formatLocation } from './_utils.js';
 import logger from '../_logger.js';
 
+/**
+ * Enrich organization data using Apollo Enrichment API
+ * @param {string} domain - Organization domain
+ * @param {string} apiKey - Apollo API key
+ * @returns {Promise<Object|null>} - Enriched data or null
+ */
+async function enrichOrganization(domain, apiKey) {
+  if (!domain) return null;
+  try {
+    const url = `${APOLLO_BASE_URL}/organizations/enrich?domain=${encodeURIComponent(domain)}`;
+    const resp = await fetchWithRetry(url, {
+      method: 'GET',
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Content-Type': 'application/json',
+        'X-Api-Key': apiKey
+      }
+    });
+
+    if (!resp.ok) {
+      logger.error(`[Apollo Enrichment] Error for ${domain}:`, resp.status);
+      return null;
+    }
+
+    const data = await resp.json();
+    return data.organization || null;
+  } catch (error) {
+    logger.error(`[Apollo Enrichment] Failed for ${domain}:`, error.message);
+    return null;
+  }
+}
+
 export default async function handler(req, res) {
   // Handle CORS
   if (cors(req, res)) return;
@@ -26,6 +58,7 @@ export default async function handler(req, res) {
       person_locations,
       organization_ids,
       q_organization_domains,
+      q_organization_name,
       organization_num_employees_ranges,
       revenue_range
     } = req.body || {};
@@ -41,6 +74,7 @@ export default async function handler(req, res) {
       person_locations,
       organization_ids,
       q_organization_domains,
+      q_organization_name,
       organization_num_employees_ranges,
       revenue_range,
       // Default to finding emails if possible, but don't filter strictly by it unless requested
@@ -108,6 +142,8 @@ export default async function handler(req, res) {
         location = person.country || '';
       }
 
+      const domain = person.organization?.primary_domain || person.organization?.domain;
+
       return {
         id: person.id,
         name: person.name || `${person.first_name} ${person.last_name}`,
@@ -116,7 +152,7 @@ export default async function handler(req, res) {
         title: person.title || person.headline,
         company: person.organization?.name,
         companyId: person.organization_id,
-        domain: person.organization?.primary_domain || person.organization?.domain,
+        domain: domain,
         location: location,
         linkedin: person.linkedin_url,
         email: person.email, // Note: Often masked/null until enriched
@@ -127,14 +163,44 @@ export default async function handler(req, res) {
         organization: {
           id: person.organization?.id,
           name: person.organization?.name,
-          domain: person.organization?.primary_domain || person.organization?.domain,
+          domain: domain,
           logoUrl: person.organization?.logo_url,
-          industry: person.organization?.industry || (person.organization?.industries || [])[0],
-          employees: person.organization?.estimated_num_employees || person.organization?.employee_count,
-          location: person.organization ? formatLocation(person.organization.city, person.organization.state, person.organization.country) : null
+          industry: person.organization?.industry || (person.organization?.industries || [])[0] || person.organization?.industry_category || (person.organization?.sic_codes?.[0] ? `SIC: ${person.organization.sic_codes[0]}` : null),
+          employees: person.organization?.estimated_num_employees || person.organization?.employee_count || null, // STRICT: No growth metrics
+          location: (person.organization && (person.organization.city || person.organization.state || person.organization.country))
+            ? formatLocation(person.organization.city, person.organization.state, person.organization.country)
+            : location // Fallback to person's location if org location is missing
         }
       };
     });
+
+    // --- ENRICHMENT STEP (Optional/Limited for People) ---
+    // Identify unique domains among people to enrich organization data
+    const domainsToEnrich = [...new Set(people
+      .filter(p => p.domain && (!p.organization.industry || !p.organization.employees))
+      .map(p => p.domain)
+    )].slice(0, 5); // Limit to 5 unique domains to save credits
+
+    if (domainsToEnrich.length > 0) {
+      logger.log(`[Apollo Search People] Enriching ${domainsToEnrich.length} unique organizations...`);
+      
+      const enrichmentMap = {};
+      await Promise.all(domainsToEnrich.map(async (domain) => {
+        const enriched = await enrichOrganization(domain, APOLLO_API_KEY);
+        if (enriched) enrichmentMap[domain] = enriched;
+      }));
+
+      // Apply enriched data back to all people from those organizations
+      people.forEach(person => {
+        if (person.domain && enrichmentMap[person.domain]) {
+          const enriched = enrichmentMap[person.domain];
+          if (enriched.industry) person.organization.industry = enriched.industry;
+          person.organization.employees = enriched.estimated_num_employees || enriched.employee_count || person.organization.employees;
+          if (enriched.logo_url && !person.organization.logoUrl) person.organization.logoUrl = enriched.logo_url;
+        }
+      });
+    }
+    // --- END ENRICHMENT STEP ---
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
