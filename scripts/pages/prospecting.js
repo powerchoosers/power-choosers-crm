@@ -255,6 +255,13 @@ const ProspectingPage = (function() {
             return;
         }
 
+        const formatEmployees = (val) => {
+            if (!val) return '-';
+            const num = parseInt(val);
+            if (isNaN(num)) return '-'; // STRICT: No growth metrics or non-numeric strings
+            return num.toLocaleString() + ' employees';
+        };
+
         elements.tableBody.innerHTML = orgs.map(org => {
             // Use global favicon helper for consistent icons
             const domain = org.domain || (org.website ? (new URL(org.website).hostname).replace(/^www\./, '') : '');
@@ -278,7 +285,7 @@ const ProspectingPage = (function() {
                 </td>
                 <td>${org.industry || '-'}</td>
                 <td>${org.location || '-'}</td>
-                <td>${org.employees ? (isNaN(parseInt(org.employees)) ? org.employees : parseInt(org.employees).toLocaleString() + ' employees') : '-'}</td>
+                <td>${formatEmployees(org.employees)}</td>
                 <td>${org.website ? `<a href="${org.website}" target="_blank" class="text-link">${org.domain || 'Website'}</a>` : '-'}</td>
                 <td>
                     <div class="qa-actions">
