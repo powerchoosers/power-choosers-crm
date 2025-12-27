@@ -1248,7 +1248,14 @@ var console = {
     const domainMatch = contains(domainQ);
     
 
-    state.filtered = state.data.filter((a) => {
+    // Use full cache for searching if available and we have a query
+    // This ensures we find records that aren't in the initial 100 loaded items
+    let sourceData = state.data;
+    if (anyFiltersActive && state.allAccountsCache && state.allAccountsCache.length > state.data.length) {
+      sourceData = state.allAccountsCache;
+    }
+
+    state.filtered = sourceData.filter((a) => {
       const acctName = a.accountName || a.name || a.companyName || '';
       const hasPhone = !!(a.companyPhone || a.phone || a.primaryPhone || a.mainPhone);
       const domain = a.domain || a.website || a.site || '';

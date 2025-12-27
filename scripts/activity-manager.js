@@ -46,6 +46,31 @@ class ActivityManager {
   }
 
   /**
+   * Clear activity caches
+   * @param {string} entityType - Optional entity type to clear (e.g., 'global', 'contact', 'account')
+   * @param {string} entityId - Optional entity ID to clear
+   */
+  clearCache(entityType = null, entityId = null) {
+    if (entityType) {
+      this.invalidateActivityCache(entityType, entityId);
+    } else {
+      // Clear everything
+      this.processedActivitiesCache.clear();
+      this.processedEmailsCache.clear();
+      this.pageCache.clear();
+      this.prerenderedPages.clear();
+      this.currentActivities = null;
+      
+      // Also clear sessionStorage persisted caches
+      sessionStorage.removeItem('activityManager_processedActivities');
+      sessionStorage.removeItem('activityManager_processedEmails');
+      sessionStorage.removeItem('activityManager_pageCache');
+      
+      console.log('[ActivityManager] Cleared all activity caches');
+    }
+  }
+
+  /**
    * Load persisted cache from sessionStorage
    */
   loadPersistedCache(key) {

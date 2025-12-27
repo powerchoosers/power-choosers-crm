@@ -27,7 +27,10 @@
     searchModal: null,
     searchResults: null,
     searchLoading: null,
-    searchEmpty: null
+    searchEmpty: null,
+    searchSkeleton: null,
+    prospectPeopleBtn: null,
+    prospectAccountsBtn: null
   };
   let stylesInjected = false;
 
@@ -38,6 +41,10 @@
     elements.searchResults = document.getElementById('search-results');
     elements.searchLoading = document.getElementById('search-loading');
     elements.searchEmpty = document.getElementById('search-empty');
+    elements.searchSkeleton = document.getElementById('search-skeleton');
+    elements.prospectPeopleBtn = document.getElementById('prospect-people-btn');
+    elements.prospectAccountsBtn = document.getElementById('prospect-accounts-btn');
+    
     // Make sure modal is hidden on load
     if (elements.searchModal) {
       elements.searchModal.hidden = true;
@@ -45,6 +52,7 @@
     }
     if (elements.searchResults) elements.searchResults.innerHTML = '';
     if (elements.searchLoading) elements.searchLoading.hidden = true;
+    if (elements.searchSkeleton) elements.searchSkeleton.hidden = true;
     if (elements.searchEmpty) elements.searchEmpty.hidden = true;
 
     if (!elements.searchInput || !elements.searchModal) {
@@ -62,26 +70,43 @@
     const style = document.createElement('style');
     style.id = 'global-search-enhanced-styles';
     style.textContent = `
-      .search-results-container .search-category {
-        border-top: 1px solid var(--grey-700, #3a3f45);
-        padding-top: 8px;
-        margin-top: 8px;
+      .search-results-container {
+        padding: 12px 12px 24px 12px;
+        box-sizing: border-box;
       }
-      .search-results-container .search-category:first-of-type {
-        border-top: none;
-        padding-top: 0;
-        margin-top: 0;
+      .search-results-container.showing-empty {
+        padding-bottom: 4px; /* 4px + 8px from prospect-actions = 12px, matches top padding */
+      }
+      .search-results-container .search-category {
+        background: var(--bg-item, #2f343a);
+        border: 1px solid var(--grey-700, #3a3f45);
+        border-radius: var(--border-radius, 8px);
+        margin-bottom: 16px;
+        margin-left: 0;
+        margin-right: 0;
+        overflow: hidden;
+      }
+      .search-results-container .search-category:last-child {
+        margin-bottom: 0;
       }
       .search-results-container .search-category .category-header {
-        padding: 4px 0 6px;
+        padding: 10px 12px;
+        background: rgba(0, 0, 0, 0.15);
         border-bottom: 1px solid var(--grey-700, #3a3f45);
+        margin: 0;
       }
       .search-results-container .search-result-item {
-        border-bottom: 1px solid var(--grey-700, #3a3f45);
-        padding: 10px 8px;
+        padding: 10px 12px;
+        margin: 0;
+        background: transparent;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.25);
+        transition: background 0.15s ease;
       }
       .search-results-container .search-result-item:last-child {
         border-bottom: none;
+      }
+      .search-results-container .search-result-item:hover {
+        background: rgba(255, 255, 255, 0.03);
       }
       .search-result-item .result-main {
         display: flex;
@@ -140,6 +165,63 @@
       .search-result-item .result-actions {
         gap: 6px;
       }
+
+      .search-results-container .search-all-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--bg-item, #2f343a);
+        border: 1px solid var(--grey-700, #3a3f45);
+        border-radius: var(--border-radius, 8px);
+        padding: 6px 10px;
+        color: var(--text-secondary, rgba(255, 255, 255, 0.8));
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+      }
+
+      .search-results-container .search-all-btn:hover {
+        background: var(--bg-hover, #3a3f45);
+        border-color: var(--border-medium, #4a4f55);
+        color: var(--text-primary, #fff);
+        transform: translateY(-1px);
+      }
+
+      .search-results-container .search-all-btn svg {
+        width: 14px;
+        height: 14px;
+        display: block;
+      }
+
+      .search-results-container .result-action-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: var(--border-radius, 8px);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--grey-700, #3a3f45);
+        color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .search-results-container .result-action-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.3);
+        color: #ffffff;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      }
+
+      .search-results-container .result-action-btn svg {
+        width: 16px;
+        height: 16px;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -162,10 +244,138 @@
         hideSearchModal();
       }
     });
+
+    // Handle prospect button clicks
+    if (elements.prospectPeopleBtn) {
+      elements.prospectPeopleBtn.addEventListener('click', () => {
+        const query = elements.searchInput.value.trim();
+        if (!query) {
+            window.location.hash = '#prospecting';
+            hideSearchModal();
+            return;
+        }
+        performProspectSearch('people', query);
+      });
+    }
+
+    if (elements.prospectAccountsBtn) {
+      elements.prospectAccountsBtn.addEventListener('click', () => {
+        const query = elements.searchInput.value.trim();
+        if (!query) {
+            window.location.hash = '#prospecting';
+            hideSearchModal();
+            return;
+        }
+        performProspectSearch('accounts', query);
+      });
+    }
+  }
+
+  async function performProspectSearch(type, query) {
+    showLoadingState();
+    try {
+      let results = {};
+      if (type === 'people') {
+        const people = await searchApolloPeople(query);
+        results = { prospectPeople: people };
+      } else {
+        const orgs = await searchApolloOrganizations(query);
+        results = { prospectAccounts: orgs };
+      }
+      showResults(results);
+    } catch (error) {
+      console.error('[Global Search] Prospect search error:', error);
+      showEmptyState();
+    }
+  }
+
+  async function searchApolloPeople(query) {
+    try {
+      const resp = await fetch('/api/apollo/search/people', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q_keywords: query, per_page: 5 })
+      });
+      if (!resp.ok) return [];
+      const data = await resp.json();
+      // The backend returns a 'people' array
+      return (data.people || []).map(p => {
+        const subtitleParts = [];
+        if (p.title) subtitleParts.push(p.title);
+        if (p.company) subtitleParts.push(p.company);
+        if (p.location) {
+          // If location is "City, State, Country", try to just take "City, State"
+          const locParts = p.location.split(', ');
+          if (locParts.length >= 2) {
+            subtitleParts.push(`${locParts[0]}, ${locParts[1]}`);
+          } else {
+            subtitleParts.push(p.location);
+          }
+        }
+        
+        return {
+          id: p.id,
+          type: 'prospectPeople',
+          title: p.name,
+          subtitle: subtitleParts.join(' • '),
+          data: p
+        };
+      });
+    } catch (error) {
+      console.error('Apollo people search error:', error);
+      return [];
+    }
+  }
+
+  async function searchApolloOrganizations(query) {
+    try {
+      const resp = await fetch('/api/apollo/search/organizations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          q_organization_name: query, // Use the correct parameter for org search
+          per_page: 5 
+        })
+      });
+      if (!resp.ok) return [];
+      const data = await resp.json();
+      // The backend returns an 'organizations' array
+      return (data.organizations || []).map(o => {
+        const subtitleParts = [];
+        if (o.industry) subtitleParts.push(o.industry);
+        if (o.location) {
+          // If location is "City, State, Country", try to just take "City, State"
+          const locParts = o.location.split(', ');
+          if (locParts.length >= 2) {
+            subtitleParts.push(`${locParts[0]}, ${locParts[1]}`);
+          } else {
+            subtitleParts.push(o.location);
+          }
+        } else if (o.domain) {
+          // Fallback to domain only if location is missing
+          subtitleParts.push(o.domain);
+        }
+        
+        return {
+          id: o.id,
+          type: 'prospectAccounts',
+          title: o.name,
+          subtitle: subtitleParts.join(' • '),
+          data: o
+        };
+      });
+    } catch (error) {
+      console.error('Apollo org search error:', error);
+      return [];
+    }
   }
 
   function showSearchModal() {
     elements.searchModal.hidden = false;
+    // Force reflow to enable transition
+    elements.searchModal.offsetHeight;
+    elements.searchModal.classList.add('open');
+    
     const query = elements.searchInput.value.trim();
     if (query) {
       // Loading state will be toggled by input handler
@@ -179,7 +389,18 @@
   }
 
   function hideSearchModal() {
-    elements.searchModal.hidden = true;
+    elements.searchModal.classList.remove('open');
+    
+    // Wait for transition to finish before hiding
+    setTimeout(() => {
+      if (!elements.searchModal.classList.contains('open')) {
+        elements.searchModal.hidden = true;
+      }
+    }, 200);
+
+    const container = document.querySelector('.search-results-container');
+    if (container) container.classList.remove('expanded');
+
     if (pendingResultsTimeout) {
       clearTimeout(pendingResultsTimeout);
       pendingResultsTimeout = null;
@@ -231,33 +452,46 @@
   }
 
   function showLoadingState() {
-    if (elements.searchLoading) elements.searchLoading.hidden = false;
+    if (elements.searchLoading) elements.searchLoading.hidden = true;
+    if (elements.searchSkeleton) elements.searchSkeleton.hidden = false;
     elements.searchResults.innerHTML = '';
     if (elements.searchEmpty) elements.searchEmpty.hidden = true;
     if (elements.searchModal) elements.searchModal.classList.add('is-loading');
+    
+    // Expand container
+    const container = document.querySelector('.search-results-container');
+    if (container) container.classList.add('expanded');
+
     loadingStartAt = Date.now();
   }
 
   // Hide all states helper
   function hideAllSearchStates() {
-    elements.searchLoading.hidden = true;
+    if (elements.searchLoading) elements.searchLoading.hidden = true;
+    if (elements.searchSkeleton) elements.searchSkeleton.hidden = true;
     elements.searchEmpty.hidden = true;
   }
 
   function showEmptyState() {
     if (elements.searchLoading) elements.searchLoading.hidden = true;
+    if (elements.searchSkeleton) elements.searchSkeleton.hidden = true;
     elements.searchResults.innerHTML = '';
-    if (elements.searchEmpty) elements.searchEmpty.hidden = false;
+    
+    // Hide empty message - the prospecting buttons are enough
+    if (elements.searchEmpty) elements.searchEmpty.hidden = true;
     if (elements.searchModal) elements.searchModal.classList.remove('is-loading');
     
-    // Add class to center the empty state
     const container = document.querySelector('.search-results-container');
-    if (container) container.classList.add('showing-empty');
+    if (container) {
+        container.classList.add('showing-empty');
+        container.classList.add('expanded');
+    }
   }
 
   function showResults(results) {
     const applyResults = () => {
       if (elements.searchLoading) elements.searchLoading.hidden = true;
+      if (elements.searchSkeleton) elements.searchSkeleton.hidden = true;
       if (elements.searchEmpty) elements.searchEmpty.hidden = true;
       let totalResults = 0;
       if (results && typeof results === 'object') {
@@ -284,7 +518,10 @@
       
       // Remove class to restore normal scrolling
       const container = document.querySelector('.search-results-container');
-      if (container) container.classList.remove('showing-empty');
+      if (container) {
+          container.classList.remove('showing-empty');
+          container.classList.add('expanded');
+      }
     };
 
     const elapsed = Date.now() - loadingStartAt;
@@ -319,6 +556,9 @@
     } finally {
       if (elements.searchLoading) {
         elements.searchLoading.hidden = true;
+      }
+      if (elements.searchSkeleton) {
+        elements.searchSkeleton.hidden = true;
       }
     }
   }
@@ -412,11 +652,17 @@
       }
       
       if (match) {
+        const subtitleParts = [person.title || person.jobTitle, person.company || person.companyName].filter(Boolean);
+        const locParts = [person.city, person.state].filter(Boolean);
+        if (locParts.length > 0) {
+          subtitleParts.push(locParts.join(', '));
+        }
+
         results.push({
           id: person.id,
           type: 'person',
           title: person.fullName || person.name || `${person.firstName || ''} ${person.lastName || ''}`.trim() || 'Unnamed Contact',
-          subtitle: [person.title || person.jobTitle, person.company || person.companyName].filter(Boolean).join(' • '),
+          subtitle: subtitleParts.join(' • '),
           data: person
         });
       }
@@ -600,13 +846,24 @@
           }
         }
         if (match) {
+          const subtitleParts = [person.title || person.jobTitle, person.company || person.companyName].filter(Boolean);
+          
+          // Add location (City, State)
+          const locParts = [person.city, person.state].filter(Boolean);
+          if (locParts.length > 0) {
+            subtitleParts.push(locParts.join(', '));
+          }
+
+          let subtitle = subtitleParts.join(' • ');
+          if (isPhoneSearch && matchedPhone) {
+            subtitle += `${subtitle ? ' • ' : '' }Phone: ${matchedPhone}`;
+          }
+
           results.push({
             id: person.id,
             type: 'person',
             title: person.fullName || person.name || `${person.firstName || ''} ${person.lastName || ''}`.trim() || 'Unnamed Contact',
-            subtitle: (isPhoneSearch && matchedPhone)
-              ? `${[person.title || person.jobTitle, person.company || person.companyName].filter(Boolean).join(' • ')}${([person.title || person.jobTitle, person.company || person.companyName].filter(Boolean).length ? ' • ' : '')}Phone: ${matchedPhone}`
-              : [person.title || person.jobTitle, person.company || person.companyName].filter(Boolean).join(' • '),
+            subtitle: subtitle,
             data: person
           });
           if (results.length >= 5) break; // Early exit once we have enough results
@@ -838,7 +1095,9 @@
       people: 'People',
       accounts: 'Accounts', 
       sequences: 'Sequences',
-      deals: 'Deals'
+      deals: 'Deals',
+      prospectPeople: 'Prospect People',
+      prospectAccounts: 'Prospect Accounts'
     };
 
     Object.keys(results).forEach(category => {
@@ -848,9 +1107,10 @@
       html += `
         <div class="search-category">
           <div class="category-header" style="display:flex; align-items:center; justify-content:space-between;">
-            <div class="category-title">${categoryNames[category]} (${items.length})</div>
-            <button class="search-all-btn btn-text" data-category="${category}" aria-label="Search all ${categoryNames[category]}">
-              Search all &rarr;
+            <div class="category-title">${categoryNames[category] || category} (${items.length})</div>
+            <button class="search-all-btn btn-text" data-category="${category}" aria-label="Search all ${categoryNames[category] || category}">
+              <span>SEARCH ALL</span>
+              ${getArrowRightIcon()}
             </button>
           </div>
           <div class="category-results">
@@ -866,18 +1126,23 @@
   function renderResultItem(item) {
     const actions = getActionsForType(item.type);
     const { iconHTML, initialsHTML } = buildVisualsForItem(item);
+    const isPerson = item.type === 'person' || item.type === 'prospectPeople';
     
     return `
       <div class="search-result-item clickable" data-id="${item.id}" data-type="${item.type}" title="Click to view ${item.title}">
         <div class="result-main">
           <div class="result-main-left">
-            <div class="result-favicon" aria-hidden="true">${iconHTML}</div>
+            ${
+              isPerson
+                ? `<div class="result-avatar" aria-hidden="true">${initialsHTML || '?'}</div>`
+                : `<div class="result-favicon" aria-hidden="true">${iconHTML}</div>`
+            }
             <div class="result-text">
               <div class="result-title">${escapeHtml(item.title)}</div>
               <div class="result-subtitle">${escapeHtml(item.subtitle)}</div>
             </div>
           </div>
-          ${initialsHTML ? `<div class="result-avatar" aria-hidden="true">${initialsHTML}</div>` : ''}
+          ${!isPerson && initialsHTML ? `<div class="result-avatar" aria-hidden="true">${initialsHTML}</div>` : ''}
         </div>
         <div class="result-actions" onclick="event.stopPropagation()">
           ${actions.filter(action => action.key !== 'view').map(action => renderActionButton(action, item)).join('')}
@@ -903,6 +1168,9 @@
       deal: [
         { key: 'edit', label: 'Edit', icon: getEditIcon() },
         { key: 'move-stage', label: 'Move Stage', icon: getMoveIcon() }
+      ],
+      prospectAccounts: [
+        { key: 'save-account', label: 'Save Account', icon: getSaveIcon() }
       ]
     };
 
@@ -1043,18 +1311,79 @@
           }, 100);
         }
         break;
+      case 'save-account':
+        if (type === 'prospectAccounts') {
+          const item = findItemById(id, type);
+          if (item && item.data) {
+            if (window.Widgets && typeof window.Widgets.addAccountToCRM === 'function') {
+              // Map prospect account data to what addAccountToCRM expects
+              // Parse location into city/state if needed
+              let city = item.data.city || '';
+              let state = item.data.state || '';
+              if (!city && !state && item.data.location) {
+                const parts = item.data.location.split(',').map(s => s.trim());
+                if (parts.length > 0) city = parts[0];
+                if (parts.length > 1) state = parts[1];
+              }
+
+              const accountData = {
+                companyName: item.data.name || item.title,
+                companyDomain: item.data.domain || '',
+                companyPhone: item.data.phone || item.data.companyPhone || '',
+                city: city,
+                state: state,
+                ...item.data
+              };
+              window.Widgets.addAccountToCRM(accountData).then(newId => {
+                if (newId) {
+                  // Navigate to account detail
+                  if (window.crm && typeof window.crm.navigateToPage === 'function') {
+                    window.crm.navigateToPage('account-details');
+                    // Wait for module to load then show account
+                    const check = () => {
+                      if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+                        window.AccountDetail.show(newId);
+                      } else {
+                        setTimeout(check, 50);
+                      }
+                    };
+                    check();
+                  } else {
+                    window.location.hash = `#account-detail?id=${newId}`;
+                  }
+                }
+              });
+            } else {
+              window.crm?.showToast && window.crm.showToast('CRM integration not available');
+            }
+          }
+        }
+        break;
       default:
         navigateToItem(type, id);
     }
   }
 
   function searchAllCategory(category) {
-    const pageMap = { people: 'people', accounts: 'accounts', deals: 'deals', sequences: 'sequences' };
+    const pageMap = { 
+      people: 'people', 
+      accounts: 'accounts', 
+      deals: 'deals', 
+      sequences: 'sequences',
+      prospectPeople: 'prospecting',
+      prospectAccounts: 'prospecting'
+    };
     const page = pageMap[category];
     if (!page) return;
     const query = (elements.searchInput && elements.searchInput.value ? elements.searchInput.value.trim() : '') || lastQuery || '';
-    if (query) setSearchPrefill(page, query);
-    navigateToPage(page);
+    
+    if (page === 'prospecting') {
+      if (query) setSearchPrefill('prospecting', query);
+      window.location.hash = '#prospecting';
+    } else {
+      if (query) setSearchPrefill(page, query);
+      navigateToPage(page);
+    }
     hideSearchModal();
   }
 
@@ -1103,7 +1432,7 @@
       return `<div style="width:${size}px;height:${size}px;border-radius:6px;background:var(--bg-item,#2f343a);"></div>`;
     };
 
-    if (type === 'person') {
+    if (type === 'person' || type === 'prospectPeople') {
       const fullName = safe(item.title);
       const initials = (() => {
         const parts = fullName.split(/\s+/).filter(Boolean);
@@ -1121,8 +1450,8 @@
         getDomainFrom(data.email || '');
       const logoUrl = data.logoUrl || data.logoURL || '';
       iconHTML = buildFavicon(logoUrl, domain, 32);
-    } else if (type === 'account') {
-      const domain = data.domain || data.website || data.site || '';
+    } else if (type === 'account' || type === 'prospectAccounts') {
+      const domain = data.domain || data.website || data.site || data.primary_domain || '';
       const logoUrl = data.logoUrl || data.logoURL || '';
       iconHTML = buildFavicon(logoUrl, domain, 32);
     } else if (type === 'deal') {
@@ -1139,10 +1468,13 @@
   }
 
   function navigateToItem(type, id) {
+    console.log('[Global Search] navigateToItem:', { type, id });
     switch (type) {
       case 'person':
+        console.log('[Global Search] Navigating to person:', id);
         // Try to show contact detail directly if available
         if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+          console.log('[Global Search] Using ContactDetail.show');
           // Navigate to people page and show detail immediately
           navigateToPage('people');
           // Use requestAnimationFrame to ensure the page has started loading
@@ -1150,16 +1482,20 @@
             window.ContactDetail.show(id);
           });
         } else {
+          console.log('[Global Search] Falling back to old behavior for person');
           // Fallback to old behavior if ContactDetail is not available
           window._globalSearchDirectNavigation = { type: 'contact', id: id };
           navigateToPage('people');
         }
         break;
       case 'account':
+        console.log('[Global Search] Navigating to account:', id);
         // For accounts, we have a dedicated detail page, so navigate directly
         if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+          console.log('[Global Search] Using AccountDetail.show');
           window.AccountDetail.show(id);
         } else {
+          console.log('[Global Search] Falling back to accounts page');
           // Fallback to accounts page
           navigateToPage('accounts');
         }
@@ -1211,6 +1547,75 @@
           if (window.crm && typeof window.crm.showToast === 'function') {
             window.crm.showToast('Deal detail view coming soon');
           }
+        }
+        break;
+      case 'prospectAccounts':
+        // For prospect accounts, import into CRM then navigate to detail page
+        {
+          const item = findItemById(id, type);
+          if (item && item.data) {
+            if (window.Widgets && typeof window.Widgets.addAccountToCRM === 'function') {
+              // Show a specific toast for the auto-import
+              window.crm?.showToast && window.crm.showToast(`Importing ${item.title} to CRM...`);
+              
+              // Parse location into city/state if needed
+              let city = item.data.city || '';
+              let state = item.data.state || '';
+              if (!city && !state && item.data.location) {
+                const parts = item.data.location.split(',').map(s => s.trim());
+                if (parts.length > 0) city = parts[0];
+                if (parts.length > 1) state = parts[1];
+              }
+
+              const accountData = {
+                companyName: item.data.name || item.title,
+                companyDomain: item.data.domain || '',
+                companyPhone: item.data.phone || item.data.companyPhone || '',
+                city: city,
+                state: state,
+                ...item.data
+              };
+              window.Widgets.addAccountToCRM(accountData).then(newId => {
+                if (newId) {
+                  // Navigate to account detail
+                  if (window.crm && typeof window.crm.navigateToPage === 'function') {
+                    window.crm.navigateToPage('account-details');
+                    // Wait for module to load then show account
+                    const check = () => {
+                      if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+                        window.AccountDetail.show(newId);
+                      } else {
+                        setTimeout(check, 50);
+                      }
+                    };
+                    check();
+                  } else {
+                    window.location.hash = `#account-detail?id=${newId}`;
+                  }
+                } else {
+                  // Fallback if import failed
+                  window.location.hash = '#prospecting';
+                }
+              });
+            } else {
+              // Fallback to prospecting page if widget not available
+              const query = item ? item.title : '';
+              if (query) setSearchPrefill('prospecting', query);
+              window.location.hash = '#prospecting';
+            }
+          } else {
+            // Fallback if no data found
+            window.location.hash = '#prospecting';
+          }
+        }
+        break;
+      case 'prospectPeople':
+        // For prospect people, still navigate to prospecting page
+        {
+          const item = findItemById(id, type);
+          const query = item ? item.title : '';
+          if (query) setSearchPrefill('prospecting', query);
+          window.location.hash = '#prospecting';
         }
         break;
       default:
@@ -1282,6 +1687,15 @@
     `;
   }
 
+  function getArrowRightIcon() {
+    return `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M5 12h12"></path>
+        <path d="M13 6l6 6-6 6"></path>
+      </svg>
+    `;
+  }
+
   function getCallIcon() {
     return `
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1297,6 +1711,16 @@
         <circle cx="8.5" cy="7" r="4"></circle>
         <line x1="20" y1="8" x2="20" y2="14"></line>
         <line x1="23" y1="11" x2="17" y2="11"></line>
+      </svg>
+    `;
+  }
+
+  function getSaveIcon() {
+    return `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+        <polyline points="7 3 7 8 15 8"></polyline>
       </svg>
     `;
   }

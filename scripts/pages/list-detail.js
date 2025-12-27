@@ -1279,7 +1279,7 @@
           if (addedPeople > 0 || addedAccounts > 0) {
             console.log(`[ListDetail] ✓ Merged ${addedPeople} people, ${addedAccounts} accounts from subcollection (legacy data)`);
           }
-          }
+        }
         }
       } catch (subErr) {
         console.warn('[ListDetail] Subcollection query failed (non-critical):', subErr);
