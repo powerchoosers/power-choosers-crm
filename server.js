@@ -117,6 +117,8 @@ import apolloUsageHandler from './api/apollo/usage.js';
 import apolloHealthHandler from './api/apollo/health.js';
 import apolloSearchPeopleHandler from './api/apollo/search-people.js';
 import apolloSearchOrganizationsHandler from './api/apollo/search-organizations.js';
+import apolloPhoneWebhookHandler from './api/apollo/phone-webhook.js';
+import apolloPhoneRetrieveHandler from './api/apollo/phone-retrieve.js';
 import uploadHostGoogleAvatarHandler from './api/upload/host-google-avatar.js';
 import uploadSignatureImageHandler from './api/upload/signature-image.js';
 import generateStaticPostHandler from './api/posts/generate-static.js';
@@ -557,6 +559,25 @@ function validateTwilioJson(req) {
 }
 
 // Twilio API endpoints (proxy to Vercel for production APIs)
+async function handleApiApolloPhoneWebhook(req, res) {
+  if (req.method === 'POST') {
+    try {
+      req.body = await parseRequestBody(req);
+    } catch (error) {
+      console.error('[Server] Apollo Phone Webhook - Body Parse Error:', error.message);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid request body' }));
+      return;
+    }
+  }
+  return await apolloPhoneWebhookHandler(req, res);
+}
+
+async function handleApiApolloPhoneRetrieve(req, res, parsedUrl) {
+  req.query = { ...parsedUrl.query };
+  return await apolloPhoneRetrieveHandler(req, res);
+}
+
 async function handleApiTwilioToken(req, res, parsedUrl) {
   // Call handler directly (no proxy)
   return await twilioTokenHandler(req, res);
@@ -912,7 +933,13 @@ const server = http.createServer(async (req, res) => {
     return handleApiApolloSearchPeople(req, res);
   }
   if (pathname === '/api/apollo/search/organizations') {
-    return handleApiApolloSearchOrganizations(req, res);
+    return handleApiApolloSearchOrganizations(req, res, parsedUrl);
+  }
+  if (pathname === '/api/apollo/phone-webhook') {
+    return handleApiApolloPhoneWebhook(req, res);
+  }
+  if (pathname === '/api/apollo/phone-retrieve') {
+    return handleApiApolloPhoneRetrieve(req, res, parsedUrl);
   }
   if (pathname === '/api/upload/host-google-avatar') {
     return handleApiUploadHostGoogleAvatar(req, res);
