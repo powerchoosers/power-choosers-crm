@@ -50,9 +50,15 @@ export default async function handler(req, res) {
     const searchBody = {
       page: page + 1, // Apollo uses 1-based pagination
       per_page: Math.min(size, 100), // Apollo max is 100
-      
-      // Job title filtering - prioritize decision-makers in facilities, finance, and operations
-      person_titles: [
+    };
+
+    // If searching by name, DO NOT restrict by title - we want to find ANYONE with that name
+    if (personName) {
+      searchBody.q_keywords = personName;
+      logger.log('[Apollo Contacts] Added name filter (bypassing title restrictions):', personName);
+    } else {
+      // Browsing mode: Filter by specific decision-maker titles
+      searchBody.person_titles = [
         // Facilities & Energy
         'Facilities Director',
         'Facilities Manager',
@@ -96,16 +102,10 @@ export default async function handler(req, res) {
         'IT Manager',
         'Chief Compliance Officer',
         'Compliance Manager'
-      ],
+      ];
       
       // Include similar titles (e.g., "Senior Facilities Manager", "VP Finance", etc.)
-      include_similar_titles: true
-    };
-
-    // Add name search if provided
-    if (personName) {
-      searchBody.q_keywords = personName;
-      logger.log('[Apollo Contacts] Added name filter:', personName);
+      searchBody.include_similar_titles = true;
     }
     
     // COMBINED FILTERING STRATEGY:
