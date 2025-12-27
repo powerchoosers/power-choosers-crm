@@ -87,6 +87,32 @@ const ProspectingPage = (function() {
         updateTableHeader();
         updatePagination({ page: 1, total_pages: 1, total_entries: 0 });
         initialized = true;
+
+        // Check for pre-filled search from global search
+        checkPrefill();
+    }
+
+    function checkPrefill() {
+        try {
+            const prefillStr = sessionStorage.getItem('pcSearchPrefill');
+            if (!prefillStr) return;
+            
+            const prefill = JSON.parse(prefillStr);
+            // Only use it if it's for this page and not too old (5 minutes)
+            if (prefill.page === 'prospecting' && (Date.now() - prefill.ts) < 5 * 60 * 1000) {
+                console.log('[Prospecting] Using pre-filled search:', prefill.query);
+                elements.searchInput.value = prefill.query;
+                state.searchQuery = prefill.query;
+                
+                // Clear it so it doesn't trigger again on refresh
+                sessionStorage.removeItem('pcSearchPrefill');
+                
+                // Perform search
+                handleSearch();
+            }
+        } catch (error) {
+            console.warn('[Prospecting] Error checking pre-fill:', error);
+        }
     }
 
     function toggleView(viewType) {
@@ -382,7 +408,48 @@ const ProspectingPage = (function() {
         if (!confirm(`Import ${org.name} into CRM?`)) return;
         
         console.log('[Prospecting] Saving org:', org);
-        alert(`Simulated import for ${org.name}.`);
+        
+        if (window.Widgets && typeof window.Widgets.addAccountToCRM === 'function') {
+            // Map prospecting org fields to what addAccountToCRM expects
+            // Parse location if needed
+            let city = org.city || '';
+            let state = org.state || '';
+            if (!city && !state && org.location) {
+                const parts = org.location.split(',').map(s => s.trim());
+                if (parts.length > 0) city = parts[0];
+                if (parts.length > 1) state = parts[1];
+            }
+
+            const accountData = {
+                companyName: org.name,
+                companyDomain: org.domain || (org.website ? (new URL(org.website).hostname).replace(/^www\./, '') : ''),
+                companyPhone: org.phone || org.companyPhone || '',
+                city: city,
+                state: state,
+                ...org
+            };
+            const newId = await window.Widgets.addAccountToCRM(accountData);
+            if (newId) {
+                // Navigate to account detail
+                if (window.crm && typeof window.crm.navigateToPage === 'function') {
+                    window.crm.navigateToPage('account-details');
+                    // Wait for module to load then show account
+                    const check = () => {
+                        if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+                            window.AccountDetail.show(newId);
+                        } else {
+                            setTimeout(check, 50);
+                        }
+                    };
+                    check();
+                } else {
+                    window.location.hash = `#account-detail?id=${newId}`;
+                }
+            }
+        } else {
+            console.error('Apollo Widget (addAccountToCRM) not found');
+            alert('CRM integration not available');
+        }
     }
 
     // Public API
