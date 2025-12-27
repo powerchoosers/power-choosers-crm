@@ -12296,20 +12296,23 @@ body {
     max-height: 500px;
     width: 100%;
     box-sizing: border-box;
-    padding-right: 0;
+    padding: 0; /* Removed all padding to allow edge-to-edge content */
 }
 
-/* When showing empty state, disable scrolling and center content */
+/* When showing empty state, collapse height and remove extra space */
 .search-results-container.showing-empty {
-    overflow: hidden;
+    max-height: none;
+    height: auto;
     display: flex;
-    align-items: center;
-    justify-content: center;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding-bottom: 4px; /* Combined with 8px div padding = 12px total bottom space */
 }
 
-/* When container is showing empty state, use consistent padding */
+/* When container is showing empty state, minimize the empty message space */
 .search-results-container.showing-empty .search-empty {
-    padding: 60px 20px;
+    padding: 0 20px 12px 20px;
     width: 100%;
     box-sizing: border-box;
     display: flex;
@@ -12317,6 +12320,7 @@ body {
     align-items: center;
     justify-content: center;
     text-align: center;
+    min-height: 0;
 }
 
 .search-loading {
@@ -12590,13 +12594,20 @@ body {
 
 .prospect-actions {
     display: flex;
-    gap: 12px;
+    gap: 8px; /* Reduced gap */
     justify-content: space-between;
     width: 100%;
-    /* Add padding to separate from results/skeleton */
-    padding-bottom: 12px;
+    box-sizing: border-box;
+    padding: 0 8px 12px 8px; /* 0 top, 8px sides, 12px bottom */
     border-bottom: 1px solid var(--border-light);
-    margin-bottom: 16px;
+    margin-bottom: 8px;
+}
+
+/* When showing empty state, remove the line and collapse spacing */
+.search-results-container.showing-empty .prospect-actions {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 8px;
 }
 
 .prospect-btn {
@@ -13763,6 +13774,60 @@ input[type="number"]::-webkit-inner-spin-button {
     border-bottom: 1px solid var(--border-light);
 }
 
+.lusha-results-title-group {
+    display: flex;
+    align-items: baseline;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-xs);
+}
+
+.lusha-name-search-container {
+    position: relative;
+    margin-bottom: var(--spacing-sm);
+}
+
+.lusha-name-search-input {
+    width: 100%;
+    height: 38px;
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 0 36px 0 12px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.lusha-name-search-input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.6;
+}
+
+.lusha-name-search-input:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.lusha-name-search-input:focus {
+    outline: none;
+    background: rgba(255, 255, 255, 0.15);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.15);
+}
+
+.lusha-search-icon {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    pointer-events: none;
+    opacity: 0.6;
+}
+
 .lusha-results-header h4 {
     margin: 0;
     color: var(--text-primary);
@@ -13779,6 +13844,7 @@ input[type="number"]::-webkit-inner-spin-button {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-md);
+    padding-top: var(--spacing-sm);
 }
 
 .lusha-contact-item {
@@ -13800,6 +13866,18 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .lusha-contact-header {
     margin-bottom: var(--spacing-sm);
+}
+
+.lusha-contact-actions-header {
+    position: absolute;
+    top: var(--spacing-md);
+    right: var(--spacing-md);
+    display: inline-flex;
+    align-items: center;
+}
+
+.lusha-contact-info {
+    padding-right: 28px;
 }
 
 .lusha-contact-name {
