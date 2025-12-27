@@ -124,32 +124,4 @@ export async function getPhoneData(personId) {
   
   return null;
 }
-  if (Date.now() > data.expiresAt) {
-    phoneStore.delete(personId);
-    return null;
-  }
-
-  return data;
-}
-
-// Export function to check all stored phone data (for debugging)
-export function getAllPhoneData() {
-  const now = Date.now();
-  const active = [];
-  
-  phoneStore.forEach((data, personId) => {
-    if (now <= data.expiresAt) {
-      active.push(data);
-    } else {
-      phoneStore.delete(personId);
-    }
-  });
-  
-  return active;
-}
-
-
-
-
-
 
