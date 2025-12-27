@@ -48,7 +48,7 @@ export default async function handler(req, res) {
     
     for (let i = 0; i < contactIds.length; i++) {
       const contactId = contactIds[i];
-      const cachedContact = contacts[i]; // May have email, apolloId, name, etc.
+      const cachedContact = contacts[i] || {}; // Fallback to empty object
       
       try {
         // 🎯 SMART ENRICHMENT STRATEGY (Priority Order):
@@ -58,57 +58,75 @@ export default async function handler(req, res) {
         // 4. Fallback to Apollo ID from contactIds array
         
         const matchBody = {
-          reveal_personal_emails: revealEmails !== false,
-          reveal_phone_number: revealPhones === true  // Enable phone reveals with webhook
+          reveal_personal_emails: revealEmails !== false
         };
         
         // If phone reveals are requested, provide webhook URL
         if (revealPhones === true) {
           // Construct webhook URL from request host
-          const protocol = req.headers['x-forwarded-proto'] || 'https';
-          const host = req.headers['host'] || req.headers['x-forwarded-host'];
-          const webhookUrl = `${protocol}://${host}/api/apollo/phone-webhook`;
-          
-          matchBody.webhook_url = webhookUrl;
-          logger.log('[Apollo Enrich] 📞 Phone reveals enabled with webhook:', webhookUrl);
+          // Use PUBLIC_BASE_URL env var if available, otherwise construct from headers
+          let baseUrl = process.env.PUBLIC_BASE_URL;
+          if (!baseUrl) {
+             const protocol = req.headers['x-forwarded-proto'] || 'https';
+             const host = req.headers['host'] || req.headers['x-forwarded-host'];
+             baseUrl = `${protocol}://${host}`;
+          }
+          const webhookUrl = `${baseUrl}/api/apollo/phone-webhook`;
+          const webhookUrlForApollo = encodeURIComponent(webhookUrl);
+          logger.log('[Apollo Enrich] 📞 Phone reveals enabled with webhook (query):', webhookUrl);
+          matchBody.__webhook_url_for_logging_only = webhookUrl; 
         }
         
         // Strategy 1: Use cached email (BEST - most reliable match)
-        if (cachedContact?.email) {
-          matchBody.email = cachedContact.email;
-          logger.log('[Apollo Enrich] Using email strategy for:', cachedContact.email);
+        const emailToUse = cachedContact.email || (i === 0 ? req.body.email : null);
+        if (emailToUse) {
+          matchBody.email = emailToUse;
+          logger.log('[Apollo Enrich] Using email strategy for:', emailToUse);
         }
         // Strategy 2: Use cached Apollo person ID (GOOD - from previous widget session)
-        else if (cachedContact?.apolloId || cachedContact?.personId || cachedContact?.id) {
-          matchBody.id = cachedContact.apolloId || cachedContact.personId || cachedContact.id;
+        else if (cachedContact.apolloId || cachedContact.personId || cachedContact.id || (!cachedContact.id && contactId && contactId.length > 15)) {
+          // If contactId looks like an Apollo ID (long string), use it
+          matchBody.id = cachedContact.apolloId || cachedContact.personId || cachedContact.id || contactId;
           logger.log('[Apollo Enrich] Using Apollo ID strategy for:', matchBody.id);
         }
-        // Strategy 3: Use name + domain (ACCEPTABLE - still works)
+        // Strategy 3: Use name + domain/company (ACCEPTABLE - still works)
         // Apollo supports either first_name+last_name OR single name parameter
-        else if (company?.domain) {
+        // We can use domain OR organization_name
+        else if (company?.domain || company?.name) {
+          const firstName = cachedContact.firstName || (i === 0 ? req.body.firstName : null);
+          const lastName = cachedContact.lastName || (i === 0 ? req.body.lastName : null);
+          const fullName = cachedContact.fullName || cachedContact.name || (i === 0 ? req.body.name : null);
+
+          // Set company context (prefer domain, fallback to name)
+          if (company.domain) matchBody.domain = company.domain;
+          if (company.name) matchBody.organization_name = company.name;
+
           // Try first_name + last_name first (more specific)
-          if (cachedContact?.firstName && cachedContact?.lastName) {
-            matchBody.first_name = cachedContact.firstName;
-            matchBody.last_name = cachedContact.lastName;
-            matchBody.domain = company.domain;
-            logger.log('[Apollo Enrich] Using first_name+last_name+domain strategy for:', matchBody.first_name, matchBody.last_name);
-          }
-          // Fallback to single name parameter if fullName is available
-          else if (cachedContact?.fullName || cachedContact?.name) {
-            matchBody.name = cachedContact.fullName || cachedContact.name;
-            matchBody.domain = company.domain;
-            logger.log('[Apollo Enrich] Using name+domain strategy for:', matchBody.name);
+          if (firstName && lastName) {
+            matchBody.first_name = firstName;
+            matchBody.last_name = lastName;
+            logger.log('[Apollo Enrich] Using first_name+last_name + company strategy');
+          } else if (fullName) {
+            // Fallback to name parameter
+            matchBody.name = fullName;
+            logger.log('[Apollo Enrich] Using name + company strategy');
+          } else {
+             logger.log('[Apollo Enrich] ⚠️ Missing name for company strategy. Contact:', cachedContact);
           }
         }
         // Strategy 4: Fallback to contactId as Apollo person ID
         else {
           matchBody.id = contactId;
-          logger.log('[Apollo Enrich] Using contactId as Apollo ID:', contactId);
+          logger.log('[Apollo Enrich] Using contactId as Apollo ID (fallback):', contactId);
         }
         
         logger.log('[Apollo Enrich] Match request:', JSON.stringify(matchBody, null, 2));
 
-        const url = `${APOLLO_BASE_URL}/people/match`;
+        let url = `${APOLLO_BASE_URL}/people/match`;
+        if (revealPhones === true) {
+          const qs = `webhook_url=${encodeURIComponent(matchBody.__webhook_url_for_logging_only)}&reveal_phone_number=true`;
+          url = `${url}?${qs}`;
+        }
         const resp = await fetchWithRetry(url, {
           method: 'POST',
           headers: {
@@ -174,14 +192,16 @@ function mapApolloContactToLushaFormat(apolloPerson) {
       type: p.type || 'work'
     }));
 
-  // Extract emails
+  // Extract emails (filter out placeholders)
   const emails = [];
-  if (apolloPerson.email) {
+  if (apolloPerson.email && !apolloPerson.email.includes('email_not_unlocked')) {
     emails.push({
       address: apolloPerson.email,
       type: 'work',
       status: apolloPerson.email_status
     });
+  } else if (apolloPerson.email) {
+    logger.log('[Apollo Enrich] 📧 Filtering out placeholder email:', apolloPerson.email);
   }
 
   // Check for specific phone types
@@ -284,5 +304,3 @@ async function saveToApolloContacts(apolloPerson, apiKey) {
     throw error;
   }
 }
-
-
