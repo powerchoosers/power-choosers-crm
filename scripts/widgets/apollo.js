@@ -1913,7 +1913,10 @@
         console.log('[Lusha Enrich] Making API call to:', `${base}/api/apollo/enrich`);
 
         // Build request body - if no requestId (cached search), send company context for fresh enrich
-        const requestBody = { contactIds: [id] };
+        const requestBody = { 
+          contactIds: [id],
+          contacts: [contact] // Pass full contact object for smart strategies
+        };
 
         if (requestId) {
           requestBody.requestId = requestId;
@@ -1924,11 +1927,22 @@
               domain: lastCompanyResult.domain,
               name: lastCompanyResult.name
             };
+          } else {
+            // Fallback to contact's company info if global context is missing
+            requestBody.company = {
+              name: contact.companyName || contact.company || '',
+              domain: contact.website || contact.companyWebsite || ''
+            };
           }
           // Include contact name/title to help backend find the right record
           if (contact.firstName && contact.lastName) {
             requestBody.name = `${contact.firstName} ${contact.lastName}`.trim();
+            requestBody.firstName = contact.firstName;
+            requestBody.lastName = contact.lastName;
+          } else if (contact.fullName || contact.name) {
+            requestBody.name = contact.fullName || contact.name;
           }
+          
           if (contact.jobTitle || contact.title) {
             requestBody.title = contact.jobTitle || contact.title;
           }
@@ -2180,24 +2194,45 @@
       // When opened from cache, always make a fresh enrich call (acts like combined reset+reveal)
       if (window.__lushaOpenedFromCache || hasExistingData || !requestId) {
         lushaLog('Making fresh enrich call for', hasExistingData ? 'enrich' : 'reveal');
+        
+        // DEBUG: Log the exact payload being prepared for cached contact enrichment
+        if (window.__lushaOpenedFromCache) {
+           console.log('[Lusha Debug] CACHED CONTACT REVEAL - Source Contact:', contact);
+           console.log('[Lusha Debug] CACHED CONTACT REVEAL - Company Context:', lastCompanyResult);
+        }
+
         try {
+          const requestBody = {
+            contactIds: [id],
+            // Pass full contact object for smart enrichment strategies
+            contacts: [contact],
+            // Include company context for direct enrich
+            company: lastCompanyResult ? {
+              domain: lastCompanyResult.domain,
+              name: lastCompanyResult.name
+            } : {
+              // Fallback to contact's company info if global context is missing
+              name: contact.companyName || contact.company || '',
+              domain: contact.website || contact.companyWebsite || ''
+            },
+            // Fallback fields for backend if contacts array isn't fully utilized
+            name: (contact.firstName && contact.lastName) ? `${contact.firstName} ${contact.lastName}` : (contact.fullName || ''),
+            firstName: contact.firstName || '',
+            lastName: contact.lastName || '',
+            title: contact.jobTitle || contact.title || '',
+            // Request only the specific datapoint to minimize billing when supported
+            revealEmails: which === 'email',
+            revealPhones: which === 'phones'
+          };
+
+          if (window.__lushaOpenedFromCache) {
+             console.log('[Lusha Debug] CACHED CONTACT REVEAL - Request Body:', requestBody);
+          }
+
           const enrichResp = await fetch(`${base}/api/apollo/enrich`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contactIds: [id],
-              // Include company context for direct enrich
-              company: lastCompanyResult ? {
-                domain: lastCompanyResult.domain,
-                name: lastCompanyResult.name
-              } : null,
-              // Pass name/title to help backend find the right record when searching
-              name: (contact.firstName && contact.lastName) ? `${contact.firstName} ${contact.lastName}` : (contact.fullName || ''),
-              title: contact.jobTitle || contact.title || '',
-              // Request only the specific datapoint to minimize billing when supported
-              revealEmails: which === 'email',
-              revealPhones: which === 'phones'
-            })
+            body: JSON.stringify(requestBody)
           });
 
           if (!enrichResp.ok) {
