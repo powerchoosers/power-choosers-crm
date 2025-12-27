@@ -65,9 +65,14 @@ export default async function handler(req, res) {
         // If phone reveals are requested, provide webhook URL
         if (revealPhones === true) {
           // Construct webhook URL from request host
-          const protocol = req.headers['x-forwarded-proto'] || 'https';
-          const host = req.headers['host'] || req.headers['x-forwarded-host'];
-          const webhookUrl = `${protocol}://${host}/api/apollo/phone-webhook`;
+          // Use PUBLIC_BASE_URL env var if available, otherwise construct from headers
+          let baseUrl = process.env.PUBLIC_BASE_URL;
+          if (!baseUrl) {
+             const protocol = req.headers['x-forwarded-proto'] || 'https';
+             const host = req.headers['host'] || req.headers['x-forwarded-host'];
+             baseUrl = `${protocol}://${host}`;
+          }
+          const webhookUrl = `${baseUrl}/api/apollo/phone-webhook`;
           
           matchBody.webhook_url = webhookUrl;
           logger.log('[Apollo Enrich] 📞 Phone reveals enabled with webhook:', webhookUrl);
