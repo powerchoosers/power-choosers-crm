@@ -74,6 +74,9 @@
         padding: 12px 12px 24px 12px;
         box-sizing: border-box;
       }
+      .search-results-container.showing-empty {
+        padding-bottom: 4px; /* 4px + 8px from prospect-actions = 12px, matches top padding */
+      }
       .search-results-container .search-category {
         background: var(--bg-item, #2f343a);
         border: 1px solid var(--grey-700, #3a3f45);
@@ -245,20 +248,125 @@
     // Handle prospect button clicks
     if (elements.prospectPeopleBtn) {
       elements.prospectPeopleBtn.addEventListener('click', () => {
-        console.log('[Global Search] Prospect People clicked');
-        // Future: wire to api/apollo/contacts.js
-        window.location.hash = '#people'; // Placeholder navigation
-        hideSearchModal();
+        const query = elements.searchInput.value.trim();
+        if (!query) {
+            window.location.hash = '#prospecting';
+            hideSearchModal();
+            return;
+        }
+        performProspectSearch('people', query);
       });
     }
 
     if (elements.prospectAccountsBtn) {
       elements.prospectAccountsBtn.addEventListener('click', () => {
-        console.log('[Global Search] Prospect Accounts clicked');
-        // Future: wire to api/apollo/company.js
-        window.location.hash = '#accounts'; // Placeholder navigation
-        hideSearchModal();
+        const query = elements.searchInput.value.trim();
+        if (!query) {
+            window.location.hash = '#prospecting';
+            hideSearchModal();
+            return;
+        }
+        performProspectSearch('accounts', query);
       });
+    }
+  }
+
+  async function performProspectSearch(type, query) {
+    showLoadingState();
+    try {
+      let results = {};
+      if (type === 'people') {
+        const people = await searchApolloPeople(query);
+        results = { prospectPeople: people };
+      } else {
+        const orgs = await searchApolloOrganizations(query);
+        results = { prospectAccounts: orgs };
+      }
+      showResults(results);
+    } catch (error) {
+      console.error('[Global Search] Prospect search error:', error);
+      showEmptyState();
+    }
+  }
+
+  async function searchApolloPeople(query) {
+    try {
+      const resp = await fetch('/api/apollo/search/people', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q_keywords: query, per_page: 5 })
+      });
+      if (!resp.ok) return [];
+      const data = await resp.json();
+      // The backend returns a 'people' array
+      return (data.people || []).map(p => {
+        const subtitleParts = [];
+        if (p.title) subtitleParts.push(p.title);
+        if (p.company) subtitleParts.push(p.company);
+        if (p.location) {
+          // If location is "City, State, Country", try to just take "City, State"
+          const locParts = p.location.split(', ');
+          if (locParts.length >= 2) {
+            subtitleParts.push(`${locParts[0]}, ${locParts[1]}`);
+          } else {
+            subtitleParts.push(p.location);
+          }
+        }
+        
+        return {
+          id: p.id,
+          type: 'prospectPeople',
+          title: p.name,
+          subtitle: subtitleParts.join(' • '),
+          data: p
+        };
+      });
+    } catch (error) {
+      console.error('Apollo people search error:', error);
+      return [];
+    }
+  }
+
+  async function searchApolloOrganizations(query) {
+    try {
+      const resp = await fetch('/api/apollo/search/organizations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          q_organization_name: query, // Use the correct parameter for org search
+          per_page: 5 
+        })
+      });
+      if (!resp.ok) return [];
+      const data = await resp.json();
+      // The backend returns an 'organizations' array
+      return (data.organizations || []).map(o => {
+        const subtitleParts = [];
+        if (o.industry) subtitleParts.push(o.industry);
+        if (o.location) {
+          // If location is "City, State, Country", try to just take "City, State"
+          const locParts = o.location.split(', ');
+          if (locParts.length >= 2) {
+            subtitleParts.push(`${locParts[0]}, ${locParts[1]}`);
+          } else {
+            subtitleParts.push(o.location);
+          }
+        } else if (o.domain) {
+          // Fallback to domain only if location is missing
+          subtitleParts.push(o.domain);
+        }
+        
+        return {
+          id: o.id,
+          type: 'prospectAccounts',
+          title: o.name,
+          subtitle: subtitleParts.join(' • '),
+          data: o
+        };
+      });
+    } catch (error) {
+      console.error('Apollo org search error:', error);
+      return [];
     }
   }
 
@@ -369,8 +477,7 @@
     if (elements.searchSkeleton) elements.searchSkeleton.hidden = true;
     elements.searchResults.innerHTML = '';
     
-    // We no longer show a separate empty container since buttons are always at top
-    // Just ensure the container class is set for consistent styling if needed
+    // Hide empty message - the prospecting buttons are enough
     if (elements.searchEmpty) elements.searchEmpty.hidden = true;
     if (elements.searchModal) elements.searchModal.classList.remove('is-loading');
     
@@ -545,11 +652,17 @@
       }
       
       if (match) {
+        const subtitleParts = [person.title || person.jobTitle, person.company || person.companyName].filter(Boolean);
+        const locParts = [person.city, person.state].filter(Boolean);
+        if (locParts.length > 0) {
+          subtitleParts.push(locParts.join(', '));
+        }
+
         results.push({
           id: person.id,
           type: 'person',
           title: person.fullName || person.name || `${person.firstName || ''} ${person.lastName || ''}`.trim() || 'Unnamed Contact',
-          subtitle: [person.title || person.jobTitle, person.company || person.companyName].filter(Boolean).join(' • '),
+          subtitle: subtitleParts.join(' • '),
           data: person
         });
       }
@@ -733,13 +846,24 @@
           }
         }
         if (match) {
+          const subtitleParts = [person.title || person.jobTitle, person.company || person.companyName].filter(Boolean);
+          
+          // Add location (City, State)
+          const locParts = [person.city, person.state].filter(Boolean);
+          if (locParts.length > 0) {
+            subtitleParts.push(locParts.join(', '));
+          }
+
+          let subtitle = subtitleParts.join(' • ');
+          if (isPhoneSearch && matchedPhone) {
+            subtitle += `${subtitle ? ' • ' : '' }Phone: ${matchedPhone}`;
+          }
+
           results.push({
             id: person.id,
             type: 'person',
             title: person.fullName || person.name || `${person.firstName || ''} ${person.lastName || ''}`.trim() || 'Unnamed Contact',
-            subtitle: (isPhoneSearch && matchedPhone)
-              ? `${[person.title || person.jobTitle, person.company || person.companyName].filter(Boolean).join(' • ')}${([person.title || person.jobTitle, person.company || person.companyName].filter(Boolean).length ? ' • ' : '')}Phone: ${matchedPhone}`
-              : [person.title || person.jobTitle, person.company || person.companyName].filter(Boolean).join(' • '),
+            subtitle: subtitle,
             data: person
           });
           if (results.length >= 5) break; // Early exit once we have enough results
@@ -971,7 +1095,9 @@
       people: 'People',
       accounts: 'Accounts', 
       sequences: 'Sequences',
-      deals: 'Deals'
+      deals: 'Deals',
+      prospectPeople: 'Prospect People',
+      prospectAccounts: 'Prospect Accounts'
     };
 
     Object.keys(results).forEach(category => {
@@ -981,8 +1107,8 @@
       html += `
         <div class="search-category">
           <div class="category-header" style="display:flex; align-items:center; justify-content:space-between;">
-            <div class="category-title">${categoryNames[category]} (${items.length})</div>
-            <button class="search-all-btn btn-text" data-category="${category}" aria-label="Search all ${categoryNames[category]}">
+            <div class="category-title">${categoryNames[category] || category} (${items.length})</div>
+            <button class="search-all-btn btn-text" data-category="${category}" aria-label="Search all ${categoryNames[category] || category}">
               <span>SEARCH ALL</span>
               ${getArrowRightIcon()}
             </button>
@@ -1000,7 +1126,7 @@
   function renderResultItem(item) {
     const actions = getActionsForType(item.type);
     const { iconHTML, initialsHTML } = buildVisualsForItem(item);
-    const isPerson = item.type === 'person';
+    const isPerson = item.type === 'person' || item.type === 'prospectPeople';
     
     return `
       <div class="search-result-item clickable" data-id="${item.id}" data-type="${item.type}" title="Click to view ${item.title}">
@@ -1042,6 +1168,9 @@
       deal: [
         { key: 'edit', label: 'Edit', icon: getEditIcon() },
         { key: 'move-stage', label: 'Move Stage', icon: getMoveIcon() }
+      ],
+      prospectAccounts: [
+        { key: 'save-account', label: 'Save Account', icon: getSaveIcon() }
       ]
     };
 
@@ -1182,18 +1311,79 @@
           }, 100);
         }
         break;
+      case 'save-account':
+        if (type === 'prospectAccounts') {
+          const item = findItemById(id, type);
+          if (item && item.data) {
+            if (window.Widgets && typeof window.Widgets.addAccountToCRM === 'function') {
+              // Map prospect account data to what addAccountToCRM expects
+              // Parse location into city/state if needed
+              let city = item.data.city || '';
+              let state = item.data.state || '';
+              if (!city && !state && item.data.location) {
+                const parts = item.data.location.split(',').map(s => s.trim());
+                if (parts.length > 0) city = parts[0];
+                if (parts.length > 1) state = parts[1];
+              }
+
+              const accountData = {
+                companyName: item.data.name || item.title,
+                companyDomain: item.data.domain || '',
+                companyPhone: item.data.phone || item.data.companyPhone || '',
+                city: city,
+                state: state,
+                ...item.data
+              };
+              window.Widgets.addAccountToCRM(accountData).then(newId => {
+                if (newId) {
+                  // Navigate to account detail
+                  if (window.crm && typeof window.crm.navigateToPage === 'function') {
+                    window.crm.navigateToPage('account-details');
+                    // Wait for module to load then show account
+                    const check = () => {
+                      if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+                        window.AccountDetail.show(newId);
+                      } else {
+                        setTimeout(check, 50);
+                      }
+                    };
+                    check();
+                  } else {
+                    window.location.hash = `#account-detail?id=${newId}`;
+                  }
+                }
+              });
+            } else {
+              window.crm?.showToast && window.crm.showToast('CRM integration not available');
+            }
+          }
+        }
+        break;
       default:
         navigateToItem(type, id);
     }
   }
 
   function searchAllCategory(category) {
-    const pageMap = { people: 'people', accounts: 'accounts', deals: 'deals', sequences: 'sequences' };
+    const pageMap = { 
+      people: 'people', 
+      accounts: 'accounts', 
+      deals: 'deals', 
+      sequences: 'sequences',
+      prospectPeople: 'prospecting',
+      prospectAccounts: 'prospecting'
+    };
     const page = pageMap[category];
     if (!page) return;
     const query = (elements.searchInput && elements.searchInput.value ? elements.searchInput.value.trim() : '') || lastQuery || '';
-    if (query) setSearchPrefill(page, query);
-    navigateToPage(page);
+    
+    if (page === 'prospecting') {
+      if (query) setSearchPrefill('prospecting', query);
+      window.location.hash = '#prospecting';
+    } else {
+      if (query) setSearchPrefill(page, query);
+      navigateToPage(page);
+    }
     hideSearchModal();
   }
 
@@ -1242,7 +1432,7 @@
       return `<div style="width:${size}px;height:${size}px;border-radius:6px;background:var(--bg-item,#2f343a);"></div>`;
     };
 
-    if (type === 'person') {
+    if (type === 'person' || type === 'prospectPeople') {
       const fullName = safe(item.title);
       const initials = (() => {
         const parts = fullName.split(/\s+/).filter(Boolean);
@@ -1260,8 +1450,8 @@
         getDomainFrom(data.email || '');
       const logoUrl = data.logoUrl || data.logoURL || '';
       iconHTML = buildFavicon(logoUrl, domain, 32);
-    } else if (type === 'account') {
-      const domain = data.domain || data.website || data.site || '';
+    } else if (type === 'account' || type === 'prospectAccounts') {
+      const domain = data.domain || data.website || data.site || data.primary_domain || '';
       const logoUrl = data.logoUrl || data.logoURL || '';
       iconHTML = buildFavicon(logoUrl, domain, 32);
     } else if (type === 'deal') {
@@ -1278,10 +1468,13 @@
   }
 
   function navigateToItem(type, id) {
+    console.log('[Global Search] navigateToItem:', { type, id });
     switch (type) {
       case 'person':
+        console.log('[Global Search] Navigating to person:', id);
         // Try to show contact detail directly if available
         if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+          console.log('[Global Search] Using ContactDetail.show');
           // Navigate to people page and show detail immediately
           navigateToPage('people');
           // Use requestAnimationFrame to ensure the page has started loading
@@ -1289,16 +1482,20 @@
             window.ContactDetail.show(id);
           });
         } else {
+          console.log('[Global Search] Falling back to old behavior for person');
           // Fallback to old behavior if ContactDetail is not available
           window._globalSearchDirectNavigation = { type: 'contact', id: id };
           navigateToPage('people');
         }
         break;
       case 'account':
+        console.log('[Global Search] Navigating to account:', id);
         // For accounts, we have a dedicated detail page, so navigate directly
         if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+          console.log('[Global Search] Using AccountDetail.show');
           window.AccountDetail.show(id);
         } else {
+          console.log('[Global Search] Falling back to accounts page');
           // Fallback to accounts page
           navigateToPage('accounts');
         }
@@ -1350,6 +1547,75 @@
           if (window.crm && typeof window.crm.showToast === 'function') {
             window.crm.showToast('Deal detail view coming soon');
           }
+        }
+        break;
+      case 'prospectAccounts':
+        // For prospect accounts, import into CRM then navigate to detail page
+        {
+          const item = findItemById(id, type);
+          if (item && item.data) {
+            if (window.Widgets && typeof window.Widgets.addAccountToCRM === 'function') {
+              // Show a specific toast for the auto-import
+              window.crm?.showToast && window.crm.showToast(`Importing ${item.title} to CRM...`);
+              
+              // Parse location into city/state if needed
+              let city = item.data.city || '';
+              let state = item.data.state || '';
+              if (!city && !state && item.data.location) {
+                const parts = item.data.location.split(',').map(s => s.trim());
+                if (parts.length > 0) city = parts[0];
+                if (parts.length > 1) state = parts[1];
+              }
+
+              const accountData = {
+                companyName: item.data.name || item.title,
+                companyDomain: item.data.domain || '',
+                companyPhone: item.data.phone || item.data.companyPhone || '',
+                city: city,
+                state: state,
+                ...item.data
+              };
+              window.Widgets.addAccountToCRM(accountData).then(newId => {
+                if (newId) {
+                  // Navigate to account detail
+                  if (window.crm && typeof window.crm.navigateToPage === 'function') {
+                    window.crm.navigateToPage('account-details');
+                    // Wait for module to load then show account
+                    const check = () => {
+                      if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+                        window.AccountDetail.show(newId);
+                      } else {
+                        setTimeout(check, 50);
+                      }
+                    };
+                    check();
+                  } else {
+                    window.location.hash = `#account-detail?id=${newId}`;
+                  }
+                } else {
+                  // Fallback if import failed
+                  window.location.hash = '#prospecting';
+                }
+              });
+            } else {
+              // Fallback to prospecting page if widget not available
+              const query = item ? item.title : '';
+              if (query) setSearchPrefill('prospecting', query);
+              window.location.hash = '#prospecting';
+            }
+          } else {
+            // Fallback if no data found
+            window.location.hash = '#prospecting';
+          }
+        }
+        break;
+      case 'prospectPeople':
+        // For prospect people, still navigate to prospecting page
+        {
+          const item = findItemById(id, type);
+          const query = item ? item.title : '';
+          if (query) setSearchPrefill('prospecting', query);
+          window.location.hash = '#prospecting';
         }
         break;
       default:
@@ -1445,6 +1711,16 @@
         <circle cx="8.5" cy="7" r="4"></circle>
         <line x1="20" y1="8" x2="20" y2="14"></line>
         <line x1="23" y1="11" x2="17" y2="11"></line>
+      </svg>
+    `;
+  }
+
+  function getSaveIcon() {
+    return `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+        <polyline points="7 3 7 8 15 8"></polyline>
       </svg>
     `;
   }
