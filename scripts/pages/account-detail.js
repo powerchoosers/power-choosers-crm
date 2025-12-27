@@ -5,7 +5,6 @@
 // This shadowed console only affects this file, not the whole app
 var __ACCOUNT_DETAIL_ORIG_CONSOLE__ = window.console || {};
 function __accountDetailDebugEnabled__() {
-  return true; // Force enable for debugging
   try {
     const v = localStorage.getItem('CRM_DEBUG_ACCOUNT_DETAIL');
     if (v != null) return v === '1' || v === 'true';
