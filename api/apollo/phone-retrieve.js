@@ -31,8 +31,8 @@ export default async function handler(req, res) {
     
     logger.log(`[Apollo Phone Retrieve] 🔍 Checking for phones for person: ${personId}`);
     
-    // Check if we have data in the store
-    const phoneData = getPhoneData(personId);
+    // Check if we have data in the store (asynchronous Firestore check)
+    const phoneData = await getPhoneData(personId);
     
     if (phoneData) {
       logger.log(`[Apollo Phone Retrieve] ✅ Found data for person: ${personId}`);
