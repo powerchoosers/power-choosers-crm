@@ -17,6 +17,15 @@
   let currentPage = 1;
   const contactsPerPage = 5;
 
+  // Simple logger helper
+  function lushaLog(...args) {
+    if (window.crm?.log) {
+      window.crm.log('[Lusha]', ...args);
+    } else {
+      console.log('[Lusha]', ...args);
+    }
+  }
+
   function getPanelContentEl() {
     const panel = document.getElementById('widget-panel');
     if (!panel) return null;
@@ -1518,6 +1527,23 @@
         } catch (_) { }
       }
 
+      // If no email match, try name + company based matching (Deduplication)
+      if (!existingId && contact.firstName && contact.lastName && companyName) {
+         try {
+           const fullName = `${contact.firstName} ${contact.lastName}`.trim();
+           const snap = await db.collection('contacts').where('name', '==', fullName).limit(5).get();
+           if (snap && snap.docs && snap.docs.length > 0) {
+              const targetCompany = companyName.toLowerCase();
+              const match = snap.docs.find(doc => {
+                 const data = doc.data();
+                 const dbCompany = (data.companyName || data.accountName || '').toLowerCase();
+                 return dbCompany.includes(targetCompany) || targetCompany.includes(dbCompany);
+              });
+              if (match) existingId = match.id;
+           }
+         } catch (_) { }
+      }
+
       // Get current account information for linking
       let accountId = null;
       let accountName = '';
@@ -2323,7 +2349,15 @@
             // Phone numbers are delivered asynchronously via webhook
             // Show loading indicator and poll for results
             lushaLog('Phone reveal requested - polling for async delivery');
-            const loadingContent = '<div class="lusha-value-item" style="color: var(--text-muted); font-style: italic;">⏳ Revealing phone numbers...</div>';
+            // Use skeleton animation for better UX during long polling
+            const loadingContent = `
+              <div class="lusha-value-item" title="Revealing phone numbers...">
+                <div class="ai-skeleton medium" style="height: 14px; margin: 4px 0; border-radius: 4px;"></div>
+              </div>
+              <div class="lusha-value-item">
+                <div class="ai-skeleton short" style="height: 14px; margin: 4px 0; border-radius: 4px;"></div>
+              </div>
+            `;
             animateRevealContent(wrap, loadingContent);
 
             // Poll for phone numbers (Apollo sends them to webhook asynchronously)
@@ -2448,12 +2482,24 @@
         } catch (_) { }
       }
 
-      // If no email match, try name-based matching
-      if (!contactExists && contact.firstName && contact.lastName) {
+      // If no email match, try name + company based matching (Apollo Style Deduplication)
+      if (!contactExists && contact.firstName && contact.lastName && (contact.companyName || contact.company)) {
         try {
+          // Note: Firestore doesn't support complex OR queries across multiple fields easily,
+          // so we check for name match first, then verify company in memory if needed
           const fullName = `${contact.firstName} ${contact.lastName}`.trim();
-          const s = await db.collection('contacts').where('name', '==', fullName).limit(1).get();
-          contactExists = !!(s && s.docs && s.docs[0]);
+          const s = await db.collection('contacts').where('name', '==', fullName).limit(5).get();
+          
+          if (s && s.docs && s.docs.length > 0) {
+             const targetCompany = (contact.companyName || contact.company || '').toLowerCase();
+             // Check if any of the name-matched contacts belong to the same company
+             const match = s.docs.find(doc => {
+                const data = doc.data();
+                const dbCompany = (data.companyName || data.accountName || '').toLowerCase();
+                return dbCompany.includes(targetCompany) || targetCompany.includes(dbCompany);
+             });
+             if (match) contactExists = true;
+          }
         } catch (_) { }
       }
 
@@ -3542,8 +3588,17 @@ function animateRevealContent(container, newContent) {
   }
 }
 
-// Helper function to poll for phone numbers delivered asynchronously via webhook
-async function pollForPhoneNumbers(personId, contact, wrap, container) {
+  // Simple logger helper (defined at top scope)
+  function lushaLog(...args) {
+    if (window.crm?.log) {
+      window.crm.log('[Lusha]', ...args);
+    } else {
+      console.log('[Lusha]', ...args);
+    }
+  }
+
+  // Helper function to poll for phone numbers delivered asynchronously via webhook
+  async function pollForPhoneNumbers(personId, contact, wrap, container) {
   const maxAttempts = 30; // Poll for up to 2.5 minutes (30 attempts * 5 seconds)
   const pollInterval = 5000; // 5 seconds between polls (reduced from 10s for faster response)
   let attempts = 0;
@@ -3564,13 +3619,25 @@ async function pollForPhoneNumbers(personId, contact, wrap, container) {
       }
 
       const data = await response.json();
+      let readyData = (data && data.ready && Array.isArray(data.phones) && data.phones.length > 0) ? data : null;
+      if (!readyData) {
+        try {
+          const localResp = await fetch(`http://localhost:3000/api/apollo/phone-retrieve?personId=${encodeURIComponent(personId)}`);
+          if (localResp.ok) {
+            const localData = await localResp.json();
+            if (localData && localData.ready && Array.isArray(localData.phones) && localData.phones.length > 0) {
+              readyData = localData;
+            }
+          }
+        } catch (_) { }
+      }
 
-      if (data.ready && data.phones && data.phones.length > 0) {
+      if (readyData && readyData.phones && readyData.phones.length > 0) {
         // Phone numbers arrived!
-        lushaLog('Phone numbers received:', data.phones.length);
+        lushaLog('Phone numbers received:', readyData.phones.length);
 
         // Extract phone numbers
-        const phones = data.phones.map(p => ({
+        const phones = readyData.phones.map(p => ({
           number: p.sanitized_number || p.raw_number,
           type: p.type || 'work'
         }));
