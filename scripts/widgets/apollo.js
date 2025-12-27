@@ -172,9 +172,26 @@
         <!-- Results Section -->
         <div class="lusha-results is-hidden" id="lusha-results">
           <div class="lusha-results-header" style="opacity:0;transform:translateY(8px);">
-            <div class="lusha-results-title-group">
-              <h4>Search Results</h4>
-              <div class="lusha-results-count" id="lusha-results-count">0 contacts found</div>
+            <div class="lusha-results-header-top">
+              <div class="lusha-results-title-group">
+                <h4>Search Results</h4>
+                <div class="lusha-results-count" id="lusha-results-count">0 contacts found</div>
+              </div>
+              <div class="lusha-pagination" id="lusha-pagination" style="display:flex; visibility: hidden;">
+                <button class="lusha-pagination-arrow" id="lusha-prev-btn" disabled>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15,18 9,12 15,6"/>
+                  </svg>
+                </button>
+                <div class="lusha-pagination-current-container">
+                  <div class="lusha-pagination-current" id="lusha-pagination-current">1</div>
+                </div>
+                <button class="lusha-pagination-arrow" id="lusha-next-btn" disabled>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9,18 15,12 9,6"/>
+                  </svg>
+                </button>
+              </div>
             </div>
             <div class="lusha-name-search-container">
               <input type="text" class="lusha-name-search-input" id="lusha-name-search-input" placeholder="Search by name...">
@@ -182,21 +199,6 @@
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
-            </div>
-            <div class="lusha-pagination" id="lusha-pagination" style="display:flex; visibility: hidden;">
-              <button class="lusha-pagination-arrow" id="lusha-prev-btn" disabled>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="15,18 9,12 15,6"/>
-                </svg>
-              </button>
-              <div class="lusha-pagination-current-container">
-                <div class="lusha-pagination-current" id="lusha-pagination-current">1</div>
-              </div>
-              <button class="lusha-pagination-arrow" id="lusha-next-btn" disabled>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="9,18 15,12 9,6"/>
-                </svg>
-              </button>
             </div>
           </div>
           
