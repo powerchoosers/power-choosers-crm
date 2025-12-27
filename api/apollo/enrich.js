@@ -73,9 +73,10 @@ export default async function handler(req, res) {
              baseUrl = `${protocol}://${host}`;
           }
           const webhookUrl = `${baseUrl}/api/apollo/phone-webhook`;
+          const webhookUrlForApollo = /%[0-9A-Fa-f]{2}/.test(webhookUrl) ? webhookUrl : encodeURIComponent(webhookUrl);
           
-          matchBody.webhook_url = webhookUrl;
-          logger.log('[Apollo Enrich] 📞 Phone reveals enabled with webhook:', webhookUrl);
+          matchBody.webhook_url = webhookUrlForApollo;
+          logger.log('[Apollo Enrich] 📞 Phone reveals enabled with webhook:', webhookUrlForApollo);
         }
         
         // Strategy 1: Use cached email (BEST - most reliable match)
@@ -301,5 +302,4 @@ async function saveToApolloContacts(apolloPerson, apiKey) {
     throw error;
   }
 }
-
 
