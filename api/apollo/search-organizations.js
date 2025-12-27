@@ -4,7 +4,6 @@
  * Used for the Prospecting page to find new accounts
  */
 
-import fs from 'fs';
 import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL, formatLocation } from './_utils.js';
 import logger from '../_logger.js';
 
@@ -127,18 +126,6 @@ export default async function handler(req, res) {
     }
 
     const searchData = await searchResp.json();
-    
-    // DEBUG: Write to a file we can definitely read
-    fs.writeFileSync('./apollo-debug.json', JSON.stringify(searchData, null, 2));
-    
-    // DEBUG: Log the keys and a sample to see what we're getting
-    logger.warn('[Apollo Search Orgs] Response Keys:', Object.keys(searchData));
-    if (searchData.organizations && searchData.organizations.length > 0) {
-      logger.warn('[Apollo Search Orgs] Full Sample Org:', JSON.stringify(searchData.organizations[0], null, 2));
-    }
-    if (searchData.accounts && searchData.accounts.length > 0) {
-       logger.warn('[Apollo Search Orgs] Full Sample Account:', JSON.stringify(searchData.accounts[0], null, 2));
-    }
     
     // Map response to a clean format for the frontend
     const rawOrgs = searchData.organizations || [];
