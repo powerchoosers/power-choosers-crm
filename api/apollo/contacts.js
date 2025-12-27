@@ -23,6 +23,7 @@ export default async function handler(req, res) {
     const { pages = {}, filters = {} } = requestBody;
     const page = pages.page !== undefined ? pages.page : 0;
     const size = pages.size !== undefined ? pages.size : 10;
+    const personName = filters.person_name || ''; // New filter for name search
     
     // Extract company filters
     const companyFilters = filters.companies?.include || {};
@@ -72,6 +73,9 @@ export default async function handler(req, res) {
         'CEO',
         'Chief Executive Officer',
         'President',
+        'Owner',
+        'Franchise Owner',
+        'Managing Director',
         'COO',
         'Chief Operating Officer',
         'Executive Director',
@@ -97,6 +101,12 @@ export default async function handler(req, res) {
       // Include similar titles (e.g., "Senior Facilities Manager", "VP Finance", etc.)
       include_similar_titles: true
     };
+
+    // Add name search if provided
+    if (personName) {
+      searchBody.q_keywords = personName;
+      logger.log('[Apollo Contacts] Added name filter:', personName);
+    }
     
     // COMBINED FILTERING STRATEGY:
     // Use BOTH company name AND domain together for best accuracy
