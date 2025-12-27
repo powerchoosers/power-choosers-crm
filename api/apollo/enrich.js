@@ -58,10 +58,12 @@ export default async function handler(req, res) {
         // 4. Fallback to Apollo ID from contactIds array
         
         const matchBody = {
-          reveal_personal_emails: revealEmails !== false
+          reveal_personal_emails: revealEmails !== false,
+          reveal_phone_number: revealPhones === true
         };
         
         // If phone reveals are requested, provide webhook URL
+        let webhookUrl = '';
         if (revealPhones === true) {
           // Construct webhook URL from request host
           // Use PUBLIC_BASE_URL env var if available, otherwise construct from headers
@@ -71,10 +73,8 @@ export default async function handler(req, res) {
              const host = req.headers['host'] || req.headers['x-forwarded-host'];
              baseUrl = `${protocol}://${host}`;
           }
-          const webhookUrl = `${baseUrl}/api/apollo/phone-webhook`;
-          const webhookUrlForApollo = encodeURIComponent(webhookUrl);
+          webhookUrl = `${baseUrl}/api/apollo/phone-webhook`;
           logger.log('[Apollo Enrich] 📞 Phone reveals enabled with webhook (query):', webhookUrl);
-          matchBody.__webhook_url_for_logging_only = webhookUrl; 
         }
         
         // Strategy 1: Use cached email (BEST - most reliable match)
@@ -123,8 +123,8 @@ export default async function handler(req, res) {
         logger.log('[Apollo Enrich] Match request:', JSON.stringify(matchBody, null, 2));
 
         let url = `${APOLLO_BASE_URL}/people/match`;
-        if (revealPhones === true) {
-          const qs = `webhook_url=${encodeURIComponent(matchBody.__webhook_url_for_logging_only)}&reveal_phone_number=true`;
+        if (revealPhones === true && webhookUrl) {
+          const qs = `webhook_url=${encodeURIComponent(webhookUrl)}`;
           url = `${url}?${qs}`;
         }
         const resp = await fetchWithRetry(url, {
