@@ -3,6 +3,15 @@
     if (window.__debugBridgeInitialized) return;
     window.__debugBridgeInitialized = true;
 
+    // Only enable in localhost:3000 as per user request to save cloudrun costs
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const isPort3000 = window.location.port === '3000';
+    
+    if (!(isLocalhost && isPort3000)) {
+        console.log('[Debug Bridge] Disabled in production environment');
+        return;
+    }
+
     const originalConsole = {
         log: console.log,
         warn: console.warn,
