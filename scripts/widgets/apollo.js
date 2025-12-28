@@ -3630,22 +3630,24 @@ function animateRevealContent(container, newContent) {
       }
 
       const data = await response.json();
-      let readyData = (data && data.ready && Array.isArray(data.phones) && data.phones.length > 0) ? data : null;
+      // Relaxed check: accept empty phones array if ready=true (meaning webhook arrived but had no phones)
+      let readyData = (data && data.ready && Array.isArray(data.phones)) ? data : null;
+      
       if (!readyData) {
         try {
           const localResp = await fetch(`http://localhost:3000/api/apollo/phone-retrieve?personId=${encodeURIComponent(personId)}`);
           if (localResp.ok) {
             const localData = await localResp.json();
-            if (localData && localData.ready && Array.isArray(localData.phones) && localData.phones.length > 0) {
+            if (localData && localData.ready && Array.isArray(localData.phones)) {
               readyData = localData;
             }
           }
         } catch (_) { }
       }
 
-      if (readyData && readyData.phones && readyData.phones.length > 0) {
-        // Phone numbers arrived!
-        lushaLog('Phone numbers received:', readyData.phones.length);
+      if (readyData) {
+        // Phone numbers (or empty result) arrived!
+        lushaLog('Phone retrieval completed. Count:', readyData.phones.length);
 
         // Extract phone numbers
         const phones = readyData.phones.map(p => ({
@@ -3655,8 +3657,23 @@ function animateRevealContent(container, newContent) {
 
         // Update UI
         const phoneNumbers = phones.map(p => p.number).filter(Boolean);
-        const newContent = phoneNumbers.map(v => `<div class="lusha-value-item">${formatPhoneLink(v)}</div>`).join('');
-        animateRevealContent(wrap, newContent);
+        
+        if (phoneNumbers.length > 0) {
+          const newContent = phoneNumbers.map(v => `<div class="lusha-value-item">${formatPhoneLink(v)}</div>`).join('');
+          animateRevealContent(wrap, newContent);
+          
+          // Show success toast
+          if (window.crm?.showToast) {
+            window.crm.showToast(`✅ Revealed ${phoneNumbers.length} phone number(s)`, 'success');
+          }
+        } else {
+           // No phones found
+           const noPhonesContent = '<div class="lusha-value-item">—</div>';
+           animateRevealContent(wrap, noPhonesContent);
+           if (window.crm?.showToast) {
+             window.crm.showToast('No phone numbers found', 'info');
+           }
+        }
 
         // Update contact object
         contact.phones = phones;
@@ -3676,11 +3693,6 @@ function animateRevealContent(container, newContent) {
           }
         } catch (e) {
           lushaLog('Failed to update cache:', e);
-        }
-
-        // Show success toast
-        if (window.crm?.showToast) {
-          window.crm.showToast(`✅ Revealed ${phoneNumbers.length} phone number(s)`, 'success');
         }
 
         return; // Done!
