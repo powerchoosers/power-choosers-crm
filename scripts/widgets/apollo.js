@@ -3630,6 +3630,12 @@ function animateRevealContent(container, newContent) {
       }
 
       const data = await response.json();
+
+      // Log backend debug info if available (critical for troubleshooting Cloud Run issues)
+      if (data && data.debug) {
+        lushaLog('🔍 [Backend Debug]', data.debug);
+      }
+
       // Relaxed check: accept empty phones array if ready=true (meaning webhook arrived but had no phones)
       let readyData = (data && data.ready && Array.isArray(data.phones)) ? data : null;
       
