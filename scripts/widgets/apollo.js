@@ -976,7 +976,9 @@
   }
 
   function mapProspectingContact(c) {
+    lushaLog('Mapping contact (input):', c);
     const isEnriched = Array.isArray(c.emails) || Array.isArray(c.phones);
+    lushaLog('Mapping contact (isEnriched?):', isEnriched, { emails: c.emails, phones: c.phones });
 
     // Parse Lusha's single "name" field into firstName and lastName
     let firstName = '';
@@ -1037,7 +1039,7 @@
       industry: c.industry || ''
     };
 
-    lushaLog('Mapping contact:', { original: c, mapped: mapped });
+    lushaLog('Mapping contact (result):', mapped);
     return mapped;
   }
 
@@ -2192,9 +2194,9 @@
         hasRequestedData = true;
       }
 
-      // If we have the data and it's from cache, just display it without API call
-      if (hasRequestedData && window.__lushaOpenedFromCache) {
-        lushaLog('Using cached data for', which, '- no API call needed');
+      // If we have the data (whether from cache or just existing in the contact object), just display it
+      if (hasRequestedData) {
+        lushaLog('Using existing/cached data for', which, '- no API call needed');
         const wrap = which === 'email'
           ? container.querySelector('[data-email-list]')
           : container.querySelector('[data-phones-list]');
@@ -2204,8 +2206,15 @@
           const newContent = emails.length ? emails.map(v => `<div class="lusha-value-item">${formatEmailLink(v)}</div>`).join('') : '<div class="lusha-value-item">—</div>';
           animateRevealContent(wrap, newContent);
         } else if (which === 'phones') {
-          const phones = Array.isArray(contact.phones) ? contact.phones.map(p => p.number || p).filter(Boolean) : [];
-          const newContent = phones.length ? phones.map(v => `<div class="lusha-value-item">${formatPhoneLink(v)}</div>`).join('') : '<div class="lusha-value-item">—</div>';
+          const phones = Array.isArray(contact.phones) ? contact.phones.map(p => ({
+            number: p.number || (typeof p === 'string' ? p : ''),
+            type: p.type || 'work'
+          })).filter(p => p.number) : [];
+          
+          const newContent = phones.length ? phones.map((p, idx) => 
+            `<div class="lusha-value-item">${formatPhoneLink(p.number, p.type, idx === 0)}</div>`
+          ).join('') : '<div class="lusha-value-item">—</div>';
+          
           animateRevealContent(wrap, newContent);
         }
 
@@ -2996,7 +3005,6 @@
       const existingContacts = Array.isArray(existing.contacts) ? existing.contacts : [];
       const existingById = new Map(existingContacts.map(c => [c.id || c.contactId, c]));
 
-      // Map incoming contacts and merge with any existing enriched data (emails/phones)
       const mappedIncoming = (contacts || []).map(mapProspectingContact);
       const mergedMap = new Map();
 
@@ -3004,6 +3012,13 @@
         const key = nc.id || nc.contactId;
         const ec = key ? existingById.get(key) : null;
         let merged = Object.assign({}, ec || {}, nc);
+        
+        lushaLog(`Saving cache for ${key}:`, { 
+           existingPhones: ec?.phones, 
+           newPhones: nc.phones, 
+           mergedPhones: merged.phones 
+        });
+
         // ALWAYS preserve enriched email/phone arrays from existing cache on refresh
         if (ec && Array.isArray(ec.emails) && ec.emails.length > 0) {
           merged.emails = ec.emails;
@@ -3632,6 +3647,17 @@ function animateRevealContent(container, newContent) {
           ${displayType} ${isPrimary ? '• Primary' : ''}
         </span>
       </div>`;
+  }
+  
+  // Need local escapeHtml for the above helper since this runs in async context
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 
   // Helper to map Apollo phone types to CRM fields (Mobile, Work Direct, Other)
