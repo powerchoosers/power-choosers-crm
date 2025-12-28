@@ -43,9 +43,16 @@ export default async function handler(req, res) {
       }));
     } else {
       // Not found yet (or expired)
+      // Import db to check status for debugging
+      const { db } = await import('../_firebase.js');
+      
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
-        ready: false 
+        ready: false,
+        debug: {
+           db_active: !!db,
+           checked_person_id: personId
+        }
       }));
     }
     
