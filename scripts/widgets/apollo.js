@@ -3690,6 +3690,12 @@ function animateRevealContent(container, newContent) {
   if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
 
   const poll = async () => {
+    // Safety check: stop polling if the widget is closed or the element is removed
+    if (!wrap || !document.body.contains(wrap)) {
+      lushaLog('Polling stopped: widget UI element no longer exists in DOM');
+      return;
+    }
+
     attempts++;
 
     try {
@@ -3724,105 +3730,112 @@ function animateRevealContent(container, newContent) {
       }
 
       if (readyData) {
-        // Phone numbers (or empty result) arrived!
-        lushaLog('Phone retrieval completed. Count:', readyData.phones.length);
+        try {
+          // Phone numbers (or empty result) arrived!
+          lushaLog('Phone retrieval completed. Count:', readyData.phones.length);
 
-        // Extract phone numbers
-        const phones = readyData.phones.map(p => ({
-          number: p.sanitized_number || p.raw_number,
-          type: p.type || 'work'
-        }));
+          // Extract phone numbers
+          const phones = readyData.phones.map(p => ({
+            number: p.sanitized_number || p.raw_number,
+            type: p.type || 'work'
+          }));
 
-        // Update UI
-        const phoneNumbers = phones.map(p => p.number).filter(Boolean);
-        
-        if (phoneNumbers.length > 0) {
-          const newContent = phones.map((p, idx) => {
-             // Treat first number as primary for display purposes in the widget
-             return `<div class="lusha-value-item">${formatPhoneLink(p.number, p.type, idx === 0)}</div>`;
-          }).join('');
-          animateRevealContent(wrap, newContent);
+          // Update UI
+          const phoneNumbers = phones.map(p => p.number).filter(Boolean);
           
-          // Show success toast
-          if (window.crm?.showToast) {
-            window.crm.showToast(`✅ Revealed ${phoneNumbers.length} phone number(s)`, 'success');
-          }
-        } else {
-           // No phones found
-           const noPhonesContent = '<div class="lusha-value-item">—</div>';
-           animateRevealContent(wrap, noPhonesContent);
-           if (window.crm?.showToast) {
-             window.crm.showToast('No phone numbers found', 'info');
-           }
-        }
-
-        // Update contact object using Smart Mapping
-        const smartMap = mapApolloPhonesToContact(phones);
-        
-        // Update local contact object
-        if (smartMap.mobile) contact.mobile = smartMap.mobile;
-        if (smartMap.workDirectPhone) contact.workDirectPhone = smartMap.workDirectPhone;
-        if (smartMap.otherPhone) contact.otherPhone = smartMap.otherPhone;
-        contact.hasPhones = phones.length > 0;
-        contact.hasMobilePhone = phones.some(p => (p.type || '').toLowerCase().includes('mobile'));
-        contact.hasDirectPhone = phones.some(p => {
-          const t = (p.type || '').toLowerCase();
-          return t.includes('work') || t.includes('direct') || t.includes('hq') || t.includes('office');
-        });
-        
-        // Also keep the raw array for reference if needed
-        contact.phones = phones;
-        
-        // Legacy fallback
-        if (phoneNumbers.length > 0) {
-          contact.phone = phoneNumbers[0];
-        }
-
-        // Update in allContacts cache
-        let updatedContactForCache = contact;
-        try {
-          const id = contact.id || contact.contactId;
-          const idx = allContacts.findIndex(c => (c.id || c.contactId) === id);
-          if (idx >= 0) {
-            // Apply smart mapping to cache
-            if (smartMap.mobile) allContacts[idx].mobile = smartMap.mobile;
-            if (smartMap.workDirectPhone) allContacts[idx].workDirectPhone = smartMap.workDirectPhone;
-            if (smartMap.otherPhone) allContacts[idx].otherPhone = smartMap.otherPhone;
+          if (phoneNumbers.length > 0) {
+            const newContent = phones.map((p, idx) => {
+               // Treat first number as primary for display purposes in the widget
+               return `<div class="lusha-value-item">${formatPhoneLink(p.number, p.type, idx === 0)}</div>`;
+            }).join('');
+            animateRevealContent(wrap, newContent);
             
-            allContacts[idx].phones = phones;
-            allContacts[idx].hasPhones = phones.length > 0;
-            allContacts[idx].hasMobilePhone = contact.hasMobilePhone;
-            allContacts[idx].hasDirectPhone = contact.hasDirectPhone;
-            if (phoneNumbers[0]) allContacts[idx].phone = phoneNumbers[0];
-            lushaLog('Updated phone numbers in cache for:', id);
-            updatedContactForCache = allContacts[idx];
+            // Show success toast
+            if (window.crm?.showToast) {
+              window.crm.showToast(`✅ Revealed ${phoneNumbers.length} phone number(s)`, 'success');
+            }
+          } else {
+             // No phones found
+             const noPhonesContent = '<div class="lusha-value-item">—</div>';
+             animateRevealContent(wrap, noPhonesContent);
+             if (window.crm?.showToast) {
+               window.crm.showToast('No phone numbers found', 'info');
+             }
           }
-        } catch (e) {
-          lushaLog('Failed to update cache:', e);
+
+          // Update contact object using Smart Mapping
+          const smartMap = mapApolloPhonesToContact(phones);
+          
+          // Update local contact object
+          if (smartMap.mobile) contact.mobile = smartMap.mobile;
+          if (smartMap.workDirectPhone) contact.workDirectPhone = smartMap.workDirectPhone;
+          if (smartMap.otherPhone) contact.otherPhone = smartMap.otherPhone;
+          contact.hasPhones = phones.length > 0;
+          contact.hasMobilePhone = phones.some(p => (p.type || '').toLowerCase().includes('mobile'));
+          contact.hasDirectPhone = phones.some(p => {
+            const t = (p.type || '').toLowerCase();
+            return t.includes('work') || t.includes('direct') || t.includes('hq') || t.includes('office');
+          });
+          
+          // Also keep the raw array for reference if needed
+          contact.phones = phones;
+          
+          // Legacy fallback
+          if (phoneNumbers.length > 0) {
+            contact.phone = phoneNumbers[0];
+          }
+
+          // Update in allContacts cache
+          let updatedContactForCache = contact;
+          try {
+            const id = contact.id || contact.contactId;
+            const idx = allContacts.findIndex(c => (c.id || c.contactId) === id);
+            if (idx >= 0) {
+              // Apply smart mapping to cache
+              if (smartMap.mobile) allContacts[idx].mobile = smartMap.mobile;
+              if (smartMap.workDirectPhone) allContacts[idx].workDirectPhone = smartMap.workDirectPhone;
+              if (smartMap.otherPhone) allContacts[idx].otherPhone = smartMap.otherPhone;
+              
+              allContacts[idx].phones = phones;
+              allContacts[idx].hasPhones = phones.length > 0;
+              allContacts[idx].hasMobilePhone = contact.hasMobilePhone;
+              allContacts[idx].hasDirectPhone = contact.hasDirectPhone;
+              if (phoneNumbers[0]) allContacts[idx].phone = phoneNumbers[0];
+              lushaLog('Updated phone numbers in cache for:', id);
+              updatedContactForCache = allContacts[idx];
+            }
+          } catch (e) {
+            lushaLog('Failed to update cache:', e);
+          }
+
+          try {
+            const revealBtn = container.querySelector('[data-reveal="phones"]');
+            if (revealBtn) revealBtn.textContent = 'Enrich';
+          } catch (_) { }
+
+          try {
+            const addContactBtn = container.querySelector('[data-action="add-contact"]');
+            if (addContactBtn) addContactBtn.setAttribute('data-contact', JSON.stringify(contact));
+          } catch (_) { }
+
+          try {
+            const companyForCache = companyContext || lastCompanyResult || {
+              domain: updatedContactForCache.fqdn || '',
+              name: updatedContactForCache.companyName || updatedContactForCache.company || ''
+            };
+            await upsertCacheContact({ company: companyForCache }, updatedContactForCache);
+            lushaLog('Persisted phone numbers to cache for:', contact.id || contact.contactId);
+          } catch (e) {
+            lushaLog('Failed to persist phone numbers to cache:', e);
+          }
+
+        } catch (processError) {
+          lushaLog('❌ Error processing phone data:', processError);
+          // Show error state in UI so user isn't stuck loading
+          animateRevealContent(wrap, '<div class="lusha-value-item" style="color: var(--danger);">Error displaying data</div>');
         }
 
-        try {
-          const revealBtn = container.querySelector('[data-reveal="phones"]');
-          if (revealBtn) revealBtn.textContent = 'Enrich';
-        } catch (_) { }
-
-        try {
-          const addContactBtn = container.querySelector('[data-action="add-contact"]');
-          if (addContactBtn) addContactBtn.setAttribute('data-contact', JSON.stringify(contact));
-        } catch (_) { }
-
-        try {
-          const companyForCache = companyContext || lastCompanyResult || {
-            domain: updatedContactForCache.fqdn || '',
-            name: updatedContactForCache.companyName || updatedContactForCache.company || ''
-          };
-          await upsertCacheContact({ company: companyForCache }, updatedContactForCache);
-          lushaLog('Persisted phone numbers to cache for:', contact.id || contact.contactId);
-        } catch (e) {
-          lushaLog('Failed to persist phone numbers to cache:', e);
-        }
-
-        return; // Done!
+        return; // Stop polling regardless of success/fail in processing
       }
 
       // Not ready yet, continue polling
@@ -3843,7 +3856,7 @@ function animateRevealContent(container, newContent) {
     } catch (error) {
       lushaLog('Phone polling error:', error);
 
-      // Retry on error (up to max attempts)
+      // Retry on network error (up to max attempts)
       if (attempts < maxAttempts) {
         setTimeout(poll, pollInterval);
       } else {
