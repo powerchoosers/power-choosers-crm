@@ -2195,6 +2195,10 @@
       // If we have the data and it's from cache, just display it without API call
       if (hasRequestedData && window.__lushaOpenedFromCache) {
         lushaLog('Using cached data for', which, '- no API call needed');
+        const wrap = which === 'email'
+          ? container.querySelector('[data-email-list]')
+          : container.querySelector('[data-phones-list]');
+        if (!wrap) return;
         if (which === 'email') {
           const emails = Array.isArray(contact.emails) ? contact.emails.map(e => e.address || e).filter(Boolean) : [];
           const newContent = emails.length ? emails.map(v => `<div class="lusha-value-item">${formatEmailLink(v)}</div>`).join('') : '<div class="lusha-value-item">—</div>';
@@ -2374,6 +2378,7 @@
             // Poll for phone numbers (Apollo sends them to webhook asynchronously)
             const personId = enriched.id || enriched.contactId || id;
             pollForPhoneNumbers(personId, contact, wrap, container);
+            return;
           }
         }
       }
@@ -3611,11 +3616,70 @@ function animateRevealContent(container, newContent) {
   // Helper function to poll for phone numbers delivered asynchronously via webhook
   async function pollForPhoneNumbers(personId, contact, wrap, container) {
   // Define helper locally in scope to avoid ReferenceError in async context
-  function formatPhoneLink(phone) {
+  function formatPhoneLink(phone, type, isPrimary = false) {
     if (!phone) return '—';
     const cleanPhone = phone.replace(/\D/g, ''); 
-    const displayPhone = phone.replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-    return `<a href="tel:${cleanPhone}" title="Click to call">${displayPhone}</a>`;
+    const displayPhone = escapeHtml(phone);
+    
+    // Format type label (e.g., "work_direct" -> "Work Direct")
+    let displayType = (type || 'Other').replace(/_/g, ' ');
+    displayType = displayType.charAt(0).toUpperCase() + displayType.slice(1);
+
+    return `
+      <div style="display:flex; flex-direction:column;">
+        <a href="tel:${cleanPhone}" title="Click to call">${displayPhone}</a>
+        <span style="font-size:11px; color:var(--text-muted); font-weight:500; margin-top:2px;">
+          ${displayType} ${isPrimary ? '• Primary' : ''}
+        </span>
+      </div>`;
+  }
+
+  // Helper to map Apollo phone types to CRM fields (Mobile, Work Direct, Other)
+  function mapApolloPhonesToContact(phones) {
+    const result = { mobile: '', workDirectPhone: '', otherPhone: '' };
+    
+    // Bucket phones by normalized type
+    const mobiles = phones.filter(p => (p.type || '').toLowerCase().includes('mobile')).map(p => p.number);
+    const works = phones.filter(p => {
+        const t = (p.type || '').toLowerCase();
+        return t.includes('work') || t.includes('direct') || t.includes('hq') || t.includes('office');
+    }).map(p => p.number);
+    const others = phones.filter(p => {
+        const t = (p.type || '').toLowerCase();
+        return !t.includes('mobile') && !t.includes('work') && !t.includes('direct') && !t.includes('hq') && !t.includes('office');
+    }).map(p => p.number);
+
+    // 1. Fill Primary Slots
+    if (mobiles.length > 0) result.mobile = mobiles.shift();
+    if (works.length > 0) result.workDirectPhone = works.shift();
+    if (others.length > 0) result.otherPhone = others.shift();
+
+    // 2. Handle Overflow (Mobile -> Other)
+    if (mobiles.length > 0 && !result.otherPhone) {
+        result.otherPhone = mobiles.shift();
+    }
+
+    // 3. Handle Overflow (Work -> Other)
+    if (works.length > 0 && !result.otherPhone) {
+        result.otherPhone = works.shift();
+    }
+
+    // 4. Handle Overflow (Other -> Mobile)
+    if (others.length > 0 && !result.mobile) {
+        result.mobile = others.shift();
+    }
+
+    // 5. Handle Overflow (Other -> Work Direct)
+    if (others.length > 0 && !result.workDirectPhone) {
+        result.workDirectPhone = others.shift();
+    }
+    
+    // 6. Double Overflow Safety (Mobile -> Work Direct?)
+    if (mobiles.length > 0 && !result.workDirectPhone) {
+        result.workDirectPhone = mobiles.shift();
+    }
+
+    return result;
   }
 
   const maxAttempts = 60; // Poll for up to 10 minutes (60 attempts * 10 seconds)
@@ -3673,7 +3737,10 @@ function animateRevealContent(container, newContent) {
         const phoneNumbers = phones.map(p => p.number).filter(Boolean);
         
         if (phoneNumbers.length > 0) {
-          const newContent = phoneNumbers.map(v => `<div class="lusha-value-item">${formatPhoneLink(v)}</div>`).join('');
+          const newContent = phones.map((p, idx) => {
+             // Treat first number as primary for display purposes in the widget
+             return `<div class="lusha-value-item">${formatPhoneLink(p.number, p.type, idx === 0)}</div>`;
+          }).join('');
           animateRevealContent(wrap, newContent);
           
           // Show success toast
@@ -3689,24 +3756,70 @@ function animateRevealContent(container, newContent) {
            }
         }
 
-        // Update contact object
+        // Update contact object using Smart Mapping
+        const smartMap = mapApolloPhonesToContact(phones);
+        
+        // Update local contact object
+        if (smartMap.mobile) contact.mobile = smartMap.mobile;
+        if (smartMap.workDirectPhone) contact.workDirectPhone = smartMap.workDirectPhone;
+        if (smartMap.otherPhone) contact.otherPhone = smartMap.otherPhone;
+        contact.hasPhones = phones.length > 0;
+        contact.hasMobilePhone = phones.some(p => (p.type || '').toLowerCase().includes('mobile'));
+        contact.hasDirectPhone = phones.some(p => {
+          const t = (p.type || '').toLowerCase();
+          return t.includes('work') || t.includes('direct') || t.includes('hq') || t.includes('office');
+        });
+        
+        // Also keep the raw array for reference if needed
         contact.phones = phones;
+        
+        // Legacy fallback
         if (phoneNumbers.length > 0) {
           contact.phone = phoneNumbers[0];
         }
 
         // Update in allContacts cache
+        let updatedContactForCache = contact;
         try {
           const id = contact.id || contact.contactId;
           const idx = allContacts.findIndex(c => (c.id || c.contactId) === id);
           if (idx >= 0) {
+            // Apply smart mapping to cache
+            if (smartMap.mobile) allContacts[idx].mobile = smartMap.mobile;
+            if (smartMap.workDirectPhone) allContacts[idx].workDirectPhone = smartMap.workDirectPhone;
+            if (smartMap.otherPhone) allContacts[idx].otherPhone = smartMap.otherPhone;
+            
             allContacts[idx].phones = phones;
             allContacts[idx].hasPhones = phones.length > 0;
+            allContacts[idx].hasMobilePhone = contact.hasMobilePhone;
+            allContacts[idx].hasDirectPhone = contact.hasDirectPhone;
             if (phoneNumbers[0]) allContacts[idx].phone = phoneNumbers[0];
             lushaLog('Updated phone numbers in cache for:', id);
+            updatedContactForCache = allContacts[idx];
           }
         } catch (e) {
           lushaLog('Failed to update cache:', e);
+        }
+
+        try {
+          const revealBtn = container.querySelector('[data-reveal="phones"]');
+          if (revealBtn) revealBtn.textContent = 'Enrich';
+        } catch (_) { }
+
+        try {
+          const addContactBtn = container.querySelector('[data-action="add-contact"]');
+          if (addContactBtn) addContactBtn.setAttribute('data-contact', JSON.stringify(contact));
+        } catch (_) { }
+
+        try {
+          const companyForCache = lastCompanyResult || {
+            domain: updatedContactForCache.fqdn || '',
+            name: updatedContactForCache.companyName || updatedContactForCache.company || ''
+          };
+          await upsertCacheContact({ company: companyForCache }, updatedContactForCache);
+          lushaLog('Persisted phone numbers to cache for:', contact.id || contact.contactId);
+        } catch (e) {
+          lushaLog('Failed to persist phone numbers to cache:', e);
         }
 
         return; // Done!
