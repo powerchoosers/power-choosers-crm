@@ -85,6 +85,11 @@ export default async function handler(req, res) {
     };
 
     // Store in Firestore (distributed state)
+    // Explicitly log DB status to help debug Cloud Run environment issues
+    if (!db) {
+       logger.warn('[Apollo Phone Webhook] ⚠️ Firestore DB is NOT initialized. Falling back to memory store (unreliable in Cloud Run). Check env vars.');
+    }
+
     if (db) {
       try {
         await db.collection('apollo_phones').doc(personId).set(payload);
