@@ -3788,16 +3788,13 @@ function animateRevealContent(container, newContent) {
     return result;
   }
 
-  const deadlineAt = Date.now() + (10 * 60 * 1000);
+  const maxAttempts = 20; // Poll for up to ~10 minutes (20 attempts * 30 seconds)
+  const pollInterval = 30000; // 30 seconds between polls
   let attempts = 0;
 
-  const getNextPollDelayMs = (attempt) => {
-    const base =
-      attempt <= 2 ? 15000 :
-      attempt <= 6 ? 30000 :
-      60000;
-    const jitter = Math.round(base * 0.15 * (Math.random() * 2 - 1));
-    return Math.max(5000, base + jitter);
+  const getNextPollDelayMs = () => {
+    const jitter = Math.round(pollInterval * 0.1 * (Math.random() * 2 - 1));
+    return Math.max(5000, pollInterval + jitter);
   };
 
   let base = (window.API_BASE_URL || '').replace(/\/$/, '');
@@ -3962,8 +3959,8 @@ function animateRevealContent(container, newContent) {
       }
 
       // Not ready yet, continue polling
-      if (Date.now() < deadlineAt) {
-        const delayMs = getNextPollDelayMs(attempts);
+      if (attempts < maxAttempts) {
+        const delayMs = getNextPollDelayMs();
         lushaLog(`Phone numbers not ready yet, polling again in ${Math.round(delayMs / 1000)}s...`);
         setTimeout(poll, delayMs);
       } else {
@@ -3981,8 +3978,8 @@ function animateRevealContent(container, newContent) {
       lushaLog('Phone polling error:', error);
 
       // Retry on network error (up to max attempts)
-      if (Date.now() < deadlineAt) {
-        const delayMs = getNextPollDelayMs(attempts);
+      if (attempts < maxAttempts) {
+        const delayMs = getNextPollDelayMs();
         setTimeout(poll, delayMs);
       } else {
         const errorContent = '<div class="lusha-value-item">—</div>';
@@ -3996,7 +3993,7 @@ function animateRevealContent(container, newContent) {
   };
 
   // Start polling after a short delay
-  setTimeout(poll, 15000);
+  setTimeout(poll, 1000);
 }
 
 // Render usage bar with cached data (immediate display)
