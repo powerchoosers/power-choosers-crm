@@ -6,7 +6,6 @@
  */
 
 import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL } from './_utils.js';
-import logger from '../_logger.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
@@ -19,8 +18,6 @@ export default async function handler(req, res) {
   
   try {
     const APOLLO_API_KEY = getApiKey();
-    
-    logger.log('[Apollo Usage] Fetching usage stats...');
     
     const usageUrl = `${APOLLO_BASE_URL}/usage_stats/api_usage_stats`;
     const usageResp = await fetchWithRetry(usageUrl, {
@@ -35,7 +32,6 @@ export default async function handler(req, res) {
 
     if (!usageResp.ok) {
       const text = await usageResp.text();
-      logger.error('[Apollo Usage] API error:', usageResp.status, text);
       
       // If 403, likely not a master API key
       if (usageResp.status === 403) {
@@ -56,18 +52,13 @@ export default async function handler(req, res) {
     }
 
     const usageData = await usageResp.json();
-    
-    logger.log('[Apollo Usage] Raw response:', JSON.stringify(usageData, null, 2));
-    
+
     // Map Apollo usage stats to Lusha format
     const response = mapApolloUsageToLushaFormat(usageData);
-    
-    logger.log('[Apollo Usage] Mapped response:', JSON.stringify(response, null, 2));
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(response));
   } catch (e) {
-    logger.error('[Apollo Usage] Error:', e);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       error: 'Server error', 
@@ -105,12 +96,6 @@ function mapApolloUsageToLushaFormat(apolloUsage) {
       total: dailyLimit,
       used: totalConsumed,
       limit: dailyLimit
-    },
-    // Include per-endpoint stats for debugging
-    byEndpoint: {
-      peopleSearch: peopleSearchStats,
-      orgSearch: orgSearchStats,
-      peopleMatch: peopleMatchStats
     }
   };
   
@@ -124,5 +109,3 @@ function mapApolloUsageToLushaFormat(apolloUsage) {
   
   return response;
 }
-
-

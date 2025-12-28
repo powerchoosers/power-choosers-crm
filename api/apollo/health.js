@@ -4,7 +4,6 @@
  */
 
 import { cors, getApiKey } from './_utils.js';
-import logger from '../_logger.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
@@ -20,7 +19,6 @@ export default async function handler(req, res) {
     
     // Test authentication with Apollo's health endpoint
     const healthUrl = 'https://api.apollo.io/v1/auth/health';
-    logger.log('[Apollo Health] Testing authentication with:', healthUrl);
     
     const response = await fetch(healthUrl, {
       method: 'GET',
@@ -30,11 +28,8 @@ export default async function handler(req, res) {
       }
     });
     
-    logger.log('[Apollo Health] Response status:', response.status);
-    
     if (!response.ok) {
       const errorText = await response.text();
-      logger.error('[Apollo Health] Authentication failed:', response.status, errorText);
       
       res.writeHead(response.status, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
@@ -50,7 +45,6 @@ export default async function handler(req, res) {
     }
     
     const data = await response.json();
-    logger.log('[Apollo Health] Authentication successful:', data);
     
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
@@ -60,7 +54,6 @@ export default async function handler(req, res) {
       data: data
     }));
   } catch (e) {
-    logger.error('[Apollo Health] Error:', e);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       success: false,

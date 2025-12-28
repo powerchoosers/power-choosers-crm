@@ -8,7 +8,6 @@
  */
 
 import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL, formatLocation } from './_utils.js';
-import logger from '../_logger.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
@@ -74,20 +73,17 @@ export default async function handler(req, res) {
              baseUrl = `${protocol}://${host}`;
           }
           webhookUrl = `${baseUrl}/api/apollo/phone-webhook`;
-          logger.log('[Apollo Enrich] 📞 Phone reveals enabled with webhook (query):', webhookUrl);
         }
         
         // Strategy 1: Use cached email (BEST - most reliable match)
         const emailToUse = cachedContact.email || (i === 0 ? req.body.email : null);
         if (emailToUse) {
           matchBody.email = emailToUse;
-          logger.log('[Apollo Enrich] Using email strategy for:', emailToUse);
         }
         // Strategy 2: Use cached Apollo person ID (GOOD - from previous widget session)
         else if (cachedContact.apolloId || cachedContact.personId || cachedContact.id || (!cachedContact.id && contactId && contactId.length > 15)) {
           // If contactId looks like an Apollo ID (long string), use it
           matchBody.id = cachedContact.apolloId || cachedContact.personId || cachedContact.id || contactId;
-          logger.log('[Apollo Enrich] Using Apollo ID strategy for:', matchBody.id);
         }
         // Strategy 3: Use name + domain/company (ACCEPTABLE - still works)
         // Apollo supports either first_name+last_name OR single name parameter
@@ -105,22 +101,15 @@ export default async function handler(req, res) {
           if (firstName && lastName) {
             matchBody.first_name = firstName;
             matchBody.last_name = lastName;
-            logger.log('[Apollo Enrich] Using first_name+last_name + company strategy');
           } else if (fullName) {
             // Fallback to name parameter
             matchBody.name = fullName;
-            logger.log('[Apollo Enrich] Using name + company strategy');
-          } else {
-             logger.log('[Apollo Enrich] ⚠️ Missing name for company strategy. Contact:', cachedContact);
           }
         }
         // Strategy 4: Fallback to contactId as Apollo person ID
         else {
           matchBody.id = contactId;
-          logger.log('[Apollo Enrich] Using contactId as Apollo ID (fallback):', contactId);
         }
-        
-        logger.log('[Apollo Enrich] Match request:', JSON.stringify(matchBody, null, 2));
 
         let url = `${APOLLO_BASE_URL}/people/match`;
         if (revealPhones === true && webhookUrl) {
@@ -139,12 +128,10 @@ export default async function handler(req, res) {
 
         if (!resp.ok) {
           const text = await resp.text();
-          logger.error('[Apollo Enrich] API error for contact', contactId, ':', resp.status, text);
           continue;
         }
 
         const data = await resp.json();
-        logger.log('[Apollo Enrich] Response for', contactId, '- person found:', !!data.person);
         
         if (data.person) {
           const mappedContact = mapApolloContactToLushaFormat(data.person);
@@ -156,11 +143,9 @@ export default async function handler(req, res) {
             await saveToApolloContacts(data.person, APOLLO_API_KEY);
           } catch (saveError) {
             // Log but don't fail the enrichment if save fails
-            logger.error('[Apollo Enrich] Failed to save contact to Apollo:', saveError.message);
           }
         }
       } catch (error) {
-        logger.error('[Apollo Enrich] Error enriching contact', contactId, ':', error);
         continue;
       }
     }
@@ -169,13 +154,10 @@ export default async function handler(req, res) {
       contacts: enrichedContacts,
       requestId: requestId || 'apollo_enrich_' + Date.now()
     };
-    
-    logger.log('[Apollo Enrich] Final response:', enrichedContacts.length, 'contacts enriched');
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(response));
   } catch (e) {
-    logger.error('[Apollo Enrich] Error:', e);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       error: 'Server error', 
@@ -200,8 +182,6 @@ function mapApolloContactToLushaFormat(apolloPerson) {
       type: 'work',
       status: apolloPerson.email_status
     });
-  } else if (apolloPerson.email) {
-    logger.log('[Apollo Enrich] 📧 Filtering out placeholder email:', apolloPerson.email);
   }
 
   // Check for specific phone types
@@ -280,8 +260,6 @@ async function saveToApolloContacts(apolloPerson, apiKey) {
       contactData.mobile_phone = mobilePhone.raw_number || mobilePhone.sanitized_number;
     }
     
-    logger.log('[Apollo Enrich] Saving to contacts:', apolloPerson.email);
-    
     const saveUrl = `${APOLLO_BASE_URL}/contacts`;
     const saveResp = await fetchWithRetry(saveUrl, {
       method: 'POST',
@@ -294,13 +272,10 @@ async function saveToApolloContacts(apolloPerson, apiKey) {
     });
     
     if (saveResp.ok) {
-      logger.log('[Apollo Enrich] Successfully saved to contacts - future enrichments FREE!');
     } else {
       const errorText = await saveResp.text();
-      logger.warn('[Apollo Enrich] Contact save failed:', saveResp.status, errorText);
     }
   } catch (error) {
-    logger.error('[Apollo Enrich] Error saving to contacts:', error);
     throw error;
   }
 }

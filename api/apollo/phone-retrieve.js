@@ -6,7 +6,6 @@
  */
 
 import { cors } from './_utils.js';
-import logger from '../_logger.js';
 import { getPhoneData } from './phone-webhook.js';
 
 export default async function handler(req, res) {
@@ -28,14 +27,11 @@ export default async function handler(req, res) {
       res.end(JSON.stringify({ error: 'Missing personId parameter' }));
       return;
     }
-    
-    logger.log(`[Apollo Phone Retrieve] 🔍 Checking for phones for person: ${personId}`);
-    
+
     // Check if we have data in the store (asynchronous Firestore check)
     const phoneData = await getPhoneData(personId);
     
     if (phoneData) {
-      logger.log(`[Apollo Phone Retrieve] ✅ Found data for person: ${personId}`);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         ready: true, 
@@ -43,21 +39,13 @@ export default async function handler(req, res) {
       }));
     } else {
       // Not found yet (or expired)
-      // Import db to check status for debugging
-      const { db } = await import('../_firebase.js');
-      
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
-        ready: false,
-        debug: {
-           db_active: !!db,
-           checked_person_id: personId
-        }
+        ready: false
       }));
     }
     
   } catch (error) {
-    logger.error('[Apollo Phone Retrieve] ❌ Error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       error: 'Internal server error', 
