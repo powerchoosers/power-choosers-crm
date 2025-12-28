@@ -43,12 +43,25 @@ export default async function handler(req, res) {
          if (phoneData.matches.length > 0) {
             phoneData = { person: phoneData.matches[0] };
          }
+      } else if (phoneData && phoneData.people && Array.isArray(phoneData.people)) {
+         // Handle people array (bulk enrichment format)
+         logger.log('[Apollo Phone Webhook] ℹ️ Payload contains "people" array.');
+         if (phoneData.people.length > 0) {
+            phoneData = { person: phoneData.people[0] };
+         }
       } else {
         logger.warn('[Apollo Phone Webhook] ⚠️ No person data in webhook payload. Keys received:', Object.keys(phoneData || {}));
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Invalid webhook payload - no person data' }));
         return;
       }
+    }
+
+    if (!phoneData.person) {
+      logger.warn('[Apollo Phone Webhook] ⚠️ Adaptation failed: Structure identified but no person object found (empty array?).');
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid webhook payload - structure found but empty' }));
+      return;
     }
 
     const personId = phoneData.person.id;
