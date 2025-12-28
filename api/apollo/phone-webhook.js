@@ -30,13 +30,25 @@ export default async function handler(req, res) {
     logger.log('[Apollo Phone Webhook] 📞 Received webhook request');
     
     // Apollo sends the phone data in the request body
-    const phoneData = req.body;
+    let phoneData = req.body;
 
     if (!phoneData || !phoneData.person) {
-      logger.warn('[Apollo Phone Webhook] ⚠️ No person data in webhook payload');
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Invalid webhook payload - no person data' }));
-      return;
+      // Check if the body itself is the person object (sometimes Apollo sends flattened structure)
+      if (phoneData && phoneData.id && (phoneData.phone_numbers || phoneData.email)) {
+        logger.log('[Apollo Phone Webhook] ℹ️ Payload appears to be flattened person object. Adapting structure.');
+        phoneData = { person: phoneData };
+      } else if (phoneData && phoneData.matches) {
+         // Handle potential matches array
+         logger.log('[Apollo Phone Webhook] ℹ️ Payload contains "matches" array.');
+         if (phoneData.matches.length > 0) {
+            phoneData = { person: phoneData.matches[0] };
+         }
+      } else {
+        logger.warn('[Apollo Phone Webhook] ⚠️ No person data in webhook payload. Keys received:', Object.keys(phoneData || {}));
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid webhook payload - no person data' }));
+        return;
+      }
     }
 
     const personId = phoneData.person.id;
