@@ -6,7 +6,6 @@
  */
 
 import { cors } from './_utils.js';
-import logger from '../_logger.js';
 import { db } from '../_firebase.js';
 
 // In-memory fallback (only for local dev without Firestore)
@@ -27,30 +26,24 @@ export default async function handler(req, res) {
   }
 
   try {
-    logger.log('[Apollo Phone Webhook] 📞 Received webhook request');
-    
     // Apollo sends the phone data in the request body
     let phoneData = req.body;
 
     if (!phoneData || !phoneData.person) {
       // Check if the body itself is the person object (sometimes Apollo sends flattened structure)
       if (phoneData && phoneData.id && (phoneData.phone_numbers || phoneData.email)) {
-        logger.log('[Apollo Phone Webhook] ℹ️ Payload appears to be flattened person object. Adapting structure.');
         phoneData = { person: phoneData };
       } else if (phoneData && phoneData.matches) {
          // Handle potential matches array
-         logger.log('[Apollo Phone Webhook] ℹ️ Payload contains "matches" array.');
          if (phoneData.matches.length > 0) {
             phoneData = { person: phoneData.matches[0] };
          }
       } else if (phoneData && phoneData.people && Array.isArray(phoneData.people)) {
          // Handle people array (bulk enrichment format)
-         logger.log('[Apollo Phone Webhook] ℹ️ Payload contains "people" array.');
          if (phoneData.people.length > 0) {
             phoneData = { person: phoneData.people[0] };
          }
       } else {
-        logger.warn('[Apollo Phone Webhook] ⚠️ No person data in webhook payload. Keys received:', Object.keys(phoneData || {}));
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Invalid webhook payload - no person data' }));
         return;
@@ -58,7 +51,6 @@ export default async function handler(req, res) {
     }
 
     if (!phoneData.person) {
-      logger.warn('[Apollo Phone Webhook] ⚠️ Adaptation failed: Structure identified but no person object found (empty array?).');
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Invalid webhook payload - structure found but empty' }));
       return;
@@ -66,7 +58,6 @@ export default async function handler(req, res) {
 
     const personId = phoneData.person.id;
     if (!personId) {
-      logger.warn('[Apollo Phone Webhook] ⚠️ No person ID in webhook payload');
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Invalid webhook payload - no person ID' }));
       return;
@@ -74,9 +65,7 @@ export default async function handler(req, res) {
 
     // Extract phone numbers
     const phones = phoneData.person.phone_numbers || [];
-    
-    logger.log(`[Apollo Phone Webhook] ✅ Received ${phones.length} phone(s) for person: ${personId}`);
-    
+
     const payload = {
       personId,
       phones,
@@ -85,24 +74,16 @@ export default async function handler(req, res) {
     };
 
     // Store in Firestore (distributed state)
-    // Explicitly log DB status to help debug Cloud Run environment issues
-    if (!db) {
-       logger.warn('[Apollo Phone Webhook] ⚠️ Firestore DB is NOT initialized. Falling back to memory store (unreliable in Cloud Run). Check env vars.');
-    }
-
     if (db) {
       try {
         await db.collection('apollo_phones').doc(personId).set(payload);
-        logger.log('[Apollo Phone Webhook] ✓ Saved to Firestore:', personId);
       } catch (dbError) {
-        logger.error('[Apollo Phone Webhook] ❌ Firestore save error:', dbError);
         // Fallback to memory
         memoryStore.set(personId, payload);
       }
     } else {
       // Fallback to memory for local dev
       memoryStore.set(personId, payload);
-      logger.log('[Apollo Phone Webhook] ! Saved to memory store (Firestore unavailable):', personId);
     }
 
     // Respond to Apollo
@@ -114,7 +95,6 @@ export default async function handler(req, res) {
     }));
 
   } catch (error) {
-    logger.error('[Apollo Phone Webhook] ❌ Error processing webhook:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       error: 'Internal server error', 
@@ -135,14 +115,12 @@ export async function getPhoneData(personId) {
         if (new Date(data.expiresAt) > new Date()) {
           return data;
         } else {
-          logger.log('[Apollo Phone Webhook] 🧹 Found expired data in Firestore for:', personId);
           // Optional: delete expired doc
           db.collection('apollo_phones').doc(personId).delete().catch(() => {});
           return null;
         }
       }
     } catch (e) {
-      logger.error('[Apollo Phone Webhook] getPhoneData Firestore error:', e);
     }
   }
 

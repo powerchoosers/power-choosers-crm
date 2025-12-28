@@ -5,7 +5,6 @@
  */
 
 import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL, formatLocation } from './_utils.js';
-import logger from '../_logger.js';
 
 /**
  * Enrich organization data using Apollo Enrichment API
@@ -27,14 +26,12 @@ async function enrichOrganization(domain, apiKey) {
     });
 
     if (!resp.ok) {
-      logger.error(`[Apollo Enrichment] Error for ${domain}:`, resp.status);
       return null;
     }
 
     const data = await resp.json();
     return data.organization || null;
   } catch (error) {
-    logger.error(`[Apollo Enrichment] Failed for ${domain}:`, error.message);
     return null;
   }
 }
@@ -85,9 +82,6 @@ export default async function handler(req, res) {
     Object.keys(searchBody).forEach(key => 
       searchBody[key] === undefined && delete searchBody[key]
     );
-    
-    logger.log('[Apollo Search People] Request:', JSON.stringify(searchBody));
-    
     const searchUrl = `${APOLLO_BASE_URL}/mixed_people/search`;
     const searchResp = await fetchWithRetry(searchUrl, {
       method: 'POST',
@@ -101,7 +95,6 @@ export default async function handler(req, res) {
 
     if (!searchResp.ok) {
       const text = await searchResp.text();
-      logger.error('[Apollo Search People] Error:', searchResp.status, text);
       res.writeHead(searchResp.status, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         error: 'Apollo search error', 
@@ -164,8 +157,6 @@ export default async function handler(req, res) {
     )].slice(0, 5); // Limit to 5 unique domains to save credits
 
     if (domainsToEnrich.length > 0) {
-      logger.log(`[Apollo Search People] Enriching ${domainsToEnrich.length} unique organizations...`);
-      
       const enrichmentMap = {};
       await Promise.all(domainsToEnrich.map(async (domain) => {
         const enriched = await enrichOrganization(domain, APOLLO_API_KEY);
@@ -191,7 +182,6 @@ export default async function handler(req, res) {
     }));
 
   } catch (error) {
-    logger.error('[Apollo Search People] Server Error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       error: 'Server error', 
