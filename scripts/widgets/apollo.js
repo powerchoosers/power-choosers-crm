@@ -3610,6 +3610,14 @@ function animateRevealContent(container, newContent) {
 
   // Helper function to poll for phone numbers delivered asynchronously via webhook
   async function pollForPhoneNumbers(personId, contact, wrap, container) {
+  // Define helper locally in scope to avoid ReferenceError in async context
+  function formatPhoneLink(phone) {
+    if (!phone) return '—';
+    const cleanPhone = phone.replace(/\D/g, ''); 
+    const displayPhone = phone.replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    return `<a href="tel:${cleanPhone}" title="Click to call">${displayPhone}</a>`;
+  }
+
   const maxAttempts = 60; // Poll for up to 10 minutes (60 attempts * 10 seconds)
   const pollInterval = 10000; // 10 seconds between polls
   let attempts = 0;
