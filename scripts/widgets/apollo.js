@@ -2377,7 +2377,7 @@
 
             // Poll for phone numbers (Apollo sends them to webhook asynchronously)
             const personId = enriched.id || enriched.contactId || id;
-            pollForPhoneNumbers(personId, contact, wrap, container);
+            pollForPhoneNumbers(personId, contact, wrap, container, lastCompanyResult);
             return;
           }
         }
@@ -3614,7 +3614,7 @@ function animateRevealContent(container, newContent) {
   }
 
   // Helper function to poll for phone numbers delivered asynchronously via webhook
-  async function pollForPhoneNumbers(personId, contact, wrap, container) {
+  async function pollForPhoneNumbers(personId, contact, wrap, container, companyContext) {
   // Define helper locally in scope to avoid ReferenceError in async context
   function formatPhoneLink(phone, type, isPrimary = false) {
     if (!phone) return '—';
@@ -3627,7 +3627,7 @@ function animateRevealContent(container, newContent) {
 
     return `
       <div style="display:flex; flex-direction:column;">
-        <a href="tel:${cleanPhone}" title="Click to call">${displayPhone}</a>
+        <a href="tel:${cleanPhone}" title="Click to call" style="color:inherit; text-decoration:none;">${displayPhone}</a>
         <span style="font-size:11px; color:var(--text-muted); font-weight:500; margin-top:2px;">
           ${displayType} ${isPrimary ? '• Primary' : ''}
         </span>
@@ -3812,7 +3812,7 @@ function animateRevealContent(container, newContent) {
         } catch (_) { }
 
         try {
-          const companyForCache = lastCompanyResult || {
+          const companyForCache = companyContext || lastCompanyResult || {
             domain: updatedContactForCache.fqdn || '',
             name: updatedContactForCache.companyName || updatedContactForCache.company || ''
           };
