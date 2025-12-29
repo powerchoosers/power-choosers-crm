@@ -57,13 +57,6 @@
     if (window.firebase) {
       window.firebaseDB = window.firebase.firestore();
       
-      // Attempt to reduce "net::ERR_ABORTED" noise by preferring WebSockets over Long Polling
-      try {
-        window.firebaseDB.settings({ experimentalAutoDetectLongPolling: false });
-      } catch (e) {
-        // Ignore if settings cannot be applied (e.g. if already initialized)
-      }
-      
       // Enable Firebase persistence for offline caching and reduced Firestore reads
       // This improves performance and reduces costs by caching data locally
       try {

@@ -36,6 +36,25 @@
 class PowerChoosersCRM {
     constructor() {
         this.currentPage = 'dashboard';
+
+        // Debug logging helper
+        window.__crmLog = (location, message, data) => {
+            try {
+                fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sessionId: 'debug-session',
+                        runId: 'quick-actions-debug',
+                        hypothesisId: 'QA1',
+                        location,
+                        message,
+                        data: data || {},
+                        timestamp: Date.now()
+                    })
+                }).catch(() => {});
+            } catch (_) {}
+        };
         this.sidebar = document.getElementById('sidebar');
 
         // Sidebar hover state
@@ -1359,7 +1378,6 @@ class PowerChoosersCRM {
             // Hide all pages
             document.querySelectorAll('.page').forEach(page => {
                 page.classList.remove('active');
-                page.hidden = true;
             });
 
             // Remove active class from all nav items
@@ -1370,7 +1388,6 @@ class PowerChoosersCRM {
             // Show target page
             const targetPage = document.getElementById(`${pageName}-page`);
             if (targetPage) {
-                targetPage.hidden = false;
                 targetPage.classList.add('active');
             }
 
@@ -1491,12 +1508,6 @@ class PowerChoosersCRM {
         }
 
         // Special handling for specific pages
-        if (pageName === 'prospecting') {
-            if (window.ProspectingPage && typeof window.ProspectingPage.init === 'function') {
-                window.ProspectingPage.init();
-            }
-        }
-
         if (pageName === 'people' && window.peopleModule) {
             if (typeof window.peopleModule.rebindDynamic === 'function') {
                 window.peopleModule.rebindDynamic();
@@ -2443,12 +2454,15 @@ class PowerChoosersCRM {
     setupWidgetInteractions() {
         // Quick Actions
         const quickActionBtns = document.querySelectorAll('.action-btn');
+        __crmLog('setupWidgetInteractions', 'Quick Actions binding', {
+            buttonsFound: quickActionBtns.length,
+            buttonsText: Array.from(quickActionBtns).map(btn => btn.textContent.trim())
+        });
         quickActionBtns.forEach(btn => {
             if (!btn._quickActionBound) {
                 btn.addEventListener('click', () => {
-                    const rawText = btn.textContent;
-                    // Normalize text: remove line breaks/tabs and collapse multiple spaces
-                    const action = rawText.replace(/[\n\r\t]+/g, ' ').replace(/\s+/g, ' ').trim();
+                    const action = btn.textContent.trim();
+                    __crmLog('setupWidgetInteractions', 'Quick Action clicked', { action });
                     this.handleQuickAction(action);
                 });
                 btn._quickActionBound = true;
@@ -2521,16 +2535,20 @@ class PowerChoosersCRM {
     }
 
     handleQuickAction(action) {
+        __crmLog('handleQuickAction', 'Action received', { action });
         switch (action) {
             case 'Add Contact':
+                __crmLog('handleQuickAction', 'Creating Add Contact modal', {});
                 this.showModal('add-contact');
                 break;
             case 'Add Account':
+                __crmLog('handleQuickAction', 'Creating Add Account modal', {});
                 // Capture current page state before opening modal for back button navigation
                 this.captureCurrentPageState();
                 this.showModal('add-account');
                 break;
             case 'Bulk Import CSV':
+                __crmLog('handleQuickAction', 'Creating Bulk Import modal', {});
                 this.createBulkImportModal();
                 break;
             default:
