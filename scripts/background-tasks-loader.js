@@ -293,20 +293,34 @@
 
   // Listen for task updates and reload data
   window.addEventListener('tasksUpdated', async (event) => {
-    const { source, taskId, deleted, newTaskCreated, rescheduled } = event.detail || {};
+    const { source, taskId, deleted, newTaskCreated, rescheduled, taskData } = event.detail || {};
 
-    // CRITICAL FIX: If a task was deleted, remove it from local cache immediately
+    if (source === 'tasksPageLoad' || source === 'navigation') {
+      return;
+    }
+
     if (deleted && taskId) {
       try {
         tasksData = tasksData.filter(t => t && t.id !== taskId);
-        
-        // Also update cache
-        if (window.CacheManager && typeof window.CacheManager.set === 'function') {
-          await window.CacheManager.set('tasks', tasksData);
+
+        if (window.CacheManager && typeof window.CacheManager.deleteRecord === 'function') {
+          await window.CacheManager.deleteRecord('tasks', taskId);
         }
       } catch (e) {
         console.warn('[BackgroundTasksLoader] Could not remove deleted task from cache:', e);
       }
+    }
+
+    if (newTaskCreated && taskData && taskData.id) {
+      try {
+        tasksData = tasksData.filter(t => t && t.id !== taskData.id);
+        tasksData.push(taskData);
+        tasksData.sort((a, b) => new Date(b.updatedAt || b.timestamp || 0) - new Date(a.updatedAt || a.timestamp || 0));
+
+        if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+          await window.CacheManager.updateRecord('tasks', taskData.id, taskData);
+        }
+      } catch (_) { }
     }
 
     // CRITICAL FIX: If a task was rescheduled, remove it from cache and force reload
@@ -326,23 +340,19 @@
       }
     }
 
-    // CRITICAL FIX: Only do full reload if a new task was created (need to fetch it)
-    // For deletions, we've already removed from cache, so just invalidate and let forceReload handle it
-    // This prevents race conditions where Firestore deletion hasn't completed yet
-    // For reschedules, we've removed from cache and will reload to get updated dueDate/dueTime
     try {
-      if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+      const shouldReloadForNewTask = !!(newTaskCreated && (!taskData || !taskData.id));
+      const shouldReload = shouldReloadForNewTask || !!rescheduled;
+
+      if (shouldReload && window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
         await window.CacheManager.invalidate('tasks');
       }
-      
-      // Reload from Firestore if a new task was created OR if a task was rescheduled
-      // For reschedules, we need to fetch the updated task with new dueDate/dueTime
-      if (newTaskCreated || rescheduled) {
-        // Small delay for reschedules to ensure Firebase update completes
+
+      if (shouldReload) {
         if (rescheduled) {
           await new Promise(resolve => setTimeout(resolve, 150));
         }
-        await loadFromFirestore(true); // Preserve existing tasks during refresh
+        await loadFromFirestore(true);
       }
 
       // Trigger Today's Tasks widget to refresh (only when dashboard is visible).
@@ -365,10 +375,9 @@
       try {
         // Remove from local cache
         tasksData = tasksData.filter(t => t && t.id !== taskId);
-        
-        // Update cache
-        if (window.CacheManager && typeof window.CacheManager.set === 'function') {
-          await window.CacheManager.set('tasks', tasksData);
+
+        if (window.CacheManager && typeof window.CacheManager.deleteRecord === 'function') {
+          await window.CacheManager.deleteRecord('tasks', taskId);
         }
         
         // CRITICAL FIX: Only trigger refresh if not from task-detail (which handles its own refresh)
@@ -396,8 +405,9 @@
           : null;
         const age = cacheAge?.timestamp ? (Date.now() - cacheAge.timestamp) : Infinity;
 
-        // CRITICAL FIX: Use the same expiry time as CacheManager (3 minutes for tasks)
-        const tasksCacheExpiry = 3 * 60 * 1000; // 3 minutes (matches CacheManager.tasksCacheExpiry)
+        const tasksCacheExpiry = (window.CacheManager && typeof window.CacheManager.tasksCacheExpiry === 'number')
+          ? window.CacheManager.tasksCacheExpiry
+          : (2 * 60 * 60 * 1000);
 
         // If cache is older than expiry time, refresh
         if (age > tasksCacheExpiry) {
@@ -534,6 +544,3 @@
   };
 
 })();
-
-
-

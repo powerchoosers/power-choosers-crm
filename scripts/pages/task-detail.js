@@ -1424,30 +1424,11 @@
       widgetsDrawer._bound = '1';
     }
 
-    // Listen for activity refresh events to update Recent Activity immediately
-    if (!document._taskDetailActivityRefreshBound) {
-      document.addEventListener('pc:activities-refresh', async (e) => {
-        const { entityType, entityId, forceRefresh } = e.detail || {};
-        if (!state.currentTask) return;
-
-        // Check if this refresh is relevant to the current task
-        const isRelevant =
-          entityType === 'global' ||
-          (entityType === 'account' && state.currentTask.accountId === entityId) ||
-          (entityType === 'contact' && state.currentTask.contactId === entityId);
-
-        if (isRelevant && window.ActivityManager) {
-          console.log('[TaskDetail] Activity refresh event received, refreshing activities');
-          await loadRecentActivityForTask();
-        }
-      });
-      document._taskDetailActivityRefreshBound = true;
-    }
-
     // CRITICAL: Listen for task deletion events (e.g. sequence removal) to auto-navigate
     if (!document._taskDetailDeletionBound) {
       document.addEventListener('pc:task-deleted', async (e) => {
-        const { taskId } = e.detail || {};
+        const { taskId, source } = e.detail || {};
+        if (source === 'task-detail') return;
         if (state.currentTask && taskId === state.currentTask.id && !state.navigating) {
           console.log('[TaskDetail] Current task was deleted (e.g. sequence removal), navigating to next task...');
           try {
@@ -1687,6 +1668,9 @@
   async function handleTaskComplete() {
     if (!state.currentTask) return;
 
+    let nextSequenceTaskId = null;
+    let nextSequenceTaskData = null;
+
     // CRITICAL: Verify ownership before deletion
     if (!isAdmin()) {
       const email = getUserEmail();
@@ -1733,49 +1717,47 @@
         if (result.success) {
           console.log('[TaskDetail] Next step created:', result.nextStepType, result);
 
-          if (result.nextStepType && (result.nextStepType.includes('linkedin') || result.nextStepType.includes('phone') || result.nextStepType.includes('task'))) {
-            if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
-              try {
-                console.log('[TaskDetail] Forcing BackgroundTasksLoader refresh to pick up new task...');
-                await window.BackgroundTasksLoader.forceReload();
-                console.log('[TaskDetail] BackgroundTasksLoader refreshed successfully');
-              } catch (reloadError) {
-                console.warn('[TaskDetail] Failed to refresh BackgroundTasksLoader:', reloadError);
-              }
-            }
+          if (result.nextStepType === 'task' && result.taskId) {
+            nextSequenceTaskId = result.taskId;
 
-            if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
-              try {
-                await window.CacheManager.invalidate('tasks');
-                console.log('[TaskDetail] Invalidated tasks cache after next step creation');
-              } catch (cacheError) {
-                console.warn('[TaskDetail] Failed to invalidate cache:', cacheError);
-              }
-            }
+            try {
+              if (window.firebaseDB) {
+                try {
+                  const nextDoc = await window.firebaseDB.collection('tasks').doc(nextSequenceTaskId).get();
+                  if (nextDoc && nextDoc.exists) {
+                    nextSequenceTaskData = { id: nextDoc.id, ...nextDoc.data() };
+                  }
+                } catch (_) { }
 
+                if (!nextSequenceTaskData) {
+                  try {
+                    const snap = await window.firebaseDB.collection('tasks')
+                      .where('id', '==', nextSequenceTaskId)
+                      .limit(1)
+                      .get();
+                    if (snap && !snap.empty) {
+                      const doc = snap.docs[0];
+                      nextSequenceTaskData = { id: doc.id, ...doc.data() };
+                    }
+                  } catch (_) { }
+                }
+              }
+
+              if (nextSequenceTaskData && window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+                await window.CacheManager.updateRecord('tasks', nextSequenceTaskData.id, nextSequenceTaskData);
+              }
+            } catch (_) { }
+          }
+
+          if (result.nextStepType) {
             window.dispatchEvent(new CustomEvent('tasksUpdated', {
               detail: {
                 source: 'sequenceTaskCompletion',
-                taskId: state.currentTask.id,
-                deleted: true,
-                newTaskCreated: true,
-                nextStepType: result.nextStepType
+                newTaskCreated: result.nextStepType === 'task',
+                nextStepType: result.nextStepType,
+                taskData: nextSequenceTaskData
               }
             }));
-
-            document.dispatchEvent(new CustomEvent('pc:tasks-loaded', {
-              detail: { source: 'sequenceTaskCompletion', newTaskCreated: true }
-            }));
-
-            // Dispatch activity refresh for immediate UI update
-            try {
-              const task = state.currentTask;
-              const entityType = task.accountId ? 'account' : (task.contactId ? 'contact' : 'global');
-              const entityId = task.accountId || task.contactId;
-              document.dispatchEvent(new CustomEvent('pc:activities-refresh', {
-                detail: { entityType, entityId, forceRefresh: true }
-              }));
-            } catch (_) { }
           }
         } else {
           console.warn('[TaskDetail] Failed to create next step:', result.message || result.error);
@@ -1862,10 +1844,8 @@
           await taskDoc.ref.delete();
           console.log('[TaskDetail] Successfully deleted task from Firestore:', state.currentTask.id);
 
-          // CRITICAL FIX: Invalidate cache after deletion to prevent stale data
-          if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
-            await window.CacheManager.invalidate('tasks');
-            console.log('[TaskDetail] Invalidated tasks cache after deletion');
+          if (window.CacheManager && typeof window.CacheManager.deleteRecord === 'function') {
+            await window.CacheManager.deleteRecord('tasks', state.currentTask.id);
           }
         } else {
           console.warn('[TaskDetail] Task not found in Firestore for deletion:', state.currentTask.id);
@@ -1886,19 +1866,7 @@
       }
     }
 
-    // CRITICAL FIX: Invalidate cache BEFORE refreshing widget to prevent stale data
-    try {
-      if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
-        await window.CacheManager.invalidate('tasks');
-        console.log('[TaskDetail] Invalidated tasks cache after completion');
-      }
-    } catch (cacheError) {
-      console.warn('[TaskDetail] Failed to invalidate cache:', cacheError);
-    }
-
-    // CRITICAL FIX: Small delay to ensure Firebase deletion and cache invalidation complete
-    // This prevents race condition where loadTodaysTasks() queries Firebase before deletion completes
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 50));
 
     // Show success message
     if (window.crm && typeof window.crm.showToast === 'function') {
@@ -1911,8 +1879,9 @@
         // Force reload BackgroundTasksLoader to ensure fresh data
         if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
           try {
-            await window.BackgroundTasksLoader.forceReload();
-            console.log('[TaskDetail] Forced BackgroundTasksLoader reload before refreshing widget');
+            window.BackgroundTasksLoader.forceReload()
+              .then(() => console.log('[TaskDetail] Forced BackgroundTasksLoader reload before refreshing widget'))
+              .catch((reloadError) => console.warn('[TaskDetail] Failed to force reload BackgroundTasksLoader:', reloadError));
           } catch (reloadError) {
             console.warn('[TaskDetail] Failed to force reload BackgroundTasksLoader:', reloadError);
           }
@@ -1940,7 +1909,11 @@
 
       // Small delay to ensure task deletion has been processed
       await new Promise(resolve => setTimeout(resolve, 100));
-      await navigateToAdjacentTask('next');
+      if (nextSequenceTaskId) {
+        await loadTaskData(nextSequenceTaskId);
+      } else {
+        await navigateToAdjacentTask('next');
+      }
     } catch (e) {
       console.warn('Could not navigate to next task, falling back to previous page:', e);
       // Fallback: navigate back if no next task available
@@ -5998,9 +5971,11 @@
   }
 
   // Load recent activity for the task (account or contact)
-  async function loadRecentActivityForTask() {
+  async function loadRecentActivityForTask(opts = {}) {
     const timelineEl = document.getElementById('task-activity-timeline');
     if (!timelineEl) return;
+
+    const forceRefresh = !!(opts && opts.forceRefresh);
 
     // Check if this is an account task or contact task
     const isAcctTask = isAccountTask(state.currentTask);
@@ -6029,7 +6004,7 @@
           }
 
           if (finalAccountId) {
-            await window.ActivityManager.renderActivities('task-activity-timeline', 'account', finalAccountId, true);
+            await window.ActivityManager.renderActivities('task-activity-timeline', 'account', finalAccountId, forceRefresh);
             // Ensure activities know they're being clicked from task-detail
             window._activityClickSource = 'task-detail';
           } else {
@@ -6084,7 +6059,7 @@
           // Find the contact ID from the contact name
           const contactId = findContactIdByName(contactName);
           if (contactId) {
-            await window.ActivityManager.renderActivities('task-activity-timeline', 'contact', contactId, true);
+            await window.ActivityManager.renderActivities('task-activity-timeline', 'contact', contactId, forceRefresh);
             // Ensure activities know they're being clicked from task-detail
             window._activityClickSource = 'task-detail';
           } else {
@@ -7285,4 +7260,3 @@
   }
 
 })();
-
