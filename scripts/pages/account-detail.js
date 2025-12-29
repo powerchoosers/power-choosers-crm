@@ -5,6 +5,7 @@
 // This shadowed console only affects this file, not the whole app
 var __ACCOUNT_DETAIL_ORIG_CONSOLE__ = window.console || {};
 function __accountDetailDebugEnabled__() {
+  return true; // Force enable for debugging
   try {
     const v = localStorage.getItem('CRM_DEBUG_ACCOUNT_DETAIL');
     if (v != null) return v === '1' || v === 'true';
@@ -3197,7 +3198,26 @@ window._adEventsAttachCount++;
     // Listen for contact creation events to refresh the contacts list
     document.addEventListener('pc:contact-created', async (e) => {
       if (state.currentAccount && e.detail) {
-        const newContact = e.detail.contact || e.detail.doc;
+        const detail = e.detail || {};
+        const id = detail.id || (detail.contact && detail.contact.id) || (detail.doc && detail.doc.id);
+        const doc = detail.contact || detail.doc || {};
+        const newContact = id ? Object.assign({ id }, doc) : doc;
+
+        if (!newContact || !newContact.id) return;
+
+        try {
+          const accountId = state.currentAccount?.id;
+          if (accountId) {
+            if (!window._accountContactsCache) window._accountContactsCache = {};
+            const list = window._accountContactsCache[accountId];
+            if (Array.isArray(list)) {
+              const exists = list.find(c => c && c.id === newContact.id);
+              if (!exists) list.push(newContact);
+            } else {
+              window._accountContactsCache[accountId] = [newContact];
+            }
+          }
+        } catch (_) { }
 
         // Inject into essential data if not already there
         if (newContact && window._essentialContactsData) {

@@ -591,7 +591,58 @@
 
   function getPageItems() { const s = (state.currentPage - 1) * state.pageSize; return state.filtered.slice(s, s + state.pageSize); }
 
-  function paginate() { if (!els.pag) return; const total = state.filtered.length; const pages = Math.max(1, Math.ceil(total / state.pageSize)); state.currentPage = Math.min(state.currentPage, pages); if (els.summary) { const st = total === 0 ? 0 : (state.currentPage - 1) * state.pageSize + 1; const en = Math.min(state.currentPage * state.pageSize, total); els.summary.textContent = `${st}-${en} of ${total}`; } let html = ''; const btn = (l, d, p) => `<button class="page-btn" ${d ? 'disabled' : ''} data-page="${p}">${l}</button>`; html += btn('Prev', state.currentPage === 1, state.currentPage - 1); for (let p = 1; p <= pages; p++) { html += `<button class="page-btn ${p === state.currentPage ? 'active' : ''}" data-page="${p}">${p}</button>`; } html += btn('Next', state.currentPage === pages, state.currentPage + 1); els.pag.innerHTML = html; els.pag.querySelectorAll('.page-btn').forEach(b => b.addEventListener('click', () => { const n = parseInt(b.getAttribute('data-page') || '1', 10); if (!isNaN(n) && n >= 1 && n <= pages) { state.currentPage = n; render(); } })); }
+  function getTotalPages() { return Math.max(1, Math.ceil(state.filtered.length / state.pageSize)); }
+
+  function renderPagination() {
+    if (!els.pag) return;
+    const totalPages = getTotalPages();
+    const current = Math.min(state.currentPage, totalPages);
+    state.currentPage = current;
+    const total = state.filtered.length;
+    const start = total === 0 ? 0 : (current - 1) * state.pageSize + 1;
+    const end = total === 0 ? 0 : Math.min(total, current * state.pageSize);
+
+    // Use unified pagination component
+    if (window.crm && window.crm.createPagination) {
+      window.crm.createPagination(current, totalPages, (page) => {
+        state.currentPage = page;
+        render();
+        // Scroll to top after page change via unified paginator
+        try {
+          requestAnimationFrame(() => {
+            const scroller = (els.page && els.page.querySelector) ? els.page.querySelector('.table-scroll') : null;
+            if (scroller && typeof scroller.scrollTo === 'function') scroller.scrollTo({ top: 0, behavior: 'auto' });
+            else if (scroller) scroller.scrollTop = 0;
+            const main = document.getElementById('main-content');
+            if (main && typeof main.scrollTo === 'function') main.scrollTo({ top: 0, behavior: 'auto' });
+            const contentArea = document.querySelector('.content-area');
+            if (contentArea && typeof contentArea.scrollTo === 'function') contentArea.scrollTo({ top: 0, behavior: 'auto' });
+            window.scrollTo(0, 0);
+          });
+        } catch (_) { /* noop */ }
+      }, els.pag.id);
+    } else {
+      // Fallback to simple pagination if unified component not available
+      let html = '';
+      const btn = (l, d, p) => `<button class="pagination-arrow" ${d ? 'disabled' : ''} data-page="${p}">${l}</button>`;
+      html += btn('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"></polyline></svg>', current <= 1, current - 1);
+      html += `<div class="pagination-current">${current}</div>`;
+      html += btn('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,18 15,12 9,6"></polyline></svg>', current >= totalPages, current + 1);
+      
+      els.pag.innerHTML = `<div class="unified-pagination">${html}</div>`;
+      els.pag.querySelectorAll('button[data-page]').forEach(b => b.addEventListener('click', () => {
+        const n = parseInt(b.getAttribute('data-page') || '1', 10);
+        if (!isNaN(n) && n >= 1 && n <= totalPages) {
+          state.currentPage = n;
+          render();
+        }
+      }));
+    }
+
+    if (els.summary) {
+      els.summary.textContent = `Showing ${start}\u2013${end} of ${total} tasks`;
+    }
+  }
 
   function render() {
     if (!els.tbody) return; state.filtered = sortTasksChronologically(state.filtered); const rows = getPageItems(); els.tbody.innerHTML = rows.map(r => rowHtml(r)).join('');
@@ -721,7 +772,7 @@
     }));
     // Header select state
     if (els.selectAll) { const pageIds = new Set(rows.map(r => r.id)); const allSelected = [...pageIds].every(id => state.selected.has(id)); els.selectAll.checked = allSelected && rows.length > 0; }
-    paginate(); updateBulkBar();
+    renderPagination(); updateBulkBar();
   }
 
   // Update task titles to descriptive format

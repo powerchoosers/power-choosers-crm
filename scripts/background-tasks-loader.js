@@ -295,6 +295,10 @@
   window.addEventListener('tasksUpdated', async (event) => {
     const { source, taskId, deleted, newTaskCreated, rescheduled } = event.detail || {};
 
+    if (source === 'tasksPageLoad' || source === 'navigation') {
+      return;
+    }
+
     // CRITICAL FIX: If a task was deleted, remove it from local cache immediately
     if (deleted && taskId) {
       try {
@@ -396,8 +400,9 @@
           : null;
         const age = cacheAge?.timestamp ? (Date.now() - cacheAge.timestamp) : Infinity;
 
-        // CRITICAL FIX: Use the same expiry time as CacheManager (3 minutes for tasks)
-        const tasksCacheExpiry = 3 * 60 * 1000; // 3 minutes (matches CacheManager.tasksCacheExpiry)
+        const tasksCacheExpiry = (window.CacheManager && typeof window.CacheManager.tasksCacheExpiry === 'number')
+          ? window.CacheManager.tasksCacheExpiry
+          : (2 * 60 * 60 * 1000);
 
         // If cache is older than expiry time, refresh
         if (age > tasksCacheExpiry) {
@@ -534,6 +539,5 @@
   };
 
 })();
-
 
 
