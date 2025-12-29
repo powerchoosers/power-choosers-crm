@@ -523,16 +523,6 @@
 
           if (account && account.id) {
             console.log('[ListDetail] Navigating to account:', account.id, account.accountName || account.name);
-
-            try {
-              const bd = document.querySelector('.bulk-select-backdrop');
-              if (bd && bd.parentNode) bd.parentNode.removeChild(bd);
-            } catch (_) { }
-            try {
-              const bd2 = document.getElementById('list-detail-delete-backdrop');
-              if (bd2 && bd2.parentNode) bd2.parentNode.removeChild(bd2);
-            } catch (_) { }
-
             // Store navigation context for back button
             window._accountNavigationSource = 'list-detail';
             window._accountNavigationListId = state.listId;
@@ -580,15 +570,6 @@
             window._accountNavigationListId = state.listId;
             window._accountNavigationListName = state.listName;
             window._accountNavigationListView = 'accounts';
-
-            try {
-              const bd = document.querySelector('.bulk-select-backdrop');
-              if (bd && bd.parentNode) bd.parentNode.removeChild(bd);
-            } catch (_) { }
-            try {
-              const bd2 = document.getElementById('list-detail-delete-backdrop');
-              if (bd2 && bd2.parentNode) bd2.parentNode.removeChild(bd2);
-            } catch (_) { }
 
             // Capture state for restoration
             try {
@@ -1298,7 +1279,7 @@
           if (addedPeople > 0 || addedAccounts > 0) {
             console.log(`[ListDetail] ✓ Merged ${addedPeople} people, ${addedAccounts} accounts from subcollection (legacy data)`);
           }
-        }
+          }
         }
       } catch (subErr) {
         console.warn('[ListDetail] Subcollection query failed (non-critical):', subErr);
