@@ -1577,23 +1577,6 @@ var console = {
     // Data loading moved to showAccountDetail
   }
 
-    // DEBUG: Add test function to manually trigger Conversational Intelligence
-    window.testConversationalIntelligence = async function (callSid) {
-      try {
-        const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
-        const response = await fetch(base + '/api/twilio/conversational-intelligence', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ callSid: callSid })
-        });
-        const result = await response.json();
-        return result;
-      } catch (error) {
-        console.error('[DEBUG] Conversational Intelligence error:', error);
-        return { error: error.message };
-      }
-    };
-
   // ===== Recent Calls (Account) =====
   function injectRecentCallsStyles() {
     if (document.getElementById('recent-calls-styles')) return;
@@ -2582,17 +2565,6 @@ var console = {
       try { transcriptHtml = renderTranscriptHtml(AI, r.formattedTranscript || r.transcript); } catch (__) { transcriptHtml = 'Transcript not available'; }
     }
 
-    // DEBUG: Log transcript data for debugging
-    console.log('[Account Detail] Call transcript debug:', {
-      callId: r.id,
-      twilioSid: r.twilioSid,
-      hasTranscript: !!r.transcript,
-      transcriptLength: r.transcript ? r.transcript.length : 0,
-      transcriptPreview: r.transcript ? r.transcript.substring(0, 100) : 'N/A',
-      hasAI: !!AI,
-      aiKeys: AI ? Object.keys(AI) : [],
-      finalTranscriptRenderedPreview: (function () { try { return (transcriptHtml || '').slice(0, 100); } catch (_) { return 'N/A'; } })()
-    });
     const rec = r.audioUrl || r.recordingUrl || '';
     let proxied = '';
     if (rec) {
@@ -3148,9 +3120,6 @@ var console = {
   };  // End of openEditAccountModal assignment
 
   function attachAccountDetailEvents() {
-if (!window._adEventsAttachCount) window._adEventsAttachCount = 0;
-window._adEventsAttachCount++;
-
     // === DOCUMENT-LEVEL LISTENERS (attach ONCE - they persist across DOM changes) ===
     if (!window._accountDetailDocEventsBound) {
       window._accountDetailDocEventsBound = true;
@@ -3796,6 +3765,10 @@ window._adEventsAttachCount++;
         // If focus moves outside the wrap, start close timer
         if (!widgetsWrap.contains(e.relatedTarget)) closeSoon();
       });
+
+      try {
+        if (widgetsBtn.matches(':hover') || widgetsWrap.matches(':hover')) openNow();
+      } catch (_) { }
     }
 
     // Add contact button
@@ -4117,14 +4090,6 @@ window._adEventsAttachCount++;
                 });
               }
               // Trigger call
-              console.log('[Account Detail][DEBUG] Calling contact with phone:', {
-                phone: phone,
-                contactName: fullName,
-                contactId: contact.id,
-                accountId: account.id,
-                accountName: account.accountName || account.name,
-                companyPhone: account.companyPhone
-              });
               window.Widgets.callNumber(phone, fullName, true, 'account-detail-contact');
             } else {
               // Fallback to tel: link

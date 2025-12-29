@@ -4063,6 +4063,10 @@
         // If focus moves outside the wrap, start close timer
         if (!widgetsWrap.contains(e.relatedTarget)) closeSoon();
       });
+
+      try {
+        if (widgetsBtn.matches(':hover') || widgetsWrap.matches(':hover')) openNow();
+      } catch (_) { }
     }
 
     // Widget drawer item clicks
