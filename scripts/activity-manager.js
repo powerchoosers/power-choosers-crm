@@ -92,10 +92,22 @@ class ActivityManager {
    */
   savePersistedCache(key, cache) {
     try {
-      // Convert Map to object for JSON storage
       const obj = Object.fromEntries(cache);
-      sessionStorage.setItem(key, JSON.stringify(obj));
+      const serialized = JSON.stringify(obj);
+      sessionStorage.setItem(key, serialized);
     } catch (e) {
+      try {
+        const entries = Array.from(cache.entries());
+        if (entries.length > 50) {
+          const trimmed = new Map(entries.slice(-50));
+          const obj2 = Object.fromEntries(trimmed);
+          sessionStorage.setItem(key, JSON.stringify(obj2));
+          cache.clear();
+          for (const [k, v] of trimmed.entries()) cache.set(k, v);
+          return;
+        }
+        sessionStorage.removeItem(key);
+      } catch (_) { }
       console.warn(`[ActivityManager] Failed to save persisted cache ${key}:`, e);
     }
   }
@@ -209,6 +221,9 @@ class ActivityManager {
 
     // Invalidate task cache when tasks are created/updated/deleted
     document.addEventListener('tasksUpdated', (e) => {
+      const source = (e && e.detail && typeof e.detail.source === 'string') ? e.detail.source : '';
+      if (source === 'tasksPageLoad' || source === 'navigation') return;
+
       if (window.CacheManager) window.CacheManager.invalidate('tasks');
       this.invalidateActivityCache('global', null); // Invalidate global activities
       this.processedEmailsCache.clear(); // Clear processed emails cache

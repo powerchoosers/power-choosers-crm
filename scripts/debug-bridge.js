@@ -8,7 +8,6 @@
     const isPort3000 = window.location.port === '3000';
     
     if (!(isLocalhost && isPort3000)) {
-        console.log('[Debug Bridge] Disabled in production environment');
         return;
     }
 
@@ -20,13 +19,25 @@
 
     function sendToDebug(type, args) {
         try {
-            // Avoid logging our own network requests to prevent infinite loops
-            const message = args.map(arg => {
-                if (typeof arg === 'object') {
-                    try { return JSON.stringify(arg); } catch(e) { return '[Circular or Non-Serializable Object]'; }
+            const formatArg = (arg) => {
+                try {
+                    if (arg instanceof Error) {
+                        return JSON.stringify({
+                            name: arg.name,
+                            message: arg.message,
+                            stack: arg.stack
+                        });
+                    }
+                } catch (_) { }
+
+                if (arg && typeof arg === 'object') {
+                    try { return JSON.stringify(arg); } catch (e) { return '[Circular or Non-Serializable Object]'; }
                 }
                 return String(arg);
-            }).join(' ');
+            };
+
+            // Avoid logging our own network requests to prevent infinite loops
+            const message = args.map(formatArg).join(' ');
 
             // Don't send logs that are just the bridge heartbeat or the bridge itself
             if (message.includes('/api/debug/log')) return;
@@ -51,8 +62,10 @@
     }
 
     console.log = function() {
-        originalConsole.log.apply(console, arguments);
-        sendToDebug('log', Array.from(arguments));
+        if (window.VERBOSE_LOGS === true) {
+            originalConsole.log.apply(console, arguments);
+            sendToDebug('log', Array.from(arguments));
+        }
     };
 
     console.warn = function() {
@@ -73,5 +86,4 @@
         sendToDebug('unhandled-rejection', [event.reason]);
     });
 
-    originalConsole.log('[Debug Bridge] Initialized - Logs are being mirrored to .cursor/debug.log');
 })();

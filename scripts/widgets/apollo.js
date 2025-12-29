@@ -30,7 +30,15 @@
   const contactsPerPage = 5;
 
   // Simple logger helper
-  function lushaLog() {}
+  const __lushaRealConsole = (typeof window !== 'undefined' && window.console)
+    ? window.console
+    : ((typeof globalThis !== 'undefined' && globalThis.console) ? globalThis.console : null);
+
+  function lushaLog() {
+    return;
+  }
+
+  try { window.__apolloWidgetLog = lushaLog; } catch (_) { }
 
   function getPanelContentEl() {
     const panel = document.getElementById('widget-panel');
@@ -375,7 +383,7 @@
   }
 
   async function performLushaSearch(options = {}) {
-    lushaLog('Starting Lusha search with options:', options);
+    lushaLog('Starting Apollo search with options:', options);
 
     // Reset pagination state
     allContacts = [];
@@ -1699,10 +1707,25 @@
       // Save to CRM contacts collection
       if (existingId) {
         await window.PCSaves.updateContact(existingId, payload);
-        window.crm?.showToast && window.crm.showToast('Enriched existing contact');
+
+        try {
+          if (window.ContactDetail && window.ContactDetail.state && window.ContactDetail.state.currentContact) {
+            const currentId = window.ContactDetail.state.currentContact.id || window.ContactDetail.state.currentContact._id;
+            if (currentId && String(currentId) === String(existingId)) {
+              window.ContactDetail.state.currentContact = Object.assign({}, window.ContactDetail.state.currentContact, payload);
+              if (typeof window.ContactDetail.renderContactDetail === 'function') {
+                window.ContactDetail.renderContactDetail();
+              }
+            }
+          }
+        } catch (_) { }
       } else {
         const ref = await db.collection('contacts').add(payload);
-        window.crm?.showToast && window.crm.showToast('Contact added to CRM');
+        try {
+          if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+            window.CacheManager.updateRecord('contacts', ref.id, Object.assign({ id: ref.id }, payload));
+          }
+        } catch (_) { }
         // Emit create event for People page to prepend
         try { document.dispatchEvent(new CustomEvent('pc:contact-created', { detail: { id: ref.id, doc: payload } })); } catch (_) { }
       }
@@ -1712,6 +1735,29 @@
         await upsertCacheContact({ company: lastCompanyResult }, contact);
       } catch (cacheError) {
       }
+
+      try {
+        if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+          window.CacheManager.invalidate('contacts');
+        }
+      } catch (_) { }
+
+      try {
+        const fullName = String(payload.name || '').trim();
+        const iconLetter = (fullName || payload.firstName || payload.companyName || 'C').toString().trim().charAt(0).toUpperCase() || 'C';
+        const titleLine = [payload.title, payload.companyName].filter(Boolean).join(' • ');
+        const hasAnyPhone = Boolean(payload.workDirectPhone || payload.mobile || payload.otherPhone || payload.phone);
+
+        if (window.crm && typeof window.crm.showToast === 'function' && hasAnyPhone) {
+          window.crm.showToast(titleLine || 'Contact', 'save', {
+            title: 'Number saved',
+            details: fullName || '',
+            icon: iconLetter,
+            duration: 3500,
+            sound: false
+          });
+        }
+      } catch (_) { }
 
     } catch (error) {
       try { window.crm?.showToast && window.crm.showToast('Failed to add/enrich contact: ' + error.message); } catch (_) { }
@@ -3592,6 +3638,14 @@
 
 })();
 
+function apolloLog() {
+  return;
+}
+
+function lushaLog() {
+  return;
+}
+
 // Simple crossfade helper
 function crossfadeToResults() {
   try {
@@ -3801,16 +3855,13 @@ function animateRevealContent(container, newContent) {
   if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
 
   const poll = async () => {
-    // Safety check: stop polling if the widget is closed or the element is removed
-    if (!wrap || !document.body.contains(wrap)) {
-      lushaLog('Polling stopped: widget UI element no longer exists in DOM');
-      return;
-    }
+    const uiAlive = !!wrap && document.body.contains(wrap);
+    const containerAlive = !!container && document.body.contains(container);
 
     attempts++;
 
     try {
-      lushaLog(`Polling for phones (attempt ${attempts}) for person:`, personId);
+      apolloLog(`Polling for phones (attempt ${attempts}) for person:`, personId);
 
       const response = await fetch(`${base}/api/apollo/phone-retrieve?personId=${encodeURIComponent(personId)}`);
 
@@ -3822,7 +3873,7 @@ function animateRevealContent(container, newContent) {
 
       // Log backend debug info if available (critical for troubleshooting Cloud Run issues)
       if (data && data.debug) {
-        lushaLog('🔍 [Backend Debug]', data.debug);
+        apolloLog('🔍 [Backend Debug]', data.debug);
       }
 
       // Relaxed check: accept empty phones array if ready=true (meaning webhook arrived but had no phones)
@@ -3843,7 +3894,7 @@ function animateRevealContent(container, newContent) {
       if (readyData) {
         try {
           // Phone numbers (or empty result) arrived!
-          lushaLog('Phone retrieval completed. Count:', readyData.phones.length);
+          apolloLog('Phone retrieval completed. Count:', readyData.phones.length);
 
           // Extract phone numbers
           const phones = readyData.phones.map(p => ({
@@ -3853,25 +3904,28 @@ function animateRevealContent(container, newContent) {
 
           // Update UI
           const phoneNumbers = phones.map(p => p.number).filter(Boolean);
+          let didSaveToCRM = false;
           
-          if (phoneNumbers.length > 0) {
-            const newContent = phones.map((p, idx) => {
-               // Treat first number as primary for display purposes in the widget
-               return `<div class="lusha-value-item">${formatPhoneLink(p.number, p.type, idx === 0)}</div>`;
-            }).join('');
-            animateRevealContent(wrap, newContent);
-            
-            // Show success toast
-            if (window.crm?.showToast) {
-              window.crm.showToast(`✅ Revealed ${phoneNumbers.length} phone number(s)`, 'success');
+          if (uiAlive) {
+            if (phoneNumbers.length > 0) {
+              const newContent = phones.map((p, idx) => {
+                 // Treat first number as primary for display purposes in the widget
+                 return `<div class="lusha-value-item">${formatPhoneLink(p.number, p.type, idx === 0)}</div>`;
+              }).join('');
+              animateRevealContent(wrap, newContent);
+              
+              // Show success toast
+              if (window.crm?.showToast) {
+                window.crm.showToast(`✅ Revealed ${phoneNumbers.length} phone number(s)`, 'success');
+              }
+            } else {
+               // No phones found
+               const noPhonesContent = '<div class="lusha-value-item">—</div>';
+               animateRevealContent(wrap, noPhonesContent);
+               if (window.crm?.showToast) {
+                 window.crm.showToast('No phone numbers found', 'info');
+               }
             }
-          } else {
-             // No phones found
-             const noPhonesContent = '<div class="lusha-value-item">—</div>';
-             animateRevealContent(wrap, noPhonesContent);
-             if (window.crm?.showToast) {
-               window.crm.showToast('No phone numbers found', 'info');
-             }
           }
 
           // Update contact object using Smart Mapping
@@ -3894,6 +3948,65 @@ function animateRevealContent(container, newContent) {
           // Legacy fallback
           if (phoneNumbers.length > 0) {
             contact.phone = phoneNumbers[0];
+          }
+
+          if (phoneNumbers.length > 0) {
+            try {
+              const db = window.firebaseDB;
+              if (db) {
+                const email = contact.email || (Array.isArray(contact.emails) && contact.emails[0] && contact.emails[0].address) || '';
+                const companyName = String(contact.company || contact.companyName || (companyContext && (companyContext.name || companyContext.companyName)) || '').trim();
+                let existingId = null;
+
+                if (email) {
+                  try {
+                    const snap = await db.collection('contacts').where('email', '==', String(email)).limit(1).get();
+                    if (snap && snap.docs && snap.docs[0]) existingId = snap.docs[0].id;
+                  } catch (_) { }
+                }
+
+                if (!existingId) {
+                  const fullName = String(contact.fullName || contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim()).trim();
+                  if (fullName && companyName) {
+                    try {
+                      const snap = await db.collection('contacts').where('name', '==', fullName).limit(5).get();
+                      if (snap && snap.docs && snap.docs.length > 0) {
+                        const targetCompany = companyName.toLowerCase();
+                        const match = snap.docs.find(doc => {
+                          const data = doc.data();
+                          const dbCompany = String(data.companyName || data.accountName || '').toLowerCase();
+                          return (dbCompany && (dbCompany.includes(targetCompany) || targetCompany.includes(dbCompany)));
+                        });
+                        if (match) existingId = match.id;
+                      }
+                    } catch (_) { }
+                  }
+                }
+
+                if (existingId) {
+                  const updatePayload = {
+                    phone: phoneNumbers[0] || '',
+                    workDirectPhone: smartMap.workDirectPhone || '',
+                    mobile: smartMap.mobile || '',
+                    otherPhone: smartMap.otherPhone || '',
+                    updatedAt: new Date()
+                  };
+
+                  if (window.PCSaves && typeof window.PCSaves.updateContact === 'function') {
+                    await window.PCSaves.updateContact(existingId, updatePayload);
+                  } else {
+                    await db.collection('contacts').doc(String(existingId)).set(updatePayload, { merge: true });
+                  }
+                  didSaveToCRM = true;
+
+                  try {
+                    if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+                      await window.CacheManager.invalidate('contacts');
+                    }
+                  } catch (_) { }
+                }
+              }
+            } catch (_) { }
           }
 
           try {
@@ -3921,21 +4034,25 @@ function animateRevealContent(container, newContent) {
               allContacts[idx].hasMobilePhone = contact.hasMobilePhone;
               allContacts[idx].hasDirectPhone = contact.hasDirectPhone;
               if (phoneNumbers[0]) allContacts[idx].phone = phoneNumbers[0];
-              lushaLog('Updated phone numbers in cache for:', id);
+              apolloLog('Updated phone numbers in cache for:', id);
               updatedContactForCache = allContacts[idx];
             }
           } catch (e) {
-            lushaLog('Failed to update cache:', e);
+            apolloLog('Failed to update cache:', e);
           }
 
           try {
-            const revealBtn = container.querySelector('[data-reveal="phones"]');
-            if (revealBtn) revealBtn.textContent = 'Enrich';
+            if (containerAlive) {
+              const revealBtn = container.querySelector('[data-reveal="phones"]');
+              if (revealBtn) revealBtn.textContent = 'Enrich';
+            }
           } catch (_) { }
 
           try {
-            const addContactBtn = container.querySelector('[data-action="add-contact"]');
-            if (addContactBtn) addContactBtn.setAttribute('data-contact', JSON.stringify(contact));
+            if (containerAlive) {
+              const addContactBtn = container.querySelector('[data-action="add-contact"]');
+              if (addContactBtn) addContactBtn.setAttribute('data-contact', JSON.stringify(contact));
+            }
           } catch (_) { }
 
           try {
@@ -3944,15 +4061,37 @@ function animateRevealContent(container, newContent) {
               name: updatedContactForCache.companyName || updatedContactForCache.company || ''
             };
             await upsertCacheContact({ company: companyForCache }, updatedContactForCache);
-            lushaLog('Persisted phone numbers to cache for:', contact.id || contact.contactId);
+            apolloLog('Persisted phone numbers to cache for:', contact.id || contact.contactId);
           } catch (e) {
-            lushaLog('Failed to persist phone numbers to cache:', e);
+            apolloLog('Failed to persist phone numbers to cache:', e);
+          }
+
+          if (!uiAlive && phoneNumbers.length > 0) {
+            try {
+              const fullName = String(contact.fullName || contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim()).trim();
+              const companyName = String((companyContext && (companyContext.name || companyContext.companyName)) || contact.companyName || contact.company || '').trim();
+              const title = String(contact.jobTitle || contact.title || '').trim();
+              const titleLine = [title, companyName].filter(Boolean).join(' • ');
+              const iconLetter = (fullName || companyName || 'C').toString().trim().charAt(0).toUpperCase() || 'C';
+
+              if (window.crm?.showToast) {
+                window.crm.showToast(titleLine || 'Contact', 'save', {
+                  title: didSaveToCRM ? 'Number saved' : 'Phone ready',
+                  details: didSaveToCRM ? (fullName || '') : ([fullName || '', 'Not saved to CRM yet'].filter(Boolean).join(' • ')),
+                  icon: iconLetter,
+                  duration: 4500,
+                  sound: false
+                });
+              }
+            } catch (_) { }
           }
 
         } catch (processError) {
-          lushaLog('❌ Error processing phone data:', processError);
+          apolloLog('❌ Error processing phone data:', processError);
           // Show error state in UI so user isn't stuck loading
-          animateRevealContent(wrap, '<div class="lusha-value-item" style="color: var(--danger);">Error displaying data</div>');
+          if (uiAlive) {
+            animateRevealContent(wrap, '<div class="lusha-value-item" style="color: var(--danger);">Error displaying data</div>');
+          }
         }
 
         return; // Stop polling regardless of success/fail in processing
@@ -3961,13 +4100,15 @@ function animateRevealContent(container, newContent) {
       // Not ready yet, continue polling
       if (attempts < maxAttempts) {
         const delayMs = getNextPollDelayMs();
-        lushaLog(`Phone numbers not ready yet, polling again in ${Math.round(delayMs / 1000)}s...`);
+        apolloLog(`Phone numbers not ready yet, polling again in ${Math.round(delayMs / 1000)}s...`);
         setTimeout(poll, delayMs);
       } else {
         // Timeout - show error
-        lushaLog('Phone polling timeout after', attempts, 'attempts');
-        const timeoutContent = '<div class="lusha-value-item" style="color: var(--text-muted);">⏱️ Phone reveal timed out. Try again later.</div>';
-        animateRevealContent(wrap, timeoutContent);
+        apolloLog('Phone polling timeout after', attempts, 'attempts');
+        if (uiAlive) {
+          const timeoutContent = '<div class="lusha-value-item" style="color: var(--text-muted);">⏱️ Phone reveal timed out. Try again later.</div>';
+          animateRevealContent(wrap, timeoutContent);
+        }
 
         if (window.crm?.showToast) {
           window.crm.showToast('Phone reveal is taking longer than expected. Try again later.', 'warning');
@@ -3975,15 +4116,17 @@ function animateRevealContent(container, newContent) {
       }
 
     } catch (error) {
-      lushaLog('Phone polling error:', error);
+      apolloLog('Phone polling error:', error);
 
       // Retry on network error (up to max attempts)
       if (attempts < maxAttempts) {
         const delayMs = getNextPollDelayMs();
         setTimeout(poll, delayMs);
       } else {
-        const errorContent = '<div class="lusha-value-item">—</div>';
-        animateRevealContent(wrap, errorContent);
+        if (uiAlive) {
+          const errorContent = '<div class="lusha-value-item">—</div>';
+          animateRevealContent(wrap, errorContent);
+        }
 
         if (window.crm?.showToast) {
           window.crm.showToast('Failed to reveal phone numbers', 'error');
