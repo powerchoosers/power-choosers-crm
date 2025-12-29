@@ -1,18 +1,6 @@
 (function () {
   'use strict';
 
-  const console = (() => {
-    const base = (typeof window !== 'undefined' && window.console)
-      ? window.console
-      : ((typeof globalThis !== 'undefined' && globalThis.console) ? globalThis.console : null);
-    const scoped = base ? Object.create(base) : {};
-    scoped.log = () => {};
-    scoped.warn = () => {};
-    scoped.error = () => {};
-    scoped.debug = () => {};
-    return scoped;
-  })();
-
   // Lusha API Widget for Contact Detail and Account Detail
   // Exposes: window.Widgets.openLusha(contactId), window.Widgets.openLushaForAccount(accountId)
   if (!window.Widgets) window.Widgets = {};
@@ -28,17 +16,6 @@
   let allContacts = []; // Store all contacts for pagination
   let currentPage = 1;
   const contactsPerPage = 5;
-
-  // Simple logger helper
-  const __lushaRealConsole = (typeof window !== 'undefined' && window.console)
-    ? window.console
-    : ((typeof globalThis !== 'undefined' && globalThis.console) ? globalThis.console : null);
-
-  function lushaLog() {
-    return;
-  }
-
-  try { window.__apolloWidgetLog = lushaLog; } catch (_) { }
 
   function getPanelContentEl() {
     const panel = document.getElementById('widget-panel');
@@ -193,35 +170,24 @@
         </div>
 
         <!-- Results Section -->
-        <div class="lusha-results is-hidden" id="lusha-results">
+        <div class="lusha-results is-hidden" id="lusha-results" style="display: block;">
           <div class="lusha-results-header" style="opacity:0;transform:translateY(8px);">
-            <div class="lusha-results-header-top">
-              <div class="lusha-results-title-group">
-                <h4>Search Results</h4>
-                <div class="lusha-results-count" id="lusha-results-count">0 contacts found</div>
+            <h4>Search Results</h4>
+            <div class="lusha-results-count" id="lusha-results-count">0 contacts found</div>
+            <div class="lusha-pagination" id="lusha-pagination" style="display:flex; visibility: hidden;">
+              <button class="lusha-pagination-arrow" id="lusha-prev-btn" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="15,18 9,12 15,6"/>
+                </svg>
+              </button>
+              <div class="lusha-pagination-current-container">
+                <div class="lusha-pagination-current" id="lusha-pagination-current">1</div>
               </div>
-              <div class="lusha-pagination" id="lusha-pagination" style="display:flex; visibility: hidden;">
-                <button class="lusha-pagination-arrow" id="lusha-prev-btn" disabled>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="15,18 9,12 15,6"/>
-                  </svg>
-                </button>
-                <div class="lusha-pagination-current-container">
-                  <div class="lusha-pagination-current" id="lusha-pagination-current">1</div>
-                </div>
-                <button class="lusha-pagination-arrow" id="lusha-next-btn" disabled>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="9,18 15,12 9,6"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div class="lusha-name-search-container">
-              <input type="text" class="lusha-name-search-input" id="lusha-name-search-input" placeholder="Search by name...">
-              <svg class="lusha-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              </svg>
+              <button class="lusha-pagination-arrow" id="lusha-next-btn" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9,18 15,12 9,6"/>
+                </svg>
+              </button>
             </div>
           </div>
           
@@ -369,21 +335,10 @@
         }
       });
     }
-
-    // Name search input
-    const nameSearchInput = document.getElementById('lusha-name-search-input');
-    if (nameSearchInput) {
-      nameSearchInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-          const name = nameSearchInput.value.trim();
-          performLushaSearch({ forceLive: true, personName: name });
-        }
-      });
-    }
   }
 
   async function performLushaSearch(options = {}) {
-    lushaLog('Starting Apollo search with options:', options);
+    lushaLog('Starting Lusha search with options:', options);
 
     // Reset pagination state
     allContacts = [];
@@ -398,7 +353,7 @@
     }
     if (resultsWrap) {
       try {
-        resultsWrap.style.display = 'flex';
+        resultsWrap.style.display = 'block';
         if (!options.forceLive) {
           resultsWrap.classList.remove('is-shown');
           resultsWrap.classList.add('is-hidden');
@@ -415,15 +370,8 @@
     const ctx = getContextDefaults(currentEntityType);
     let companyName = ctx.companyName;
     let domain = ctx.domain;
-
-    // If we have a preserved result from a previous open of the same entity, use its context to ensure consistent cache keys
-    if (lastCompanyResult) {
-      if (lastCompanyResult.domain) domain = lastCompanyResult.domain;
-      if (lastCompanyResult.name) companyName = lastCompanyResult.name;
-      lushaLog('Using preserved lastCompanyResult for context:', { companyName, domain });
-    }
-
     lushaLog('Context derived:', { companyName, domain, entityType: currentEntityType, currentAccountId, currentContactId });
+    console.log('[Apollo Widget] Search context:', { companyName, domain, entityType: currentEntityType, currentAccountId, currentContactId, lastCompanyResult: lastCompanyResult?.name });
 
     try {
       if (!companyName && !domain) {
@@ -487,34 +435,8 @@
             lushaLog('Name map restored from cache. size=', nameMap.size);
           } catch (_) { }
 
-          const cachedContacts = Array.isArray(cached.contacts) ? cached.contacts : [];
-          const hydratedContacts = cachedContacts.map(c => {
-            const key = c.contactId || c.id;
-            if (!key) return c;
-            try {
-              const rawHard = localStorage.getItem(`lusha_contact_${key}`);
-              if (!rawHard) return c;
-              const hardCached = JSON.parse(rawHard);
-              const merged = Object.assign({}, c);
-              if (hardCached && Array.isArray(hardCached.phones) && hardCached.phones.length > 0) {
-                merged.phones = hardCached.phones;
-                merged.hasPhones = true;
-                merged.phone = hardCached.phone || (hardCached.phones[0] && hardCached.phones[0].number);
-                merged.mobile = hardCached.mobile;
-                merged.workDirectPhone = hardCached.workDirectPhone;
-                merged.otherPhone = hardCached.otherPhone;
-              }
-              if (hardCached && Array.isArray(hardCached.emails) && hardCached.emails.length > 0) {
-                merged.emails = hardCached.emails;
-                merged.hasEmails = true;
-                merged.email = hardCached.email || (hardCached.emails[0] && hardCached.emails[0].address);
-              }
-              return merged;
-            } catch (_) { return c; }
-          });
-
           renderCompanyPanel(lastCompanyResult, false); // Allow animation for cached results
-          updateResults(hydratedContacts);
+          updateResults(cached.contacts);
           // Crossfade from loading to results
           try { crossfadeToResults(); } catch (_) { }
 
@@ -564,31 +486,7 @@
             // Minimal company context (avoid company GET)
             lastCompanyResult = { name: companyName || '', domain: domain || '' };
             renderCompanyPanel(lastCompanyResult, false);
-            const hydratedContacts = (Array.isArray(contacts) ? contacts : []).map(c => {
-              const key = c.contactId || c.id;
-              if (!key) return c;
-              try {
-                const rawHard = localStorage.getItem(`lusha_contact_${key}`);
-                if (!rawHard) return c;
-                const hardCached = JSON.parse(rawHard);
-                const merged = Object.assign({}, c);
-                if (hardCached && Array.isArray(hardCached.phones) && hardCached.phones.length > 0) {
-                  merged.phones = hardCached.phones;
-                  merged.hasPhones = true;
-                  merged.phone = hardCached.phone || (hardCached.phones[0] && hardCached.phones[0].number);
-                  merged.mobile = hardCached.mobile;
-                  merged.workDirectPhone = hardCached.workDirectPhone;
-                  merged.otherPhone = hardCached.otherPhone;
-                }
-                if (hardCached && Array.isArray(hardCached.emails) && hardCached.emails.length > 0) {
-                  merged.emails = hardCached.emails;
-                  merged.hasEmails = true;
-                  merged.email = hardCached.email || (hardCached.emails[0] && hardCached.emails[0].address);
-                }
-                return merged;
-              } catch (_) { return c; }
-            });
-            updateResults(hydratedContacts);
+            updateResults(contacts);
             // Persist minimal results to lusha_cache immediately so reopen shows them
             try { await saveCache({ company: lastCompanyResult, contacts }); } catch (_) { }
             try { crossfadeToResults(); } catch (_) { }
@@ -665,6 +563,7 @@
           // extract basic company info from first contact's organization (NO extra API call - saves 1 credit!)
           if (contacts.length > 0 && lastCompanyResult && lastCompanyResult._notFoundInApollo) {
             const firstContact = contacts[0];
+            console.log('[Apollo Widget] Company not found by domain, using contact data (no extra credit charge)');
             lastCompanyResult = {
               id: firstContact.companyId || null,
               name: firstContact.companyName || companyName,
@@ -714,25 +613,22 @@
       let base = (window.API_BASE_URL || '').replace(/\/$/, '');
       if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
 
-      // Only fetch company data if we don't have it or if we're forcing live WITHOUT a name search
-      if (!lastCompanyResult || (!options.personName && options.forceLive)) {
-        const params = new URLSearchParams();
-        if (domain) params.append('domain', domain);
-        if (companyName) params.append('company', companyName);
-        const url = `${base}/api/apollo/company?${params.toString()}`;
-        lushaLog('Fetching company data from:', url);
-        const resp = await fetch(url, { method: 'GET' });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const company = await resp.json();
-        lushaLog('Company data received:', company);
-        lastCompanyResult = company;
-        // For uncached live results, animate summary like cached to avoid jitter
-        try {
-          // Allow one frame for layout to settle before animating the company panel
-          requestAnimationFrame(() => renderCompanyPanel(company, false));
-        } catch (_) { renderCompanyPanel(company, false); }
-        window.__lushaOpenedFromCache = false;
-      }
+      const params = new URLSearchParams();
+      if (domain) params.append('domain', domain);
+      if (companyName) params.append('company', companyName);
+      const url = `${base}/api/apollo/company?${params.toString()}`;
+      lushaLog('Fetching company data from:', url);
+      const resp = await fetch(url, { method: 'GET' });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const company = await resp.json();
+      lushaLog('Company data received:', company);
+      lastCompanyResult = company;
+      // For uncached live results, animate summary like cached to avoid jitter
+      try {
+        // Allow one frame for layout to settle before animating the company panel
+        requestAnimationFrame(() => renderCompanyPanel(company, false));
+      } catch (_) { renderCompanyPanel(company, false); }
+      window.__lushaOpenedFromCache = false;
 
       // Pull all pages (search only, no enrichment)
       const collected = [];
@@ -742,22 +638,24 @@
       do {
         const requestBody = {
           pages: { page, size: pageSize },
-          filters: { 
-            companies: { include: {} },
-            person_name: options.personName || ''
-          }
+          filters: { companies: { include: {} } }
         };
         // Prioritize company ID for account-specific searches (most accurate)
-        if (lastCompanyResult && lastCompanyResult.id) {
-          requestBody.filters.companies.include.ids = [lastCompanyResult.id];
-        } else if (lastCompanyResult && lastCompanyResult.domain) {
-          requestBody.filters.companies.include.domains = [lastCompanyResult.domain];
-        } else if (lastCompanyResult && lastCompanyResult.name) {
-          requestBody.filters.companies.include.names = [lastCompanyResult.name];
+        if (company.id) {
+          requestBody.filters.companies.include.ids = [company.id];
+          console.log('[Apollo Widget] Using company ID for contacts search:', company.id, 'Company name:', company.name);
+        } else if (company.domain) {
+          requestBody.filters.companies.include.domains = [company.domain];
+          console.log('[Apollo Widget] Using company domain for contacts search:', company.domain);
+        } else if (company.name) {
+          requestBody.filters.companies.include.names = [company.name];
+          console.log('[Apollo Widget] Using company name for contacts search:', company.name);
         } else {
+          console.warn('[Apollo Widget] No company identifier available for contacts search!', company);
         }
 
         lushaLog('Fetching contacts page:', page, 'requestBody:', requestBody);
+        console.log('[Apollo Widget] Contacts search request:', JSON.stringify(requestBody, null, 2));
         const r = await fetch(`${base}/api/apollo/contacts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const data = await r.json();
@@ -824,7 +722,7 @@
           const loadingEl = document.getElementById('lusha-loading');
           if (resultsEl) {
             resultsEl.style.transition = 'none';
-            resultsEl.style.display = 'flex';
+            resultsEl.style.display = 'block';
             resultsEl.classList.remove('is-hidden');
             resultsEl.classList.add('is-shown');
           }
@@ -840,6 +738,7 @@
       try { renderUsageBar(); } catch (_) { }
     } catch (error) {
       lushaLog('Search error:', error);
+      console.error('Lusha search error:', error);
       try { window.crm?.showToast && window.crm.showToast('Search failed: ' + error.message); } catch (_) { }
     } finally {
       // Ensure loading is hidden
@@ -887,6 +786,7 @@
     if (entityType === 'account') {
       try {
         const a = window.AccountDetail?.state?.currentAccount || {};
+        console.log('[Lusha] Account state:', a);
 
         // Enhanced fallback chain for account name
         const name = a.name || a.accountName || a.companyName ||
@@ -906,9 +806,11 @@
           }
         }
 
+        console.log('[Lusha] Account data:', { name, d, hasAccountDetail: !!window.AccountDetail });
         if (!companyName && name) companyName = name;
         if (!domain && d) domain = deriveDomain(d);
       } catch (e) {
+        console.log('[Lusha] Account error:', e);
       }
     } else {
       try {
@@ -949,6 +851,7 @@
 
     // No longer populating input fields (they were removed)
 
+    try { console.log('[Lusha] Prefilled', { page: entityType, companyName, domain, contactName, contactEmail }); } catch (_) { }
   }
 
   async function loadEmployees(kind, company) {
@@ -976,14 +879,18 @@
       } else if (company?.name) {
         requestBody.filters.companies.include.names = [company.name];
       } else {
+        console.warn('[Lusha] No company identifier available for search');
         return;
       }
 
+      console.log('[Lusha] Contacts request body:', requestBody);
       const resp = await fetch(`${base}/api/apollo/contacts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
+      console.log('[Lusha] Raw contacts response:', data);
       const contacts = Array.isArray(data.contacts) ? data.contacts : [];
       const contactIdsFromPayload = Array.isArray(data.contactIds) ? data.contactIds.filter(Boolean) : [];
+      console.log('[Lusha] Parsed contacts array:', contacts);
 
       // Do NOT auto-enrich to avoid consuming credits; keep requestId for per-contact reveals
       window.__lushaLastRequestId = data.requestId || null;
@@ -1011,9 +918,10 @@
 
       // If popular returned none, try the full list as a fallback
       if (kind === 'popular' && contacts.length === 0) {
+        console.log('[Lusha] Popular empty, loading all employees as fallback');
         await loadEmployees('all', company);
       }
-    } catch (_) { }
+    } catch (e) { console.error('Employees load failed', e); }
   }
   function formatCompanyPhone(phone) {
     if (!phone) return '';
@@ -1031,115 +939,68 @@
   }
 
   function mapProspectingContact(c) {
-    lushaLog('Mapping contact (input):', c);
-    let base = c;
-    try {
-      const key = c && (c.id || c.contactId);
-      if (key) {
-        const rawHard = localStorage.getItem(`lusha_contact_${key}`);
-        if (rawHard) {
-          const hardCached = JSON.parse(rawHard);
-          base = Object.assign({}, c);
-          if (hardCached && Array.isArray(hardCached.phones) && hardCached.phones.length > 0) {
-            base.phones = hardCached.phones;
-            base.hasPhones = true;
-            base.phone = hardCached.phone || (hardCached.phones[0] && hardCached.phones[0].number);
-            base.mobile = hardCached.mobile;
-            base.workDirectPhone = hardCached.workDirectPhone;
-            base.otherPhone = hardCached.otherPhone;
-          }
-          if (hardCached && Array.isArray(hardCached.emails) && hardCached.emails.length > 0) {
-            base.emails = hardCached.emails;
-            base.hasEmails = true;
-            base.email = hardCached.email || (hardCached.emails[0] && hardCached.emails[0].address);
-          }
-        }
-      }
-    } catch (_) { }
-
-    const isEnriched = Array.isArray(base.emails) || Array.isArray(base.phones);
-    lushaLog('Mapping contact (isEnriched?):', isEnriched, { emails: base.emails, phones: base.phones });
+    const isEnriched = Array.isArray(c.emails) || Array.isArray(c.phones);
 
     // Parse Lusha's single "name" field into firstName and lastName
     let firstName = '';
     let lastName = '';
-    if (base.name && typeof base.name === 'string') {
-      const nameParts = base.name.trim().split(' ');
+    if (c.name && typeof c.name === 'string') {
+      const nameParts = c.name.trim().split(' ');
       firstName = nameParts[0] || '';
       lastName = nameParts.slice(1).join(' ') || '';
     } else {
       // Fallback to existing structure if available
-      firstName = base.firstName || base.name?.first || '';
-      lastName = base.lastName || base.name?.last || '';
+      firstName = c.firstName || c.name?.first || '';
+      lastName = c.lastName || c.name?.last || '';
     }
     // If only fullName provided, split it
-    if ((!firstName && !lastName) && typeof base.fullName === 'string' && base.fullName.trim()) {
-      const parts = base.fullName.trim().split(/\s+/);
+    if ((!firstName && !lastName) && typeof c.fullName === 'string' && c.fullName.trim()) {
+      const parts = c.fullName.trim().split(/\s+/);
       firstName = firstName || parts.shift() || '';
       lastName = lastName || parts.join(' ');
     }
-    const fullName = (typeof base.fullName === 'string' && base.fullName.trim())
-      ? base.fullName.trim()
+    const fullName = (typeof c.fullName === 'string' && c.fullName.trim())
+      ? c.fullName.trim()
       : `${firstName} ${lastName}`.trim();
 
     // Map Lusha phone flags to CRM phone fields
     const phoneMapping = {
-      mobile: base.hasMobilePhone || false,
-      workDirectPhone: base.hasDirectPhone || false,
-      otherPhone: base.hasPhones || false
+      mobile: c.hasMobilePhone || false,
+      workDirectPhone: c.hasDirectPhone || false,
+      otherPhone: c.hasPhones || false
     };
-
-    // Reconstruct phones array from flattened fields if missing
-    let phones = Array.isArray(base.phones) ? [...base.phones] : [];
-    
-    // If phones array is empty but we have flattened fields, reconstruct it
-    if (phones.length === 0) {
-      if (base.workDirectPhone) {
-        phones.push({ number: base.workDirectPhone, type: 'work_direct' });
-      }
-      if (base.mobile) {
-        phones.push({ number: base.mobile, type: 'mobile' });
-      }
-      if (base.otherPhone) {
-        phones.push({ number: base.otherPhone, type: 'other' });
-      }
-      // If we still have no phones but 'phone' field exists
-      if (phones.length === 0 && base.phone) {
-        phones.push({ number: base.phone, type: 'work' });
-      }
-    }
 
     const mapped = {
       firstName: firstName,
       lastName: lastName,
       fullName: fullName,
-      jobTitle: base.jobTitle || '',
-      company: base.companyName || '',
-      email: isEnriched && base.emails && base.emails.length > 0 ? base.emails[0].address : '',
-      phone: isEnriched && phones.length > 0 ? phones[0].number : '',
-      fqdn: base.fqdn || '',
-      companyId: base.companyId || null,
-      id: base.id || base.contactId,
-      hasEmails: isEnriched ? (base.emails && base.emails.length > 0) : !!base?.hasEmails,
-      hasPhones: isEnriched ? (phones.length > 0) : (!!base?.hasPhones || !!base?.workDirectPhone || !!base?.mobile),
+      jobTitle: c.jobTitle || '',
+      company: c.companyName || '',
+      email: isEnriched && c.emails && c.emails.length > 0 ? c.emails[0].address : '',
+      phone: isEnriched && c.phones && c.phones.length > 0 ? c.phones[0].number : '',
+      fqdn: c.fqdn || '',
+      companyId: c.companyId || null,
+      id: c.id || c.contactId,
+      hasEmails: isEnriched ? (c.emails && c.emails.length > 0) : !!c?.hasEmails,
+      hasPhones: isEnriched ? (c.phones && c.phones.length > 0) : !!c?.hasPhones,
       // Add phone field mapping for CRM
       phoneMapping: phoneMapping,
-      emails: base.emails || [],
-      phones: phones,
-      isSuccess: base.isSuccess !== false, // Default to true for search results
+      emails: c.emails || [],
+      phones: c.phones || [],
+      isSuccess: c.isSuccess !== false, // Default to true for search results
       // Carry through additional helpful fields
-      location: base.location || base.city || '',
-      linkedin: base.linkedin || base.linkedinUrl || (base.social && base.social.linkedin) || '',
+      location: c.location || c.city || '',
+      linkedin: c.linkedin || c.linkedinUrl || (c.social && c.social.linkedin) || '',
       // Map additional fields for CRM
-      seniority: base.seniority || '',
-      department: base.department || '',
-      city: base.city || '',
-      state: base.state || '',
-      country: base.country || '',
-      industry: base.industry || ''
+      seniority: c.seniority || '',
+      department: c.department || '',
+      city: c.city || '',
+      state: c.state || '',
+      country: c.country || '',
+      industry: c.industry || ''
     };
 
-    lushaLog('Mapping contact (result):', mapped);
+    lushaLog('Mapping contact:', { original: c, mapped: mapped });
     return mapped;
   }
 
@@ -1192,31 +1053,10 @@
     // Create collapsible description
     let descHtml = '';
     if (fullDescription) {
-      const normalized = String(fullDescription)
-        .replace(/\r\n/g, '\n')
-        .replace(/<br\s*\/?>/gi, '\n');
-      const lines = normalized.split('\n');
-      const shouldToggleByLines = lines.length > 5;
-      const shouldToggleByLength = normalized.length > 420;
-      const hasMoreThan5Lines = shouldToggleByLines || shouldToggleByLength;
-
-      let previewLines = [];
-      let remainingLines = [];
-
-      if (shouldToggleByLines) {
-        previewLines = lines.slice(0, 5);
-        remainingLines = lines.slice(5);
-      } else if (shouldToggleByLength) {
-        let previewText = normalized.slice(0, 420);
-        const lastSpace = previewText.lastIndexOf(' ');
-        if (lastSpace > 300) previewText = previewText.slice(0, lastSpace);
-        const rest = normalized.slice(previewText.length).trim();
-        previewLines = [previewText.trim()];
-        remainingLines = [rest];
-      } else {
-        previewLines = lines;
-        remainingLines = [];
-      }
+      const lines = fullDescription.split('\n');
+      const hasMoreThan5Lines = lines.length > 5;
+      const previewLines = hasMoreThan5Lines ? lines.slice(0, 5) : lines;
+      const remainingLines = hasMoreThan5Lines ? lines.slice(5) : [];
 
       descHtml = `
         <div class="company-desc-container">
@@ -1471,7 +1311,7 @@
     }
 
     // Show results
-    resultsEl.style.display = 'flex';
+    resultsEl.style.display = 'block';
   }
 
   function createContactElement(contact, index) {
@@ -1581,6 +1421,11 @@
         <button class="lusha-action-btn" data-action="copy-info" data-contact='${escapeHtml(JSON.stringify(contact))}'>
           Copy Info
         </button>
+        ${contact.linkedin ? `<a href="${escapeHtml(contact.linkedin)}" target="_blank" rel="noopener" class="lusha-linkedin-link" title="View LinkedIn Profile" style="margin-left:4px;display:inline-flex;align-items:center;">
+          <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\">
+            <path d=\"M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z\"/>
+          </svg>
+        </a>` : ''}
       </div>
     `;
 
@@ -1592,7 +1437,7 @@
     const revealPhonesBtn = div.querySelector('[data-reveal="phones"]');
 
     if (addContactBtn) {
-      addContactBtn.addEventListener('click', () => addContactToCRM(contact, div));
+      addContactBtn.addEventListener('click', () => addContactToCRM(contact));
     }
     if (enrichContactBtn) {
       enrichContactBtn.addEventListener('click', () => enrichExistingContact(contact));
@@ -1613,8 +1458,7 @@
     return div;
   }
 
-  async function addContactToCRM(contact, containerEl) {
-    let saved = false;
+  async function addContactToCRM(contact) {
     try {
       const db = window.firebaseDB;
       if (!db) throw new Error('Firestore not initialized');
@@ -1628,23 +1472,6 @@
           const snap = await db.collection('contacts').where('email', '==', email).limit(1).get();
           if (snap && snap.docs && snap.docs[0]) existingId = snap.docs[0].id;
         } catch (_) { }
-      }
-
-      // If no email match, try name + company based matching (Deduplication)
-      if (!existingId && contact.firstName && contact.lastName && companyName) {
-         try {
-           const fullName = `${contact.firstName} ${contact.lastName}`.trim();
-           const snap = await db.collection('contacts').where('name', '==', fullName).limit(5).get();
-           if (snap && snap.docs && snap.docs.length > 0) {
-              const targetCompany = companyName.toLowerCase();
-              const match = snap.docs.find(doc => {
-                 const data = doc.data();
-                 const dbCompany = (data.companyName || data.accountName || '').toLowerCase();
-                 return dbCompany.includes(targetCompany) || targetCompany.includes(dbCompany);
-              });
-              if (match) existingId = match.id;
-           }
-         } catch (_) { }
       }
 
       // Get current account information for linking
@@ -1708,74 +1535,32 @@
       // Save to CRM contacts collection
       if (existingId) {
         await window.PCSaves.updateContact(existingId, payload);
-        saved = true;
-
-        try {
-          if (window.ContactDetail && window.ContactDetail.state && window.ContactDetail.state.currentContact) {
-            const currentId = window.ContactDetail.state.currentContact.id || window.ContactDetail.state.currentContact._id;
-            if (currentId && String(currentId) === String(existingId)) {
-              window.ContactDetail.state.currentContact = Object.assign({}, window.ContactDetail.state.currentContact, payload);
-              if (typeof window.ContactDetail.renderContactDetail === 'function') {
-                window.ContactDetail.renderContactDetail();
-              }
-            }
-          }
-        } catch (_) { }
+        window.crm?.showToast && window.crm.showToast('Enriched existing contact');
       } else {
         const ref = await db.collection('contacts').add(payload);
-        const created = Object.assign({ id: ref.id }, payload);
-        saved = true;
-        try {
-          if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
-            window.CacheManager.updateRecord('contacts', ref.id, created);
-          }
-        } catch (_) { }
+        window.crm?.showToast && window.crm.showToast('Contact added to CRM');
         // Emit create event for People page to prepend
-        try { document.dispatchEvent(new CustomEvent('pc:contact-created', { detail: { id: ref.id, doc: created, contact: created } })); } catch (_) { }
+        try { document.dispatchEvent(new CustomEvent('pc:contact-created', { detail: { id: ref.id, doc: payload } })); } catch (_) { }
       }
-
-      try {
-        if (containerEl && saved) {
-          updateActionButtons(containerEl, contact, { forceExists: true }).catch(() => { });
-        }
-      } catch (_) { }
 
       // SIMULTANEOUSLY save to Lusha cache to reduce future API usage
       try {
         await upsertCacheContact({ company: lastCompanyResult }, contact);
+        console.log('[Lusha] Contact saved to both CRM and cache');
       } catch (cacheError) {
+        console.warn('[Lusha] Failed to save to cache (CRM save succeeded):', cacheError);
       }
 
-      try {
-        if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
-          window.CacheManager.invalidate('contacts');
-        }
-      } catch (_) { }
-
-      try {
-        const fullName = String(payload.name || '').trim();
-        const iconLetter = (fullName || payload.firstName || payload.companyName || 'C').toString().trim().charAt(0).toUpperCase() || 'C';
-        const titleLine = [payload.title, payload.companyName].filter(Boolean).join(' • ');
-        const hasAnyPhone = Boolean(payload.workDirectPhone || payload.mobile || payload.otherPhone || payload.phone);
-
-        if (window.crm && typeof window.crm.showToast === 'function' && hasAnyPhone) {
-          window.crm.showToast(titleLine || 'Contact', 'save', {
-            title: 'Number saved',
-            details: fullName || '',
-            icon: iconLetter,
-            duration: 3500,
-            sound: false
-          });
-        }
-      } catch (_) { }
-
     } catch (error) {
+      console.error('Error adding contact:', error);
       try { window.crm?.showToast && window.crm.showToast('Failed to add/enrich contact: ' + error.message); } catch (_) { }
     } finally {
       // Update UI button state immediately
       try {
-        const card = containerEl || document.querySelector(`.lusha-contact-item[data-id="${contact.id || contact.contactId}"]`);
-        if (card) updateActionButtons(card, contact, saved ? { forceExists: true } : undefined).catch(() => { });
+        const card = document.querySelector(`.lusha-contact-item[data-id="${contact.id || contact.contactId}"]`);
+        if (card) {
+          updateActionButtons(card, contact).catch(() => { });
+        }
       } catch (_) { }
     }
   }
@@ -1792,11 +1577,13 @@
       // Try to get current account ID from page context
       if (currentEntityType === 'account' && currentAccountId) {
         existingId = currentAccountId;
+        console.log('[Lusha Account] Using current account ID from page context:', existingId);
       }
 
       // Fallback: try to get from AccountDetail state
       if (!existingId && window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount) {
         existingId = window.AccountDetail.state.currentAccount.id || window.AccountDetail.state.currentAccount.accountId;
+        console.log('[Lusha Account] Using account ID from AccountDetail state:', existingId);
       }
 
       // Final fallback: search by domain/name (for cases where we're not on a specific account page)
@@ -1814,27 +1601,27 @@
       }
       // Build payload by including ONLY non-empty values from Apollo/Lusha to avoid overwriting
       // existing CRM fields with blanks (we only set fields when API actually provides data)
-      const mainAddress = (contact.address || (lastCompanyResult && lastCompanyResult.address)) ? String(contact.address || lastCompanyResult.address) : '';
+      const mainAddress = (lastCompanyResult && lastCompanyResult.address) ? String(lastCompanyResult.address) : '';
       const candidateFields = {
         accountName: companyName,
         name: companyName,
         domain: domain || (lastCompanyResult && lastCompanyResult.domain) || '',
-        website: contact.website || (lastCompanyResult && lastCompanyResult.website) || (domain ? `https://${domain}` : ''),
-        industry: contact.industry || (lastCompanyResult && lastCompanyResult.industry) || '',
-        employees: contact.employees || (lastCompanyResult && lastCompanyResult.employees) || '',
-        shortDescription: contact.description || contact.shortDescription || (lastCompanyResult && lastCompanyResult.description) || '',
-        logoUrl: (contact.logoUrl || (lastCompanyResult && lastCompanyResult.logoUrl)) ? String(contact.logoUrl || lastCompanyResult.logoUrl) : '',
-        linkedin: (contact.linkedin || (lastCompanyResult && lastCompanyResult.linkedin)) ? String(contact.linkedin || lastCompanyResult.linkedin) : '',
-        city: (contact.city || (lastCompanyResult && lastCompanyResult.city)) ? String(contact.city || lastCompanyResult.city) : '',
-        state: (contact.state || (lastCompanyResult && lastCompanyResult.state)) ? String(contact.state || lastCompanyResult.state) : '',
-        country: (contact.country || (lastCompanyResult && lastCompanyResult.country)) ? String(contact.country || lastCompanyResult.country) : '',
+        website: (lastCompanyResult && lastCompanyResult.website) || (domain ? `https://${domain}` : ''),
+        industry: (lastCompanyResult && lastCompanyResult.industry) || '',
+        employees: (lastCompanyResult && lastCompanyResult.employees) || '',
+        shortDescription: (lastCompanyResult && lastCompanyResult.description) || '',
+        logoUrl: (lastCompanyResult && lastCompanyResult.logoUrl) ? String(lastCompanyResult.logoUrl) : '',
+        linkedin: (lastCompanyResult && lastCompanyResult.linkedin) ? String(lastCompanyResult.linkedin) : '',
+        city: (lastCompanyResult && lastCompanyResult.city) ? String(lastCompanyResult.city) : '',
+        state: (lastCompanyResult && lastCompanyResult.state) ? String(lastCompanyResult.state) : '',
+        country: (lastCompanyResult && lastCompanyResult.country) ? String(lastCompanyResult.country) : '',
         // Store a single-line primary address and also map into serviceAddresses for account detail
         address: mainAddress,
         // Company phone from Apollo → companyPhone field in CRM (only when provided)
-        companyPhone: (contact.companyPhone || (lastCompanyResult && lastCompanyResult.companyPhone)) ? String(contact.companyPhone || lastCompanyResult.companyPhone) : '',
-        foundedYear: (contact.foundedYear || (lastCompanyResult && lastCompanyResult.foundedYear)) ? String(contact.foundedYear || lastCompanyResult.foundedYear) : '',
-        revenue: (contact.revenue || (lastCompanyResult && lastCompanyResult.revenue)) ? String(contact.revenue || lastCompanyResult.revenue) : '',
-        companyType: (contact.companyType || (lastCompanyResult && lastCompanyResult.companyType)) ? String(contact.companyType || lastCompanyResult.companyType) : ''
+        companyPhone: (lastCompanyResult && lastCompanyResult.companyPhone) ? String(lastCompanyResult.companyPhone) : '',
+        foundedYear: (lastCompanyResult && lastCompanyResult.foundedYear) ? String(lastCompanyResult.foundedYear) : '',
+        revenue: (lastCompanyResult && lastCompanyResult.revenue) ? String(lastCompanyResult.revenue) : '',
+        companyType: (lastCompanyResult && lastCompanyResult.companyType) ? String(lastCompanyResult.companyType) : ''
       };
       const payload = { source: 'lusha', updatedAt: new Date(), createdAt: new Date() };
       Object.keys(candidateFields).forEach((key) => {
@@ -1851,6 +1638,7 @@
         payload.serviceAddresses = [{ address: mainAddress.trim(), isPrimary: true }];
       }
       if (existingId) {
+        console.log('[Apollo Widget] Enriching account with payload:', payload);
         // This uses PCSaves.updateAccount which already:
         // - Updates in-memory cache optimistically
         // - Dispatches a single pc:account-updated event
@@ -1869,6 +1657,7 @@
             if (idx !== -1) {
               Object.assign(accounts[idx], payload);
               accounts[idx].updatedAt = new Date();
+              console.log('[Apollo Widget] Updated global accounts cache for account:', existingId);
             }
           }
 
@@ -1882,9 +1671,11 @@
             if (bgIdx !== -1) {
               Object.assign(bgAccounts[bgIdx], payload);
               bgAccounts[bgIdx].updatedAt = new Date();
+              console.log('[Apollo Widget] Updated BackgroundAccountsLoader cache for account:', existingId);
             }
           }
         } catch (cacheErr) {
+          console.warn('[Apollo Widget] Failed to update global caches:', cacheErr);
         }
 
         window.crm?.showToast && window.crm.showToast('Enriched existing account');
@@ -1898,81 +1689,56 @@
             const existingIdStr = String(existingId);
             const currentIdStr = currentId ? String(currentId) : '';
 
+            console.log('[Apollo Widget] Checking account match - currentId:', currentIdStr, 'existingId:', existingIdStr);
+
             if (currentIdStr && currentIdStr === existingIdStr) {
               // Merge enriched fields into current state so UI updates immediately
               const mergedAccount = Object.assign({}, current, payload);
               window.AccountDetail.state.currentAccount = mergedAccount;
+
+              console.log('[Apollo Widget] Merged account state, calling renderAccountDetail');
 
               // Use requestAnimationFrame to ensure DOM is ready
               requestAnimationFrame(() => {
                 try {
                   if (typeof window.AccountDetail.renderAccountDetail === 'function') {
                     window.AccountDetail.renderAccountDetail();
+                    console.log('[Apollo Widget] renderAccountDetail called successfully');
                   } else {
+                    console.warn('[Apollo Widget] renderAccountDetail function not available');
                   }
                 } catch (renderErr) {
+                  console.error('[Apollo Widget] Error calling renderAccountDetail:', renderErr);
                 }
               });
             } else {
+              console.log('[Apollo Widget] Account ID mismatch - not refreshing detail page. Current:', currentIdStr, 'Expected:', existingIdStr);
             }
           } else {
+            console.log('[Apollo Widget] AccountDetail state not available or no current account');
           }
         } catch (err) {
+          console.error('[Apollo Widget] Failed to refresh Account Detail after enrichment:', err);
         }
-
-        return existingId;
 
       } else {
         const ref = await db.collection('accounts').add(payload);
-        const newId = ref.id;
-
-        // CRITICAL: Update global caches immediately so search works without refresh
-        try {
-          const newAccount = { id: newId, ...payload };
-          
-          // 1. Update CacheManager (IndexedDB)
-          if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
-            // updateRecord works for new records too (fetches empty, merges, puts)
-            window.CacheManager.updateRecord('accounts', newId, newAccount);
-          }
-          
-          // 2. Update window.getAccountsData (in-memory cache)
-          if (typeof window.getAccountsData === 'function') {
-            const accounts = window.getAccountsData(true);
-            if (Array.isArray(accounts)) {
-              accounts.push(newAccount);
-            }
-          }
-          
-          // 3. Update BackgroundAccountsLoader (in-memory cache)
-          if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
-             const bgAccounts = window.BackgroundAccountsLoader.getAccountsData();
-             if (Array.isArray(bgAccounts)) {
-               bgAccounts.push(newAccount);
-             }
-          }
-          
-        } catch (err) {
-        }
-
         window.crm?.showToast && window.crm.showToast('Account added to CRM');
 
         // Dispatch account-created event
         try {
           const ev = new CustomEvent('pc:account-created', {
             detail: {
-              id: newId,
+              id: ref.id,
               doc: payload
             }
           });
           document.dispatchEvent(ev);
         } catch (_) { /* noop */ }
-
-        return newId;
       }
     } catch (e) {
+      console.error('Add account failed', e);
       window.crm?.showToast && window.crm.showToast('Failed to add/enrich account: ' + (e && e.message ? e.message : ''));
-      return null;
     }
   }
 
@@ -2010,14 +1776,19 @@
 
   async function enrichExistingContact(contact) {
     try {
+      console.log('[Lusha Enrich] Starting enrichment for contact:', contact);
+
       // Check if contact already has enriched data in cache
       const hasEmails = Array.isArray(contact.emails) && contact.emails.length > 0;
       const hasPhones = Array.isArray(contact.phones) && contact.phones.length > 0;
+
+      console.log('[Lusha Enrich] Contact has cached data - Emails:', hasEmails, 'Phones:', hasPhones);
 
       let enriched = null;
 
       // If contact already has enriched data from cache, use it directly
       if (hasEmails || hasPhones) {
+        console.log('[Lusha Enrich] Using cached enriched data from contact object');
         enriched = {
           id: contact.id || contact.contactId,
           firstName: contact.firstName || '',
@@ -2039,12 +1810,17 @@
         window.crm?.showToast && window.crm.showToast('Using cached enrichment data...');
       } else {
         // No cached data, need to call API
+        console.log('[Lusha Enrich] No cached data, calling API for fresh enrichment');
+
         let base = (window.API_BASE_URL || '').replace(/\/$/, '');
         if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
         const requestId = window.__lushaLastRequestId;
         const id = contact.id || contact.contactId;
 
+        console.log('[Lusha Enrich] RequestId:', requestId, 'ContactId:', id);
+
         if (!id) {
+          console.warn('[Lusha Enrich] Missing contact ID');
           window.crm?.showToast && window.crm.showToast('Cannot enrich: Missing contact ID');
           return;
         }
@@ -2052,11 +1828,10 @@
         // Show loading toast
         window.crm?.showToast && window.crm.showToast('Enriching contact...');
 
+        console.log('[Lusha Enrich] Making API call to:', `${base}/api/apollo/enrich`);
+
         // Build request body - if no requestId (cached search), send company context for fresh enrich
-        const requestBody = { 
-          contactIds: [id],
-          contacts: [contact] // Pass full contact object for smart strategies
-        };
+        const requestBody = { contactIds: [id] };
 
         if (requestId) {
           requestBody.requestId = requestId;
@@ -2067,46 +1842,44 @@
               domain: lastCompanyResult.domain,
               name: lastCompanyResult.name
             };
-          } else {
-            // Fallback to contact's company info if global context is missing
-            requestBody.company = {
-              name: contact.companyName || contact.company || '',
-              domain: contact.website || contact.companyWebsite || ''
-            };
           }
           // Include contact name/title to help backend find the right record
           if (contact.firstName && contact.lastName) {
             requestBody.name = `${contact.firstName} ${contact.lastName}`.trim();
-            requestBody.firstName = contact.firstName;
-            requestBody.lastName = contact.lastName;
-          } else if (contact.fullName || contact.name) {
-            requestBody.name = contact.fullName || contact.name;
           }
-          
           if (contact.jobTitle || contact.title) {
             requestBody.title = contact.jobTitle || contact.title;
           }
         }
+
+        console.log('[Lusha Enrich] Request body:', requestBody);
 
         const resp = await fetch(`${base}/api/apollo/enrich`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(requestBody)
         });
 
+        console.log('[Lusha Enrich] API response status:', resp.status);
+
         if (!resp.ok) {
           const errorText = await resp.text();
+          console.error('[Lusha Enrich] API error:', errorText);
           throw new Error(`HTTP ${resp.status}: ${errorText}`);
         }
 
         const data = await resp.json();
+        console.log('[Lusha Enrich] API response data:', data);
 
         enriched = (data.contacts && data.contacts[0]) || null;
 
         if (!enriched) {
+          console.warn('[Lusha Enrich] No enriched data returned from API');
           window.crm?.showToast && window.crm.showToast('No enrichment data available from API');
           return;
         }
       }
+
+      console.log('[Lusha Enrich] Enriched data to use:', enriched);
 
       // Track session credits for enrichments
       trackSessionCredits('enrichments', 1);
@@ -2114,6 +1887,7 @@
       // Find and update existing contact in CRM
       const db = window.firebaseDB;
       if (!db) {
+        console.error('[Lusha Enrich] Firestore not initialized');
         window.crm?.showToast && window.crm.showToast('Database not available');
         return;
       }
@@ -2124,23 +1898,28 @@
       // Try to get current contact ID from page context
       if (currentEntityType === 'contact' && currentContactId) {
         existingId = currentContactId;
+        console.log('[Lusha Enrich] Using current contact ID from page context:', existingId);
       } else if (currentEntityType === 'account' && currentAccountId) {
         // For account context, we need to find the most relevant contact
         try {
           const snap = await db.collection('contacts').where('accountId', '==', currentAccountId).limit(1).get();
           if (snap && snap.docs && snap.docs[0]) {
             existingId = snap.docs[0].id;
+            console.log('[Lusha Enrich] Found contact for account:', existingId);
           }
         } catch (e) {
+          console.error('[Lusha Enrich] Error finding contact for account:', e);
         }
       }
 
       // Fallback: try to get from ContactDetail state
       if (!existingId && window.ContactDetail && window.ContactDetail.state && window.ContactDetail.state.currentContact) {
         existingId = window.ContactDetail.state.currentContact.id || window.ContactDetail.state.currentContact.contactId;
+        console.log('[Lusha Enrich] Using contact ID from ContactDetail state:', existingId);
       }
 
       if (!existingId) {
+        console.warn('[Lusha Enrich] Could not find existing contact to update - no current contact context');
         window.crm?.showToast && window.crm.showToast('Could not find existing contact to enrich - please ensure you are on a contact page');
         return;
       }
@@ -2166,6 +1945,8 @@
         if (mobileNum) updatePayload.mobile = mobileNum;
         if (workNum) updatePayload.workDirectPhone = workNum;
         if (otherNum) updatePayload.otherPhone = otherNum;
+
+        console.log('[Lusha Enrich] Mapped phones - Mobile:', mobileNum, 'Work:', workNum, 'Other:', otherNum);
       }
 
       // Add LinkedIn if available
@@ -2200,8 +1981,11 @@
         updatePayload.department = enriched.department;
       }
 
+      console.log('[Lusha Enrich] Update payload:', updatePayload);
+
       // Update the contact
       await window.PCSaves.updateContact(existingId, updatePayload);
+      console.log('[Lusha Enrich] Contact enriched successfully:', existingId);
       window.crm?.showToast && window.crm.showToast('Contact enriched successfully');
 
       // Refresh the contact details page if we're viewing that contact
@@ -2216,6 +2000,7 @@
             };
 
             // We're viewing the contact that was just enriched, refresh the page
+            console.log('[Lusha Enrich] Refreshing contact details page after enrichment');
             window.ContactDetail.renderContactDetail();
 
             // Also trigger a custom event to ensure all components refresh
@@ -2223,11 +2008,13 @@
               detail: { contactId: existingId, enrichedData: enriched }
             });
             document.dispatchEvent(refreshEvent);
+            console.log('[Lusha Enrich] Dispatched pc:contact-enriched event');
           }
         }
 
         // Also check if we're on account details page and refresh that too
         if (window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount) {
+          console.log('[Lusha Enrich] Refreshing account details page after contact enrichment');
           window.AccountDetail.renderAccountDetail();
 
           // Trigger account refresh event
@@ -2235,6 +2022,7 @@
             detail: { accountId: window.AccountDetail.state.currentAccount.id }
           });
           document.dispatchEvent(accountRefreshEvent);
+          console.log('[Lusha Enrich] Dispatched pc:account-refresh event');
         }
 
         // Also refresh any other pages that might be showing this contact
@@ -2248,11 +2036,14 @@
             }
           });
           document.dispatchEvent(generalUpdateEvent);
+          console.log('[Lusha Enrich] Dispatched pc:contact-updated event');
         } catch (_) { /* noop */ }
       } catch (refreshError) {
+        console.warn('[Lusha Enrich] Failed to refresh pages:', refreshError);
       }
 
     } catch (e) {
+      console.error('[Lusha Enrich] Failed:', e);
       window.crm?.showToast && window.crm.showToast('Failed to enrich contact: ' + (e.message || 'Unknown error'));
     }
   }
@@ -2279,27 +2070,16 @@
         hasRequestedData = true;
       }
 
-      // If we have the data (whether from cache or just existing in the contact object), just display it
-      if (hasRequestedData) {
-        lushaLog('Using existing/cached data for', which, '- no API call needed');
-        const wrap = which === 'email'
-          ? container.querySelector('[data-email-list]')
-          : container.querySelector('[data-phones-list]');
-        if (!wrap) return;
+      // If we have the data and it's from cache, just display it without API call
+      if (hasRequestedData && window.__lushaOpenedFromCache) {
+        lushaLog('Using cached data for', which, '- no API call needed');
         if (which === 'email') {
           const emails = Array.isArray(contact.emails) ? contact.emails.map(e => e.address || e).filter(Boolean) : [];
           const newContent = emails.length ? emails.map(v => `<div class="lusha-value-item">${formatEmailLink(v)}</div>`).join('') : '<div class="lusha-value-item">—</div>';
           animateRevealContent(wrap, newContent);
         } else if (which === 'phones') {
-          const phones = Array.isArray(contact.phones) ? contact.phones.map(p => ({
-            number: p.number || (typeof p === 'string' ? p : ''),
-            type: p.type || 'work'
-          })).filter(p => p.number) : [];
-          
-          const newContent = phones.length ? phones.map((p, idx) => 
-            `<div class="lusha-value-item">${formatPhoneLink(p.number, p.type, idx === 0)}</div>`
-          ).join('') : '<div class="lusha-value-item">—</div>';
-          
+          const phones = Array.isArray(contact.phones) ? contact.phones.map(p => p.number || p).filter(Boolean) : [];
+          const newContent = phones.length ? phones.map(v => `<div class="lusha-value-item">${formatPhoneLink(v)}</div>`).join('') : '<div class="lusha-value-item">—</div>';
           animateRevealContent(wrap, newContent);
         }
 
@@ -2318,35 +2098,24 @@
       // When opened from cache, always make a fresh enrich call (acts like combined reset+reveal)
       if (window.__lushaOpenedFromCache || hasExistingData || !requestId) {
         lushaLog('Making fresh enrich call for', hasExistingData ? 'enrich' : 'reveal');
-
         try {
-          const requestBody = {
-            contactIds: [id],
-            // Pass full contact object for smart enrichment strategies
-            contacts: [contact],
-            // Include company context for direct enrich
-            company: lastCompanyResult ? {
-              domain: lastCompanyResult.domain,
-              name: lastCompanyResult.name
-            } : {
-              // Fallback to contact's company info if global context is missing
-              name: contact.companyName || contact.company || '',
-              domain: contact.website || contact.companyWebsite || ''
-            },
-            // Fallback fields for backend if contacts array isn't fully utilized
-            name: (contact.firstName && contact.lastName) ? `${contact.firstName} ${contact.lastName}` : (contact.fullName || ''),
-            firstName: contact.firstName || '',
-            lastName: contact.lastName || '',
-            title: contact.jobTitle || contact.title || '',
-            // Request only the specific datapoint to minimize billing when supported
-            revealEmails: which === 'email',
-            revealPhones: which === 'phones'
-          };
-
           const enrichResp = await fetch(`${base}/api/apollo/enrich`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
+            body: JSON.stringify({
+              contactIds: [id],
+              // Include company context for direct enrich
+              company: lastCompanyResult ? {
+                domain: lastCompanyResult.domain,
+                name: lastCompanyResult.name
+              } : null,
+              // Pass name/title to help backend find the right record when searching
+              name: (contact.firstName && contact.lastName) ? `${contact.firstName} ${contact.lastName}` : (contact.fullName || ''),
+              title: contact.jobTitle || contact.title || '',
+              // Request only the specific datapoint to minimize billing when supported
+              revealEmails: which === 'email',
+              revealPhones: which === 'phones'
+            })
           });
 
           if (!enrichResp.ok) {
@@ -2376,18 +2145,7 @@
         lushaLog('Making enrich request with requestId:', requestId, 'contactId:', id);
         const resp = await fetch(`${base}/api/apollo/enrich`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            requestId,
-            contactIds: [id],
-            contacts: [contact],
-            company: lastCompanyResult ? { domain: lastCompanyResult.domain, name: lastCompanyResult.name } : undefined,
-            name: contact.fullName || contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim(),
-            firstName: contact.firstName,
-            lastName: contact.lastName,
-            title: contact.jobTitle || contact.title || '',
-            revealEmails: which === 'email',
-            revealPhones: which === 'phones'
-          })
+          body: JSON.stringify({ requestId, contactIds: [id] })
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
@@ -2448,21 +2206,12 @@
             // Phone numbers are delivered asynchronously via webhook
             // Show loading indicator and poll for results
             lushaLog('Phone reveal requested - polling for async delivery');
-            // Use skeleton animation for better UX during long polling
-            const loadingContent = `
-              <div class="lusha-value-item" title="Revealing phone numbers...">
-                <div class="ai-skeleton medium" style="height: 14px; margin: 4px 0; border-radius: 4px;"></div>
-              </div>
-              <div class="lusha-value-item">
-                <div class="ai-skeleton short" style="height: 14px; margin: 4px 0; border-radius: 4px;"></div>
-              </div>
-            `;
+            const loadingContent = '<div class="lusha-value-item" style="color: var(--text-muted); font-style: italic;">⏳ Revealing phone numbers...</div>';
             animateRevealContent(wrap, loadingContent);
 
             // Poll for phone numbers (Apollo sends them to webhook asynchronously)
             const personId = enriched.id || enriched.contactId || id;
-            pollForPhoneNumbers(personId, contact, wrap, container, lastCompanyResult);
-            return;
+            pollForPhoneNumbers(personId, contact, wrap, container);
           }
         }
       }
@@ -2504,14 +2253,7 @@
           if (which === 'phones' && Array.isArray(enriched.phones)) {
             merged.phones = enriched.phones;
             merged.hasPhones = enriched.phones.length > 0;
-            // Ensure phone fields are set directly for persistence
-            if (enriched.phones[0] && enriched.phones[0].number) {
-               merged.phone = enriched.phones[0].number;
-               const smartMap = mapApolloPhonesToContact(enriched.phones);
-               merged.mobile = smartMap.mobile;
-               merged.workDirectPhone = smartMap.workDirectPhone;
-               merged.otherPhone = smartMap.otherPhone;
-            }
+            if (enriched.phones[0] && enriched.phones[0].number) merged.phone = enriched.phones[0].number;
           }
           if (enriched.firstName || enriched.lastName || (enriched.name && (enriched.name.first || enriched.name.last || enriched.name.full))) {
             merged.firstName = enriched.firstName || (enriched.name && enriched.name.first) || merged.firstName;
@@ -2538,66 +2280,9 @@
       try {
         const id = contact.id || contact.contactId;
         const idx = allContacts.findIndex(c => (c.id || c.contactId) === id);
-        
-        // Deep copy the object to be cached to avoid reference issues
-        let contactToCache = idx >= 0 
-          ? JSON.parse(JSON.stringify(allContacts[idx])) 
-          : JSON.parse(JSON.stringify(contact));
-
-        // Explicitly force the revealed data into the cached object
-        if (which === 'email' && Array.isArray(enriched.emails)) {
-           contactToCache.emails = enriched.emails;
-           contactToCache.hasEmails = true;
-           if (enriched.emails[0] && enriched.emails[0].address) {
-             contactToCache.email = enriched.emails[0].address;
-           }
-        }
-        
-        if (which === 'phones' && Array.isArray(enriched.phones)) {
-           const smartMap = mapApolloPhonesToContact(enriched.phones);
-           contactToCache.mobile = smartMap.mobile;
-           contactToCache.workDirectPhone = smartMap.workDirectPhone;
-           contactToCache.otherPhone = smartMap.otherPhone;
-           // Ensure phones array is explicitly set
-           contactToCache.phones = enriched.phones;
-           contactToCache.hasPhones = true;
-           // Also set primary phone for legacy compatibility
-           if (enriched.phones[0]) {
-             contactToCache.phone = enriched.phones[0].number;
-           }
-        }
-
-        // Save to cache
-        // Ensure we are passing a valid company object for the cache key
-        // Fallback to current search context if lastCompanyResult is missing
-        const companyCtx = lastCompanyResult || 
-                           (contactToCache.companyName ? { name: contactToCache.companyName, domain: contactToCache.fqdn || '' } : null) ||
-                           { name: document.getElementById('lusha-company-search')?.value || '', domain: document.getElementById('lusha-company-domain')?.value || '' };
-        
-        if (companyCtx && companyCtx.name) {
-           await upsertCacheContact({ company: companyCtx }, contactToCache);
-           
-           // If we're updating a cache entry, we should ALSO try to update the "domain-based" cache key version if it differs
-           // This handles the case where user searches by name "Victoria Group Corp" but domain is "victoriagroup.com"
-           if (companyCtx.domain && companyCtx.name && companyCtx.domain !== companyCtx.name) {
-              await upsertCacheContact({ company: { name: companyCtx.domain, domain: companyCtx.domain } }, contactToCache);
-           }
-           
-           // FORCE SAVE TO LOCALSTORAGE FOR THIS SPECIFIC CONTACT
-           // This acts as a "hard" fallback cache keyed by the contact ID itself, ignoring company/domain context
-           try {
-             const contactCacheKey = `lusha_contact_${id}`;
-             localStorage.setItem(contactCacheKey, JSON.stringify(contactToCache));
-           } catch (_) { }
-
-        } else {
-        }
-        
-        // Update the in-memory array as well to reflect the change immediately if the user re-renders without reload
-        if (idx >= 0) {
-           allContacts[idx] = contactToCache;
-        }
-
+        const contactToCache = idx >= 0 ? allContacts[idx] : Object.assign({}, contact, which === 'email' ? { emails: enriched.emails } : { phones: enriched.phones });
+        await upsertCacheContact({ company: lastCompanyResult }, contactToCache);
+        console.log('[Lusha] Revealed data saved to cache with merged contact data');
         const email = enriched.emails && enriched.emails[0] && enriched.emails[0].address;
         if (email && window.firebaseDB) {
           try {
@@ -2617,80 +2302,56 @@
               if (Object.keys(updatePayload).length > 0) {
                 updatePayload.updatedAt = new Date();
                 await window.PCSaves.updateContact(existingId, updatePayload);
+                console.log('[Lusha] CRM contact updated with revealed data');
               }
             }
           } catch (crmError) {
+            console.warn('[Lusha] Failed to update CRM contact (cache save succeeded):', crmError);
           }
         }
       } catch (cacheError) {
+        console.warn('[Lusha] Failed to save to cache:', cacheError);
       }
-    } catch (_) { }
+    } catch (e) { console.warn('Reveal failed', e); }
   }
 
-  function setActionButtonsState(containerEl, contactExists) {
-    const addBtn = containerEl.querySelector('[data-action="add-contact"]');
-    const enrichBtn = containerEl.querySelector('[data-action="enrich-contact"]');
-    if (enrichBtn) enrichBtn.style.display = contactExists ? '' : 'none';
-    if (addBtn) addBtn.style.display = contactExists ? 'none' : '';
-  }
-
-  async function updateActionButtons(containerEl, contact, opts) {
+  async function updateActionButtons(containerEl, contact) {
     try {
-      if (opts && opts.forceExists) {
-        setActionButtonsState(containerEl, true);
-        return;
-      }
-
       const db = window.firebaseDB;
       if (!db) return;
 
-      const email = contact.email || (Array.isArray(contact.emails) && contact.emails[0] && contact.emails[0].address) || '';
-      const firstName = (contact.firstName || '').toString().trim();
-      const lastName = (contact.lastName || '').toString().trim();
-      const fullName = (firstName && lastName) ? `${firstName} ${lastName}`.trim() : (contact.fullName || '').toString().trim();
-      const targetCompany = (contact.companyName || contact.company || '').toString().trim().toLowerCase();
-      const phone = contact.phone || contact.phoneNumber || (Array.isArray(contact.phones) && contact.phones[0] && contact.phones[0].number) || '';
-
-      const checks = [];
-      if (email) {
-        checks.push(
-          db.collection('contacts').where('email', '==', email).limit(1).get()
-            .then(s => !!(s && s.docs && s.docs[0]))
-            .catch(() => false)
-        );
-      } else {
-        if (fullName && targetCompany) {
-          checks.push(
-            db.collection('contacts').where('name', '==', fullName).limit(5).get()
-              .then(s => {
-                if (!s || !s.docs || s.docs.length === 0) return false;
-                const match = s.docs.find(doc => {
-                  const data = doc.data();
-                  const dbCompany = (data.companyName || data.accountName || '').toString().toLowerCase();
-                  if (!dbCompany) return false;
-                  return dbCompany.includes(targetCompany) || targetCompany.includes(dbCompany);
-                });
-                return !!match;
-              })
-              .catch(() => false)
-          );
-        }
-        if (phone) {
-          checks.push(
-            db.collection('contacts').where('phone', '==', phone).limit(1).get()
-              .then(s => !!(s && s.docs && s.docs[0]))
-              .catch(() => false)
-          );
-        }
-      }
-
       let contactExists = false;
-      if (checks.length > 0) {
-        const results = await Promise.all(checks);
-        contactExists = results.some(Boolean);
+
+      // Check by email first
+      const email = contact.email || (Array.isArray(contact.emails) && contact.emails[0] && contact.emails[0].address) || '';
+      if (email) {
+        try {
+          const s = await db.collection('contacts').where('email', '==', email).limit(1).get();
+          contactExists = !!(s && s.docs && s.docs[0]);
+        } catch (_) { }
       }
 
-      setActionButtonsState(containerEl, contactExists);
+      // If no email match, try name-based matching
+      if (!contactExists && contact.firstName && contact.lastName) {
+        try {
+          const fullName = `${contact.firstName} ${contact.lastName}`.trim();
+          const s = await db.collection('contacts').where('name', '==', fullName).limit(1).get();
+          contactExists = !!(s && s.docs && s.docs[0]);
+        } catch (_) { }
+      }
+
+      // If still no match, try phone-based matching
+      if (!contactExists && contact.phone) {
+        try {
+          const s = await db.collection('contacts').where('phone', '==', contact.phone).limit(1).get();
+          contactExists = !!(s && s.docs && s.docs[0]);
+        } catch (_) { }
+      }
+
+      const addBtn = containerEl.querySelector('[data-action="add-contact"]');
+      const enrichBtn = containerEl.querySelector('[data-action="enrich-contact"]');
+      if (enrichBtn) enrichBtn.style.display = contactExists ? '' : 'none';
+      if (addBtn) addBtn.style.display = contactExists ? 'none' : '';
     } catch (_) { }
   }
 
@@ -2847,7 +2508,7 @@
 
       if (resultsWrap) {
         // Ensure results container is shown before animating (for consistent measuring)
-        resultsWrap.style.display = 'flex';
+        resultsWrap.style.display = 'block';
         resultsWrap.classList.add('is-shown');
         resultsWrap.classList.remove('is-hidden');
       }
@@ -2920,6 +2581,7 @@
 
     } catch (e) {
       lushaLog('Update results failed:', e);
+      console.error('Update results failed', e);
     }
   }
 
@@ -2991,6 +2653,7 @@
 
     } catch (e) {
       lushaLog('Display current page failed:', e);
+      console.error('Display current page failed', e);
     }
   }
 
@@ -3018,6 +2681,7 @@
 
     } catch (e) {
       lushaLog('Update pagination controls failed:', e);
+      console.error('Update pagination controls failed', e);
     }
   }
 
@@ -3060,7 +2724,7 @@
         let app = null;
         try { app = window.firebase.app(name); } catch (_) { }
         if (!app) {
-          try { app = window.firebase.initializeApp(window.__LUSHA_CACHE_CONFIG, name); } catch (_) { }
+          try { app = window.firebase.initializeApp(window.__LUSHA_CACHE_CONFIG, name); } catch (e) { console.warn('Cache app init failed', e); }
         }
         if (app && app.firestore) return app.firestore();
       }
@@ -3153,50 +2817,14 @@
       const existingContacts = Array.isArray(existing.contacts) ? existing.contacts : [];
       const existingById = new Map(existingContacts.map(c => [c.id || c.contactId, c]));
 
+      // Map incoming contacts and merge with any existing enriched data (emails/phones)
       const mappedIncoming = (contacts || []).map(mapProspectingContact);
       const mergedMap = new Map();
 
       mappedIncoming.forEach(nc => {
         const key = nc.id || nc.contactId;
         const ec = key ? existingById.get(key) : null;
-        
-        // CHECK LOCALSTORAGE HARD FALLBACK
-        // This is the "Nuclear Option" - if specific contact data was saved directly to LS, prioritize it over everything else
-        let hardCached = null;
-        if (key) {
-          try {
-            const rawHard = localStorage.getItem(`lusha_contact_${key}`);
-            if (rawHard) {
-               hardCached = JSON.parse(rawHard);
-            }
-          } catch (_) {}
-        }
-
         let merged = Object.assign({}, ec || {}, nc);
-        
-        // If hard cached data exists, overlay its enriched fields
-        if (hardCached) {
-           if (hardCached.phones && hardCached.phones.length > 0) {
-             merged.phones = hardCached.phones;
-             merged.hasPhones = true;
-             merged.phone = hardCached.phone || (hardCached.phones[0] && hardCached.phones[0].number);
-             merged.mobile = hardCached.mobile;
-             merged.workDirectPhone = hardCached.workDirectPhone;
-             merged.otherPhone = hardCached.otherPhone;
-           }
-           if (hardCached.emails && hardCached.emails.length > 0) {
-             merged.emails = hardCached.emails;
-             merged.hasEmails = true;
-             merged.email = hardCached.email || (hardCached.emails[0] && hardCached.emails[0].address);
-           }
-        }
-        
-        lushaLog(`Saving cache for ${key}:`, { 
-           existingPhones: ec?.phones, 
-           newPhones: nc.phones, 
-           mergedPhones: merged.phones 
-        });
-
         // ALWAYS preserve enriched email/phone arrays from existing cache on refresh
         if (ec && Array.isArray(ec.emails) && ec.emails.length > 0) {
           merged.emails = ec.emails;
@@ -3258,7 +2886,8 @@
       }
       // Always persist to localStorage as a fallback cache
       try { localStorage.setItem(`lusha_cache_${docId}`, JSON.stringify(payload)); } catch (_) { }
-    } catch (_) { }
+      console.log('[Lusha] Cache saved (merged preserve enrich)', docId, { contacts: mergedContacts.length });
+    } catch (e) { console.warn('[Lusha] Cache save failed', e); }
   }
 
   async function upsertCacheContact({ company }, enriched) {
@@ -3308,7 +2937,8 @@
       if (ref) await ref.set(updateData, { merge: true });
       else __lushaScheduleCacheWrite(docId, updateData, true);
       try { localStorage.setItem(`lusha_cache_${docId}`, JSON.stringify(Object.assign({}, existing, updateData))); } catch (_) { }
-    } catch (_) { }
+      console.log('[Lusha] Cache upserted contact', mapped.id);
+    } catch (e) { console.warn('[Lusha] Cache upsert failed', e); }
   }
 
   // Merge helper: preserve enriched emails/phones from existing cache, prefer fresh names
@@ -3378,6 +3008,7 @@
     initializeSessionTracking();
     window.__lushaSessionTracking.creditsUsedThisSession += creditsUsed;
     window.__lushaSessionTracking.operations[operation] = (window.__lushaSessionTracking.operations[operation] || 0) + creditsUsed;
+    console.log(`[Lusha Session] ${operation}: +${creditsUsed} credits (session total: ${window.__lushaSessionTracking.creditsUsedThisSession})`);
   }
 
   // Get session credit summary
@@ -3409,7 +3040,11 @@
         cachedAt: Date.now(),
         lastUpdated: Date.now()
       });
-    } catch (_) { }
+
+      console.log('[Lusha Usage] Cached usage data to Firebase');
+    } catch (e) {
+      console.warn('[Lusha Usage] Failed to cache usage data:', e);
+    }
   }
 
   // Load cached usage data
@@ -3440,8 +3075,14 @@
         }
       }
       return null;
-    } catch (_) { return null; }
+    } catch (e) {
+      console.warn('[Lusha Usage] Failed to load cached usage data:', e);
+      return null;
+    }
   }
+
+  // Debug logging function
+  function lushaLog() { /* debug disabled in production */ }
 
   function ensureLushaStyles() {
     // Removed inline styles - using main.css styles instead for refined appearance
@@ -3586,6 +3227,9 @@
         text = `${credits} credit${credits !== 1 ? 's' : ''} used • ${sessionCredits} this session`;
       }
 
+      // Log credit usage for tracking
+      console.log(`[Lusha Credit Usage] ${text} - Type: ${type}`);
+
       const chip = document.createElement('div');
       chip.className = 'lusha-credits-chip';
       chip.style.display = 'block';
@@ -3630,6 +3274,7 @@
 
   function openLushaForAccount(accountId) {
     lushaLog('openLushaForAccount called with:', accountId);
+    console.log('[Lusha] openLushaForAccount called with:', accountId);
     currentAccountId = accountId;
     currentEntityType = 'account';
     removeExistingWidget();
@@ -3637,8 +3282,10 @@
     // Ensure prefill runs after widget is created
     setTimeout(() => {
       lushaLog('Running prefill for account...');
+      console.log('[Lusha] Running prefill for account...');
       try { prefillInputs('account'); } catch (e) {
         lushaLog('Prefill error:', e);
+        console.log('[Lusha] Prefill error:', e);
       }
     }, 100);
     // Removed toast notification
@@ -3657,17 +3304,8 @@
   window.Widgets.openLushaForAccount = openLushaForAccount;
   window.Widgets.closeLusha = closeLusha;
   window.Widgets.isLushaOpen = isLushaOpen;
-  window.Widgets.addAccountToCRM = addAccountToCRM;
 
 })();
-
-function apolloLog() {
-  return;
-}
-
-function lushaLog() {
-  return;
-}
 
 // Simple crossfade helper
 function crossfadeToResults() {
@@ -3680,7 +3318,7 @@ function crossfadeToResults() {
     void resultsEl.offsetHeight; // force reflow
 
     // Loading is already hidden, just show results immediately
-    resultsEl.style.display = 'flex';
+    resultsEl.style.display = 'block';
     resultsEl.classList.remove('is-hidden');
     resultsEl.classList.add('is-shown');
 
@@ -3781,110 +3419,25 @@ function animateRevealContent(container, newContent) {
       }, 300);
     }
   } catch (e) {
+    console.warn('Animation failed, falling back to direct replacement:', e);
     container.innerHTML = newContent;
   }
 }
 
-  // Helper function to poll for phone numbers delivered asynchronously via webhook
-  async function pollForPhoneNumbers(personId, contact, wrap, container, companyContext) {
-  // Define helper locally in scope to avoid ReferenceError in async context
-  function formatPhoneLink(phone, type, isPrimary = false) {
-    if (!phone) return '—';
-    const cleanPhone = phone.replace(/\D/g, ''); 
-    const displayPhone = escapeHtml(phone);
-    
-    // Format type label (e.g., "work_direct" -> "Work Direct")
-    let displayType = (type || 'Other').replace(/_/g, ' ');
-    displayType = displayType.charAt(0).toUpperCase() + displayType.slice(1);
-
-    return `
-      <div style="display:flex; flex-direction:column;">
-        <a href="tel:${cleanPhone}" title="Click to call" style="color:inherit; text-decoration:none;">${displayPhone}</a>
-        <span style="font-size:11px; color:var(--text-muted); font-weight:500; margin-top:2px;">
-          ${displayType} ${isPrimary ? '• Primary' : ''}
-        </span>
-      </div>`;
-  }
-  
-  // Need local escapeHtml for the above helper since this runs in async context
-  function escapeHtml(str) {
-    if (!str) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  }
-
-  // Helper to map Apollo phone types to CRM fields (Mobile, Work Direct, Other)
-  function mapApolloPhonesToContact(phones) {
-    const result = { mobile: '', workDirectPhone: '', otherPhone: '' };
-    
-    // Bucket phones by normalized type
-    const mobiles = phones.filter(p => (p.type || '').toLowerCase().includes('mobile')).map(p => p.number);
-    const works = phones.filter(p => {
-        const t = (p.type || '').toLowerCase();
-        return t.includes('work') || t.includes('direct') || t.includes('hq') || t.includes('office');
-    }).map(p => p.number);
-    const others = phones.filter(p => {
-        const t = (p.type || '').toLowerCase();
-        return !t.includes('mobile') && !t.includes('work') && !t.includes('direct') && !t.includes('hq') && !t.includes('office');
-    }).map(p => p.number);
-
-    // 1. Fill Primary Slots
-    if (mobiles.length > 0) result.mobile = mobiles.shift();
-    if (works.length > 0) result.workDirectPhone = works.shift();
-    if (others.length > 0) result.otherPhone = others.shift();
-
-    // 2. Handle Overflow (Mobile -> Other)
-    if (mobiles.length > 0 && !result.otherPhone) {
-        result.otherPhone = mobiles.shift();
-    }
-
-    // 3. Handle Overflow (Work -> Other)
-    if (works.length > 0 && !result.otherPhone) {
-        result.otherPhone = works.shift();
-    }
-
-    // 4. Handle Overflow (Other -> Mobile)
-    if (others.length > 0 && !result.mobile) {
-        result.mobile = others.shift();
-    }
-
-    // 5. Handle Overflow (Other -> Work Direct)
-    if (others.length > 0 && !result.workDirectPhone) {
-        result.workDirectPhone = others.shift();
-    }
-    
-    // 6. Double Overflow Safety (Mobile -> Work Direct?)
-    if (mobiles.length > 0 && !result.workDirectPhone) {
-        result.workDirectPhone = mobiles.shift();
-    }
-
-    return result;
-  }
-
-  const maxAttempts = 20; // Poll for up to ~10 minutes (20 attempts * 30 seconds)
-  const pollInterval = 30000; // 30 seconds between polls
+// Helper function to poll for phone numbers delivered asynchronously via webhook
+async function pollForPhoneNumbers(personId, contact, wrap, container) {
+  const maxAttempts = 30; // Poll for up to 2.5 minutes (30 attempts * 5 seconds)
+  const pollInterval = 5000; // 5 seconds between polls (reduced from 10s for faster response)
   let attempts = 0;
-
-  const getNextPollDelayMs = () => {
-    const jitter = Math.round(pollInterval * 0.1 * (Math.random() * 2 - 1));
-    return Math.max(5000, pollInterval + jitter);
-  };
 
   let base = (window.API_BASE_URL || '').replace(/\/$/, '');
   if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
 
   const poll = async () => {
-    const uiAlive = !!wrap && document.body.contains(wrap);
-    const containerAlive = !!container && document.body.contains(container);
-
     attempts++;
 
     try {
-      apolloLog(`Polling for phones (attempt ${attempts}) for person:`, personId);
+      lushaLog(`Polling for phones (attempt ${attempts}/${maxAttempts}) for person:`, personId);
 
       const response = await fetch(`${base}/api/apollo/phone-retrieve?personId=${encodeURIComponent(personId)}`);
 
@@ -3894,244 +3447,58 @@ function animateRevealContent(container, newContent) {
 
       const data = await response.json();
 
-      // Log backend debug info if available (critical for troubleshooting Cloud Run issues)
-      if (data && data.debug) {
-        apolloLog('🔍 [Backend Debug]', data.debug);
-      }
+      if (data.ready && data.phones && data.phones.length > 0) {
+        // Phone numbers arrived!
+        lushaLog('Phone numbers received:', data.phones.length);
 
-      // Relaxed check: accept empty phones array if ready=true (meaning webhook arrived but had no phones)
-      let readyData = (data && data.ready && Array.isArray(data.phones)) ? data : null;
-      
-      if (!readyData) {
-        try {
-          const localResp = await fetch(`http://localhost:3000/api/apollo/phone-retrieve?personId=${encodeURIComponent(personId)}`);
-          if (localResp.ok) {
-            const localData = await localResp.json();
-            if (localData && localData.ready && Array.isArray(localData.phones)) {
-              readyData = localData;
-            }
-          }
-        } catch (_) { }
-      }
+        // Extract phone numbers
+        const phones = data.phones.map(p => ({
+          number: p.sanitized_number || p.raw_number,
+          type: p.type || 'work'
+        }));
 
-      if (readyData) {
-        try {
-          // Phone numbers (or empty result) arrived!
-          apolloLog('Phone retrieval completed. Count:', readyData.phones.length);
+        // Update UI
+        const phoneNumbers = phones.map(p => p.number).filter(Boolean);
+        const newContent = phoneNumbers.map(v => `<div class="lusha-value-item">${formatPhoneLink(v)}</div>`).join('');
+        animateRevealContent(wrap, newContent);
 
-          // Extract phone numbers
-          const phones = readyData.phones.map(p => ({
-            number: p.sanitized_number || p.raw_number,
-            type: p.type || 'work'
-          }));
-
-          // Update UI
-          const phoneNumbers = phones.map(p => p.number).filter(Boolean);
-          let didSaveToCRM = false;
-          
-          if (uiAlive) {
-            if (phoneNumbers.length > 0) {
-              const newContent = phones.map((p, idx) => {
-                 // Treat first number as primary for display purposes in the widget
-                 return `<div class="lusha-value-item">${formatPhoneLink(p.number, p.type, idx === 0)}</div>`;
-              }).join('');
-              animateRevealContent(wrap, newContent);
-              
-              // Show success toast
-              if (window.crm?.showToast) {
-                window.crm.showToast(`✅ Revealed ${phoneNumbers.length} phone number(s)`, 'success');
-              }
-            } else {
-               // No phones found
-               const noPhonesContent = '<div class="lusha-value-item">—</div>';
-               animateRevealContent(wrap, noPhonesContent);
-               if (window.crm?.showToast) {
-                 window.crm.showToast('No phone numbers found', 'info');
-               }
-            }
-          }
-
-          // Update contact object using Smart Mapping
-          const smartMap = mapApolloPhonesToContact(phones);
-          
-          // Update local contact object
-          if (smartMap.mobile) contact.mobile = smartMap.mobile;
-          if (smartMap.workDirectPhone) contact.workDirectPhone = smartMap.workDirectPhone;
-          if (smartMap.otherPhone) contact.otherPhone = smartMap.otherPhone;
-          contact.hasPhones = phones.length > 0;
-          contact.hasMobilePhone = phones.some(p => (p.type || '').toLowerCase().includes('mobile'));
-          contact.hasDirectPhone = phones.some(p => {
-            const t = (p.type || '').toLowerCase();
-            return t.includes('work') || t.includes('direct') || t.includes('hq') || t.includes('office');
-          });
-          
-          // Also keep the raw array for reference if needed
-          contact.phones = phones;
-          
-          // Legacy fallback
-          if (phoneNumbers.length > 0) {
-            contact.phone = phoneNumbers[0];
-          }
-
-          if (phoneNumbers.length > 0) {
-            try {
-              const db = window.firebaseDB;
-              if (db) {
-                const email = contact.email || (Array.isArray(contact.emails) && contact.emails[0] && contact.emails[0].address) || '';
-                const companyName = String(contact.company || contact.companyName || (companyContext && (companyContext.name || companyContext.companyName)) || '').trim();
-                let existingId = null;
-
-                if (email) {
-                  try {
-                    const snap = await db.collection('contacts').where('email', '==', String(email)).limit(1).get();
-                    if (snap && snap.docs && snap.docs[0]) existingId = snap.docs[0].id;
-                  } catch (_) { }
-                }
-
-                if (!existingId) {
-                  const fullName = String(contact.fullName || contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim()).trim();
-                  if (fullName && companyName) {
-                    try {
-                      const snap = await db.collection('contacts').where('name', '==', fullName).limit(5).get();
-                      if (snap && snap.docs && snap.docs.length > 0) {
-                        const targetCompany = companyName.toLowerCase();
-                        const match = snap.docs.find(doc => {
-                          const data = doc.data();
-                          const dbCompany = String(data.companyName || data.accountName || '').toLowerCase();
-                          return (dbCompany && (dbCompany.includes(targetCompany) || targetCompany.includes(dbCompany)));
-                        });
-                        if (match) existingId = match.id;
-                      }
-                    } catch (_) { }
-                  }
-                }
-
-                if (existingId) {
-                  const updatePayload = {
-                    phone: phoneNumbers[0] || '',
-                    workDirectPhone: smartMap.workDirectPhone || '',
-                    mobile: smartMap.mobile || '',
-                    otherPhone: smartMap.otherPhone || '',
-                    updatedAt: new Date()
-                  };
-
-                  if (window.PCSaves && typeof window.PCSaves.updateContact === 'function') {
-                    await window.PCSaves.updateContact(existingId, updatePayload);
-                  } else {
-                    await db.collection('contacts').doc(String(existingId)).set(updatePayload, { merge: true });
-                  }
-                  didSaveToCRM = true;
-
-                  try {
-                    if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
-                      await window.CacheManager.invalidate('contacts');
-                    }
-                  } catch (_) { }
-                }
-              }
-            } catch (_) { }
-          }
-
-          try {
-            const keys = Array.from(new Set([contact.id, contact.contactId, personId].filter(Boolean)));
-            keys.forEach(k => {
-              try {
-                localStorage.setItem(`lusha_contact_${k}`, JSON.stringify(contact));
-              } catch (_) { }
-            });
-          } catch (_) { }
-
-          // Update in allContacts cache
-          let updatedContactForCache = contact;
-          try {
-            const id = contact.id || contact.contactId;
-            const idx = allContacts.findIndex(c => (c.id || c.contactId) === id);
-            if (idx >= 0) {
-              // Apply smart mapping to cache
-              if (smartMap.mobile) allContacts[idx].mobile = smartMap.mobile;
-              if (smartMap.workDirectPhone) allContacts[idx].workDirectPhone = smartMap.workDirectPhone;
-              if (smartMap.otherPhone) allContacts[idx].otherPhone = smartMap.otherPhone;
-              
-              allContacts[idx].phones = phones;
-              allContacts[idx].hasPhones = phones.length > 0;
-              allContacts[idx].hasMobilePhone = contact.hasMobilePhone;
-              allContacts[idx].hasDirectPhone = contact.hasDirectPhone;
-              if (phoneNumbers[0]) allContacts[idx].phone = phoneNumbers[0];
-              apolloLog('Updated phone numbers in cache for:', id);
-              updatedContactForCache = allContacts[idx];
-            }
-          } catch (e) {
-            apolloLog('Failed to update cache:', e);
-          }
-
-          try {
-            if (containerAlive) {
-              const revealBtn = container.querySelector('[data-reveal="phones"]');
-              if (revealBtn) revealBtn.textContent = 'Enrich';
-            }
-          } catch (_) { }
-
-          try {
-            if (containerAlive) {
-              const addContactBtn = container.querySelector('[data-action="add-contact"]');
-              if (addContactBtn) addContactBtn.setAttribute('data-contact', JSON.stringify(contact));
-            }
-          } catch (_) { }
-
-          try {
-            const companyForCache = companyContext || lastCompanyResult || {
-              domain: updatedContactForCache.fqdn || '',
-              name: updatedContactForCache.companyName || updatedContactForCache.company || ''
-            };
-            await upsertCacheContact({ company: companyForCache }, updatedContactForCache);
-            apolloLog('Persisted phone numbers to cache for:', contact.id || contact.contactId);
-          } catch (e) {
-            apolloLog('Failed to persist phone numbers to cache:', e);
-          }
-
-          if (!uiAlive && phoneNumbers.length > 0) {
-            try {
-              const fullName = String(contact.fullName || contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim()).trim();
-              const companyName = String((companyContext && (companyContext.name || companyContext.companyName)) || contact.companyName || contact.company || '').trim();
-              const title = String(contact.jobTitle || contact.title || '').trim();
-              const titleLine = [title, companyName].filter(Boolean).join(' • ');
-              const iconLetter = (fullName || companyName || 'C').toString().trim().charAt(0).toUpperCase() || 'C';
-
-              if (window.crm?.showToast) {
-                window.crm.showToast(titleLine || 'Contact', 'save', {
-                  title: didSaveToCRM ? 'Number saved' : 'Phone ready',
-                  details: didSaveToCRM ? (fullName || '') : ([fullName || '', 'Not saved to CRM yet'].filter(Boolean).join(' • ')),
-                  icon: iconLetter,
-                  duration: 4500,
-                  sound: false
-                });
-              }
-            } catch (_) { }
-          }
-
-        } catch (processError) {
-          apolloLog('❌ Error processing phone data:', processError);
-          // Show error state in UI so user isn't stuck loading
-          if (uiAlive) {
-            animateRevealContent(wrap, '<div class="lusha-value-item" style="color: var(--danger);">Error displaying data</div>');
-          }
+        // Update contact object
+        contact.phones = phones;
+        if (phoneNumbers.length > 0) {
+          contact.phone = phoneNumbers[0];
         }
 
-        return; // Stop polling regardless of success/fail in processing
+        // Update in allContacts cache
+        try {
+          const id = contact.id || contact.contactId;
+          const idx = allContacts.findIndex(c => (c.id || c.contactId) === id);
+          if (idx >= 0) {
+            allContacts[idx].phones = phones;
+            allContacts[idx].hasPhones = phones.length > 0;
+            if (phoneNumbers[0]) allContacts[idx].phone = phoneNumbers[0];
+            lushaLog('Updated phone numbers in cache for:', id);
+          }
+        } catch (e) {
+          lushaLog('Failed to update cache:', e);
+        }
+
+        // Show success toast
+        if (window.crm?.showToast) {
+          window.crm.showToast(`✅ Revealed ${phoneNumbers.length} phone number(s)`, 'success');
+        }
+
+        return; // Done!
       }
 
       // Not ready yet, continue polling
       if (attempts < maxAttempts) {
-        const delayMs = getNextPollDelayMs();
-        apolloLog(`Phone numbers not ready yet, polling again in ${Math.round(delayMs / 1000)}s...`);
-        setTimeout(poll, delayMs);
+        lushaLog(`Phone numbers not ready yet, polling again in ${pollInterval / 1000}s...`);
+        setTimeout(poll, pollInterval);
       } else {
         // Timeout - show error
-        apolloLog('Phone polling timeout after', attempts, 'attempts');
-        if (uiAlive) {
-          const timeoutContent = '<div class="lusha-value-item" style="color: var(--text-muted);">⏱️ Phone reveal timed out. Try again later.</div>';
-          animateRevealContent(wrap, timeoutContent);
-        }
+        lushaLog('Phone polling timeout after', attempts, 'attempts');
+        const timeoutContent = '<div class="lusha-value-item" style="color: var(--text-muted);">⏱️ Phone reveal timed out. Try again later.</div>';
+        animateRevealContent(wrap, timeoutContent);
 
         if (window.crm?.showToast) {
           window.crm.showToast('Phone reveal is taking longer than expected. Try again later.', 'warning');
@@ -4139,17 +3506,14 @@ function animateRevealContent(container, newContent) {
       }
 
     } catch (error) {
-      apolloLog('Phone polling error:', error);
+      lushaLog('Phone polling error:', error);
 
-      // Retry on network error (up to max attempts)
+      // Retry on error (up to max attempts)
       if (attempts < maxAttempts) {
-        const delayMs = getNextPollDelayMs();
-        setTimeout(poll, delayMs);
+        setTimeout(poll, pollInterval);
       } else {
-        if (uiAlive) {
-          const errorContent = '<div class="lusha-value-item">—</div>';
-          animateRevealContent(wrap, errorContent);
-        }
+        const errorContent = '<div class="lusha-value-item">—</div>';
+        animateRevealContent(wrap, errorContent);
 
         if (window.crm?.showToast) {
           window.crm.showToast('Failed to reveal phone numbers', 'error');
@@ -4159,8 +3523,93 @@ function animateRevealContent(container, newContent) {
   };
 
   // Start polling after a short delay
-  setTimeout(poll, 1000);
+  setTimeout(poll, 1000); // Initial 1-second delay before first poll (reduced for faster response)
 }
+
+// Helper function to set credit total (can be called manually if needed)
+function setLushaCreditTotal(total) {
+  try {
+    if (typeof total === 'number' && total > 0) {
+      window.LUSHA_CREDITS_TOTAL = total;
+      localStorage.setItem('LUSHA_CREDITS_TOTAL', total.toString());
+      console.log('[Lusha Usage] Set credit total to:', total);
+      // Force refresh the usage bar
+      window.__lushaUsageLastFetch = 0;
+      renderUsageBar();
+    }
+  } catch (_) { }
+}
+
+// Expose globally for manual use
+window.setLushaCreditTotal = setLushaCreditTotal;
+
+// Helper function to force refresh usage bar (for testing)
+function refreshLushaUsageBar() {
+  window.__lushaUsageLastFetch = 0;
+  renderUsageBar();
+}
+window.refreshLushaUsageBar = refreshLushaUsageBar;
+
+// Quick fix function to immediately update the display
+function fixLushaCreditDisplay() {
+  try {
+    const txt = document.getElementById('lusha-usage-text');
+    const fill = document.getElementById('lusha-usage-fill');
+    const lab = document.getElementById('lusha-usage-label');
+
+    if (txt) {
+      // Get current used value from the text
+      const currentText = txt.textContent;
+      const usedMatch = currentText.match(/(\d+)/);
+      const used = usedMatch ? parseInt(usedMatch[1]) : 0;
+
+      // Calculate total: if we have 323 used and 277 remaining, total = 600
+      // This matches your 600-credit plan
+      const total = 600; // Your plan total
+      const pct = Math.round((used / total) * 100);
+
+      txt.textContent = `${used}/${total}`;
+      if (fill) fill.style.width = pct + '%';
+      if (lab) lab.textContent = 'Credits';
+
+      console.log('[Lusha Usage] Quick fix applied - used:', used, 'total:', total, 'pct:', pct + '%');
+    }
+  } catch (e) {
+    console.error('[Lusha Usage] Quick fix failed:', e);
+  }
+}
+window.fixLushaCreditDisplay = fixLushaCreditDisplay;
+
+// Test function to verify hover effects are working
+function testLushaHoverEffects() {
+  const contactItems = document.querySelectorAll('.lusha-contact-item');
+  console.log('Found', contactItems.length, 'contact items');
+
+  if (contactItems.length > 0) {
+    const firstItem = contactItems[0];
+    console.log('Testing hover effect on first contact item...');
+
+    // Manually apply the hover styles
+    firstItem.style.transform = 'translateY(-20px) scale(1.05)';
+    firstItem.style.boxShadow = '0 20px 50px rgba(0, 0, 0, 0.4)';
+    firstItem.style.zIndex = '1000';
+    firstItem.style.border = '3px solid #ff6b35';
+
+    console.log('Applied test styles. You should see the card lift up with an orange border.');
+
+    // Remove after 3 seconds
+    setTimeout(() => {
+      firstItem.style.transform = '';
+      firstItem.style.boxShadow = '';
+      firstItem.style.zIndex = '';
+      firstItem.style.border = '';
+      console.log('Removed test styles.');
+    }, 3000);
+  } else {
+    console.log('No contact items found. Make sure the Lusha widget is open and has results.');
+  }
+}
+window.testLushaHoverEffects = testLushaHoverEffects;
 
 // Render usage bar with cached data (immediate display)
 function renderUsageBarWithData(cachedData) {
@@ -4251,9 +3700,13 @@ function renderUsageBarWithData(cachedData) {
     if (fill) fill.style.width = pct + '%';
 
     const displayText = limit ? `${used}/${limit}` : `${used} used`;
+    console.log('[Lusha Usage] Cached display - used:', used, 'limit:', limit, 'displayText:', displayText, 'pct:', pct);
+
     if (txt) txt.textContent = displayText;
     if (lab) lab.textContent = label;
-  } catch (_) { }
+  } catch (e) {
+    console.warn('[Lusha Usage] Failed to render cached usage bar:', e);
+  }
 }
 
 // Fetch and render live Lusha usage bar (rate-limited server endpoint)
@@ -4262,6 +3715,7 @@ async function renderUsageBar() {
     // First, try to load cached usage data for immediate display
     const cachedUsage = await loadCachedUsageData();
     if (cachedUsage) {
+      console.log('[Lusha Usage] Using cached usage data for immediate display');
       renderUsageBarWithData(cachedUsage);
     }
 
@@ -4278,6 +3732,7 @@ async function renderUsageBar() {
     if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
     const resp = await fetch(`${base}/api/apollo/usage`, { method: 'GET' });
     if (!resp.ok) {
+      console.log('[Lusha Usage] API request failed:', resp.status, resp.statusText);
       // Fallback: show hard-coded 600 total with 0 used if API fails
       const fallbackLimit = 600;
       const fallbackUsed = 0;
@@ -4313,11 +3768,15 @@ async function renderUsageBar() {
       if (fill) fill.style.width = fallbackPct + '%';
       if (txt) txt.textContent = `${fallbackUsed}/${fallbackLimit}`;
       if (lab) lab.textContent = 'Credits';
+
+      console.log('[Lusha Usage] Using fallback display - used:', fallbackUsed, 'limit:', fallbackLimit);
       return;
     }
     const data = await resp.json();
+    console.log('[Lusha Usage] Raw API response:', data);
     const usage = data && data.usage ? data.usage : {};
     const headers = data && data.headers ? data.headers : {};
+    console.log('[Lusha Usage] Parsed usage:', usage, 'headers:', headers);
 
     // Cache the usage data for immediate display next time
     await cacheUsageData({ usage, headers });
@@ -4361,6 +3820,8 @@ async function renderUsageBar() {
       usage?.account?.credits?.used
     );
 
+    console.log('[Lusha Usage] Calculated creditsTotal:', creditsTotal, 'creditsUsed:', creditsUsed, 'configuredTotal:', configuredTotal);
+
     let label = 'Credits';
     let limit;
     let used;
@@ -4369,6 +3830,8 @@ async function renderUsageBar() {
     limit = 600; // Your 600-credit plan
     used = (creditsUsed != null && creditsUsed >= 0) ? creditsUsed : 0;
     label = 'Credits';
+
+    console.log('[Lusha Usage] Hard coded display - used:', used, 'total:', limit, 'format: Usage/600');
 
     const pct = limit > 0 ? Math.max(0, Math.min(100, Math.round((used / limit) * 100))) : 0;
 
