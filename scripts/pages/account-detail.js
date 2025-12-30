@@ -1168,7 +1168,6 @@ var console = {
   }
 
   function renderAccountDetail() {
-    console.log('[AccountDetail] renderAccountDetail called');
     if (!state.currentAccount || !els.mainContent) return;
 
 
@@ -3737,60 +3736,87 @@ var console = {
     }
 
     // Widgets dropdown functionality
-    const widgetsBtn = document.getElementById('open-widgets');
-    const widgetsWrap = document.querySelector('#account-detail-header .widgets-wrap');
+    // Helper to bind widget events with retry capability
+    const bindWidgetsEvents = () => {
+      const widgetsBtn = document.getElementById('open-widgets');
+      const widgetsWrap = document.querySelector('#account-detail-header .widgets-wrap');
 
-    if (widgetsBtn && widgetsWrap && !widgetsBtn._bound) {
-      widgetsBtn._bound = true;
-      // Click toggles open state (also support keyboard)
-      widgetsBtn.addEventListener('click', (e) => {
-        e.preventDefault();
+      // FORCE RESET: Always reset the bound flag if we found the elements.
+      // This fixes the issue where navigation from other pages leaves a stale flag on a reused element
+      // but listeners might be detached or invalid.
+      if (widgetsBtn) widgetsBtn._bound = false;
+
+      if (widgetsBtn && widgetsWrap && !widgetsBtn._bound) {
+        widgetsBtn._bound = true;
+        // Click toggles open state (also support keyboard)
+        widgetsBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          
+          // Fix for hover/click conflict:
+          // If the menu was JUST opened by hover (< 500ms ago), treat this click as 
+          // a confirmation to "keep open" rather than a toggle to "close".
+          // This prevents the common issue where a user hovers (opening it) and then 
+          // immediately clicks (accidentally closing it).
+          const justOpened = widgetsWrap._lastAutoOpen && (Date.now() - widgetsWrap._lastAutoOpen < 500);
+          
+          if (justOpened && widgetsWrap.classList.contains('open')) {
+            // Do nothing (keep it open)
+            return;
+          }
+
+          const isOpen = widgetsWrap.classList.toggle('open');
+          widgetsBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+
+        // Hover/focus intent: open immediately, close with slight delay
+        const openNow = () => {
+          clearTimeout(widgetsWrap._closeTimer);
+          if (!widgetsWrap.classList.contains('open')) {
+            widgetsWrap.classList.add('open');
+            widgetsBtn.setAttribute('aria-expanded', 'true');
+            widgetsWrap._lastAutoOpen = Date.now(); // Track when we auto-opened
+          }
+        };
+        const closeSoon = () => {
+          clearTimeout(widgetsWrap._closeTimer);
+          widgetsWrap._closeTimer = setTimeout(() => {
+            widgetsWrap.classList.remove('open');
+            widgetsBtn.setAttribute('aria-expanded', 'false');
+          }, 320); // slightly longer grace period to move into the drawer
+        };
+
+        widgetsWrap.addEventListener('mouseenter', openNow);
+        widgetsWrap.addEventListener('mouseleave', closeSoon);
+        widgetsWrap.addEventListener('focusin', openNow);
+        widgetsWrap.addEventListener('focusout', (e) => {
+          // If focus moves outside the wrap, start close timer
+          if (!widgetsWrap.contains(e.relatedTarget)) closeSoon();
+        });
+
+        // CHECK: If the mouse is already over the new element (because we just replaced the DOM),
+        // the browser won't fire a new 'mouseenter'. We must check manually.
+        const checkHover = () => {
+          try {
+            const isHovering = widgetsBtn.matches(':hover') || widgetsWrap.matches(':hover');
+            // Silent check to avoid log spam
+            if (isHovering) openNow();
+          } catch (err) {
+            // noop
+          }
+        };
         
-        // Fix for hover/click conflict:
-        // If the menu was JUST opened by hover (< 500ms ago), treat this click as 
-        // a confirmation to "keep open" rather than a toggle to "close".
-        // This prevents the common issue where a user hovers (opening it) and then 
-        // immediately clicks (accidentally closing it).
-        const justOpened = widgetsWrap._lastAutoOpen && (Date.now() - widgetsWrap._lastAutoOpen < 500);
-        
-        if (justOpened && widgetsWrap.classList.contains('open')) {
-          // Do nothing (keep it open)
-          return;
-        }
+        // Check immediately and after a short delay to allow layout to settle
+        checkHover();
+        setTimeout(checkHover, 50);
+        setTimeout(checkHover, 200);
+      }
+    };
 
-        const isOpen = widgetsWrap.classList.toggle('open');
-        widgetsBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-      });
-
-      // Hover/focus intent: open immediately, close with slight delay
-      const openNow = () => {
-        clearTimeout(widgetsWrap._closeTimer);
-        if (!widgetsWrap.classList.contains('open')) {
-          widgetsWrap.classList.add('open');
-          widgetsBtn.setAttribute('aria-expanded', 'true');
-          widgetsWrap._lastAutoOpen = Date.now(); // Track when we auto-opened
-        }
-      };
-      const closeSoon = () => {
-        clearTimeout(widgetsWrap._closeTimer);
-        widgetsWrap._closeTimer = setTimeout(() => {
-          widgetsWrap.classList.remove('open');
-          widgetsBtn.setAttribute('aria-expanded', 'false');
-        }, 320); // slightly longer grace period to move into the drawer
-      };
-
-      widgetsWrap.addEventListener('mouseenter', openNow);
-      widgetsWrap.addEventListener('mouseleave', closeSoon);
-      widgetsWrap.addEventListener('focusin', openNow);
-      widgetsWrap.addEventListener('focusout', (e) => {
-        // If focus moves outside the wrap, start close timer
-        if (!widgetsWrap.contains(e.relatedTarget)) closeSoon();
-      });
-
-      try {
-        if (widgetsBtn.matches(':hover') || widgetsWrap.matches(':hover')) openNow();
-      } catch (_) { }
-    }
+    // Attempt to bind immediately
+    bindWidgetsEvents();
+    
+    // RETRY: In case DOM elements weren't ready or were replaced immediately after
+    setTimeout(bindWidgetsEvents, 150);
 
     // Add contact button
     const addContactBtn = document.getElementById('add-contact-to-account');
@@ -4814,8 +4840,6 @@ var console = {
 
   // Commit the edit to Firestore and update UI
   async function commitEdit(wrap, field, value) {
-    console.log('[Account Detail] commitEdit called:', { field, value, type: typeof value });
-
     // Special handling for service addresses
     if (field.startsWith('serviceAddress_')) {
       const addressIndex = parseInt(wrap.getAttribute('data-address-index'), 10);
@@ -4839,9 +4863,7 @@ var console = {
     // Convert contractEndDate to ISO for storage, display as MM/DD/YYYY via updateFieldText
     let toSave = value;
     if (field === 'contractEndDate') {
-      console.log('[Account Detail] Processing contractEndDate:', { original: value });
       toSave = toMDY(value);
-      console.log('[Account Detail] Converted to MDY:', { converted: toSave });
     }
     // Normalize phone numbers for any recognized phone key
     if (field === 'phone' || field === 'companyPhone' || field === 'primaryPhone' || field === 'mainPhone') {
@@ -4895,7 +4917,6 @@ var console = {
         }
       } catch (_) { /* noop */ }
     }
-    console.log('[Account Detail] Saving to Firebase:', { field, toSave });
     await saveField(field, toSave);
     updateFieldText(wrap, toSave);
 
@@ -4905,7 +4926,6 @@ var console = {
         // Give the UI a moment to update, then reprocess all phone elements
         setTimeout(() => {
           if (window.ClickToCall && typeof window.ClickToCall.processSpecificPhoneElements === 'function') {
-            console.log('[Account Detail] Refreshing click-to-call bindings after phone update');
             window.ClickToCall.processSpecificPhoneElements();
           }
         }, 100);
@@ -5124,13 +5144,10 @@ var console = {
       // Explicitly remove contact attributes to prevent contact lookup
       el.removeAttribute('data-contact-id');
       el.removeAttribute('data-contact-name');
-
-      console.log('[Account Detail] Phone click binding updated with new number:', displayPhone);
     } catch (_) { }
 
     // Create new click handler (using closure to capture current phone number)
     const callNum = digitsOnly.length === 10 ? `+1${digitsOnly}` : (cleaned.startsWith('+') ? cleaned : `+${digitsOnly}`);
-    console.log('[Account Detail] Creating click handler with phone number:', callNum);
 
     el._pcClickHandler = function (e) {
       try {
@@ -5139,7 +5156,6 @@ var console = {
         else e.stopPropagation();
       } catch (_) { }
 
-      console.log('[Account Detail] Phone clicked, calling:', callNum);
       // Set call context explicitly to company mode
       try {
         if (window.Widgets && typeof window.Widgets.setCallContext === 'function') {
@@ -5203,7 +5219,6 @@ var console = {
             isCompanyPhone: true
           };
 
-          console.log('[Account Detail] Setting call context with phone:', callNum);
           window.Widgets.setCallContext(callContext);
 
           // Mark that we've set a specific context to prevent generic click-to-call from overriding
@@ -5219,11 +5234,9 @@ var console = {
           // Mark the exact time of the user click to prove a fresh gesture
           try { window.Widgets._lastClickToCallAt = Date.now(); } catch (_) { }
 
-          console.log('[Account Detail] Calling Widgets.callNumber with:', callNum);
           // Use 'click-to-call' source to ensure auto-trigger works
           window.Widgets.callNumber(callNum.replace(/\D/g, ''), '', true, 'click-to-call');
         } else {
-          console.log('[Account Detail] Falling back to tel: link');
           window.open(`tel:${encodeURIComponent(callNum)}`);
         }
       } catch (_) { }
@@ -5233,7 +5246,6 @@ var console = {
     el.addEventListener('click', el._pcClickHandler);
     el._pcClickBound = true;
     el.classList.add('clickable-phone');
-    console.log('[Account Detail] Click handler attached to phone element');
   }
 
   // Ensure default action buttons (edit/copy/delete) exist after editing lifecycle
@@ -5253,7 +5265,6 @@ var console = {
     const onEnergyUpdated = (e) => {
       try {
         const d = e.detail || {};
-        console.log('[Account Detail] Received energy update event:', d, 'Current account ID:', state.currentAccount?.id);
         // Only update if this is for the current account
         if (d.entity === 'account' && d.id === state.currentAccount?.id) {
           const field = d.field;
