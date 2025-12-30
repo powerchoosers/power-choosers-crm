@@ -1660,6 +1660,36 @@
   async function handleTaskComplete() {
     if (!state.currentTask) return;
 
+    // CRITICAL FIX: Identify the next task in the global queue BEFORE deleting the current one
+    // This must be done before any deletion logic runs
+    let nextQueueTaskId = null;
+    try {
+      // Use the shared queue generator to ensure consistent sorting
+      const queue = await getSortedTasksQueue();
+      // Filter out completed tasks just in case
+      const activeQueue = queue.filter(t => t.status !== 'completed');
+      
+      const currentIndex = activeQueue.findIndex(t => t.id === state.currentTask.id);
+      
+      if (currentIndex !== -1 && currentIndex < activeQueue.length - 1) {
+        // Next task is the one immediately following current task
+        nextQueueTaskId = activeQueue[currentIndex + 1].id;
+        console.log('[TaskDetail] Pre-identified next task in queue (Priority 1):', nextQueueTaskId);
+      } else if (activeQueue.length > 0 && currentIndex === -1) {
+        // If current task is not in the queue (e.g. freshly loaded), go to the first available task
+        nextQueueTaskId = activeQueue[0].id;
+        console.log('[TaskDetail] Current task not in queue, defaulting to first available:', nextQueueTaskId);
+      } else if (currentIndex !== -1 && currentIndex === activeQueue.length - 1 && activeQueue.length > 1) {
+         // If we are at the end, maybe go to the first one? Or just null (end of queue)
+         // Let's try to go to the first one if it's different
+         if (activeQueue[0].id !== state.currentTask.id) {
+            nextQueueTaskId = activeQueue[0].id;
+         }
+      }
+    } catch (e) {
+      console.warn('[TaskDetail] Failed to pre-calculate next task:', e);
+    }
+
     let nextSequenceTaskId = null;
     let nextSequenceTaskData = null;
 
@@ -1894,16 +1924,22 @@
       detail: { taskId: state.currentTask.id, source: 'task-detail' }
     }));
 
-    // Navigate to next task instead of going back
+      // Navigate to next task instead of going back
     try {
       // Clean up any existing avatars/icons before navigation
       cleanupExistingAvatarsAndIcons();
 
       // Small delay to ensure task deletion has been processed
       await new Promise(resolve => setTimeout(resolve, 100));
-      if (nextSequenceTaskId) {
+      
+      // CRITICAL FIX: Prioritize global queue navigation over sequence creation
+      // This ensures user flows through their daily list instead of getting stuck in a sequence loop
+      if (nextQueueTaskId) {
+        await loadTaskData(nextQueueTaskId);
+      } else if (nextSequenceTaskId) {
         await loadTaskData(nextSequenceTaskId);
       } else {
+        // Fallback to standard navigation (might fail if list is empty)
         await navigateToAdjacentTask('next');
       }
     } catch (e) {
@@ -2452,6 +2488,195 @@
     }
   }
 
+  async function getSortedTasksQueue() {
+    // Get all tasks from the same source (localStorage + Firebase) with ownership filtering
+    let allTasks = [];
+
+    // Load from localStorage (with ownership filtering)
+    try {
+      const key = getUserTasksKey();
+      const userTasks = JSON.parse(localStorage.getItem(key) || '[]');
+      allTasks = filterTasksByOwnership(userTasks);
+
+      // Fallback to legacy key
+      if (allTasks.length === 0) {
+        const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+        allTasks = filterTasksByOwnership(legacyTasks);
+      }
+    } catch (_) { allTasks = []; }
+
+    // Load from BackgroundTasksLoader (cache-first, cost-efficient)
+    if (window.BackgroundTasksLoader) {
+      try {
+        const cachedTasks = window.BackgroundTasksLoader.getTasksData() || [];
+        const filteredCached = filterTasksByOwnership(cachedTasks);
+
+        // Merge with localStorage (local takes precedence for duplicates)
+        const allTasksMap = new Map();
+        allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
+        filteredCached.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+        allTasks = Array.from(allTasksMap.values());
+      } catch (e) {
+        console.warn('Could not load tasks from BackgroundTasksLoader:', e);
+      }
+    }
+
+    // CRITICAL FIX: Always add LinkedIn sequence tasks (regardless of BackgroundTasksLoader)
+    try {
+      const linkedInTasks = await getLinkedInTasksFromSequences();
+      const allTasksMap = new Map();
+      allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
+      linkedInTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+      allTasks = Array.from(allTasksMap.values());
+    } catch (e) {
+      console.warn('Could not load LinkedIn tasks for navigation:', e);
+    }
+
+    // Only query Firebase if BackgroundTasksLoader doesn't have enough data
+    if (allTasks.length < 10 && window.firebaseDB) {
+      try {
+        let firebaseTasks = [];
+
+        if (!isAdmin()) {
+          const email = getUserEmail();
+          if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
+            firebaseTasks = await window.DataManager.queryWithOwnership('tasks');
+            firebaseTasks = firebaseTasks.slice(0, 200);
+          } else if (email) {
+            // Fallback: two separate queries
+            const [ownedSnap, assignedSnap] = await Promise.all([
+              window.firebaseDB.collection('tasks')
+                .where('ownerId', '==', email)
+                .orderBy('timestamp', 'desc')
+                .limit(100)
+                .get(),
+              window.firebaseDB.collection('tasks')
+                .where('assignedTo', '==', email)
+                .orderBy('timestamp', 'desc')
+                .limit(100)
+                .get()
+            ]);
+
+            const tasksMap = new Map();
+            ownedSnap.docs.forEach(doc => {
+              const data = doc.data();
+              tasksMap.set(doc.id, {
+                id: doc.id,
+                ...data,
+                createdAt: data.createdAt || (data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now(),
+                status: data.status || 'pending'
+              });
+            });
+            assignedSnap.docs.forEach(doc => {
+              if (!tasksMap.has(doc.id)) {
+                const data = doc.data();
+                tasksMap.set(doc.id, {
+                  id: doc.id,
+                  ...data,
+                  createdAt: data.createdAt || (data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now(),
+                  status: data.status || 'pending'
+                });
+              }
+            });
+            firebaseTasks = Array.from(tasksMap.values());
+          }
+        } else {
+          // Admin: unrestricted query
+          const snapshot = await window.firebaseDB.collection('tasks')
+            .orderBy('timestamp', 'desc')
+            .limit(200)
+            .get();
+          firebaseTasks = snapshot.docs.map(doc => {
+            const data = doc.data() || {};
+            const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
+            return { ...data, id: (data.id || doc.id), createdAt, status: data.status || 'pending' };
+          });
+        }
+
+        // Merge with existing tasks
+        const allTasksMap = new Map();
+        allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
+        firebaseTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+
+        // CRITICAL FIX: Add LinkedIn sequence tasks (in case they weren't loaded earlier)
+        const linkedInTasks = await getLinkedInTasksFromSequences();
+        linkedInTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+
+        allTasks = Array.from(allTasksMap.values());
+      } catch (e) {
+        console.warn('Could not load tasks from Firebase for navigation:', e);
+      }
+    }
+
+    // Filter to today's and overdue pending tasks (same logic as Today's Tasks widget)
+    const today = new Date();
+    const localMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+    const parseDateStrict = (dateStr) => {
+      if (!dateStr) return null;
+      try {
+        if (dateStr.includes('/')) {
+          const [mm, dd, yyyy] = dateStr.split('/').map(n => parseInt(n, 10));
+          if (!isNaN(mm) && !isNaN(dd) && !isNaN(yyyy)) return new Date(yyyy, mm - 1, dd);
+        } else if (dateStr.includes('-')) {
+          const [yyyy, mm, dd] = dateStr.split('-').map(n => parseInt(n, 10));
+          if (!isNaN(mm) && !isNaN(dd) && !isNaN(yyyy)) return new Date(yyyy, mm - 1, dd);
+        }
+        const d = new Date(dateStr);
+        if (!isNaN(d)) return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      } catch (_) { /* noop */ }
+      return null;
+    };
+
+    const todaysTasks = allTasks.filter(task => {
+      if ((task.status || 'pending') !== 'pending') return false;
+      const d = parseDateStrict(task.dueDate);
+      if (!d) return false;
+      return d.getTime() <= localMidnight.getTime();
+    });
+
+    // Sort by due date/time (earliest to latest)
+    todaysTasks.sort((a, b) => {
+      const da = parseDateStrict(a.dueDate);
+      const db = parseDateStrict(b.dueDate);
+      if (da && db) {
+        const dd = da - db;
+        if (dd !== 0) return dd;
+      } else if (da && !db) {
+        return -1;
+      } else if (!da && db) {
+        return 1;
+      }
+
+      const parseTimeToMinutes = (timeStr) => {
+        if (!timeStr || typeof timeStr !== 'string') return NaN;
+        const m = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        if (!m) return NaN;
+        let h = parseInt(m[1], 10);
+        const mins = parseInt(m[2], 10);
+        const ap = m[3].toUpperCase();
+        if (h === 12) h = 0;
+        if (ap === 'PM') h += 12;
+        return h * 60 + mins;
+      };
+
+      const ta = parseTimeToMinutes(a.dueTime);
+      const tb = parseTimeToMinutes(b.dueTime);
+      const taValid = !isNaN(ta), tbValid = !isNaN(tb);
+      if (taValid && tbValid) {
+        const td = ta - tb; if (td !== 0) return td;
+      } else if (taValid && !tbValid) {
+        return -1;
+      } else if (!taValid && tbValid) {
+        return 1;
+      }
+
+      return (a.createdAt || 0) - (b.createdAt || 0);
+    });
+
+    return todaysTasks;
+  }
+
   async function navigateToAdjacentTask(direction) {
     if (!state.currentTask) return;
 
@@ -2464,190 +2689,7 @@
     state.navigating = true;
 
     try {
-      // Get all tasks from the same source (localStorage + Firebase) with ownership filtering
-      let allTasks = [];
-
-      // Load from localStorage (with ownership filtering)
-      try {
-        const key = getUserTasksKey();
-        const userTasks = JSON.parse(localStorage.getItem(key) || '[]');
-        allTasks = filterTasksByOwnership(userTasks);
-
-        // Fallback to legacy key
-        if (allTasks.length === 0) {
-          const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
-          allTasks = filterTasksByOwnership(legacyTasks);
-        }
-      } catch (_) { allTasks = []; }
-
-      // Load from BackgroundTasksLoader (cache-first, cost-efficient)
-      if (window.BackgroundTasksLoader) {
-        try {
-          const cachedTasks = window.BackgroundTasksLoader.getTasksData() || [];
-          const filteredCached = filterTasksByOwnership(cachedTasks);
-
-          // Merge with localStorage (local takes precedence for duplicates)
-          const allTasksMap = new Map();
-          allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
-          filteredCached.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
-          allTasks = Array.from(allTasksMap.values());
-        } catch (e) {
-          console.warn('Could not load tasks from BackgroundTasksLoader:', e);
-        }
-      }
-
-      // CRITICAL FIX: Always add LinkedIn sequence tasks (regardless of BackgroundTasksLoader)
-      try {
-        const linkedInTasks = await getLinkedInTasksFromSequences();
-        const allTasksMap = new Map();
-        allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
-        linkedInTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
-        allTasks = Array.from(allTasksMap.values());
-      } catch (e) {
-        console.warn('Could not load LinkedIn tasks for navigation:', e);
-      }
-
-      // Only query Firebase if BackgroundTasksLoader doesn't have enough data
-      if (allTasks.length < 10 && window.firebaseDB) {
-        try {
-          let firebaseTasks = [];
-
-          if (!isAdmin()) {
-            const email = getUserEmail();
-            if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
-              firebaseTasks = await window.DataManager.queryWithOwnership('tasks');
-              firebaseTasks = firebaseTasks.slice(0, 200);
-            } else if (email) {
-              // Fallback: two separate queries
-              const [ownedSnap, assignedSnap] = await Promise.all([
-                window.firebaseDB.collection('tasks')
-                  .where('ownerId', '==', email)
-                  .orderBy('timestamp', 'desc')
-                  .limit(100)
-                  .get(),
-                window.firebaseDB.collection('tasks')
-                  .where('assignedTo', '==', email)
-                  .orderBy('timestamp', 'desc')
-                  .limit(100)
-                  .get()
-              ]);
-
-              const tasksMap = new Map();
-              ownedSnap.docs.forEach(doc => {
-                const data = doc.data();
-                tasksMap.set(doc.id, {
-                  id: doc.id,
-                  ...data,
-                  createdAt: data.createdAt || (data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now(),
-                  status: data.status || 'pending'
-                });
-              });
-              assignedSnap.docs.forEach(doc => {
-                if (!tasksMap.has(doc.id)) {
-                  const data = doc.data();
-                  tasksMap.set(doc.id, {
-                    id: doc.id,
-                    ...data,
-                    createdAt: data.createdAt || (data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now(),
-                    status: data.status || 'pending'
-                  });
-                }
-              });
-              firebaseTasks = Array.from(tasksMap.values());
-            }
-          } else {
-            // Admin: unrestricted query
-            const snapshot = await window.firebaseDB.collection('tasks')
-              .orderBy('timestamp', 'desc')
-              .limit(200)
-              .get();
-            firebaseTasks = snapshot.docs.map(doc => {
-              const data = doc.data() || {};
-              const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
-              return { ...data, id: (data.id || doc.id), createdAt, status: data.status || 'pending' };
-            });
-          }
-
-          // Merge with existing tasks
-          const allTasksMap = new Map();
-          allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
-          firebaseTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
-
-          // CRITICAL FIX: Add LinkedIn sequence tasks (in case they weren't loaded earlier)
-          const linkedInTasks = await getLinkedInTasksFromSequences();
-          linkedInTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
-
-          allTasks = Array.from(allTasksMap.values());
-        } catch (e) {
-          console.warn('Could not load tasks from Firebase for navigation:', e);
-        }
-      }
-
-      // Filter to today's and overdue pending tasks (same logic as Today's Tasks widget)
-      const today = new Date();
-      const localMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-
-      const parseDateStrict = (dateStr) => {
-        if (!dateStr) return null;
-        try {
-          if (dateStr.includes('/')) {
-            const [mm, dd, yyyy] = dateStr.split('/').map(n => parseInt(n, 10));
-            if (!isNaN(mm) && !isNaN(dd) && !isNaN(yyyy)) return new Date(yyyy, mm - 1, dd);
-          } else if (dateStr.includes('-')) {
-            const [yyyy, mm, dd] = dateStr.split('-').map(n => parseInt(n, 10));
-            if (!isNaN(mm) && !isNaN(dd) && !isNaN(yyyy)) return new Date(yyyy, mm - 1, dd);
-          }
-          const d = new Date(dateStr);
-          if (!isNaN(d)) return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-        } catch (_) { /* noop */ }
-        return null;
-      };
-
-      const todaysTasks = allTasks.filter(task => {
-        if ((task.status || 'pending') !== 'pending') return false;
-        const d = parseDateStrict(task.dueDate);
-        if (!d) return false;
-        return d.getTime() <= localMidnight.getTime();
-      });
-
-      // Sort by due date/time (earliest to latest)
-      todaysTasks.sort((a, b) => {
-        const da = parseDateStrict(a.dueDate);
-        const db = parseDateStrict(b.dueDate);
-        if (da && db) {
-          const dd = da - db;
-          if (dd !== 0) return dd;
-        } else if (da && !db) {
-          return -1;
-        } else if (!da && db) {
-          return 1;
-        }
-
-        const parseTimeToMinutes = (timeStr) => {
-          if (!timeStr || typeof timeStr !== 'string') return NaN;
-          const m = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-          if (!m) return NaN;
-          let h = parseInt(m[1], 10);
-          const mins = parseInt(m[2], 10);
-          const ap = m[3].toUpperCase();
-          if (h === 12) h = 0;
-          if (ap === 'PM') h += 12;
-          return h * 60 + mins;
-        };
-
-        const ta = parseTimeToMinutes(a.dueTime);
-        const tb = parseTimeToMinutes(b.dueTime);
-        const taValid = !isNaN(ta), tbValid = !isNaN(tb);
-        if (taValid && tbValid) {
-          const td = ta - tb; if (td !== 0) return td;
-        } else if (taValid && !tbValid) {
-          return -1;
-        } else if (!taValid && tbValid) {
-          return 1;
-        }
-
-        return (a.createdAt || 0) - (b.createdAt || 0);
-      });
+      const todaysTasks = await getSortedTasksQueue();
 
       // Find current task index
       const currentIndex = todaysTasks.findIndex(task => task.id === state.currentTask.id);
@@ -2938,6 +2980,11 @@
     state.account = null;
     state._taskAccountFound = false;
     state._taskAccountNotFound = false;
+    // Clear currentTask to prevent UI from rendering stale data during load
+    // But keep ID if needed? No, loadTaskData takes taskId as arg.
+    if (state.currentTask && state.currentTask.id !== taskId) {
+       state.currentTask = null;
+    }
     state.loadingTask = true;
 
     try {
@@ -3003,9 +3050,6 @@
       if (!task && window._essentialTasksData) {
         const filteredEssential = filterTasksByOwnership(window._essentialTasksData);
         task = filteredEssential.find(t => t.id === taskId);
-        if (task) {
-          console.log('[TaskDetail] Using pre-loaded task data');
-        }
       }
 
       // If not found, try BackgroundTasksLoader (cache-first, cost-efficient)
@@ -3038,8 +3082,6 @@
       // If not found, try Firebase (with ownership filtering)
       if (!task && window.firebaseDB) {
         try {
-          console.log('[TaskDetail] Loading task from Firebase:', taskId);
-
           // CRITICAL FIX: Try multiple strategies to find the task
           // Strategy 1: Try to get document directly by ID (if taskId is a document ID)
           try {
@@ -3120,7 +3162,6 @@
                   const doc = snapshot.docs[0];
                   const data = doc.data();
                   task = { ...data, id: data.id || doc.id };
-                  console.log('[TaskDetail] Found task via admin query:', doc.id);
                 }
               } catch (queryError) {
                 console.warn('[TaskDetail] Admin query by id field failed (may not be indexed):', queryError);
@@ -3191,7 +3232,6 @@
               task.timestamp.toDate().getTime() : task.timestamp) || Date.now();
             task.createdAt = createdAt;
             task.status = task.status || 'pending';
-            console.log('[TaskDetail] Task loaded successfully:', { id: task.id, type: task.type, title: task.title });
           } else {
             console.warn('[TaskDetail] Task not found in Firebase after all strategies:', taskId);
           }
@@ -3332,7 +3372,6 @@
       // Render the task page
       try {
         renderTaskPage();
-        console.log('[TaskDetail] Task page rendered successfully');
       } catch (renderError) {
         console.error('[TaskDetail] Error rendering task page:', renderError);
         showTaskError('Failed to render task. Please refresh the page.');
@@ -3571,7 +3610,6 @@
         // Try to find by accountId first
         if (task.accountId && accountsData.length > 0) {
           account = accountsData.find(a => a.id === task.accountId);
-          if (account) console.log('[TaskDetail] Found account by ID:', task.accountId);
         }
 
         // Fallback: try to find by name
@@ -3580,7 +3618,6 @@
             const accountName = a.accountName || a.name || a.companyName || '';
             return accountName && accountName.toLowerCase() === String(task.account).toLowerCase();
           });
-          if (account) console.log('[TaskDetail] Found account by name:', task.account);
         }
 
         // LAST RESORT: Direct Firebase query if cache/loaders failed
@@ -3592,7 +3629,6 @@
               const doc = await window.firebaseDB.collection('accounts').doc(task.accountId).get();
               if (doc.exists) {
                 account = { id: doc.id, ...doc.data() };
-                console.log('[TaskDetail] ✓ Found account via direct Firebase query by ID');
               }
             }
 
@@ -3618,7 +3654,6 @@
                 if (!snap2.empty) {
                   const doc = snap2.docs[0];
                   account = { id: doc.id, ...doc.data() };
-                  console.log('[TaskDetail] ✓ Found account via Firebase query by name field');
                 }
               }
             }
@@ -3695,7 +3730,6 @@
           const element = titleSection.querySelector(isAvatar ? '.avatar-initials' : '.company-favicon-header');
           if (element) {
             element.classList.add('icon-loaded');
-            console.log(`[TaskDetail] Successfully rendered ${isAvatar ? 'avatar' : 'icon'}`);
           }
         });
 
@@ -4718,7 +4752,11 @@
 
     // CRITICAL FIX: Setup inline editing after every DOM replacement
     // This must be called after each render since DOM elements are replaced
-    setupInlineEditing();
+    // Use requestAnimationFrame to ensure DOM is ready
+    requestAnimationFrame(() => {
+      console.log('[TaskDetail] Setting up inline editing for new content...');
+      setupInlineEditing();
+    });
 
     // Attach event handlers for task-specific buttons after rendering
     setTimeout(() => {
@@ -6556,7 +6594,6 @@
 
       // Only refresh if the updated contact matches the task's contact
       if (id === taskContactId || id === stateContactId) {
-        console.log('[TaskDetail] Contact updated, reloading contact data:', id);
 
         try {
           // Reload contact data from Firestore to get latest changes
@@ -6611,6 +6648,7 @@
   // ==== Inline editing functions for Account Information and Energy & Contract ====
   function setupInlineEditing() {
     const infoGrids = document.querySelectorAll('#task-detail-page .info-grid');
+    
     infoGrids.forEach(infoGrid => {
       if (infoGrid && !infoGrid._bound) {
         infoGrid.addEventListener('click', async (e) => {
@@ -7015,7 +7053,6 @@
             if (accountDoc.exists) {
               const updatedAccount = { id: accountDoc.id, ...accountDoc.data() };
               state.account = updatedAccount;
-              console.log('[TaskDetail] ✓ Reloaded account data after energy update');
 
               // Re-render the task page to show updated energy information
               renderTaskPage();
