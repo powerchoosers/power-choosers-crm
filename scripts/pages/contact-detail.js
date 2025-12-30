@@ -2624,8 +2624,9 @@
               </button>
               <div id="widgets-drawer" class="widgets-drawer" role="menu" aria-label="Contact widgets">
                 <button type="button" class="widget-item" data-widget="lusha" title="Prospect" aria-label="Prospect">
-                  <svg width="16" height="16" viewBox="0 0 48 48" fill="currentColor" aria-hidden="true">
-                    <path d="M46.117,23.081l-0.995-0.04H45.12C34.243,22.613,25.387,13.757,24.959,2.88l-0.04-0.996	C24.9,1.39,24.494,1,24,1s-0.9,0.39-0.919,0.883l-0.04,0.996c-0.429,10.877-9.285,19.733-20.163,20.162l-0.995,0.04	C1.39,23.1,1,23.506,1,24s0.39,0.9,0.884,0.919l0.995,0.039c10.877,0.43,19.733,9.286,20.162,20.163l0.04,0.996	C23.1,46.61,23.506,47,24,47s0.9-0.39,0.919-0.883l0.04-0.996c0.429-10.877,9.285-19.733,20.162-20.163l0.995-0.039	C46.61,24.9,47,24.494,47,24S46.61,23.1,46.117,23.081z"/>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                   </svg>
                 </button>
                 <button type="button" class="widget-item" data-widget="maps" title="Google Maps" aria-label="Google Maps">
@@ -2647,8 +2648,11 @@
                 </button>
                 <button type="button" class="widget-item" data-widget="notes" title="Notes" aria-label="Notes">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <path d="M4 4h12a2 2 0 0 1 2 2v14l-4 4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>
-                    <path d="M14 20v-4a2 2 0 0 1 2-2h4"/>
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14,2 14,8 20,8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10,9 9,9 8,9"></polyline>
                   </svg>
                 </button>
               </div>
@@ -2863,11 +2867,19 @@
     return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
   }
 
-  function loadContactActivities() {
+  async function loadContactActivities() {
+    const peoplePage = document.getElementById('people-page');
+    const containerId = 'contact-activity-timeline';
+    
+    // H1 Fix: Wait a moment for navigateToPage to finish adding .active class
+    // Increased to 500ms to handle "Back" button navigation transitions
+    await new Promise(resolve => setTimeout(resolve, 500));
+
     if (!window.ActivityManager || !state.currentContact) return;
 
     const contactId = state.currentContact.id;
-    window.ActivityManager.renderActivities('contact-activity-timeline', 'contact', contactId);
+    // Pass forceRefresh=true to bypass visibility checks during navigation
+    window.ActivityManager.renderActivities(containerId, 'contact', contactId, true);
 
     // Setup pagination
     setupContactActivityPagination(contactId);

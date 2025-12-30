@@ -5776,12 +5776,6 @@ return;
         this._todaysTasksPaginationNav = false;
 
 
-        // CRITICAL FIX: Prevent multiple renders within the same load cycle
-        if (this._hasRenderedForCurrentLoad) {
-            console.log('[CRM] Already rendered for current load cycle, skipping duplicate render');
-            return;
-        }
-        this._hasRenderedForCurrentLoad = true;
 
         // allTasks is already merged and deduped by the caller (local first, then Firebase)
 
@@ -5830,6 +5824,15 @@ return;
             // Final tiebreaker: creation time (oldest first to keep stability)
             return (a.createdAt || 0) - (b.createdAt || 0);
         });
+
+        // Smart Render Check: Avoid re-rendering if data hasn't changed (prevents flicker/scroll jumps)
+        // This replaces the old "block all updates" logic which broke pagination and live updates.
+        const currentFingerprint = todaysTasks.map(t => t.id + ':' + (t.status||'') + ':' + (t.dueDate||'')).join('|');
+        if (!isPaginationNav && this._lastRenderedFingerprint === currentFingerprint && this._hasRenderedForCurrentLoad) {
+             return;
+        }
+        this._lastRenderedFingerprint = currentFingerprint;
+        this._hasRenderedForCurrentLoad = true;
 
         // Initialize pagination state if not exists
         if (!this.todaysTasksPagination) {
@@ -6457,12 +6460,17 @@ window.__pcFaviconHelper = {
             if (!img) return;
             const parent = img.parentNode;
             const doReplace = () => {
-                const html = this.generateFaviconHTML(domain, size, idSuffix);
-                const div = document.createElement('div');
-                div.innerHTML = html;
-                const replacement = div.firstElementChild;
-                if (parent && replacement) parent.replaceChild(replacement, img);
-                else if (img) img.src = `https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(domain)}`;
+              const html = this.generateFaviconHTML(domain, size, idSuffix);
+              const div = document.createElement('div');
+              div.innerHTML = html;
+              const replacement = div.firstElementChild;
+              
+              // Verify img is still a child of parent before replacing
+              if (parent && replacement && img.parentNode === parent) {
+                parent.replaceChild(replacement, img);
+              } else if (img) {
+                img.src = `https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(domain)}`;
+              }
             };
             // Fade out before replacement for smoother UX
             try { img.classList.add('icon-unloading'); } catch (_) { }

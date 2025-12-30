@@ -139,11 +139,12 @@
   /**
    * Fetch messages from Gmail API
    */
-  async function fetchGmailMessages(accessToken, query = 'in:inbox', maxResults = MAX_MESSAGES_PER_SYNC) {
+  async function fetchGmailMessagesPage(accessToken, query = 'in:inbox', maxResults = MAX_MESSAGES_PER_SYNC, pageToken = null) {
     try {
       const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages');
       url.searchParams.set('q', query);
       url.searchParams.set('maxResults', maxResults.toString());
+      if (pageToken) url.searchParams.set('pageToken', pageToken);
 
       const response = await fetch(url, {
         headers: {
@@ -163,17 +164,35 @@
           } catch (storageErr) {
             console.warn('[GmailSync] Could not clear expired token:', storageErr);
           }
-          return { messages: [], needsReauth: true };
+          return { messages: [], needsReauth: true, nextPageToken: null, resultSizeEstimate: null };
         }
         throw new Error(`Gmail API error: ${response.status}`);
       }
 
       const data = await response.json();
-      return { messages: data.messages || [], needsReauth: false };
+      return {
+        messages: data.messages || [],
+        needsReauth: false,
+        nextPageToken: data.nextPageToken || null,
+        resultSizeEstimate: typeof data.resultSizeEstimate === 'number' ? data.resultSizeEstimate : null
+      };
     } catch (error) {
       console.error('[GmailSync] Failed to fetch messages:', error);
-      return { messages: [], error };
+      return { messages: [], error, nextPageToken: null, resultSizeEstimate: null };
     }
+  }
+
+  async function fetchGmailMessages(accessToken, query = 'in:inbox', maxResults = MAX_MESSAGES_PER_SYNC) {
+    return fetchGmailMessagesPage(accessToken, query, maxResults, null);
+  }
+
+  async function estimateQuery(accessToken, query = 'in:inbox') {
+    const res = await fetchGmailMessagesPage(accessToken, query, 1, null);
+    return {
+      query,
+      resultSizeEstimate: res.resultSizeEstimate,
+      needsReauth: !!res.needsReauth
+    };
   }
 
   /**
@@ -486,7 +505,6 @@
     try {
       const db = firebase.firestore();
       const docRef = await db.collection('emails').add(emailData);
-      console.log('[GmailSync] Saved email:', docRef.id, '-', emailData.subject);
       return docRef.id;
     } catch (error) {
       console.error('[GmailSync] Failed to save email:', error);
@@ -498,7 +516,7 @@
    * Main sync function - syncs Gmail inbox to Firestore
    */
   async function syncGmailInbox(options = {}) {
-    const { force = false, maxMessages = MAX_MESSAGES_PER_SYNC } = options;
+    const { force = false, maxMessages = MAX_MESSAGES_PER_SYNC, maxPages = 1, query = 'in:inbox' } = options;
 
     // Check cooldown
     if (!force && _lastSyncTime && (Date.now() - _lastSyncTime) < SYNC_COOLDOWN_MS) {
@@ -533,8 +551,33 @@
         return { synced: 0, skipped: 0, status: 'no_token' };
       }
 
-      // Fetch recent messages from inbox
-      const { messages, needsReauth, error } = await fetchGmailMessages(accessToken, 'in:inbox', maxMessages);
+      let collected = [];
+      let pageToken = null;
+      let pages = 0;
+      let lastEstimate = null;
+      let needsReauth = false;
+      let error = null;
+
+      while (pages < Math.max(1, maxPages) && collected.length < maxMessages) {
+        pages++;
+        const pageSize = Math.min(500, Math.max(1, maxMessages - collected.length));
+        const pageRes = await fetchGmailMessagesPage(accessToken, query, pageSize, pageToken);
+        needsReauth = !!pageRes.needsReauth;
+        error = pageRes.error || null;
+        if (typeof pageRes.resultSizeEstimate === 'number') lastEstimate = pageRes.resultSizeEstimate;
+        if (needsReauth || error) break;
+        const msgs = pageRes.messages || [];
+        collected.push(...msgs);
+        pageToken = pageRes.nextPageToken || null;
+        if (!pageToken || msgs.length === 0) break;
+      }
+
+      const deduped = new Map();
+      collected.forEach(m => {
+        if (m && m.id && !deduped.has(m.id)) deduped.set(m.id, m);
+      });
+
+      const messages = Array.from(deduped.values());
 
       if (needsReauth) {
         console.log('[GmailSync] Token needs refresh, re-authenticating...');
@@ -543,13 +586,13 @@
           _isSyncing = false;
           return { synced: 0, skipped: 0, status: 'reauth_failed' };
         }
-        // Retry fetch
-        const retryResult = await fetchGmailMessages(accessToken, 'in:inbox', maxMessages);
+        // Retry a single page after reauth
+        const retryResult = await fetchGmailMessagesPage(accessToken, query, Math.min(500, maxMessages), null);
         if (retryResult.error) {
           _isSyncing = false;
           return { synced: 0, skipped: 0, status: 'fetch_failed' };
         }
-        messages.push(...retryResult.messages);
+        messages.push(...(retryResult.messages || []));
       }
 
       if (error) {
@@ -594,8 +637,7 @@
             synced++;
           }
 
-          // Small delay to avoid rate limits
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise(resolve => setTimeout(resolve, 25));
         } catch (msgError) {
           console.error('[GmailSync] Error processing message:', msg.id, msgError);
         }
@@ -610,7 +652,6 @@
         // This ensures newly synced emails appear immediately with correct sorting
         if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
           await window.CacheManager.invalidate('emails');
-          console.log('[GmailSync] Cache invalidated after sync');
         }
         
         // Invalidate folder count cache in background loader
@@ -635,7 +676,7 @@
         }
       }
 
-      return { synced, skipped, status: 'success' };
+      return { synced, skipped, status: 'success', query, resultSizeEstimate: lastEstimate };
 
     } catch (error) {
       console.error('[GmailSync] Sync failed:', error);
@@ -755,13 +796,35 @@
    * Force re-sync (ignores cooldown)
    */
   async function forceSync(maxMessages = MAX_MESSAGES_PER_SYNC) {
-    return syncGmailInbox({ force: true, maxMessages });
+    return syncGmailInbox({ force: true, maxMessages, maxPages: 1, query: 'in:inbox' });
+  }
+
+  async function backfill(options = {}) {
+    const { olderThanDays = 5, maxMessages = 300, maxPages = 6 } = options;
+    const days = Math.max(1, parseInt(olderThanDays, 10) || 5);
+    const q = `in:anywhere -in:sent older_than:${days}d`;
+    return syncGmailInbox({ force: true, maxMessages, maxPages, query: q });
+  }
+
+  async function estimate(query = 'in:inbox') {
+    let accessToken = await getGmailAccessToken();
+    if (!accessToken) return { query, resultSizeEstimate: null, needsReauth: true };
+
+    const est = await estimateQuery(accessToken, query);
+    if (est.needsReauth) {
+      accessToken = await reauthenticateWithGmailScope();
+      if (!accessToken) return { query, resultSizeEstimate: null, needsReauth: true };
+      return await estimateQuery(accessToken, query);
+    }
+    return est;
   }
 
   // Export public API
   window.GmailInboxSync = {
     sync: syncGmailInbox,
     forceSync: forceSync,
+    backfill: backfill,
+    estimate: estimate,
     isAvailable: isGmailSyncAvailable,
     getStatus: getSyncStatus,
     getAttachment: getAttachment

@@ -869,15 +869,7 @@
       #task-detail-page .activity-section { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius-lg); padding: var(--spacing-base); margin: 0; box-shadow: var(--elevation-card); }
       #task-detail-page .activity-section .section-title { font-weight: 600; font-size: 1rem; color: var(--text-primary); margin: 0 0 var(--spacing-base) 0; }
       
-      /* Activity Timeline */
-      #task-detail-page .activity-section { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius-lg); padding: var(--spacing-base); margin: 0; }
-      #task-detail-page .activity-timeline { display: flex; flex-direction: column; gap: var(--spacing-sm); }
-      #task-detail-page .activity-item { display: flex; align-items: start; gap: var(--spacing-sm); padding: var(--spacing-sm); border: 1px solid var(--border-light); border-radius: var(--border-radius); background: var(--bg-item); }
-      #task-detail-page .activity-icon { width: 24px; height: 24px; border-radius: 50%; background: var(--bg-hover); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-      #task-detail-page .activity-content { flex: 1; }
-      #task-detail-page .activity-title { font-weight: 600; color: var(--text-primary); font-size: 0.9rem; }
-      #task-detail-page .activity-time { color: var(--text-secondary); font-size: 0.8rem; }
-      #task-detail-page .activity-placeholder { text-align: center; padding: var(--spacing-lg) 0; color: var(--text-secondary); }
+      /* Activity Timeline - uses global .activities-list styling */
       
       /* Avatar Styles - Match People Page */
       #task-detail-page .avatar-initials {
@@ -4409,20 +4401,11 @@
       }
     });
 
-    // Verify links exist (for debugging)
-    const companyLinks = document.querySelectorAll('#task-detail-page .company-link');
-    const contactLinks = document.querySelectorAll('#task-detail-page .contact-link');
-    if (companyLinks.length > 0 || contactLinks.length > 0) {
-      console.log(`[TaskDetail] Found ${companyLinks.length} company links and ${contactLinks.length} contact links (handlers use event delegation)`);
-    }
-
     // Load widgets
     loadTaskWidgets();
 
-    // Load recent activity data for phone tasks
-    if (state.taskType === 'phone-call') {
-      loadRecentActivityForTask();
-    }
+    // Load recent activity data (contact or account tasks)
+    loadRecentActivityForTask({ forceRefresh: true });
 
     // If phone task, embed contact details on the right
     try {
@@ -5061,7 +5044,7 @@
         <!-- Recent Activity -->
         <div class="activity-section">
           <h3 class="section-title">Recent Activity</h3>
-          <div class="activity-timeline" id="task-activity-timeline">
+          <div class="activities-list" id="task-activity-timeline">
             <div class="activity-placeholder">
               <div class="placeholder-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -5359,7 +5342,7 @@
         <!-- Recent Activity -->
         <div class="activity-section">
           <h3 class="section-title">Recent Activity</h3>
-          <div class="activity-timeline" id="task-activity-timeline">
+          <div class="activities-list" id="task-activity-timeline">
             <div class="activity-placeholder">
               <div class="placeholder-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -5662,7 +5645,7 @@
         <!-- Recent Activity -->
         <div class="activity-section">
           <h3 class="section-title">Recent Activity</h3>
-          <div class="activity-timeline" id="task-activity-timeline">
+          <div class="activities-list" id="task-activity-timeline">
             <div class="activity-placeholder">
               <div class="placeholder-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -5931,8 +5914,6 @@
         suggestedContactName: ''
       };
 
-      console.log('[Task Detail] Setting company phone context:', contextPayload);
-
       // Set the context in the phone widget (same pattern as account-detail.js)
       if (window.Widgets && typeof window.Widgets.setCallContext === 'function') {
         window.Widgets.setCallContext(contextPayload);
@@ -5972,6 +5953,8 @@
 
   // Load recent activity for the task (account or contact)
   async function loadRecentActivityForTask(opts = {}) {
+    await new Promise(resolve => setTimeout(resolve, 500));
+
     const timelineEl = document.getElementById('task-activity-timeline');
     if (!timelineEl) return;
 

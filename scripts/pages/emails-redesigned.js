@@ -100,6 +100,8 @@
     els.searchInput = document.getElementById('emails-search');
     els.clearBtn = document.getElementById('clear-search-btn');
     els.composeBtn = document.getElementById('compose-email-btn');
+    els.syncGmailBtn = document.getElementById('sync-gmail-btn');
+    els.backfillGmailBtn = document.getElementById('backfill-gmail-btn');
     els.generateBtn = document.getElementById('generate-scheduled-btn');
     els.summary = document.getElementById('emails-summary');
     els.count = document.getElementById('emails-count');
@@ -157,6 +159,111 @@
         e.preventDefault();
         openComposeModal(); // Call with no parameters for new email
       });
+    }
+
+    if (els.syncGmailBtn && !els.syncGmailBtn._emailsBound) {
+      els.syncGmailBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        try {
+          if (!window.GmailInboxSync || typeof window.GmailInboxSync.forceSync !== 'function') {
+            window.crm?.showToast?.('Gmail sync is not available on this page', 'error');
+            return;
+          }
+
+          try {
+            const status = (typeof window.GmailInboxSync.getStatus === 'function') ? window.GmailInboxSync.getStatus() : null;
+            if (status && status.isSyncing) {
+              window.crm?.showToast?.('Gmail sync is already running. Give it a minute.', 'success');
+              return;
+            }
+          } catch (_) { }
+
+          if (typeof window.GmailInboxSync.isAvailable === 'function' && !window.GmailInboxSync.isAvailable()) {
+            window.crm?.showToast?.('Sign in with Google to sync Gmail', 'error');
+            return;
+          }
+
+          els.syncGmailBtn.disabled = true;
+          els.syncGmailBtn.style.opacity = '0.6';
+
+          try {
+            if (typeof window.GmailInboxSync.estimate === 'function') {
+              const [inboxEst, allMailEst] = await Promise.all([
+                window.GmailInboxSync.estimate('in:inbox'),
+                window.GmailInboxSync.estimate('in:anywhere -in:sent')
+              ]);
+
+              const inboxN = inboxEst && typeof inboxEst.resultSizeEstimate === 'number' ? inboxEst.resultSizeEstimate : null;
+              const allMailN = allMailEst && typeof allMailEst.resultSizeEstimate === 'number' ? allMailEst.resultSizeEstimate : null;
+
+              if (inboxN !== null || allMailN !== null) {
+                const parts = [];
+                if (inboxN !== null) parts.push(`Inbox ~${inboxN}`);
+                if (allMailN !== null) parts.push(`All Mail ~${allMailN}`);
+                window.crm?.showToast?.(parts.join(' | '), 'success');
+              }
+            }
+          } catch (_) { }
+
+          const result = await window.GmailInboxSync.forceSync(200);
+
+          if (result && result.status && result.status !== 'success') {
+            if (result.status === 'reauth_failed' || result.status === 'no_token') {
+              window.crm?.showToast?.('Gmail needs reconnect. Allow popup and try again.', 'error');
+            } else {
+              window.crm?.showToast?.('Gmail sync did not complete', 'error');
+            }
+          }
+
+          await loadData(true);
+        } catch (err) {
+          console.error('[EmailsPage] Manual Gmail sync failed:', err);
+          window.crm?.showToast?.('Gmail sync failed', 'error');
+        } finally {
+          try {
+            els.syncGmailBtn.disabled = false;
+            els.syncGmailBtn.style.opacity = '1';
+          } catch (_) { }
+        }
+      });
+      els.syncGmailBtn._emailsBound = true;
+    }
+
+    if (els.backfillGmailBtn && !els.backfillGmailBtn._emailsBound) {
+      els.backfillGmailBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        try {
+          if (!window.GmailInboxSync || typeof window.GmailInboxSync.backfill !== 'function') {
+            window.crm?.showToast?.('Gmail backfill is not available on this page', 'error');
+            return;
+          }
+
+          try {
+            const status = (typeof window.GmailInboxSync.getStatus === 'function') ? window.GmailInboxSync.getStatus() : null;
+            if (status && status.isSyncing) {
+              window.crm?.showToast?.('Gmail sync is already running. Wait, then retry backfill.', 'success');
+              return;
+            }
+          } catch (_) { }
+
+          els.backfillGmailBtn.disabled = true;
+          els.backfillGmailBtn.style.opacity = '0.6';
+
+          window.crm?.showToast?.('Backfilling older Gmail emails (30d)...', 'success');
+          const result = await window.GmailInboxSync.backfill({ olderThanDays: 5, maxMessages: 300, maxPages: 6 });
+
+          await loadData(true);
+        } catch (err) {
+          console.error('[EmailsPage] Gmail backfill failed:', err);
+          window.crm?.showToast?.('Gmail backfill failed', 'error');
+        } finally {
+          try {
+            els.backfillGmailBtn.disabled = false;
+            els.backfillGmailBtn.style.opacity = '1';
+          } catch (_) { }
+        }
+      });
+      els.backfillGmailBtn._emailsBound = true;
     }
 
     // Generate scheduled emails button
@@ -473,7 +580,8 @@
 
     // Check if we need to load more data to fill the current page
     const neededForPage = state.currentPage * state.pageSize;
-    console.log('[EmailsPage] Filter check - filtered:', state.filtered.length, 'needed:', neededForPage, 'hasMore:', state.hasMore, 'loader available:', !!window.BackgroundEmailsLoader);
+    const searchTermNow = els.searchInput?.value?.trim() || '';
+    console.log('[EmailsPage] Filter check - filtered:', state.filtered.length, 'needed:', neededForPage, 'hasMore:', state.hasMore, 'search:', !!searchTermNow, 'loader available:', !!window.BackgroundEmailsLoader);
 
     // Update folder total count asynchronously (do not block UI)
     updateFolderCount().catch(() => { });
@@ -483,7 +591,7 @@
     // so we never need to paginate for this folder.
     const shouldLoadMore = (
       state.currentFolder !== 'scheduled' &&
-      state.currentPage > 1 && // Only try to load more for pages beyond the first
+      (state.currentPage > 1 || (searchTermNow && state.filtered.length < state.pageSize)) &&
       state.filtered.length < neededForPage &&
       state.hasMore &&
       window.BackgroundEmailsLoader &&
@@ -506,6 +614,13 @@
       }
       render();
     }
+  }
+
+  function getPaginationTotalRecords() {
+    const base = state.filtered.length;
+    if (!state.hasMore) return base;
+    const min = state.currentPage * state.pageSize + 1;
+    return Math.max(base, min);
   }
 
   // Update total count for the current folder without loading all records
@@ -546,10 +661,11 @@
       const neededForPage = state.currentPage * state.pageSize;
       // OPTIMIZATION: Only load what we need for the current page, no aggressive preloading
       const targetCount = neededForPage;
+      const searchTermNow = els.searchInput?.value?.trim() || '';
       let attempts = 0;
-      const maxAttempts = 10; // Reduced from 20/50 for faster response
+      const maxAttempts = searchTermNow ? 25 : 10;
 
-      console.log('[EmailsPage] loadMoreUntilEnough started - filtered:', state.filtered.length, 'needed:', neededForPage, 'target:', targetCount);
+      console.log('[EmailsPage] loadMoreUntilEnough started - filtered:', state.filtered.length, 'needed:', neededForPage, 'target:', targetCount, 'search:', !!searchTermNow, 'maxAttempts:', maxAttempts);
 
       while (state.filtered.length < targetCount && state.hasMore && attempts < maxAttempts) {
         attempts++;
@@ -696,15 +812,16 @@
     // Update summary and count
     // Use folder total count (queried from Firestore), fallback to filtered length in search mode
     const searchTermNow = els.searchInput?.value?.trim() || '';
-    const totalToShow = searchTermNow ? state.filtered.length : (state.folderCount || state.filtered.length);
+    const loadedTotal = state.filtered.length;
+    const totalLabel = `${loadedTotal}${state.hasMore ? '+' : ''}`;
     if (els.summary) {
-      const start = totalToShow === 0 ? 0 : (state.currentPage - 1) * state.pageSize + 1;
-      const end = Math.min(state.currentPage * state.pageSize, totalToShow);
-      els.summary.textContent = `${start}-${end} of ${totalToShow} emails`;
+      const start = rows.length === 0 ? 0 : (state.currentPage - 1) * state.pageSize + 1;
+      const end = rows.length === 0 ? 0 : (start + rows.length - 1);
+      els.summary.textContent = `${start}-${end} of ${totalLabel} emails`;
     }
 
     if (els.count) {
-      els.count.textContent = `${totalToShow} emails`;
+      els.count.textContent = `${totalLabel} emails`;
     }
 
     // Update select all checkbox
@@ -1632,11 +1749,10 @@
   function renderPagination() {
     if (!els.pagination) return;
 
-    // Use folder total count (queried, not fully loaded) unless search is active
-    const searchTermNow = els.searchInput?.value?.trim() || '';
-    const totalRecords = searchTermNow ? state.filtered.length : (state.folderCount || state.filtered.length);
+    const totalRecords = getPaginationTotalRecords();
     const totalPages = Math.max(1, Math.ceil(totalRecords / state.pageSize));
     const currentPage = Math.min(state.currentPage, totalPages);
+    console.log('[EmailsPage] Pagination computed', { currentPage, totalPages, totalRecords, filtered: state.filtered.length, hasMore: state.hasMore });
 
     if (window.crm && window.crm.createPagination) {
       window.crm.createPagination(currentPage, totalPages, async (page) => {

@@ -1530,7 +1530,13 @@ async function handleApiDebugHealth(req, res) {
 
 async function handleApiDebugLog(req, res) {
   if (req.method === 'POST') {
-    req.body = await parseRequestBody(req);
+    try {
+      req.body = await parseRequestBody(req);
+    } catch (error) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid request body' }));
+      return;
+    }
   }
   return await debugLogHandler(req, res);
 }
