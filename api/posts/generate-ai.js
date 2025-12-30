@@ -63,6 +63,8 @@ STYLE RULES:
 3. BULLET POINTS: Use for any list of 3+ items
 4. BOLD KEY STATS: Wrap important numbers in <strong> tags (e.g., "<strong>30% of your annual bill</strong>")
 5. NO GENERIC ADVICE: Instead of "Consider energy audits," say "Schedule an audit before March 31 to capture the ITC tax credit deadline"
+6. NO MARKDOWN: Output pure HTML. Do NOT use ## for headers (use <h2>/<h3>). Do NOT use ** for bold (use <strong>).
+7. NO CITATIONS: Do NOT include citations like [1], [2], etc. The content must be clean reading.
 
 EMOTIONAL TRIGGERS (Use at least ONE):
 - FEAR OF LOSS: "Missing this window means overpaying for 12 months"
@@ -680,6 +682,13 @@ export default async function handler(req, res) {
 
     // Parse response
     const generatedPost = parseAIResponse(responseText);
+
+    logger.log('[AI Post Generation] Post-processing check:', {
+      originalContentSample: responseText.substring(0, 100) + '...',
+      cleanedContentSample: generatedPost.content.substring(0, 100) + '...',
+      hasMarkdownHeaders: generatedPost.content.includes('## '),
+      hasCitations: /\[\d+\]/.test(generatedPost.content)
+    });
 
     logger.log('[AI Post Generation] Successfully generated post:', {
       title: generatedPost.title,
