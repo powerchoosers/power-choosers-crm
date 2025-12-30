@@ -1168,6 +1168,7 @@ var console = {
   }
 
   function renderAccountDetail() {
+    console.log('[AccountDetail] renderAccountDetail called');
     if (!state.currentAccount || !els.mainContent) return;
 
 
@@ -3160,6 +3161,7 @@ var console = {
     });
 
     document.addEventListener('pc:account-updated', (e) => {
+      console.log('[AccountDetail] Received pc:account-updated event', e.detail);
       if (state.currentAccount && e.detail && e.detail.id === state.currentAccount.id) {
         const changes = e.detail.changes || {};
         state.currentAccount = { ...state.currentAccount, ...changes };
@@ -3737,7 +3739,7 @@ var console = {
     // Widgets dropdown functionality
     const widgetsBtn = document.getElementById('open-widgets');
     const widgetsWrap = document.querySelector('#account-detail-header .widgets-wrap');
-    
+
     if (widgetsBtn && widgetsWrap && !widgetsBtn._bound) {
       widgetsBtn._bound = true;
       // Click toggles open state (also support keyboard)
