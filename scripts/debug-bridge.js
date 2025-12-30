@@ -17,6 +17,20 @@
         error: console.error
     };
 
+    const debugEnabled = (
+        window.VERBOSE_LOGS === true ||
+        window.PC_DEBUG === true ||
+        (typeof localStorage !== 'undefined' && localStorage.getItem('pc-debug-logs') === 'true')
+    );
+
+    function shouldSendLog(args) {
+        try {
+            return debugEnabled;
+        } catch (_) {
+            return debugEnabled;
+        }
+    }
+
     function sendToDebug(type, args) {
         try {
             const formatArg = (arg) => {
@@ -61,16 +75,26 @@
         }
     }
 
+    try {
+        originalConsole.log('[Debug Bridge] Initialized - Logs are being mirrored to .cursor/debug.log', {
+            debugEnabled,
+            href: window.location.href
+        });
+        sendToDebug('log', ['[Debug Bridge] Initialized - Logs are being mirrored to .cursor/debug.log', { debugEnabled, href: window.location.href }]);
+    } catch (_) { }
+
     console.log = function() {
-        if (window.VERBOSE_LOGS === true) {
-            originalConsole.log.apply(console, arguments);
+        originalConsole.log.apply(console, arguments);
+        if (shouldSendLog(Array.from(arguments))) {
             sendToDebug('log', Array.from(arguments));
         }
     };
 
     console.warn = function() {
         originalConsole.warn.apply(console, arguments);
-        sendToDebug('warn', Array.from(arguments));
+        if (shouldSendLog(Array.from(arguments))) {
+            sendToDebug('warn', Array.from(arguments));
+        }
     };
 
     console.error = function() {

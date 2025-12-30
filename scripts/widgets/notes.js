@@ -155,48 +155,78 @@
       }
       const text = (textarea && textarea.value != null) ? String(textarea.value) : '';
       setStatus('Saving...');
+      const prevText = lastRemoteText;
       try {
         const collection = entityType === 'account' ? 'accounts' : 'contacts';
         const ref = db.collection(collection).doc(currentId);
+        const nowIso = new Date().toISOString();
         const payload = { 
           notes: text, 
           notesUpdatedAt: fv && typeof fv.serverTimestamp === 'function' ? fv.serverTimestamp() : new Date().toISOString(),
           updatedAt: fv && typeof fv.serverTimestamp === 'function' ? fv.serverTimestamp() : new Date().toISOString()
         };
-        await ref.set(payload, { merge: true });
+
+        const writePromise = ref.set(payload, { merge: true });
+
+        try {
+          if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+            await window.CacheManager.updateRecord(collection, currentId, {
+              notes: text,
+              notesUpdatedAt: nowIso,
+              updatedAt: nowIso
+            });
+          }
+
+          if (window.ActivityManager) {
+            try { window.ActivityManager.clearCache(entityType, currentId); } catch (_) { }
+
+            const containerId = entityType === 'account' ? 'account-activity-timeline' : 'contact-activity-timeline';
+            window.ActivityManager.renderActivities(containerId, entityType, currentId, false, { disableAnimations: true, source: 'notes' });
+
+            try {
+              const taskTimelineEl = document.getElementById('task-activity-timeline');
+              if (taskTimelineEl) {
+                window.ActivityManager.renderActivities('task-activity-timeline', entityType, currentId, true, { disableAnimations: true, source: 'notes' });
+              }
+            } catch (_) { }
+          }
+        } catch (_) { }
+
+        await writePromise;
+
         lastRemoteText = text;
         const ts = new Date();
         // American 12-hour time with AM/PM
         const timeStr = ts.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
         setStatus(`Saved ${timeStr}`);
-        
-        // Trigger activity refresh for the current entity
-        try {
-          if (window.ActivityManager) {
-            // Clear cache first to ensure fresh data
-            window.ActivityManager.clearCache();
-            
-            // Refresh activities for the current entity
-            if (entityType === 'contact' && currentContactId) {
-              // Trigger contact activity refresh with force refresh
-              document.dispatchEvent(new CustomEvent('pc:activities-refresh', { 
-                detail: { entityType: 'contact', entityId: currentContactId, forceRefresh: true } 
-              }));
-            } else if (entityType === 'account' && currentAccountId) {
-              // Trigger account activity refresh with force refresh
-              document.dispatchEvent(new CustomEvent('pc:activities-refresh', { 
-                detail: { entityType: 'account', entityId: currentAccountId, forceRefresh: true } 
-              }));
-            }
-            // Also refresh global activities with force refresh
-            document.dispatchEvent(new CustomEvent('pc:activities-refresh', { 
-              detail: { entityType: 'global', forceRefresh: true } 
-            }));
-          }
-        } catch (e) {
-          console.warn('Failed to trigger activity refresh:', e);
-        }
       } catch (err) {
+        try {
+          if (textarea && textarea.value !== prevText) textarea.value = prevText;
+        } catch (_) { }
+
+        try {
+          const collection = entityType === 'account' ? 'accounts' : 'contacts';
+          const revertIso = new Date().toISOString();
+          if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+            await window.CacheManager.updateRecord(collection, currentId, {
+              notes: prevText,
+              notesUpdatedAt: revertIso,
+              updatedAt: revertIso
+            });
+          }
+          if (window.ActivityManager) {
+            try { window.ActivityManager.clearCache(entityType, currentId); } catch (_) { }
+            const containerId = entityType === 'account' ? 'account-activity-timeline' : 'contact-activity-timeline';
+            window.ActivityManager.renderActivities(containerId, entityType, currentId, false, { disableAnimations: true, source: 'notes-revert' });
+            try {
+              const taskTimelineEl = document.getElementById('task-activity-timeline');
+              if (taskTimelineEl) {
+                window.ActivityManager.renderActivities('task-activity-timeline', entityType, currentId, true, { disableAnimations: true, source: 'notes-revert' });
+              }
+            } catch (_) { }
+          }
+        } catch (_) { }
+
         console.error('Save notes failed', err);
         setStatus('Save failed');
         try { window.crm?.showToast && window.crm.showToast('Failed to save notes'); } catch (_) {}

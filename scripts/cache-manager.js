@@ -511,30 +511,52 @@ class CacheManager {
 
   // Update a single record in cache (for real-time updates)
   async updateRecord(collection, id, changes) {
-    if (!id || !changes) return;
+    if (!id || !changes) return false;
 
     try {
       await this.init();
-      const tx = this.db.transaction([collection], 'readwrite');
-      const store = tx.objectStore(collection);
+      if (!this.db || this.db.version === 0) return false;
 
-      // Get existing record
-      const getRequest = store.get(id);
+      const ok = await new Promise((resolve) => {
+        const tx = this.db.transaction([collection], 'readwrite');
+        const store = tx.objectStore(collection);
 
-      getRequest.onsuccess = () => {
-        const existing = getRequest.result || { id };
-        const updated = { ...existing, ...changes, updatedAt: changes.updatedAt || new Date() };
+        const getRequest = store.get(id);
 
-        // Update record
-        store.put(updated);
-        console.log(`[CacheManager] ✓ Updated ${collection}/${id} in cache`);
-      };
+        getRequest.onsuccess = () => {
+          const existing = getRequest.result || { id };
+          const updated = { ...existing, ...changes, updatedAt: changes.updatedAt || new Date() };
+          store.put(updated);
+        };
 
-      getRequest.onerror = () => {
-        console.error(`[CacheManager] Error updating ${collection}/${id}:`, getRequest.error);
-      };
+        getRequest.onerror = () => {
+          console.error(`[CacheManager] Error updating ${collection}/${id}:`, getRequest.error);
+          resolve(false);
+        };
+
+        tx.oncomplete = () => {
+          console.log(`[CacheManager] ✓ Updated ${collection}/${id} in cache`);
+          resolve(true);
+        };
+
+        tx.onerror = () => {
+          console.error(`[CacheManager] Error updating ${collection}/${id}:`, tx.error);
+          resolve(false);
+        };
+      });
+
+      if (ok) {
+        try {
+          const metaTx = this.db.transaction(['_meta'], 'readwrite');
+          const metaStore = metaTx.objectStore('_meta');
+          metaStore.put({ collection, timestamp: Date.now() });
+        } catch (_) { }
+      }
+
+      return ok;
     } catch (error) {
       console.error(`[CacheManager] Error updating record in cache:`, error);
+      return false;
     }
   }
 
@@ -936,6 +958,5 @@ if (typeof window !== 'undefined') {
     return stats;
   };
 }
-
 
 

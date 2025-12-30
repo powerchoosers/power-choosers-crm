@@ -35,7 +35,6 @@ class ActivityManager {
       // Also clear page caches for this entity
       const pageCacheKeys = Array.from(this.pageCache.keys()).filter(key => key.startsWith(cacheKey));
       pageCacheKeys.forEach(key => this.pageCache.delete(key));
-      console.log(`[ActivityManager] Invalidated activity cache for ${cacheKey}`);
     };
 
     // Setup memory monitoring
@@ -65,8 +64,6 @@ class ActivityManager {
       sessionStorage.removeItem('activityManager_processedActivities');
       sessionStorage.removeItem('activityManager_processedEmails');
       sessionStorage.removeItem('activityManager_pageCache');
-      
-      console.log('[ActivityManager] Cleared all activity caches');
     }
   }
 
@@ -323,7 +320,7 @@ class ActivityManager {
     const forceRefresh = !!(opts && opts.forceRefresh);
     // Prevent refreshes immediately after page load (cooldown period to prevent flickering)
     const timeSincePageLoad = Date.now() - this.pageLoadTime;
-    if (timeSincePageLoad < this.refreshCooldown) {
+    if (!forceRefresh && timeSincePageLoad < this.refreshCooldown) {
       return;
     }
 
@@ -472,25 +469,39 @@ class ActivityManager {
       // Get calls from CacheManager (includes Firebase and localStorage fallback)
       const calls = await (window.CacheManager ? window.CacheManager.get('calls', forceRefresh) : this.fetchCalls(limit));
 
+      // OPTIMIZATION: Pre-calculate contact IDs for account view to avoid O(N^2) loops
+      let accountContactIds = new Set();
+      if (entityType === 'account' && entityId) {
+        const contacts = window.getPeopleData ? (window.getPeopleData() || []) : [];
+        contacts.forEach(c => {
+          if (String(c.accountId) === String(entityId)) {
+            accountContactIds.add(String(c.id));
+          }
+        });
+      }
+
       for (const call of calls) {
         let shouldInclude = false;
 
         if (entityType === 'global') {
           shouldInclude = true;
         } else if (entityType === 'contact' && entityId) {
-          shouldInclude = call.contactId === entityId;
+          shouldInclude = String(call.contactId) === String(entityId);
         } else if (entityType === 'account' && entityId) {
-          // For account, include calls from all contacts in that account
-          if (window.getPeopleData) {
-            const contacts = window.getPeopleData() || [];
-            const accountContacts = contacts.filter(c => c.accountId === entityId);
-            shouldInclude = accountContacts.some(c => c.id === call.contactId);
+          // Check if call is linked directly to account
+          if (String(call.accountId) === String(entityId)) {
+            shouldInclude = true;
+          } else {
+            // Or linked to a contact in that account (using O(1) Set lookup)
+            shouldInclude = accountContactIds.has(String(call.contactId));
           }
         }
 
         // Skip completed calls - don't show them in recent activities
         const callStatus = (call.status || '').toLowerCase();
-        if (shouldInclude && callStatus !== 'completed' && callStatus !== 'ended' && callStatus !== 'finished') {
+        const isCompleted = callStatus === 'completed' || callStatus === 'ended' || callStatus === 'finished';
+        
+        if (shouldInclude && !isCompleted) {
           activities.push({
             id: `call-${call.id}`,
             type: 'call',
@@ -569,7 +580,7 @@ class ActivityManager {
       } else if (entityType === 'contact' && entityId) {
         // For specific contact, find the contact and check if it has notes
         const contacts = await (window.CacheManager ? window.CacheManager.get('contacts', forceRefresh) : []);
-        const contact = contacts.find(c => c && c.id === entityId);
+        const contact = contacts.find(c => c && String(c.id) === String(entityId));
         if (contact && contact.notes && contact.notes.trim()) {
           // Use proper timestamp priority: notesUpdatedAt > updatedAt > createdAt
           const timestamp = contact.notesUpdatedAt || contact.updatedAt || contact.createdAt;
@@ -585,8 +596,14 @@ class ActivityManager {
         }
       } else if (entityType === 'account' && entityId) {
         // For specific account, find the account and check if it has notes
-        const accounts = await (window.CacheManager ? window.CacheManager.get('accounts', forceRefresh) : []);
-        const account = accounts.find(a => a && a.id === entityId);
+        const [accounts, contacts] = await Promise.all([
+          window.CacheManager ? window.CacheManager.get('accounts', forceRefresh) : [],
+          window.CacheManager ? window.CacheManager.get('contacts', forceRefresh) : []
+        ]);
+
+        const account = accounts.find(a => a && String(a.id) === String(entityId));
+        
+        // 1. Add account's own notes
         if (account && account.notes && account.notes.trim()) {
           // Use proper timestamp priority: notesUpdatedAt > updatedAt > createdAt
           const timestamp = account.notesUpdatedAt || account.updatedAt || account.createdAt;
@@ -599,6 +616,23 @@ class ActivityManager {
             icon: 'note',
             data: { ...account, entityType: 'account' }
           });
+        }
+
+        // 2. Add notes from all contacts in this account
+        const accountContacts = contacts.filter(c => c && String(c.accountId) === String(entityId));
+        for (const contact of accountContacts) {
+          if (contact.notes && contact.notes.trim()) {
+            const timestamp = contact.notesUpdatedAt || contact.updatedAt || contact.createdAt;
+            activities.push({
+              id: `note-contact-${contact.id}`,
+              type: 'note',
+              title: `Note Added (${contact.firstName || ''} ${contact.lastName || ''})`.trim(),
+              description: this.truncateText(contact.notes, 100),
+              timestamp: timestamp,
+              icon: 'note',
+              data: { ...contact, entityType: 'contact' }
+            });
+          }
         }
       }
     } catch (error) {
@@ -617,19 +651,27 @@ class ActivityManager {
     try {
       const sequences = await (window.CacheManager ? window.CacheManager.get('sequences', forceRefresh) : this.fetchSequences(limit));
 
+      // OPTIMIZATION: Pre-calculate contact IDs for account view to avoid O(N^2) loops
+      let accountContactIds = new Set();
+      if (entityType === 'account' && entityId) {
+        const contacts = window.getPeopleData ? (window.getPeopleData() || []) : [];
+        contacts.forEach(c => {
+          if (String(c.accountId) === String(entityId)) {
+            accountContactIds.add(String(c.id));
+          }
+        });
+      }
+
       for (const sequence of sequences) {
         let shouldInclude = false;
 
         if (entityType === 'global') {
           shouldInclude = true;
         } else if (entityType === 'contact' && entityId) {
-          shouldInclude = sequence.contactId === entityId;
+          shouldInclude = String(sequence.contactId) === String(entityId);
         } else if (entityType === 'account' && entityId) {
-          if (window.getPeopleData) {
-            const contacts = window.getPeopleData() || [];
-            const accountContacts = contacts.filter(c => c.accountId === entityId);
-            shouldInclude = accountContacts.some(c => c.id === sequence.contactId);
-          }
+          // Or linked to a contact in that account (using O(1) Set lookup)
+          shouldInclude = accountContactIds.has(String(sequence.contactId));
         }
 
         if (shouldInclude) {
@@ -696,14 +738,14 @@ class ActivityManager {
           contactMap: emailToContactMap,
           idsSet: new Set(allContacts.map(c => c.id).filter(Boolean))
         };
-        console.log(`[ActivityManager] Rebuilt contact email cache for ${allContacts.length} contacts`);
+        
       }
 
       const { emailsSet: contactEmailsSet, contactMap: emailToContactMap, idsSet: contactIdsSet } = this._contactsEmailCache;
 
 
       if (!contactsLoaded) {
-        console.log('[ActivityManager] Waiting for contacts to load before filtering emails...');
+        
         if (window.BackgroundLoaderCoordinator && typeof window.BackgroundLoaderCoordinator.loadCollection === 'function') {
           await window.BackgroundLoaderCoordinator.loadCollection('contacts');
         } else if (window.CacheManager) {
@@ -752,9 +794,8 @@ class ActivityManager {
       // Filter emails to only include those from CRM contacts
       const crmEmails = emails.filter(email => {
         // Check by contactId first (fastest)
-        if (email.contactId && contactIdsSet.has(email.contactId)) {
-          return true;
-        }
+        const matchById = email.contactId && contactIdsSet.has(email.contactId);
+        if (matchById) return true;
 
         // Check by email addresses using proper sent/received logic
         const currentUserEmail = window.DataManager?.getCurrentUserEmail?.() || window.currentUserEmail || '';
@@ -777,7 +818,6 @@ class ActivityManager {
         // Fallback: if we can't determine direction, check if sender is a contact
         return emailFrom.some(addr => contactEmailsSet.has(addr));
       });
-
 
       // Process emails - use cache for already processed emails
       const processedEmails = [];
@@ -891,6 +931,16 @@ class ActivityManager {
 
 
       // Filter processed emails by entity type
+      // OPTIMIZATION: Pre-calculate contact IDs for account view to avoid O(N^2) loops
+      let accountContactIds = new Set();
+      if (entityType === 'account' && entityId) {
+        allContacts.forEach(c => {
+          if (String(c.accountId) === String(entityId)) {
+            accountContactIds.add(String(c.id));
+          }
+        });
+      }
+
       processedEmails.forEach(emailActivity => {
         let shouldInclude = false;
 
@@ -898,17 +948,16 @@ class ActivityManager {
           shouldInclude = true;
         } else if (entityType === 'contact' && entityId) {
           // Match by contactId if available
-          if (emailActivity.data.contactId === entityId) {
+          if (String(emailActivity.data.contactId) === String(entityId)) {
             shouldInclude = true;
           }
         } else if (entityType === 'account' && entityId) {
           // Match by accountId if available
-          if (emailActivity.data.accountId === entityId) {
+          if (String(emailActivity.data.accountId) === String(entityId)) {
             shouldInclude = true;
           } else {
-            // Match by contactId for contacts in this account
-            const accountContacts = allContacts.filter(c => c.accountId === entityId);
-            shouldInclude = accountContacts.some(c => c.id === emailActivity.data.contactId);
+            // Match by contactId for contacts in this account (using O(1) Set lookup)
+            shouldInclude = accountContactIds.has(String(emailActivity.data.contactId));
           }
         }
 
@@ -934,15 +983,32 @@ class ActivityManager {
     try {
       const tasks = await (window.CacheManager ? window.CacheManager.get('tasks', forceRefresh) : this.fetchTasks(limit));
 
+      // OPTIMIZATION: Pre-calculate contact IDs for account view to avoid O(N^2) loops
+      let accountContactIds = new Set();
+      if (entityType === 'account' && entityId) {
+        const contacts = window.getPeopleData ? (window.getPeopleData() || []) : [];
+        contacts.forEach(c => {
+          if (String(c.accountId) === String(entityId)) {
+            accountContactIds.add(String(c.id));
+          }
+        });
+      }
+
       for (const task of tasks) {
         let shouldInclude = false;
 
         if (entityType === 'global') {
           shouldInclude = true;
         } else if (entityType === 'contact' && entityId) {
-          shouldInclude = task.contactId === entityId;
+          shouldInclude = String(task.contactId) === String(entityId);
         } else if (entityType === 'account' && entityId) {
-          shouldInclude = task.accountId === entityId;
+          // Include tasks directly for the account
+          if (String(task.accountId) === String(entityId)) {
+            shouldInclude = true;
+          } else {
+            // Or tasks for contacts in this account (using O(1) Set lookup)
+            shouldInclude = accountContactIds.has(String(task.contactId));
+          }
         }
 
         if (shouldInclude) {
@@ -1961,7 +2027,7 @@ class ActivityManager {
   /**
    * Render activities for a specific container
    */
-  async renderActivities(containerId, entityType = 'global', entityId = null, forceRefresh = false) {
+  async renderActivities(containerId, entityType = 'global', entityId = null, forceRefresh = false, opts = {}) {
     const container = document.getElementById(containerId);
     if (!container) {
       return;
@@ -1972,7 +2038,6 @@ class ActivityManager {
     const page = container.closest('.page');
     const isVisible = page && page.classList.contains('active') && !page.hidden;
     if (!isVisible && !forceRefresh) {
-      // console.log(`[ActivityManager] Skipping render for hidden container: ${containerId}`);
       return;
     }
 
@@ -1982,6 +2047,7 @@ class ActivityManager {
     }
 
     const renderPromise = (async () => {
+      const disableAnimations = !!(opts && opts.disableAnimations);
       // Avoid flicker: only show loading spinner when container is empty or forceRefresh
       const hasExistingContent = container && container.children && container.children.length > 0 && !container.querySelector('.loading-spinner');
       if (!forceRefresh && hasExistingContent) {
@@ -2026,26 +2092,33 @@ class ActivityManager {
         const paginatedActivities = this.getPageActivities(activities, this.currentPage);
         const activityHtml = this.renderActivityList(paginatedActivities);
         const sigKey = `${containerId}::${entityType}::${entityId || ''}::page:${this.currentPage}`;
-        const newSignature = (paginatedActivities || []).map(a => a && a.id ? String(a.id) : '').join('|');
+        const newSignature = (paginatedActivities || []).map(a => {
+          const id = a && a.id ? String(a.id) : '';
+          const ts = a ? this.getTimestampMs(a.timestamp) : 0;
+          return `${id}@${ts}`;
+        }).join('|');
         const prevSignature = this.lastRenderedSignatures ? this.lastRenderedSignatures.get(sigKey) : null;
         // Always replace the loading state - with fallback
         if (activityHtml && activityHtml.trim().length > 0) {
           // If we already rendered the same items, skip DOM replacement (prevents icon/glyph flicker)
           if (!forceRefresh && hasExistingContent && prevSignature && prevSignature === newSignature) {
-            // Already rendered this exact content; skip DOM replacement
+            // Skip update
           } else {
-            // Smooth height transition logic
-            const currentHeight = container.offsetHeight;
-            container.style.height = currentHeight + 'px';
-            container.innerHTML = activityHtml;
-            this.attachActivityEvents(container, entityType, entityId);
+            if (disableAnimations) {
+              container.style.height = '';
+              container.innerHTML = activityHtml;
+              this.attachActivityEvents(container, entityType, entityId);
+            } else {
+              const currentHeight = container.offsetHeight;
+              container.style.height = currentHeight + 'px';
+              container.innerHTML = activityHtml;
+              this.attachActivityEvents(container, entityType, entityId);
 
-            // Measure new height
-            requestAnimationFrame(() => {
-              container.style.height = container.scrollHeight + 'px';
-              // Reset height after transition
-              setTimeout(() => { container.style.height = ''; }, 450);
-            });
+              requestAnimationFrame(() => {
+                container.style.height = container.scrollHeight + 'px';
+                setTimeout(() => { container.style.height = ''; }, 450);
+              });
+            }
 
             try { if (this.lastRenderedSignatures) this.lastRenderedSignatures.set(sigKey, newSignature); } catch (_) { /* noop */ }
           }
