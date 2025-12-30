@@ -3737,11 +3737,25 @@ var console = {
     // Widgets dropdown functionality
     const widgetsBtn = document.getElementById('open-widgets');
     const widgetsWrap = document.querySelector('#account-detail-header .widgets-wrap');
+    
     if (widgetsBtn && widgetsWrap && !widgetsBtn._bound) {
       widgetsBtn._bound = true;
       // Click toggles open state (also support keyboard)
       widgetsBtn.addEventListener('click', (e) => {
         e.preventDefault();
+        
+        // Fix for hover/click conflict:
+        // If the menu was JUST opened by hover (< 500ms ago), treat this click as 
+        // a confirmation to "keep open" rather than a toggle to "close".
+        // This prevents the common issue where a user hovers (opening it) and then 
+        // immediately clicks (accidentally closing it).
+        const justOpened = widgetsWrap._lastAutoOpen && (Date.now() - widgetsWrap._lastAutoOpen < 500);
+        
+        if (justOpened && widgetsWrap.classList.contains('open')) {
+          // Do nothing (keep it open)
+          return;
+        }
+
         const isOpen = widgetsWrap.classList.toggle('open');
         widgetsBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
       });
@@ -3752,6 +3766,7 @@ var console = {
         if (!widgetsWrap.classList.contains('open')) {
           widgetsWrap.classList.add('open');
           widgetsBtn.setAttribute('aria-expanded', 'true');
+          widgetsWrap._lastAutoOpen = Date.now(); // Track when we auto-opened
         }
       };
       const closeSoon = () => {
