@@ -41,9 +41,8 @@
     }
 
     try {
-      // Priority 1: Use stored access token from memory (auth.js stores this)
+      // Use stored token if available
       if (window._googleAccessToken) {
-        console.log('[GmailSync] Using stored Google access token from memory');
         return window._googleAccessToken;
       }
       
@@ -52,7 +51,6 @@
         const persistedToken = localStorage.getItem('pc:googleAccessToken');
         if (persistedToken) {
           window._googleAccessToken = persistedToken; // Also restore to memory
-          console.log('[GmailSync] Using persisted Google access token from localStorage');
           return persistedToken;
         }
       } catch (storageErr) {
@@ -66,7 +64,6 @@
       }
 
       // Priority 4: Re-authenticate with Gmail scope (only if token is missing or expired)
-      console.log('[GmailSync] Need to re-authenticate for Gmail access');
       return await reauthenticateWithGmailScope();
     } catch (error) {
       console.error('[GmailSync] Failed to get access token:', error);
@@ -81,7 +78,6 @@
   async function reauthenticateWithGmailScope() {
     // Prevent multiple simultaneous re-authentication attempts
     if (_isReauthenticating) {
-      console.log('[GmailSync] Re-authentication already in progress, waiting...');
       // Wait for current re-auth to complete (max 30 seconds)
       let attempts = 0;
       while (_isReauthenticating && attempts < 300) {
@@ -97,26 +93,23 @@
 
     _isReauthenticating = true;
     try {
+      // Trigger the standard Google login flow with the extra scope
       const provider = new firebase.auth.GoogleAuthProvider();
       provider.addScope('https://www.googleapis.com/auth/gmail.readonly');
       
-      // Use popup instead of redirect to avoid redirect loops
-      // User prefers popup for Gmail sync re-authentication
-      console.log('[GmailSync] Requesting Gmail access via popup...');
-      const result = await firebase.auth().currentUser.reauthenticateWithPopup(provider);
+      const result = await firebase.auth().signInWithPopup(provider);
+      const credential = firebase.auth.GoogleAuthProvider.credentialFromResult(result);
+      const accessToken = credential.accessToken;
       
-      const credential = result.credential;
-      if (credential && credential.accessToken) {
-        // Store in both memory and localStorage
-        window._googleAccessToken = credential.accessToken;
+      if (accessToken) {
+        window._googleAccessToken = accessToken;
         try {
-          localStorage.setItem('pc:googleAccessToken', credential.accessToken);
-          console.log('[GmailSync] Got Gmail access token via popup reauthentication (persisted)');
+          localStorage.setItem('google_access_token', accessToken);
         } catch (storageErr) {
-          console.warn('[GmailSync] Could not persist token:', storageErr);
+          // Ignore storage errors
         }
         _isReauthenticating = false;
-        return credential.accessToken;
+        return accessToken;
       }
       
       _isReauthenticating = false;
@@ -160,7 +153,6 @@
           try {
             localStorage.removeItem('pc:googleAccessToken');
             window._googleAccessToken = null;
-            console.log('[GmailSync] Cleared expired token from storage');
           } catch (storageErr) {
             console.warn('[GmailSync] Could not clear expired token:', storageErr);
           }
@@ -520,13 +512,11 @@
 
     // Check cooldown
     if (!force && _lastSyncTime && (Date.now() - _lastSyncTime) < SYNC_COOLDOWN_MS) {
-      console.log('[GmailSync] Sync cooldown active, skipping');
       return { synced: 0, skipped: 0, status: 'cooldown' };
     }
 
     // Check if already syncing
     if (_isSyncing) {
-      console.log('[GmailSync] Already syncing, skipping');
       return { synced: 0, skipped: 0, status: 'already_syncing' };
     }
 
@@ -538,8 +528,6 @@
       _isSyncing = false;
       return { synced: 0, skipped: 0, status: 'no_user' };
     }
-
-    console.log('[GmailSync] Starting sync for:', userEmail);
 
     try {
       // Get access token
@@ -580,7 +568,6 @@
       const messages = Array.from(deduped.values());
 
       if (needsReauth) {
-        console.log('[GmailSync] Token needs refresh, re-authenticating...');
         accessToken = await reauthenticateWithGmailScope();
         if (!accessToken) {
           _isSyncing = false;
@@ -599,8 +586,6 @@
         _isSyncing = false;
         return { synced: 0, skipped: 0, status: 'fetch_failed', error };
       }
-
-      console.log('[GmailSync] Found', messages.length, 'messages to check');
 
       let synced = 0;
       let skipped = 0;
@@ -644,7 +629,6 @@
       }
 
       _lastSyncTime = Date.now();
-      console.log('[GmailSync] Sync complete:', synced, 'synced,', skipped, 'skipped');
 
       // Notify BackgroundEmailsLoader to refresh
       if (synced > 0) {
@@ -709,32 +693,7 @@
     };
   }
 
-  // Auto-sync when emails page is opened (with cooldown)
-  document.addEventListener('pc:page-changed', async (e) => {
-    if (e.detail?.page === 'emails' && isGmailSyncAvailable()) {
-      console.log('[GmailSync] Emails page opened, starting sync...');
-      await syncGmailInbox();
-    }
-  });
-
-  // Also listen for emails page showing
-  if (!document._gmailSyncBound) {
-    const emailsPage = document.getElementById('emails-page');
-    if (emailsPage) {
-      const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          if (mutation.attributeName === 'style' || mutation.attributeName === 'class') {
-            const isVisible = emailsPage.style.display !== 'none' && !emailsPage.classList.contains('hidden');
-            if (isVisible && isGmailSyncAvailable()) {
-              syncGmailInbox();
-            }
-          }
-        });
-      });
-      observer.observe(emailsPage, { attributes: true, attributeFilter: ['style', 'class'] });
-    }
-    document._gmailSyncBound = true;
-  }
+  // Auto-sync disabled - functionality no longer needed
 
   /**
    * Fetch and decode an attachment for display
@@ -819,17 +778,10 @@
     return est;
   }
 
-  // Export public API
+  // Export public API (minimal)
   window.GmailInboxSync = {
-    sync: syncGmailInbox,
-    forceSync: forceSync,
-    backfill: backfill,
-    estimate: estimate,
     isAvailable: isGmailSyncAvailable,
-    getStatus: getSyncStatus,
-    getAttachment: getAttachment
+    getStatus: getSyncStatus
   };
-
-  console.log('[GmailSync] Client-side Gmail sync module initialized');
 })();
 

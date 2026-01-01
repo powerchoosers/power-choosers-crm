@@ -3,13 +3,14 @@
     if (window.__debugBridgeInitialized) return;
     window.__debugBridgeInitialized = true;
 
-    // Only enable in localhost:3000 as per user request to save cloudrun costs
+    // Only enable in localhost as per user request to save cloudrun costs
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const isPort3000 = window.location.port === '3000';
     
-    if (!(isLocalhost && isPort3000)) {
+    if (!isLocalhost) {
         return;
     }
+
+    console.log('[Debug Bridge] Attempting to initialize on localhost...');
 
     const originalConsole = {
         log: console.log,
@@ -75,31 +76,54 @@
         }
     }
 
+    function bridgeSend(type, args, opts) {
+        const force = !!(opts && opts.force === true);
+        if (!force && !shouldSendLog(args)) return;
+        sendToDebug(type, args);
+    }
+
     try {
-        originalConsole.log('[Debug Bridge] Initialized - Logs are being mirrored to .cursor/debug.log', {
-            debugEnabled,
-            href: window.location.href
-        });
-        sendToDebug('log', ['[Debug Bridge] Initialized - Logs are being mirrored to .cursor/debug.log', { debugEnabled, href: window.location.href }]);
+        window.PCDebug = window.PCDebug || {};
+        window.PCDebug.enabled = debugEnabled;
+        window.PCDebug.send = function(type) {
+            const args = Array.prototype.slice.call(arguments, 1);
+            bridgeSend(type, args, { force: true });
+        };
+        window.PCDebug.log = function(label, data) {
+            bridgeSend('log', [label, data], { force: true });
+        };
+        window.PCDebug.warn = function(label, data) {
+            bridgeSend('warn', [label, data], { force: true });
+        };
+        window.PCDebug.error = function(label, data) {
+            bridgeSend('error', [label, data], { force: true });
+        };
+    } catch (_) { }
+
+    try {
+        // Suppress initialization log unless verbose mode is explicitly on
+        if (debugEnabled) {
+            originalConsole.log('[Debug Bridge] Initialized - Logs are being mirrored to .cursor/debug.log', {
+                debugEnabled,
+                href: window.location.href
+            });
+            sendToDebug('log', ['[Debug Bridge] Initialized - Logs are being mirrored to .cursor/debug.log', { debugEnabled, href: window.location.href }]);
+        }
     } catch (_) { }
 
     console.log = function() {
         originalConsole.log.apply(console, arguments);
-        if (shouldSendLog(Array.from(arguments))) {
-            sendToDebug('log', Array.from(arguments));
-        }
+        bridgeSend('log', Array.from(arguments));
     };
 
     console.warn = function() {
         originalConsole.warn.apply(console, arguments);
-        if (shouldSendLog(Array.from(arguments))) {
-            sendToDebug('warn', Array.from(arguments));
-        }
+        bridgeSend('warn', Array.from(arguments));
     };
 
     console.error = function() {
         originalConsole.error.apply(console, arguments);
-        sendToDebug('error', Array.from(arguments));
+        bridgeSend('error', Array.from(arguments), { force: true });
     };
 
     window.addEventListener('error', function(event) {

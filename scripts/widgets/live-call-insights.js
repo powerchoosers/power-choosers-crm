@@ -101,8 +101,6 @@ class LiveCallInsights {
 
         // Start polling for updates
         this.startPolling();
-
-        console.log('[Live Insights] Started for call:', callSid);
     }
 
     stopLiveInsights() {
@@ -119,8 +117,6 @@ class LiveCallInsights {
         this.updateStatus('inactive', 'Inactive');
         this.transcriptContainer.innerHTML = '<div class="transcript-placeholder">Start a call to see live transcription...</div>';
         this.tipsContainer.innerHTML = '<div class="tips-placeholder">AI tips will appear here during your call...</div>';
-
-        console.log('[Live Insights] Stopped');
     }
 
     startPolling() {

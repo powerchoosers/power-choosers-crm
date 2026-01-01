@@ -24,6 +24,8 @@ class ActivityManager {
     this.pageLoadTime = Date.now(); // Track when ActivityManager was initialized
     this.refreshCooldown = 5000; // 5 second cooldown after page load to prevent flickering
 
+    this._persistDisabledKeys = new Set();
+
     // Setup cache invalidation listeners for immediate updates when new activities are created
     this.setupCacheInvalidationListeners();
 
@@ -88,9 +90,17 @@ class ActivityManager {
    * Save cache to sessionStorage
    */
   savePersistedCache(key, cache) {
+    if (this._persistDisabledKeys && this._persistDisabledKeys.has(key)) {
+      return;
+    }
     try {
       const obj = Object.fromEntries(cache);
       const serialized = JSON.stringify(obj);
+      if (serialized.length > 1_000_000) {
+        if (this._persistDisabledKeys) this._persistDisabledKeys.add(key);
+        try { sessionStorage.removeItem(key); } catch (_) { }
+        return;
+      }
       sessionStorage.setItem(key, serialized);
     } catch (e) {
       try {
@@ -105,6 +115,11 @@ class ActivityManager {
         }
         sessionStorage.removeItem(key);
       } catch (_) { }
+      if (e && (e.name === 'QuotaExceededError' || String(e.message || '').includes('exceeded the quota'))) {
+        if (this._persistDisabledKeys) this._persistDisabledKeys.add(key);
+        try { sessionStorage.removeItem(key); } catch (_) { }
+        return;
+      }
       console.warn(`[ActivityManager] Failed to save persisted cache ${key}:`, e);
     }
   }
@@ -2236,23 +2251,41 @@ class ActivityManager {
           let navigationTarget = null;
           let navigationType = null;
 
-          if (activity.data && activity.data.entityType === 'contact') {
+          // Priority 1: Check for explicit emailId or email type
+          if (activity.type === 'email' || activity.emailId) {
+            navigationTarget = activity.emailId || activity.id.replace(/^email-/, '');
+            navigationType = 'email';
+          } 
+          else if (activity.type === 'task' || activity.taskId) {
+            navigationTarget = activity.taskId || activity.id.replace(/^task-/, '');
+            navigationType = 'task';
+          }
+          // Priority 2: Check for explicit data entity type
+          else if (activity.data && activity.data.entityType === 'contact') {
             navigationTarget = activity.data.id;
             navigationType = 'contact';
           } else if (activity.data && activity.data.entityType === 'account') {
             navigationTarget = activity.data.id;
             navigationType = 'account';
-          } else if (activity.data && activity.data.contactId) {
+          } else if (activity.data && activity.data.entityType === 'task') {
+            navigationTarget = activity.data.id;
+            navigationType = 'task';
+          } 
+          // Priority 3: Check for ID fields
+          else if (activity.data && activity.data.contactId) {
             navigationTarget = activity.data.contactId;
             navigationType = 'contact';
           } else if (activity.data && activity.data.accountId) {
             navigationTarget = activity.data.accountId;
             navigationType = 'account';
+          } else if (activity.data && activity.data.taskId) {
+            navigationTarget = activity.data.taskId;
+            navigationType = 'task';
           }
 
           // Add click handler attributes if we have a navigation target
           const clickAttributes = navigationTarget ?
-            `onclick="window.ActivityManager.navigateToDetail('${navigationType}', '${navigationTarget}'); event.stopPropagation();" style="cursor: pointer;"` :
+            `onclick="window.ActivityManager.handleActivityClick('${activity.id}', '${navigationType}', '${navigationTarget}'); event.stopPropagation();" style="cursor: pointer;"` :
             '';
 
 
@@ -3218,6 +3251,53 @@ class ActivityManager {
     await this.renderActivities(containerId, entityType, entityId);
   }
 
+  handleActivityClick(activityId, navigationType, navigationTarget) {
+    try {
+      let activity = null;
+      const allActivities = this.processedActivitiesCache.get('global-global') || [];
+      activity = allActivities.find(a => a.id === activityId);
+
+      if (!activity && navigationType === 'email') {
+        const emailId = activityId.replace(/^email-/, '');
+        activity = this.processedEmailsCache.get(emailId);
+      }
+      
+      if (activity && activity.data) {
+        this.primeCacheAndNavigate(navigationType, navigationTarget, activity.data);
+      } else {
+        this.navigateToDetail(navigationType, navigationTarget);
+      }
+    } catch (error) {
+      console.error('[ActivityManager] Error in handleActivityClick:', error);
+      this.navigateToDetail(navigationType, navigationTarget);
+    }
+  }
+
+  primeCacheAndNavigate(entityType, entityId, data) {
+    if (entityType === 'email') {
+      if (!window.emailCache) window.emailCache = new Map();
+      if (data) {
+        window.emailCache.set(entityId, data);
+      }
+    } else if (entityType === 'contact') {
+      if (data) {
+        window._prefetchedContactForDetail = data;
+      }
+    } else if (entityType === 'account') {
+      if (data) {
+        window._prefetchedAccountForDetail = data;
+      }
+    } else if (entityType === 'task') {
+      if (data) {
+        if (!window._essentialTasksData) window._essentialTasksData = [];
+        window._essentialTasksData = window._essentialTasksData.filter(t => t.id !== entityId);
+        window._essentialTasksData.push(data);
+      }
+    }
+
+    this.navigateToDetail(entityType, entityId);
+  }
+
   /**
    * Get contact data for navigation (prefetching mechanism)
    */
@@ -3234,7 +3314,7 @@ class ActivityManager {
 
       // If not found in cache, try to find in the activity data we already have
       // This handles cases where the contact ID doesn't match between Firebase and localStorage
-      const allActivities = this.cache.get('global-timeline') || [];
+      const allActivities = this.processedActivitiesCache.get('global-global') || [];
 
       for (const activity of allActivities) {
         if (activity.type === 'note' &&
@@ -3295,6 +3375,24 @@ class ActivityManager {
         setTimeout(() => {
           if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
             window.AccountDetail.show(entityId);
+          }
+        }, 100);
+      }
+    } else if (entityType === 'email') {
+      // Navigate to email detail
+      if (window.crm && typeof window.crm.navigateToPage === 'function') {
+        window.crm.navigateToPage('email-detail', { emailId: entityId });
+      }
+    } else if (entityType === 'task') {
+      if (window.TaskDetail && typeof window.TaskDetail.open === 'function') {
+        window.TaskDetail.open(entityId, 'dashboard');
+      } else {
+        if (window.crm && typeof window.crm.navigateToPage === 'function') {
+          window.crm.navigateToPage('task-detail');
+        }
+        setTimeout(() => {
+          if (window.TaskDetail && typeof window.TaskDetail.open === 'function') {
+            window.TaskDetail.open(entityId, 'dashboard');
           }
         }, 100);
       }

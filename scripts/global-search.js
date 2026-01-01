@@ -422,7 +422,6 @@
 
   function handleSearchInput(e) {
     const query = e.target.value.trim();
-    console.log('[Global Search] Input event triggered, query:', query);
 
     // Clear existing timeout
     if (searchTimeout) {
@@ -446,7 +445,6 @@
 
     // Debounce search
     searchTimeout = setTimeout(() => {
-      console.log('[Global Search] Performing search for:', query);
       performSearch(query);
     }, SEARCH_DELAY);
   }
@@ -537,17 +535,13 @@
   }
 
   async function performSearch(query) {
-    console.log('[Global Search] performSearch called with:', query);
     lastQuery = query;
     try {
       const results = await searchAllData(query);
-      console.log('[Global Search] Search results:', results);
       
       if (Object.keys(results).length === 0) {
-        console.log('[Global Search] No results found, showing empty state');
         showEmptyState();
       } else {
-        console.log('[Global Search] Results found, showing results');
         showResults(results);
       }
     } catch (error) {
@@ -590,7 +584,6 @@
 
   async function searchAllData(query) {
     const normalizedQuery = query.toLowerCase();
-    console.log('[Global Search] searchAllData called with normalized query:', normalizedQuery);
     
     // Fetch fresh data from Firebase
     const pPeople = searchPeople(normalizedQuery);
@@ -787,29 +780,24 @@
   }
 
   async function searchPeople(query) {
-    console.log('[Global Search] searchPeople called with query:', query);
     
     // OPTIMIZED: Use cached data from background loader instead of loading entire collection
     // This saves thousands of Firestore reads per search
     let people = [];
     if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
       people = window.BackgroundContactsLoader.getContactsData() || [];
-      console.log('[Global Search] Using cached contacts:', people.length);
     } else if (window.firebaseDB) {
       // Fallback to Firestore only if background loader not available
-      console.log('[Global Search] Fallback: Fetching contacts from Firebase...');
       const snapshot = await window.firebaseDB.collection('contacts').limit(500).get();
       snapshot.forEach(doc => people.push({ id: doc.id, ...doc.data() }));
     }
     
     if (people.length === 0) {
-      console.log('[Global Search] No contacts available');
       return [];
     }
 
     try {
       const results = [];
-      console.log('[Global Search] Searching', people.length, 'contacts');
 
       const qDigits = String(query || '').replace(/\D/g, '');
       const isPhoneSearch = qDigits.length >= 7; // handle most common formats/partials
@@ -883,16 +871,13 @@
     let accounts = [];
     if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
       accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
-      console.log('[Global Search] Using cached accounts:', accounts.length);
     } else if (window.firebaseDB) {
       // Fallback to Firestore only if background loader not available
-      console.log('[Global Search] Fallback: Fetching accounts from Firebase...');
       const snapshot = await window.firebaseDB.collection('accounts').limit(500).get();
       snapshot.forEach(doc => accounts.push({ id: doc.id, ...doc.data() }));
     }
     
     if (accounts.length === 0) {
-      console.log('No accounts available for search');
       return [];
     }
 
@@ -984,7 +969,6 @@
     let sequences = [];
     if (window.BackgroundSequencesLoader && typeof window.BackgroundSequencesLoader.getSequencesData === 'function') {
       sequences = window.BackgroundSequencesLoader.getSequencesData() || [];
-      console.log('[Global Search] Using cached sequences:', sequences.length);
     } else if (window.firebaseDB) {
       // Fallback to Firestore only if background loader not available
       const snapshot = await window.firebaseDB.collection('sequences').limit(200).get();
@@ -1468,13 +1452,10 @@
   }
 
   function navigateToItem(type, id) {
-    console.log('[Global Search] navigateToItem:', { type, id });
     switch (type) {
       case 'person':
-        console.log('[Global Search] Navigating to person:', id);
         // Try to show contact detail directly if available
         if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
-          console.log('[Global Search] Using ContactDetail.show');
           // Navigate to people page and show detail immediately
           navigateToPage('people');
           // Use requestAnimationFrame to ensure the page has started loading
@@ -1482,20 +1463,16 @@
             window.ContactDetail.show(id);
           });
         } else {
-          console.log('[Global Search] Falling back to old behavior for person');
           // Fallback to old behavior if ContactDetail is not available
           window._globalSearchDirectNavigation = { type: 'contact', id: id };
           navigateToPage('people');
         }
         break;
       case 'account':
-        console.log('[Global Search] Navigating to account:', id);
         // For accounts, we have a dedicated detail page, so navigate directly
         if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
-          console.log('[Global Search] Using AccountDetail.show');
           window.AccountDetail.show(id);
         } else {
-          console.log('[Global Search] Falling back to accounts page');
           // Fallback to accounts page
           navigateToPage('accounts');
         }

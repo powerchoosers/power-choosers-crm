@@ -143,7 +143,7 @@ var console = {
             try { 
               if (window.__restoringAccounts) {
                 window.__restoringAccounts = false; 
-                console.log('[Accounts] ✓ Cleared restoration flag - navigation complete');
+                // console.log('[Accounts] ✓ Cleared restoration flag - navigation complete');
                 // No need for additional render() - applyFilters() already rendered
               }
             } catch(_){} 

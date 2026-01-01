@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="scripts/debug-bridge.js"></script>
+<script src="scripts/debug-bridge.js"></script>
     <title>Power Choosers CRM</title>
     <meta name="description"
         content="Power Choosers CRM - Manage your energy procurement accounts and customer relationships">
@@ -34,15 +34,14 @@
     <script>
         // Verify SDK loading
         window.addEventListener('load', () => {
-            if (typeof Twilio !== 'undefined' && Twilio.Device) {
-                console.log('[Twilio] SDK loaded successfully from unpkg CDN');
-            } else {
+            if (!(typeof Twilio !== 'undefined' && Twilio.Device)) {
                 console.error('[Twilio] SDK failed to load from unpkg CDN');
             }
         });
     </script>
     <script>
         // API base will be set later based on environment
+        console.log('[Debug Bridge] CRM Dashboard HTML loaded');
     </script>
     <script>
         // Algolia Configuration
@@ -54,7 +53,6 @@
                 accounts: 'accounts'
             }
         };
-        console.log('[Algolia] Configuration loaded');
     </script>
     <script>
         // Optional: Configure your Twilio/Business phone numbers so Calls page can identify the counterparty correctly
@@ -66,7 +64,6 @@
                 const nums = Array.isArray(JSON.parse(raw || '[]')) ? JSON.parse(raw || '[]') : [];
                 if (nums.length) {
                     window.CRM_BUSINESS_NUMBERS = nums;
-                    console.log('[CRM] Business numbers:', nums);
                 }
             } catch (e) { /* ignore */ }
         })();
@@ -896,8 +893,6 @@
                                         <h2 class="page-title">Emails</h2>
                                         <div class="page-actions">
                                             <button class="btn-primary" id="compose-email-btn">Compose</button>
-                                            <button class="btn-secondary" id="sync-gmail-btn">Sync Gmail</button>
-                                            <button class="btn-secondary" id="backfill-gmail-btn">Backfill 30d</button>
                                             <button class="btn-secondary" id="generate-scheduled-btn"
                                                 style="display: none;">Generate Now</button>
                                         </div>
@@ -4558,28 +4553,46 @@
         window.crmScriptsLoaded = false;
         window._loadedPageScripts = new Set();
 
-        // Helper to load a single script
         window.loadScript = function (src) {
-            return new Promise((resolve, reject) => {
-                // Check if already loaded
+            return new Promise((resolve) => {
                 const baseSrc = String(src || '');
-                const alreadyLoaded = Array.from(document.querySelectorAll('script[data-src-base]'))
-                    .some(s => s.getAttribute('data-src-base') === baseSrc);
-                if (alreadyLoaded) {
-                    resolve();
+                const cacheBuster = (function () {
+                    try {
+                        const raw = window.__PC_CACHE_BUSTER;
+                        if (!raw) return '';
+                        const b = String(raw).replace(/^[?&]/, '');
+                        if (!b) return '';
+                        return (baseSrc.includes('?') ? '&' : '?') + b;
+                    } catch (_) {
+                        return '';
+                    }
+                })();
+                const finalSrc = baseSrc + cacheBuster;
+                const existing = Array.from(document.querySelectorAll('script[data-src-base]'))
+                    .find(s => s.getAttribute('data-src-base') === baseSrc && s.getAttribute('data-load-ok') === 'true');
+                if (existing) {
+                    resolve(true);
                     return;
                 }
 
+                const start = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+
                 const script = document.createElement('script');
-                script.src = baseSrc;
+                script.src = finalSrc;
                 script.setAttribute('data-src-base', baseSrc);
                 script.onload = () => {
-                    console.log('[LazyLoad] ✓ Loaded:', baseSrc);
-                    resolve();
+                    script.setAttribute('data-load-ok', 'true');
+                    if (window.PC_DEBUG === true) {
+                        const end = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+                        console.log('[LazyLoad] Loaded script', { src: baseSrc, ms: Math.round(end - start) });
+                    }
+                    resolve(true);
                 };
                 script.onerror = () => {
+                    script.setAttribute('data-load-ok', 'false');
+                    try { script.remove(); } catch (_) { }
                     console.warn('[LazyLoad] Failed to load:', baseSrc);
-                    resolve(); // Continue even if one fails
+                    resolve(false);
                 };
                 document.body.appendChild(script);
             });
@@ -4588,11 +4601,8 @@
         // Load core CRM scripts (essentials only)
         window.loadCRMScripts = function () {
             if (window.crmScriptsLoaded) {
-                console.log('[LazyLoad] Scripts already loaded');
                 return Promise.resolve();
             }
-
-            console.log('[LazyLoad] Loading core CRM scripts...');
 
             // Core scripts loaded immediately (cache manager MUST be first)
             const coreScripts = [
@@ -4645,13 +4655,11 @@
                 return promise.then(() => window.loadScript(src));
             }, Promise.resolve()).then(() => {
                 window.crmScriptsLoaded = true;
-                console.log('[LazyLoad] ✓ Core CRM scripts loaded!');
                 
                 // Pre-warm commonly used page scripts in the background
                 // Uses requestIdleCallback to avoid blocking the main thread
                 if ('requestIdleCallback' in window) {
                     requestIdleCallback(() => {
-                        console.log('[LazyLoad] Pre-warming People & Accounts scripts...');
                         // Pre-fetch scripts without executing init
                         window._loadedPageScripts = window._loadedPageScripts || new Set();
                         const prewarmScripts = [
@@ -4726,25 +4734,24 @@
 
             const scripts = pageScriptMap[pageName];
             if (!scripts) {
-                console.log(`[LazyLoad] No scripts needed for page: ${pageName}`);
                 return;
             }
 
-            // Check if already loaded
             if (window._loadedPageScripts.has(pageName)) {
-                console.log(`[LazyLoad] Page scripts already loaded for: ${pageName}`);
                 return;
             }
 
-            console.log(`[LazyLoad] Loading scripts for page: ${pageName}`);
-
-            // Load scripts for this page
+            let allOk = true;
             for (const src of scripts) {
-                await window.loadScript(src);
+                const ok = await window.loadScript(src);
+                if (!ok) allOk = false;
             }
 
-            window._loadedPageScripts.add(pageName);
-            console.log(`[LazyLoad] ✓ Page scripts loaded for: ${pageName}`);
+            if (allOk) {
+                window._loadedPageScripts.add(pageName);
+            } else {
+                console.warn('[LazyLoad] One or more scripts failed for page:', pageName);
+            }
         };
     </script>
     <!-- API Base URL (global) -->
@@ -5144,7 +5151,7 @@
             try {
                 // Set Google Maps API key directly
                 window.GOOGLE_MAPS_API = 'AIzaSyCydOVPsFnyY83M5ABb2lBZWcMqh4wqV2k';
-                console.log('Google Maps API key configured');
+                // console.log('Google Maps API key configured');
             } catch (e) {
                 console.warn('Google Maps API key init error:', e);
             }

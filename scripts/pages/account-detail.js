@@ -5,7 +5,7 @@
 // This shadowed console only affects this file, not the whole app
 var __ACCOUNT_DETAIL_ORIG_CONSOLE__ = window.console || {};
 function __accountDetailDebugEnabled__() {
-  return true; // Force enable for debugging
+  if (window.PC_DEBUG) return true; // Respect global debug flag
   try {
     const v = localStorage.getItem('CRM_DEBUG_ACCOUNT_DETAIL');
     if (v != null) return v === '1' || v === 'true';
@@ -123,7 +123,7 @@ var console = {
     // Only set up once
     if (document._pcAccountDetailDelegated) return;
 
-    console.log('[AccountDetail] Setting up event delegation on document');
+    // console.log('[AccountDetail] Setting up event delegation on document');
 
     const delegatedClickHandler = (e) => {
       // Check if click is on "Add to list" button
@@ -131,7 +131,7 @@ var console = {
       if (addToListBtn) {
         e.preventDefault();
         e.stopPropagation();
-        console.log('[AccountDetail] Add to list clicked via delegation');
+        // console.log('[AccountDetail] Add to list clicked via delegation');
 
         // Toggle behavior: close if already open
         if (document.getElementById('account-lists-panel')) {
@@ -147,7 +147,7 @@ var console = {
       if (websiteBtn && document.getElementById('account-details-page')) {
         e.preventDefault();
         e.stopPropagation();
-        console.log('[AccountDetail] Website button clicked via delegation');
+        // console.log('[AccountDetail] Website button clicked via delegation');
         handleQuickAction('website');
         return;
       }
@@ -157,7 +157,7 @@ var console = {
       if (linkedInBtn && document.getElementById('account-details-page')) {
         e.preventDefault();
         e.stopPropagation();
-        console.log('[AccountDetail] LinkedIn button clicked via delegation');
+        // console.log('[AccountDetail] LinkedIn button clicked via delegation');
         handleQuickAction('linkedin');
         return;
       }
@@ -168,7 +168,7 @@ var console = {
       if (editBtn && editBtn.dataset.action === 'edit-account' && document.getElementById('account-details-page') && !document.getElementById('contact-detail-header')) {
         e.preventDefault();
         e.stopPropagation();
-        console.log('[AccountDetail] Edit account button clicked via delegation');
+        // console.log('[AccountDetail] Edit account button clicked via delegation');
         openEditAccountModal();
         return;
       }
@@ -179,7 +179,7 @@ var console = {
     eventListeners.push({ type: 'click', handler: delegatedClickHandler, target: document });
 
     document._pcAccountDetailDelegated = true;
-    console.log('[AccountDetail] Event delegation set up successfully');
+    // console.log('[AccountDetail] Event delegation set up successfully');
   }
 
   // Initialize event delegation immediately
@@ -188,26 +188,26 @@ var console = {
   // Listen for contacts data becoming available (ONCE)
   if (!document._accountDetailContactsListenerBound) {
     document.addEventListener('pc:contacts-loaded', async (e) => {
-      console.log('[AccountDetail] Contacts loaded event received, count:', e.detail?.count);
+      // console.log('[AccountDetail] Contacts loaded event received, count:', e.detail?.count);
 
       // Update the contacts cache - prioritize BackgroundContactsLoader
       if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
         window._accountDetailPeopleCache = window.BackgroundContactsLoader.getContactsData() || [];
-        console.log('[AccountDetail] Updated people cache from BackgroundContactsLoader:', window._accountDetailPeopleCache.length);
+        // console.log('[AccountDetail] Updated people cache from BackgroundContactsLoader:', window._accountDetailPeopleCache.length);
       } else if (typeof window.getPeopleData === 'function') {
         window._accountDetailPeopleCache = window.getPeopleData() || [];
-        console.log('[AccountDetail] Updated people cache from getPeopleData:', window._accountDetailPeopleCache.length);
+        // console.log('[AccountDetail] Updated people cache from getPeopleData:', window._accountDetailPeopleCache.length);
       }
 
       // Re-render just the contacts section if we're showing an account
       if (state.currentAccount && window._accountDetailPeopleCache && window._accountDetailPeopleCache.length > 0) {
         const contactsList = document.getElementById('account-contacts-list');
         if (contactsList) {
-          console.log('[AccountDetail] Re-rendering contacts section with', window._accountDetailPeopleCache.length, 'contacts');
+          // console.log('[AccountDetail] Re-rendering contacts section with', window._accountDetailPeopleCache.length, 'contacts');
           try {
             contactsList.innerHTML = await renderAccountContacts(state.currentAccount);
             bindContactItemEvents();
-            console.log('[AccountDetail] Contacts section re-rendered successfully');
+            // console.log('[AccountDetail] Contacts section re-rendered successfully');
           } catch (error) {
             console.error('[AccountDetail] Error re-rendering contacts:', error);
           }
@@ -215,11 +215,11 @@ var console = {
           console.warn('[AccountDetail] Contact list element not found');
         }
       } else {
-        console.log('[AccountDetail] Not re-rendering: account=', !!state.currentAccount, 'cache length=', window._accountDetailPeopleCache?.length);
+        // console.log('[AccountDetail] Not re-rendering: account=', !!state.currentAccount, 'cache length=', window._accountDetailPeopleCache?.length);
       }
     });
     document._accountDetailContactsListenerBound = true;
-    console.log('[AccountDetail] Registered contacts-loaded listener');
+    // console.log('[AccountDetail] Registered contacts-loaded listener');
   }
 
   // ==== Date helpers for Energy & Contract fields ====
@@ -272,7 +272,7 @@ var console = {
     // CRITICAL: Debounce rapid-fire calls (prevents event listener pile-up)
     const now = Date.now();
     if (_lastRequestedAccountId === accountId && (now - _lastShowAccountDetailTime) < 500) {
-      console.log('[AccountDetail] Debouncing duplicate call for same account within 500ms:', accountId);
+      // console.log('[AccountDetail] Debouncing duplicate call for same account within 500ms:', accountId);
       return;
     }
     _lastShowAccountDetailTime = now;
@@ -281,11 +281,11 @@ var console = {
     if (_showAccountDetailInProgress) {
       // If same account is already loading, skip this call entirely
       if (_lastRequestedAccountId === accountId) {
-        console.log('[AccountDetail] Skipping duplicate call - already in progress:', accountId);
+        // console.log('[AccountDetail] Skipping duplicate call - already in progress:', accountId);
         return;
       }
       // If different account, wait for current to finish (but don't block forever)
-      console.log('[AccountDetail] Waiting for previous load to complete...');
+      // console.log('[AccountDetail] Waiting for previous load to complete...');
       let waitCount = 0;
       while (_showAccountDetailInProgress && waitCount < 50) {
         await new Promise(r => setTimeout(r, 100));
@@ -343,17 +343,17 @@ var console = {
     try {
       if (typeof window.getPeopleData === 'function') {
         window._accountDetailPeopleCache = window.getPeopleData() || [];
-        console.log('[AccountDetail] Cached people data from people.js:', window._accountDetailPeopleCache.length);
+        // console.log('[AccountDetail] Cached people data from people.js:', window._accountDetailPeopleCache.length);
         contactsLoaded = window._accountDetailPeopleCache.length > 0;
       } else if (window.CacheManager && typeof window.CacheManager.get === 'function') {
-        console.log('[AccountDetail] Loading people data from cache...');
+        // console.log('[AccountDetail] Loading people data from cache...');
         const contacts = await window.CacheManager.get('contacts');
         window._accountDetailPeopleCache = (contacts && Array.isArray(contacts)) ? contacts : [];
-        console.log('[AccountDetail] Cached people data from CacheManager:', window._accountDetailPeopleCache.length);
+        // console.log('[AccountDetail] Cached people data from CacheManager:', window._accountDetailPeopleCache.length);
         contactsLoaded = window._accountDetailPeopleCache.length > 0;
       } else {
         // If people.js hasn't loaded and no cache, contacts will load via event
-        console.log('[AccountDetail] No people data available yet, will update when loaded');
+        // console.log('[AccountDetail] No people data available yet, will update when loaded');
         window._accountDetailPeopleCache = [];
         contactsLoaded = false;
       }
@@ -363,7 +363,7 @@ var console = {
       contactsLoaded = false;
     }
 
-    console.log('[AccountDetail] Contacts loaded:', contactsLoaded, 'Count:', window._accountDetailPeopleCache.length);
+    // console.log('[AccountDetail] Contacts loaded:', contactsLoaded, 'Count:', window._accountDetailPeopleCache.length);
 
     // Render account detail immediately (no animations)
     try {
@@ -376,16 +376,16 @@ var console = {
         return;
       }
 
-      console.log('[AccountDetail] Rendering account:', account.accountName || account.name);
+      // console.log('[AccountDetail] Rendering account:', account.accountName || account.name);
       renderAccountDetail();
-      console.log('[AccountDetail] Render complete');
+      // console.log('[AccountDetail] Render complete');
     } catch (error) {
       console.error('[AccountDetail] Error during render:', error);
     }
 
     // If no contacts loaded and account is rendering, set up retry
     if (!contactsLoaded && state.currentAccount) {
-      console.log('[AccountDetail] No contacts available yet, will retry when event fires');
+      // console.log('[AccountDetail] No contacts available yet, will retry when event fires');
 
       // Add a one-time retry with timeout in case event doesn't fire
       setTimeout(async () => {
@@ -393,13 +393,13 @@ var console = {
           // Try loading again
           if (typeof window.getPeopleData === 'function') {
             window._accountDetailPeopleCache = window.getPeopleData() || [];
-            console.log('[AccountDetail] Retry: Got', window._accountDetailPeopleCache.length, 'contacts');
+            // console.log('[AccountDetail] Retry: Got', window._accountDetailPeopleCache.length, 'contacts');
 
             // Update contacts section
             if (window._accountDetailPeopleCache.length > 0) {
               const contactsList = document.getElementById('account-contacts-list');
               if (contactsList && state.currentAccount) {
-                console.log('[AccountDetail] Retry: Re-rendering contacts section');
+                // console.log('[AccountDetail] Retry: Re-rendering contacts section');
                 contactsList.innerHTML = await renderAccountContacts(state.currentAccount);
                 bindContactItemEvents();
               }
@@ -416,7 +416,7 @@ var console = {
     }
 
     // TRIGGER BACKGROUND DATA LOADING (NON-BLOCKING)
-    console.log('[AccountDetail] Triggering background activities and calls load');
+    // console.log('[AccountDetail] Triggering background activities and calls load');
     loadAccountActivities();
     try {
       injectRecentCallsStyles();
@@ -452,7 +452,7 @@ var console = {
       const accountsData = window.BackgroundAccountsLoader.getAccountsData() || [];
       const found = accountsData.find(a => a.id === accountId);
       if (found) {
-        console.log('[AccountDetail] ✓ Found account in BackgroundAccountsLoader cache:', found.name || found.accountName);
+        // console.log('[AccountDetail] ✓ Found account in BackgroundAccountsLoader cache:', found.name || found.accountName);
         return found;
       }
     }
@@ -466,13 +466,13 @@ var console = {
     }
 
     // FALLBACK: If not in cache (e.g., after clearing cache), load from Firebase
-    console.log('[AccountDetail] Account not in cache, loading from Firebase:', accountId);
+    // console.log('[AccountDetail] Account not in cache, loading from Firebase:', accountId);
     if (window.firebaseDB) {
       try {
         const doc = await window.firebaseDB.collection('accounts').doc(accountId).get();
         if (doc.exists) {
           const account = { id: doc.id, ...doc.data() };
-          console.log('[AccountDetail] ✓ Loaded account from Firebase:', account.name || account.accountName);
+          // console.log('[AccountDetail] ✓ Loaded account from Firebase:', account.name || account.accountName);
           return account;
         }
       } catch (error) {
@@ -1224,9 +1224,11 @@ var console = {
       try {
         if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
         const u = new URL(s);
-        return (u.hostname || '').replace(/^www\./i, '');
+        const res = (u.hostname || '').replace(/^www\./i, '');
+        return res;
       } catch (e) {
-        return s.replace(/^https?:\/\/(www\.)?/i, '').split('/')[0];
+        const res = s.replace(/^https?:\/\/(www\.)?/i, '').split('/')[0];
+        return res;
       }
     })(domain);
 
@@ -1240,7 +1242,7 @@ var console = {
               </svg>
             </button>
             <div class="contact-header-profile">
-              ${(window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') ? window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: a.logoUrl, domain: favDomain, size: 64 }) : (favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 64) : '') : '')}
+              ${(window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') ? window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: a.logoUrl, domain: favDomain, website: a.website, size: 64 }) : (favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 64) : '') : '')}
               <div class="avatar-circle-small" style="${favDomain ? 'display:none;' : ''}">${escapeHtml(getInitials(name))}</div>
               <div class="contact-header-text">
                 <div class="contact-title-row">
@@ -1704,7 +1706,7 @@ var console = {
         const callData = event.detail;
         if (callData && (callData.accountId === state.currentAccount?.id ||
           callData.call?.accountId === state.currentAccount?.id)) {
-          console.log('[AccountDetail] Call logged for this account, refreshing activities');
+          // console.log('[AccountDetail] Call logged for this account, refreshing activities');
 
           // Immediately refresh recent calls section
           if (window.ActivityManager && typeof window.ActivityManager.renderActivities === 'function') {
@@ -1724,7 +1726,7 @@ var console = {
       // Listen for call insights ready (after transcript processing completes)
       document.addEventListener('pc:call-insights-ready', (event) => {
         const { callSid, call } = event.detail || {};
-        console.log('[AccountDetail] Call insights ready:', callSid);
+        // console.log('[AccountDetail] Call insights ready:', callSid);
 
         // Update the call in our local cache
         if (Array.isArray(state._arcCalls) && callSid) {
@@ -1940,7 +1942,7 @@ var console = {
       const j = await r.json().catch(() => ({}));
       const calls = (j && j.ok && Array.isArray(j.calls)) ? j.calls : [];
 
-      console.log(`[Account Detail] Loaded ${calls.length} targeted calls for account ${accountId}`);
+      // console.log(`[Account Detail] Loaded ${calls.length} targeted calls for account ${accountId}`);
 
       // FIX: Limit calls to prevent massive DOM rendering
       const limited = calls.length > 20 ? calls.slice(0, 20) : calls;
@@ -2000,7 +2002,7 @@ var console = {
             // Use the correct property names from the call object
             const callSid = call.id || call.twilioSid || call.callSid;
             const recordingSid = call.recordingSid || call.recording_id;
-            console.log('[AccountDetail] Triggering CI processing for call:', callSid, 'recording:', recordingSid);
+            // console.log('[AccountDetail] Triggering CI processing for call:', callSid, 'recording:', recordingSid);
             triggerAccountCI(callSid, recordingSid, btn);
             return;
           }
@@ -2162,7 +2164,7 @@ var console = {
       const success = await window.SharedCIProcessor.processCall(callSid, recordingSid, btn, {
         context: 'account-detail',
         onSuccess: (call) => {
-          console.log('[AccountDetail] CI processing completed:', call);
+          // console.log('[AccountDetail] CI processing completed:', call);
 
           // Update state cache so future renders show full insights
           try {
@@ -2202,7 +2204,7 @@ var console = {
 
     // If no recordingSid provided, the API will look it up by callSid
     if (!recordingSid) {
-      console.log('[AccountDetail] No recordingSid provided, API will look up recording for callSid:', callSid);
+      // console.log('[AccountDetail] No recordingSid provided, API will look up recording for callSid:', callSid);
     }
 
     try {
@@ -2251,7 +2253,7 @@ var console = {
       }
 
       const result = await response.json();
-      console.log('[AccountDetail] CI processing initiated:', result);
+      // console.log('[AccountDetail] CI processing initiated:', result);
 
       // Update the button to show processing state (consistent with contact-detail)
       btn.innerHTML = '<span class="ci-btn-spinner" aria-hidden="true"></span>';
@@ -2294,7 +2296,7 @@ var console = {
     // Guard against duplicate listeners
     const guardKey = `_accountDetailInsights_${callSid}_Bound`;
     if (document[guardKey]) {
-      console.log('[AccountDetail] Insights listener already active for call:', callSid);
+      // console.log('[AccountDetail] Insights listener already active for call:', callSid);
       return;
     }
     document[guardKey] = true;
@@ -2353,7 +2355,7 @@ var console = {
             finalizeReady(call);
             unsubscribe(); // Stop listening - saves Firebase costs
             delete document[guardKey]; // Clear guard
-            console.log('[AccountDetail] Insights ready for call:', callSid);
+            // console.log('[AccountDetail] Insights ready for call:', callSid);
           }
         }
       }, (error) => {
@@ -2365,7 +2367,7 @@ var console = {
     setTimeout(() => {
       unsubscribe();
       delete document[guardKey];
-      console.log('[AccountDetail] Auto-cleanup: Insights listener stopped for call:', callSid);
+      // console.log('[AccountDetail] Auto-cleanup: Insights listener stopped for call:', callSid);
     }, 5 * 60 * 1000);
   }
 
@@ -3127,7 +3129,7 @@ var console = {
     // === DOCUMENT-LEVEL LISTENERS (attach ONCE - they persist across DOM changes) ===
     if (!window._accountDetailDocEventsBound) {
       window._accountDetailDocEventsBound = true;
-      console.log('[AccountDetail] Attaching document-level event listeners (one-time)');
+      // console.log('[AccountDetail] Attaching document-level event listeners (one-time)');
 
     // Listen for activity refresh events
     document.addEventListener('pc:activities-refresh', (e) => {
@@ -3148,7 +3150,7 @@ var console = {
 
         // Only update if this is the current account being viewed
         if (id === state.currentAccount.id) {
-          console.log('[AccountDetail] Account updated via pc:account-created, refreshing display');
+          // console.log('[AccountDetail] Account updated via pc:account-created, refreshing display');
 
           // Update the current account data with new fields
           state.currentAccount = { ...state.currentAccount, ...doc };
@@ -3160,11 +3162,11 @@ var console = {
     });
 
     document.addEventListener('pc:account-updated', (e) => {
-      console.log('[AccountDetail] Received pc:account-updated event', e.detail);
+      // console.log('[AccountDetail] Received pc:account-updated event', e.detail);
       if (state.currentAccount && e.detail && e.detail.id === state.currentAccount.id) {
         const changes = e.detail.changes || {};
         state.currentAccount = { ...state.currentAccount, ...changes };
-        console.log('[AccountDetail] Updating view for recent changes', changes);
+        // console.log('[AccountDetail] Updating view for recent changes', changes);
         renderAccountDetail();
       }
     });
@@ -3198,7 +3200,7 @@ var console = {
           const exists = window._essentialContactsData.find(c => c.id === newContact.id);
           if (!exists) {
             window._essentialContactsData.push(newContact);
-            console.log('[AccountDetail] Added new contact to essential data');
+            // console.log('[AccountDetail] Added new contact to essential data');
           }
         }
 
@@ -3211,17 +3213,17 @@ var console = {
           const exists = window._accountDetailPeopleCache.find(c => c.id === newContact.id);
           if (!exists) {
             window._accountDetailPeopleCache.push(newContact);
-            console.log('[AccountDetail] Added new contact to _accountDetailPeopleCache');
+            // console.log('[AccountDetail] Added new contact to _accountDetailPeopleCache');
           }
 
           // Update BackgroundContactsLoader if available
           if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
             const contactsData = window.BackgroundContactsLoader.getContactsData() || [];
             const exists = contactsData.find(c => c.id === newContact.id);
-            if (!exists) {
-              contactsData.push(newContact);
-              console.log('[AccountDetail] Added new contact to BackgroundContactsLoader');
-            }
+          if (!exists) {
+            contactsData.push(newContact);
+            // console.log('[AccountDetail] Added new contact to BackgroundContactsLoader');
+          }
           }
 
           // Update CacheManager contacts asynchronously
@@ -3234,7 +3236,7 @@ var console = {
                 return window.CacheManager.set('contacts', contacts);
               }
             }).then(() => {
-              console.log('[AccountDetail] Added new contact to CacheManager and persisted');
+              // console.log('[AccountDetail] Added new contact to CacheManager and persisted');
             }).catch(err => {
               console.warn('[AccountDetail] Failed to update cache:', err);
             });
@@ -3249,7 +3251,7 @@ var console = {
               }
             });
             document.dispatchEvent(event);
-            console.log('[AccountDetail] Dispatched pc:contacts-loaded event for new contact');
+            // console.log('[AccountDetail] Dispatched pc:contacts-loaded event for new contact');
           } catch (err) {
             console.warn('[AccountDetail] Failed to dispatch event:', err);
           }
@@ -3279,7 +3281,7 @@ var console = {
               ...window._essentialContactsData[idx],
               ...changes
             };
-            console.log('[AccountDetail] Updated contact in essential data');
+            // console.log('[AccountDetail] Updated contact in essential data');
           }
         }
 
@@ -3291,7 +3293,7 @@ var console = {
               ...window._accountDetailPeopleCache[idx],
               ...changes
             };
-            console.log('[AccountDetail] Updated contact in _accountDetailPeopleCache');
+            // console.log('[AccountDetail] Updated contact in _accountDetailPeopleCache');
           }
         }
 
@@ -3304,7 +3306,7 @@ var console = {
               ...contactsData[idx],
               ...changes
             };
-            console.log('[AccountDetail] Updated contact in BackgroundContactsLoader');
+            // console.log('[AccountDetail] Updated contact in BackgroundContactsLoader');
           }
         }
 
@@ -3319,7 +3321,7 @@ var console = {
               }
             }
           }).then(() => {
-            console.log('[AccountDetail] Updated contact in CacheManager and persisted');
+            // console.log('[AccountDetail] Updated contact in CacheManager and persisted');
           }).catch(() => { });
         }
 
@@ -3551,7 +3553,7 @@ var console = {
         if (window._accountNavigationSource === 'accounts') {
           try {
             const restore = window._accountsReturn || {};
-            console.log('[Account Detail] Back button: Returning to accounts page with restore data:', restore);
+            // console.log('[Account Detail] Back button: Returning to accounts page with restore data:', restore);
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
               // Set robust restoration flags with longer timeout
               try {
@@ -3581,7 +3583,7 @@ var console = {
                       }
                     });
                     document.dispatchEvent(ev);
-                    console.log('[Account Detail] Back button: Dispatched fallback pc:accounts-restore event');
+                    // console.log('[Account Detail] Back button: Dispatched fallback pc:accounts-restore event');
                   } catch (_) { }
                   return;
                 }
@@ -3598,7 +3600,7 @@ var console = {
                       }
                     });
                     document.dispatchEvent(ev);
-                    console.log('[Account Detail] Back button: Dispatched pc:accounts-restore event (ready) after', attempts, 'attempts');
+                    // console.log('[Account Detail] Back button: Dispatched pc:accounts-restore event (ready) after', attempts, 'attempts');
 
                     // Clear global restore data after successful dispatch
                     try { window.__accountsRestoreData = null; } catch (_) { }
@@ -3619,10 +3621,10 @@ var console = {
 
         // Check if we came from list detail page
         if (window._accountNavigationSource === 'list-detail' && window._accountNavigationListId) {
-          console.log('Returning to list detail page:', window._accountNavigationListId);
+          // console.log('Returning to list detail page:', window._accountNavigationListId);
           // Navigate back to list detail page
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
-            console.log('Navigating to list detail page for account:', window._accountNavigationListId);
+            // console.log('Navigating to list detail page for account:', window._accountNavigationListId);
             // Seed context so list detail initializes to the correct list and view
             try {
               window.listDetailContext = {
@@ -3668,7 +3670,7 @@ var console = {
                       }
                     });
                     document.dispatchEvent(ev);
-                    console.log('[AccountDetail] Dispatched pc:list-detail-restore event (ready) after', attempts, 'attempts');
+                    // console.log('[AccountDetail] Dispatched pc:list-detail-restore event (ready) after', attempts, 'attempts');
                     return;
                   }
                 } catch (_) { }
@@ -3693,7 +3695,7 @@ var console = {
         if (window._accountNavigationSource === 'add-account') {
           try {
             const restore = window._addAccountReturn || {};
-            console.log('[Account Detail] Back button: Returning to page after adding account:', restore);
+            // console.log('[Account Detail] Back button: Returning to page after adding account:', restore);
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
               // Navigate back to the page where the user was before adding the account
               const targetPage = restore.page || 'accounts';
@@ -3714,7 +3716,7 @@ var console = {
                       }
                     });
                     document.dispatchEvent(ev);
-                    console.log('[Account Detail] Back button: Dispatched pc:accounts-restore event for add-account flow');
+                    // console.log('[Account Detail] Back button: Dispatched pc:accounts-restore event for add-account flow');
                   } catch (_) { }
                 }, 60);
               }
@@ -4062,7 +4064,7 @@ var console = {
       if (contactName) {
         contactName.style.fontSize = '1.1rem';
         contactName.style.fontWeight = '600';
-        console.log('Applied font size to contact name:', contactName.textContent);
+        // console.log('Applied font size to contact name:', contactName.textContent);
       }
 
       item.addEventListener('click', (e) => {
@@ -4070,7 +4072,7 @@ var console = {
         if (e.target.closest('.contact-quick-action-btn')) return;
 
         const contactId = item.getAttribute('data-contact-id');
-        console.log('Contact clicked:', contactId, 'ContactDetail available:', !!window.ContactDetail);
+        // console.log('Contact clicked:', contactId, 'ContactDetail available:', !!window.ContactDetail);
 
         if (contactId) {
           // Store the source page for back button navigation
@@ -4239,7 +4241,7 @@ var console = {
             }
           } catch (_) { /* noop */ }
         }
-        console.log('Widget: Notes for account', accountId);
+        // console.log('Widget: Notes for account', accountId);
         try { window.crm?.showToast && window.crm.showToast('Open Notes'); } catch (_) { }
         break;
       }
@@ -4258,7 +4260,7 @@ var console = {
             }
           } catch (_) { /* noop */ }
         }
-        console.log('Widget: Energy Health Check for account', accountId);
+        // console.log('Widget: Energy Health Check for account', accountId);
         try { window.crm?.showToast && window.crm.showToast('Open Energy Health Check'); } catch (_) { }
         break;
       }
@@ -4277,7 +4279,7 @@ var console = {
             }
           } catch (_) { /* noop */ }
         }
-        console.log('Widget: Deal Calculator for account', accountId);
+        // console.log('Widget: Deal Calculator for account', accountId);
         try { window.crm?.showToast && window.crm.showToast('Open Deal Calculator'); } catch (_) { }
         break;
       }
@@ -4295,7 +4297,7 @@ var console = {
             }
           } catch (_) { /* noop */ }
         }
-        console.log('Widget: Prospect for account', accountId);
+        // console.log('Widget: Prospect for account', accountId);
         try { window.crm?.showToast && window.crm.showToast('Open Prospect'); } catch (_) { }
         break;
       }
@@ -4314,12 +4316,12 @@ var console = {
             }
           } catch (_) { /* noop */ }
         }
-        console.log('Widget: Google Maps for account', accountId);
+        // console.log('Widget: Google Maps for account', accountId);
         try { window.crm?.showToast && window.crm.showToast('Open Google Maps'); } catch (_) { }
         break;
       }
       default:
-        console.log('Unknown widget action:', which, 'for account', accountId);
+        // console.log('Unknown widget action:', which, 'for account', accountId);
     }
   }
 
@@ -4721,12 +4723,12 @@ var console = {
 
       // Add supplier suggestions for electricity supplier field
       if (field === 'electricitySupplier') {
-        console.log('[Account Detail] Adding supplier suggestions for field:', field);
-        console.log('[Account Detail] window.addSupplierSuggestions available:', !!window.addSupplierSuggestions);
-        console.log('[Account Detail] window.SupplierNames available:', !!window.SupplierNames, 'count:', window.SupplierNames?.length);
+        // console.log('[Account Detail] Adding supplier suggestions for field:', field);
+        // console.log('[Account Detail] window.addSupplierSuggestions available:', !!window.addSupplierSuggestions);
+        // console.log('[Account Detail] window.SupplierNames available:', !!window.SupplierNames, 'count:', window.SupplierNames?.length);
         if (window.addSupplierSuggestions) {
           window.addSupplierSuggestions(input, 'account-supplier-list');
-          console.log('[Account Detail] Supplier suggestions added to input');
+          // console.log('[Account Detail] Supplier suggestions added to input');
         } else {
           console.warn('[Account Detail] window.addSupplierSuggestions not available');
         }
@@ -4989,7 +4991,7 @@ var console = {
             if (idx !== -1) {
               Object.assign(accounts[idx], updateBatch);
               accounts[idx].updatedAt = new Date();
-              console.log('[Account Detail] Batch updated global accounts cache:', Object.keys(updateBatch));
+              // console.log('[Account Detail] Batch updated global accounts cache:', Object.keys(updateBatch));
             }
           }
         } catch (_) { /* noop */ }
@@ -5700,7 +5702,7 @@ var console = {
           updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp || new Date()
         });
 
-        console.log('[AccountDetail] Updated list recordCount for', listId);
+        // console.log('[AccountDetail] Updated list recordCount for', listId);
       } catch (countError) {
         console.warn('[AccountDetail] Failed to update list count:', countError);
       }

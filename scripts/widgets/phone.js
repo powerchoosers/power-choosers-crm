@@ -168,7 +168,6 @@
     callWorker.onmessage = (e) => {
       const { type, data } = e.data;
       if (type === 'CALL_LOGGED') {
-        console.log('[Phone] Call logged in background:', data);
         // Trigger page refresh after call is logged
         try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number: data.phoneNumber } })); } catch(_) {}
       }
@@ -278,7 +277,8 @@
           await state.device.audio.setInputDevice(inputDeviceId);
           console.debug('[TwilioRTC] Input device set to:', inputDeviceId);
         } catch (e) {
-          console.warn('[TwilioRTC] Failed to set input device:', e);
+          // Changed from console.warn to console.debug as this is often expected noise when 'default' device isn't available
+          console.debug('[TwilioRTC] Failed to set input device (expected if default not found):', e);
           // Try without any specific device
           try {
             await state.device.audio.unsetInputDevice();
@@ -909,9 +909,7 @@
         
         // Request browser notification permission for incoming calls
         if ('Notification' in window && Notification.permission === 'default') {
-          Notification.requestPermission().then(permission => {
-            console.log('[Phone] Notification permission:', permission);
-          });
+          Notification.requestPermission();
         }
         
         return state.device;
@@ -1892,17 +1890,7 @@
 
   // Microphone permission handling
   async function checkMicrophonePermission(card) {
-    console.log('[Phone] checkMicrophonePermission called');
-    console.log('[Phone] Current state:', {
-      checked: TwilioRTC.state.micPermissionChecked,
-      granted: TwilioRTC.state.micPermissionGranted,
-      isSecureContext: window.isSecureContext,
-      protocol: window.location.protocol,
-      hasUserGesture: document.hasStoredUserActivation || 'unknown'
-    });
-    
     if (TwilioRTC.state.micPermissionChecked && TwilioRTC.state.micPermissionGranted) {
-      console.log('[Phone] Permission already granted, returning true');
       return true;
     }
     
@@ -1925,12 +1913,10 @@
     }
     
     try {
-      console.log('[Phone] Requesting microphone permission...');
       // Always attempt to request microphone permission directly
       // This will trigger the browser permission dialog if needed
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        console.log('[Phone] Microphone permission granted!');
         // Stop the stream immediately as we only need permission
         stream.getTracks().forEach(track => track.stop());
         TwilioRTC.state.micPermissionGranted = true;
@@ -3688,18 +3674,15 @@
             
             if (inputDevices && inputDevices.size > 0) {
               const deviceIds = Array.from(inputDevices.keys());
-              console.log('[Phone] Available input devices:', deviceIds);
               
               // Try 'default' first, fallback to first available device
               if (!deviceIds.includes('default') && deviceIds.length > 0) {
                 inputDeviceId = deviceIds[0];
-                console.log('[Phone] Using first available input device:', inputDeviceId);
               }
             }
             
             try {
               await device.audio.setInputDevice(inputDeviceId);
-              console.log('[Phone] Input device set to:', inputDeviceId);
             } catch (e) {
               console.warn('[Phone] Failed to set input device, trying without specific device:', e);
               try {
@@ -3720,17 +3703,14 @@
               
               if (outputDevices && outputDevices.size > 0) {
                 const deviceIds = Array.from(outputDevices.keys());
-                console.log('[Phone] Available output devices:', deviceIds);
                 
                 if (!deviceIds.includes('default') && deviceIds.length > 0) {
                   outputDeviceId = deviceIds[0];
-                  console.log('[Phone] Using first available output device:', outputDeviceId);
                 }
               }
               
               try {
                 device.audio.speakerDevices.set(outputDeviceId);
-                console.log('[Phone] Output device set to:', outputDeviceId);
               } catch (e) {
                 console.warn('[Phone] Failed to set output device, using browser default:', e);
               }
@@ -4341,9 +4321,7 @@
                 accountId: payload.accountId,
                 contactId: payload.contactId
               };
-              console.log('[Phone] Dispatching pc:call-logged event', eventDetail);
               document.dispatchEvent(new CustomEvent('pc:call-logged', { detail: eventDetail }));
-              console.log('[Phone] ✓ Event dispatched successfully');
             } catch (e) { 
               console.error('[Phone] Error dispatching pc:call-logged event:', e);
             }
@@ -5391,13 +5369,6 @@
       if (ctx.phoneType !== undefined) currentCallContext.phoneType = ctx.phoneType;
       
       console.debug('[Phone Widget] Call context updated:', currentCallContext);
-      console.log('[Phone Widget][DEBUG] setCallContext called with:', {
-        input: ctx,
-        result: currentCallContext,
-        nameField: currentCallContext.name,
-        contactNameField: currentCallContext.contactName,
-        companyField: currentCallContext.company
-      });
     } catch(_) {}
   };
   window.Widgets.isPhoneOpen = function () { return !!document.getElementById(WIDGET_ID); };
@@ -5464,22 +5435,18 @@
     window.debugTwilio = async function() {
       try {
         const base = (window.API_BASE_URL || '').replace(/\/$/, '');
-        console.log('API Base URL:', base);
         
         // Check token endpoint
         const resp = await fetch(`${base}/api/twilio/token?identity=agent`);
-        console.log('Token Response Status:', resp.status);
         
         if (resp.ok) {
           const data = await resp.json();
-          console.log('Token Data:', data);
           
           if (data.token) {
             // Decode JWT to see what's in it (just the payload, not validating signature)
             try {
               const parts = data.token.split('.');
               const payload = JSON.parse(atob(parts[1]));
-              console.log('JWT Payload:', payload);
             } catch (e) {
               console.warn('Could not decode JWT:', e);
             }
@@ -5491,10 +5458,8 @@
         
         // Try to create a device
         if (typeof Twilio !== 'undefined' && Twilio.Device) {
-          console.log('Twilio Voice SDK available');
           try {
             const device = await TwilioRTC.ensureDevice();
-            console.log('Device created:', device);
           } catch (e) {
             console.error('Device creation error:', e);
           }

@@ -19,47 +19,43 @@ MCP Debugging Rules (must follow):
    ALWAYS call clear_logs immediately before adding new logging instrumentation or starting a fresh test run. This ensures the logs you read are relevant to the current test, not old noise.
 
 3. Debug Mode Management:
-   - To enable verbose logging, insert `<script>window.PC_DEBUG = true;</script>` immediately BEFORE the `debug-bridge.js` script tag in `index.html` and `crm-dashboard.html`.
+   - To enable verbose logging, insert `<script>window.PC_DEBUG = true;</script>` immediately BEFORE the `debug-bridge.js` script tag in `crm-dashboard.html` (primary) and `index.html` (secondary).
    - To disable verbose logging, remove the `<script>window.PC_DEBUG = true;</script>` line during cleanup.
+   - **Pro Tip**: Use `console.log('[STATE SNAPSHOT]', { ...someState })` to dump complex objects. The bridge handles JSON serialization.
 
-4. Cleanup Logs:
-   After analyzing logs and drawing a conclusion, call clear_logs again to leave the environment clean for the next task. Remove any temporary `PC_DEBUG` flags from HTML files.
+4. Backend Debugging:
+   - Use `import logger from '../_logger.js';` in any backend API file.
+   - Use `logger.info('[Hypothesis: ...] ...')` to send backend logs to the same unified `.cursor/debug.log` file.
+   - This allows you to see the interleaved flow of Frontend → API Request → Backend Logic → API Response in one place.
 
-5. Bridge Maintenance:
+5. Cleanup Logs, Instrumentation & Tracking:
+   - After analyzing logs and drawing a conclusion, call clear_logs again to leave the environment clean.
+   - **MANDATORY**: Once Trey says "fixed", "resolved", or "done", proactively remove ALL temporary console.log statements and PC_DEBUG flags from the code.
+   - **MANDATORY**: Delete the `active-issue.md` file immediately after cleanup is complete.
+
+5. Issue Tracking & MD Management:
+   - **Creation**: At the start of every new issue reported by Trey, create a file named `active-issue.md` in the root directory.
+   - **Content**: This file must contain:
+     - The original issue description.
+     - Your initial hypotheses.
+     - A log of attempted fixes and their outcomes.
+     - A list of files where temporary debugging code was added.
+   - **Updating**: Update this file after every significant step (e.g., after adding logs, after a failed fix attempt, after a successful verification).
+   - **Persistence**: Refer to `active-issue.md` at the start of every turn to ensure you are up to speed with the current state of the debug session.
+
+6. Bridge Maintenance:
    Ensure scripts/debug-bridge.js is always included in the <head> of index.html and crm-dashboard.html.
 
-MCP Server Structure (know this context):
-- Location: mcp-server/index.js
-- Transport: Stdio
-- Dependencies: @modelcontextprotocol/sdk
-- Portability: Keep MCP server logic independent of the main CRM backend. It only needs read/write access to the .cursor/ directory.
-
-Backend Integration (know and verify this when logs aren’t flowing):
-- Endpoint: /api/debug/log (POST)
-- Handler: api/debug/log.js
-- Route Registration: Always verify server.js has the /api/debug/log route in its preflight whitelist and correctly routes to the handler.
-
-Coding Standards for Logs (how you instrument):
-- Hypothesis-Driven Logging:
-  - Bad: console.log('variable:', x)
-  - Good: console.log('[Hypothesis: Cache Miss] Checking if variable x is null:', x === null, { x })
-  - Good: console.log('[Hypothesis: Race Condition] Step 1 finished at:', Date.now())
-
-- Multiple Solutions:
-  When testing fixes, log the outcome of different branches or conditions to compare potential solutions.
-
-- Structured Output:
-  Use objects for complex data so the bridge captures the full context.
-
-- Privacy:
-  Avoid logging sensitive user data (PII).
-
-- Proactive:
-  When adding new frontend features, proactively add console.log statements that the bridge will pick up.
+6. Log Blocking Audit:
+   If logs aren't appearing, check if `console.log` or `console.error` is being overridden or suppressed in `scripts/main.js` or the specific page module.
 
 ==============================
 CODEBASE FACTS (so you debug efficiently)
 ==============================
+
+Where the action is:
+- `crm-dashboard.html`: The core of the CRM. Most complex logic, state management, and debugging happens here.
+- `index.html`: The customer-facing landing page. More basic, but still supports the bridge for lead-capture debugging.
 
 Log plumbing (how logs move):
 - scripts/debug-bridge.js overrides console.log/warn/error and POSTs logs to /api/debug/log.
@@ -75,17 +71,15 @@ What “good” looks like:
   - url
   - timestamp
 
-Important note:
-- If you don’t see any logs, the bridge may not be included in the HTML <head> yet. Your job is to detect that and fix it (Bridge Maintenance rule).
-
 ==============================
 YOUR DEFAULT DEBUG LOOP (organized + beginner-friendly)
 ==============================
 
 When Trey reports a bug, do this every time:
 
-Step 0) State hypotheses FIRST (before changing code)
-- Write 2–4 short hypotheses. Keep them testable.
+Step 0) Initialize Tracking & State Hypotheses
+- Create `active-issue.md` in the root with the issue description.
+- Write 2–4 short hypotheses in the MD file and state them to Trey.
 - Example:
   H1: “The click handler is not attached.”
   H2: “A fetch call fails (401/500) and the UI doesn’t handle it.”
@@ -94,41 +88,42 @@ Step 0) State hypotheses FIRST (before changing code)
 Step 1) Pick the smallest “repro steps”
 - Ask yourself: what exact clicks/inputs reproduce it in < 60 seconds?
 - If Trey gave steps, reuse them; if not, infer likely steps from the UI.
+- Record these steps in `active-issue.md`.
 
 Step 2) Clear logs and Enable Debug Mode (mandatory)
 - Call crm-debugger clear_logs.
-- Ensure `<script>window.PC_DEBUG = true;</script>` is present in `index.html` and `crm-dashboard.html` to enable the bridge's verbose mode.
+- Ensure `<script>window.PC_DEBUG = true;</script>` is present in `crm-dashboard.html` or `index.html`.
 
-Step 3) Reproduce the bug (a “test run”)
+Step 3) Reproduce & Diagnose
 - Tell Trey exactly what to do, step-by-step, like a checklist.
-- Keep it short and specific (click this, type this, press save, etc.).
-- If possible, reproduce yourself using the app.
+- If the cause is obvious, skip to Step 8 (Fix).
+- If not sure, add targeted instrumentation (Step 7) and then reproduce.
 
 Step 4) Read logs (mandatory)
 - Call crm-debugger get_frontend_logs (start with limit ~80).
-- If needed, call again with a higher limit.
+- Update `active-issue.md` with relevant log findings.
 
 Step 5) Decide which hypothesis survives
 - Match logs to hypotheses:
   - JavaScript errors → usually H? about missing data/undefined variables/DOM issues.
   - “Failed to fetch” or network errors → usually API/CORS/endpoint issues.
   - No logs at all → logging bridge is broken/not included/server not running.
+- Mark the surviving hypothesis in `active-issue.md`.
 
 Step 6) Narrow to the exact file/function
 - Use the URL in logs + the error message.
 - Search the codebase for the message text or nearby function names.
-- Identify: “where it breaks” and “why it breaks”.
 
-Step 7) Add targeted instrumentation (only if needed)
-- If logs aren’t enough, add 3–6 temporary logs that test ONE hypothesis.
-- Format every new log like:
-  console.log('[Hypothesis: H2 Fetch Failure] About to call /api/whatever', { importantValues })
-- ALWAYS clear logs before re-running after adding logs.
+Step 7) Add targeted instrumentation (if diagnosis is needed)
+- Add 3–6 temporary logs that test ONE hypothesis.
+- Format: console.log('[Hypothesis: H2 Fetch Failure] About to call /api/whatever', { importantValues })
+- Record the files/lines where you added logs in `active-issue.md`.
+- ALWAYS clear logs before re-running.
 
 Step 8) Fix the issue with the smallest safe change
 - Change as little code as needed.
 - Prefer existing patterns/utilities already used in the repo.
-- Do not add noisy logs permanently unless Trey asked.
+- Update `active-issue.md` with the fix details.
 
 Step 9) Verify fix (must)
 - Clear logs.
@@ -136,32 +131,12 @@ Step 9) Verify fix (must)
 - Read logs again and confirm:
   - The error is gone.
   - Behavior matches expectation.
-  - No new errors appeared.
+- Record verification outcome in `active-issue.md`.
 
-Step 10) Cleanup
-- Call clear_logs again to leave things clean.
-- Remove temporary logs from the code.
-- Remove `<script>window.PC_DEBUG = true;</script>` from HTML files unless Trey wants it kept.
-
-==============================
-HOW YOU SHOULD INSTRUCT TREY TO RUN A TEST (copy/paste checklist style)
-==============================
-
-When you need Trey to trigger logs, give him a simple script like:
-
-1) Keep the server running (local): “npm run dev” (or “node server.js”).
-2) Open the app page that shows the bug.
-3) Do these exact steps:
-   - Step A: …
-   - Step B: …
-   - Step C: …
-4) Tell me what you saw (1 sentence).
-5) I will pull the logs and tell you what they mean.
-
-If the bug is “nothing happens”:
-- Tell Trey to do the click again slowly, once.
-- Then refresh and repeat once.
-- Then you pull logs.
+Step 10) Cleanup (MANDATORY)
+- Call clear_logs.
+- Remove ALL temporary logs and `PC_DEBUG` flags.
+- **Delete `active-issue.md`**.
 
 ==============================
 IF LOGS ARE EMPTY (fast diagnosis)
@@ -171,12 +146,9 @@ If get_frontend_logs shows nothing useful, check in this order:
 
 1) Is the server running and serving the page?
 2) Is scripts/debug-bridge.js included in the HTML <head>?
-   - Must be in index.html and crm-dashboard.html per rules.
-3) Is /api/debug/log reachable?
-   - The bridge sends POST /api/debug/log.
-   - If that endpoint is broken, logs won’t reach .cursor/debug.log.
-4) Does .cursor/debug.log exist and is it writable?
-5) If still stuck, add ONE visible frontend console.log early in page load to confirm the bridge captures it, then repeat the loop (clear logs first).
+3) Is `window.PC_DEBUG = true` set in the HTML? (Required for non-error logs).
+4) Is /api/debug/log reachable? (POST /api/debug/log).
+5) Is something in `scripts/main.js` overriding `console.log` globally?
 
 ==============================
 WHAT TO OUTPUT TO TREY (every time)
