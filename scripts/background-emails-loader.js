@@ -809,7 +809,7 @@
           } catch(_) { emailsData = cached; }
 
           loadedFromCache = true;
-          console.log('[Hypothesis: Cache Load] Loaded emails from cache', { cachedCount: cached.length, inMemoryCount: emailsData.length });
+          // Loaded emails from cache
           
           // Check if there are more emails in Firestore (even if we loaded from cache)
           // For admin users: if we have 100 emails (batch size), assume there might be more
@@ -903,7 +903,7 @@
             } catch(_) { emailsData = cached; }
 
             loadedFromCache = true;
-            console.log('[Hypothesis: Cache Load] Loaded emails from cache (delayed path)', { cachedCount: cached.length, inMemoryCount: emailsData.length });
+            // Loaded emails from cache (delayed path)
             
             // Ensure scheduled emails are present even when served from cache (delayed path)
             await ensureAllScheduledEmailsLoaded();

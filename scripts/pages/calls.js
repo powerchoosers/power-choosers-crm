@@ -195,7 +195,7 @@ var console = {
           for (const ph of phones) if (ph && !map.has(ph)) map.set(ph,{ id: c.id, name, title, company });
         }
         
-        console.log('[Calls] ✓ Built phone map with', map.size, 'entries (zero Firebase queries)');
+        // console.log('[Calls] ✓ Built phone map with', map.size, 'entries (zero Firebase queries)');
         _phoneToContactCache = map; 
         return map;
       }
@@ -497,12 +497,7 @@ if (!document._callsRestoreBound) {
     els.selectAll = document.getElementById('select-all-calls');
     els.toggle = document.getElementById('toggle-calls-filters'); els.panel = document.getElementById('calls-filters'); els.count = document.getElementById('calls-filter-count');
     
-    console.log('[Calls Filter Debug] els.toggle found:', !!els.toggle);
-    console.log('[Calls Filter Debug] els.panel found:', !!els.panel);
     if (els.panel) {
-      console.log('[Calls Filter Debug] panel initial classes:', els.panel.className);
-      console.log('[Calls Filter Debug] panel initial hidden attribute:', els.panel.hasAttribute('hidden'));
-      console.log('[Calls Filter Debug] panel initial computed style:', window.getComputedStyle(els.panel).display, window.getComputedStyle(els.panel).opacity, window.getComputedStyle(els.panel).transform);
     }
     
     // Tabs + grid to mirror People page
@@ -518,45 +513,28 @@ if (!document._callsRestoreBound) {
   function attachEvents() {
     if (!document._callsToggleBound && els.toggle && els.panel) {
       els.toggle.addEventListener('click', () => {
-      console.log('[Calls Filter Debug] Toggle clicked');
-      console.log('[Calls Filter Debug] els.toggle:', els.toggle);
-      console.log('[Calls Filter Debug] els.panel:', els.panel);
       
       const isHidden = els.panel.hasAttribute('hidden');
-      console.log('[Calls Filter Debug] isHidden:', isHidden);
-      console.log('[Calls Filter Debug] panel classes before:', els.panel.className);
-      console.log('[Calls Filter Debug] panel style before:', els.panel.style.cssText);
       
       const textEl = els.toggle.querySelector('.filter-text');
-      console.log('[Calls Filter Debug] textEl:', textEl);
       
       if (isHidden) {
-        console.log('[Calls Filter Debug] Opening filter panel...');
         els.panel.removeAttribute('hidden');
-        console.log('[Calls Filter Debug] Removed hidden attribute');
-        console.log('[Calls Filter Debug] panel classes after removing hidden:', els.panel.className);
         
         setTimeout(()=>{ 
-          console.log('[Calls Filter Debug] Adding show class...');
           els.panel.classList.add('show'); 
-          console.log('[Calls Filter Debug] panel classes after adding show:', els.panel.className);
-          console.log('[Calls Filter Debug] panel computed style after show:', window.getComputedStyle(els.panel).display, window.getComputedStyle(els.panel).opacity, window.getComputedStyle(els.panel).transform);
           
           // Force a reflow to ensure the transition starts
           els.panel.offsetHeight;
           
           // Check if transition is working after a short delay
           setTimeout(() => {
-            console.log('[Calls Filter Debug] panel computed style after transition start:', window.getComputedStyle(els.panel).display, window.getComputedStyle(els.panel).opacity, window.getComputedStyle(els.panel).transform);
           }, 50);
         }, 10);
         if (textEl) textEl.textContent = 'Hide Filters';
       } else {
-        console.log('[Calls Filter Debug] Closing filter panel...');
         els.panel.classList.remove('show');
-        console.log('[Calls Filter Debug] Removed show class');
         setTimeout(()=>{ 
-          console.log('[Calls Filter Debug] Adding hidden attribute...');
           els.panel.setAttribute('hidden',''); 
         }, 300);
         if (textEl) textEl.textContent = 'Show Filters';
@@ -1125,7 +1103,7 @@ if (!document._callsRestoreBound) {
             // Data is already enriched - use it directly
             state.data = allCalls;
             state.hasMore = result.hasMore;
-            console.log('[Calls] ✓ Using enriched data from BackgroundCallsLoader');
+            // console.log('[Calls] ✓ Using enriched data from BackgroundCallsLoader');
           }
           
           // Update filtered data and re-render
@@ -1154,7 +1132,7 @@ if (!document._callsRestoreBound) {
       
       if (bgData && Array.isArray(bgData) && bgData.length > 0 && dataIsEnriched) {
         // FAST PATH: Data is enriched - display immediately (0 Firebase queries, 0 enrichment delay)
-        console.log('[Calls] ✓ Using enriched data from BackgroundCallsLoader:', bgData.length, 'calls (instant display)');
+        // console.log('[Calls] ✓ Using enriched data from BackgroundCallsLoader:', bgData.length, 'calls (instant display)');
         
         const isAdmin = (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function')
           ? window.DataManager.isCurrentUserAdmin()
@@ -1381,7 +1359,7 @@ if (!document._callsRestoreBound) {
         }
         
         render();
-        console.log('[Calls] ✅ Page rendered instantly with', quickRows.length, 'calls');
+        // console.log('[Calls] ✅ Page rendered instantly with', quickRows.length, 'calls');
         
         // BACKGROUND ENRICHMENT: Enrich in chunks without blocking UI
         setTimeout(() => {
@@ -1447,7 +1425,7 @@ if (!document._callsRestoreBound) {
             if (acc.accountName) accountByNameMap.set(acc.accountName, acc);
             if (acc.name && acc.name !== acc.accountName) accountByNameMap.set(acc.name, acc);
           }
-          console.log('[Calls] ✓ Built account lookup maps:', accountByIdMap.size, 'by ID,', accountByPhoneMap.size, 'by phone,', accountByNameMap.size, 'by name');
+          // console.log('[Calls] ✓ Built account lookup maps:', accountByIdMap.size, 'by ID,', accountByPhoneMap.size, 'by phone,', accountByNameMap.size, 'by name');
           
           // Populate module-level caches for rowHtml() to use (O(1) lookups instead of O(n) .find())
           _accountByIdCache = accountByIdMap;
@@ -1465,7 +1443,7 @@ if (!document._callsRestoreBound) {
               contactsByAccountMap.get(accId).push(p);
             }
           }
-          console.log('[Calls] ✓ Built contact lookup maps:', contactByIdMap.size, 'by ID,', contactsByAccountMap.size, 'by account');
+          // console.log('[Calls] ✓ Built contact lookup maps:', contactByIdMap.size, 'by ID,', contactsByAccountMap.size, 'by account');
           
           // CRITICAL FIX: Pre-compute call counts by phone/contactId ONCE (O(n))
           // This fixes the O(n³) complexity in pickMostActiveContactForAccountLocal
@@ -1480,7 +1458,7 @@ if (!document._callsRestoreBound) {
               if (k.contactId) callCountByContactId.set(String(k.contactId), (callCountByContactId.get(String(k.contactId)) || 0) + 1);
             } catch(_) {}
           }
-          console.log('[Calls] ✓ Pre-computed call counts:', callCountByPhone.size, 'phones,', callCountByContactId.size, 'contacts');
+          // console.log('[Calls] ✓ Pre-computed call counts:', callCountByPhone.size, 'phones,', callCountByContactId.size, 'contacts');
           
           // Cache for most active contact lookups
           const mostActiveContactCache = new Map();
@@ -2111,7 +2089,7 @@ if (!document._callsRestoreBound) {
           
           // Always use API data, even if empty
           const enrichmentDuration = Date.now() - enrichmentStartTime;
-          console.log('[Calls] ✓ OPTIMIZED: Enriched', rows.length, 'calls in', enrichmentDuration + 'ms (was 5-15 seconds before optimization)');
+          // console.log('[Calls] ✓ OPTIMIZED: Enriched', rows.length, 'calls in', enrichmentDuration + 'ms (was 5-15 seconds before optimization)');
           
           // Mark enriched calls to avoid re-enrichment
           rows.forEach(row => {
@@ -2125,7 +2103,7 @@ if (!document._callsRestoreBound) {
           if (window.CacheManager && typeof window.CacheManager.set === 'function' && rows.length > 0) {
             try {
               await window.CacheManager.set('calls', rows);
-              console.log('[Calls] ✓ Cached', rows.length, 'enriched calls for instant future loads');
+              // console.log('[Calls] ✓ Cached', rows.length, 'enriched calls for instant future loads');
             } catch (cacheError) {
               console.warn('[Calls] Failed to cache calls:', cacheError);
             }
@@ -2135,7 +2113,7 @@ if (!document._callsRestoreBound) {
           if (window.BackgroundCallsLoader && typeof window.BackgroundCallsLoader.updateCache === 'function') {
             try {
               await window.BackgroundCallsLoader.updateCache(rows);
-              console.log('[Calls] ✓ Updated BackgroundCallsLoader with enriched data');
+              // console.log('[Calls] ✓ Updated BackgroundCallsLoader with enriched data');
             } catch (e) {
               console.warn('[Calls] Failed to update BackgroundCallsLoader:', e);
             }
@@ -2313,13 +2291,13 @@ if (!document._callsRestoreBound) {
     render();
     
     const duration = Date.now() - startTime;
-    console.log('[Calls] ✅ Background enrichment complete:', enrichedRows.length, 'calls in', duration + 'ms');
+    // console.log('[Calls] ✅ Background enrichment complete:', enrichedRows.length, 'calls in', duration + 'ms');
     
     // Cache enriched data
     if (window.CacheManager && typeof window.CacheManager.set === 'function') {
       try {
         await window.CacheManager.set('calls', enrichedRows);
-        console.log('[Calls] 💾 Cached enriched calls for instant future loads');
+        // console.log('[Calls] 💾 Cached enriched calls for instant future loads');
       } catch (e) { console.warn('[Calls] Cache error:', e); }
     }
     

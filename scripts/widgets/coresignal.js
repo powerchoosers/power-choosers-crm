@@ -161,10 +161,6 @@
     const title = '';
     const location = '';
     const skills = '';
-    
-    // Debug logging
-    console.log('Coresignal search context:', ctx);
-    console.log('Searching for company:', company);
 
     const must = [];
     // Do not attempt domain search in employee index; domain is resolved to company id separately
@@ -303,29 +299,20 @@
     const norm = (s) => String(s||'').trim();
     const normDomain = (s) => norm(s).replace(/^https?:\/\//i,'').replace(/^www\./i,'').split('/')[0].toLowerCase();
     
-    console.log('Deriving context - checking available objects:', {
-      AccountDetail: !!window.AccountDetail,
-      ContactDetail: !!window.ContactDetail,
-      AccountDetailState: !!(window.AccountDetail && window.AccountDetail.state),
-      ContactDetailState: !!(window.ContactDetail && window.ContactDetail.state)
-    });
-    
     try {
       if (window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount) {
         const a = window.AccountDetail.state.currentAccount;
         out.domain = normDomain(a.domain || a.website || a.site || a.webSite || a.website_url || '');
         out.company = norm(a.name || a.accountName || a.companyName || a.company_name || '');
-        console.log('AccountDetail context found:', { domain: out.domain, company: out.company, account: a });
         return out;
       }
-    } catch(e) { console.log('AccountDetail error:', e); }
+    } catch(e) { }
     
     try {
       if (window.ContactDetail && window.ContactDetail.state && window.ContactDetail.state.currentContact) {
         const c = window.ContactDetail.state.currentContact;
         out.company = norm(c.companyName || c.company || c.accountName || c.company_name || '');
         out.domain = normDomain(c.companyWebsite || c.website || c.company_website || '');
-        console.log('ContactDetail context found:', { domain: out.domain, company: out.company, contact: c });
         // Try linked account for better domain
         const accId = window.ContactDetail.state._linkedAccountId;
         if (!out.domain && accId && typeof window.getAccountsData === 'function') {
@@ -333,12 +320,11 @@
           const acc = accounts.find(x => String(x.id||'') === String(accId));
           if (acc) {
             out.domain = normDomain(acc.domain || acc.website || acc.site || acc.webSite || acc.website_url || '');
-            console.log('Linked account domain found:', { domain: out.domain, account: acc });
           }
         }
         return out;
       }
-    } catch(e) { console.log('ContactDetail error:', e); }
+    } catch(e) { }
     
     // Try alternative methods to get account/contact data
     try {
@@ -351,13 +337,11 @@
         if (accountName) {
           out.company = norm(accountName);
           out.domain = normDomain(domain || '');
-          console.log('Found account data from DOM:', { domain: out.domain, company: out.company });
           return out;
         }
       }
-    } catch(e) { console.log('DOM data extraction error:', e); }
+    } catch(e) { }
     
-    console.log('No context found, returning empty:', out);
     return out;
   }
 

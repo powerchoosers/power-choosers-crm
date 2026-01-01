@@ -227,7 +227,7 @@
           }
         } catch (_) { }
 
-        console.error('Save notes failed', err);
+        // console.error('Save notes failed', err);
         setStatus('Save failed');
         try { window.crm?.showToast && window.crm.showToast('Failed to save notes'); } catch (_) {}
       }
@@ -390,7 +390,7 @@
         setStatus && setStatus('Synced');
       }
     }, (err) => {
-      console.warn('Notes listener error', err);
+      // console.warn('Notes listener error', err);
       setStatus && setStatus('Realtime disabled');
     });
   }

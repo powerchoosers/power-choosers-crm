@@ -1039,7 +1039,7 @@
             if (contacts.length > 0) {
               state.dataPeople = contacts;
               state.loadedPeople = true;
-              console.log('[ListDetail] ✓ BackgroundContactsLoader ready after', (attempt + 1) * 100, 'ms with', contacts.length, 'contacts');
+              // console.log('[ListDetail] ✓ BackgroundContactsLoader ready after', (attempt + 1) * 100, 'ms with', contacts.length, 'contacts');
             }
           }
 
@@ -1048,7 +1048,7 @@
             if (accounts.length > 0) {
               state.dataAccounts = accounts;
               state.loadedAccounts = true;
-              console.log('[ListDetail] ✓ BackgroundAccountsLoader ready after', (attempt + 1) * 100, 'ms with', accounts.length, 'accounts');
+              // console.log('[ListDetail] ✓ BackgroundAccountsLoader ready after', (attempt + 1) * 100, 'ms with', accounts.length, 'accounts');
             }
           }
 
@@ -1152,7 +1152,7 @@
           if (cached.length > 0) {
             state.dataPeople = cached;
             state.loadedPeople = true;
-            console.log('[ListDetail] ✓ Preserved contacts cache on error (zero cost)');
+            // console.log('[ListDetail] ✓ Preserved contacts cache on error (zero cost)');
           }
         } catch (cacheErr) {
           console.warn('[ListDetail] Contacts cache fallback failed:', cacheErr);
@@ -1165,7 +1165,7 @@
           if (cached.length > 0) {
             state.dataAccounts = cached;
             state.loadedAccounts = true;
-            console.log('[ListDetail] ✓ Preserved accounts cache on error (zero cost)');
+            // console.log('[ListDetail] ✓ Preserved accounts cache on error (zero cost)');
           }
         } catch (cacheErr) {
           console.warn('[ListDetail] Accounts cache fallback failed:', cacheErr);
@@ -1218,7 +1218,7 @@
       if (cached && (cached.people instanceof Set || Array.isArray(cached.people))) {
         state.membersPeople = cached.people instanceof Set ? cached.people : new Set(cached.people || []);
         state.membersAccounts = cached.accounts instanceof Set ? cached.accounts : new Set(cached.accounts || []);
-        console.log(`[ListDetail] ✓ Loaded ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts from cache (zero cost)`);
+        // console.log(`[ListDetail] ✓ Loaded ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts from cache (zero cost)`);
 
         // Update legacy in-memory cache for backward compatibility
         window.listMembersCache = window.listMembersCache || {};
@@ -1261,7 +1261,7 @@
             if (t === 'people' || t === 'contact' || t === 'contacts') state.membersPeople.add(id);
             else if (t === 'accounts' || t === 'account') state.membersAccounts.add(id);
           });
-          console.log(`[ListDetail] ✓ Loaded ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts from top-level collection`);
+          // console.log(`[ListDetail] ✓ Loaded ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts from top-level collection`);
         }
       } catch (lmErr) {
         console.warn('[ListDetail] Top-level query failed:', lmErr);
@@ -1296,7 +1296,7 @@
           const addedPeople = state.membersPeople.size - beforePeople;
           const addedAccounts = state.membersAccounts.size - beforeAccounts;
           if (addedPeople > 0 || addedAccounts > 0) {
-            console.log(`[ListDetail] ✓ Merged ${addedPeople} people, ${addedAccounts} accounts from subcollection (legacy data)`);
+            // console.log(`[ListDetail] ✓ Merged ${addedPeople} people, ${addedAccounts} accounts from subcollection (legacy data)`);
           }
         }
         }
@@ -1308,13 +1308,13 @@
       if (state.membersPeople.size > 0 || state.membersAccounts.size > 0) {
         try {
           await window.CacheManager.cacheListMembers(listId, state.membersPeople, state.membersAccounts);
-          console.log(`[ListDetail] ✓ Cached members for future use (zero cost on next load)`);
+          // console.log(`[ListDetail] ✓ Cached members for future use (zero cost on next load)`);
         } catch (cacheErr) {
           console.warn('[ListDetail] Cache write failed (non-critical):', cacheErr);
         }
       }
 
-      console.log(`[ListDetail] ✓ Fetched from Firebase: ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts`);
+      // console.log(`[ListDetail] ✓ Fetched from Firebase: ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts`);
 
       // 4) Update legacy in-memory cache for backward compatibility
       window.listMembersCache = window.listMembersCache || {};
@@ -1445,6 +1445,24 @@
 
   function normalize(s) { return (s || '').toString().trim().toLowerCase(); }
 
+  function normalizeCompanyKey(s) {
+    const raw = normalize(decodeHtmlEntities(s));
+    if (!raw) return '';
+    let cleaned = raw.replace(/&/g, ' and ');
+    cleaned = cleaned.replace(/[^a-z0-9]+/g, ' ').trim();
+    if (!cleaned) return '';
+
+    const suffixes = new Set([
+      'inc', 'incorporated', 'llc', 'l', 'ltd', 'limited', 'co', 'company', 'corp', 'corporation',
+      'holdings', 'holding', 'group', 'services', 'service', 'solutions', 'solution', 'energy'
+    ]);
+
+    const parts = cleaned.split(/\s+/).filter(Boolean);
+    while (parts.length && suffixes.has(parts[parts.length - 1])) parts.pop();
+    while (parts.length && suffixes.has(parts[parts.length - 1])) parts.pop();
+    return parts.join(' ').trim();
+  }
+
   // Helper to decode HTML entities (for company name matching)
   function decodeHtmlEntities(str) {
     if (!str) return '';
@@ -1459,12 +1477,33 @@
     // Decode HTML entities first (e.g., &#039; → ', &amp; → &)
     const decodedName = decodeHtmlEntities(companyName);
     const normalizedName = normalize(decodedName);
+    const targetKey = normalizeCompanyKey(decodedName);
 
     // First try state.dataAccounts (local cache)
     let account = state.dataAccounts.find(acc => {
       const accName = normalize(acc.accountName || acc.name || acc.companyName || '');
       return accName === normalizedName;
     });
+
+    if (!account && targetKey) {
+      const candidates = state.dataAccounts
+        .map(acc => {
+          const accName = (acc && (acc.accountName || acc.name || acc.companyName)) || '';
+          const key = normalizeCompanyKey(accName);
+          return { acc, key };
+        })
+        .filter(x => x.acc && x.key && (x.key === targetKey || x.key.includes(targetKey) || targetKey.includes(x.key)));
+
+      if (candidates.length) {
+        candidates.sort((a, b) => {
+          const da = Math.abs(a.key.length - targetKey.length);
+          const db = Math.abs(b.key.length - targetKey.length);
+          if (da !== db) return da - db;
+          return a.key.length - b.key.length;
+        });
+        account = candidates[0].acc;
+      }
+    }
 
     if (account) {
       console.debug('[ListDetail] Found account in state.dataAccounts:', decodedName, '→', account.id);
@@ -1479,6 +1518,27 @@
           const accName = normalize(acc.accountName || acc.name || acc.companyName || '');
           return accName === normalizedName;
         });
+
+        if (!account && targetKey) {
+          const candidates = allAccounts
+            .map(acc => {
+              const accName = (acc && (acc.accountName || acc.name || acc.companyName)) || '';
+              const key = normalizeCompanyKey(accName);
+              return { acc, key };
+            })
+            .filter(x => x.acc && x.key && (x.key === targetKey || x.key.includes(targetKey) || targetKey.includes(x.key)));
+
+          if (candidates.length) {
+            candidates.sort((a, b) => {
+              const da = Math.abs(a.key.length - targetKey.length);
+              const db = Math.abs(b.key.length - targetKey.length);
+              if (da !== db) return da - db;
+              return a.key.length - b.key.length;
+            });
+            account = candidates[0].acc;
+          }
+        }
+
         if (account) {
           console.debug('[ListDetail] Found account in BackgroundAccountsLoader:', decodedName, '→', account.id);
         }
@@ -1493,6 +1553,27 @@
           const accName = normalize(acc.accountName || acc.name || acc.companyName || '');
           return accName === normalizedName;
         });
+
+        if (!account && targetKey) {
+          const candidates = allAccounts
+            .map(acc => {
+              const accName = (acc && (acc.accountName || acc.name || acc.companyName)) || '';
+              const key = normalizeCompanyKey(accName);
+              return { acc, key };
+            })
+            .filter(x => x.acc && x.key && (x.key === targetKey || x.key.includes(targetKey) || targetKey.includes(x.key)));
+
+          if (candidates.length) {
+            candidates.sort((a, b) => {
+              const da = Math.abs(a.key.length - targetKey.length);
+              const db = Math.abs(b.key.length - targetKey.length);
+              if (da !== db) return da - db;
+              return a.key.length - b.key.length;
+            });
+            account = candidates[0].acc;
+          }
+        }
+
         if (account) {
           console.debug('[ListDetail] Found account in getAccountsData:', decodedName, '→', account.id);
         }
@@ -2125,7 +2206,7 @@
         });
       });
 
-      console.log(`[ListDetail] ✓ Fetched ${fetchedCount} missing contacts`);
+      // console.log(`[ListDetail] ✓ Fetched ${fetchedCount} missing contacts`);
 
     } catch (e) {
       console.warn('[ListDetail] Error fetching missing contacts:', e);
@@ -2163,7 +2244,7 @@
         });
       });
 
-      console.log(`[ListDetail] ✓ Fetched ${fetchedCount} missing accounts`);
+      // console.log(`[ListDetail] ✓ Fetched ${fetchedCount} missing accounts`);
 
     } catch (e) {
       console.warn('[ListDetail] Error fetching missing accounts:', e);
@@ -2271,14 +2352,14 @@
             // Clear in-memory cache for this list
             if (window.listMembersCache) {
               delete window.listMembersCache[listId];
-              console.log('[ListDetail] ✓ Cleared in-memory cache for current list');
+              // console.log('[ListDetail] ✓ Cleared in-memory cache for current list');
             }
 
             // CRITICAL FIX: Also invalidate IndexedDB cache
             if (window.CacheManager && typeof window.CacheManager.invalidateListCache === 'function') {
               try {
                 await window.CacheManager.invalidateListCache(listId);
-                console.log('[ListDetail] ✓ Invalidated IndexedDB cache for current list');
+                // console.log('[ListDetail] ✓ Invalidated IndexedDB cache for current list');
               } catch (cacheError) {
                 console.warn('[ListDetail] Cache invalidation failed:', cacheError);
               }
@@ -2287,10 +2368,10 @@
             // Force reload of list members (will fetch fresh from Firestore)
             await refreshListMembership();
 
-            console.log('[ListDetail] ✓ Reloaded list after bulk import:', {
-              people: state.membersPeople.size,
-              accounts: state.membersAccounts.size
-            });
+            // // console.log('[ListDetail] ✓ Reloaded list after bulk import:', {
+            //   people: state.membersPeople.size,
+            //   accounts: state.membersAccounts.size
+            // });
           }
         } catch (e) {
           console.error('[ListDetail] Error handling bulk import complete:', e);
@@ -2383,13 +2464,13 @@
             requestAnimationFrame(() => {
               try {
                 window.scrollTo(0, scroll);
-                console.log('[ListDetail] ✓ Restored scroll position:', scroll);
+                // console.log('[ListDetail] ✓ Restored scroll position:', scroll);
 
                 // Clear restoration flag after successful restore
                 try {
                   window.__restoringListDetail = false;
                   window.__restoringListDetailUntil = 0;
-                  console.log('[ListDetail] ✓ Cleared restoration flag');
+                  // console.log('[ListDetail] ✓ Cleared restoration flag');
                 } catch (_) { }
               } catch (_) { }
             });
@@ -2466,7 +2547,7 @@
           // Re-fetch members
           await fetchMembers(state.listId);
 
-          console.log(`[ListDetail] ✓ Re-fetched after cache invalidation: ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts`);
+          // console.log(`[ListDetail] ✓ Re-fetched after cache invalidation: ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts`);
         }
       } catch (countCheckErr) {
         console.warn('[ListDetail] Error checking count mismatch:', countCheckErr);
@@ -2504,12 +2585,14 @@
       console.warn('[ListDetail] Accounts Set not initialized, creating empty Set');
     }
 
-    console.log('[ListDetail] ✓ Data and members loaded, ready to filter:', {
+    /*
+    // console.log('[ListDetail] ✓ Data and members loaded, ready to filter:', {
       people: state.dataPeople.length,
       accounts: state.dataAccounts.length,
       membersPeople: state.membersPeople.size,
       membersAccounts: state.membersAccounts.size
     });
+    */
 
     // Re-render with loaded data - batch all DOM updates in a single frame
     renderTableHead();
@@ -2587,14 +2670,14 @@
       // Clear the in-memory cache for this list
       if (window.listMembersCache && window.listMembersCache[state.listId]) {
         delete window.listMembersCache[state.listId];
-        console.log('[ListDetail] ✓ Cleared in-memory cache');
+        // console.log('[ListDetail] ✓ Cleared in-memory cache');
       }
 
       // CRITICAL FIX: Also invalidate IndexedDB cache to ensure fresh data
       if (window.CacheManager && typeof window.CacheManager.invalidateListCache === 'function') {
         try {
           await window.CacheManager.invalidateListCache(state.listId);
-          console.log('[ListDetail] ✓ Invalidated IndexedDB cache');
+          // console.log('[ListDetail] ✓ Invalidated IndexedDB cache');
         } catch (cacheError) {
           console.warn('[ListDetail] Cache invalidation failed:', cacheError);
         }
@@ -2606,10 +2689,10 @@
       // Re-apply filters to show all members
       applyFilters();
 
-      console.log('[ListDetail] ✓ Refreshed list membership:', {
-        people: state.membersPeople.size,
-        accounts: state.membersAccounts.size
-      });
+      // // console.log('[ListDetail] ✓ Refreshed list membership:', {
+      //   people: state.membersPeople.size,
+      //   accounts: state.membersAccounts.size
+      // });
     }
   }
 
@@ -4674,7 +4757,7 @@ async function handleDeleteConfirm(ids, view) {
                   newCount: actualCount
                 }
               }));
-              console.log(`[Bulk Delete] ✓ Dispatched count update event: ${actualCount}`);
+              // console.log(`[Bulk Delete] ✓ Dispatched count update event: ${actualCount}`);
             } catch (e) {
               console.warn('[Bulk Delete] Failed to dispatch count update event:', e);
             }

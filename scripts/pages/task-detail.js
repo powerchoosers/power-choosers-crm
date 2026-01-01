@@ -411,7 +411,7 @@
         linkedInTasks.push(task);
       });
 
-      console.log('[TaskDetail] Loaded', linkedInTasks.length, 'LinkedIn sequence tasks for navigation');
+      // console.log('[TaskDetail] Loaded', linkedInTasks.length, 'LinkedIn sequence tasks for navigation');
     } catch (error) {
       console.error('[TaskDetail] Error loading LinkedIn sequence tasks:', error);
     }
@@ -655,7 +655,7 @@
     #task-detail-page .quick-action-btn:hover {
       background: var(--bg-hover) !important;
       color: var(--text-primary) !important;
-      border-color: var(--border-medium) !important;
+      border-color: #ffffff !important;
       transform: translateY(-1px);
       box-shadow: var(--shadow-sm);
     }
@@ -958,7 +958,7 @@
       /* Widget Button Hover */
       #task-detail-page #task-open-widgets:hover {
         background: var(--bg-secondary);
-        border-color: var(--accent-color);
+        border-color: #ffffff !important;
         transform: translateY(-1px);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       }
@@ -1041,7 +1041,7 @@
       
       #task-detail-page .widgets-drawer .widget-item:hover {
         background: var(--bg-secondary);
-        border-color: var(--accent-color);
+        border-color: #ffffff !important;
         transform: translateY(-1px);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       }
@@ -1083,7 +1083,7 @@
       #task-detail-page .btn-icon:hover {
         background: var(--bg-hover);
         color: var(--text-primary);
-        border-color: var(--grey-500);
+        border-color: #ffffff !important;
       }
       
       #task-detail-page .btn-icon:disabled {
@@ -1113,7 +1113,7 @@
       }
       #task-detail-page #task-reschedule-btn:hover {
         background: var(--bg-item);
-        border-color: var(--border-light);
+        border-color: #ffffff !important;
         color: var(--text-inverse);
       }
       #task-detail-page #task-reschedule-btn svg {
@@ -1194,10 +1194,16 @@
         transition: var(--transition-fast);
       }
       
+      #task-detail-page .icon-btn-sm:hover {
+        background: var(--bg-hover);
+        border-color: #ffffff !important;
+        color: var(--text-inverse);
+      }
+      
       #task-detail-page .btn-icon-add:hover {
         background: var(--bg-hover);
         color: var(--text-primary);
-        border-color: var(--grey-500);
+        border-color: #ffffff !important;
       }
       
       #task-detail-page .contacts-list {
@@ -1219,7 +1225,7 @@
       
       #task-detail-page .contact-item:hover {
         background: var(--bg-hover);
-        border-color: var(--grey-500);
+        border-color: #ffffff !important;
       }
       
       #task-detail-page .contact-avatar {
@@ -1422,7 +1428,7 @@
         const { taskId, source } = e.detail || {};
         if (source === 'task-detail') return;
         if (state.currentTask && taskId === state.currentTask.id && !state.navigating) {
-          console.log('[TaskDetail] Current task was deleted (e.g. sequence removal), navigating to next task...');
+          // console.log('[TaskDetail] Current task was deleted (e.g. sequence removal), navigating to next task...');
           try {
             // Small delay to ensure any prior state transitions complete
             await new Promise(resolve => setTimeout(resolve, 200));
@@ -1473,7 +1479,7 @@
             }
           } catch (_) { /* noop */ }
         }
-        console.log('Widget: Prospect for', accountId ? 'account' : 'contact', accountId || contactId);
+        // console.log('Widget: Prospect for', accountId ? 'account' : 'contact', accountId || contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Prospect'); } catch (_) { }
         break;
       }
@@ -1491,7 +1497,7 @@
             }
           } catch (_) { /* noop */ }
         }
-        console.log('Widget: Google Maps for', accountId ? 'account' : 'contact', accountId || contactId);
+        // console.log('Widget: Google Maps for', accountId ? 'account' : 'contact', accountId || contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Google Maps'); } catch (_) { }
         break;
       }
@@ -1510,7 +1516,7 @@
             }
           } catch (_) { /* noop */ }
         }
-        console.log('Widget: Energy Health Check for', accountId ? 'account' : 'contact', accountId || contactId);
+        // console.log('Widget: Energy Health Check for', accountId ? 'account' : 'contact', accountId || contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Energy Health Check'); } catch (_) { }
         break;
       }
@@ -1529,7 +1535,7 @@
             }
           } catch (_) { /* noop */ }
         }
-        console.log('Widget: Deal Calculator for', accountId ? 'account' : 'contact', accountId || contactId);
+        // console.log('Widget: Deal Calculator for', accountId ? 'account' : 'contact', accountId || contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Deal Calculator'); } catch (_) { }
         break;
       }
@@ -1549,12 +1555,12 @@
             }
           } catch (_) { /* noop */ }
         }
-        console.log('Widget: Notes for contact', contactId);
+        // console.log('Widget: Notes for contact', contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Notes'); } catch (_) { }
         break;
       }
       default:
-        console.log('Unknown widget action:', which);
+        // console.log('Unknown widget action:', which);
     }
   }
 
@@ -1577,7 +1583,7 @@
             }
             // Dispatch account details restore event
             document.dispatchEvent(new CustomEvent('pc:account-details-restore', { detail: restore || {} }));
-            console.log('[Task Detail] Restored account details state:', restore);
+            // console.log('[Task Detail] Restored account details state:', restore);
           } catch (_) { }
         }, 80);
         return;
@@ -1592,7 +1598,7 @@
             if (restore.taskId && window.TaskDetail && typeof window.TaskDetail.open === 'function') {
               window.TaskDetail.open(restore.taskId, restore.source || 'dashboard');
             }
-            console.log('[Task Detail] Restored task detail state:', restore);
+            // console.log('[Task Detail] Restored task detail state:', restore);
           } catch (_) { }
         }, 80);
         return;
@@ -1644,7 +1650,7 @@
             }
             // Dispatch dashboard restore event
             document.dispatchEvent(new CustomEvent('pc:dashboard-restore', { detail: restore || {} }));
-            console.log('[Task Detail] Restored dashboard state:', restore);
+            // console.log('[Task Detail] Restored dashboard state:', restore);
           } catch (_) { }
         }, 80);
         return;
@@ -1674,11 +1680,11 @@
       if (currentIndex !== -1 && currentIndex < activeQueue.length - 1) {
         // Next task is the one immediately following current task
         nextQueueTaskId = activeQueue[currentIndex + 1].id;
-        console.log('[TaskDetail] Pre-identified next task in queue (Priority 1):', nextQueueTaskId);
+        // console.log('[TaskDetail] Pre-identified next task in queue (Priority 1):', nextQueueTaskId);
       } else if (activeQueue.length > 0 && currentIndex === -1) {
         // If current task is not in the queue (e.g. freshly loaded), go to the first available task
         nextQueueTaskId = activeQueue[0].id;
-        console.log('[TaskDetail] Current task not in queue, defaulting to first available:', nextQueueTaskId);
+        // console.log('[TaskDetail] Current task not in queue, defaulting to first available:', nextQueueTaskId);
       } else if (currentIndex !== -1 && currentIndex === activeQueue.length - 1 && activeQueue.length > 1) {
          // If we are at the end, maybe go to the first one? Or just null (end of queue)
          // Let's try to go to the first one if it's different
@@ -1727,7 +1733,7 @@
     // Trigger sequence next step BEFORE deleting the current task so the API can read it
     if (state.currentTask && (state.currentTask.isSequenceTask || state.currentTask.sequenceId)) {
       try {
-        console.log('[TaskDetail] Completed sequence task, creating next step...', state.currentTask.id);
+        // console.log('[TaskDetail] Completed sequence task, creating next step...', state.currentTask.id);
         const baseUrl = getApiBaseUrl();
         const response = await fetch(`${baseUrl}/api/complete-sequence-task`, {
           method: 'POST',
@@ -1737,7 +1743,7 @@
         const result = await response.json();
 
         if (result.success) {
-          console.log('[TaskDetail] Next step created:', result.nextStepType, result);
+          // console.log('[TaskDetail] Next step created:', result.nextStepType, result);
 
           if (result.nextStepType === 'task' && result.taskId) {
             nextSequenceTaskId = result.taskId;
@@ -1806,7 +1812,7 @@
         try {
           const removed = window.BackgroundTasksLoader.removeTask(state.currentTask.id);
           if (removed) {
-            console.log('[TaskDetail] Removed task from BackgroundTasksLoader cache');
+            // console.log('[TaskDetail] Removed task from BackgroundTasksLoader cache');
           }
         } catch (e) {
           console.warn('[TaskDetail] Could not remove task from BackgroundTasksLoader:', e);
@@ -1864,7 +1870,7 @@
 
           // Delete using the document reference
           await taskDoc.ref.delete();
-          console.log('[TaskDetail] Successfully deleted task from Firestore:', state.currentTask.id);
+          // console.log('[TaskDetail] Successfully deleted task from Firestore:', state.currentTask.id);
 
           if (window.CacheManager && typeof window.CacheManager.deleteRecord === 'function') {
             await window.CacheManager.deleteRecord('tasks', state.currentTask.id);
@@ -1882,7 +1888,7 @@
     if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.removeTask === 'function') {
       try {
         window.BackgroundTasksLoader.removeTask(state.currentTask.id);
-        console.log('[TaskDetail] Removed task from BackgroundTasksLoader cache');
+        // console.log('[TaskDetail] Removed task from BackgroundTasksLoader cache');
       } catch (e) {
         console.warn('[TaskDetail] Could not remove task from BackgroundTasksLoader:', e);
       }
@@ -1902,7 +1908,7 @@
         if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
           try {
             window.BackgroundTasksLoader.forceReload()
-              .then(() => console.log('[TaskDetail] Forced BackgroundTasksLoader reload before refreshing widget'))
+              .then(() => { /* console.log('[TaskDetail] Forced BackgroundTasksLoader reload before refreshing widget') */ })
               .catch((reloadError) => console.warn('[TaskDetail] Failed to force reload BackgroundTasksLoader:', reloadError));
           } catch (reloadError) {
             console.warn('[TaskDetail] Failed to force reload BackgroundTasksLoader:', reloadError);
@@ -2045,21 +2051,21 @@
       }
       .reschedule-popover .form-actions { display:flex; justify-content:flex-end; gap:8px; }
       .reschedule-popover .btn-primary { height:32px; padding:0 12px; border-radius: var(--border-radius-sm); background: var(--orange-primary); color: var(--text-inverse); border:1px solid var(--orange-primary); font-weight:600; }
-      .reschedule-popover .btn-primary:hover { background: var(--orange-dark, #e67e00); border-color: var(--orange-dark, #e67e00); filter: brightness(0.95); }
-      .reschedule-popover .btn-text { height:32px; padding:0 12px; border-radius: var(--border-radius-sm); background: transparent; color: var(--text-secondary); border:1px solid transparent; }
-      .reschedule-popover .btn-text:hover { background: var(--grey-700); color: var(--text-inverse); }
+      .reschedule-popover .btn-primary:hover { background: var(--orange-dark, #e67e00); border-color: #ffffff !important; filter: brightness(0.95); }
+      .reschedule-popover .btn-text { height:32px; padding:0 12px; border-radius: var(--border-radius-sm); background: transparent; color: var(--text-secondary); border:1px solid transparent; transition: var(--transition-fast); }
+      .reschedule-popover .btn-text:hover { background: var(--grey-700); color: var(--text-inverse); border-color: #ffffff !important; }
       .reschedule-popover .close-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; min-width: 28px; min-height: 28px; padding: 0; background: var(--bg-item); color: var(--grey-300); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); line-height: 1; font-size: 16px; font-weight: 600; cursor: pointer; transition: var(--transition-fast); box-sizing: border-box; }
-      .reschedule-popover .close-btn:hover { background: var(--grey-600); color: var(--text-inverse); }
+      .reschedule-popover .close-btn:hover { background: var(--grey-600); color: var(--text-inverse); border-color: #ffffff !important; }
       .reschedule-popover .calendar-toolbar { display: none; margin-top: 8px; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius); box-shadow: var(--elevation-card); padding: 8px; }
       .reschedule-popover .calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
       .reschedule-popover .calendar-month-year { font-weight: 600; }
       .reschedule-popover .calendar-nav-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; transition: var(--transition-fast); }
-      .reschedule-popover .calendar-nav-btn:hover { background: var(--bg-secondary); border-color: var(--accent-color); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+      .reschedule-popover .calendar-nav-btn:hover { background: var(--bg-secondary); border-color: #ffffff !important; box-shadow: 0 2px 8px rgba(0,0,0,.1); }
       .reschedule-popover .calendar-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
       .reschedule-popover .calendar-weekday { text-align: center; font-size: 11px; color: var(--text-secondary); font-weight: 600; }
       .reschedule-popover .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-      .reschedule-popover .calendar-grid button { padding: 6px 0; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; }
-      .reschedule-popover .calendar-grid button:hover { background: var(--bg-secondary); }
+      .reschedule-popover .calendar-grid button { padding: 6px 0; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; transition: var(--transition-fast); }
+      .reschedule-popover .calendar-grid button:hover { background: var(--bg-secondary); border-color: #ffffff !important; }
       .reschedule-popover .calendar-grid > div:empty { background: transparent; border: none; }
       .reschedule-popover .calendar-grid button.today { border-color: var(--orange-primary); }
       .reschedule-popover .calendar-grid button.selected { background: var(--orange-primary); color: #fff; border-color: var(--orange-primary); }
@@ -2355,7 +2361,7 @@
     if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.removeTask === 'function') {
       try {
         window.BackgroundTasksLoader.removeTask(task.id);
-        console.log('[TaskDetail] Removed rescheduled task from BackgroundTasksLoader cache');
+        // console.log('[TaskDetail] Removed rescheduled task from BackgroundTasksLoader cache');
       } catch (e) {
         console.warn('[TaskDetail] Failed to remove task from BackgroundTasksLoader:', e);
       }
@@ -2379,7 +2385,7 @@
     if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
       try {
         await window.CacheManager.invalidate('tasks');
-        console.log('[TaskDetail] Invalidated tasks cache after reschedule');
+        // console.log('[TaskDetail] Invalidated tasks cache after reschedule');
       } catch (_) { }
     }
 
@@ -2390,7 +2396,7 @@
     if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
       try {
         await window.BackgroundTasksLoader.forceReload();
-        console.log('[TaskDetail] BackgroundTasksLoader reloaded after reschedule');
+        // console.log('[TaskDetail] BackgroundTasksLoader reloaded after reschedule');
       } catch (e) {
         console.warn('[TaskDetail] Failed to refresh BackgroundTasksLoader after reschedule', e);
       }
@@ -2482,7 +2488,7 @@
         timestamp: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
       });
 
-      console.log('Task notes saved to recent activities:', activityData);
+      // console.log('Task notes saved to recent activities:', activityData);
     } catch (error) {
       console.error('Error saving task notes to recent activities:', error);
     }
@@ -2682,7 +2688,7 @@
 
     // Prevent multiple rapid clicks
     if (state.navigating) {
-      console.log('Navigation already in progress, ignoring click');
+      // console.log('Navigation already in progress, ignoring click');
       return;
     }
 
@@ -2697,7 +2703,7 @@
       // If current task not found (e.g., just completed), find the appropriate next task
       let targetIndex;
       if (currentIndex === -1) {
-        console.log('Current task not found in filtered list (likely just completed)');
+        // console.log('Current task not found in filtered list (likely just completed)');
         if (direction === 'next') {
           // For next navigation after completion, go to the first remaining task
           targetIndex = 0;
@@ -2716,14 +2722,14 @@
 
       // Check bounds - don't navigate if at the end
       if (targetIndex < 0 || targetIndex >= todaysTasks.length) {
-        console.log(`Navigation ${direction} blocked: targetIndex ${targetIndex}, total tasks ${todaysTasks.length}`);
+        // console.log(`Navigation ${direction} blocked: targetIndex ${targetIndex}, total tasks ${todaysTasks.length}`);
         return;
       }
 
       // Navigate to the target task
       const targetTask = todaysTasks[targetIndex];
       if (targetTask && targetTask.id) {
-        console.log(`Navigating ${direction} from task ${currentIndex} to task ${targetIndex}: ${targetTask.title}`);
+        // console.log(`Navigating ${direction} from task ${currentIndex} to task ${targetIndex}: ${targetTask.title}`);
 
         // Clean up any existing avatars/icons before loading new task
         cleanupExistingAvatarsAndIcons();
@@ -3070,9 +3076,9 @@
           }
 
           if (task) {
-            console.log('[TaskDetail] Using BackgroundTasksLoader cached data');
+            // console.log('[TaskDetail] Using BackgroundTasksLoader cached data');
           } else {
-            console.log('[TaskDetail] Task not found in BackgroundTasksLoader cache, will try Firebase');
+            // console.log('[TaskDetail] Task not found in BackgroundTasksLoader cache, will try Firebase');
           }
         } catch (e) {
           console.warn('Could not load task from BackgroundTasksLoader:', e);
@@ -3092,7 +3098,7 @@
               if (isAdmin() || !data.ownerId && !data.assignedTo) {
                 // Admin or no ownership fields - allow
                 task = { ...data, id: data.id || directDoc.id };
-                console.log('[TaskDetail] Found task by document ID:', directDoc.id);
+                // console.log('[TaskDetail] Found task by document ID:', directDoc.id);
               } else {
                 const email = getUserEmail();
                 const ownerId = (data.ownerId || '').toLowerCase();
@@ -3100,13 +3106,13 @@
                 const createdBy = (data.createdBy || '').toLowerCase();
                 if (ownerId === email || assignedTo === email || createdBy === email) {
                   task = { ...data, id: data.id || directDoc.id };
-                  console.log('[TaskDetail] Found task by document ID (ownership verified):', directDoc.id);
+                  // console.log('[TaskDetail] Found task by document ID (ownership verified):', directDoc.id);
                 }
               }
             }
           } catch (directError) {
-            console.log('[TaskDetail] Direct document lookup failed, trying queries:', directError);
-          }
+              // console.log('[TaskDetail] Direct document lookup failed, trying queries:', directError);
+            }
 
           // Strategy 2: Query by 'id' field (if taskId is stored as a field)
           if (!task) {
@@ -3117,7 +3123,7 @@
                 const allTasks = await window.DataManager.queryWithOwnership('tasks');
                 task = allTasks.find(t => (t.id === taskId) || (t.id && String(t.id) === String(taskId)));
                 if (task) {
-                  console.log('[TaskDetail] Found task via DataManager.queryWithOwnership');
+                  // console.log('[TaskDetail] Found task via DataManager.queryWithOwnership');
                 }
               } else if (email) {
                 // Fallback: try queries with 'id' field
@@ -3139,12 +3145,12 @@
                     const doc = ownedSnap.docs[0];
                     const data = doc.data();
                     task = { ...data, id: data.id || doc.id };
-                    console.log('[TaskDetail] Found task via ownerId query:', doc.id);
+                    // console.log('[TaskDetail] Found task via ownerId query:', doc.id);
                   } else if (!assignedSnap.empty) {
                     const doc = assignedSnap.docs[0];
                     const data = doc.data();
                     task = { ...data, id: data.id || doc.id };
-                    console.log('[TaskDetail] Found task via assignedTo query:', doc.id);
+                    // console.log('[TaskDetail] Found task via assignedTo query:', doc.id);
                   }
                 } catch (queryError) {
                   console.warn('[TaskDetail] Query by id field failed (may not be indexed):', queryError);
@@ -3171,7 +3177,7 @@
 
           // Strategy 3: Load all tasks and find by ID (fallback if queries fail)
           if (!task) {
-            console.log('[TaskDetail] Trying fallback: load all tasks and find by ID');
+            // console.log('[TaskDetail] Trying fallback: load all tasks and find by ID');
             try {
               let allTasks = [];
               if (!isAdmin()) {
@@ -3220,7 +3226,7 @@
               });
 
               if (task) {
-                console.log('[TaskDetail] Found task via fallback search through all tasks');
+                // console.log('[TaskDetail] Found task via fallback search through all tasks');
               }
             } catch (fallbackError) {
               console.warn('[TaskDetail] Fallback search failed:', fallbackError);
@@ -3242,7 +3248,7 @@
 
       if (!task) {
         console.error('[TaskDetail] Task not found after all attempts:', taskId);
-        console.log('[TaskDetail] Debug info:', {
+        /* console.log('[TaskDetail] Debug info:', {
           taskId,
           hasFirebase: !!window.firebaseDB,
           hasBackgroundLoader: !!window.BackgroundTasksLoader,
@@ -3250,12 +3256,12 @@
           localStorageKey: getUserTasksKey(),
           localStorageCount: (JSON.parse(localStorage.getItem(getUserTasksKey()) || '[]')).length,
           legacyLocalStorageCount: (JSON.parse(localStorage.getItem('userTasks') || '[]')).length
-        });
+        }); */
 
         // CRITICAL FIX: Try force reloading cache before giving up
         try {
           if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
-            console.log('[TaskDetail] Task not found in cache, forcing cache reload...');
+            // console.log('[TaskDetail] Task not found in cache, forcing cache reload...');
             await window.BackgroundTasksLoader.forceReload();
 
             // Try one more time after reload
@@ -3264,7 +3270,7 @@
             task = filteredReloaded.find(t => t && (t.id === taskId || String(t.id) === String(taskId)));
 
             if (task) {
-              console.log('[TaskDetail] Found task after force reload');
+              // console.log('[TaskDetail] Found task after force reload');
             } else {
               console.warn('[TaskDetail] Task still not found after force reload');
             }
@@ -3288,7 +3294,7 @@
       // CRITICAL FIX: Validate task data before normalization
       if (typeof task !== 'object' || !task.id) {
         console.error('[TaskDetail] Invalid task data:', task);
-        console.log('[TaskDetail] Task object keys:', task ? Object.keys(task) : 'null');
+        // console.log('[TaskDetail] Task object keys:', task ? Object.keys(task) : 'null');
         showTaskError('Invalid task data. Please refresh the page.');
         state.loadingTask = false;
         return;
@@ -3305,13 +3311,13 @@
       task.contactId = task.contactId || '';
       task.accountId = task.accountId || '';
 
-      console.log('[TaskDetail] Task validated and normalized:', {
+      /* console.log('[TaskDetail] Task validated and normalized:', {
         id: task.id,
         type: task.type,
         title: task.title,
         hasContact: !!task.contact,
         hasAccount: !!task.account
-      });
+      }); */
 
       // Normalize legacy task shapes/titles/types
       const normType = (t) => {
@@ -3340,23 +3346,23 @@
       state.currentTask = task;
       state.taskType = task.type;
 
-      console.log('[TaskDetail] Task loaded, preparing to render:', {
+      /* console.log('[TaskDetail] Task loaded, preparing to render:', {
         id: task.id,
         type: task.type,
         title: task.title,
         contact: task.contact,
         account: task.account
-      });
+      }); */
 
       // Load contact/account data - AWAIT to ensure data is loaded before rendering
       await loadContactAccountData(task);
 
-      console.log('[TaskDetail] Contact/account data loading complete:', {
+      /* console.log('[TaskDetail] Contact/account data loading complete:', {
         hasContact: !!state.contact,
         hasAccount: !!state.account,
         contactId: state.contact?.id,
         accountId: state.account?.id
-      });
+      }); */
 
       // CRITICAL FIX: Ensure DOM is ready before rendering
       if (!els.content) {
@@ -3464,7 +3470,7 @@
         console.warn('[TaskDetail] Failed to dispatch tasksUpdated for stale task cleanup:', e);
       }
 
-      console.log('[TaskDetail] Cleaned up stale task locally:', taskId);
+      // console.log('[TaskDetail] Cleaned up stale task locally:', taskId);
     } catch (e) {
       console.warn('[TaskDetail] Unexpected error during stale task cleanup:', e);
     }
@@ -3481,14 +3487,14 @@
     // Method 1: Try CacheManager first (most reliable - always available)
     if (window.CacheManager && typeof window.CacheManager.get === 'function') {
       try {
-        console.log('[TaskDetail] Loading contacts/accounts from CacheManager...');
+        // console.log('[TaskDetail] Loading contacts/accounts from CacheManager...');
         const [cachedContacts, cachedAccounts] = await Promise.all([
           window.CacheManager.get('contacts').catch(() => []),
           window.CacheManager.get('accounts').catch(() => [])
         ]);
         contactsData = cachedContacts || [];
         accountsData = cachedAccounts || [];
-        console.log('[TaskDetail] CacheManager returned', contactsData.length, 'contacts,', accountsData.length, 'accounts');
+        // console.log('[TaskDetail] CacheManager returned', contactsData.length, 'contacts,', accountsData.length, 'accounts');
       } catch (e) {
         console.warn('[TaskDetail] CacheManager failed:', e);
       }
@@ -3497,36 +3503,36 @@
     // Method 2: Try getPeopleData/getAccountsData (page module data)
     if (contactsData.length === 0 && typeof window.getPeopleData === 'function') {
       contactsData = window.getPeopleData() || [];
-      console.log('[TaskDetail] getPeopleData returned', contactsData.length, 'contacts');
+      // console.log('[TaskDetail] getPeopleData returned', contactsData.length, 'contacts');
     }
     if (accountsData.length === 0 && typeof window.getAccountsData === 'function') {
       accountsData = window.getAccountsData(true) || [];
-      console.log('[TaskDetail] getAccountsData returned', accountsData.length, 'accounts');
+      // console.log('[TaskDetail] getAccountsData returned', accountsData.length, 'accounts');
     }
 
     // Method 3: Try BackgroundContactsLoader/BackgroundAccountsLoader if available
     if (contactsData.length === 0 && window.BackgroundContactsLoader) {
       contactsData = window.BackgroundContactsLoader.getContactsData() || [];
-      console.log('[TaskDetail] BackgroundContactsLoader returned', contactsData.length, 'contacts');
+      // console.log('[TaskDetail] BackgroundContactsLoader returned', contactsData.length, 'contacts');
     }
     if (accountsData.length === 0 && window.BackgroundAccountsLoader) {
       accountsData = window.BackgroundAccountsLoader.getAccountsData() || [];
-      console.log('[TaskDetail] BackgroundAccountsLoader returned', accountsData.length, 'accounts');
+      // console.log('[TaskDetail] BackgroundAccountsLoader returned', accountsData.length, 'accounts');
     }
 
     // Method 4: If still no data, wait a bit and retry with CacheManager
     if ((contactsData.length === 0 || accountsData.length === 0) && window.CacheManager) {
-      console.log('[TaskDetail] Waiting for cache to populate...');
+      // console.log('[TaskDetail] Waiting for cache to populate...');
       await new Promise(resolve => setTimeout(resolve, 500));
 
       try {
         if (contactsData.length === 0) {
           contactsData = await window.CacheManager.get('contacts').catch(() => []) || [];
-          console.log('[TaskDetail] Retry: CacheManager returned', contactsData.length, 'contacts');
+          // console.log('[TaskDetail] Retry: CacheManager returned', contactsData.length, 'contacts');
         }
         if (accountsData.length === 0) {
           accountsData = await window.CacheManager.get('accounts').catch(() => []) || [];
-          console.log('[TaskDetail] Retry: CacheManager returned', accountsData.length, 'accounts');
+          // console.log('[TaskDetail] Retry: CacheManager returned', accountsData.length, 'accounts');
         }
       } catch (e) {
         console.warn('[TaskDetail] Retry CacheManager failed:', e);
@@ -3541,7 +3547,7 @@
         // Try to find by contactId first
         if (task.contactId && contactsData.length > 0) {
           contact = contactsData.find(p => p.id === task.contactId);
-          if (contact) console.log('[TaskDetail] Found contact by ID:', task.contactId);
+          // if (contact) console.log('[TaskDetail] Found contact by ID:', task.contactId);
         }
 
         // Fallback: try to find by name
@@ -3550,19 +3556,19 @@
             const fullName = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
             return fullName && fullName.toLowerCase() === String(task.contact).toLowerCase();
           });
-          if (contact) console.log('[TaskDetail] Found contact by name:', task.contact);
+          // if (contact) console.log('[TaskDetail] Found contact by name:', task.contact);
         }
 
         // LAST RESORT: Direct Firebase query if cache/loaders failed
         if (!contact && window.firebaseDB) {
-          console.log('[TaskDetail] Cache miss - querying Firebase directly for contact...');
+          // console.log('[TaskDetail] Cache miss - querying Firebase directly for contact...');
           try {
             // Try by ID first (direct document lookup - most efficient)
             if (task.contactId) {
               const doc = await window.firebaseDB.collection('contacts').doc(task.contactId).get();
               if (doc.exists) {
                 contact = { id: doc.id, ...doc.data() };
-                console.log('[TaskDetail] ✓ Found contact via direct Firebase query by ID');
+                // console.log('[TaskDetail] ✓ Found contact via direct Firebase query by ID');
               }
             }
 
@@ -3581,7 +3587,7 @@
                 if (!snap.empty) {
                   const doc = snap.docs[0];
                   contact = { id: doc.id, ...doc.data() };
-                  console.log('[TaskDetail] ✓ Found contact via Firebase query by name');
+                  // console.log('[TaskDetail] ✓ Found contact via Firebase query by name');
                 }
               }
             }
@@ -3592,7 +3598,7 @@
 
         if (contact) {
           state.contact = contact;
-          console.log('[TaskDetail] ✓ Loaded contact data:', contact.id, contact.firstName, contact.lastName);
+          // console.log('[TaskDetail] ✓ Loaded contact data:', contact.id, contact.firstName, contact.lastName);
         } else {
           console.warn('[TaskDetail] ✗ Could not find contact:', task.contactId || task.contact, '(searched', contactsData.length, 'contacts + Firebase)');
         }
@@ -3622,7 +3628,7 @@
 
         // LAST RESORT: Direct Firebase query if cache/loaders failed
         if (!account && window.firebaseDB) {
-          console.log('[TaskDetail] Cache miss - querying Firebase directly for account...');
+          // console.log('[TaskDetail] Cache miss - querying Firebase directly for account...');
           try {
             // Try by ID first (direct document lookup - most efficient)
             if (task.accountId) {
@@ -3642,7 +3648,7 @@
               if (!snap.empty) {
                 const doc = snap.docs[0];
                 account = { id: doc.id, ...doc.data() };
-                console.log('[TaskDetail] ✓ Found account via Firebase query by accountName');
+                // console.log('[TaskDetail] ✓ Found account via Firebase query by accountName');
               }
 
               // Also try 'name' field as fallback
@@ -3666,7 +3672,7 @@
           state.account = account;
           // Mark that we successfully found the account for this task
           state._taskAccountFound = true;
-          console.log('[TaskDetail] ✓ Loaded account data:', account.id, account.accountName || account.name);
+          // console.log('[TaskDetail] ✓ Loaded account data:', account.id, account.accountName || account.name);
         } else {
           // CRITICAL FIX: Explicitly set state.account to null when account is not found
           // This prevents stale account data from previous tasks from persisting
@@ -3812,7 +3818,7 @@
     const buttonsHTML = renderTaskHeaderButtons();
     if (buttonsHTML) {
       header.insertAdjacentHTML('beforeend', buttonsHTML);
-      console.log('[TaskDetail] Header action buttons injected successfully');
+      // console.log('[TaskDetail] Header action buttons injected successfully');
     }
   }
 
@@ -3824,11 +3830,11 @@
       return;
     }
 
-    console.log('[TaskDetail] Rendering task page for task:', {
-      id: state.currentTask.id,
-      type: state.currentTask.type,
-      title: state.currentTask.title
-    });
+    // console.log('[TaskDetail] Rendering task page for task:', {
+    //   id: state.currentTask.id,
+    //   type: state.currentTask.type,
+    //   title: state.currentTask.title
+    // });
 
     // CRITICAL: Ensure DOM refs are initialized
     if (!els.content) {
@@ -3886,11 +3892,17 @@
         };
         const domain = account?.domain ? String(account.domain).replace(/^https?:\/\//, '').replace(/\/$/, '').replace(/^www\./i, '') : deriveDomain(account?.website || '');
         const logoUrl = account?.logoUrl || '';
+
         const companyIconSize = 40; // Larger icon for header
         let companyIconHTML = '';
         try {
           if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
-            companyIconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: companyIconSize });
+            companyIconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ 
+              logoUrl, 
+              domain, 
+              website: account?.website || '',
+              size: companyIconSize 
+            });
           }
         } catch (_) { /* noop */ }
 
@@ -4011,7 +4023,7 @@
           return e ? e[0].toUpperCase() : '?';
         })();
 
-        console.log('Contact task - Contact name:', contactName, 'Initials:', initials);
+        // console.log('Contact task - Contact name:', contactName, 'Initials:', initials);
 
         // Update the main title to include clickable contact name
         if (els.title && contactName) {
@@ -4021,22 +4033,22 @@
           // Priority 1: Use state.contact if available (most reliable)
           if (state.contact && state.contact.id) {
             finalContactId = state.contact.id;
-            console.log('[TaskDetail] Using contactId from state.contact:', finalContactId);
+            // console.log('[TaskDetail] Using contactId from state.contact:', finalContactId);
           }
           // Priority 2: Use person.id if found from lookup
           else if (person && person.id) {
             finalContactId = person.id;
-            console.log('[TaskDetail] Using contactId from person lookup:', finalContactId);
+            // console.log('[TaskDetail] Using contactId from person lookup:', finalContactId);
           }
           // Priority 3: Use task contactId
           else if (contactId) {
             finalContactId = contactId;
-            console.log('[TaskDetail] Using contactId from task:', finalContactId);
+            // console.log('[TaskDetail] Using contactId from task:', finalContactId);
           }
           // Priority 4: Check person._id as fallback
           else if (person && person._id) {
             finalContactId = person._id;
-            console.log('[TaskDetail] Using contactId from person._id:', finalContactId);
+            // console.log('[TaskDetail] Using contactId from person._id:', finalContactId);
           }
           // Priority 5: Last resort - try to find contact by name in BackgroundContactsLoader
           else if (contactName && window.BackgroundContactsLoader) {
@@ -4048,21 +4060,21 @@
               });
               if (foundContact && foundContact.id) {
                 finalContactId = foundContact.id;
-                console.log('[TaskDetail] Found contactId from BackgroundContactsLoader:', finalContactId);
+                // console.log('[TaskDetail] Found contactId from BackgroundContactsLoader:', finalContactId);
               }
             } catch (e) {
               console.warn('[TaskDetail] Error finding contact in BackgroundContactsLoader:', e);
             }
           }
 
-          console.log('[TaskDetail] Rendering contact link:', {
+          /* console.log('[TaskDetail] Rendering contact link:', {
             contactName,
             contactId: finalContactId,
             hasPerson: !!person,
             personId: person?.id,
             hasStateContact: !!state.contact,
             stateContactId: state.contact?.id
-          });
+          }); */
 
           // CRITICAL FIX: Always render the link, even without ID (handler will try to resolve it)
           const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(finalContactId || '')}" data-contact-name="${escapeHtml(contactName)}" style="cursor: pointer;">${escapeHtml(contactName)}</a>`;
@@ -4085,11 +4097,11 @@
           requestAnimationFrame(() => {
             const contactLink = els.title.querySelector('.contact-link');
             if (contactLink) {
-              console.log('[TaskDetail] ✓ Contact link rendered successfully:', {
-                contactId: contactLink.getAttribute('data-contact-id'),
-                contactName: contactLink.getAttribute('data-contact-name'),
-                hasHandler: !!document._taskDetailContactHandlersBound
-              });
+              // // console.log('[TaskDetail] ✓ Contact link rendered successfully:', {
+              //   contactId: contactLink.getAttribute('data-contact-id'),
+              //   contactName: contactLink.getAttribute('data-contact-name'),
+              //   hasHandler: !!document._taskDetailContactHandlersBound
+              // });
 
               // Verify event handler is set up
               if (!document._taskDetailContactHandlersBound) {
@@ -4144,7 +4156,7 @@
         // Add absolutely positioned avatar to the main title container using retry helper
         // Ensure we have valid initials
         const finalInitials = initials && initials !== '?' ? initials : (contactName ? contactName.charAt(0).toUpperCase() : 'C');
-        console.log('Contact task - Rendering avatar with initials:', finalInitials);
+        // console.log('Contact task - Rendering avatar with initials:', finalInitials);
 
         // Render avatar with retry - ensure it's inside .contact-header-text
         // CRITICAL FIX: Use scoped selector within task-detail-page
@@ -4157,7 +4169,7 @@
           // Create avatar element
           const avatarHTML = `<span class="avatar-initials avatar-absolute" aria-hidden="true" style="position: absolute; left: -50px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; background: var(--orange-subtle); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; letter-spacing: 0.5px;">${escapeHtml(finalInitials)}</span>`;
           titleSection.insertAdjacentHTML('beforeend', avatarHTML);
-          console.log('[TaskDetail] Avatar rendered successfully with initials:', finalInitials);
+          // console.log('[TaskDetail] Avatar rendered successfully with initials:', finalInitials);
         } else {
           // Fallback to retry helper if element not found
           console.warn('[TaskDetail] .contact-header-text not found, using retry helper');
@@ -4220,7 +4232,7 @@
         return e ? e[0].toUpperCase() : '?';
       })();
 
-      console.log('LinkedIn task - Contact name:', contactName, 'Initials:', initials);
+      // console.log('LinkedIn task - Contact name:', contactName, 'Initials:', initials);
 
       // Update the main title to include clickable contact name
       if (els.title && contactName) {
@@ -4231,22 +4243,22 @@
         // Priority 1: Use state.contact if available (most reliable)
         if (state.contact && state.contact.id) {
           finalContactId = state.contact.id;
-          console.log('[TaskDetail] LinkedIn: Using contactId from state.contact:', finalContactId);
+          // console.log('[TaskDetail] LinkedIn: Using contactId from state.contact:', finalContactId);
         }
         // Priority 2: Use person.id if found from lookup
         else if (person && person.id) {
           finalContactId = person.id;
-          console.log('[TaskDetail] LinkedIn: Using contactId from person lookup:', finalContactId);
+          // console.log('[TaskDetail] LinkedIn: Using contactId from person lookup:', finalContactId);
         }
         // Priority 3: Use task contactId
         else if (taskContactId) {
           finalContactId = taskContactId;
-          console.log('[TaskDetail] LinkedIn: Using contactId from task:', finalContactId);
+          // console.log('[TaskDetail] LinkedIn: Using contactId from task:', finalContactId);
         }
         // Priority 4: Check person._id as fallback
         else if (person && person._id) {
           finalContactId = person._id;
-          console.log('[TaskDetail] LinkedIn: Using contactId from person._id:', finalContactId);
+          // console.log('[TaskDetail] LinkedIn: Using contactId from person._id:', finalContactId);
         }
         // Priority 5: Last resort - try to find contact by name in BackgroundContactsLoader
         else if (contactName && window.BackgroundContactsLoader) {
@@ -4258,21 +4270,21 @@
             });
             if (foundContact && foundContact.id) {
               finalContactId = foundContact.id;
-              console.log('[TaskDetail] LinkedIn: Found contactId from BackgroundContactsLoader:', finalContactId);
+              // console.log('[TaskDetail] LinkedIn: Found contactId from BackgroundContactsLoader:', finalContactId);
             }
           } catch (e) {
             console.warn('[TaskDetail] LinkedIn: Error finding contact in BackgroundContactsLoader:', e);
           }
         }
 
-        console.log('[TaskDetail] Rendering LinkedIn contact link:', {
-          contactName,
-          contactId: finalContactId,
-          hasPerson: !!person,
-          personId: person?.id,
-          hasStateContact: !!state.contact,
-          stateContactId: state.contact?.id
-        });
+        // console.log('[TaskDetail] Rendering LinkedIn contact link:', {
+        //   contactName,
+        //   contactId: finalContactId,
+        //   hasPerson: !!person,
+        //   personId: person?.id,
+        //   hasStateContact: !!state.contact,
+        //   stateContactId: state.contact?.id
+        // });
 
         const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(finalContactId || '')}" data-contact-name="${escapeHtml(contactName)}" style="cursor: pointer;">${escapeHtml(contactName)}</a>`;
         // Determine action text based on task type (contact name goes in the middle)
@@ -4661,7 +4673,7 @@
       const accountId = companyLink.getAttribute('data-account-id');
       const accountName = companyLink.getAttribute('data-account-name');
 
-      console.log('[TaskDetail] Company link clicked:', { accountId, accountName });
+      // console.log('[TaskDetail] Company link clicked:', { accountId, accountName });
 
       // Capture task detail state for back navigation
       if (state.currentTask) {
@@ -4694,7 +4706,7 @@
               return accName === searchName || accName.includes(searchName) || searchName.includes(accName);
             });
             if (account && account.id) {
-              console.log('[TaskDetail] Found account by name:', account.id);
+              // console.log('[TaskDetail] Found account by name:', account.id);
               window.AccountDetail.show(account.id);
             } else {
               console.warn('[TaskDetail] Account not found:', accountName);
@@ -4823,7 +4835,7 @@
 
     // Use the same LinkedIn logic as contact-detail.js
     if (person && person.linkedin) {
-      console.log('[TaskDetail] Using contact personal LinkedIn:', person.linkedin);
+      // console.log('[TaskDetail] Using contact personal LinkedIn:', person.linkedin);
       try {
         window.open(person.linkedin, '_blank', 'noopener');
       } catch (e) {
@@ -4837,8 +4849,8 @@
       const fullName = person ? ([person.firstName, person.lastName].filter(Boolean).join(' ') || person.name || '') : contactName;
       const query = encodeURIComponent(fullName);
       const url = `https://www.linkedin.com/search/results/people/?keywords=${query}`;
-      console.log('[TaskDetail] No personal LinkedIn, searching for person:', fullName);
-      console.log('[TaskDetail] LinkedIn search URL:', url);
+      // console.log('[TaskDetail] No personal LinkedIn, searching for person:', fullName);
+      // console.log('[TaskDetail] LinkedIn search URL:', url);
       try {
         window.open(url, '_blank', 'noopener');
       } catch (e) {
@@ -6602,7 +6614,7 @@
             if (contactDoc.exists) {
               const updatedContact = { id: contactDoc.id, ...contactDoc.data() };
               state.contact = updatedContact;
-              console.log('[TaskDetail] ✓ Reloaded contact data:', updatedContact.firstName, updatedContact.lastName);
+              // console.log('[TaskDetail] ✓ Reloaded contact data:', updatedContact.firstName, updatedContact.lastName);
 
               // Re-render the task page to show updated contact information
               renderTaskPage();
@@ -6996,7 +7008,7 @@
             if (accountDoc.exists) {
               const updatedAccount = { id: accountDoc.id, ...accountDoc.data() };
               state.account = updatedAccount;
-              console.log('[TaskDetail] ✓ Reloaded account data:', updatedAccount.accountName || updatedAccount.name);
+              // console.log('[TaskDetail] ✓ Reloaded account data:', updatedAccount.accountName || updatedAccount.name);
 
               // Re-render the task page to show updated account information
               renderTaskPage();
@@ -7198,7 +7210,7 @@
             if (accountDoc.exists) {
               const updatedAccount = { id: accountDoc.id, ...accountDoc.data() };
               state.account = updatedAccount;
-              console.log('[TaskDetail] ✓ Reloaded account data after returning from account-detail');
+              // console.log('[TaskDetail] ✓ Reloaded account data after returning from account-detail');
 
               // Re-render the task page to show updated account information
               renderTaskPage();
