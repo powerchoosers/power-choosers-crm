@@ -1242,7 +1242,13 @@ var console = {
               </svg>
             </button>
             <div class="contact-header-profile">
-              ${(window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') ? window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: a.logoUrl, domain: favDomain, website: a.website, size: 64 }) : (favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 64) : '') : '')}
+              ${(function() {
+                const iconOpts = { logoUrl: a.logoUrl, domain: favDomain, website: a.website, size: 64 };
+                if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
+                  return window.__pcFaviconHelper.generateCompanyIconHTML(iconOpts);
+                }
+                return favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 64) : '') : '';
+              })()}
               <div class="avatar-circle-small" style="${favDomain ? 'display:none;' : ''}">${escapeHtml(getInitials(name))}</div>
               <div class="contact-header-text">
                 <div class="contact-title-row">

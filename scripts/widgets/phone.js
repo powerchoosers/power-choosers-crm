@@ -1562,37 +1562,22 @@
           // If newSrc is empty but we have an existing logo, preserve it (prevents flickering on call connect)
           if (newSrc && existingSrc !== newSrc) {
             // Absolute priority: explicit logoUrl provided by the page/widget
-            try {
-              avatarWrap.innerHTML = `<img class="company-favicon" src="${logoUrl}" alt="" aria-hidden="true" referrerpolicy="no-referrer" loading="lazy">`;
-            } catch(_) { /* noop */ }
+            if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
+              avatarWrap.innerHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: newSrc, domain, size: 28 });
+            } else {
+              avatarWrap.innerHTML = `<img class="company-favicon" src="${newSrc}" alt="" aria-hidden="true" referrerpolicy="no-referrer" loading="lazy" onerror="this.style.display='none'">`;
+            }
           } else if (!newSrc && existingImg && existingSrc) {
             // New logoUrl is empty but we have an existing logo - preserve it to prevent flickering
             // Don't update the DOM, just skip the logo rendering logic
             // Continue with the rest of the function (name/sub updates, animations, etc.)
           } else if (!newSrc && !existingImg) {
             // No logo and no existing image - try fallbacks
-            if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML==='function') {
+            if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
               // Helper will try multiple favicon sources; fallback to accounts icon if it fails
-              const html = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: '', domain, size: 28 });
-              if (html && html.indexOf('company-favicon') !== -1) {
-                avatarWrap.innerHTML = html;
-              } else if (domain && typeof window.__pcFaviconHelper.generateFaviconHTML === 'function') {
-                avatarWrap.innerHTML = window.__pcFaviconHelper.generateFaviconHTML(domain, 28);
-              } else if (typeof window.__pcAccountsIcon === 'function') {
-                avatarWrap.innerHTML = window.__pcAccountsIcon();
-              }
-            } else if (domain && window.__pcFaviconHelper) {
-              avatarWrap.innerHTML = window.__pcFaviconHelper.generateFaviconHTML(domain, 28);
-            } else if (domain) {
-              // Helper not available: fall back to direct favicon URL
-              const src = favicon || (domain ? `https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}` : '');
-              if (src) {
-                avatarWrap.innerHTML = `<img class="company-favicon" src="${src}" alt="" aria-hidden="true" referrerpolicy="no-referrer" loading="lazy">`;
-              } else if (typeof window.__pcAccountsIcon === 'function') {
-                avatarWrap.innerHTML = window.__pcAccountsIcon();
-              }
+              avatarWrap.innerHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: '', domain, size: 28 });
             } else if (typeof window.__pcAccountsIcon === 'function') {
-              avatarWrap.innerHTML = window.__pcAccountsIcon();
+              avatarWrap.innerHTML = window.__pcAccountsIcon(28);
             }
           }
           // If logoUrl is empty but we have an existing image, don't clear it (prevents flickering)

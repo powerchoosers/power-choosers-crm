@@ -5,6 +5,7 @@
 var __ACCOUNTS_ORIG_CONSOLE__ = window.console || {};
 function __accountsDebugEnabled__(){
   try {
+    if (window.PC_DEBUG) return true;
     const v = localStorage.getItem('CRM_DEBUG_ACCOUNTS');
     if (v != null) return v === '1' || v === 'true';
   } catch(_) {}
