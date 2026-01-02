@@ -16740,9 +16740,14 @@ th.drag-over::after {
     left: 0;
     width: 100%;
     height: 100%;
-    display: none;
+    display: flex;
     align-items: center;
     justify-content: center;
+}
+
+.company-favicon-container.favicon-loading .company-favicon:not(.company-favicon--fallback) {
+    opacity: 0 !important;
+    transform: scale(0.95) !important;
 }
 
 /* Fallback favicon styling */
@@ -16764,6 +16769,10 @@ th.drag-over::after {
 }
 
 /* Favicon container states */
+.company-favicon-container.favicon-loading .company-favicon-fallback {
+    display: none;
+}
+
 .company-favicon-container.favicon-loaded .company-favicon-fallback {
     display: none;
 }

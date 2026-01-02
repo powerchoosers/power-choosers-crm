@@ -1789,8 +1789,12 @@
               const html = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 32 });
               return html && String(html).trim() ? html : '<span class="company-favicon placeholder" aria-hidden="true"></span>';
             }
-            if (domain) {
-              return `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=32&domain=${escapeHtml(domain)}" alt="" aria-hidden="true" referrerpolicy="no-referrer" loading="lazy" style="pointer-events:none" onerror="this.style.display='none'" />`;
+            if (domain && window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateFaviconHTML === 'function') {
+              const html = window.__pcFaviconHelper.generateFaviconHTML(domain, 32);
+              return html && String(html).trim() ? html : '<span class="company-favicon placeholder" aria-hidden="true"></span>';
+            }
+            if (typeof window.__pcAccountsIcon === 'function') {
+              return window.__pcAccountsIcon(32);
             }
             return '<span class="company-favicon placeholder" aria-hidden="true"></span>';
           })();

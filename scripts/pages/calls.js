@@ -3,6 +3,7 @@
 var __CALLS_ORIG_CONSOLE__ = window.console || {};
 function __callsDebugEnabled__(){
   try {
+    if (window.PC_DEBUG) return true;
     const v = localStorage.getItem('CRM_DEBUG_CALLS');
     if (v != null) return v === '1' || v === 'true';
   } catch(_) {}

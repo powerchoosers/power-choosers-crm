@@ -606,7 +606,7 @@
     if (logoRenderTimeout) clearTimeout(logoRenderTimeout);
     logoRenderTimeout = setTimeout(() => {
       actuallyRender();
-    }, 1000); // Wait 1 second to batch all logo hits together
+    }, 300); // Reduced to 300ms to match regular render and reduce flicker
   }
 
   // Rename original render to actuallyRender
@@ -617,6 +617,7 @@
     
     // Simple hash to see if we actually need to update the DOM
     // Include logoUrl from the discovered cache so we re-render when a logo is found
+    // Also include failure cache state to prevent flicker
     const currentDataHash = rows.map(r => {
       const recipientEmail = Array.isArray(r.to) ? r.to[0] : (r.to || r.from || '');
       const domain = extractDomain(recipientEmail);
@@ -624,16 +625,21 @@
       const discoveredInfo = domainAccountInfoCache.get(normalizedDomain);
       const logoPart = discoveredInfo ? (discoveredInfo.logoUrl || 'no-logo') : 'pending';
       
+      const isFailed = window.__pcFaviconHelper && (
+        (domain && window.__pcFaviconHelper.failedDomains.has(domain)) ||
+        (discoveredInfo?.logoUrl && window.__pcFaviconHelper.failedLogos.has(discoveredInfo.logoUrl))
+      );
+      
       // Include displayName in the hash so we re-render when a name lookup completes
       const displayName = extractName(recipientEmail);
       
-      return `${r.id}-${r.updatedAt || r.timestamp}-${r.status}-${r.unread}-${r.starred}-${logoPart}-${displayName}`;
+      return `${r.id}-${r.updatedAt || r.timestamp}-${r.status}-${r.unread}-${r.starred}-${logoPart}-${displayName}-${isFailed ? 'failed' : 'ok'}`;
     }).join('|');
     const isSearchActive = !!(els.searchInput?.value?.trim());
     
     // Only skip if data is identical AND we aren't in a state that requires fresh render (like search)
     // and if we already have content in the tbody
-    if (currentDataHash === lastRenderedDataHash && els.tbody.children.length > 0 && !isSearchActive) {
+    if (currentDataHash === lastRenderedDataHash && els.tbody.children.length > 0) {
       return;
     }
     lastRenderedDataHash = currentDataHash;
@@ -721,7 +727,7 @@
     if (accountLookupPromises.has(normalizedDomain) || accountLookupFailures.has(normalizedDomain)) {
       return accountLookupPromises.get(normalizedDomain);
     }
-
+    
     const dbAvailable = !!window.firebaseDB && typeof window.firebaseDB.collection === 'function';
 
     const promise = (async () => {
@@ -854,6 +860,7 @@
       if (!recipientDomain) return { logoUrl: null, domain: null, matchedSource: 'none' };
 
       const normalizedRecipientDomain = normalizeDomainString(recipientDomain);
+      
       const backgroundAccounts = (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function')
         ? window.BackgroundAccountsLoader.getAccountsData() || []
         : [];
@@ -909,14 +916,9 @@
       // Get account info for recipient
       const accountInfo = getRecipientAccountInfo(recipientEmail);
       
-      // STABLE CACHE KEY: Use the recipient email address only.
-      // This is the most stable identifier we have for a row's recipient.
-      // It ensures that even if domains or logos are discovered later, 
-      // we don't switch cache entries and cause flickering.
       const cacheKey = `favicon-${recipientEmail.toLowerCase()}-28`;
-      
       const cachedEntry = faviconCache.get(cacheKey);
-      
+
       // SMART CACHE CHECK: If we have a cached entry, but it lacks a logo and we just found one, 
       // we MUST regenerate to show the new logo.
       const shouldForceRegenerate = cachedEntry && !cachedEntry.logoUrl && accountInfo.logoUrl;
@@ -945,12 +947,20 @@
       const senderEmail = email.from;
       const senderDomain = extractDomain(senderEmail);
       displayName = extractName(senderEmail) || 'Unknown';
+
+      // Get account info for sender (to get logoUrl if available)
+      const accountInfo = getRecipientAccountInfo(senderEmail);
       
       // STABLE CACHE KEY for received emails
       const cacheKey = `favicon-${(senderEmail || senderDomain || 'unknown').toLowerCase()}-28`;
 
       const cachedEntry = faviconCache.get(cacheKey);
-      if (cachedEntry) {
+      
+      // SMART CACHE CHECK: If we have a cached entry, but it lacks a logo and we just found one, 
+      // we MUST regenerate to show the new logo.
+      const shouldForceRegenerate = cachedEntry && !cachedEntry.logoUrl && accountInfo.logoUrl;
+
+      if (cachedEntry && !shouldForceRegenerate) {
         avatarHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
           logoUrl: cachedEntry.logoUrl,
           domain: cachedEntry.domain,
@@ -959,13 +969,14 @@
         });
       } else {
         avatarHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
-          domain: senderDomain,
+          logoUrl: accountInfo.logoUrl,
+          domain: accountInfo.domain || senderDomain,
           size: 28,
           idSuffix: email.id
         });
         faviconCache.set(cacheKey, {
-          logoUrl: null,
-          domain: senderDomain || null
+          logoUrl: accountInfo.logoUrl || null,
+          domain: accountInfo.domain || senderDomain || null
         });
       }
     }

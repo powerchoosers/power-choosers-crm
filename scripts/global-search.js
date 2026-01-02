@@ -1410,8 +1410,8 @@
         const html = window.__pcFaviconHelper.generateFaviconHTML(cleanDomain, size);
         if (html && String(html).trim()) return html;
       }
-      if (cleanDomain) {
-        return `<img src="https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(cleanDomain)}" alt="" aria-hidden="true" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'" />`;
+      if (typeof window.__pcAccountsIcon === 'function') {
+        return window.__pcAccountsIcon(size);
       }
       return `<div style="width:${size}px;height:${size}px;border-radius:6px;background:var(--bg-item,#2f343a);"></div>`;
     };
