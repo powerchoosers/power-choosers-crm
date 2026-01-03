@@ -135,7 +135,8 @@ async function processSingleActivation(activationId, isProduction) {
   logAlways(`Processing activation: ${activationId}`);
 
   try {
-    const claimResult = await db.runTransaction(async (transaction) => {
+    // Use transaction to ensure idempotency
+    await db.runTransaction(async (transaction) => {
       const doc = await transaction.get(activationRef);
 
       if (!doc.exists) {
@@ -155,7 +156,8 @@ async function processSingleActivation(activationId, isProduction) {
           if (!isProduction) {
             logger.log(`[ProcessSequenceActivations] Activation ${activationId} already being processed`);
           }
-          return { shouldProcess: false, reason: 'already_processing' };
+          // Don't throw error - just return success (idempotent behavior)
+          return;
         } else {
           if (!isProduction) {
             logger.warn(`[ProcessSequenceActivations] Activation ${activationId} is stale, re-claiming`);
@@ -165,7 +167,7 @@ async function processSingleActivation(activationId, isProduction) {
         if (!isProduction) {
           logger.log(`[ProcessSequenceActivations] Activation ${activationId} already completed`);
         }
-        return { shouldProcess: false, reason: 'already_completed' };
+        return;
       }
 
       // Claim the activation
@@ -174,16 +176,7 @@ async function processSingleActivation(activationId, isProduction) {
         processingStartedAt: admin.firestore.FieldValue.serverTimestamp(),
         retryCount: admin.firestore.FieldValue.increment(1)
       });
-
-      return { shouldProcess: true, reason: 'claimed' };
     });
-
-    if (!claimResult || claimResult.shouldProcess === false) {
-      if (!isProduction) {
-        logger.log(`[ProcessSequenceActivations] Skipping activation ${activationId}: ${claimResult?.reason || 'unknown'}`);
-      }
-      return;
-    }
 
     // Now process outside the transaction
     const doc = await activationRef.get();
@@ -467,3 +460,4 @@ async function processSingleActivation(activationId, isProduction) {
     throw error;
   }
 }
+
