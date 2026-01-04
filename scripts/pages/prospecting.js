@@ -33,7 +33,7 @@ const ProspectingPage = (function() {
 
     function init() {
         if (initialized) return;
-        console.log('[Prospecting] Initializing...');
+        // console.log('[Prospecting] Initializing...');
         
         // Cache DOM elements
         elements.container = document.getElementById('prospecting-page');
@@ -407,7 +407,7 @@ const ProspectingPage = (function() {
 
         if (!confirm(`Import ${org.name} into CRM?`)) return;
         
-        console.log('[Prospecting] Saving org:', org);
+        // console.log('[Prospecting] Saving org:', org);
         
         if (window.Widgets && typeof window.Widgets.addAccountToCRM === 'function') {
             // Map prospecting org fields to what addAccountToCRM expects

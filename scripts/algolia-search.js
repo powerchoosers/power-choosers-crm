@@ -34,7 +34,7 @@ class AlgoliaSearchHelper {
       this.indices.accounts = this.client.initIndex(indices.accounts);
       
       this.isInitialized = true;
-      console.log('[Algolia] Search helper initialized successfully');
+      // console.log('[Algolia] Search helper initialized successfully');
     } catch (error) {
       console.error('[Algolia] Failed to initialize:', error);
     }
@@ -65,7 +65,7 @@ class AlgoliaSearchHelper {
 
       const results = await this.indices.contacts.search(query, searchOptions);
       
-      console.log('[Algolia] Contacts search:', query, '→', results.nbHits, 'results');
+      // console.log('[Algolia] Contacts search:', query, '→', results.nbHits, 'results');
       return results;
     } catch (error) {
       console.error('[Algolia] Search contacts failed:', error);
@@ -98,7 +98,7 @@ class AlgoliaSearchHelper {
 
       const results = await this.indices.accounts.search(query, searchOptions);
       
-      console.log('[Algolia] Accounts search:', query, '→', results.nbHits, 'results');
+      // console.log('[Algolia] Accounts search:', query, '→', results.nbHits, 'results');
       return results;
     } catch (error) {
       console.error('[Algolia] Search accounts failed:', error);
@@ -118,6 +118,6 @@ class AlgoliaSearchHelper {
 // Initialize global Algolia search helper
 if (typeof window !== 'undefined') {
   window.AlgoliaSearch = new AlgoliaSearchHelper();
-  console.log('[Algolia] Global search helper created');
+  // console.log('[Algolia] Global search helper created');
 }
 
