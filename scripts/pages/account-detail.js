@@ -292,26 +292,26 @@ var console = {
         waitCount++;
       }
     }
-    
+
     _showAccountDetailInProgress = true;
     _lastRequestedAccountId = accountId;
 
     try {
-    // Ensure page exists and navigate to it
-    if (window.crm && typeof window.crm.navigateToPage === 'function') {
-      try { window.crm.navigateToPage('account-details'); } catch (e) { /* noop */ }
-    }
-    if (!initDomRefs()) { _showAccountDetailInProgress = false; return; }
+      // Ensure page exists and navigate to it
+      if (window.crm && typeof window.crm.navigateToPage === 'function') {
+        try { window.crm.navigateToPage('account-details'); } catch (e) { /* noop */ }
+      }
+      if (!initDomRefs()) { _showAccountDetailInProgress = false; return; }
 
-    // Set loading state but don't clear DOM (prevents flicker)
-    state.currentAccount = null;
+      // Set loading state but don't clear DOM (prevents flicker)
+      state.currentAccount = null;
 
-    const account = await findAccountById(accountId);
-    if (!account) {
-      console.error('Account not found:', accountId);
-      const headerSection = els.pageContainer ? els.pageContainer.querySelector('.page-title-section') : null;
-      if (headerSection) {
-        headerSection.innerHTML = `
+      const account = await findAccountById(accountId);
+      if (!account) {
+        console.error('Account not found:', accountId);
+        const headerSection = els.pageContainer ? els.pageContainer.querySelector('.page-title-section') : null;
+        if (headerSection) {
+          headerSection.innerHTML = `
           <div class="contact-header-info">
             <button class="back-btn back-btn--icon" id="back-to-accounts" aria-label="Back to Accounts" title="Back to Accounts">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
@@ -325,109 +325,109 @@ var console = {
             </div>
           </div>
         `;
-      }
-      if (els.mainContent) {
-        els.mainContent.innerHTML = `
+        }
+        if (els.mainContent) {
+          els.mainContent.innerHTML = `
           <div style="display: flex; align-items: center; justify-content: center; min-height: 400px; flex-direction: column; gap: 16px;">
             <p style="color: var(--text-secondary); font-size: 14px;">Account not found</p>
           </div>
         `;
+        }
+        return;
       }
-      return;
-    }
 
-    state.currentAccount = account;
+      state.currentAccount = account;
 
-    // Load contacts data upfront for renderAccountContacts
-    let contactsLoaded = false;
-    try {
-      if (typeof window.getPeopleData === 'function') {
-        window._accountDetailPeopleCache = window.getPeopleData() || [];
-        // console.log('[AccountDetail] Cached people data from people.js:', window._accountDetailPeopleCache.length);
-        contactsLoaded = window._accountDetailPeopleCache.length > 0;
-      } else if (window.CacheManager && typeof window.CacheManager.get === 'function') {
-        // console.log('[AccountDetail] Loading people data from cache...');
-        const contacts = await window.CacheManager.get('contacts');
-        window._accountDetailPeopleCache = (contacts && Array.isArray(contacts)) ? contacts : [];
-        // console.log('[AccountDetail] Cached people data from CacheManager:', window._accountDetailPeopleCache.length);
-        contactsLoaded = window._accountDetailPeopleCache.length > 0;
-      } else {
-        // If people.js hasn't loaded and no cache, contacts will load via event
-        // console.log('[AccountDetail] No people data available yet, will update when loaded');
+      // Load contacts data upfront for renderAccountContacts
+      let contactsLoaded = false;
+      try {
+        if (typeof window.getPeopleData === 'function') {
+          window._accountDetailPeopleCache = window.getPeopleData() || [];
+          // console.log('[AccountDetail] Cached people data from people.js:', window._accountDetailPeopleCache.length);
+          contactsLoaded = window._accountDetailPeopleCache.length > 0;
+        } else if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+          // console.log('[AccountDetail] Loading people data from cache...');
+          const contacts = await window.CacheManager.get('contacts');
+          window._accountDetailPeopleCache = (contacts && Array.isArray(contacts)) ? contacts : [];
+          // console.log('[AccountDetail] Cached people data from CacheManager:', window._accountDetailPeopleCache.length);
+          contactsLoaded = window._accountDetailPeopleCache.length > 0;
+        } else {
+          // If people.js hasn't loaded and no cache, contacts will load via event
+          // console.log('[AccountDetail] No people data available yet, will update when loaded');
+          window._accountDetailPeopleCache = [];
+          contactsLoaded = false;
+        }
+      } catch (error) {
+        console.error('[AccountDetail] Failed to load people data:', error);
         window._accountDetailPeopleCache = [];
         contactsLoaded = false;
       }
-    } catch (error) {
-      console.error('[AccountDetail] Failed to load people data:', error);
-      window._accountDetailPeopleCache = [];
-      contactsLoaded = false;
-    }
 
-    // console.log('[AccountDetail] Contacts loaded:', contactsLoaded, 'Count:', window._accountDetailPeopleCache.length);
+      // console.log('[AccountDetail] Contacts loaded:', contactsLoaded, 'Count:', window._accountDetailPeopleCache.length);
 
-    // Render account detail immediately (no animations)
-    try {
-      if (!account) {
-        console.error('[AccountDetail] Cannot render: account is null');
-        return;
+      // Render account detail immediately (no animations)
+      try {
+        if (!account) {
+          console.error('[AccountDetail] Cannot render: account is null');
+          return;
+        }
+        if (!els.mainContent) {
+          console.error('[AccountDetail] Cannot render: els.mainContent is null');
+          return;
+        }
+
+        // console.log('[AccountDetail] Rendering account:', account.accountName || account.name);
+        renderAccountDetail();
+        // console.log('[AccountDetail] Render complete');
+      } catch (error) {
+        console.error('[AccountDetail] Error during render:', error);
       }
-      if (!els.mainContent) {
-        console.error('[AccountDetail] Cannot render: els.mainContent is null');
-        return;
-      }
 
-      // console.log('[AccountDetail] Rendering account:', account.accountName || account.name);
-      renderAccountDetail();
-      // console.log('[AccountDetail] Render complete');
-    } catch (error) {
-      console.error('[AccountDetail] Error during render:', error);
-    }
+      // If no contacts loaded and account is rendering, set up retry
+      if (!contactsLoaded && state.currentAccount) {
+        // console.log('[AccountDetail] No contacts available yet, will retry when event fires');
 
-    // If no contacts loaded and account is rendering, set up retry
-    if (!contactsLoaded && state.currentAccount) {
-      // console.log('[AccountDetail] No contacts available yet, will retry when event fires');
+        // Add a one-time retry with timeout in case event doesn't fire
+        setTimeout(async () => {
+          if (window._accountDetailPeopleCache && window._accountDetailPeopleCache.length === 0) {
+            // Try loading again
+            if (typeof window.getPeopleData === 'function') {
+              window._accountDetailPeopleCache = window.getPeopleData() || [];
+              // console.log('[AccountDetail] Retry: Got', window._accountDetailPeopleCache.length, 'contacts');
 
-      // Add a one-time retry with timeout in case event doesn't fire
-      setTimeout(async () => {
-        if (window._accountDetailPeopleCache && window._accountDetailPeopleCache.length === 0) {
-          // Try loading again
-          if (typeof window.getPeopleData === 'function') {
-            window._accountDetailPeopleCache = window.getPeopleData() || [];
-            // console.log('[AccountDetail] Retry: Got', window._accountDetailPeopleCache.length, 'contacts');
-
-            // Update contacts section
-            if (window._accountDetailPeopleCache.length > 0) {
-              const contactsList = document.getElementById('account-contacts-list');
-              if (contactsList && state.currentAccount) {
-                // console.log('[AccountDetail] Retry: Re-rendering contacts section');
-                contactsList.innerHTML = await renderAccountContacts(state.currentAccount);
-                bindContactItemEvents();
+              // Update contacts section
+              if (window._accountDetailPeopleCache.length > 0) {
+                const contactsList = document.getElementById('account-contacts-list');
+                if (contactsList && state.currentAccount) {
+                  // console.log('[AccountDetail] Retry: Re-rendering contacts section');
+                  contactsList.innerHTML = await renderAccountContacts(state.currentAccount);
+                  bindContactItemEvents();
+                }
               }
             }
           }
-        }
-      }, 1000); // Retry after 1 second
-    }
+        }, 1000); // Retry after 1 second
+      }
 
-    // Setup energy update listener for real-time sync with Health Widget (ONCE)
-    if (!window._accountDetailEnergyListenerBound) {
-      try { window.AccountDetail.setupEnergyUpdateListener(); } catch (_) {}
-          window._accountDetailEnergyListenerBound = true;
-    }
+      // Setup energy update listener for real-time sync with Health Widget (ONCE)
+      if (!window._accountDetailEnergyListenerBound) {
+        try { window.AccountDetail.setupEnergyUpdateListener(); } catch (_) { }
+        window._accountDetailEnergyListenerBound = true;
+      }
 
-    // TRIGGER BACKGROUND DATA LOADING (NON-BLOCKING)
-    // console.log('[AccountDetail] Triggering background activities and calls load');
-    loadAccountActivities();
-    try {
-      injectRecentCallsStyles();
-      // FIX: Make recent calls load asynchronously to prevent page freeze
-      // Defer the call to avoid blocking page load if API is slow
-      setTimeout(() => {
-        loadRecentCallsForAccount().catch(error => {
-          console.warn('[AccountDetail] Recent calls load failed:', error);
-        });
-      }, 100); // Small delay to ensure page is fully rendered first
-    } catch (_) {}
+      // TRIGGER BACKGROUND DATA LOADING (NON-BLOCKING)
+      // console.log('[AccountDetail] Triggering background activities and calls load');
+      loadAccountActivities();
+      try {
+        injectRecentCallsStyles();
+        // FIX: Make recent calls load asynchronously to prevent page freeze
+        // Defer the call to avoid blocking page load if API is slow
+        setTimeout(() => {
+          loadRecentCallsForAccount().catch(error => {
+            console.warn('[AccountDetail] Recent calls load failed:', error);
+          });
+        }, 100); // Small delay to ensure page is fully rendered first
+      } catch (_) { }
 
     } finally {
       // CRITICAL: Always release the mutex
@@ -921,7 +921,7 @@ var console = {
       // OPTIMIZATION: Use BackgroundContactsLoader (instant) instead of Firestore (15+ seconds)
       const allCachedContacts = window.BackgroundContactsLoader.getContactsData() || [];
       log('[AccountDetail] Using BackgroundContactsLoader for fast filtering, total:', allCachedContacts.length);
-      
+
       // Filter client-side (much faster than Firestore query)
       const norm = (s) => String(s || '').toLowerCase()
         .replace(/\(usa\)|\(u\.s\.a\.\)|\(us\)/g, '')
@@ -936,18 +936,18 @@ var console = {
         const contactCompany = contact.companyName || contact.accountName || '';
         return norm(contactCompany) === normalizedAccountName;
       });
-      
+
       // Cache for future use (even if 0 contacts - prevents re-querying)
       if (!window._accountContactsCache) window._accountContactsCache = {};
       window._accountContactsCache[accountId] = allContacts;
-      
+
       log('[AccountDetail] Filtered to', allContacts.length, 'contacts from BackgroundContactsLoader');
-      
+
       // CRITICAL: Skip Firestore query if BackgroundContactsLoader was available
       // Even if 0 contacts found, we trust the loader (prevents 16+ second freeze)
       // Return early - don't fall through to Firestore
     }
-    
+
     // Only query Firestore if BackgroundContactsLoader is NOT available (rare fallback)
     // This should almost never happen since BackgroundContactsLoader loads on app init
     if (allContacts.length === 0 && !window.BackgroundContactsLoader && window.firebaseDB) {
@@ -1037,8 +1037,9 @@ var console = {
         const email = contact.email || '';
         const phone = contact.workDirectPhone || contact.mobile || contact.otherPhone || '';
 
+        const delay = (index * 0.05).toFixed(2);
         return `
-          <div class="contact-item" data-contact-id="${contact.id}">
+          <div class="contact-item modern-reveal premium-borderline" data-contact-id="${contact.id}" style="animation-delay: ${delay}s;">
             <div class="contact-avatar">
               <div class="avatar-circle-small">${getInitials(fullName)}</div>
             </div>
@@ -1242,13 +1243,13 @@ var console = {
               </svg>
             </button>
             <div class="contact-header-profile">
-              ${(function() {
-                const iconOpts = { logoUrl: a.logoUrl, domain: favDomain, website: a.website, size: 64 };
-                if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
-                  return window.__pcFaviconHelper.generateCompanyIconHTML(iconOpts);
-                }
-                return favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 64) : '') : '';
-              })()}
+              ${(function () {
+        const iconOpts = { logoUrl: a.logoUrl, domain: favDomain, website: a.website, size: 64 };
+        if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
+          return window.__pcFaviconHelper.generateCompanyIconHTML(iconOpts);
+        }
+        return favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 64) : '') : '';
+      })()}
               <div class="avatar-circle-small" style="${favDomain ? 'display:none;' : ''}">${escapeHtml(getInitials(name))}</div>
               <div class="contact-header-text">
                 <div class="contact-title-row">
@@ -1954,9 +1955,9 @@ var console = {
       const limited = calls.length > 20 ? calls.slice(0, 20) : calls;
       const filtered = limited;
 
-      if (!filtered.length) { 
-        arcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>'); 
-        return; 
+      if (!filtered.length) {
+        arcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>');
+        return;
       }
 
       // Enrich for direction/number like Calls page for consistent UI
@@ -2039,7 +2040,7 @@ var console = {
       return;
     }
     const slice = arcGetSlice();
-    arcUpdateListAnimated(list, slice.map(call => rcItemHtml(call)).join(''));
+    arcUpdateListAnimated(list, slice.map((call, index) => rcItemHtml(call, index)).join(''));
     // delegate click to handle dynamic rerenders (prevent duplicate listeners)
     list.querySelectorAll('.rc-insights').forEach(btn => {
       if (!btn._insightsListenerBound) {
@@ -2110,7 +2111,7 @@ var console = {
     }
   }
 
-  function rcItemHtml(c) {
+  function rcItemHtml(c, index = 0) {
     // Prefer contact name; if absent and this is a company call, show company instead of "Unknown"
     const hasContact = !!(c.contactId && c.contactName);
     const displayName = hasContact ? (c.contactName) : (c.accountName || c.company || 'Unknown');
@@ -2142,8 +2143,9 @@ var console = {
     const direction = escapeHtml((c.direction || '').charAt(0).toUpperCase() + (c.direction || '').slice(1));
     const sig = `${idAttr}|${c.status || c.outcome || ''}|${c.durationSec || c.duration || 0}|${c.transcript ? 1 : 0}|${c.aiInsights ? 1 : 0}`;
 
+    const delay = (index * 0.05).toFixed(2);
     return `
-      <div class=\"rc-item\" data-id=\"${idAttr}\" data-sig=\"${sig}\">
+      <div class=\"rc-item modern-reveal premium-borderline\" data-id=\"${idAttr}\" data-sig=\"${sig}\" style=\"animation-delay: ${delay}s;\">
         <div class="rc-meta">
           <div class="rc-title">${name || company || 'Unknown'}</div>
           <div class="rc-sub">${when} • <span class="rc-duration">${durStr}</span> • <span class="phone-number" 
@@ -3137,208 +3139,208 @@ var console = {
       window._accountDetailDocEventsBound = true;
       // console.log('[AccountDetail] Attaching document-level event listeners (one-time)');
 
-    // Listen for activity refresh events
-    document.addEventListener('pc:activities-refresh', (e) => {
-      const { entityType, entityId, forceRefresh } = e.detail || {};
-      if (entityType === 'account' && entityId === state.currentAccount?.id) {
-        // Refresh account activities
-        if (window.ActivityManager) {
-          const activityManager = window.ActivityManager; // use singleton
-          activityManager.renderActivities('account-activity-timeline', 'account', entityId, forceRefresh);
+      // Listen for activity refresh events
+      document.addEventListener('pc:activities-refresh', (e) => {
+        const { entityType, entityId, forceRefresh } = e.detail || {};
+        if (entityType === 'account' && entityId === state.currentAccount?.id) {
+          // Refresh account activities
+          if (window.ActivityManager) {
+            const activityManager = window.ActivityManager; // use singleton
+            activityManager.renderActivities('account-activity-timeline', 'account', entityId, forceRefresh);
+          }
         }
-      }
-    });
+      });
 
-    // Listen for account creation events (from CSV import, etc.)
-    document.addEventListener('pc:account-created', (e) => {
-      if (state.currentAccount && e.detail) {
-        const { id, doc } = e.detail;
+      // Listen for account creation events (from CSV import, etc.)
+      document.addEventListener('pc:account-created', (e) => {
+        if (state.currentAccount && e.detail) {
+          const { id, doc } = e.detail;
 
-        // Only update if this is the current account being viewed
-        if (id === state.currentAccount.id) {
-          // console.log('[AccountDetail] Account updated via pc:account-created, refreshing display');
+          // Only update if this is the current account being viewed
+          if (id === state.currentAccount.id) {
+            // console.log('[AccountDetail] Account updated via pc:account-created, refreshing display');
 
-          // Update the current account data with new fields
-          state.currentAccount = { ...state.currentAccount, ...doc };
+            // Update the current account data with new fields
+            state.currentAccount = { ...state.currentAccount, ...doc };
 
-          // Re-render the account detail to show updated fields
+            // Re-render the account detail to show updated fields
+            renderAccountDetail();
+          }
+        }
+      });
+
+      document.addEventListener('pc:account-updated', (e) => {
+        // console.log('[AccountDetail] Received pc:account-updated event', e.detail);
+        if (state.currentAccount && e.detail && e.detail.id === state.currentAccount.id) {
+          const changes = e.detail.changes || {};
+          state.currentAccount = { ...state.currentAccount, ...changes };
+          // console.log('[AccountDetail] Updating view for recent changes', changes);
           renderAccountDetail();
         }
-      }
-    });
+      });
 
-    document.addEventListener('pc:account-updated', (e) => {
-      // console.log('[AccountDetail] Received pc:account-updated event', e.detail);
-      if (state.currentAccount && e.detail && e.detail.id === state.currentAccount.id) {
-        const changes = e.detail.changes || {};
-        state.currentAccount = { ...state.currentAccount, ...changes };
-        // console.log('[AccountDetail] Updating view for recent changes', changes);
-        renderAccountDetail();
-      }
-    });
+      // Listen for contact creation events to refresh the contacts list
+      document.addEventListener('pc:contact-created', async (e) => {
+        if (state.currentAccount && e.detail) {
+          const detail = e.detail || {};
+          const id = detail.id || (detail.contact && detail.contact.id) || (detail.doc && detail.doc.id);
+          const doc = detail.contact || detail.doc || {};
+          const newContact = id ? Object.assign({ id }, doc) : doc;
 
-    // Listen for contact creation events to refresh the contacts list
-    document.addEventListener('pc:contact-created', async (e) => {
-      if (state.currentAccount && e.detail) {
-        const detail = e.detail || {};
-        const id = detail.id || (detail.contact && detail.contact.id) || (detail.doc && detail.doc.id);
-        const doc = detail.contact || detail.doc || {};
-        const newContact = id ? Object.assign({ id }, doc) : doc;
+          if (!newContact || !newContact.id) return;
 
-        if (!newContact || !newContact.id) return;
+          try {
+            const accountId = state.currentAccount?.id;
+            if (accountId) {
+              if (!window._accountContactsCache) window._accountContactsCache = {};
+              const list = window._accountContactsCache[accountId];
+              if (Array.isArray(list)) {
+                const exists = list.find(c => c && c.id === newContact.id);
+                if (!exists) list.push(newContact);
+              } else {
+                window._accountContactsCache[accountId] = [newContact];
+              }
+            }
+          } catch (_) { }
 
-        try {
-          const accountId = state.currentAccount?.id;
-          if (accountId) {
-            if (!window._accountContactsCache) window._accountContactsCache = {};
-            const list = window._accountContactsCache[accountId];
-            if (Array.isArray(list)) {
-              const exists = list.find(c => c && c.id === newContact.id);
-              if (!exists) list.push(newContact);
-            } else {
-              window._accountContactsCache[accountId] = [newContact];
+          // Inject into essential data if not already there
+          if (newContact && window._essentialContactsData) {
+            const exists = window._essentialContactsData.find(c => c.id === newContact.id);
+            if (!exists) {
+              window._essentialContactsData.push(newContact);
+              // console.log('[AccountDetail] Added new contact to essential data');
             }
           }
-        } catch (_) { }
 
-        // Inject into essential data if not already there
-        if (newContact && window._essentialContactsData) {
-          const exists = window._essentialContactsData.find(c => c.id === newContact.id);
-          if (!exists) {
-            window._essentialContactsData.push(newContact);
-            // console.log('[AccountDetail] Added new contact to essential data');
+          // Update ALL contact caches to include the new contact
+          if (newContact) {
+            // Update account detail people cache
+            if (!window._accountDetailPeopleCache) {
+              window._accountDetailPeopleCache = [];
+            }
+            const exists = window._accountDetailPeopleCache.find(c => c.id === newContact.id);
+            if (!exists) {
+              window._accountDetailPeopleCache.push(newContact);
+              // console.log('[AccountDetail] Added new contact to _accountDetailPeopleCache');
+            }
+
+            // Update BackgroundContactsLoader if available
+            if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+              const contactsData = window.BackgroundContactsLoader.getContactsData() || [];
+              const exists = contactsData.find(c => c.id === newContact.id);
+              if (!exists) {
+                contactsData.push(newContact);
+                // console.log('[AccountDetail] Added new contact to BackgroundContactsLoader');
+              }
+            }
+
+            // Update CacheManager contacts asynchronously
+            if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+              window.CacheManager.get('contacts').then(contacts => {
+                if (!contacts) contacts = [];
+                const exists = contacts.find(c => c.id === newContact.id);
+                if (!exists) {
+                  contacts.push(newContact);
+                  return window.CacheManager.set('contacts', contacts);
+                }
+              }).then(() => {
+                // console.log('[AccountDetail] Added new contact to CacheManager and persisted');
+              }).catch(err => {
+                console.warn('[AccountDetail] Failed to update cache:', err);
+              });
+            }
+
+            // Dispatch event to notify other modules
+            try {
+              const event = new CustomEvent('pc:contacts-loaded', {
+                detail: {
+                  count: window._accountDetailPeopleCache.length,
+                  newContact: true
+                }
+              });
+              document.dispatchEvent(event);
+              // console.log('[AccountDetail] Dispatched pc:contacts-loaded event for new contact');
+            } catch (err) {
+              console.warn('[AccountDetail] Failed to dispatch event:', err);
+            }
+          }
+
+          // Refresh the contacts list
+          const contactsList = document.getElementById('account-contacts-list');
+          if (contactsList) {
+            contactsList.innerHTML = await renderAccountContacts(state.currentAccount);
+            // Re-bind event handlers for the new contact items
+            bindContactItemEvents();
           }
         }
+      });
 
-        // Update ALL contact caches to include the new contact
-        if (newContact) {
-          // Update account detail people cache
-          if (!window._accountDetailPeopleCache) {
-            window._accountDetailPeopleCache = [];
+      // Listen for contact updates to refresh the contacts list
+      document.addEventListener('pc:contact-updated', async (e) => {
+        if (state.currentAccount && e.detail) {
+          const contactId = e.detail.id;
+          const changes = e.detail.changes || {};
+
+          // Update the contact in essential data
+          if (window._essentialContactsData) {
+            const idx = window._essentialContactsData.findIndex(c => c.id === contactId);
+            if (idx >= 0) {
+              window._essentialContactsData[idx] = {
+                ...window._essentialContactsData[idx],
+                ...changes
+              };
+              // console.log('[AccountDetail] Updated contact in essential data');
+            }
           }
-          const exists = window._accountDetailPeopleCache.find(c => c.id === newContact.id);
-          if (!exists) {
-            window._accountDetailPeopleCache.push(newContact);
-            // console.log('[AccountDetail] Added new contact to _accountDetailPeopleCache');
+
+          // Update account detail people cache
+          if (window._accountDetailPeopleCache && Array.isArray(window._accountDetailPeopleCache)) {
+            const idx = window._accountDetailPeopleCache.findIndex(c => c.id === contactId);
+            if (idx >= 0) {
+              window._accountDetailPeopleCache[idx] = {
+                ...window._accountDetailPeopleCache[idx],
+                ...changes
+              };
+              // console.log('[AccountDetail] Updated contact in _accountDetailPeopleCache');
+            }
           }
 
           // Update BackgroundContactsLoader if available
           if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
             const contactsData = window.BackgroundContactsLoader.getContactsData() || [];
-            const exists = contactsData.find(c => c.id === newContact.id);
-          if (!exists) {
-            contactsData.push(newContact);
-            // console.log('[AccountDetail] Added new contact to BackgroundContactsLoader');
-          }
+            const idx = contactsData.findIndex(c => c.id === contactId);
+            if (idx >= 0) {
+              contactsData[idx] = {
+                ...contactsData[idx],
+                ...changes
+              };
+              // console.log('[AccountDetail] Updated contact in BackgroundContactsLoader');
+            }
           }
 
-          // Update CacheManager contacts asynchronously
+          // Update CacheManager
           if (window.CacheManager && typeof window.CacheManager.get === 'function') {
             window.CacheManager.get('contacts').then(contacts => {
-              if (!contacts) contacts = [];
-              const exists = contacts.find(c => c.id === newContact.id);
-              if (!exists) {
-                contacts.push(newContact);
-                return window.CacheManager.set('contacts', contacts);
+              if (contacts) {
+                const idx = contacts.findIndex(c => c.id === contactId);
+                if (idx >= 0) {
+                  contacts[idx] = { ...contacts[idx], ...changes };
+                  return window.CacheManager.set('contacts', contacts);
+                }
               }
             }).then(() => {
-              // console.log('[AccountDetail] Added new contact to CacheManager and persisted');
-            }).catch(err => {
-              console.warn('[AccountDetail] Failed to update cache:', err);
-            });
+              // console.log('[AccountDetail] Updated contact in CacheManager and persisted');
+            }).catch(() => { });
           }
 
-          // Dispatch event to notify other modules
-          try {
-            const event = new CustomEvent('pc:contacts-loaded', {
-              detail: {
-                count: window._accountDetailPeopleCache.length,
-                newContact: true
-              }
-            });
-            document.dispatchEvent(event);
-            // console.log('[AccountDetail] Dispatched pc:contacts-loaded event for new contact');
-          } catch (err) {
-            console.warn('[AccountDetail] Failed to dispatch event:', err);
+          // Refresh contacts list display
+          const contactsList = document.getElementById('account-contacts-list');
+          if (contactsList) {
+            contactsList.innerHTML = await renderAccountContacts(state.currentAccount);
+            bindContactItemEvents();
           }
         }
-
-        // Refresh the contacts list
-        const contactsList = document.getElementById('account-contacts-list');
-        if (contactsList) {
-          contactsList.innerHTML = await renderAccountContacts(state.currentAccount);
-          // Re-bind event handlers for the new contact items
-          bindContactItemEvents();
-        }
-      }
-    });
-
-    // Listen for contact updates to refresh the contacts list
-    document.addEventListener('pc:contact-updated', async (e) => {
-      if (state.currentAccount && e.detail) {
-        const contactId = e.detail.id;
-        const changes = e.detail.changes || {};
-
-        // Update the contact in essential data
-        if (window._essentialContactsData) {
-          const idx = window._essentialContactsData.findIndex(c => c.id === contactId);
-          if (idx >= 0) {
-            window._essentialContactsData[idx] = {
-              ...window._essentialContactsData[idx],
-              ...changes
-            };
-            // console.log('[AccountDetail] Updated contact in essential data');
-          }
-        }
-
-        // Update account detail people cache
-        if (window._accountDetailPeopleCache && Array.isArray(window._accountDetailPeopleCache)) {
-          const idx = window._accountDetailPeopleCache.findIndex(c => c.id === contactId);
-          if (idx >= 0) {
-            window._accountDetailPeopleCache[idx] = {
-              ...window._accountDetailPeopleCache[idx],
-              ...changes
-            };
-            // console.log('[AccountDetail] Updated contact in _accountDetailPeopleCache');
-          }
-        }
-
-        // Update BackgroundContactsLoader if available
-        if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
-          const contactsData = window.BackgroundContactsLoader.getContactsData() || [];
-          const idx = contactsData.findIndex(c => c.id === contactId);
-          if (idx >= 0) {
-            contactsData[idx] = {
-              ...contactsData[idx],
-              ...changes
-            };
-            // console.log('[AccountDetail] Updated contact in BackgroundContactsLoader');
-          }
-        }
-
-        // Update CacheManager
-        if (window.CacheManager && typeof window.CacheManager.get === 'function') {
-          window.CacheManager.get('contacts').then(contacts => {
-            if (contacts) {
-              const idx = contacts.findIndex(c => c.id === contactId);
-              if (idx >= 0) {
-                contacts[idx] = { ...contacts[idx], ...changes };
-                return window.CacheManager.set('contacts', contacts);
-              }
-            }
-          }).then(() => {
-            // console.log('[AccountDetail] Updated contact in CacheManager and persisted');
-          }).catch(() => { });
-        }
-
-        // Refresh contacts list display
-        const contactsList = document.getElementById('account-contacts-list');
-        if (contactsList) {
-          contactsList.innerHTML = await renderAccountContacts(state.currentAccount);
-          bindContactItemEvents();
-        }
-      }
-    });
+      });
     } // End of document-level listeners (one-time)
 
     // === DOM ELEMENT HANDLERS (re-attach on each render - elements are recreated) ===
@@ -3759,14 +3761,14 @@ var console = {
         // Click toggles open state (also support keyboard)
         widgetsBtn.addEventListener('click', (e) => {
           e.preventDefault();
-          
+
           // Fix for hover/click conflict:
           // If the menu was JUST opened by hover (< 500ms ago), treat this click as 
           // a confirmation to "keep open" rather than a toggle to "close".
           // This prevents the common issue where a user hovers (opening it) and then 
           // immediately clicks (accidentally closing it).
           const justOpened = widgetsWrap._lastAutoOpen && (Date.now() - widgetsWrap._lastAutoOpen < 500);
-          
+
           if (justOpened && widgetsWrap.classList.contains('open')) {
             // Do nothing (keep it open)
             return;
@@ -3812,7 +3814,7 @@ var console = {
             // noop
           }
         };
-        
+
         // Check immediately and after a short delay to allow layout to settle
         checkHover();
         setTimeout(checkHover, 50);
@@ -3822,7 +3824,7 @@ var console = {
 
     // Attempt to bind immediately
     bindWidgetsEvents();
-    
+
     // RETRY: In case DOM elements weren't ready or were replaced immediately after
     setTimeout(bindWidgetsEvents, 150);
 
@@ -4327,7 +4329,7 @@ var console = {
         break;
       }
       default:
-        // console.log('Unknown widget action:', which, 'for account', accountId);
+      // console.log('Unknown widget action:', which, 'for account', accountId);
     }
   }
 

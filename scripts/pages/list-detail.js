@@ -2740,7 +2740,7 @@
     const page = document.getElementById('list-detail-page');
     els.theadRow = page ? page.querySelector('#list-detail-table thead tr') : els.theadRow;
     if (!els || !els.theadRow) {
-      console.warn('[ListDetail] No theadRow found for drag and drop');
+      // console.warn('[ListDetail] No theadRow found for drag and drop');
       return;
     }
 
@@ -2748,9 +2748,6 @@
     let dragOverTh = null;
     let isDragging = false;
     const ths = Array.from(els.theadRow.querySelectorAll('th'));
-
-    console.log('[ListDetail] Found', ths.length, 'draggable headers');
-    console.log('[ListDetail] Headers found:', ths.map(th => th.textContent.trim()));
 
     // Helper to commit a move given a source and highlighted target
     function commitHeaderMove(sourceTh, targetTh) {
@@ -2766,56 +2763,113 @@
     els.theadRow.addEventListener('dragover', (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-
-      const th = e.target.closest('th');
-      if (!th || !th.hasAttribute('draggable')) return;
-
-      // Remove previous highlight
-      if (dragOverTh && dragOverTh !== th) {
-        dragOverTh.classList.remove('drag-over');
+      
+      if (!isDragging || !dragSrcTh) return;
+      
+      // Get all available columns (excluding the one being dragged)
+      const allThs = Array.from(els.theadRow.querySelectorAll('th')).filter(th => th !== dragSrcTh);
+      if (allThs.length === 0) return;
+      
+      let targetTh = null;
+      
+      // Method 1: Direct element detection using elementsFromPoint
+      const elements = document.elementsFromPoint(e.clientX, e.clientY);
+      targetTh = elements.find(el => el.tagName === 'TH' && el !== dragSrcTh);
+      
+      // Method 2: If no direct hit, find by mouse position within column bounds
+      if (!targetTh) {
+        for (const th of allThs) {
+          const rect = th.getBoundingClientRect();
+          // More generous hit area for easier targeting
+          const isOverColumn = e.clientX >= rect.left - 15 && e.clientX <= rect.right + 15;
+          
+          if (isOverColumn) {
+            targetTh = th;
+            break;
+          }
+        }
       }
-
-      // Add highlight to current target
-      if (th !== dragSrcTh) {
-        th.classList.add('drag-over');
-        dragOverTh = th;
+      
+      // Method 3: Find closest column by distance to center
+      if (!targetTh) {
+        let closestTh = null;
+        let closestDistance = Infinity;
+        
+        for (const th of allThs) {
+          const rect = th.getBoundingClientRect();
+          const centerX = rect.left + rect.width / 2;
+          const distance = Math.abs(e.clientX - centerX);
+          
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            closestTh = th;
+          }
+        }
+        
+        // Use closest column if within reasonable distance (reduced threshold for better precision)
+        if (closestDistance < 100) {
+          targetTh = closestTh;
+        }
       }
-    });
-
-    els.theadRow.addEventListener('dragleave', (e) => {
-      // Only remove highlight if we're leaving the header row entirely
-      if (!els.theadRow.contains(e.relatedTarget)) {
+      
+      // Method 4: Edge case handling for adjacent columns
+      if (!targetTh) {
+        // Check if mouse is in the gap between columns
+        const draggedIndex = Array.from(els.theadRow.children).indexOf(dragSrcTh);
+        const nextSibling = dragSrcTh.nextElementSibling;
+        const prevSibling = dragSrcTh.previousElementSibling;
+        
+        if (nextSibling && nextSibling.tagName === 'TH') {
+          const nextRect = nextSibling.getBoundingClientRect();
+          if (e.clientX >= nextRect.left - 30 && e.clientX <= nextRect.right + 30) {
+            targetTh = nextSibling;
+          }
+        } else if (prevSibling && prevSibling.tagName === 'TH') {
+          const prevRect = prevSibling.getBoundingClientRect();
+          if (e.clientX >= prevRect.left - 30 && e.clientX <= prevRect.right + 30) {
+            targetTh = prevSibling;
+          }
+        }
+      }
+      
+      // Update highlight if we found a new target
+      if (targetTh && targetTh !== dragOverTh) {
+        // Remove previous highlight
         if (dragOverTh) {
           dragOverTh.classList.remove('drag-over');
-          dragOverTh = null;
         }
+        
+        // Add new highlight
+        dragOverTh = targetTh;
+        targetTh.classList.add('drag-over');
       }
     });
 
+    // Global drop handler - drop into the currently highlighted (dragOverTh) column
     els.theadRow.addEventListener('drop', (e) => {
       e.preventDefault();
-
+      
+      if (!dragSrcTh || !dragOverTh) return;
+      
       // Remove highlight
-      if (dragOverTh) {
-        dragOverTh.classList.remove('drag-over');
-      }
-
+      dragOverTh.classList.remove('drag-over');
+      
       // Commit the move - this will insert the dragged column before the highlighted target
-      if (commitHeaderMove(dragSrcTh, dragOverTh)) {
-        // Update the column order and persist
-        const newOrder = getListDetailHeaderOrderFromDom();
-        if (newOrder.length > 0) {
-          if (state.view === 'people') {
-            peopleColumnOrder = newOrder;
-          } else {
-            accountsColumnOrder = newOrder;
-          }
-          persistColumnOrder();
-          // Re-render to reflect new column order
-          render();
+      commitHeaderMove(dragSrcTh, dragOverTh);
+      
+      // Update the column order and persist
+      const newOrder = getListDetailHeaderOrderFromDom();
+      if (newOrder.length > 0) {
+        if (state.view === 'people') {
+          peopleColumnOrder = newOrder;
+        } else {
+          accountsColumnOrder = newOrder;
         }
+        persistColumnOrder();
+        // Re-render to reflect new column order
+        render();
       }
-
+      
       dragOverTh = null;
     });
 
@@ -2824,23 +2878,34 @@
       th.setAttribute('draggable', 'true');
 
       th.addEventListener('dragstart', (e) => {
-        console.log('[ListDetail] Drag start triggered on:', th.textContent.trim());
-        dragSrcTh = th;
-        th.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/html', th.outerHTML);
         isDragging = true;
+        dragSrcTh = th;
+        const key = th.getAttribute('data-col') || '';
+        try { 
+          e.dataTransfer?.setData('text/plain', key);
+          e.dataTransfer.effectAllowed = 'move';
+        } catch (_) { /* noop */ }
+        th.classList.add('dragging');
+        
+        // Add visual feedback to all other headers
+        ths.forEach(otherTh => {
+          if (otherTh !== th) {
+            otherTh.classList.add('drag-target');
+          }
+        });
       });
 
-      th.addEventListener('dragend', (e) => {
+      th.addEventListener('dragend', () => {
+        // Clean up all visual states
+        isDragging = false;
         th.classList.remove('dragging');
+        ths.forEach(otherTh => {
+          otherTh.classList.remove('drag-over', 'drag-target');
+        });
         dragSrcTh = null;
         dragOverTh = null;
-        isDragging = false;
       });
     });
-
-    console.log('[ListDetail] Drag and drop initialized for', ths.length, 'headers');
   }
 
 

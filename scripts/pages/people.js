@@ -1981,7 +1981,7 @@
       state.hasMore = contactsArray.length > initialBatchSize;
       
       state.loaded = true;
-      console.log('[People] Initial render with', state.data.length, 'of', contactsArray.length, 'contacts (hasMore:', state.hasMore, ')');
+      // console.log('[People] Initial render with', state.data.length, 'of', contactsArray.length, 'contacts (hasMore:', state.hasMore, ')');
       
       // Check if we're restoring from back navigation
       if (window.__restoringPeople && window._peopleReturn) {
@@ -2113,7 +2113,7 @@
           return c;
         });
         state.hasMore = state.data.length + nextBatch.length < state.allContactsCache.length;
-        console.log(`[People] Loaded ${nextBatch.length} more contacts from cache (enriched)`);
+        // console.log(`[People] Loaded ${nextBatch.length} more contacts from cache (enriched)`);
       } else if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.loadMore === 'function') {
         // Use BackgroundContactsLoader for seamless pagination
         const result = await window.BackgroundContactsLoader.loadMore();
@@ -2171,7 +2171,7 @@
         // Clear full cache to save memory if we have 500+ records loaded
         if (state.data.length > 500 && state.allContactsCache) {
           state.allContactsCache = null;
-          console.log('[People] Cleared full cache to save memory (keeping', state.data.length, 'loaded records)');
+          // console.log('[People] Cleared full cache to save memory (keeping', state.data.length, 'loaded records)');
         }
       }
     } catch (error) {
@@ -2403,7 +2403,7 @@
         const prev = els.fCity.getAttribute('data-ph') || 'e.g., Austin, Dallas';
         els.fCity.setAttribute('placeholder', prev);
       }
-      try { console.log('[Filters][DEBUG] city placeholder', els.fCity.getAttribute('placeholder')); } catch(_) {}
+
     }
   }
   function addCityToken(label){ 
@@ -3134,7 +3134,7 @@
         peopleCallStatusCache.set(key, value);
       });
       
-      console.log('[People] Updated call status for', Object.keys(callStatus).length, 'items');
+      // console.log('[People] Updated call status for', Object.keys(callStatus).length, 'items');
     } catch (error) {
       console.error('[People] Failed to update call status:', error);
     }
@@ -3289,7 +3289,7 @@
           // 1. Unsubscribe from Firestore (CRITICAL)
           if (typeof _unsubscribePeople === 'function') {
             try { _unsubscribePeople(); _unsubscribePeople = null; } catch(_) {}
-            console.log('[People] Unsubscribed from Firestore');
+            // console.log('[People] Unsubscribed from Firestore');
           }
 
           // 2. Disconnect observers (CRITICAL)
@@ -3362,7 +3362,7 @@
   try {
     document.addEventListener('bulk-assignment-complete', (event) => {
       if (event.detail && event.detail.collectionType === 'contacts') {
-        console.log('[People] Bulk assignment complete, refreshing...');
+        // console.log('[People] Bulk assignment complete, refreshing...');
         state.loaded = false;
         loadDataOnce();
       }
@@ -3376,7 +3376,7 @@
     document._peopleCallLoggedBound = true;
     document.addEventListener('pc:call-logged', (event) => {
       const { call, targetPhone, accountId, contactId } = event.detail || {};
-      console.log('[People] Call logged event received:', { targetPhone, accountId, contactId });
+      // console.log('[People] Call logged event received:', { targetPhone, accountId, contactId });
       
       // 0. Invalidate call status cache for affected items
       const keysToInvalidate = [];
@@ -3393,7 +3393,7 @@
       });
       
       if (keysToInvalidate.length > 0) {
-        console.log('[People] Invalidated call status cache for:', keysToInvalidate);
+        // console.log('[People] Invalidated call status cache for:', keysToInvalidate);
       }
       
       // 1. Add call to in-memory cache if available
@@ -3454,7 +3454,7 @@
           if (badge) {
             badge.remove();
             badgesRemoved++;
-            console.log('[People] Removed "No Calls" badge from contact:', rowContactId);
+            // console.log('[People] Removed "No Calls" badge from contact:', rowContactId);
           }
         }
       });
@@ -4832,7 +4832,7 @@
     // state.data = [];      // Keep paginated view for restoration
     // state.filtered = [];  // Keep filtered view for restoration
     // Keep hasAnimated = true to prevent icon animations on subsequent visits
-    console.log('[People] UI state cleaned (preserving data for back navigation)');
+    // console.log('[People] UI state cleaned (preserving data for back navigation)');
   };
 })();
 

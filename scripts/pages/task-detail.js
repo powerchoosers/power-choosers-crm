@@ -4651,7 +4651,7 @@
       }
     }, { capture: true });
 
-    console.log('[TaskDetail] Header button handlers bound via event delegation');
+    // console.log('[TaskDetail] Header button handlers bound via event delegation');
   }
 
   function setupCompanyLinkHandlers() {
@@ -6309,7 +6309,7 @@
     const haveAddBtnHandler = typeof document._taskDetailAddContactHandler === 'function';
 
     if (document._taskDetailContactHandlersBound && haveLinkHandler && haveAddBtnHandler) {
-      console.log('[TaskDetail] Contact handlers already bound, skipping');
+      // console.log('[TaskDetail] Contact handlers already bound, skipping');
       return;
     }
 
@@ -6317,7 +6317,7 @@
       console.warn('[TaskDetail] Contact handler guard was set but listeners were missing. Rebinding now.');
     }
 
-    console.log('[TaskDetail] Setting up contact link handlers');
+    // console.log('[TaskDetail] Setting up contact link handlers');
 
     const contactLinkHandler = (e) => {
       // FIX: Skip navigation if click originated from a button inside the link
@@ -6371,7 +6371,7 @@
           });
 
           if (contact && contact.id) {
-            console.log('[TaskDetail] Found contact by name:', contact.id);
+            // console.log('[TaskDetail] Found contact by name:', contact.id);
             // Update the link with the found ID
             contactLink.setAttribute('data-contact-id', contact.id);
             // Retry the click with the ID
@@ -6424,7 +6424,7 @@
             });
             if (contact && contact.id) {
               finalContactId = contact.id;
-              console.log('[TaskDetail] Found contact by name via BackgroundContactsLoader:', finalContactId);
+              // console.log('[TaskDetail] Found contact by name via BackgroundContactsLoader:', finalContactId);
             }
           }
         } catch (error) {
@@ -6467,7 +6467,7 @@
             const tryShowContact = () => {
               if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
                 try {
-                  console.log('[TaskDetail] Opening contact detail for ID:', finalContactId);
+                  // console.log('[TaskDetail] Opening contact detail for ID:', finalContactId);
                   window.ContactDetail.show(finalContactId);
                 } catch (error) {
                   console.error('[TaskDetail] Error showing contact:', error);

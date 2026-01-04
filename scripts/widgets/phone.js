@@ -8,13 +8,16 @@
 
   // Debug wrapper for this module (disabled by default)
   function phoneLog() {
-    try { if (window.CRM_DEBUG_PHONE) console.debug.apply(console, arguments); } catch(_) {}
+    try { if (window.CRM_DEBUG_PHONE) console.debug.apply(console, arguments); } catch (_) { }
   }
 
   // Business phone number for fallback calls
   const DEFAULT_BUSINESS_E164 = '+18176630380';
   const BUSINESS_PHONE = '817-663-0380'; // legacy fallback without formatting
-  
+
+  // Track active call connection globally within this module
+  let currentCall = null;
+
   // Get selected phone number from settings (for caller ID)
   function getSelectedPhoneNumber() {
     try {
@@ -34,7 +37,7 @@
           }
         }
       }
-      
+
       // Fallback to static method
       const settings = window.SettingsPage?.getSettings?.();
       if (settings) {
@@ -47,7 +50,7 @@
           if (normalized) return normalized;
         }
       }
-      
+
       // Fallback to localStorage
       const savedSettings = localStorage.getItem('crm-settings');
       if (savedSettings) {
@@ -61,14 +64,14 @@
             const normalized = normalizeToE164(selectedNumber);
             if (normalized) return normalized;
           }
-        } catch(_) {}
+        } catch (_) { }
       }
-    } catch(_) {}
-    
+    } catch (_) { }
+
     // Final fallback to default
     return getBusinessNumberE164();
   }
-  
+
   // Check if bridge to mobile is enabled (admin only feature)
   function isBridgeToMobileEnabled() {
     try {
@@ -79,13 +82,13 @@
           return true;
         }
       }
-      
+
       // Fallback to static method
       const settings = window.SettingsPage?.getSettings?.();
       if (settings && settings.bridgeToMobile === true) {
         return true;
       }
-      
+
       // Fallback to localStorage
       const savedSettings = localStorage.getItem('crm-settings');
       if (savedSettings) {
@@ -94,13 +97,13 @@
           if (parsed.bridgeToMobile === true) {
             return true;
           }
-        } catch(_) {}
+        } catch (_) { }
       }
-    } catch(_) {}
-    
+    } catch (_) { }
+
     return false;
   }
-  
+
   // Normalize phone number to E.164 format
   function normalizeToE164(phone) {
     if (!phone) return null;
@@ -110,12 +113,12 @@
     if (String(phone).startsWith('+')) return String(phone);
     return null;
   }
-  
-  function getBusinessNumberE164(){
+
+  function getBusinessNumberE164() {
     try {
       const arr = (window.CRM_BUSINESS_NUMBERS || []).filter(Boolean);
       if (arr && arr.length) return String(arr[0]);
-    } catch(_) {}
+    } catch (_) { }
     // Fallbacks
     if (BUSINESS_PHONE && BUSINESS_PHONE.length === 10) return `+1${BUSINESS_PHONE}`;
     return DEFAULT_BUSINESS_E164;
@@ -135,7 +138,7 @@
       if (!snapshot || !snapshot.length) return;
       if (!card) card = document.getElementById(WIDGET_ID);
       requestAnimationFrame(() => {
-        try { window.__pc_lastFlipAt = Date.now(); } catch(_) {}
+        try { window.__pc_lastFlipAt = Date.now(); } catch (_) { }
         snapshot.forEach(({ el, top }) => {
           try {
             const newTop = el.getBoundingClientRect().top;
@@ -153,12 +156,12 @@
               el.style.transform = '';
             };
             el.addEventListener('transitionend', cleanup, { once: true });
-          } catch(_) {}
+          } catch (_) { }
         });
         // Align container height animation with child movement
         smoothResize(card, duration);
       });
-    } catch (_) {}
+    } catch (_) { }
   }
 
   // Call Processing Web Worker
@@ -169,7 +172,7 @@
       const { type, data } = e.data;
       if (type === 'CALL_LOGGED') {
         // Trigger page refresh after call is logged
-        try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number: data.phoneNumber } })); } catch(_) {}
+        try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number: data.phoneNumber } })); } catch (_) { }
       }
     };
     callWorker.onerror = (error) => {
@@ -185,15 +188,15 @@
   }
 
   // Twilio Device state management
-  const TwilioRTC = (function() {
-    const state = { 
-      device: null, 
-      connection: null, 
-      ready: false, 
-      connecting: false, 
-      micPermissionGranted: false, 
+  const TwilioRTC = (function () {
+    const state = {
+      device: null,
+      connection: null,
+      ready: false,
+      connecting: false,
+      micPermissionGranted: false,
       micPermissionChecked: false,
-      tokenRefreshTimer: null 
+      tokenRefreshTimer: null
     };
 
     async function ensureDevice() {
@@ -205,24 +208,24 @@
       }
 
       if (typeof Twilio === 'undefined' || !Twilio.Device) {
-        try { window.crm?.showToast && window.crm.showToast('Twilio Voice SDK not loaded'); } catch(_) {}
+        try { window.crm?.showToast && window.crm.showToast('Twilio Voice SDK not loaded'); } catch (_) { }
         throw new Error('Twilio Voice SDK not loaded. Add script tag to HTML.');
       }
 
       const base = (window.API_BASE_URL || '').replace(/\/$/, '');
       if (!base) {
-        try { window.crm?.showToast && window.crm.showToast('API base URL not configured'); } catch(_) {}
+        try { window.crm?.showToast && window.crm.showToast('API base URL not configured'); } catch (_) { }
         throw new Error('Missing API_BASE_URL');
       }
 
-      try { console.debug('[TwilioRTC] ensureDevice: API base =', base); } catch(_) {}
+      try { console.debug('[TwilioRTC] ensureDevice: API base =', base); } catch (_) { }
       state.connecting = true;
 
       try {
         // Get Twilio access token
         const resp = await fetch(`${base}/api/twilio/token?identity=agent`);
-        try { console.debug('[TwilioRTC] Token fetch status =', resp.status); } catch(_) {}
-        
+        try { console.debug('[TwilioRTC] Token fetch status =', resp.status); } catch (_) { }
+
         const j = await resp.json().catch(() => ({}));
         if (!resp.ok || !j?.token) {
           const errorMsg = j?.error || j?.message || `HTTP ${resp.status}`;
@@ -231,14 +234,14 @@
             error: errorMsg,
             response: j
           });
-          try { window.crm?.showToast && window.crm.showToast(`Token error: ${errorMsg}`); } catch(_) {}
+          try { window.crm?.showToast && window.crm.showToast(`Token error: ${errorMsg}`); } catch (_) { }
           throw new Error(errorMsg);
         }
-        
+
         // Validate token format (JWT should be 3 parts separated by dots)
         if (!j.token || typeof j.token !== 'string' || j.token.split('.').length !== 3) {
           console.error('[TwilioRTC] Invalid token format received');
-          try { window.crm?.showToast && window.crm.showToast('Invalid token format from server'); } catch(_) {}
+          try { window.crm?.showToast && window.crm.showToast('Invalid token format from server'); } catch (_) { }
           throw new Error('Invalid token format');
         }
 
@@ -249,7 +252,7 @@
           enableImprovedSignalingErrorPrecision: true,
           logLevel: 'warn'
         });
-        
+
         // Set audio constraints for better audio quality
         state.device.audio.setAudioConstraints({
           echoCancellation: true,
@@ -258,22 +261,22 @@
           sampleRate: 48000,
           channelCount: 2
         });
-        
+
         // Set input device - use first available if 'default' doesn't exist
         try {
           const inputDevices = state.device.audio.availableInputDevices;
           let inputDeviceId = 'default';
-          
+
           if (inputDevices && inputDevices.size > 0) {
             const deviceIds = Array.from(inputDevices.keys());
             console.debug('[TwilioRTC] Available input devices during init:', deviceIds);
-            
+
             if (!deviceIds.includes('default') && deviceIds.length > 0) {
               inputDeviceId = deviceIds[0];
               console.debug('[TwilioRTC] Using first available input device:', inputDeviceId);
             }
           }
-          
+
           await state.device.audio.setInputDevice(inputDeviceId);
           console.debug('[TwilioRTC] Input device set to:', inputDeviceId);
         } catch (e) {
@@ -282,7 +285,7 @@
           // Try without any specific device
           try {
             await state.device.audio.unsetInputDevice();
-          } catch (_) {}
+          } catch (_) { }
         }
 
         // Set up device event handlers
@@ -293,7 +296,7 @@
 
         state.device.on('error', (error) => {
           console.error('[TwilioRTC] Device error:', error);
-          
+
           // If it's a token-related error, try to refresh immediately
           if (error.code === 20101 || error.code === 31204) {
             console.error('[TwilioRTC] Token validation error:', {
@@ -301,21 +304,21 @@
               message: error.message,
               name: error.name
             });
-            
+
             // For 20101 (AccessTokenInvalid), this usually means credentials are wrong
             if (error.code === 20101) {
               console.error('[TwilioRTC] CRITICAL: Token is invalid - check Twilio credentials in environment variables');
-              try { 
-                window.crm?.showToast && window.crm.showToast('Twilio authentication failed. Please check server configuration.'); 
-              } catch(_) {}
+              try {
+                window.crm?.showToast && window.crm.showToast('Twilio authentication failed. Please check server configuration.');
+              } catch (_) { }
             }
-            
+
             console.debug('[TwilioRTC] Token error detected, attempting immediate refresh...');
             setTimeout(async () => {
               try {
                 const refreshResp = await fetch(`${base}/api/twilio/token?identity=agent`);
                 const refreshData = await refreshResp.json().catch(() => ({}));
-                
+
                 if (refreshResp.ok && refreshData?.token && state.device) {
                   // Validate new token before updating
                   if (refreshData.token.split('.').length === 3) {
@@ -335,33 +338,33 @@
               }
             }, 1000);
           }
-          
-          try { window.crm?.showToast && window.crm.showToast(`Device error: ${error?.message || 'Unknown error'}`); } catch(_) {}
+
+          try { window.crm?.showToast && window.crm.showToast(`Device error: ${error?.message || 'Unknown error'}`); } catch (_) { }
         });
-        
+
         // Handle device changes (e.g., headset plugged in/out)
         // According to Twilio best practices
         state.device.audio.on('deviceChange', () => {
           console.debug('[TwilioRTC] Audio devices changed');
           // Update UI with new device list if needed
         });
-        
+
         // Set speaker device for output - use first available if 'default' doesn't exist
         if (state.device.audio.isOutputSelectionSupported) {
           try {
             const outputDevices = state.device.audio.availableOutputDevices;
             let outputDeviceId = 'default';
-            
+
             if (outputDevices && outputDevices.size > 0) {
               const deviceIds = Array.from(outputDevices.keys());
               console.debug('[TwilioRTC] Available output devices during init:', deviceIds);
-              
+
               if (!deviceIds.includes('default') && deviceIds.length > 0) {
                 outputDeviceId = deviceIds[0];
                 console.debug('[TwilioRTC] Using first available output device during init:', outputDeviceId);
               }
             }
-            
+
             state.device.audio.speakerDevices.set(outputDeviceId);
             console.debug('[TwilioRTC] Output device set during init:', outputDeviceId);
           } catch (e) {
@@ -374,12 +377,12 @@
           state.device.on('warning', (name, data) => {
             console.warn('[TwilioRTC] Device warning:', name, data || {});
           });
-        } catch (_) {}
+        } catch (_) { }
 
         state.device.on('incoming', async (conn) => {
           console.debug('[TwilioRTC] Incoming call:', conn);
 
-          // [FIX] Do NOT open widget yet - only show toast notification
+          // Do NOT open widget yet - only show toast notification
           // Widget will open when user clicks "Answer" on the toast
 
           // Set input/output devices before accepting the call
@@ -388,21 +391,21 @@
             try {
               const inputDevices = state.device.audio.availableInputDevices;
               let inputDeviceId = 'default';
-              
+
               if (inputDevices && inputDevices.size > 0) {
                 const deviceIds = Array.from(inputDevices.keys());
                 if (!deviceIds.includes('default') && deviceIds.length > 0) {
                   inputDeviceId = deviceIds[0];
                 }
               }
-              
+
               await state.device.audio.setInputDevice(inputDeviceId);
             } catch (e) {
               console.warn('[TwilioRTC] Failed to set input device for incoming call:', e);
               // Try without any specific device if default fails
               try {
                 await state.device.audio.unsetInputDevice();
-              } catch (_) {}
+              } catch (_) { }
             }
             if (state.device.audio.isOutputSelectionSupported) {
               try {
@@ -426,81 +429,211 @@
             // Use originalCaller parameter if available, otherwise fall back to From
             const number = conn.customParameters?.originalCaller || conn.parameters?.From || '';
             console.debug('[TwilioRTC] Incoming call from number:', number, 'Original caller:', conn.customParameters?.originalCaller, 'Full parameters:', conn.parameters);
+
+            // [AGENT FIX] CRITICAL: Clear stale call context BEFORE resolving incoming caller.
+            // Without this, resolvePhoneMeta() would return the LAST OUTBOUND call's data instead
+            // of looking up fresh data for the actual incoming caller.
+            currentCallContext = {
+              number: '',
+              name: '',
+              company: '',
+              accountId: null,
+              accountName: null,
+              contactId: null,
+              contactName: null,
+              city: '',
+              state: '',
+              domain: '',
+              logoUrl: '',
+              isCompanyPhone: false,
+              isActive: false
+            };
+
             const meta = await resolvePhoneMeta(number);
 
-            // Remember connection so we can accept on click (do NOT mark as active connection yet)
+            // Pre-warm the icon cache as soon as we have meta (before toast shows)
+            if (meta && meta.domain && window.__pcFaviconHelper) {
+              window.__pcFaviconHelper.preWarm(meta.domain);
+            }
+
             TwilioRTC.state.pendingIncoming = conn;
+            TwilioRTC.state.pendingIncomingMeta = meta;
+            TwilioRTC.state.pendingIncomingNumber = number;
+
+            // Listen for connection events immediately
+            conn.on('accept', () => {
+              console.debug('[TwilioRTC] Incoming call connection accepted');
+              isCallInProgress = true;
+              state.connection = conn;
+              currentCall = conn; // Set global connection reference
+
+              // Update global call context for incoming call
+              currentCallContext = {
+                number: number,
+                name: meta?.name || '',
+                company: meta?.account || '',
+                accountId: meta?.accountId || null,
+                accountName: meta?.account || null,
+                contactId: meta?.contactId || null,
+                contactName: meta?.name || '',
+                city: meta?.city || '',
+                state: meta?.state || '',
+                domain: meta?.domain || '',
+                logoUrl: meta?.logoUrl || '',
+                isCompanyPhone: !!(meta?.account && !meta?.contactId),
+                isActive: true
+              };
+
+              // Ensure UI is updated
+              setInCallUI(true);
+
+              // If we have meta, update the display
+              if (meta) {
+                setContactDisplay(meta, number);
+              }
+
+              // Start timer
+              const card = document.getElementById(WIDGET_ID);
+              let incomingCallSid = null;
+              try {
+                const pp = (conn && (conn.parameters || conn._parameters)) || {};
+                incomingCallSid = pp.CallSid || pp.callSid || null;
+              } catch (_) { }
+              startLiveCallTimer(card, incomingCallSid);
+
+              const callStartTime = Date.now();
+              const callId = `call_${callStartTime}_${Math.random().toString(36).substr(2, 9)}`;
+
+              // Cleanup on disconnect - Handle cleanup regardless of who hangs up
+              const cleanup = () => {
+                console.debug('[TwilioRTC] Incoming call connection cleanup (disconnect/cancel/error)');
+                isCallInProgress = false;
+                state.connection = null;
+
+                const widget = document.getElementById(WIDGET_ID);
+                stopLiveCallTimer(widget);
+                setInCallUI(false);
+
+                if (widget) {
+                  widget.classList.remove('in-call');
+                  const input = widget.querySelector('.phone-display');
+                  if (input) input.value = '';
+                  try { clearContactDisplay(); } catch (_) { }
+                }
+
+                // Reset current call state
+                if (typeof currentCallContext !== 'undefined' && currentCallContext) {
+                  currentCallContext.isActive = false;
+                  currentCallContext.number = '';
+                }
+                currentCallSid = null;
+                currentCall = null; // Clear global connection reference
+
+                // Log call status
+                if (typeof updateCallStatus === 'function') {
+                  const duration = Math.floor((Date.now() - callStartTime) / 1000);
+                  updateCallStatus(number, 'completed', callStartTime, duration, incomingCallSid || callId, number, 'incoming');
+                }
+
+                // Ensure all listeners are removed to avoid double-cleanup
+                conn.removeListener('disconnect', cleanup);
+                conn.removeListener('cancel', cleanup);
+                conn.removeListener('error', cleanup);
+
+                // Notify that call has ended
+                try {
+                  document.dispatchEvent(new CustomEvent('pc:call-completed', { detail: { callSid: incomingCallSid } }));
+                  document.dispatchEvent(new CustomEvent('callStateChanged', { detail: { state: 'ended', callSid: incomingCallSid } }));
+                } catch (_) { }
+              };
+
+              conn.on('disconnect', cleanup);
+              conn.on('cancel', cleanup);
+              conn.on('error', cleanup);
+            });
 
             // Show enhanced toast notification for incoming call
             if (window.ToastManager) {
-                console.debug('[TwilioRTC] Toast notification data:', {
-                    name: meta.name,
-                    account: meta.account,
-                    title: meta.title,
-                    city: meta.city,
-                    state: meta.state,
-                    domain: meta.domain,
-                    logoUrl: meta.logoUrl
-                });
-                
-                const callData = {
-                    callerName: meta.name || '',
-                    callerNumber: number,
-                    company: meta.account || '',
-                    title: meta.title || '',
-                    city: meta.city || '',
-                    state: meta.state || '',
-                    // Use logoUrl if available, otherwise generate favicon from domain
-                    callerIdImage: meta.logoUrl || (meta.domain ? makeFavicon(meta.domain) : null),
-                    carrierName: meta.carrierName || '',
-                    carrierType: meta.carrierType || '',
-                    nationalFormat: meta.nationalFormat || number,
-                    connection: conn
-                };
-                
-                const toastId = window.ToastManager.showCallNotification(callData);
-                callData.toastId = toastId;
-                TwilioRTC.state.pendingIncoming.toastId = toastId;
+              console.debug('[TwilioRTC] Toast notification data:', {
+                name: meta.name,
+                account: meta.account,
+                title: meta.title,
+                city: meta.city,
+                state: meta.state,
+                domain: meta.domain,
+                logoUrl: meta.logoUrl
+              });
+
+              const callData = {
+                callerName: meta.name || '',
+                callerNumber: number,
+                company: meta.account || '',
+                title: meta.title || '',
+                city: meta.city || '',
+                state: meta.state || '',
+                accountId: meta.accountId || null,
+                contactId: meta.contactId || null,
+                domain: meta.domain || '',
+                // Use logoUrl if available, otherwise generate favicon from domain
+                callerIdImage: meta.logoUrl || (meta.domain ? makeFavicon(meta.domain) : null),
+                isCompanyPhone: !!(meta.account && !meta.contactId), // Explicitly flag if this is a company/account call
+                carrierName: meta.carrierName || '',
+                carrierType: meta.carrierType || '',
+                nationalFormat: meta.nationalFormat || number,
+                connection: conn
+              };
+
+              const toastId = window.ToastManager.showCallNotification(callData);
+              callData.toastId = toastId;
+              TwilioRTC.state.pendingIncoming.toastId = toastId;
             }
 
             // Show browser notification for incoming call (so user sees it on other tabs)
             if ('Notification' in window && Notification.permission === 'granted') {
-                const notificationTitle = meta.name || 'Incoming Call';
-                const notificationBody = meta.name ? 
-                    `${meta.nationalFormat || number}${meta.title ? ` (${meta.title})` : ''}${meta.account ? ` at ${meta.account}` : ''}` :
-                    meta.nationalFormat || number;
-                
-                const browserNotification = new Notification(notificationTitle, {
-                    body: notificationBody,
-                    icon: 'https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png',
-                    tag: 'incoming-call',
-                    requireInteraction: true // Keep notification visible until user interacts
-                });
+              const notificationTitle = meta.name || 'Incoming Call';
+              const notificationBody = meta.name ?
+                `${meta.nationalFormat || number}${meta.title ? ` (${meta.title})` : ''}${meta.account ? ` at ${meta.account}` : ''}` :
+                meta.nationalFormat || number;
 
-                // Close browser notification when user answers via toast
-                browserNotification.onclick = () => {
-                    browserNotification.close();
-                    // Focus the CRM window
-                    window.focus();
-                };
+              const browserNotification = new Notification(notificationTitle, {
+                body: notificationBody,
+                icon: 'https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png',
+                tag: 'incoming-call',
+                requireInteraction: true // Keep notification visible until user interacts
+              });
+
+              // Close browser notification when user answers via toast
+              browserNotification.onclick = () => {
+                browserNotification.close();
+                // Focus the CRM window
+                window.focus();
+              };
             }
 
             // If the caller hangs up (cancels) before we accept, immediately clean up UI/state
             try {
               conn.on('cancel', () => {
                 console.debug('[TwilioRTC] Incoming call canceled by remote - cleaning up UI');
-                
+
                 // Add missed call notification to badge
                 if (window.Notifications && typeof window.Notifications.addMissedCall === 'function') {
-                    const callerName = meta?.name || '';
-                    const callerNumber = number || '';
-                    window.Notifications.addMissedCall(callerNumber, callerName);
+                  const callerName = meta?.name || '';
+                  const callerNumber = number || '';
+                  window.Notifications.addMissedCall(callerNumber, callerName);
                 }
-                
+
+                // [AGENT FIX] Capture toast ID before clearing pending state
+                const toastId = TwilioRTC.state.pendingIncoming ? TwilioRTC.state.pendingIncoming.toastId : null;
+
                 // Clear pending state
                 TwilioRTC.state.pendingIncoming = null;
                 // Ensure any lingering connection reference is cleared
                 TwilioRTC.state.connection = null;
+
+                // [AGENT FIX] Explicitly remove the toast
+                if (toastId && window.ToastManager) {
+                  try { window.ToastManager.removeToast(toastId); } catch (_) { }
+                }
                 // Reset UI button/text
                 try {
                   const cardCancel = document.getElementById(WIDGET_ID);
@@ -516,15 +649,15 @@
                     const titleCancel = cardCancel.querySelector('.widget-title');
                     if (titleCancel) titleCancel.innerHTML = 'Phone';
                     // Remove in-call contact display if present
-                    try { clearContactDisplay(); } catch(_) {}
+                    try { clearContactDisplay(); } catch (_) { }
                   }
-                } catch(_) {}
+                } catch (_) { }
                 // Ensure timers/states are reset
-                try { stopLiveCallTimer(document.getElementById(WIDGET_ID)); } catch(_) {}
+                try { stopLiveCallTimer(document.getElementById(WIDGET_ID)); } catch (_) { }
                 isCallInProgress = false;
-                currentCallContext = { 
-                  number: '', 
-                  name: '', 
+                currentCallContext = {
+                  number: '',
+                  name: '',
                   company: '',
                   accountId: null,
                   accountName: null,
@@ -534,7 +667,7 @@
                   state: '',
                   domain: '',
                   isCompanyPhone: false,
-                  isActive: false 
+                  isActive: false
                 };
                 // Toast notification auto-removed by ToastManager
                 // Set cooldowns to prevent any auto-trigger or quick redial
@@ -542,19 +675,19 @@
                 lastCalledNumber = number;
                 autoTriggerBlockUntil = Date.now() + 15000;
                 // Mark connection as canceled so accept() can guard
-                try { conn._canceled = true; } catch(_) {}
+                try { conn._canceled = true; } catch (_) { }
                 // Optional: notify missed call
                 try {
                   const from = conn.customParameters?.originalCaller || conn.parameters?.From || '';
                   if (window.Notifications && typeof window.Notifications.addMissedCall === 'function') {
                     window.Notifications.addMissedCall(from, null);
                   }
-                } catch(_) {}
+                } catch (_) { }
                 console.debug('[TwilioRTC] Incoming cancel cleanup complete');
               });
-            } catch(_) {}
+            } catch (_) { }
 
-            // [FIX] Do NOT pre-populate UI while ringing - widget stays closed until user answers
+            // Do NOT pre-populate UI while ringing - widget stays closed until user answers
             // Toast notification handles the ringing state visually
 
             const accept = async () => {
@@ -568,20 +701,20 @@
                     TwilioRTC.state.pendingIncoming = null;
                     TwilioRTC.state.connection = null;
                     isCallInProgress = false;
-                    currentCallContext = { 
-                  number: '', 
-                  name: '', 
-                  company: '',
-                  accountId: null,
-                  accountName: null,
-                  contactId: null,
-                  contactName: null,
-                  city: '',
-                  state: '',
-                  domain: '',
-                  isCompanyPhone: false,
-                  isActive: false 
-                };
+                    currentCallContext = {
+                      number: '',
+                      name: '',
+                      company: '',
+                      accountId: null,
+                      accountName: null,
+                      contactId: null,
+                      contactName: null,
+                      city: '',
+                      state: '',
+                      domain: '',
+                      isCompanyPhone: false,
+                      isActive: false
+                    };
                     const cardGone = document.getElementById(WIDGET_ID);
                     if (cardGone) {
                       const btnGone = cardGone.querySelector('.call-btn-start');
@@ -594,7 +727,7 @@
                     // Toast notification auto-removed by ToastManager
                     return;
                   }
-                } catch(_) {}
+                } catch (_) { }
                 // Ensure widget is open for controls
                 if (!document.getElementById(WIDGET_ID)) {
                   openPhone();
@@ -612,9 +745,16 @@
                       }
                     }
                     await state.device.audio.setInputDevice(inputDeviceId);
-                  } catch(_) {}
+                  } catch (_) { }
                 }
-                conn.accept();
+
+                // Use the original accept function if we've wrapped it
+                if (typeof conn._accept === 'function') {
+                  conn._accept();
+                } else {
+                  conn.accept();
+                }
+
                 isCallInProgress = true;
                 // Store the connection reference
                 TwilioRTC.state.connection = conn;
@@ -623,13 +763,13 @@
                 try {
                   const pp = (conn && (conn.parameters || conn._parameters)) || {};
                   incomingCallSid = pp.CallSid || pp.callSid || null;
-                } catch(_) {}
+                } catch (_) { }
                 try {
                   document.dispatchEvent(new CustomEvent('callStarted', { detail: { callSid: incomingCallSid } }));
                   const el = document.getElementById(WIDGET_ID);
                   if (el) el.dispatchEvent(new CustomEvent('callStateChanged', { detail: { state: 'in-call', callSid: incomingCallSid } }));
-                } catch(_) {}
-                
+                } catch (_) { }
+
                 // Set full call context for incoming call (now that it's accepted)
                 currentCallContext = {
                   number: number,
@@ -647,17 +787,14 @@
                   isActive: true
                 };
                 console.debug('[Phone] Incoming call context set on accept:', currentCallContext);
-                
+
                 // Start live timer banner
                 startLiveCallTimer(document.getElementById(WIDGET_ID), incomingCallSid);
                 const card = document.getElementById(WIDGET_ID);
                 if (card) {
-                  const btn = card.querySelector('.call-btn-start');
-                  if (btn) {
-                    btn.textContent = 'Hang Up';
-                    btn.classList.remove('btn-primary');
-                    btn.classList.add('btn-danger');
-                  }
+                  // Use the official UI state function
+                  setInCallUI(true);
+
                   const input = card.querySelector('.phone-display');
                   if (input) {
                     console.debug('[Phone] Setting input to caller number:', number);
@@ -669,34 +806,41 @@
                 const callStartTime = Date.now();
                 const callId = `call_${callStartTime}_${Math.random().toString(36).substr(2, 9)}`;
                 if (typeof updateCallStatus === 'function') {
-                // Use Twilio CallSid if available so backend persists immediately
-                updateCallStatus(number, 'connected', callStartTime, 0, incomingCallSid || callId, number, 'incoming');
-                // Immediately notify recent calls refresh so account detail updates without reload
-                try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch(_) {}
+                  // Use Twilio CallSid if available so backend persists immediately
+                  updateCallStatus(number, 'connected', callStartTime, 0, incomingCallSid || callId, number, 'incoming');
+                  // Immediately notify recent calls refresh so account detail updates without reload
+                  try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch (_) { }
                 } else {
                   console.warn('[TwilioRTC] updateCallStatus not available - skipping status update');
                 }
 
                 conn.on('disconnect', () => {
                   console.debug('[Phone] Call disconnected');
-                  
-                  // [WEB WORKER FIX] Only set critical flags immediately - everything else goes to worker
+
+                  // Record call in notification system
+                  if (window.Notifications && typeof window.Notifications.addCallCompleted === 'function') {
+                    const callEndTime = Date.now();
+                    const durationSec = Math.floor((callEndTime - callStartTime) / 1000);
+                    const callerName = meta?.name || '';
+                    window.Notifications.addCallCompleted(number, callerName, durationSec);
+                  }
+
+                  // Only set critical flags immediately - everything else goes to worker
                   const disconnectTime = Date.now();
                   lastCallCompleted = disconnectTime;
                   lastCalledNumber = number;
                   isCallInProgress = false;
                   autoTriggerBlockUntil = Date.now() + 3000;
-                  
+
                   // Clear critical state immediately
                   TwilioRTC.state.connection = null;
                   TwilioRTC.state.pendingIncoming = null;
-                  currentCall = null;
-                  
+
                   // [WEB WORKER] Send call completion to background worker
                   if (callWorker) {
                     const callEndTime = Date.now();
                     const duration = Math.floor((callEndTime - callStartTime) / 1000);
-                    
+
                     callWorker.postMessage({
                       type: 'CALL_COMPLETED',
                       data: {
@@ -714,15 +858,15 @@
                     setTimeout(() => {
                       const callEndTime = Date.now();
                       const duration = Math.floor((callEndTime - callStartTime) / 1000);
-                  updateCallStatus(number, 'completed', callStartTime, duration, incomingCallSid || callId, number, 'incoming');
-                  try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch(_) {}
+                      updateCallStatus(number, 'completed', callStartTime, duration, incomingCallSid || callId, number, 'incoming');
+                      try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch (_) { }
                     }, 0);
                   }
-                  
+
                   // Immediate UI cleanup (non-blocking)
                   const widget = document.getElementById(WIDGET_ID);
                   stopLiveCallTimer(widget);
-                  
+
                   // Clear UI state completely and ensure call button shows "Call"
                   if (widget) {
                     const btn = widget.querySelector('.call-btn-start');
@@ -739,14 +883,23 @@
                     if (input) input.value = '';
                     const title = widget.querySelector('.widget-title');
                     if (title) title.innerHTML = 'Phone';
-                    try { clearContactDisplay(); } catch(_) {}
-                    try { widget.classList.remove('in-call'); } catch(_) {}
                   }
-                  
+
+                  // Notify that call has ended
+                  try {
+                    document.dispatchEvent(new CustomEvent('pc:call-completed', { detail: { callSid: incomingCallSid || callId } }));
+                    document.dispatchEvent(new CustomEvent('callStateChanged', { detail: { state: 'ended', callSid: incomingCallSid || callId } }));
+                  } catch (_) { }
+
+                  if (widget) {
+                    try { clearContactDisplay(); } catch (_) { }
+                    try { widget.classList.remove('in-call'); } catch (_) { }
+                  }
+
                   // Force UI update to ensure button state is visible
                   setInCallUI(false);
                   console.debug('[Phone] DISCONNECT: UI cleanup complete, call should show as ended');
-                  
+
                   // Fire-and-forget termination of all related call legs
                   const callSidsToTerminate = [];
                   if (window.currentServerCallSid) {
@@ -757,7 +910,7 @@
                     if (browserCallSid && !callSidsToTerminate.includes(browserCallSid)) {
                       callSidsToTerminate.push(browserCallSid);
                     }
-                  } catch(_) {}
+                  } catch (_) { }
                   try {
                     if (window.storedDialCallSids && Array.isArray(window.storedDialCallSids)) {
                       window.storedDialCallSids.forEach(sid => {
@@ -766,8 +919,8 @@
                         }
                       });
                     }
-                  } catch(_) {}
-                  
+                  } catch (_) { }
+
                   if (callSidsToTerminate.length > 0) {
                     try {
                       const base = (window.API_BASE_URL || '').replace(/\/$/, '');
@@ -775,12 +928,12 @@
                       fetch(`${base}/api/twilio/hangup`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ callSids: callSidsToTerminate })
-                      }).catch(()=>{});
-                    } catch (_) {}
+                      }).catch(() => { });
+                    } catch (_) { }
                     window.currentServerCallSid = null;
                     window.storedDialCallSids = null;
                   }
-                  
+
                   // [REMOVED] Audio device release - was causing UI freeze on hangup
                   // Browser will automatically release microphone when tab closes/refreshes
                   // Trade-off: Red recording dot may linger in tab until refresh (minor UX issue vs major freeze issue)
@@ -789,25 +942,25 @@
                 conn.on('error', (error) => {
                   console.error('[Phone] Call error:', error);
                   isCallInProgress = false;
-                  currentCallContext = { 
-                  number: '', 
-                  name: '', 
-                  company: '',
-                  accountId: null,
-                  accountName: null,
-                  contactId: null,
-                  contactName: null,
-                  city: '',
-                  state: '',
-                  domain: '',
-                  isCompanyPhone: false,
-                  isActive: false 
-                };
-                  
+                  currentCallContext = {
+                    number: '',
+                    name: '',
+                    company: '',
+                    accountId: null,
+                    accountName: null,
+                    contactId: null,
+                    contactName: null,
+                    city: '',
+                    state: '',
+                    domain: '',
+                    isCompanyPhone: false,
+                    isActive: false
+                  };
+
                   // Clear ALL connection state
                   TwilioRTC.state.pendingIncoming = null;
                   TwilioRTC.state.connection = null;
-                  
+
                   const card3 = document.getElementById(WIDGET_ID);
                   if (card3) {
                     const btn3 = card3.querySelector('.call-btn-start');
@@ -821,8 +974,8 @@
                     if (input3) input3.value = '';
                     const title3 = card3.querySelector('.widget-title');
                     if (title3) title3.innerHTML = 'Phone';
-                    try { clearContactDisplay(); } catch(_) {}
-                    try { card3.classList.remove('in-call'); } catch(_) {}
+                    try { clearContactDisplay(); } catch (_) { }
+                    try { card3.classList.remove('in-call'); } catch (_) { }
                   }
                   // Stop live timer and restore banner
                   stopLiveCallTimer(card3);
@@ -840,6 +993,60 @@
               }
             };
 
+            // Define reject handler for user-initiated decline
+            const reject = () => {
+              console.debug('[TwilioRTC] Rejecting incoming call (user action)');
+              try {
+                // Use original reject if wrapped
+                if (typeof conn._reject === 'function') {
+                  conn._reject();
+                } else {
+                  conn.reject();
+                }
+              } catch (e) {
+                console.warn('[TwilioRTC] Error rejecting call:', e);
+              }
+
+              // Add missed call notification to record user-initiated decline
+              if (window.Notifications && typeof window.Notifications.addMissedCall === 'function') {
+                const callerName = meta?.name || '';
+                const callerNumber = number || '';
+                window.Notifications.addMissedCall(callerNumber, callerName);
+              }
+
+              // Clean up state immediately
+              TwilioRTC.state.pendingIncoming = null;
+              TwilioRTC.state.connection = null;
+
+              // Trigger UI cleanup (similar to cancel handler)
+              const card = document.getElementById(WIDGET_ID);
+              if (card) {
+                const btn = card.querySelector('.call-btn-start');
+                if (btn) {
+                  btn.textContent = 'Call';
+                  btn.classList.remove('btn-danger');
+                  btn.classList.add('btn-primary');
+                }
+                const input = card.querySelector('.phone-display');
+                if (input) input.value = '';
+                const title = card.querySelector('.widget-title');
+                if (title) title.innerHTML = 'Phone';
+                try { clearContactDisplay(); } catch (_) { }
+              }
+              try { stopLiveCallTimer(document.getElementById(WIDGET_ID)); } catch (_) { }
+              isCallInProgress = false;
+              // Set cooldowns
+              lastCallCompleted = Date.now();
+              autoTriggerBlockUntil = Date.now() + 5000;
+            };
+
+            // Attach enhanced handlers to connection
+            // Store original Twilio functions to avoid recursion
+            conn._accept = conn.accept;
+            conn._reject = conn.reject;
+            conn.accept = accept;
+            conn.reject = reject;
+
             // Old notification system removed - using ToastManager (shown above at line ~282-300)
           } catch (e) {
             console.error('[TwilioRTC] Incoming notification error:', e);
@@ -849,7 +1056,7 @@
         // Belt-and-suspenders: device-level disconnect handler to ensure cleanup
         try {
           state.device.on('disconnect', (conn) => {
-            try { console.debug('[TwilioRTC] Device-level disconnect observed', conn?.parameters || {}); } catch(_) {}
+            try { console.debug('[TwilioRTC] Device-level disconnect observed', conn?.parameters || {}); } catch (_) { }
             // Clear connection state
             TwilioRTC.state.connection = null;
             TwilioRTC.state.pendingIncoming = null;
@@ -869,30 +1076,31 @@
               if (inputX) inputX.value = '';
               const titleX = cardX.querySelector('.widget-title');
               if (titleX) titleX.innerHTML = 'Phone';
-              try { clearContactDisplay(); } catch(_) {}
-              try { cardX.classList.remove('in-call'); } catch(_) {}
+              try { clearContactDisplay(); } catch (_) { }
+              try { cardX.classList.remove('in-call'); } catch (_) { }
             }
-            try { stopLiveCallTimer(cardX); } catch(_) {}
+            try { stopLiveCallTimer(cardX); } catch (_) { }
+            setInCallUI(false); // Ensure consistent UI reset
             lastCallCompleted = Date.now();
             autoTriggerBlockUntil = Date.now() + 10000;
             console.debug('[TwilioRTC] Device-level disconnect cleanup complete');
           });
-        } catch (_) {}
+        } catch (_) { }
 
         // Register the device
         await state.device.register();
-        
+
         // Set up automatic token refresh (refresh every 50 minutes, tokens expire after 1 hour)
         if (state.tokenRefreshTimer) {
           clearInterval(state.tokenRefreshTimer);
         }
-        
+
         state.tokenRefreshTimer = setInterval(async () => {
           try {
             console.debug('[TwilioRTC] Refreshing access token...');
             const refreshResp = await fetch(`${base}/api/twilio/token?identity=agent`);
             const refreshData = await refreshResp.json().catch(() => ({}));
-            
+
             if (refreshResp.ok && refreshData?.token && state.device) {
               state.device.updateToken(refreshData.token);
               console.debug('[TwilioRTC] Token refreshed successfully');
@@ -903,15 +1111,15 @@
             console.error('[TwilioRTC] Token refresh error:', refreshError);
           }
         }, 50 * 60 * 1000); // 50 minutes
-        
-        try { console.debug('[TwilioRTC] Device ready with token refresh enabled'); } catch(_) {}
+
+        try { console.debug('[TwilioRTC] Device ready with token refresh enabled'); } catch (_) { }
         state.ready = true;
-        
+
         // Request browser notification permission for incoming calls
         if ('Notification' in window && Notification.permission === 'default') {
           Notification.requestPermission();
         }
-        
+
         return state.device;
       } finally {
         state.connecting = false;
@@ -927,30 +1135,39 @@
       if (state.device) {
         try {
           state.device.destroy();
-        } catch(_) {}
+        } catch (_) { }
         state.device = null;
       }
       state.ready = false;
       state.connecting = false;
     };
-    
+
     // Accept incoming call
     function acceptCall() {
       if (state.pendingIncoming) {
-        console.debug('[TwilioRTC] Accepting incoming call');
-        
-        // Store toast ID before clearing pending state
-        const toastId = state.pendingIncoming.toastId;
-        
-        state.pendingIncoming.accept();
-        state.connection = state.pendingIncoming;
+        console.debug('[TwilioRTC] Accepting incoming call via public API');
+
+        const conn = state.pendingIncoming;
+        const toastId = conn.toastId;
+
+        // Ensure widget is open for controls
+        if (!document.getElementById(WIDGET_ID)) {
+          openPhone();
+        }
+
+        // Trigger acceptance - the 'accept' listener in the 'incoming' handler 
+        // will take care of state, UI, timer, and disconnect logic.
+        conn.accept();
+
         state.pendingIncoming = null;
-        
+        state.pendingIncomingMeta = null;
+        state.pendingIncomingNumber = null;
+
         // Remove toast notification
         if (toastId && window.ToastManager) {
           window.ToastManager.removeToast(toastId);
         }
-        
+
         return true;
       }
       return false;
@@ -960,24 +1177,24 @@
     function declineCall() {
       if (state.pendingIncoming) {
         console.debug('[TwilioRTC] Declining incoming call');
-        
+
         // Store toast ID before clearing pending state
         const toastId = state.pendingIncoming.toastId;
-        
+
         state.pendingIncoming.reject();
         state.pendingIncoming = null;
-        
+
         // Remove toast notification
         if (toastId && window.ToastManager) {
           window.ToastManager.removeToast(toastId);
         }
-        
+
         return true;
       }
       return false;
     }
 
-    return { state, ensureDevice, shutdown, acceptCall, declineCall };
+    return { state, ensureDevice, shutdown, acceptCall, declineCall, hangup: () => ensureDevice.cleanup() };
   })();
 
   const WIDGET_ID = 'phone-widget';
@@ -1037,7 +1254,7 @@
           return data;
         }
       }
-    } catch (_) {}
+    } catch (_) { }
     return [];
   }
 
@@ -1167,6 +1384,27 @@
 
   function findLocalCRMMeta(candidateDigits) {
     if (!candidateDigits.length) return null;
+
+    // 1. Check current AccountDetail/ContactDetail state (highest priority as it's what user is looking at)
+    try {
+      if (window.ContactDetail && window.ContactDetail.state && window.ContactDetail.state.currentContact) {
+        const c = window.ContactDetail.state.currentContact;
+        const phones = getContactPhones(c);
+        if (phones.some(p => matchesCandidate(p, candidateDigits))) {
+          const a = window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount;
+          return buildContactMeta(c, a && a.id === c.accountId ? a : null);
+        }
+      }
+      if (window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount) {
+        const a = window.AccountDetail.state.currentAccount;
+        const phones = [a.companyPhone, a.phone, a.primaryPhone, a.mainPhone].filter(Boolean);
+        if (phones.some(p => matchesCandidate(p, candidateDigits))) {
+          return buildAccountMeta(a);
+        }
+      }
+    } catch (_) { }
+
+    // 2. Check global CRM data
     const peopleData = getCRMData('getPeopleData');
     const accountsData = getCRMData('getAccountsData');
     for (const contact of peopleData) {
@@ -1186,10 +1424,10 @@
 
   async function resolvePhoneMeta(number, preserveContext = null) {
     const digits = (number || '').replace(/\D/g, '');
-    const e164 = digits && digits.length === 10 ? `+1${digits}` : (digits && digits.startsWith('1') && digits.length === 11 ? `+${digits}` : (String(number||'').startsWith('+') ? String(number) : ''));
-    const candidates = Array.from(new Set([digits, e164.replace(/\D/g,'')] )).filter(Boolean);
+    const e164 = digits && digits.length === 10 ? `+1${digits}` : (digits && digits.startsWith('1') && digits.length === 11 ? `+${digits}` : (String(number || '').startsWith('+') ? String(number) : ''));
+    const candidates = Array.from(new Set([digits, e164.replace(/\D/g, '')])).filter(Boolean);
     const candidateDigits = normalizeCandidateDigits(candidates, number);
-    
+
     // CRITICAL: If we have existing context with IDs/names, preserve it and only enrich missing fields
     // This prevents CRM lookup from overwriting context that was set by click-to-call
     // ALWAYS prefer preserveContext if it has data, even if currentCallContext is empty
@@ -1222,41 +1460,41 @@
           }
         }
       }
-    } catch(_) {}
-    
+    } catch (_) { }
+
     // Check if preserveContext is an empty object (has keys but no data) - treat as null
     const preserveContextHasData = preserveContext && (
-      preserveContext.accountId || preserveContext.contactId || 
+      preserveContext.accountId || preserveContext.contactId ||
       preserveContext.name || preserveContext.company || preserveContext.accountName
     );
-    
+
     const existingContext = preserveContextHasData
-      ? preserveContext 
+      ? preserveContext
       : (storedProgrammaticContext && (storedProgrammaticContext.accountId || storedProgrammaticContext.contactId || storedProgrammaticContext.name || storedProgrammaticContext.company))
         ? storedProgrammaticContext
         : (currentCallContext && (currentCallContext.accountId || currentCallContext.contactId || currentCallContext.name || currentCallContext.company || currentCallContext.accountName))
           ? currentCallContext
           : null;
     const hasExistingContext = !!(existingContext && (
-      existingContext.accountId || existingContext.contactId || 
-      existingContext.name || existingContext.contactName || 
+      existingContext.accountId || existingContext.contactId ||
+      existingContext.name || existingContext.contactName ||
       existingContext.company || existingContext.accountName
     ));
-    
-    const meta = { 
-      number, 
-      name: hasExistingContext ? (existingContext.name || existingContext.contactName || '') : '', 
-      account: hasExistingContext ? (existingContext.company || existingContext.accountName || '') : '', 
-      title: '', 
-      city: hasExistingContext ? (existingContext.city || '') : '', 
-      state: hasExistingContext ? (existingContext.state || '') : '', 
-      domain: hasExistingContext ? (existingContext.domain || '') : '', 
-      logoUrl: hasExistingContext ? (existingContext.logoUrl || '') : '', 
-      contactId: hasExistingContext ? (existingContext.contactId || null) : null, 
-      accountId: hasExistingContext ? (existingContext.accountId || null) : null, 
-      callerIdImage: null 
+
+    const meta = {
+      number,
+      name: hasExistingContext ? (existingContext.name || existingContext.contactName || '') : '',
+      account: hasExistingContext ? (existingContext.company || existingContext.accountName || '') : '',
+      title: '',
+      city: hasExistingContext ? (existingContext.city || '') : '',
+      state: hasExistingContext ? (existingContext.state || '') : '',
+      domain: hasExistingContext ? (existingContext.domain || '') : '',
+      logoUrl: hasExistingContext ? (existingContext.logoUrl || '') : '',
+      contactId: hasExistingContext ? (existingContext.contactId || null) : null,
+      accountId: hasExistingContext ? (existingContext.accountId || null) : null,
+      callerIdImage: null
     };
-    
+
     const localMeta = !hasExistingContext ? findLocalCRMMeta(candidateDigits) : null;
     if (localMeta) {
       return { ...meta, ...localMeta };
@@ -1266,7 +1504,7 @@
     if (hasExistingContext) {
       return meta;
     }
-    
+
     try {
       // App-provided resolver if available
       if (window.crm && typeof window.crm.resolvePhoneMeta === 'function') {
@@ -1285,40 +1523,40 @@
             const resp = await fetch(url, opt);
             if (resp && resp.ok) {
               const j = await resp.json().catch(() => ({}));
-                  if (j) {
-                    // Skip disabled endpoints
-                    if (j.success === false && j.disabled) {
-                      console.debug('[Phone] Memoized route is disabled, invalidating memo');
-                      window.__pcPhoneSearchRoute = null;
-                    } else {
-                      let c = j.contact || (Array.isArray(j.contacts) && j.contacts[0]) || j.person || ((j.name || j.title || j.email) ? j : null);
-                      let a = j.account || (Array.isArray(j.accounts) && j.accounts[0]) || j.company || ((j.company || j.accountName || j.domain) ? j : null);
-                      if (c || a) {
-                        // Merge CRM results with existing context (preserve existing context fields)
-                        const resolved = {
-                          ...meta, // This already has existing context if preserveContext was passed
-                          // Only overwrite fields that are empty in existing context
-                          name: meta.name || (c && (c.name || ((c.firstName||c.first_name||'') + ' ' + (c.lastName||c.last_name||'')).trim())) || '',
-                          account: meta.account || (a && (a.name || a.accountName || a.company || '')) || (c && (c.account || c.company || '')) || '',
-                          title: meta.title || (c && (c.title || c.jobTitle || c.job_title)) || '',
-                          city: meta.city || (c && c.city) || (a && a.city) || '',
-                          state: meta.state || (c && c.state) || (a && a.state) || '',
-                          domain: meta.domain || (c && (c.domain || (c.email||'').split('@')[1])) || (a && (a.domain || a.website)) || '',
-                          logoUrl: meta.logoUrl || (a && a.logoUrl) || '',
-                          contactId: meta.contactId || (c && (c.id || c.contactId || c._id)) || null,
-                          accountId: meta.accountId || (a && (a.id || a.accountId || a._id)) || null
-                        };
-                        console.debug('[Phone] Resolved metadata (memoized route):', { url, resolved });
-                        return resolved;
-                      }
-                    }
+              if (j) {
+                // Skip disabled endpoints
+                if (j.success === false && j.disabled) {
+                  console.debug('[Phone] Memoized route is disabled, invalidating memo');
+                  window.__pcPhoneSearchRoute = null;
+                } else {
+                  let c = j.contact || (Array.isArray(j.contacts) && j.contacts[0]) || j.person || ((j.name || j.title || j.email) ? j : null);
+                  let a = j.account || (Array.isArray(j.accounts) && j.accounts[0]) || j.company || ((j.company || j.accountName || j.domain) ? j : null);
+                  if (c || a) {
+                    // Merge CRM results with existing context (preserve existing context fields)
+                    const resolved = {
+                      ...meta, // This already has existing context if preserveContext was passed
+                      // Only overwrite fields that are empty in existing context
+                      name: meta.name || (c && (c.name || ((c.firstName || c.first_name || '') + ' ' + (c.lastName || c.last_name || '')).trim())) || '',
+                      account: meta.account || (a && (a.name || a.accountName || a.company || '')) || (c && (c.account || c.company || '')) || '',
+                      title: meta.title || (c && (c.title || c.jobTitle || c.job_title)) || '',
+                      city: meta.city || (c && c.city) || (a && a.city) || '',
+                      state: meta.state || (c && c.state) || (a && a.state) || '',
+                      domain: meta.domain || (c && (c.domain || (c.email || '').split('@')[1])) || (a && (a.domain || a.website)) || '',
+                      logoUrl: meta.logoUrl || (a && a.logoUrl) || '',
+                      contactId: meta.contactId || (c && (c.id || c.contactId || c._id)) || null,
+                      accountId: meta.accountId || (a && (a.id || a.accountId || a._id)) || null
+                    };
+                    console.debug('[Phone] Resolved metadata (memoized route):', { url, resolved });
+                    return resolved;
                   }
+                }
+              }
             } else {
               // Invalidate memo on failure
               window.__pcPhoneSearchRoute = null;
             }
           }
-        } catch(_) { /* ignore memo errors */ }
+        } catch (_) { /* ignore memo errors */ }
         // Try multiple likely routes and payloads to avoid 404s when backend changes
         async function tryFetches() {
           const routes = [];
@@ -1331,7 +1569,7 @@
           // POST variants (try these second - some may be disabled)
           const bodies = candidates.map(p => ([
             { phone: p },
-            { e164: (p.length===10?`+1${p}`:(p.startsWith('1')&&p.length===11?`+${p}`:`+${p}`)) },
+            { e164: (p.length === 10 ? `+1${p}` : (p.startsWith('1') && p.length === 11 ? `+${p}` : `+${p}`)) },
             { query: { phone: p } }
           ])).flat();
           ['search', 'contacts/search', 'v1/search', 'lookup/phone', 'contacts/lookup'].forEach(path => {
@@ -1340,9 +1578,9 @@
           for (const r of routes) {
             try {
               const resp = await fetch(r.url, r.method === 'POST' ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(r.body) } : undefined);
-              if (!resp || !resp.ok) { 
+              if (!resp || !resp.ok) {
                 console.debug('[Phone] Search route failed:', r.url, resp.status);
-                continue; 
+                continue;
               }
               const j = await resp.json().catch(() => ({}));
               if (!j) {
@@ -1372,12 +1610,12 @@
                 const resolved = {
                   ...meta, // This already has existing context if preserveContext was passed
                   // Only overwrite fields that are empty in existing context
-                  name: meta.name || (c && (c.name || ((c.firstName||c.first_name||'') + ' ' + (c.lastName||c.last_name||'')).trim())) || '',
+                  name: meta.name || (c && (c.name || ((c.firstName || c.first_name || '') + ' ' + (c.lastName || c.last_name || '')).trim())) || '',
                   account: meta.account || (a && (a.name || a.accountName || a.company || '')) || (c && (c.account || c.company || '')) || '',
                   title: meta.title || (c && (c.title || c.jobTitle || c.job_title)) || '',
                   city: meta.city || (c && c.city) || (a && a.city) || '',
                   state: meta.state || (c && c.state) || (a && a.state) || '',
-                  domain: meta.domain || (c && (c.domain || (c.email||'').split('@')[1])) || (a && (a.domain || a.website)) || '',
+                  domain: meta.domain || (c && (c.domain || (c.email || '').split('@')[1])) || (a && (a.domain || a.website)) || '',
                   logoUrl: meta.logoUrl || (a && a.logoUrl) || '',
                   contactId: meta.contactId || (c && (c.id || c.contactId || c._id)) || null,
                   accountId: meta.accountId || (a && (a.id || a.accountId || a._id)) || null
@@ -1391,10 +1629,10 @@
                   } else {
                     window.__pcPhoneSearchRoute = { method: 'POST', url: r.url, bodyTemplate: (typeof r.body === 'object' && r.body && r.body.query) ? { query: {} } : {} };
                   }
-                } catch(_) {}
+                } catch (_) { }
                 return resolved;
               }
-            } catch(_) { /* try next */ }
+            } catch (_) { /* try next */ }
           }
           return null;
         }
@@ -1402,30 +1640,30 @@
         if (found) {
           return found;
         }
-        
+
         // Twilio caller ID lookup disabled by user (feature deactivated in Twilio console)
         // Skipping Twilio lookup to avoid unnecessary API calls and console errors
         // CRM search results above should be sufficient for existing contacts/accounts
       }
-    } catch (_) {}
+    } catch (_) { }
     return meta;
   }
 
   function makeFavicon(domain) {
-  if (!domain) return '';
-  const d = domain.replace(/^https?:\/\//, '');
-  // Use the new favicon helper system if available
-  if (window.__pcFaviconHelper) {
-    const faviconHTML = (typeof window.__pcFaviconHelper.generateCompanyIconHTML==='function')
-      ? window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: (currentCallContext && currentCallContext.logoUrl) || '', domain: d, size: 64 })
-      : window.__pcFaviconHelper.generateFaviconHTML(d, 64);
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = faviconHTML;
-    const img = tempDiv.querySelector('.company-favicon');
-    return img ? img.src : '';
-  }
-  // Return empty string instead of old system to prevent flickering
-  return '';
+    if (!domain) return '';
+    const d = domain.replace(/^https?:\/\//, '');
+    // Use the new favicon helper system if available
+    if (window.__pcFaviconHelper) {
+      const faviconHTML = (typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function')
+        ? window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: (currentCallContext && currentCallContext.logoUrl) || '', domain: d, size: 64 })
+        : window.__pcFaviconHelper.generateFaviconHTML(d, 64);
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = faviconHTML;
+      const img = tempDiv.querySelector('.company-favicon');
+      return img ? img.src : '';
+    }
+    // Return empty string instead of old system to prevent flickering
+    return '';
   }
 
   // Inject minimal styles for the in-call contact display that replaces the input
@@ -1512,12 +1750,12 @@
       // CRITICAL: Always prioritize currentCallContext.logoUrl to prevent flickering
       // Only use meta.logoUrl if currentCallContext doesn't have one
       // This prevents the logo from being cleared when setContactDisplay is called multiple times
-      const logoUrl = (currentCallContext && currentCallContext.logoUrl) 
+      const logoUrl = (currentCallContext && currentCallContext.logoUrl)
         ? currentCallContext.logoUrl
         : (meta && meta.logoUrl) || '';
-      
+
       const displayNumber = number || (currentCallContext && currentCallContext.number) || '';
-      
+
       // For company phone calls, show company name only
       // For individual contact calls, show contact name
       let nameLine;
@@ -1528,7 +1766,57 @@
         // This ensures first call shows the name correctly
         nameLine = (currentCallContext && currentCallContext.name) || (currentCallContext && currentCallContext.contactName) || (meta && meta.name) || '';
       }
-      
+
+      // Extract IDs for click-to-navigate
+      const contactId = (currentCallContext && currentCallContext.contactId) || (meta && meta.contactId) || null;
+      const accountId = (currentCallContext && currentCallContext.accountId) || (meta && meta.accountId) || null;
+
+      // Update name element with clickability
+      const nameEl = box.querySelector('.contact-name');
+      if (nameEl) {
+        nameEl.textContent = nameLine;
+
+        if (contactId || accountId) {
+          nameEl.style.cursor = 'pointer';
+          nameEl.style.textDecoration = 'underline';
+          nameEl.title = 'Click to view details';
+          nameEl.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('[Phone Widget] Clicked contact:', contactId || accountId);
+
+            if (contactId) {
+              if (window.crm && typeof window.crm.navigateToPage === 'function') {
+                window.crm.navigateToPage('contact-detail');
+                setTimeout(() => {
+                  if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+                    window.ContactDetail.show(contactId);
+                  }
+                }, 100);
+              }
+            } else if (accountId) {
+              if (window.crm && typeof window.crm.navigateToPage === 'function') {
+                window.crm.navigateToPage('account-details');
+                if (window.location.hash) {
+                  window.location.hash = `#account-detail?id=${accountId}`;
+                } else {
+                  setTimeout(() => {
+                    if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+                      window.AccountDetail.show(accountId);
+                    }
+                  }, 100);
+                }
+              }
+            }
+          };
+        } else {
+          nameEl.style.cursor = 'default';
+          nameEl.style.textDecoration = 'none';
+          nameEl.title = '';
+          nameEl.onclick = null;
+        }
+      }
+
       // Build subtitle: for company calls show location + number, for individual calls show company + number
       let sub;
       if (isCompanyPhone) {
@@ -1537,7 +1825,7 @@
       } else {
         sub = [account, displayNumber].filter(Boolean).join(' • ');
       }
-      
+
       phoneLog('[Phone Widget] setContactDisplay', {
         meta: meta,
         currentCallContext: currentCallContext,
@@ -1557,7 +1845,7 @@
           const existingImg = avatarWrap.querySelector('.company-favicon');
           const existingSrc = existingImg ? existingImg.src : '';
           const newSrc = logoUrl || '';
-          
+
           // Only update if the logo URL has actually changed
           // If newSrc is empty but we have an existing logo, preserve it (prevents flickering on call connect)
           if (newSrc && existingSrc !== newSrc) {
@@ -1583,7 +1871,7 @@
           // If logoUrl is empty but we have an existing image, don't clear it (prevents flickering)
         } else {
           // Individual contact: render initials avatar (letter glyphs)
-          const initials = (function(){
+          const initials = (function () {
             const n = (nameLine || '').trim();
             if (!n) return '?';
             const parts = n.split(/\s+/).filter(Boolean);
@@ -1594,24 +1882,23 @@
           avatarWrap.innerHTML = `<div class="avatar-initials" aria-hidden="true">${initials}</div>`;
         }
       }
-      const nameEl = box.querySelector('.contact-name');
       const subEl = box.querySelector('.contact-sub');
-      if (nameEl) nameEl.textContent = nameLine || displayNumber || 'On call';
+      // nameEl is already handled and click-enabled above
       if (subEl) subEl.textContent = sub;
       // Animate input out then pop-in details with synchronized shift
       const inputEl = body.querySelector('.phone-display');
       if (inputEl && inputEl.style.display !== 'none') {
         inputEl.classList.add('is-hiding');
-        setTimeout(() => { try { inputEl.style.display = 'none'; inputEl.classList.remove('is-hiding'); } catch(_) {} }, 200);
+        setTimeout(() => { try { inputEl.style.display = 'none'; inputEl.classList.remove('is-hiding'); } catch (_) { } }, 200);
       }
       // Ensure initial state for transition and trigger reliably
       box.classList.remove('--show');
       // Force explicit initial values for reliability across browsers
-      try { box.style.opacity = '0'; box.style.transform = 'translateY(-6px) scale(0.98)'; } catch(_) {}
+      try { box.style.opacity = '0'; box.style.transform = 'translateY(-6px) scale(0.98)'; } catch (_) { }
       void box.offsetHeight; // reflow to guarantee CSS transition
       requestAnimationFrame(() => {
         box.classList.add('--show');
-        try { box.style.opacity = ''; box.style.transform = ''; } catch(_) {}
+        try { box.style.opacity = ''; box.style.transform = ''; } catch (_) { }
         runFlipFromSnapshot(snapshot, card, 320);
       });
 
@@ -1620,16 +1907,16 @@
         card.classList.add('in-call');
         if (!existed) {
           card.classList.add('placing-call');
-          setTimeout(() => { try { card.classList.remove('placing-call'); } catch(_) {} }, 900);
+          setTimeout(() => { try { card.classList.remove('placing-call'); } catch (_) { } }, 900);
         }
-      } catch(_) {}
+      } catch (_) { }
 
       // Always keep header title clean (no duplicate name next to "Phone")
       const titleEl = card.querySelector('.widget-title');
       if (titleEl) titleEl.textContent = 'Phone';
 
       // Height animation is handled inside runFlipFromSnapshot for sync
-    } catch (_) {}
+    } catch (_) { }
   }
 
   function clearContactDisplay() {
@@ -1655,10 +1942,10 @@
             box.style.marginBottom = '0px';
           });
           // Remove after animation ends
-          const cleanup = () => { try { box.remove(); } catch(_) {} };
+          const cleanup = () => { try { box.remove(); } catch (_) { } };
           box.addEventListener('transitionend', (e) => { if (e.propertyName === 'height') cleanup(); }, { once: true });
           setTimeout(cleanup, 360);
-        } catch(_) { box.classList.remove('--show'); }
+        } catch (_) { box.classList.remove('--show'); }
       }
       if (input) {
         // Prepare input to animate back in: start hidden state then animate to visible
@@ -1667,16 +1954,181 @@
         requestAnimationFrame(() => {
           input.classList.remove('is-hiding');
           input.classList.add('is-showing');
-          setTimeout(() => { try { input.classList.remove('is-showing'); } catch(_) {} }, 220);
+          setTimeout(() => { try { input.classList.remove('is-showing'); } catch (_) { } }, 220);
         });
       }
       // Keep header title simple
       const titleEl = card.querySelector('.widget-title');
       if (titleEl) titleEl.textContent = 'Phone';
-      try { card.classList.remove('placing-call'); card.classList.remove('in-call'); } catch(_) {}
+      try { card.classList.remove('placing-call'); card.classList.remove('in-call'); } catch (_) { }
       // Run FLIP shift for internal elements in sync with container height
       runFlipFromSnapshot(snapshot, card, 320);
-    } catch (_) {}
+    } catch (_) { }
+  }
+
+  // Debounce call status updates to prevent UI stuttering
+  let statusUpdateTimeout = null;
+  const debouncedStatusUpdates = new Map();
+
+  // [OPTIMIZATION] Made non-async to prevent any blocking - all operations are fire-and-forget
+  function updateCallStatus(phoneNumber, status, startTime, duration = 0, callId = null, fromNumber = null, callType = 'outgoing') {
+    try {
+      const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+      if (!base) return;
+
+      // Debounce rapid status updates for the same call
+      const callKey = `${phoneNumber}_${callId || startTime}`;
+      const now = Date.now();
+      const lastUpdate = debouncedStatusUpdates.get(callKey) || 0;
+
+      // Skip updates that are too frequent (less than 500ms apart)
+      if (now - lastUpdate < 500 && status !== 'completed' && status !== 'failed') {
+        return;
+      }
+
+      debouncedStatusUpdates.set(callKey, now);
+
+      const callSid = callId || `call_${startTime}_${Math.random().toString(36).substr(2, 9)}`;
+      const timestamp = new Date(startTime).toISOString();
+
+      // For incoming calls, use the caller's number as 'from' and business number as 'to'
+      // For outgoing calls, use business number as 'from' and target number as 'to'
+      const isIncoming = callType === 'incoming';
+      const biz = getBusinessNumberE164();
+      const callFrom = isIncoming ? (fromNumber || phoneNumber) : biz;
+      const callTo = isIncoming ? biz : phoneNumber;
+
+      // Get current user email for ownership tracking
+      const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
+        ? window.DataManager.getCurrentUserEmail()
+        : ((window.currentUserEmail || '').toLowerCase());
+
+      const payload = {
+        callSid: callSid,
+        to: callTo,
+        from: callFrom,
+        status: status,
+        duration: duration,
+        durationSec: duration,
+        callTime: timestamp,
+        timestamp: timestamp,
+        // CRITICAL: Add userEmail for ownership tracking (allows employees to see their own calls)
+        userEmail: userEmail || null,
+        agentEmail: userEmail || null,
+        // include call context (avoid stale fallback name in company-call mode)
+        accountId: currentCallContext.accountId || null,
+        accountName: currentCallContext.accountName || currentCallContext.company || null,
+        contactId: currentCallContext.contactId || null,
+        contactName: (currentCallContext.isCompanyPhone ? null : (currentCallContext.contactName || null)),
+        source: 'phone-widget',
+        targetPhone: String(phoneNumber || '').replace(/\D/g, '').slice(-10),
+        businessPhone: biz
+      };
+
+      // [OPTIMIZATION] Only write to /api/calls on 'completed' status to reduce Firestore commits
+      // Twilio status webhooks already track call lifecycle (initiated, ringing, in-progress, etc.)
+      // Frontend only needs to write final call record with CRM context (accountId, contactId, etc.)
+      if (status === 'completed') {
+        phoneLog('[Phone] POST /api/calls (completed status only) - FIRE AND FORGET', { base, payload });
+
+        // [CRITICAL FIX] Fire-and-forget to prevent UI freeze/blocking
+        // Don't await - let it run in background so user can navigate immediately
+        fetch(`${base}/api/calls`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).then(resp => resp.json()).then(respJson => {
+          phoneLog('[Phone] /api/calls response (background)', { status: 'success', body: respJson });
+          // Dispatch event to update "No Calls" badges on People/Accounts pages
+          try {
+            const eventDetail = {
+              call: respJson.call || payload,
+              targetPhone: payload.targetPhone,
+              accountId: payload.accountId,
+              contactId: payload.contactId
+            };
+            document.dispatchEvent(new CustomEvent('pc:call-logged', { detail: eventDetail }));
+          } catch (e) {
+            console.error('[Phone] Error dispatching pc:call-logged event:', e);
+          }
+        }).catch(err => {
+          phoneLog('[Phone] /api/calls error (non-blocking)', err);
+        });
+      } else {
+        phoneLog('[Phone] Skipping /api/calls POST (status:', status, ') - only writes on completed to reduce Firestore costs');
+      }
+
+      // Trigger refresh for Account Detail and Contact Detail pages when call completes
+      if (status === 'completed') {
+        try {
+          // Dispatch custom event to trigger recent calls refresh on detail pages
+          document.dispatchEvent(new CustomEvent('pc:call-completed', {
+            detail: {
+              callSid: callSid,
+              accountId: currentCallContext.accountId,
+              contactId: currentCallContext.contactId,
+              phoneNumber: phoneNumber
+            }
+          }));
+          phoneLog('[Phone] Dispatched pc:call-completed event for page refresh');
+        } catch (_) { }
+      }
+
+      // [OPTIMIZATION] Refresh calls page only if visible - use same debounce strategy
+      const isCallsPageActive = () => {
+        try {
+          const el = document.getElementById('calls-page');
+          if (!el) return false;
+          if (typeof el.matches === 'function' && el.matches('.active, .is-active, :not([hidden])')) return true;
+          return el.offsetParent !== null; // visible in layout
+        } catch (_) { return false; }
+      };
+      const refreshCallsIfActive = (label) => {
+        if (isCallInProgress) return; // do not refresh during live call
+        if (!isCallsPageActive()) {
+          phoneLog(`[Phone] Skipping calls page refresh - not visible`);
+          return;
+        }
+        if (window.callsModule && typeof window.callsModule.loadData === 'function') {
+          // Schedule in next tick to avoid blocking current execution
+          setTimeout(() => {
+            try { window.callsModule.loadData(); } catch (_) { }
+            phoneLog(`[Phone] Refreshed calls page data (${label})`);
+          }, 0);
+        }
+      };
+      // Debounced refresh with 1.5s delay (same as detail pages)
+      setTimeout(() => refreshCallsIfActive('t+1.5s'), 1500);
+
+    } catch (error) {
+      console.error('[Phone] Failed to update call status:', error);
+    }
+  }
+
+  function setInCallUI(inCall) {
+    if (!callBtn) {
+      // Shared reference not set? try to find in DOM
+      const card = document.getElementById(WIDGET_ID);
+      if (card) callBtn = card.querySelector('.call-btn-start');
+    }
+    if (!callBtn) return;
+
+    // Mark card as in-call for CSS
+    const card = document.getElementById(WIDGET_ID);
+    if (card) {
+      if (inCall) card.classList.add('in-call');
+      else card.classList.remove('in-call');
+    }
+
+    if (inCall) {
+      callBtn.textContent = 'Hang Up';
+      callBtn.classList.remove('btn-primary');
+      callBtn.classList.add('btn-danger');
+    } else {
+      callBtn.textContent = 'Call';
+      callBtn.classList.remove('btn-danger');
+      callBtn.classList.add('btn-primary');
+    }
   }
 
   // OLD NOTIFICATION SYSTEM - REMOVED (Using new ToastManager instead)
@@ -1703,7 +2155,7 @@
   let callTimerHandle = null;
   let callTimerStartedAt = 0;
   let currentCallSid = null; // Track current call SID for live updates
-  
+
   function formatDuration(ms) {
     const total = Math.floor(ms / 1000);
     const h = Math.floor(total / 3600);
@@ -1712,7 +2164,7 @@
     const pad = (n) => String(n).padStart(2, '0');
     return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
   }
-  
+
   // Format duration for recent calls display (e.g., "2m 15s")
   function formatDurationForRecentCalls(ms) {
     const total = Math.floor(ms / 1000);
@@ -1740,7 +2192,7 @@
       const elapsed = Date.now() - callTimerStartedAt;
       const micText = card.querySelector('.mic-text');
       if (micText) micText.textContent = formatDuration(elapsed);
-      
+
       // Broadcast live duration to recent calls sections (throttled every ~2s)
       if (currentCallSid) {
         const tick = Math.floor(elapsed / 2000);
@@ -1750,10 +2202,12 @@
               detail: {
                 callSid: currentCallSid,
                 duration: Math.floor(elapsed / 1000),
-                durationFormatted: formatDurationForRecentCalls(elapsed)
+                durationFormatted: formatDurationForRecentCalls(elapsed),
+                contactName: currentCallContext.name || currentCallContext.contactName || currentCallContext.company || currentCallContext.number,
+                number: currentCallContext.number
               }
             }));
-          } catch(_) {}
+          } catch (_) { }
         }
       }
     }, 1000);
@@ -1772,7 +2226,7 @@
     // If no recent FLIP, capture snapshot so mic banner/text change is synchronized
     const snapshot = recentlyFlipped ? null : captureLayoutSnapshot(card);
     // Remove in-call spacing state on any call end
-    try { card.classList.remove('in-call'); } catch(_) {}
+    try { card.classList.remove('in-call'); } catch (_) { }
     // Restore the idle banner depending on mic permission state
     if (TwilioRTC.state.micPermissionGranted) {
       setMicBanner(card, 'ok', 'Browser calls enabled');
@@ -1855,7 +2309,7 @@
       card.style.height = start + 'px';
       void card.offsetHeight; // reflow
       card.style.transition = `height ${duration}ms cubic-bezier(0.4,0,0.2,1)`;
-      try { window.__pc_lastCardResizeAt = Date.now(); } catch(_) { }
+      try { window.__pc_lastCardResizeAt = Date.now(); } catch (_) { }
       card.style.height = target + 'px';
       const cleanup = () => {
         card.style.transition = '';
@@ -1870,7 +2324,7 @@
         cleanup();
       };
       card.addEventListener('transitionend', onEnd);
-    } catch(_) {}
+    } catch (_) { }
   }
 
   // Microphone permission handling
@@ -1878,25 +2332,25 @@
     if (TwilioRTC.state.micPermissionChecked && TwilioRTC.state.micPermissionGranted) {
       return true;
     }
-    
+
     // Check if we're in a secure context (HTTPS or localhost)
     if (!window.isSecureContext) {
       console.error('[Phone] Not in secure context - microphone access requires HTTPS or localhost');
-      try { 
-        window.crm?.showToast && window.crm.showToast('Microphone access requires HTTPS or localhost'); 
-      } catch(_) {}
+      try {
+        window.crm?.showToast && window.crm.showToast('Microphone access requires HTTPS or localhost');
+      } catch (_) { }
       return false;
     }
-    
+
     // Check if getUserMedia is available
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       console.error('[Phone] getUserMedia not available');
-      try { 
-        window.crm?.showToast && window.crm.showToast('Microphone access not supported in this browser'); 
-      } catch(_) {}
+      try {
+        window.crm?.showToast && window.crm.showToast('Microphone access not supported in this browser');
+      } catch (_) { }
       return false;
     }
-    
+
     try {
       // Always attempt to request microphone permission directly
       // This will trigger the browser permission dialog if needed
@@ -1911,7 +2365,7 @@
         console.warn('[Phone] Microphone permission denied:', micError?.name, micError?.message);
         TwilioRTC.state.micPermissionGranted = false;
         TwilioRTC.state.micPermissionChecked = true;
-        
+
         // Show helpful message based on error type
         let message = 'Microphone access needed for browser calls.';
         if (micError?.name === 'NotAllowedError') {
@@ -1921,10 +2375,10 @@
         } else if (micError?.name === 'NotReadableError') {
           message = 'Microphone is being used by another application.';
         }
-        
-        try { 
-          window.crm?.showToast && window.crm.showToast(message); 
-        } catch(_) {}
+
+        try {
+          window.crm?.showToast && window.crm.showToast(message);
+        } catch (_) { }
         return false;
       }
     } catch (error) {
@@ -2024,17 +2478,17 @@
   function normalizeDialedNumber(raw) {
     let s = (raw || '').trim();
     if (!s) return { ok: false, value: '', extension: '' };
-    
+
     // Parse phone number and extension
     const parsed = parsePhoneWithExtension(s);
     if (!parsed.number) return { ok: false, value: '', extension: '' };
-    
+
     // map letters to digits for the main number
     let number = parsed.number.replace(/[A-Za-z]/g, (c) => letterToDigit(c) || '');
     const hasPlus = number.startsWith('+');
     const digits = number.replace(/\D/g, '');
     let e164 = '';
-    
+
     if (hasPlus) {
       e164 = '+' + digits;
     } else if (digits.length === 11 && digits.startsWith('1')) {
@@ -2047,7 +2501,7 @@
     } else {
       return { ok: false, value: '', extension: parsed.extension || '' };
     }
-    
+
     if (/^\+\d{8,15}$/.test(e164)) {
       return { ok: true, value: e164, extension: parsed.extension || '' };
     }
@@ -2058,7 +2512,7 @@
   function parsePhoneWithExtension(input) {
     const raw = (input || '').toString().trim();
     if (!raw) return { number: '', extension: '' };
-    
+
     // Common extension patterns
     const extensionPatterns = [
       /ext\.?\s*(\d+)/i,
@@ -2067,10 +2521,10 @@
       /#\s*(\d+)/i,
       /\s+(\d{3,6})\s*$/  // 3-6 digits at the end (common extension length)
     ];
-    
+
     let number = raw;
     let extension = '';
-    
+
     // Try to find extension using various patterns
     for (const pattern of extensionPatterns) {
       const match = number.match(pattern);
@@ -2080,7 +2534,7 @@
         break;
       }
     }
-    
+
     return { number, extension };
   }
 
@@ -2126,11 +2580,11 @@
         </div>
         <div class="dialpad">
           ${[
-            {d:'1', l:''}, {d:'2', l:'ABC'}, {d:'3', l:'DEF'},
-            {d:'4', l:'GHI'}, {d:'5', l:'JKL'}, {d:'6', l:'MNO'},
-            {d:'7', l:'PQRS'}, {d:'8', l:'TUV'}, {d:'9', l:'WXYZ'},
-            {d:'*', l:''}, {d:'0', l:'+'}, {d:'#', l:''}
-          ].map(k => `
+        { d: '1', l: '' }, { d: '2', l: 'ABC' }, { d: '3', l: 'DEF' },
+        { d: '4', l: 'GHI' }, { d: '5', l: 'JKL' }, { d: '6', l: 'MNO' },
+        { d: '7', l: 'PQRS' }, { d: '8', l: 'TUV' }, { d: '9', l: 'WXYZ' },
+        { d: '*', l: '' }, { d: '0', l: '+' }, { d: '#', l: '' }
+      ].map(k => `
             <button type="button" class="dial-key" data-key="${k.d}">
               <div class="dial-digit">${k.d}</div>
               <div class="dial-letters">${k.l}</div>
@@ -2164,17 +2618,17 @@
     const appendChar = (ch) => {
       if (!input) return;
       input.value = (input.value || '') + ch;
-      try { input.focus(); } catch (_) {}
+      try { input.focus(); } catch (_) { }
     };
 
     const clearAll = () => {
       if (!input) return;
       input.value = '';
-      try { input.focus(); } catch (_) {}
+      try { input.focus(); } catch (_) { }
     };
 
     // --- Mini Scripts (embedded call scripts) ---
-    function ensureMiniScriptsStyles(){
+    function ensureMiniScriptsStyles() {
       if (document.getElementById('phone-mini-scripts-styles')) return;
       const style = document.createElement('style');
       style.id = 'phone-mini-scripts-styles';
@@ -2312,7 +2766,7 @@
       document.head.appendChild(style);
     }
 
-    function buildMiniScriptsUI(card){
+    function buildMiniScriptsUI(card) {
       ensureMiniScriptsStyles();
       const body = card.querySelector('.phone-body');
       const wrap = card.querySelector('.mini-scripts-wrap');
@@ -2346,14 +2800,14 @@
       const state = { current: '', history: [], overrideContactId: null, monthlySpend: null };
 
       // Data helpers (subset from scripts page)
-      function escapeHtml(str){ if (str == null) return ''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
-      function splitName(s){ const parts = String(s||'').trim().split(/\s+/); return { first: parts[0]||'', last: parts.slice(1).join(' ')||'', full: String(s||'').trim() }; }
-      function normPhone(p){ return String(p||'').replace(/\D/g,'').slice(-10); }
-      function normDomain(email){ return String(email||'').split('@')[1]?.toLowerCase() || ''; }
-      function normName(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim(); }
-      function getPeopleCache(){ try { return (typeof window.getPeopleData==='function' ? (window.getPeopleData()||[]) : []); } catch(_) { return []; } }
-      function getAccountsCache(){ try { return (typeof window.getAccountsData==='function' ? (window.getAccountsData()||[]) : []); } catch(_) { return []; } }
-      function formatDateMDY(v){
+      function escapeHtml(str) { if (str == null) return ''; return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
+      function splitName(s) { const parts = String(s || '').trim().split(/\s+/); return { first: parts[0] || '', last: parts.slice(1).join(' ') || '', full: String(s || '').trim() }; }
+      function normPhone(p) { return String(p || '').replace(/\D/g, '').slice(-10); }
+      function normDomain(email) { return String(email || '').split('@')[1]?.toLowerCase() || ''; }
+      function normName(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim(); }
+      function getPeopleCache() { try { return (typeof window.getPeopleData === 'function' ? (window.getPeopleData() || []) : []); } catch (_) { return []; } }
+      function getAccountsCache() { try { return (typeof window.getAccountsData === 'function' ? (window.getAccountsData() || []) : []); } catch (_) { return []; } }
+      function formatDateMDY(v) {
         try {
           if (!v) return '';
           const str = String(v).trim();
@@ -2370,13 +2824,13 @@
             }
           }
           if (isNaN(d.getTime())) return String(v);
-          const mm = String(d.getMonth()+1).padStart(2,'0');
-          const dd = String(d.getDate()).padStart(2,'0');
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
           const yyyy = d.getFullYear();
           return `${mm}/${dd}/${yyyy}`;
-        } catch(_) { return String(v||''); }
+        } catch (_) { return String(v || ''); }
       }
-      function toMDY(v){
+      function toMDY(v) {
         try {
           if (!v) return '';
           const str = String(v).trim();
@@ -2393,17 +2847,17 @@
             }
           }
           if (isNaN(d.getTime())) return String(v);
-          const mm = String(d.getMonth()+1).padStart(2,'0');
-          const dd = String(d.getDate()).padStart(2,'0');
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
           const yyyy = d.getFullYear();
           return `${mm}/${dd}/${yyyy}`;
-        } catch(_) { return String(v||''); }
+        } catch (_) { return String(v || ''); }
       }
 
-      function normalizeAccount(a){ const obj = a ? { ...a } : {}; obj.supplier = obj.supplier || obj.currentSupplier || obj.current_supplier || obj.energySupplier || obj.electricitySupplier || obj.supplierName || ''; const end = obj.contractEnd || obj.contract_end || obj.renewalDate || obj.renewal_date || obj.contractEndDate || obj.contract_end_date || obj.contractExpiry || obj.expiration || obj.expirationDate || obj.expiresOn || ''; obj.contract_end = end || ''; obj.contractEnd = end || obj.contractEnd || ''; obj.name = obj.name || obj.accountName || obj.companyName || ''; obj.industry = obj.industry || ''; obj.city = obj.city || obj.locationCity || obj.billingCity || ''; obj.state = obj.state || obj.region || obj.billingState || ''; obj.website = obj.website || obj.domain || ''; obj.accountId = obj.accountId || obj.account_id || obj.account || obj.companyId || ''; return obj; }
-      function normalizeContact(c){
+      function normalizeAccount(a) { const obj = a ? { ...a } : {}; obj.supplier = obj.supplier || obj.currentSupplier || obj.current_supplier || obj.energySupplier || obj.electricitySupplier || obj.supplierName || ''; const end = obj.contractEnd || obj.contract_end || obj.renewalDate || obj.renewal_date || obj.contractEndDate || obj.contract_end_date || obj.contractExpiry || obj.expiration || obj.expirationDate || obj.expiresOn || ''; obj.contract_end = end || ''; obj.contractEnd = end || obj.contractEnd || ''; obj.name = obj.name || obj.accountName || obj.companyName || ''; obj.industry = obj.industry || ''; obj.city = obj.city || obj.locationCity || obj.billingCity || ''; obj.state = obj.state || obj.region || obj.billingState || ''; obj.website = obj.website || obj.domain || ''; obj.accountId = obj.accountId || obj.account_id || obj.account || obj.companyId || ''; return obj; }
+      function normalizeContact(c) {
         const obj = c ? { ...c } : {};
-        const nameGuess = obj.name || ((obj.firstName||obj.first_name||'') + ' ' + (obj.lastName||obj.last_name||'')).trim();
+        const nameGuess = obj.name || ((obj.firstName || obj.first_name || '') + ' ' + (obj.lastName || obj.last_name || '')).trim();
         const sp = splitName(nameGuess);
         obj.firstName = obj.firstName || obj.first_name || sp.first;
         obj.lastName = obj.lastName || obj.last_name || sp.last;
@@ -2416,7 +2870,7 @@
           } else {
             obj.phone = obj.phone || obj.workDirectPhone || obj.mobile || obj.otherPhone || obj.mobile_phone || '';
           }
-        } catch(_) {
+        } catch (_) {
           obj.phone = obj.phone || obj.workDirectPhone || obj.mobile || obj.otherPhone || obj.mobile_phone || '';
         }
         obj.mobile = obj.mobile || obj.mobile_phone || '';
@@ -2432,56 +2886,56 @@
         return obj;
       }
 
-      function findAccountForContact(contact){ if (!contact) return {}; const accounts = getAccountsCache(); try { if (contact.accountId) { const hitById = accounts.find(a => String(a.id||a.accountId||'') === String(contact.accountId)); if (hitById) return hitById; } } catch(_) {} const clean = (s)=> String(s||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\b(llc|inc|inc\.|co|co\.|corp|corp\.|ltd|ltd\.)\b/g,' ').replace(/\s+/g,' ').trim(); const comp = clean(contact.company||contact.companyName||''); if (comp) { const hit = accounts.find(a=> { const nm = clean(a.accountName||a.name||a.companyName||''); return nm && nm === comp; }); if (hit) return hit; } const domain = normDomain(contact.email||''); if (domain) { const match = accounts.find(a=> { const d = String(a.domain||a.website||'').toLowerCase().replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0]; return d && (domain.endsWith(d) || d.endsWith(domain)); }); if (match) return match; } return {}; }
+      function findAccountForContact(contact) { if (!contact) return {}; const accounts = getAccountsCache(); try { if (contact.accountId) { const hitById = accounts.find(a => String(a.id || a.accountId || '') === String(contact.accountId)); if (hitById) return hitById; } } catch (_) { } const clean = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\b(llc|inc|inc\.|co|co\.|corp|corp\.|ltd|ltd\.)\b/g, ' ').replace(/\s+/g, ' ').trim(); const comp = clean(contact.company || contact.companyName || ''); if (comp) { const hit = accounts.find(a => { const nm = clean(a.accountName || a.name || a.companyName || ''); return nm && nm === comp; }); if (hit) return hit; } const domain = normDomain(contact.email || ''); if (domain) { const match = accounts.find(a => { const d = String(a.domain || a.website || '').toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0]; return d && (domain.endsWith(d) || d.endsWith(domain)); }); if (match) return match; } return {}; }
 
-      function getAccountKey(a){ return String((a && (a.accountName||a.name||a.companyName||''))||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim(); }
+      function getAccountKey(a) { return String((a && (a.accountName || a.name || a.companyName || '')) || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim(); }
 
-      function getLiveData(){
+      function getLiveData() {
         // Build from current call context + optional override contact
         const ctx = currentCallContext || {};
         let contact = null; let account = null;
-        
+
         // Priority 1: Prefer override contact if manually selected
         try {
           if (state.overrideContactId) {
             const people = getPeopleCache();
             const found = people.find(p => {
-              const pid = String(p.id||'');
-              const alt1 = String(p.contactId||'');
-              const alt2 = String(p._id||'');
-              const target = String(state.overrideContactId||'');
+              const pid = String(p.id || '');
+              const alt1 = String(p.contactId || '');
+              const alt2 = String(p._id || '');
+              const target = String(state.overrideContactId || '');
               return pid === target || alt1 === target || alt2 === target;
             });
             if (found) {
               contact = found;
             }
           }
-        } catch(_) {}
-        
+        } catch (_) { }
+
         // Priority 2: If phone widget has contactId in context, use that (direct contact call)
         if (!contact && ctx.contactId) {
           try {
             const people = getPeopleCache();
             const found = people.find(p => {
-              const pid = String(p.id||'');
-              const alt1 = String(p.contactId||'');
-              const alt2 = String(p._id||'');
-              const target = String(ctx.contactId||'');
+              const pid = String(p.id || '');
+              const alt1 = String(p.contactId || '');
+              const alt2 = String(p._id || '');
+              const target = String(ctx.contactId || '');
               return pid === target || alt1 === target || alt2 === target;
             });
             if (found) {
               contact = found;
             }
-          } catch(_) {}
+          } catch (_) { }
         }
-        
+
         // Priority 3: If not selected, try to infer from context name or number
         if (!contact && ctx) {
           try {
             const people = getPeopleCache();
             if (ctx.name) {
-            const nm = normName(ctx.name);
-            contact = people.find(p => normName(p.name || ((p.firstName||'') + ' ' + (p.lastName||''))) === nm) || null;
+              const nm = normName(ctx.name);
+              contact = people.find(p => normName(p.name || ((p.firstName || '') + ' ' + (p.lastName || ''))) === nm) || null;
             }
             // If still no contact, try by number
             if (!contact && ctx.number) {
@@ -2491,32 +2945,32 @@
                 return candidates.some(ph => normPhone(ph) === n10);
               }) || null;
             }
-          } catch(_) {}
+          } catch (_) { }
         }
         // Resolve account - prefer accountId from context, then from contact
         if (ctx.accountId) {
           try {
             const accounts = getAccountsCache();
             const found = accounts.find(a => {
-              const aid = String(a.id||'');
-              const alt1 = String(a.accountId||'');
-              const alt2 = String(a._id||'');
-              const target = String(ctx.accountId||'');
+              const aid = String(a.id || '');
+              const alt1 = String(a.accountId || '');
+              const alt2 = String(a._id || '');
+              const target = String(ctx.accountId || '');
               return aid === target || alt1 === target || alt2 === target;
             });
             if (found) account = found;
-          } catch(_) {}
+          } catch (_) { }
         }
-        
+
         // If no account found via accountId, try finding from contact
         if (!account) {
-        try { account = findAccountForContact(contact) || {}; } catch(_) { account = {}; }
+          try { account = findAccountForContact(contact) || {}; } catch (_) { account = {}; }
         }
-        
+
         // If still no account, try by company name from context
         if (!account || !account.name) {
           const accounts = getAccountsCache();
-          const nm = String(ctx.company||'').trim();
+          const nm = String(ctx.company || '').trim();
           if (nm) {
             const hit = accounts.find(a => getAccountKey(a) === getAccountKey({ name: nm }));
             if (hit) account = hit;
@@ -2535,13 +2989,13 @@
           const finalContractEnd = healthContractEnd ? toMDY(healthContractEnd) : detailContractEnd;
           if (finalSupplier) account.supplier = finalSupplier;
           if (finalContractEnd) { account.contract_end = finalContractEnd; account.contractEnd = finalContractEnd; }
-        } catch(_) {}
+        } catch (_) { }
 
         // Borrow missing from contact if needed
         if (!account.supplier && contact.supplier) account.supplier = contact.supplier;
         if (!account.contract_end && contact.contract_end) account.contract_end = contact.contract_end;
         if (!account.contractEnd && contact.contract_end) account.contractEnd = contact.contract_end;
-        
+
         // If no account found, fall back to using the selected contact's company for {{account.name}}
         if (!account.name && (contact.company || contact.companyName)) {
           account.name = contact.company || contact.companyName;
@@ -2551,8 +3005,8 @@
         return { contact, account };
       }
 
-      function dayPart(){ try { const h = new Date().getHours(); if (h >= 5 && h < 12) return 'Good morning'; if (h >= 12 && h < 17) return 'Good afternoon'; if (h >= 17 && h <= 20) return 'Good evening'; return 'Hello'; } catch(_) { return 'Hello'; } }
-      function chip(scope, key){
+      function dayPart() { try { const h = new Date().getHours(); if (h >= 5 && h < 12) return 'Good morning'; if (h >= 12 && h < 17) return 'Good afternoon'; if (h >= 17 && h <= 20) return 'Good evening'; return 'Hello'; } catch (_) { return 'Hello'; } }
+      function chip(scope, key) {
         const friendly = {
           'name': 'company name',
           'first_name': 'first name',
@@ -2568,11 +3022,11 @@
           'city': 'city',
           'state': 'state',
           'website': 'website'
-        }[key] || String(key).replace(/_/g,' ').toLowerCase();
+        }[key] || String(key).replace(/_/g, ' ').toLowerCase();
         const token = `{{${scope}.${key}}}`;
         return `<span class="var-chip" data-var="${scope}.${key}" data-token="${token}" contenteditable="false">${friendly}</span>`;
       }
-      function renderTemplateChips(str){
+      function renderTemplateChips(str) {
         if (!str) return '';
         // Replace known tokens with chips without substituting live values
         let result = String(str);
@@ -2580,10 +3034,10 @@
         try {
           const dp = dayPart();
           result = result.replace(/\{\{\s*day\.part\s*\}\}/gi, escapeHtml(dp));
-        } catch(_) {}
+        } catch (_) { }
         const tokens = [
-          'contact.first_name','contact.last_name','contact.full_name','contact.phone','contact.mobile','contact.email','contact.title',
-          'account.name','account.industry','account.city','account.state','account.website','account.supplier','account.contract_end'
+          'contact.first_name', 'contact.last_name', 'contact.full_name', 'contact.phone', 'contact.mobile', 'contact.email', 'contact.title',
+          'account.name', 'account.industry', 'account.city', 'account.state', 'account.website', 'account.supplier', 'account.contract_end'
         ];
         tokens.forEach(key => {
           const [scope, k] = key.split('.');
@@ -2593,7 +3047,7 @@
         return result;
       }
 
-      function renderTemplateValues(str){
+      function renderTemplateValues(str) {
         if (!str) return '';
         const dp = dayPart();
         const data = getLiveData();
@@ -2610,25 +3064,25 @@
         } catch (_) {
           agentFirstName = '';
         }
-        
+
         // Calculate savings based on monthly spend from state
         let monthlySpend = 0;
         let annualSpend = 0;
         let potentialSavings = 0;
-        
+
         // Use stored monthly spend value if available
         if (state.monthlySpend && state.monthlySpend > 0) {
           monthlySpend = state.monthlySpend;
           annualSpend = monthlySpend * 12;
           potentialSavings = Math.round(annualSpend * 0.25); // 25% savings estimate
         }
-        
+
         // Format numbers with commas
         const formatCurrency = (num) => {
           if (num === 0 || !num) return 'an estimated amount';
           return '$' + num.toLocaleString();
         };
-        
+
         const values = {
           'day.part': dp,
           'agent.first_name': agentFirstName,
@@ -2650,15 +3104,15 @@
           'annual_spend': formatCurrency(annualSpend),
           'potential_savings': formatCurrency(potentialSavings)
         };
-        
+
         let result = String(str);
-        
+
         // Replace {{variable}} placeholders with actual values
         for (const [key, value] of Object.entries(values)) {
           const pattern = new RegExp(`\\{\\{\\s*${key.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\s*\\}\\}`, 'gi');
           result = result.replace(pattern, escapeHtml(value || ''));
         }
-        
+
         // Handle badge placeholders - replace (contact name) etc. with actual data if available
         // Use the actual contact data from getLiveData() for better accuracy
         const actualContact = data.contact || {};
@@ -2667,7 +3121,7 @@
         const contactName = values['contact.first_name'] || actualContact.firstName || actualContact.first_name || splitName(actualContact.name || '').first || splitName(actualContact.fullName || '').first || '';
         // For company name, try account first, then contact company
         const companyName = values['account.name'] || actualAccount.name || actualAccount.accountName || actualAccount.companyName || actualContact.company || actualContact.companyName || '';
-        
+
         // Get your name from settings (first name only from general settings)
         // Use synchronous method to avoid async issues
         let yourName = '';
@@ -2682,7 +3136,7 @@
           // Fallback if settings not available
           yourName = '';
         }
-        
+
         // Replace badge placeholders - handle both HTML-wrapped and plain text versions
         // Plain text placeholders: (contact name), (your name), (company name)
         if (contactName) {
@@ -2707,10 +3161,10 @@
           // Plain text version (no HTML)
           result = result.replace(/\(company name\)/gi, escapeHtml(companyName));
         }
-        
+
         // Tone markers and pause indicators are kept as-is (they're already properly formatted HTML)
         // No additional processing needed - they render correctly
-        
+
         return result;
       }
 
@@ -2761,17 +3215,17 @@
                 return window.DataManager.getCurrentUserEmail();
               }
               return (window.currentUserEmail || '').toLowerCase();
-            } catch(_) {
+            } catch (_) {
               return (window.currentUserEmail || '').toLowerCase();
             }
           };
           const email = getUserEmail();
           if (!email) return;
-          
+
           // Use per-user document like settings.js
           const docId = `call-scripts-${email}`;
           const doc = await window.firebaseDB.collection('settings').doc(docId).get();
-          
+
           if (doc.exists) {
             const data = doc.data();
             if (data && data.openerKey) {
@@ -2780,27 +3234,27 @@
                 // Update currentOpener
                 const oldDefault = currentOpener;
                 currentOpener = savedOpener;
-                
+
                 // Update availableOpeners - remove saved opener, add old default back
                 availableOpeners = availableOpeners.filter(o => o.key !== savedOpener.key);
                 if (oldDefault && oldDefault.key !== savedOpener.key) {
                   // Only add old default if it's different
                   availableOpeners.push(oldDefault);
                 }
-                
+
                 // Sync with call-scripts module if available
                 if (window.callScriptsModule) {
                   try {
                     window.callScriptsModule.currentOpener = currentOpener;
                     window.callScriptsModule.availableOpeners = availableOpeners;
-                  } catch(_) {}
+                  } catch (_) { }
                 }
-                
+
                 updateHookOpener();
               }
             }
           }
-        } catch(err) {
+        } catch (err) {
           console.warn('[Phone Widget] Could not load saved opener:', err);
         }
       }
@@ -2814,7 +3268,7 @@
                 return window.DataManager.getCurrentUserEmail();
               }
               return (window.currentUserEmail || '').toLowerCase();
-            } catch(_) {
+            } catch (_) {
               return (window.currentUserEmail || '').toLowerCase();
             }
           };
@@ -2823,25 +3277,25 @@
               if (window.firebase && window.firebase.auth && window.firebase.auth().currentUser) {
                 return window.firebase.auth().currentUser.uid;
               }
-            } catch(_) {}
+            } catch (_) { }
             return null;
           };
-          
+
           const email = getUserEmail();
           const userId = getCurrentUserId();
           if (!email) return;
-          
+
           // Use per-user document pattern from settings.js
           const docId = `call-scripts-${email}`;
           const docRef = window.firebaseDB.collection('settings').doc(docId);
-          
+
           const updateData = {
             openerKey: openerKey,
             ownerId: email,
             updatedAt: window.firebase.firestore.FieldValue.serverTimestamp()
           };
           if (userId) updateData.userId = userId;
-          
+
           // Check if document exists
           const doc = await docRef.get();
           if (doc.exists) {
@@ -2853,7 +3307,7 @@
               createdAt: window.firebase.firestore.FieldValue.serverTimestamp()
             });
           }
-        } catch(err) {
+        } catch (err) {
           console.warn('[Phone Widget] Could not save opener selection:', err);
         }
       }
@@ -2899,7 +3353,7 @@
           try {
             window.callScriptsModule.currentOpener = currentOpener;
             window.callScriptsModule.availableOpeners = availableOpeners;
-          } catch(_) {}
+          } catch (_) { }
         }
         // Wait a bit for FLOW to be available from call-scripts.js
         setTimeout(() => {
@@ -2909,7 +3363,7 @@
         // If load fails, just use default
         updateHookOpener();
       });
-      
+
       // Also sync with call-scripts module if it's already loaded (eager load)
       if (window.callScriptsModule && window.callScriptsModule.currentOpener) {
         const csOpener = window.callScriptsModule.currentOpener;
@@ -2920,7 +3374,7 @@
         }
       }
 
-      function renderNode(){
+      function renderNode() {
         // Ensure FLOW is available - get fresh reference each time
         let FLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
         if (!FLOW) {
@@ -2942,7 +3396,7 @@
           }, 500);
           return;
         }
-        
+
         const key = state.current;
         // Ensure hook is updated before rendering
         if (key === 'hook' || (FLOW && FLOW[key] && (FLOW[key].stage === 'Opening' || FLOW[key].stage.includes('Gatekeeper')))) {
@@ -2950,52 +3404,52 @@
         }
         const node = FLOW[key];
         if (!node) { display.innerHTML = ''; responses.innerHTML = ''; buildStageNavigation(); return; }
-        
+
         // Update stage navigation
         buildStageNavigation();
-        
+
         // Measure current height before changes
         const currentHeight = card.getBoundingClientRect().height;
-        
+
         // Fade out current content
         display.classList.remove('--visible');
         const oldButtons = responses.querySelectorAll('.btn-secondary');
         oldButtons.forEach(b => b.classList.remove('--visible'));
-        
+
         // Update DOM after brief fade
         setTimeout(() => {
-          const live = (function(){ try { return hasActiveCall() || (currentCallContext && currentCallContext.isActive); } catch(_) { return false; } })();
+          const live = (function () { try { return hasActiveCall() || (currentCallContext && currentCallContext.isActive); } catch (_) { return false; } })();
           // Always render with values when contact is selected, even if not in live call
           const hasSelectedContact = !!(state.overrideContactId);
           const shouldRenderValues = live || hasSelectedContact;
           display.innerHTML = shouldRenderValues ? renderTemplateValues(node.text || '') : renderTemplateChips(node.text || '');
           responses.innerHTML = '';
-          
+
           // Special handling for situation_discovery and all acknowledgment states that ask about monthly spending - show input field
-          if (key === 'situation_discovery' || 
-              key === 'ack_confident_handle' || 
-              key === 'ack_struggling' || 
-              key === 'ack_no_idea' ||
-              key === 'ack_dq_confident' ||
-              key === 'ack_dq_struggling' ||
-              key === 'ack_vendor_handling') {
+          if (key === 'situation_discovery' ||
+            key === 'ack_confident_handle' ||
+            key === 'ack_struggling' ||
+            key === 'ack_no_idea' ||
+            key === 'ack_dq_confident' ||
+            key === 'ack_dq_struggling' ||
+            key === 'ack_vendor_handling') {
             const inputWrap = document.createElement('div');
             inputWrap.className = 'monthly-spend-input-wrap';
             inputWrap.style.cssText = 'width: 100%; margin-bottom: 12px;';
-            
+
             const label = document.createElement('label');
             label.textContent = 'Monthly Spend:';
             label.style.cssText = 'display: block; margin-bottom: 6px; color: var(--text-primary); font-size: 14px;';
             inputWrap.appendChild(label);
-            
+
             const inputContainer = document.createElement('div');
             inputContainer.style.cssText = 'display: flex; gap: 8px; align-items: center;';
-            
+
             const dollarSign = document.createElement('span');
             dollarSign.textContent = '$';
             dollarSign.style.cssText = 'color: var(--text-primary); font-size: 16px; font-weight: 500;';
             inputContainer.appendChild(dollarSign);
-            
+
             const input = document.createElement('input');
             input.type = 'number';
             input.placeholder = 'Enter amount (e.g., 5000)';
@@ -3033,7 +3487,7 @@
             inputContainer.appendChild(input);
             inputWrap.appendChild(inputContainer);
             responses.appendChild(inputWrap);
-            
+
             const nextBtn = document.createElement('button');
             nextBtn.type = 'button';
             nextBtn.className = 'btn-secondary';
@@ -3059,11 +3513,11 @@
               }
             });
             responses.appendChild(nextBtn);
-            
+
             // Add "Don't know offhand" button (different labels based on state)
-            const dontKnowLabel = key === 'ack_no_idea' ? "Honestly don't have a guess" : 
-                                  key === 'ack_confident_handle' || key === 'ack_dq_confident' || key === 'ack_dq_struggling' ? "Don't know exact amount" :
-                                  "Don't know offhand";
+            const dontKnowLabel = key === 'ack_no_idea' ? "Honestly don't have a guess" :
+              key === 'ack_confident_handle' || key === 'ack_dq_confident' || key === 'ack_dq_struggling' ? "Don't know exact amount" :
+                "Don't know offhand";
             const dontKnowBtn = document.createElement('button');
             dontKnowBtn.type = 'button';
             dontKnowBtn.className = 'btn-secondary';
@@ -3088,29 +3542,29 @@
               responses.appendChild(b);
             });
           }
-          
+
           // Let CSS transition handle height smoothly
           requestAnimationFrame(() => {
             // Set explicit start height
             card.style.height = currentHeight + 'px';
             card.style.overflow = 'hidden';
-            
+
             requestAnimationFrame(() => {
               // Get target height with new content
               const tempHeight = card.style.height;
               card.style.height = 'auto';
               const targetHeight = card.scrollHeight;
               card.style.height = tempHeight;
-              
+
               // Trigger CSS transition to target
               requestAnimationFrame(() => {
                 card.style.height = targetHeight + 'px';
-                
+
                 // Fade in new content
                 display.classList.add('--visible');
                 const newButtons = responses.querySelectorAll('.btn-secondary');
                 newButtons.forEach(b => b.classList.add('--visible'));
-                
+
                 // Clean up after transition
                 const cleanup = () => {
                   card.style.height = '';
@@ -3123,46 +3577,46 @@
         }, 80);
       }
 
-      function startAt(key){ state.current = key; state.history = []; renderNode(); }
-      function goBack(){ if (!state.history.length) return; state.current = state.history.pop(); renderNode(); }
-      function resetAll(){ 
+      function startAt(key) { state.current = key; state.history = []; renderNode(); }
+      function goBack() { if (!state.history.length) return; state.current = state.history.pop(); renderNode(); }
+      function resetAll() {
         // Smooth animation when resetting
-        state.current = ''; 
-        state.history = []; 
+        state.current = '';
+        state.history = [];
         state.overrideContactId = null;
-        state.monthlySpend = null; 
-        inputEl.value = ''; 
+        state.monthlySpend = null;
+        inputEl.value = '';
         closeSuggest();
-        
+
         // Animate collapse smoothly
         const currentHeight = card.getBoundingClientRect().height;
-        
+
         // Fade out content
         display.classList.remove('--visible');
         const oldButtons = responses.querySelectorAll('.btn-secondary');
         oldButtons.forEach(b => b.classList.remove('--visible'));
-        
+
         setTimeout(() => {
           // Clear content
           display.innerHTML = '';
           responses.innerHTML = '';
-          
+
           // Animate height collapse
           requestAnimationFrame(() => {
             card.style.height = currentHeight + 'px';
             card.style.overflow = 'hidden';
-            
+
             requestAnimationFrame(() => {
               // Measure collapsed height
               const tempHeight = card.style.height;
               card.style.height = 'auto';
               const targetHeight = card.scrollHeight;
               card.style.height = tempHeight;
-              
+
               requestAnimationFrame(() => {
                 // Trigger CSS transition
                 card.style.height = targetHeight + 'px';
-                
+
                 // Clean up after transition
                 setTimeout(() => {
                   card.style.height = '';
@@ -3191,7 +3645,7 @@
       function buildStageNavigation() {
         const stageNav = el.querySelector('.ms-stage-nav');
         if (!stageNav) return;
-        
+
         // Get fresh FLOW reference each time
         const FLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
         if (!FLOW) {
@@ -3238,41 +3692,68 @@
       // Search suggestions (account-scoped)
       const inputEl = el.querySelector('.ms-input');
       const panelEl = el.querySelector('.ms-suggest');
-      function closeSuggest(){ panelEl.hidden = true; }
-      function openSuggest(){ panelEl.hidden = false; }
-      function setSelectedContact(id){ state.overrideContactId = id ? String(id) : null; try { const people = getPeopleCache(); const sel = people.find(p => String(p.id||p.contactId||p._id||'') === String(id)); if (sel){ const name = sel.name || ((sel.firstName||'') + ' ' + (sel.lastName||'')); inputEl.value = name; } } catch(_) {} closeSuggest(); renderNode(); }
-      function buildSuggestions(q){
+      function closeSuggest() { panelEl.hidden = true; }
+      function openSuggest() { panelEl.hidden = false; }
+      function setSelectedContact(id) { state.overrideContactId = id ? String(id) : null; try { const people = getPeopleCache(); const sel = people.find(p => String(p.id || p.contactId || p._id || '') === String(id)); if (sel) { const name = sel.name || ((sel.firstName || '') + ' ' + (sel.lastName || '')); inputEl.value = name; } } catch (_) { } closeSuggest(); renderNode(); }
+      function buildSuggestions(q) {
         const people = getPeopleCache();
         const ctxData = getLiveData();
         const accKey = getAccountKey(ctxData.account);
-        const qn = String(q||'').trim().toLowerCase();
+        const qn = String(q || '').trim().toLowerCase();
         const filtered = people.filter(p => {
-          const nm = (p.name || ((p.firstName||'') + ' ' + (p.lastName||''))).toLowerCase();
+          const nm = (p.name || ((p.firstName || '') + ' ' + (p.lastName || ''))).toLowerCase();
           const acct = getAccountKey({ name: p.company || p.companyName || '' });
           const matchAccount = !accKey || (acct === accKey);
           const matchName = !qn || nm.includes(qn);
           return matchAccount && matchName;
         }).slice(0, 8);
-        if (!filtered.length){ panelEl.innerHTML = '<div class="item" aria-disabled="true">No matches</div>'; openSuggest(); return; }
+        if (!filtered.length) { panelEl.innerHTML = '<div class="item" aria-disabled="true">No matches</div>'; openSuggest(); return; }
         panelEl.innerHTML = filtered.map(p => {
-          const nm = (p.name || ((p.firstName||'') + ' ' + (p.lastName||''))) || '';
-          const first = (nm||'?').charAt(0).toUpperCase();
-          return `<div class="item" role="option" data-id="${escapeHtml(p.id||p.contactId||p._id||'')}"><div class="glyph">${first}</div><div class="label">${escapeHtml(nm)}</div></div>`;
+          const nm = (p.name || ((p.firstName || '') + ' ' + (p.lastName || ''))) || '';
+          const first = (nm || '?').charAt(0).toUpperCase();
+          return `<div class="item" role="option" data-id="${escapeHtml(p.id || p.contactId || p._id || '')}"><div class="glyph">${first}</div><div class="label">${escapeHtml(nm)}</div></div>`;
         }).join('');
         openSuggest();
       }
-      inputEl.addEventListener('input', () => { const v = inputEl.value||''; if (!v.trim()){ state.overrideContactId = null; closeSuggest(); renderNode(); return; } buildSuggestions(v); });
-      inputEl.addEventListener('keydown', (e) => { if (e.key==='Escape'){ closeSuggest(); return; } if (e.key==='Enter'){ const first = panelEl.querySelector('.item'); if (first){ const id = first.getAttribute('data-id'); if (id) setSelectedContact(id); closeSuggest(); e.preventDefault(); } } });
+      inputEl.addEventListener('input', () => { const v = inputEl.value || ''; if (!v.trim()) { state.overrideContactId = null; closeSuggest(); renderNode(); return; } buildSuggestions(v); });
+      inputEl.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSuggest(); return; } if (e.key === 'Enter') { const first = panelEl.querySelector('.item'); if (first) { const id = first.getAttribute('data-id'); if (id) setSelectedContact(id); closeSuggest(); e.preventDefault(); } } });
       panelEl.addEventListener('click', (e) => { const it = e.target.closest && e.target.closest('.item'); if (!it) return; const id = it.getAttribute('data-id'); if (id) setSelectedContact(id); });
       document.addEventListener('click', (e) => { if (!el.contains(e.target)) closeSuggest(); });
 
       // Energy updates
       let lastEnergyAt = 0; const TH = 3000;
-      const onEnergy = (ev) => { try { const now = Date.now(); if (now - lastEnergyAt < TH) return; lastEnergyAt = now; const d = ev.detail||{}; const live = getLiveData(); const contactId = live.contact?.id || live.contact?.contactId || live.contact?._id; const accountId = live.account?.id || live.account?.accountId || live.account?._id; const relevant = (d.entity==='contact' && String(d.id)===String(contactId)) || (d.entity==='account' && String(d.id)===String(accountId)); if (relevant) renderNode(); } catch(_) {} };
+      const onEnergy = (ev) => { try { const now = Date.now(); if (now - lastEnergyAt < TH) return; lastEnergyAt = now; const d = ev.detail || {}; const live = getLiveData(); const contactId = live.contact?.id || live.contact?.contactId || live.contact?._id; const accountId = live.account?.id || live.account?.accountId || live.account?._id; const relevant = (d.entity === 'contact' && String(d.id) === String(contactId)) || (d.entity === 'account' && String(d.id) === String(accountId)); if (relevant) renderNode(); } catch (_) { } };
       document.addEventListener('pc:energy-updated', onEnergy);
 
       // Re-render on call state changes (e.g., connected -> substitute values)
-      try { card.addEventListener('callStateChanged', () => renderNode()); } catch(_) {}
+      try { card.addEventListener('callStateChanged', () => renderNode()); } catch (_) { }
+
+      // --- Global Export for External Control ---
+      window.Widgets = window.Widgets || {};
+      window.Widgets.hangup = function () {
+        console.log('[Phone] Global hangup requested');
+        // 1. Try clicking the visual button first (triggers UI flow)
+        const btn = document.querySelector('#phone-widget .call-btn-start');
+        if (btn && btn.classList.contains('btn-danger')) {
+          btn.click();
+          return;
+        }
+        // 2. Direct API disconnect
+        if (currentCall) {
+          currentCall.disconnect();
+          return;
+        }
+        // 3. Fallback to cleaning up connection
+        if (TwilioRTC && TwilioRTC.state && TwilioRTC.state.connection) {
+          TwilioRTC.state.connection.disconnect();
+        }
+      };
+      window.Widgets.isPhoneOpen = function () {
+        return !!document.getElementById('phone-widget');
+      };
+
+      // Initialize (if not already done by script tag position)
+      openPhone();
 
       // Initialize empty and build stage navigation
       state.current = '';
@@ -3302,11 +3783,11 @@
       });
     }
 
-    function toggleMiniScripts(card){
+    function toggleMiniScripts(card) {
       if (!card) return;
       const wrap = card.querySelector('.mini-scripts-wrap');
       if (!wrap) return;
-      
+
       // If scripts UI hasn't been built yet, build it now
       // This ensures FLOW is available when scripts button is clicked
       const miniScripts = wrap.querySelector('.mini-scripts');
@@ -3317,7 +3798,7 @@
         }, 100);
         return;
       }
-      
+
       // Ensure FLOW is available before showing scripts
       const displaySelector = '.ms-display';
       let display = card.querySelector(displaySelector);
@@ -3341,37 +3822,37 @@
         }, 500);
         return;
       }
-      
+
       const isHidden = wrap.hasAttribute('hidden');
-      
+
       if (isHidden) {
         // OPENING: Use CSS transition for smooth expansion
         const currentHeight = card.getBoundingClientRect().height;
-        
+
         // Build UI and unhide
         buildMiniScriptsUI(card);
         wrap.removeAttribute('hidden');
         const miniScripts = wrap.querySelector('.mini-scripts');
-        
+
         requestAnimationFrame(() => {
           // Set explicit start height
           card.style.height = currentHeight + 'px';
           card.style.overflow = 'hidden';
-          
+
           requestAnimationFrame(() => {
             // Measure target height
             const tempHeight = card.style.height;
             card.style.height = 'auto';
             const targetHeight = card.scrollHeight;
             card.style.height = tempHeight;
-            
+
             requestAnimationFrame(() => {
               // Trigger CSS transition
               card.style.height = targetHeight + 'px';
               if (miniScripts) miniScripts.classList.add('--show');
-              
+
               // Focus input and cleanup after transition
-              try { const si = wrap.querySelector('.ms-input'); if (si) setTimeout(() => si.focus(), 100); } catch(_) {}
+              try { const si = wrap.querySelector('.ms-input'); if (si) setTimeout(() => si.focus(), 100); } catch (_) { }
               setTimeout(() => {
                 card.style.height = '';
                 card.style.overflow = '';
@@ -3383,15 +3864,15 @@
         // CLOSING: Use CSS transition for smooth collapse
         const miniScripts = wrap.querySelector('.mini-scripts');
         const currentHeight = card.getBoundingClientRect().height;
-        
+
         // Fade out content
         if (miniScripts) miniScripts.classList.remove('--show');
-        
+
         requestAnimationFrame(() => {
           // Set explicit start height
           card.style.height = currentHeight + 'px';
           card.style.overflow = 'hidden';
-          
+
           requestAnimationFrame(() => {
             // Measure target height (after hiding mini-scripts)
             wrap.setAttribute('hidden', '');
@@ -3400,11 +3881,11 @@
             const targetHeight = card.scrollHeight;
             card.style.height = tempHeight;
             wrap.removeAttribute('hidden');
-            
+
             requestAnimationFrame(() => {
               // Trigger CSS transition
               card.style.height = targetHeight + 'px';
-              
+
               // Clean up after transition
               setTimeout(() => {
                 card.style.height = '';
@@ -3422,7 +3903,7 @@
       if (!input) return;
       const current = input.value || '';
       input.value = current.slice(0, -1);
-      try { input.focus(); } catch (_) {}
+      try { input.focus(); } catch (_) { }
     };
 
     // Handle paste on input only and keep only allowed characters
@@ -3433,14 +3914,14 @@
       const text = (clip.getData && (clip.getData('text') || clip.getData('Text'))) || '';
       if (!text) return;
       e.preventDefault();
-      try { e.stopPropagation(); } catch (_) {}
+      try { e.stopPropagation(); } catch (_) { }
       // Map letters to T9 digits; allow digits, *, #, and a single leading +
       const mapped = String(text).replace(/[A-Za-z]/g, (c) => letterToDigit(c) || '');
       const cleaned = mapped.replace(/[^0-9*#\+]/g, '');
       const existing = input.value || '';
       const next = existing ? (existing + cleaned.replace(/\+/g, '')) : cleaned.replace(/(.*?)(\+)(.*)/, '+$1$3');
       input.value = next;
-      try { input.focus(); } catch (_) {}
+      try { input.focus(); } catch (_) { }
     };
     if (input) input.addEventListener('paste', onPaste);
 
@@ -3448,7 +3929,7 @@
     const trackUserInput = () => {
       lastUserTypingTime = Date.now();
     };
-    
+
     // Dialpad clicks
     // Helper: detect active call connection
     const hasActiveCall = () => {
@@ -3462,7 +3943,7 @@
           const st2 = (typeof currentCall.status === 'function') ? currentCall.status() : 'open';
           return st2 && st2 !== 'closed';
         }
-      } catch(_) {}
+      } catch (_) { }
       return false;
     };
     const sendDTMF = (digit) => {
@@ -3479,10 +3960,10 @@
             const keyBtn = card.querySelector(`.dial-key[data-key="${CSS.escape(String(digit))}"]`);
             if (keyBtn) {
               keyBtn.classList.add('dtmf-flash');
-              setTimeout(() => { try { keyBtn.classList.remove('dtmf-flash'); } catch(_) {} }, 180);
+              setTimeout(() => { try { keyBtn.classList.remove('dtmf-flash'); } catch (_) { } }, 180);
             }
           }
-        } catch(_) {}
+        } catch (_) { }
       } catch (e) {
         console.warn('[Phone] Failed to send DTMF:', e);
       }
@@ -3498,7 +3979,7 @@
         }
       });
     });
-    
+
     // Helper: lookup contact by phone and update widget display
     function enrichTitleFromPhone(rawNumber) {
       // Suggested contact lookup disabled to avoid stale/incorrect attributions
@@ -3510,11 +3991,11 @@
     if (input) {
       input.addEventListener('input', trackUserInput);
       input.addEventListener('keydown', trackUserInput);
-      
+
       // Disable suggested-contact lookup during typing (keep context from source page only)
       input.addEventListener('input', () => {
         const value = input.value || '';
-        
+
         // CRITICAL: Skip context clearing if this input matches the current call context number
         // This indicates it's a programmatic set from callNumber, not user typing
         // Check if we have context data (IDs, names, company) even if isActive isn't set yet
@@ -3524,17 +4005,17 @@
         const storedContext = input._programmaticContext;
         const normalizedStoredNumber = (storedContext?.number || '').replace(/\D/g, '');
         const hasContextData = !!(currentCallContext && (
-          currentCallContext.accountId || currentCallContext.contactId || 
+          currentCallContext.accountId || currentCallContext.contactId ||
           currentCallContext.name || currentCallContext.company || currentCallContext.accountName
         ));
         const hasStoredContextData = !!(storedContext && (
-          storedContext.accountId || storedContext.contactId || 
+          storedContext.accountId || storedContext.contactId ||
           storedContext.name || storedContext.company
         ));
         // Check both currentCallContext and stored programmatic context
         const isProgrammaticSet = (normalizedValue === normalizedContextNumber && hasContextData) ||
-                                  (normalizedValue === normalizedStoredNumber && hasStoredContextData);
-        
+          (normalizedValue === normalizedStoredNumber && hasStoredContextData);
+
         if (isProgrammaticSet) {
           console.debug('[Phone] Input event from programmatic set - preserving context');
           // If we have stored context but currentCallContext was cleared, restore it
@@ -3562,9 +4043,9 @@
           }
           return;
         }
-        
+
         if (!value.trim()) {
-          try { clearContactDisplay(); } catch(_) {}
+          try { clearContactDisplay(); } catch (_) { }
           // Also clear the context when input is cleared
           // BUT: Don't clear if a call is in progress
           if (!isCallInProgress) {
@@ -3593,7 +4074,7 @@
         // Reuse normalizedValue and normalizedContextNumber already declared above
         const valueMatchesContext = normalizedValue && normalizedContextNumber && normalizedValue === normalizedContextNumber;
         // Reuse hasContextData already declared above
-        
+
         if (value.trim() && currentCallContext.isActive === false && !isCallInProgress && !valueMatchesContext && !hasContextData) {
           console.debug('[Phone] User typing new number - clearing stale context');
           currentCallContext = {
@@ -3612,11 +4093,11 @@
             isActive: false
           };
         }
-        
+
         // Also clear context if user is typing a different number than what's in context
         // BUT: Don't clear context if a call is currently in progress
-        if (value.trim() && currentCallContext.isActive && currentCallContext.number && 
-            currentCallContext.number !== value.trim() && !isCallInProgress) {
+        if (value.trim() && currentCallContext.isActive && currentCallContext.number &&
+          currentCallContext.number !== value.trim() && !isCallInProgress) {
           console.debug('[Phone] User typing different number - clearing existing context');
           currentCallContext = {
             number: '',
@@ -3638,17 +4119,16 @@
     }
 
     // Actions
-    const callBtn = card.querySelector('.call-btn-start');
+    callBtn = card.querySelector('.call-btn-start');
     const scriptsToggle = card.querySelector('.scripts-toggle');
     if (scriptsToggle && !scriptsToggle._bound) { scriptsToggle.addEventListener('click', () => toggleMiniScripts(card)); scriptsToggle._bound = true; }
-    let currentCall = null;
 
     async function placeBrowserCall(number, extension = '') {
       console.debug('[Phone] Attempting browser call to:', number, extension ? `ext. ${extension}` : '');
-      
+
       try {
         const device = await TwilioRTC.ensureDevice();
-        
+
         // Set input device before making the call according to Twilio best practices
         // This ensures proper audio device selection for the call
         if (device.audio) {
@@ -3656,44 +4136,44 @@
             // Get available input devices and use the first one if 'default' doesn't exist
             const inputDevices = device.audio.availableInputDevices;
             let inputDeviceId = 'default';
-            
+
             if (inputDevices && inputDevices.size > 0) {
               const deviceIds = Array.from(inputDevices.keys());
-              
+
               // Try 'default' first, fallback to first available device
               if (!deviceIds.includes('default') && deviceIds.length > 0) {
                 inputDeviceId = deviceIds[0];
               }
             }
-            
+
             try {
               await device.audio.setInputDevice(inputDeviceId);
             } catch (e) {
               console.warn('[Phone] Failed to set input device, trying without specific device:', e);
               try {
                 await device.audio.unsetInputDevice();
-              } catch (_) {}
+              } catch (_) { }
             }
           } catch (e) {
             console.warn('[Phone] Failed to set input device:', e);
             // Continue without setting input device - Twilio will use browser default
           }
-          
+
           // Set speaker device for output according to Twilio best practices
           if (device.audio.isOutputSelectionSupported) {
             try {
               // Get available output devices and use the first one if 'default' doesn't exist
               const outputDevices = device.audio.availableOutputDevices;
               let outputDeviceId = 'default';
-              
+
               if (outputDevices && outputDevices.size > 0) {
                 const deviceIds = Array.from(outputDevices.keys());
-                
+
                 if (!deviceIds.includes('default') && deviceIds.length > 0) {
                   outputDeviceId = deviceIds[0];
                 }
               }
-              
+
               try {
                 device.audio.speakerDevices.set(outputDeviceId);
               } catch (e) {
@@ -3705,17 +4185,17 @@
             }
           }
         }
-        
+
         // Get selected phone number from settings for caller ID
         const selectedCallerId = getSelectedPhoneNumber();
         console.debug('[Phone] Using caller ID:', selectedCallerId);
-        
+
         // Verify TwiML App configuration before making call
         const base = (window.API_BASE_URL || '').replace(/\/$/, '');
         const expectedVoiceUrl = `${base}/api/twilio/voice`;
         console.debug('[Phone] Expected TwiML App Voice URL:', expectedVoiceUrl);
         console.debug('[Phone] Make sure your TwiML App (configured in TWILIO_TWIML_APP_SID) has Voice URL set to:', expectedVoiceUrl);
-        
+
         // Make the call with recording enabled via TwiML app
         // Pass From parameter so TwiML webhook can use it as callerId
         try {
@@ -3738,27 +4218,27 @@
           if (connectError?.message?.includes('external') || connectError?.message?.includes('url') || connectError?.message?.includes('webhook')) {
             console.error('[Phone] ERROR: TwiML App Voice URL may be misconfigured!');
             console.error('[Phone] Please verify in Twilio Console that your TwiML App Voice URL points to:', expectedVoiceUrl);
-            try { window.crm?.showToast && window.crm.showToast('TwiML App configuration error - check console'); } catch(_) {}
+            try { window.crm?.showToast && window.crm.showToast('TwiML App configuration error - check console'); } catch (_) { }
           }
           throw connectError;
         }
         // Store outbound connection globally for unified cleanup paths
-        try { TwilioRTC.state.connection = currentCall; } catch(_) {}
-        
+        try { TwilioRTC.state.connection = currentCall; } catch (_) { }
+
         console.debug('[Phone] Call initiated');
-        
+
         // Set UI immediately for responsiveness
         setInCallUI(true);
-        
+
         // Track call start time and generate consistent call ID
         const callStartTime = Date.now();
         const callId = `call_${callStartTime}_${Math.random().toString(36).substr(2, 9)}`;
         let twilioCallSid = null;
-        
+
         // Log initial call with extension info
         const callNumber = extension ? `${number} ext. ${extension}` : number;
         await logCall(callNumber, 'browser', callId);
-        
+
         // Handle call events
         currentCall.on('accept', async () => {
           console.debug('[Phone] Call connected');
@@ -3770,13 +4250,13 @@
             const p = (currentCall && (currentCall.parameters || currentCall._parameters)) || {};
             twilioCallSid = p.CallSid || p.callSid || null;
             if (twilioCallSid) console.debug('[Phone] Captured Twilio CallSid:', twilioCallSid);
-          } catch(_) {}
+          } catch (_) { }
           // Notify widgets that a call started
           try {
             document.dispatchEvent(new CustomEvent('callStarted', { detail: { callSid: twilioCallSid || callId } }));
             const el = document.getElementById(WIDGET_ID);
             if (el) el.dispatchEvent(new CustomEvent('callStateChanged', { detail: { state: 'in-call', callSid: twilioCallSid || callId } }));
-          } catch(_) {}
+          } catch (_) { }
           // Show live timer in banner
           const card = document.getElementById(WIDGET_ID);
           startLiveCallTimer(card, twilioCallSid || callId);
@@ -3789,14 +4269,14 @@
             const hasExistingContext = !!(currentCallContext && (
               currentCallContext.accountId ||
               currentCallContext.contactId ||
-              currentCallContext.name || 
+              currentCallContext.name ||
               currentCallContext.contactName ||
-              currentCallContext.company || 
+              currentCallContext.company ||
               currentCallContext.accountName
             ));
-            
+
             console.debug('[Phone] Call accept - hasExistingContext:', hasExistingContext, 'currentCallContext:', currentCallContext);
-            
+
             let meta = {};
             // CRITICAL: Capture context snapshot BEFORE async operations to prevent it from being cleared
             const contextSnapshot = hasExistingContext ? {
@@ -3813,7 +4293,7 @@
               logoUrl: currentCallContext.logoUrl || '',
               isCompanyPhone: currentCallContext.isCompanyPhone || false
             } : null;
-            
+
             if (!hasExistingContext) {
               // Only resolve if we don't have context - prevents DOM lookup after navigation
               console.debug('[Phone] No existing context, resolving phone meta for:', number);
@@ -3839,7 +4319,7 @@
                 };
               }
             }
-            
+
             // Merge call context data with resolved meta to ensure company info is preserved
             // ALWAYS prefer existing context over resolved meta to preserve names after navigation
             // Use contextSnapshot if available (captured before async operations), otherwise fall back to currentCallContext
@@ -3870,38 +4350,60 @@
                 phoneType: contextToMerge.phoneType || meta.phoneType || null
               })
             };
-            
+
             console.debug('[Phone] Merged meta for contact display:', mergedMeta);
+
+            // CRITICAL FIX: Update context so global events (top bar) get the resolved IDs
+            if (currentCallContext) {
+              Object.assign(currentCallContext, {
+                contactId: mergedMeta.contactId,
+                accountId: mergedMeta.accountId,
+                name: mergedMeta.name || currentCallContext.name,
+                contactName: mergedMeta.contactName || currentCallContext.contactName,
+                company: mergedMeta.company || mergedMeta.account || mergedMeta.accountName || currentCallContext.company,
+                accountName: mergedMeta.accountName || mergedMeta.account || currentCallContext.accountName,
+                logoUrl: mergedMeta.logoUrl || currentCallContext.logoUrl,
+                city: mergedMeta.city || currentCallContext.city,
+                state: mergedMeta.state || currentCallContext.state
+              });
+            }
+
             setContactDisplay(mergedMeta, number);
-          } catch(err) {
+          } catch (err) {
             console.error('[Phone] Error setting contact display on call accept:', err);
           }
           // Update call status to connected using same call ID
           updateCallStatus(number, 'connected', callStartTime, 0, twilioCallSid || callId);
           // Immediately notify account detail to refresh recent calls (so it appears without reload)
-          try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch(_) {}
+          try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch (_) { }
         });
-        
+
         currentCall.on('disconnect', () => {
           console.debug('[Phone] Call disconnected');
-          
-          // [WEB WORKER FIX] Only set critical flags immediately - everything else goes to worker
+
+          // Only set critical flags immediately - everything else goes to worker
           const disconnectTime = Date.now();
           lastCallCompleted = disconnectTime;
           lastCalledNumber = number;
           isCallInProgress = false;
           autoTriggerBlockUntil = Date.now() + 3000;
-          
+
           // Clear critical state immediately
           TwilioRTC.state.connection = null;
           TwilioRTC.state.pendingIncoming = null;
-          currentCall = null;
-          
+
+          // Ensure currentCallContext is reset for outbound hangup
+          if (typeof currentCallContext !== 'undefined' && currentCallContext) {
+            currentCallContext.isActive = false;
+            currentCallContext.number = '';
+          }
+          currentCallSid = null;
+
           // [WEB WORKER] Send call completion to background worker
           if (callWorker) {
             const callEndTime = Date.now();
             const duration = Math.floor((callEndTime - callStartTime) / 1000);
-            
+
             callWorker.postMessage({
               type: 'CALL_COMPLETED',
               data: {
@@ -3919,15 +4421,15 @@
             setTimeout(() => {
               const callEndTime = Date.now();
               const duration = Math.floor((callEndTime - callStartTime) / 1000);
-          updateCallStatus(number, 'completed', callStartTime, duration, twilioCallSid || callId);
-          try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch(_) {}
+              updateCallStatus(number, 'completed', callStartTime, duration, twilioCallSid || callId);
+              try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch (_) { }
             }, 0);
           }
-          
+
           // Immediate UI cleanup (non-blocking)
           const widget = document.getElementById(WIDGET_ID);
           stopLiveCallTimer(widget);
-          
+
           // Clear UI state completely and ensure call button shows "Call"
           if (widget) {
             const btn = widget.querySelector('.call-btn-start');
@@ -3938,8 +4440,8 @@
               btn.classList.add('btn-primary');
               // Disable button briefly to prevent accidental immediate redial
               btn.disabled = true;
-              setTimeout(() => { 
-                btn.disabled = false; 
+              setTimeout(() => {
+                btn.disabled = false;
                 console.debug('[Phone] DISCONNECT: Button re-enabled after 2s cooldown');
               }, 2000);
             }
@@ -3947,23 +4449,29 @@
             if (input) input.value = '';
             const title = widget.querySelector('.widget-title');
             if (title) title.innerHTML = 'Phone';
-            try { clearContactDisplay(); } catch(_) {}
-            try { widget.classList.remove('in-call'); } catch(_) {}
+            try { clearContactDisplay(); } catch (_) { }
+            try { widget.classList.remove('in-call'); } catch (_) { }
           }
-          
+
           // Force UI update to ensure button state is visible
           setInCallUI(false);
           console.debug('[Phone] DISCONNECT: UI cleanup complete, call should show as ended');
-          
+
+          // Notify that call has ended
+          try {
+            document.dispatchEvent(new CustomEvent('pc:call-completed', { detail: { callSid: twilioCallSid || callId } }));
+            document.dispatchEvent(new CustomEvent('callStateChanged', { detail: { state: 'ended', callSid: twilioCallSid || callId } }));
+          } catch (_) { }
+
           // CRITICAL: Terminate all related call legs BEFORE disconnecting browser client
           // Collect all CallSids: server call, browser call, and any stored child SIDs
           const callSidsToTerminate = [];
-          
+
           // Add server-side call SID (parent call from API)
           if (window.currentServerCallSid) {
             callSidsToTerminate.push(window.currentServerCallSid);
           }
-          
+
           // Add browser client CallSid if available
           try {
             if (currentCall && currentCall.parameters) {
@@ -3978,8 +4486,8 @@
                 callSidsToTerminate.push(connCallSid);
               }
             }
-          } catch(_) {}
-          
+          } catch (_) { }
+
           // Add any stored child CallSids (from status callbacks)
           try {
             if (window.storedDialCallSids && Array.isArray(window.storedDialCallSids)) {
@@ -3989,8 +4497,8 @@
                 }
               });
             }
-          } catch(_) {}
-          
+          } catch (_) { }
+
           // Terminate all call legs BEFORE disconnecting browser client (per Twilio recommendation)
           if (callSidsToTerminate.length > 0) {
             try {
@@ -4000,44 +4508,47 @@
               fetch(`${base}/api/twilio/hangup`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ callSids: callSidsToTerminate })
-              }).catch(()=>{});
-            } catch(_) { /* ignore */ }
+              }).catch(() => { });
+            } catch (_) { /* ignore */ }
             window.currentServerCallSid = null;
             window.storedDialCallSids = null;
           }
-          
+
           // [REMOVED] Audio device release - was causing UI freeze on hangup
           // Browser will automatically release microphone when tab closes/refreshes
           // Trade-off: Red recording dot may linger in tab until refresh (minor UX issue vs major freeze issue)
-          
+
           // Don't clear call context yet - keep it for proper attribution
           // Context will be cleared when call actually ends
           console.debug('[Phone] Call context preserved for attribution');
-          
+
           console.debug('[Phone] Call cleanup complete - aggressive anti-redial protection active');
           console.debug('[Phone] Cooldown set:', { lastCallCompleted: disconnectTime, lastCalledNumber: number });
+
+          // Final state clear
+          currentCall = null;
         });
-        
+
         currentCall.on('error', (error) => {
           console.error('[Phone] Call error:', error);
           const callEndTime = Date.now();
           const duration = Math.floor((callEndTime - callStartTime) / 1000);
-          
+
           // IMMEDIATE cleanup on error
           updateCallStatus(number, 'failed', callStartTime, duration, callId);
           currentCall = null;
           isCallInProgress = false;
-          
+
           // Clear ALL Twilio state
           TwilioRTC.state.connection = null;
           TwilioRTC.state.pendingIncoming = null;
-          
+
           setInCallUI(false);
-          
+
           // Stop live timer and restore banner
           const widget = document.getElementById(WIDGET_ID);
           stopLiveCallTimer(widget);
-          
+
           // Force UI reset
           if (widget) {
             const btn = widget.querySelector('.call-btn-start');
@@ -4053,9 +4564,9 @@
             if (input) input.value = '';
             const title = widget.querySelector('.widget-title');
             if (title) title.innerHTML = 'Phone';
-            try { clearContactDisplay(); } catch(_) {}
+            try { clearContactDisplay(); } catch (_) { }
           }
-          
+
           // Clear context on error too
           currentCallContext = {
             number: '',
@@ -4071,12 +4582,12 @@
             isCompanyPhone: false,
             isActive: false
           };
-          
+
           // Set reasonable cooldown after error
           lastCallCompleted = Date.now();
           lastCalledNumber = number;
           autoTriggerBlockUntil = Date.now() + 3000; // Reduced to 3 seconds
-          
+
           // Release audio devices
           if (TwilioRTC.state.device && TwilioRTC.state.device.audio) {
             try {
@@ -4087,9 +4598,9 @@
             }
           }
         });
-        
+
         return currentCall;
-        
+
       } catch (error) {
         console.error('[Phone] Browser call failed:', error);
         setInCallUI(false);
@@ -4103,7 +4614,7 @@
       if (isMainWebsite) {
         // On main website - actually initiate the call
         console.debug('[Phone] Main website call - initiating call to:', number);
-        
+
         try {
           // Create a tel: link and simulate clicking it to trigger the phone system
           const telLink = document.createElement('a');
@@ -4112,10 +4623,10 @@
           document.body.appendChild(telLink);
           telLink.click();
           document.body.removeChild(telLink);
-          
+
           // Show success message
-          try { window.crm?.showToast && window.crm.showToast('Call initiated - check your phone/dialer'); } catch(_) {}
-          
+          try { window.crm?.showToast && window.crm.showToast('Call initiated - check your phone/dialer'); } catch (_) { }
+
           // Optional: Track the call attempt (for analytics)
           if (typeof gtag !== 'undefined') {
             gtag('event', 'phone_call', {
@@ -4123,28 +4634,28 @@
               'source': 'phone_widget'
             });
           }
-          
+
           return { success: true, message: 'Call initiated via tel: link' };
         } catch (error) {
           console.error('[Phone] Error creating tel link:', error);
-          try { window.crm?.showToast && window.crm.showToast('Call initiation failed'); } catch(_) {}
+          try { window.crm?.showToast && window.crm.showToast('Call initiation failed'); } catch (_) { }
           throw error;
         }
       } else {
         // On CRM - use Twilio API to call your phone and connect to target
         const base = (window.API_BASE_URL || '').replace(/\/$/, '');
-        
+
         // Get selected phone number from settings for caller ID
         const selectedCallerId = getSelectedPhoneNumber();
-        
+
         const callData = {
           from: selectedCallerId, // Use selected Twilio number from settings
           to: number, // Target number to call
           agent_phone: '+19728342317' // Your personal phone that will ring first
         };
-        
+
         console.debug('[Phone] Making CRM API call with caller ID:', selectedCallerId, callData);
-        
+
         const r = await fetch(`${base}/api/twilio/call`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -4152,44 +4663,44 @@
         });
         const data = await r.json().catch(() => ({}));
         if (!r.ok || data?.error) throw new Error(data?.error || `HTTP ${r.status}`);
-        
+
         // Store the server call SID for potential termination
         if (data?.callSid) {
           window.currentServerCallSid = data.callSid;
           console.debug('[Phone] Server call initiated with SID:', data.callSid);
         }
-        
+
         // Show appropriate message based on call context
         const contactName = currentCallContext.name;
-        const message = contactName ? 
-          `Calling ${contactName} - your phone will ring first` : 
+        const message = contactName ?
+          `Calling ${contactName} - your phone will ring first` :
           'Your phone will ring first, then we\'ll connect the call';
-        
-        try { window.crm?.showToast && window.crm.showToast(message); } catch(_) {}
+
+        try { window.crm?.showToast && window.crm.showToast(message); } catch (_) { }
         return data;
       }
     }
-    
+
     async function logCall(phoneNumber, callType, callId = null, fromNumber = null) {
       try {
         const base = (window.API_BASE_URL || '').replace(/\/$/, '');
         if (!base) return;
-        
+
         const callSid = callId || `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const timestamp = new Date().toISOString();
-        
+
         // For incoming calls, use the caller's number as 'from' and business number as 'to'
         // For outgoing calls, use selected phone number as 'from' and target number as 'to'
         const isIncoming = callType === 'incoming';
         const biz = isIncoming ? getBusinessNumberE164() : getSelectedPhoneNumber();
         const callFrom = isIncoming ? (fromNumber || phoneNumber) : biz;
         const callTo = isIncoming ? biz : phoneNumber;
-        
+
         // Get current user email for ownership tracking
         const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
           ? window.DataManager.getCurrentUserEmail()
           : ((window.currentUserEmail || '').toLowerCase());
-        
+
         const response = await fetch(`${base}/api/calls`, {
           method: 'POST',
           headers: {
@@ -4216,7 +4727,7 @@
             businessPhone: biz
           })
         });
-        
+
         const data = await response.json();
         return data.call?.id || callSid; // Return call ID for tracking
       } catch (error) {
@@ -4224,44 +4735,44 @@
         return null;
       }
     }
-    
+
     // Debounce call status updates to prevent UI stuttering
     let statusUpdateTimeout = null;
     const debouncedStatusUpdates = new Map();
-    
+
     // [OPTIMIZATION] Made non-async to prevent any blocking - all operations are fire-and-forget
     function updateCallStatus(phoneNumber, status, startTime, duration = 0, callId = null, fromNumber = null, callType = 'outgoing') {
       try {
         const base = (window.API_BASE_URL || '').replace(/\/$/, '');
         if (!base) return;
-        
+
         // Debounce rapid status updates for the same call
         const callKey = `${phoneNumber}_${callId || startTime}`;
         const now = Date.now();
         const lastUpdate = debouncedStatusUpdates.get(callKey) || 0;
-        
+
         // Skip updates that are too frequent (less than 500ms apart)
         if (now - lastUpdate < 500 && status !== 'completed' && status !== 'failed') {
           return;
         }
-        
+
         debouncedStatusUpdates.set(callKey, now);
-        
+
         const callSid = callId || `call_${startTime}_${Math.random().toString(36).substr(2, 9)}`;
         const timestamp = new Date(startTime).toISOString();
-        
+
         // For incoming calls, use the caller's number as 'from' and business number as 'to'
         // For outgoing calls, use business number as 'from' and target number as 'to'
         const isIncoming = callType === 'incoming';
         const biz = getBusinessNumberE164();
         const callFrom = isIncoming ? (fromNumber || phoneNumber) : biz;
         const callTo = isIncoming ? biz : phoneNumber;
-        
+
         // Get current user email for ownership tracking
         const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
           ? window.DataManager.getCurrentUserEmail()
           : ((window.currentUserEmail || '').toLowerCase());
-        
+
         const payload = {
           callSid: callSid,
           to: callTo,
@@ -4293,21 +4804,21 @@
           // [CRITICAL FIX] Fire-and-forget to prevent UI freeze/blocking
           // Don't await - let it run in background so user can navigate immediately
           fetch(`${base}/api/calls`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
           }).then(resp => resp.json()).then(respJson => {
             phoneLog('[Phone] /api/calls response (background)', { status: 'success', body: respJson });
             // Dispatch event to update "No Calls" badges on People/Accounts pages
             try {
-              const eventDetail = { 
+              const eventDetail = {
                 call: respJson.call || payload,
                 targetPhone: payload.targetPhone,
                 accountId: payload.accountId,
                 contactId: payload.contactId
               };
               document.dispatchEvent(new CustomEvent('pc:call-logged', { detail: eventDetail }));
-            } catch (e) { 
+            } catch (e) {
               console.error('[Phone] Error dispatching pc:call-logged event:', e);
             }
           }).catch(err => {
@@ -4316,23 +4827,23 @@
         } else {
           phoneLog('[Phone] Skipping /api/calls POST (status:', status, ') - only writes on completed to reduce Firestore costs');
         }
-        
+
         // Trigger refresh for Account Detail and Contact Detail pages when call completes
         if (status === 'completed') {
           try {
             // Dispatch custom event to trigger recent calls refresh on detail pages
-            document.dispatchEvent(new CustomEvent('pc:call-completed', { 
-              detail: { 
+            document.dispatchEvent(new CustomEvent('pc:call-completed', {
+              detail: {
                 callSid: callSid,
                 accountId: currentCallContext.accountId,
                 contactId: currentCallContext.contactId,
                 phoneNumber: phoneNumber
-              } 
+              }
             }));
             phoneLog('[Phone] Dispatched pc:call-completed event for page refresh');
-          } catch(_) {}
+          } catch (_) { }
         }
-        
+
         // [OPTIMIZATION] Refresh calls page only if visible - use same debounce strategy
         const isCallsPageActive = () => {
           try {
@@ -4340,7 +4851,7 @@
             if (!el) return false;
             if (typeof el.matches === 'function' && el.matches('.active, .is-active, :not([hidden])')) return true;
             return el.offsetParent !== null; // visible in layout
-          } catch(_) { return false; }
+          } catch (_) { return false; }
         };
         const refreshCallsIfActive = (label) => {
           if (isCallInProgress) return; // do not refresh during live call
@@ -4351,29 +4862,16 @@
           if (window.callsModule && typeof window.callsModule.loadData === 'function') {
             // Schedule in next tick to avoid blocking current execution
             setTimeout(() => {
-            try { window.callsModule.loadData(); } catch(_) {}
-            phoneLog(`[Phone] Refreshed calls page data (${label})`);
+              try { window.callsModule.loadData(); } catch (_) { }
+              phoneLog(`[Phone] Refreshed calls page data (${label})`);
             }, 0);
           }
         };
         // Debounced refresh with 1.5s delay (same as detail pages)
         setTimeout(() => refreshCallsIfActive('t+1.5s'), 1500);
-        
+
       } catch (error) {
         console.error('[Phone] Failed to update call status:', error);
-      }
-    }
-    function setInCallUI(inCall) {
-      if (!callBtn) return;
-      // Do not toggle in-call here; handled by setContactDisplay() once details are loaded
-      if (inCall) {
-        callBtn.textContent = 'Hang Up';
-        callBtn.classList.remove('btn-primary');
-        callBtn.classList.add('btn-danger');
-      } else {
-        callBtn.textContent = 'Call';
-        callBtn.classList.remove('btn-danger');
-        callBtn.classList.add('btn-primary');
       }
     }
     if (callBtn) callBtn.addEventListener('click', async () => {
@@ -4382,7 +4880,7 @@
         try {
           console.debug('[Phone] Declining pending incoming call');
           TwilioRTC.state.pendingIncoming.reject();
-        } catch(_) {}
+        } catch (_) { }
         TwilioRTC.state.pendingIncoming = null;
         isCallInProgress = false;
         setInCallUI(false);
@@ -4393,21 +4891,21 @@
         const title = card.querySelector('.widget-title');
         if (title) title.innerHTML = 'Phone';
         if (input) input.value = '';
-        try { clearContactDisplay(); } catch(_) {}
+        try { clearContactDisplay(); } catch (_) { }
         return;
       }
 
       // If already in a call (currentCall exists OR isCallInProgress OR device connection), hangup
       if (currentCall || isCallInProgress || TwilioRTC.state?.connection) {
         console.debug('[Phone] Hanging up active call - currentCall:', !!currentCall, 'isCallInProgress:', isCallInProgress, 'deviceConnection:', !!TwilioRTC.state?.connection);
-        
+
         // IMMEDIATE state clearing to prevent double-clicks and ensure proper hangup
         const wasInCall = isCallInProgress;
         isCallInProgress = false;
-        
+
         // Try to disconnect all possible connections with retry logic
         const disconnectPromises = [];
-        
+
         try {
           // Disconnect outbound call
           if (currentCall) {
@@ -4417,14 +4915,14 @@
                   currentCall.disconnect();
                   console.debug('[Phone] Manual hangup - disconnected outbound call');
                   resolve();
-                } catch(e) {
+                } catch (e) {
                   console.warn('[Phone] Error disconnecting outbound call:', e);
                   resolve();
                 }
               })
             );
           }
-          
+
           // Disconnect inbound call (most important for your issue)
           if (TwilioRTC.state?.connection) {
             disconnectPromises.push(
@@ -4433,14 +4931,14 @@
                   TwilioRTC.state.connection.disconnect();
                   console.debug('[Phone] Manual hangup - disconnected inbound call');
                   resolve();
-                } catch(e) {
+                } catch (e) {
                   console.warn('[Phone] Error disconnecting inbound call:', e);
                   resolve();
                 }
               })
             );
           }
-          
+
           // Also try pending incoming
           if (TwilioRTC.state?.pendingIncoming) {
             disconnectPromises.push(
@@ -4449,33 +4947,33 @@
                   TwilioRTC.state.pendingIncoming.reject();
                   console.debug('[Phone] Manual hangup - rejected pending incoming');
                   resolve();
-                } catch(e) {
+                } catch (e) {
                   console.warn('[Phone] Error rejecting pending incoming:', e);
                   resolve();
                 }
               })
             );
           }
-          
+
           // Wait for all disconnections to complete (with timeout)
           await Promise.race([
             Promise.all(disconnectPromises),
             new Promise(resolve => setTimeout(resolve, 2000)) // 2 second timeout
           ]);
-          
-        } catch(e) {
+
+        } catch (e) {
           console.error('[Phone] Error during manual hangup:', e);
         }
-        
+
         // CRITICAL: Terminate all related call legs BEFORE clearing state
         // Collect all CallSids: server call, browser call, and any stored child SIDs
         const callSidsToTerminate = [];
-        
+
         // Add server-side call SID
         if (window.currentServerCallSid) {
           callSidsToTerminate.push(window.currentServerCallSid);
         }
-        
+
         // Add browser client CallSids
         try {
           if (currentCall && currentCall.parameters) {
@@ -4490,8 +4988,8 @@
               callSidsToTerminate.push(connCallSid);
             }
           }
-        } catch(_) {}
-        
+        } catch (_) { }
+
         // Add stored child CallSids
         try {
           if (window.storedDialCallSids && Array.isArray(window.storedDialCallSids)) {
@@ -4501,8 +4999,8 @@
               }
             });
           }
-        } catch(_) {}
-        
+        } catch (_) { }
+
         // Terminate all call legs BEFORE disconnecting browser client (per Twilio recommendation)
         if (callSidsToTerminate.length > 0) {
           try {
@@ -4512,24 +5010,24 @@
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ callSids: callSidsToTerminate })
-            }).catch(() => {});
-          } catch(_) {}
+            }).catch(() => { });
+          } catch (_) { }
           window.currentServerCallSid = null;
           window.storedDialCallSids = null;
         }
-        
+
         // Force clear ALL state immediately
         currentCall = null;
         isCallInProgress = false;
         TwilioRTC.state.connection = null;
         TwilioRTC.state.pendingIncoming = null;
-        
+
         // Clear UI state (first remove contact display with a synchronized animation,
         // then stop the live timer to avoid double height animations)
         setInCallUI(false);
-        try { clearContactDisplay(); } catch(_) {}
+        try { clearContactDisplay(); } catch (_) { }
         stopLiveCallTimer(card);
-        
+
         // Clear context on manual hangup but preserve important associations for recent calls
         currentCallContext = {
           number: '',
@@ -4546,11 +5044,11 @@
           domain: currentCallContext?.domain || '',
           isCompanyPhone: currentCallContext?.isCompanyPhone || false
         };
-        
+
         // Set reasonable cooldown on manual hangup
         lastCallCompleted = Date.now();
         autoTriggerBlockUntil = Date.now() + 3000; // Reduced to 3 seconds
-        
+
         // Release audio devices to ensure proper cleanup
         if (TwilioRTC.state.device && TwilioRTC.state.device.audio) {
           try {
@@ -4560,52 +5058,52 @@
             console.warn('[Phone] Failed to release audio input device:', e);
           }
         }
-        
+
         // Call ended
-        
+
         // Clear the input and reset title
         if (input) input.value = '';
         const title = card.querySelector('.widget-title');
         if (title) title.innerHTML = 'Phone';
-        try { clearContactDisplay(); } catch(_) {}
-        try { const c = document.getElementById(WIDGET_ID); if (c) c.classList.remove('in-call'); } catch(_) {}
-        
+        try { clearContactDisplay(); } catch (_) { }
+        try { const c = document.getElementById(WIDGET_ID); if (c) c.classList.remove('in-call'); } catch (_) { }
+
         return; // CRITICAL: Exit here, do NOT continue to dialing logic
       }
 
       const raw = (input && input.value || '').trim();
       if (!raw) {
-        try { window.crm?.showToast && window.crm.showToast('Enter a number to call'); } catch (_) {}
+        try { window.crm?.showToast && window.crm.showToast('Enter a number to call'); } catch (_) { }
         return;
       }
       const normalized = normalizeDialedNumber(raw);
       if (!normalized.ok) {
-        try { window.crm?.showToast && window.crm.showToast('Invalid number. Use 10-digit US or +countrycode number.'); } catch (_) {}
+        try { window.crm?.showToast && window.crm.showToast('Invalid number. Use 10-digit US or +countrycode number.'); } catch (_) { }
         return;
       }
       // Immediately switch button to Hang Up and mark call-in-progress so user can cancel immediately
       isCallInProgress = true;
       setInCallUI(true);
-      try { if (callBtn) callBtn.disabled = false; } catch(_) {}
+      try { if (callBtn) callBtn.disabled = false; } catch (_) { }
       // update UI with normalized value and enrich title from People data
-      if (input) { 
+      if (input) {
         // Show the full number with extension in the input field
         const displayValue = normalized.extension ? `${normalized.value} ext. ${normalized.extension}` : normalized.value;
         input.value = displayValue;
       }
       enrichTitleFromPhone(normalized.value);
-      
+
       // Check if this is a manual call (no existing context) or a click-to-call (has context)
       // IMPORTANT: Only consider it existing context if it's ACTIVE AND matches the current number
       // If the context is from a different number, treat it as stale and clear it
-      const hasExistingContext = !!(currentCallContext && currentCallContext.isActive && 
+      const hasExistingContext = !!(currentCallContext && currentCallContext.isActive &&
         currentCallContext.number === normalized.value && (
-        currentCallContext.accountId || 
-        currentCallContext.contactId || 
-        currentCallContext.company || 
-        currentCallContext.name
-      ));
-      
+          currentCallContext.accountId ||
+          currentCallContext.contactId ||
+          currentCallContext.company ||
+          currentCallContext.name
+        ));
+
       // If context exists but is for a different number, clear it first
       if (currentCallContext && currentCallContext.isActive && currentCallContext.number !== normalized.value) {
         console.debug('[Phone] Clearing context for different number - old:', currentCallContext.number, 'new:', normalized.value);
@@ -4625,14 +5123,14 @@
           isActive: false
         };
       }
-      
+
       // Only resolve metadata if this is truly a manual entry (no active context from click-to-call)
       if (!hasExistingContext) {
         try {
           console.debug('[Phone] Manual call - resolving phone metadata for:', normalized.value);
           // Pass currentCallContext to preserve any context that might exist
           const freshMeta = await resolvePhoneMeta(normalized.value, currentCallContext).catch(() => ({}));
-          
+
           // Update current call context with fresh data from CRM/Twilio
           currentCallContext = {
             number: normalized.value,
@@ -4649,9 +5147,9 @@
             isCompanyPhone: !!(freshMeta.account && !freshMeta.contactId),
             isActive: true
           };
-          
+
           console.debug('[Phone] Manual call context resolved:', currentCallContext);
-          
+
           // Build meta object for setContactDisplay (expects meta.account, not meta.company)
           const displayMeta = {
             name: freshMeta.name || '',
@@ -4664,12 +5162,12 @@
             logoUrl: freshMeta.logoUrl || ''
           };
           setContactDisplay(displayMeta, normalized.value);
-        } catch(metaError) {
+        } catch (metaError) {
           console.warn('[Phone] Failed to resolve phone metadata:', metaError);
           // Fallback to minimal context if resolution fails
-          const earlyMeta = { 
+          const earlyMeta = {
             name: normalized.value,
-            account: '', 
+            account: '',
             domain: '',
             city: '',
             state: '',
@@ -4680,18 +5178,18 @@
       } else {
         // Click-to-call scenario - use existing context
         console.debug('[Phone] Click-to-call detected - using existing context:', currentCallContext);
-      try {
-        const earlyMeta = { 
-          name: (currentCallContext && currentCallContext.name) || '', 
-          account: (currentCallContext && currentCallContext.company) || '', 
-          domain: (currentCallContext && currentCallContext.domain) || '',
-          city: (currentCallContext && currentCallContext.city) || '',
-          state: (currentCallContext && currentCallContext.state) || '',
+        try {
+          const earlyMeta = {
+            name: (currentCallContext && currentCallContext.name) || '',
+            account: (currentCallContext && currentCallContext.company) || '',
+            domain: (currentCallContext && currentCallContext.domain) || '',
+            city: (currentCallContext && currentCallContext.city) || '',
+            state: (currentCallContext && currentCallContext.state) || '',
             logoUrl: (currentCallContext && currentCallContext.logoUrl) || '',
-          isCompanyPhone: !!(currentCallContext && currentCallContext.isCompanyPhone)
-        };
-        setContactDisplay(earlyMeta, normalized.value);
-      } catch(_) {}
+            isCompanyPhone: !!(currentCallContext && currentCallContext.isCompanyPhone)
+          };
+          setContactDisplay(earlyMeta, normalized.value);
+        } catch (_) { }
       }
       // Immediately switch button to Hang Up and mark call-in-progress so user can cancel immediately
       isCallInProgress = true;
@@ -4699,20 +5197,20 @@
       try {
         // Determine website mode: if no API base configured, treat as marketing site
         const isMainWebsite = !window.API_BASE_URL; // No API configured means main website
-        
+
         if (isMainWebsite) {
           // On main website - skip browser calling and go straight to fallback
           console.debug('[Phone] On main website, using fallback call directly');
-          try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value}...`); } catch (_) {}
+          try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value}...`); } catch (_) { }
           try {
             await fallbackServerCall(normalized.value);
           } catch (e2) {
             console.error('[Phone] Fallback call failed:', e2?.message || e2);
-            try { window.crm?.showToast && window.crm.showToast(`Call failed: ${e2?.message || 'Error'}`); } catch (_) {}
+            try { window.crm?.showToast && window.crm.showToast(`Call failed: ${e2?.message || 'Error'}`); } catch (_) { }
           }
           return;
         }
-        
+
         // Check microphone permission before attempting browser call (CRM only)
         // This will now trigger the permission dialog since it's in response to user click
         let hasMicPermission = false;
@@ -4726,7 +5224,7 @@
           updateMicrophoneStatusUI(card, 'error');
           hasMicPermission = false;
         }
-        
+
         // If user already canceled during permission prompt, abort
         if (!isCallInProgress) {
           console.debug('[Phone] Aborting dial: user canceled before placement');
@@ -4741,21 +5239,21 @@
               console.debug('[Phone] Aborting: user canceled after permission but before placing call');
               return;
             }
-            
+
             // Check if bridge to mobile is enabled - if so, skip browser call and go straight to server call
             const bridgeToMobile = isBridgeToMobileEnabled();
             if (bridgeToMobile) {
               console.debug('[Phone] Bridge to mobile enabled - using server call (mobile phone)');
-              try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} - your phone will ring first...`); } catch (_) {}
+              try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} - your phone will ring first...`); } catch (_) { }
               try {
                 await fallbackServerCall(normalized.value);
               } catch (e2) {
                 console.error('[Phone] Server call failed:', e2?.message || e2);
-                try { window.crm?.showToast && window.crm.showToast(`Call failed: ${e2?.message || 'Error'}`); } catch (_) {}
+                try { window.crm?.showToast && window.crm.showToast(`Call failed: ${e2?.message || 'Error'}`); } catch (_) { }
               }
               return; // Exit early - server call attempted
             }
-            
+
             // Bridge to mobile is OFF - try browser call first
             const call = await placeBrowserCall(normalized.value, normalized.extension);
             console.debug('[Phone] Browser call successful, no fallback needed');
@@ -4764,12 +5262,12 @@
           } catch (e) {
             // Fallback to server-initiated PSTN flow
             console.warn('[Phone] Browser call failed, falling back to server call:', e?.message || e);
-            try { window.crm?.showToast && window.crm.showToast(`Browser call failed. Falling back...`); } catch(_) {}
+            try { window.crm?.showToast && window.crm.showToast(`Browser call failed. Falling back...`); } catch (_) { }
             try {
               await fallbackServerCall(normalized.value);
             } catch (e2) {
               console.error('[Phone] Fallback call also failed:', e2?.message || e2);
-              try { window.crm?.showToast && window.crm.showToast(`Call failed: ${e2?.message || 'Error'}`); } catch (_) {}
+              try { window.crm?.showToast && window.crm.showToast(`Call failed: ${e2?.message || 'Error'}`); } catch (_) { }
             }
           }
         } else {
@@ -4780,25 +5278,25 @@
             console.debug('[Phone] Aborting: user canceled before server call');
             return;
           }
-          
+
           if (bridgeToMobile) {
             console.debug('[Phone] Using server-based calling (bridge to mobile enabled)');
-            try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} - your phone will ring first...`); } catch (_) {}
+            try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} - your phone will ring first...`); } catch (_) { }
           } else {
             console.debug('[Phone] Using server-based calling (no mic permission)');
-            try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} - your phone will ring first...`); } catch (_) {}
+            try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} - your phone will ring first...`); } catch (_) { }
           }
-          
+
           try {
             await fallbackServerCall(normalized.value);
           } catch (e2) {
             console.error('[Phone] Fallback call failed:', e2?.message || e2);
-            try { window.crm?.showToast && window.crm.showToast(`Call failed: ${e2?.message || 'Error'}`); } catch (_) {}
+            try { window.crm?.showToast && window.crm.showToast(`Call failed: ${e2?.message || 'Error'}`); } catch (_) { }
           }
         }
       } catch (generalError) {
         console.error('[Phone] General call error:', generalError?.message || generalError);
-        try { window.crm?.showToast && window.crm.showToast(`Call error: ${generalError?.message || 'Unknown error'}`); } catch (_) {}
+        try { window.crm?.showToast && window.crm.showToast(`Call error: ${generalError?.message || 'Unknown error'}`); } catch (_) { }
       }
     });
     // Backspace button removed
@@ -4826,7 +5324,7 @@
           adjustHeightIfAnimating(card);
         }
       };
-      
+
       micStatus.addEventListener('click', handleMicRetry);
       micStatus.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -4844,7 +5342,7 @@
         if (active && active.classList && active.classList.contains('ms-input')) {
           return; // let the input handle typing
         }
-      } catch(_) {}
+      } catch (_) { }
       const { key } = e;
       // Do not intercept common shortcuts (paste/copy/select-all, etc.)
       if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -4870,7 +5368,7 @@
 
     // Make the whole card focusable to receive key events, but keep input primary
     card.setAttribute('tabindex', '-1');
-    setTimeout(() => { try { input && input.focus(); } catch (_) {} }, 0);
+    setTimeout(() => { try { input && input.focus(); } catch (_) { } }, 0);
 
     return card;
   }
@@ -4878,16 +5376,16 @@
   function openPhone() {
     const content = getPanelContentEl();
     if (!content) {
-      try { window.crm?.showToast && window.crm.showToast('Widget panel not found'); } catch (_) {}
+      try { window.crm?.showToast && window.crm.showToast('Widget panel not found'); } catch (_) { }
       return;
     }
 
     // If already open, bring into view and focus instead of re-creating
     const existingCard = document.getElementById(WIDGET_ID);
     if (existingCard) {
-      try { existingCard.parentElement && existingCard.parentElement.prepend(existingCard); } catch (_) {}
-      try { existingCard.focus(); } catch (_) {}
-      try { window.crm?.showToast && window.crm.showToast('Phone already open'); } catch (_) {}
+      try { existingCard.parentElement && existingCard.parentElement.prepend(existingCard); } catch (_) { }
+      try { existingCard.focus(); } catch (_) { }
+      try { window.crm?.showToast && window.crm.showToast('Phone already open'); } catch (_) { }
       return;
     }
 
@@ -4968,7 +5466,7 @@
             const h = parseFloat(card.style.height) || 0;
             const needed = card.scrollHeight;
             if (needed > h) card.style.height = needed + 'px';
-          } catch(_) {}
+          } catch (_) { }
         }, ms));
       });
     }
@@ -5000,20 +5498,21 @@
   let lastCallCompleted = 0;
   let lastCalledNumber = '';
   let isCallInProgress = false;
+  let callBtn = null; // Shared reference for UI updates
   const CALLBACK_COOLDOWN = 8000; // 8 seconds cooldown
   const SAME_NUMBER_COOLDOWN = 5000; // 5 seconds for same number
   // Hard global guard to suppress any auto-dial after a call ends unless there is a fresh user click
   let autoTriggerBlockUntil = 0; // ms epoch
-  
+
   // Track user typing activity in phone widget
   let lastUserTypingTime = 0;
   const USER_TYPING_COOLDOWN = 2000; // 2 seconds after user stops typing
-  
+
   // Global call function for CRM integration
-  window.Widgets.callNumber = function(number, contactName = '', autoTrigger = false, source = 'unknown') {
+  window.Widgets.callNumber = function (number, contactName = '', autoTrigger = false, source = 'unknown') {
     // Add stack trace to debug who's calling this function
     phoneLog('[Phone] CALLNUMBER', { number, contactName, autoTrigger, source, isCallInProgress, lastCallCompleted, lastCalledNumber, currentCallContext });
-    
+
     const now = Date.now();
     let contactCompany = '';
 
@@ -5023,7 +5522,7 @@
       // REMOVED: Contact name lookup from phone number
       // This was causing contact company info to leak into account detail phone calls
     } catch (_) { /* non-fatal */ }
-    
+
     // Allow click-to-call to bypass most restrictions (user-initiated action)
     const isClickToCall = (source === 'click-to-call');
 
@@ -5051,20 +5550,20 @@
         autoTrigger = false;
       }
     }
-    
+
     // Block ALL auto-triggers if a call is currently in progress (except click-to-call)
     if (isCallInProgress && !isClickToCall) {
       console.warn('[Phone] BLOCKED: Call already in progress (non-click-to-call)');
       autoTrigger = false;
     }
-    
+
     // Aggressive cooldown check - if we just completed a call, block auto-triggers (but allow click-to-call)
     if (now - lastCallCompleted < CALLBACK_COOLDOWN && !isClickToCall) {
       console.warn('[Phone] BLOCKED: Auto-call blocked due to recent call completion cooldown (non-click-to-call)');
       console.warn('[Phone] Time since last call:', now - lastCallCompleted, 'ms, cooldown:', CALLBACK_COOLDOWN, 'ms');
       autoTrigger = false;
     }
-    
+
     // Extra protection for the same number (but allow click-to-call after shorter cooldown)
     const sameNumberCooldown = isClickToCall ? 3000 : SAME_NUMBER_COOLDOWN; // 3s for clicks, 15s for auto
     if (lastCalledNumber === number && now - lastCallCompleted < sameNumberCooldown) {
@@ -5076,13 +5575,13 @@
       console.warn('[Phone] Last called number:', lastCalledNumber, 'Current number:', number);
       autoTrigger = false;
     }
-    
+
     // Don't auto-trigger if the same number/contact is already in context (but allow click-to-call)
     if (currentCallContext.number === number && currentCallContext.name === contactName && currentCallContext.isActive && !isClickToCall) {
       console.warn('[Phone] BLOCKED: Same number/contact already active in context (non-click-to-call)');
       autoTrigger = false;
     }
-    
+
     // Extra protection: Don't auto-trigger if user has manually entered a different number (but allow click-to-call)
     const widget = document.getElementById(WIDGET_ID);
     if (widget && autoTrigger && !isClickToCall) {
@@ -5092,28 +5591,28 @@
         autoTrigger = false;
       }
     }
-    
+
     // ABSOLUTE BLOCK: Only applies to non-click-to-call to prevent loops
     if (!isClickToCall && autoTrigger && lastCalledNumber === number && now - lastCallCompleted < 30000) {
       console.error('[Phone] ABSOLUTE BLOCK: Preventing potential callback loop for number:', number);
       console.error('[Phone] Time since last call to this number:', now - lastCallCompleted, 'ms');
       return false; // Return early, don't even open the widget
     }
-    
+
     // EXTRA PROTECTION: Block auto-trigger if we just disconnected ANY call recently (but allow click-to-call)
     if (autoTrigger && now - lastCallCompleted < 5000 && !isClickToCall) {
       console.error('[Phone] EXTRA PROTECTION: Blocking auto-trigger due to recent call disconnect (non-click-to-call)');
       console.error('[Phone] Time since last disconnect:', now - lastCallCompleted, 'ms');
       autoTrigger = false; // Don't return false, just disable auto-trigger
     }
-    
+
     // CRITICAL: Block auto-trigger if user has been actively typing recently (but allow click-to-call)
     if (autoTrigger && now - lastUserTypingTime < USER_TYPING_COOLDOWN && !isClickToCall) {
       console.error('[Phone] BLOCKED: User has been typing recently - preventing auto-trigger (non-click-to-call)');
       console.error('[Phone] Time since last typing:', now - lastUserTypingTime, 'ms, cooldown:', USER_TYPING_COOLDOWN, 'ms');
       autoTrigger = false;
     }
-    
+
     // Additional safety: never auto-trigger if called within 2 seconds of previous call (but allow click-to-call)
     const timeSinceLastCall = now - (window.lastCallNumberTime || 0);
     if (autoTrigger && timeSinceLastCall < 2000 && !isClickToCall) {
@@ -5121,7 +5620,7 @@
       autoTrigger = false;
     }
     window.lastCallNumberTime = now;
-    
+
     // Overwrite context deterministically based on explicit page context
     // Infer company-mode if explicit flag or account context is present (and no contact)
     const hasAccountCtx = !!(currentCallContext && (currentCallContext.accountId || currentCallContext.accountName || currentCallContext.company));
@@ -5150,16 +5649,16 @@
       contactId: currentCallContext.contactId,
       contactName: currentCallContext.contactName
     });
-    
+
     // Open phone widget if not already open
     const wasClosed = !document.getElementById(WIDGET_ID);
     if (wasClosed) {
       openPhone();
     }
-    
+
     // Get the card element (it should exist now, either from openPhone() or already in DOM)
     let card = document.getElementById(WIDGET_ID);
-    
+
     // CRITICAL: Store context snapshot on input element AFTER openPhone() to ensure it exists
     // This allows the input handler to detect programmatic sets even if currentCallContext is cleared
     if (card) {
@@ -5186,7 +5685,7 @@
         }, 100);
       }
     }
-    
+
     // Update the widget display with the new context
     try {
       // Build proper meta object for setContactDisplay
@@ -5204,7 +5703,7 @@
     } catch (e) {
       console.warn('[Phone Widget] Failed to update contact display:', e);
     }
-    
+
     // Populate number immediately and optionally auto-trigger call within user gesture
     if (card) {
       const input = card.querySelector('.phone-display');
@@ -5217,27 +5716,27 @@
       if (number && autoTrigger) {
         // If widget was just opened, wait a bit for DOM to settle before looking for button
         const findAndClickButton = () => {
-          const callBtn = card.querySelector('.call-btn-start');
+          callBtn = card.querySelector('.call-btn-start');
           if (callBtn && !isCallInProgress) {
-          // Final safety check before auto-triggering for non-click-to-call only
-          const finalCheck = now - lastCallCompleted;
-          if (!isClickToCall && finalCheck < CALLBACK_COOLDOWN) {
-            console.error('[Phone] FINAL SAFETY BLOCK: Refusing auto-trigger due to recent call (non-click-to-call)');
-            console.error('[Phone] Time since last call:', finalCheck, 'ms, required:', CALLBACK_COOLDOWN, 'ms');
-            return false;
-          }
-          console.debug('[Phone] Auto-triggering call');
-          // Important: Do NOT pre-set isCallInProgress here. Doing so causes the
-          // call button's click handler to interpret this as an active call and
-          // immediately execute the hangup path. We only set isCallInProgress
-          // upon successful connection (see placeBrowserCall 'accept' handler).
-          // Click immediately to preserve user gesture for mic permission
-          callBtn.click();
+            // Final safety check before auto-triggering for non-click-to-call only
+            const finalCheck = now - lastCallCompleted;
+            if (!isClickToCall && finalCheck < CALLBACK_COOLDOWN) {
+              console.error('[Phone] FINAL SAFETY BLOCK: Refusing auto-trigger due to recent call (non-click-to-call)');
+              console.error('[Phone] Time since last call:', finalCheck, 'ms, required:', CALLBACK_COOLDOWN, 'ms');
+              return false;
+            }
+            console.debug('[Phone] Auto-triggering call');
+            // Important: Do NOT pre-set isCallInProgress here. Doing so causes the
+            // call button's click handler to interpret this as an active call and
+            // immediately execute the hangup path. We only set isCallInProgress
+            // upon successful connection (see placeBrowserCall 'accept' handler).
+            // Click immediately to preserve user gesture for mic permission
+            callBtn.click();
           } else {
             console.warn('[Phone] Auto-trigger blocked - call already in progress or button not found');
           }
         };
-        
+
         // If widget was just opened, wait for DOM to settle before looking for button
         if (wasClosed) {
           // Use requestAnimationFrame to wait for DOM to be ready
@@ -5254,7 +5753,7 @@
         console.debug('[Phone] Not auto-triggering call - user must click Call button');
       }
     }
-    
+
     return true;
   };
 
@@ -5268,7 +5767,7 @@
       const widget = document.getElementById(WIDGET_ID);
       if (!widget) return;
       const footer = widget.querySelector('.phone-footer') || widget;
-      if (footer && !footer.querySelector('.stereo-toggle')){
+      if (footer && !footer.querySelector('.stereo-toggle')) {
         const btn = document.createElement('button');
         btn.className = 'stereo-toggle';
         btn.type = 'button';
@@ -5287,7 +5786,7 @@
           try {
             // Apply to device audio constraints immediately
             const device = await TwilioRTC.ensureDevice();
-            if (device && device.audio && typeof device.audio.setAudioConstraints === 'function'){
+            if (device && device.audio && typeof device.audio.setAudioConstraints === 'function') {
               await device.audio.setAudioConstraints({
                 echoCancellation: true,
                 noiseSuppression: true,
@@ -5296,11 +5795,11 @@
                 channelCount: preferStereo ? 2 : 1
               });
             }
-          } catch(_) {}
+          } catch (_) { }
         });
         // Insert before the main call button if found
-        const callBtn = widget.querySelector('.call-btn-start') || footer.firstChild;
-        if (callBtn && callBtn.parentNode){
+        callBtn = widget.querySelector('.call-btn-start') || footer.firstChild;
+        if (callBtn && callBtn.parentNode) {
           callBtn.parentNode.insertBefore(btn, callBtn);
         } else {
           footer.appendChild(btn);
@@ -5310,16 +5809,16 @@
     // Try now and after slight delay (widget may render after)
     setTimeout(ensureToggle, 200);
     setTimeout(ensureToggle, 800);
-  } catch(_) {}
+  } catch (_) { }
 
   window.Widgets.openPhone = openPhone;
   window.Widgets.closePhone = closePhoneWidget;
   // Allow pages to set the current call context (account/contact attribution)
-  window.Widgets.setCallContext = function(ctx){
+  window.Widgets.setCallContext = function (ctx) {
     try {
       ctx = ctx || {};
       console.debug('[Phone Widget] Setting call context:', ctx);
-      
+
       // Clear previous context first to prevent stale data
       currentCallContext.accountId = null;
       currentCallContext.accountName = null;
@@ -5334,7 +5833,7 @@
       currentCallContext.isCompanyPhone = false;
       currentCallContext.suggestedContactId = null;
       currentCallContext.suggestedContactName = '';
-      
+
       // Set new context - preserve all fields including empty strings and nulls
       // Use explicit checks to preserve empty strings (which are falsy but valid)
       currentCallContext.accountId = (ctx.accountId !== undefined && ctx.accountId !== null) ? ctx.accountId : null;
@@ -5352,15 +5851,28 @@
       currentCallContext.suggestedContactName = (ctx.suggestedContactName !== undefined) ? ctx.suggestedContactName : '';
       // Preserve phoneType if provided
       if (ctx.phoneType !== undefined) currentCallContext.phoneType = ctx.phoneType;
-      
+
       console.debug('[Phone Widget] Call context updated:', currentCallContext);
-    } catch(_) {}
+
+      // Force UI update immediately if widget is visible
+      if (isPhoneOpen()) {
+        setContactDisplay(currentCallContext, currentCallContext.number || 'Active Call');
+        if (currentCallContext.logoUrl) {
+          const logoEl = document.querySelector('#phone-widget .company-logo');
+          if (logoEl) {
+            logoEl.src = currentCallContext.logoUrl;
+            logoEl.style.display = 'block';
+          }
+        }
+      }
+    } catch (_) { }
   };
   window.Widgets.isPhoneOpen = function () { return !!document.getElementById(WIDGET_ID); };
+  window.Widgets.resolvePhoneMeta = resolvePhoneMeta;
   window.Widgets.resetMicrophonePermission = resetMicrophonePermission;
-  
+
   // Expose for console diagnostics
-  try { window.TwilioRTC = TwilioRTC; } catch(_) {}
+  try { window.TwilioRTC = TwilioRTC; } catch (_) { }
 
   // Background: register Twilio Device only when needed (not in a loop)
   // This prevents the 800ms loop that was causing browser stuttering
@@ -5371,12 +5883,12 @@
         TwilioRTC.ensureDevice().catch(e => console.warn('[Phone] Background device init failed:', e?.message || e));
       }, 2000); // Increased delay to avoid blocking initial page load
     }
-  } catch (_) {}
+  } catch (_) { }
 
   // Console helpers for manual dialing from DevTools
   try {
     // Server-initiated call via Twilio backend
-    window.callServer = async function(number) {
+    window.callServer = async function (number) {
       const n = (number || '').trim();
       if (!n) throw new Error('Missing number');
       const base = (window.API_BASE_URL || '').replace(/\/$/, '');
@@ -5392,7 +5904,7 @@
     };
 
     // Attempt browser-based call using Twilio Voice SDK
-    window.callBrowser = async function(number) {
+    window.callBrowser = async function (number) {
       const n = (number || '').trim();
       if (!n) throw new Error('Missing number');
       const device = await TwilioRTC.ensureDevice();
@@ -5407,7 +5919,7 @@
 
     // Grouped helper
     window.Call = { server: window.callServer, browser: window.callBrowser, ensureDevice: TwilioRTC.ensureDevice };
-    
+
     // Expose currentCallContext globally so call-scripts.js can access contact/account IDs
     Object.defineProperty(window, 'currentCallContext', {
       get: () => currentCallContext,
@@ -5415,18 +5927,66 @@
       configurable: true,
       enumerable: true
     });
-    
+
+    // Debug helper to simulate incoming call
+    window.TwilioRTC.simulateIncoming = async function (number, name) {
+      const n = number || '+15550109999';
+      console.log('[TwilioRTC] Simulating incoming call from:', n);
+      const mockConn = {
+        parameters: { From: n },
+        customParameters: {},
+        status: () => mockConn._status || 'pending',
+        accept: () => {
+          console.log('[TwilioRTC] Mock call accepted');
+          mockConn._status = 'open';
+          // Simulate the 'accept' event that would happen on a real connection
+          if (mockConn._listeners && mockConn._listeners['accept']) mockConn._listeners['accept']();
+        },
+        ignore: () => { console.log('[TwilioRTC] Mock call ignored'); mockConn._status = 'closed'; },
+        reject: () => { console.log('[TwilioRTC] Mock call rejected'); mockConn._status = 'closed'; },
+        on: (evt, cb) => {
+          mockConn._listeners = mockConn._listeners || {};
+          mockConn._listeners[evt] = cb;
+        },
+        _status: 'pending',
+        _listeners: {}
+      };
+
+      const meta = await resolvePhoneMeta(n);
+      if (name) meta.name = name;
+
+      TwilioRTC.state.pendingIncoming = mockConn;
+
+      if (window.ToastManager) {
+        const callData = {
+          callerName: meta.name || '',
+          callerNumber: n,
+          company: meta.account || '',
+          title: meta.title || '',
+          city: meta.city || '',
+          state: meta.state || '',
+          accountId: meta.accountId || null,
+          contactId: meta.contactId || null,
+          domain: meta.domain || '',
+          callerIdImage: meta.logoUrl || (meta.domain ? makeFavicon(meta.domain) : null),
+          connection: mockConn
+        };
+        window.ToastManager.showCallNotification(callData);
+      }
+      return mockConn;
+    };
+
     // Debug helper to check Twilio configuration
-    window.debugTwilio = async function() {
+    window.debugTwilio = async function () {
       try {
         const base = (window.API_BASE_URL || '').replace(/\/$/, '');
-        
+
         // Check token endpoint
         const resp = await fetch(`${base}/api/twilio/token?identity=agent`);
-        
+
         if (resp.ok) {
           const data = await resp.json();
-          
+
           if (data.token) {
             // Decode JWT to see what's in it (just the payload, not validating signature)
             try {
@@ -5440,7 +6000,7 @@
           const error = await resp.text();
           console.error('Token Error Response:', error);
         }
-        
+
         // Try to create a device
         if (typeof Twilio !== 'undefined' && Twilio.Device) {
           try {
@@ -5451,11 +6011,11 @@
         } else {
           console.error('Twilio Voice SDK not loaded');
         }
-        
+
       } catch (error) {
         console.error('Debug error:', error);
       }
     };
-  } catch (_) {}
+  } catch (_) { }
 
 })();

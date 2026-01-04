@@ -4,10 +4,7 @@
 
 (function suppressNoisyFirestoreHandshakeErrors() {
     try {
-        if (window.PC_DEBUG) console.log('[Log Audit] Firestore suppression check start', { 
-            suppressPref: localStorage.getItem('pc-suppress-fs-400'),
-            debugMode: window.PC_DEBUG 
-        });
+        // Firestore suppression check start removed for cleaner production logs
         const shouldSuppress = localStorage.getItem('pc-suppress-fs-400') !== 'false' && !window.PC_DEBUG;
         if (!shouldSuppress) return;
         const originalConsoleError = window.console && window.console.error ? window.console.error.bind(window.console) : null;
@@ -309,7 +306,7 @@ class PowerChoosersCRM {
             this.loadTodaysTasks();
         }
         this.loadEnergyNews();
-        
+
         // Load activities with a small delay to ensure initial skeleton is seen if load is instant
         setTimeout(() => {
             this.loadHomeActivities();
@@ -1290,7 +1287,7 @@ class PowerChoosersCRM {
     }
 
     async navigateToPage(pageName, params = {}) {
-        console.log('[Navigation] Navigating to:', pageName, { params, from: this.currentPage });
+        // console.log('[Navigation] Navigating to:', pageName, { params, from: this.currentPage });
         const fromPage = this.currentPage;
 
         // Clean up previous page memory BEFORE navigating
@@ -5192,7 +5189,7 @@ class PowerChoosersCRM {
 
     renderTaskSkeletons(count = 3) {
         return Array(count).fill(0).map(() => `
-            <div class="task-item" style="opacity: 0.6; pointer-events: none; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 10px; display: flex; align-items: center; min-height: 60px; padding: 12px 16px;">
+            <div class="task-item modern-reveal premium-borderline" style="opacity: 0.7; pointer-events: none; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 10px; display: flex; align-items: center; min-height: 60px; padding: 12px 16px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); animation-fill-mode: forwards;">
                 <div class="task-info" style="flex: 1;">
                     <div class="skeleton-text medium skeleton-shimmer" style="margin-bottom: 8px; height: 14px;"></div>
                     <div class="skeleton-text short skeleton-shimmer" style="height: 12px;"></div>
@@ -5204,7 +5201,7 @@ class PowerChoosersCRM {
 
     renderNewsSkeletons(count = 3) {
         return Array(count).fill(0).map(() => `
-            <div class="news-item" style="opacity: 0.6; pointer-events: none; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 10px; min-height: 84px; display: flex; flex-direction: column; justify-content: center; padding: 12px 16px;">
+            <div class="news-item modern-reveal premium-borderline" style="opacity: 0.7; pointer-events: none; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 10px; min-height: 84px; display: flex; flex-direction: column; justify-content: center; padding: 12px 16px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); animation-fill-mode: forwards;">
                 <div class="news-title skeleton-text skeleton-shimmer" style="width: 95%; margin-bottom: 12px; height: 16px;"></div>
                 <div class="news-time skeleton-text short skeleton-shimmer" style="height: 12px;"></div>
             </div>
@@ -5215,7 +5212,7 @@ class PowerChoosersCRM {
         return Array(count).fill(0).map((_, index) => {
             const delay = (index * 0.1).toFixed(2);
             return `
-                <div class="task-item skeleton-task" style="opacity: 0.6; pointer-events: none; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 8px; min-height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; animation-delay: ${delay}s;">
+                <div class="task-item skeleton-task modern-reveal premium-borderline" style="opacity: 0.7; pointer-events: none; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 8px; min-height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; animation-delay: ${delay}s; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); animation-fill-mode: forwards;">
                     <div class="task-info" style="flex: 1;">
                         <div class="task-name skeleton-text skeleton-shimmer" style="width: 85%; margin-bottom: 6px; height: 14px;"></div>
                         <div class="task-time skeleton-text short skeleton-shimmer" style="height: 12px; width: 60%;"></div>
@@ -5338,37 +5335,37 @@ class PowerChoosersCRM {
                 localTasks = [];
 
             } else {
-            // Try namespaced key first (matches tasks.js/task-detail.js patterns)
-            const email = getUserEmail();
-            const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
-            const namespacedTasks = JSON.parse(localStorage.getItem(namespacedKey) || '[]');
-            localTasks = Array.isArray(namespacedTasks) ? namespacedTasks : [];
+                // Try namespaced key first (matches tasks.js/task-detail.js patterns)
+                const email = getUserEmail();
+                const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
+                const namespacedTasks = JSON.parse(localStorage.getItem(namespacedKey) || '[]');
+                localTasks = Array.isArray(namespacedTasks) ? namespacedTasks : [];
 
 
-            // CRITICAL: Filter by ownership for non-admin users (localStorage bypasses Firestore rules)
-            if (!isAdmin() && localTasks.length > 0) {
-                const beforeCount = localTasks.length;
+                // CRITICAL: Filter by ownership for non-admin users (localStorage bypasses Firestore rules)
+                if (!isAdmin() && localTasks.length > 0) {
+                    const beforeCount = localTasks.length;
+                    localTasks = localTasks.filter(t => {
+                        if (!t) return false;
+                        const ownerId = (t.ownerId || '').toLowerCase();
+                        const assignedTo = (t.assignedTo || '').toLowerCase();
+                        const createdBy = (t.createdBy || '').toLowerCase();
+                        return ownerId === email || assignedTo === email || createdBy === email;
+                    });
+
+                }
+
+                // CRITICAL: Filter out completed tasks from localStorage cache (they shouldn't show in Today's Tasks)
+                // Use broader completion markers than just status to avoid schema drift.
+                const beforeCompletionFilter = localTasks.length;
                 localTasks = localTasks.filter(t => {
                     if (!t) return false;
-                    const ownerId = (t.ownerId || '').toLowerCase();
-                    const assignedTo = (t.assignedTo || '').toLowerCase();
-                    const createdBy = (t.createdBy || '').toLowerCase();
-                    return ownerId === email || assignedTo === email || createdBy === email;
+                    const status = String(t.status || 'pending').toLowerCase();
+                    if (status === 'completed' || status === 'done') return false;
+                    if (t.completed === true || t.isCompleted === true) return false;
+                    if (t.completedAt || t.completed_at) return false;
+                    return true;
                 });
-
-            }
-
-            // CRITICAL: Filter out completed tasks from localStorage cache (they shouldn't show in Today's Tasks)
-            // Use broader completion markers than just status to avoid schema drift.
-            const beforeCompletionFilter = localTasks.length;
-            localTasks = localTasks.filter(t => {
-                if (!t) return false;
-                const status = String(t.status || 'pending').toLowerCase();
-                if (status === 'completed' || status === 'done') return false;
-                if (t.completed === true || t.isCompleted === true) return false;
-                if (t.completedAt || t.completed_at) return false;
-                return true;
-            });
 
 
             }
@@ -5381,8 +5378,8 @@ class PowerChoosersCRM {
             const coordinatorReady = !!(window.BackgroundLoaderCoordinator && window.BackgroundLoaderCoordinator.isLoaded && window.BackgroundLoaderCoordinator.isLoaded('tasks'));
             if (!isAdmin() && !coordinatorReady && localTasks.length > 0) {
                 this.renderTodaysTasks(localTasks, parseDateStrict, parseTimeToMinutes, today);
-        }
-        } catch (_) {}
+            }
+        } catch (_) { }
 
         // If not skipping Firebase, fetch Firebase data in background and update
         if (!skipFirebase) {
@@ -5638,7 +5635,7 @@ class PowerChoosersCRM {
 
         const tasksList = document.querySelector('.tasks-list');
         if (!tasksList) {
-return;
+            return;
         }
 
         // Pagination navigation should not replay entry animations or trigger re-fetch/skeletons.
@@ -5698,9 +5695,9 @@ return;
 
         // Smart Render Check: Avoid re-rendering if data hasn't changed (prevents flicker/scroll jumps)
         // This replaces the old "block all updates" logic which broke pagination and live updates.
-        const currentFingerprint = todaysTasks.map(t => t.id + ':' + (t.status||'') + ':' + (t.dueDate||'')).join('|');
+        const currentFingerprint = todaysTasks.map(t => t.id + ':' + (t.status || '') + ':' + (t.dueDate || '')).join('|');
         if (!isPaginationNav && this._lastRenderedFingerprint === currentFingerprint && this._hasRenderedForCurrentLoad) {
-             return;
+            return;
         }
         this._lastRenderedFingerprint = currentFingerprint;
         this._hasRenderedForCurrentLoad = true;
@@ -5741,11 +5738,11 @@ return;
                 // CRITICAL FIX: Set priority to 'sequence' for sequence tasks (matches tasks.js logic)
                 const isSequenceTask = !!task.isSequenceTask || !!task.isLinkedInTask;
                 const priorityValue = isSequenceTask ? 'sequence' : (task.priority || '');
-                
+
                 // Add staggered delay for modern reveal (skip on pagination clicks for "clean" page turns)
                 const delay = (index * 0.05).toFixed(2);
                 const revealStyle = isPaginationNav ? '' : `style="animation-delay: ${delay}s;"`;
-                const revealClass = isPaginationNav ? '' : 'modern-reveal';
+                const revealClass = isPaginationNav ? '' : 'modern-reveal premium-borderline';
 
                 return `
                     <div class="task-item ${revealClass}" data-task-id="${task.id}" style="cursor: pointer;" ${revealStyle}>
@@ -5781,14 +5778,14 @@ return;
             `;
         }
 
-        document.querySelectorAll('.tasks-list').forEach(list => { 
+        document.querySelectorAll('.tasks-list').forEach(list => {
             // Smooth height transition logic
             const currentHeight = list.offsetHeight;
             list.style.height = currentHeight + 'px';
-            
+
             // Set new content
             list.innerHTML = tasksHtml;
-            
+
             // Measure new height
             requestAnimationFrame(() => {
                 list.style.height = list.scrollHeight + 'px';
@@ -5931,11 +5928,11 @@ return;
                     if (action === 'prev' && this.todaysTasksPagination.currentPage > 1) {
                         this.todaysTasksPagination.currentPage--;
                         this._todaysTasksPaginationNav = true;
-this.renderTodaysTasks(allTasks, parseDateStrict, parseTimeToMinutes, today);
+                        this.renderTodaysTasks(allTasks, parseDateStrict, parseTimeToMinutes, today);
                     } else if (action === 'next' && this.todaysTasksPagination.currentPage < totalPages) {
                         this.todaysTasksPagination.currentPage++;
                         this._todaysTasksPaginationNav = true;
-this.renderTodaysTasks(allTasks, parseDateStrict, parseTimeToMinutes, today);
+                        this.renderTodaysTasks(allTasks, parseDateStrict, parseTimeToMinutes, today);
                     }
                 });
             });
@@ -6032,7 +6029,7 @@ this.renderTodaysTasks(allTasks, parseDateStrict, parseTimeToMinutes, today);
     }
 
     async loadEnergyNews() {
-// DEBOUNCING: Prevent multiple calls within 5 seconds
+        // DEBOUNCING: Prevent multiple calls within 5 seconds
         const now = Date.now();
         const newsList = document.querySelector('.news-list');
         const lastRef = document.getElementById('news-last-refreshed');
@@ -6066,7 +6063,7 @@ this.renderTodaysTasks(allTasks, parseDateStrict, parseTimeToMinutes, today);
                 }).join('');
 
                 newsList.innerHTML = newsHtml;
-if (lastRef && this._cachedNews.lastRefreshed) {
+                if (lastRef && this._cachedNews.lastRefreshed) {
                     const dt = new Date(this._cachedNews.lastRefreshed);
                     lastRef.textContent = `Last updated: ${dt.toLocaleTimeString()}`;
                 }
@@ -6143,7 +6140,7 @@ if (lastRef && this._cachedNews.lastRefreshed) {
                     const revealStyle = `style="animation-delay: ${delay}s;"`;
 
                     return `
-                        <a class="news-item modern-reveal" href="${safeHref}" target="_blank" rel="noopener noreferrer" ${revealStyle}>
+                        <a class="news-item modern-reveal premium-borderline" href="${safeHref}" target="_blank" rel="noopener noreferrer" ${revealStyle}>
                             <div class="news-title">${title}</div>
                             <div class="news-time">${escapeHtml(time)}</div>
                         </a>
@@ -6198,7 +6195,7 @@ if (lastRef && this._cachedNews.lastRefreshed) {
             : window.ActivityManager.renderActivities('home-activity-timeline', 'global');
 
         Promise.resolve(renderPromise).then(() => {
-        this.setupHomeActivityPagination();
+            this.setupHomeActivityPagination();
         }).catch(() => {
             // Keep silent - ActivityManager handles its own error UI
         });
@@ -6283,24 +6280,48 @@ window.__pcFaviconHelper = {
     // Shared cache for generated favicon metadata to ensure stable IDs across pages
     faviconMetadata: new Map(),
     // Shared cache for domains that have failed all favicon sources to prevent repeated cycling
-    failedDomains: (function() {
+    failedDomains: (function () {
         try {
             const cached = sessionStorage.getItem('pc-failed-domains');
             return cached ? new Set(JSON.parse(cached)) : new Set();
         } catch (_) { return new Set(); }
     })(),
     // Shared cache for specific logo URLs that have failed to avoid re-trying them
-    failedLogos: (function() {
+    failedLogos: (function () {
         try {
             const cached = sessionStorage.getItem('pc-failed-logos');
             return cached ? new Set(JSON.parse(cached)) : new Set();
         } catch (_) { return new Set(); }
     })(),
 
-    _saveCache: function() {
+    _saveCache: function () {
         try {
             sessionStorage.setItem('pc-failed-domains', JSON.stringify([...this.failedDomains]));
             sessionStorage.setItem('pc-failed-logos', JSON.stringify([...this.failedLogos]));
+            sessionStorage.setItem('pc-trying-domains', JSON.stringify([...this.tryingDomains])); // Persist trying index
+        } catch (_) { }
+    },
+
+    // Pre-warm favicon cache for a domain
+    preWarm: function (domain) {
+        try {
+            const clean = this.normalizeDomain(domain);
+            if (!clean || this.failedDomains.has(clean)) return;
+
+            // If we don't have an index yet, start at 0
+            if (!this.tryingDomains.has(clean)) {
+                this.tryingDomains.set(clean, 0);
+                this._saveCache();
+            }
+
+            // Create a hidden image to trigger browser cache
+            const img = new Image();
+            const requestSize = 128;
+            img.src = `https://logo.clearbit.com/${encodeURIComponent(clean)}`;
+
+            // Also pre-warm Google as the most reliable secondary
+            const img2 = new Image();
+            img2.src = `https://www.google.com/s2/favicons?sz=${requestSize}&domain=${encodeURIComponent(clean)}`;
         } catch (_) { }
     },
 
@@ -6379,24 +6400,24 @@ window.__pcFaviconHelper = {
             const website = (opts && opts.website) ? String(opts.website).trim() : '';
             const idSuffix = (opts && opts.idSuffix) ? String(opts.idSuffix) : '';
 
-            // CRITICAL FIX: If domain is missing but website exists, derive it
+            // If domain is missing but website exists, derive it
             if (!domain && website) {
                 domain = this.normalizeDomain(website);
             }
 
             const fallbackIcon = window.__pcAccountsIcon(size);
 
-            if (domain && this.failedDomains && this.failedDomains.has(domain)) {
-                return `<span class="company-favicon-container favicon-failed" style="width:${size}px;height:${size}px;"><span class="company-favicon-fallback">${fallbackIcon}</span></span>`;
-            }
+            // [AGENT FIX] Removed early check for failedDomains. We should try logoUrl first.
+            // If logoUrl is missing or fails, generateFaviconHTML will handle the failedDomains check.
 
             if (logoUrl) {
                 const normalizedLogo = this.normalizeLogoUrl(logoUrl);
-                // If this specific logo URL has already failed, or if we are already deep in a favicon cycle for this domain,
-                // skip the broken logo and use the persistent favicon source.
-                const isTryingFavicon = domain && this.tryingDomains.has(domain);
 
-                if ((normalizedLogo && this.failedLogos && this.failedLogos.has(normalizedLogo)) || isTryingFavicon) {
+                // [AGENT FIX] Prioritize logoUrl! Only skip if this SPECIFIC URL has failed previously.
+                // Do NOT skip just because we have a working favicon (tryingDomains), or we'll never show the logo.
+                const isLogoFailed = normalizedLogo && this.failedLogos && this.failedLogos.has(normalizedLogo);
+
+                if (isLogoFailed) {
                     if (domain) return this.generateFaviconHTML(domain, size, idSuffix);
                 }
 
@@ -6404,7 +6425,7 @@ window.__pcFaviconHelper = {
                 const looksLikeBareDomain = /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(logoUrl) && !/\s/.test(logoUrl) && !logoUrl.includes('/');
                 let parsed = null;
                 try { parsed = /^https?:\/\//i.test(logoUrl) ? new URL(logoUrl) : null; } catch (_) { parsed = null; }
-                
+
                 // Only use favicon fallback for bare domains, not for URLs
                 if (looksLikeBareDomain) {
                     const clean = this.normalizeDomain(logoUrl);
@@ -6416,8 +6437,14 @@ window.__pcFaviconHelper = {
                 const safeDomain = String(cleanDomain || '').replace(/'/g, "\\'");
                 const safeSuffix = String(idSuffix || '').replace(/'/g, "\\'");
 
-                return `<span class="company-favicon-container favicon-loading" style="width:${size}px;height:${size}px;">
-                            <img class="company-favicon" 
+                // Immediate Visibility: If we have a direct logo URL and it hasn't failed yet, 
+                // don't hide it with 'favicon-loading'. This reduces the perceived delay.
+                const isLikelyGood = !this.failedLogos.has(normalizedLogo);
+                const containerClass = isLikelyGood ? 'company-favicon-container favicon-loaded' : 'company-favicon-container favicon-loading';
+                const imgVisibility = isLikelyGood ? 'visibility:visible;' : 'visibility:hidden;';
+
+                return `<span class="${containerClass}" style="width:${size}px;height:${size}px;">
+                            <img class="company-favicon ${isLikelyGood ? 'icon-loaded' : ''}" 
                                  src="${logoUrl}" 
                                  alt="" 
                                  referrerpolicy="no-referrer" 
@@ -6425,7 +6452,7 @@ window.__pcFaviconHelper = {
                                  data-source-index="0"
                                  data-display-size="${size}"
                                  data-domain="${cleanDomain}"
-                                 style="width:${size}px;height:${size}px;object-fit:cover;border-radius:6px;flex-shrink:0;pointer-events:none;background-color:rgba(255,255,255,0.05);visibility:hidden;"
+                                 style="width:${size}px;height:${size}px;object-fit:cover;border-radius:6px;flex-shrink:0;pointer-events:none;background-color:rgba(255,255,255,0.05);${imgVisibility}"
                                  onload="window.__pcFaviconHelper.onFaviconLoadEl(this)"
                                  onerror="window.__pcFaviconHelper.onLogoErrorEl(this,'${safeDomain}',${size},'${safeSuffix}')" />
                             <span class="company-favicon-fallback">${fallbackIcon}</span>
@@ -6451,11 +6478,11 @@ window.__pcFaviconHelper = {
         try {
             if (!img) return;
             const src = String(img.currentSrc || img.src || '').trim();
-            
+
             // Mark this specific logo URL as failed so we don't try it again on next render
             if (src && /^https?:\/\//i.test(src)) {
-                try { 
-                    this.failedLogos.add(src); 
+                try {
+                    this.failedLogos.add(src);
                     this._saveCache();
                 } catch (_) { }
             }
@@ -6530,7 +6557,7 @@ window.__pcFaviconHelper = {
         }
 
         const requestSize = Math.max((parseInt(size, 10) || 0) * 2, 64);
-        
+
         // PERSISTENCE FIX: Check if we are already trying a specific index for this domain
         const startingIndex = this.tryingDomains.get(cleanDomain) || 0;
 
@@ -6548,7 +6575,7 @@ window.__pcFaviconHelper = {
         const safeDomain = String(cleanDomain || '').replace(/'/g, "\\'");
         const useIndex = startingIndex < faviconSources.length ? startingIndex : 0;
 
-        // [FIX] Warm Start: If we already have a persistent index, don't hide the icon with 'favicon-loading'
+        // Warm Start: If we already have a persistent index, don't hide the icon with 'favicon-loading'
         // This prevents the "flip-back" flicker during rapid re-renders
         const isWarmStart = this.tryingDomains.has(cleanDomain);
         const containerClass = isWarmStart ? 'company-favicon-container favicon-loaded' : 'company-favicon-container favicon-loading';
@@ -6582,12 +6609,12 @@ window.__pcFaviconHelper = {
         const sourceIndex = img.dataset.sourceIndex || '0';
         if (!img.dataset.sourceIndex) img.dataset.sourceIndex = '0';
 
-        // [FIX] Placeholder Detection: Google returns a 16x16 globe if no favicon is found.
+        // Placeholder Detection: Google returns a 16x16 globe if no favicon is found.
         // Since we requested sz=64 (or larger), a 16x16 result is a generic placeholder.
         if (dom && img.naturalWidth > 0) {
             const isGoogle = img.src.includes('google.com/s2/favicons');
             const isPlaceholder = (isGoogle && img.naturalWidth === 16);
-            
+
             if (isPlaceholder || img.naturalWidth < 16) {
                 setTimeout(() => {
                     try { window.__pcFaviconHelper.onFaviconErrorEl(img, dom, displaySize); } catch (_) { }
@@ -6600,9 +6627,9 @@ window.__pcFaviconHelper = {
         // PERSISTENCE FIX: We keep it in tryingDomains even on success so that re-renders 
         // use the same successful index instead of restarting at 0
         if (dom) {
-            try { 
-                this.failedDomains.delete(dom); 
-                // [FIX] Double-check that we are actually persisting the successful index
+            try {
+                this.failedDomains.delete(dom);
+                // Double-check that we are actually persisting the successful index
                 this.tryingDomains.set(dom, parseInt(sourceIndex, 10));
             } catch (_) { }
         }
@@ -6684,8 +6711,8 @@ window.__pcFaviconHelper = {
             }, 120);
         } else {
             if (cleanDomain) {
-                try { 
-                    this.failedDomains.add(cleanDomain); 
+                try {
+                    this.failedDomains.add(cleanDomain);
                     this.tryingDomains.delete(cleanDomain);
                     this._saveCache();
                 } catch (_) { }
@@ -6722,7 +6749,7 @@ window.__pcIconAnimator = {
         const loadImage = (img) => {
             // Prevent duplicate processing
             if (img.dataset.iconObserved) return;
-            
+
             // Skip non-images (like the fallback span) that are already marked as loaded
             if (img.tagName !== 'IMG' && img.classList.contains('icon-loaded')) {
                 img.dataset.iconObserved = 'true';
@@ -7284,7 +7311,7 @@ function initializeCRM() {
     const urlParams = new URLSearchParams(window.location.search);
     const emailId = urlParams.get('emailId');
     if (emailId && window.crm) {
-        console.log('[CRM] Deep link detected: emailId =', emailId);
+        // console.log('[CRM] Deep link detected: emailId =', emailId);
         window.crm.navigateToPage('email-detail', { emailId: emailId });
     }
 }

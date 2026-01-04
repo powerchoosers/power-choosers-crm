@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<script>window.PC_DEBUG = true;</script>
-<script src="scripts/debug-bridge.js"></script>
+    <script>window.PC_DEBUG = true;</script>
+    <script src="scripts/debug-bridge.js"></script>
     <title>Power Choosers CRM</title>
     <meta name="description"
         content="Power Choosers CRM - Manage your energy procurement accounts and customer relationships">
@@ -98,6 +98,23 @@
                         </path>
                     </svg>
                 </button>
+
+                <!-- Active Call Display (Hidden by default) -->
+                <div id="active-call-display" class="active-call-display" style="display: none;">
+                    <div class="active-call-info">
+                        <span class="active-call-status-dot"></span>
+                        <span class="active-call-contact" id="active-call-contact-text"></span>
+                        <span class="active-call-timer" id="active-call-timer">00:00</span>
+                    </div>
+                    <button class="active-call-end-btn" id="active-call-end-btn" title="End Call">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path
+                                d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z">
+                            </path>
+                        </svg>
+                    </button>
+                </div>
             </div>
             <div class="top-bar-right">
                 <button class="icon-btn" id="scripts-btn" title="Phone Scripts">
@@ -176,7 +193,8 @@
                 <div class="search-results-container">
                     <div class="prospect-actions">
                         <button class="prospect-btn" id="prospect-people-btn">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
                                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                                 <circle cx="9" cy="7" r="4"></circle>
                                 <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
@@ -185,8 +203,11 @@
                             Prospect People
                         </button>
                         <button class="prospect-btn" id="prospect-accounts-btn">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1"></path>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path
+                                    d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1">
+                                </path>
                             </svg>
                             Prospect Accounts
                         </button>
@@ -293,7 +314,8 @@
                             <span class="nav-text">Accounts</span>
                         </a>
                         <a href="#prospecting" class="nav-item" data-page="prospecting">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
                                 <circle cx="11" cy="11" r="8"></circle>
                                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                             </svg>
@@ -433,14 +455,16 @@
                                 <div class="dashboard-card">
                                     <h3 class="card-title">Suggested Leads</h3>
                                     <div class="leads-list">
-                                        <div class="lead-item">
+                                        <div class="lead-item modern-reveal premium-borderline"
+                                            style="animation-delay: 0.1s;">
                                             <div class="lead-info">
                                                 <div class="lead-name">Acme Manufacturing</div>
                                                 <div class="lead-details">Industrial • 500kW avg usage</div>
                                             </div>
                                             <div class="lead-score">92%</div>
                                         </div>
-                                        <div class="lead-item">
+                                        <div class="lead-item modern-reveal premium-borderline"
+                                            style="animation-delay: 0.2s;">
                                             <div class="lead-info">
                                                 <div class="lead-name">Downtown Office Complex</div>
                                                 <div class="lead-details">Commercial • 300kW avg usage</div>
@@ -561,22 +585,27 @@
                                         <h2 class="page-title">Prospecting</h2>
                                         <div class="page-actions">
                                             <div class="view-toggle" id="prospecting-view-toggle">
-                                                <button class="toggle-btn filter-tab active" data-view="people">People Search</button>
-                                                <button class="toggle-btn filter-tab" data-view="accounts">Account Search</button>
+                                                <button class="toggle-btn filter-tab active" data-view="people">People
+                                                    Search</button>
+                                                <button class="toggle-btn filter-tab" data-view="accounts">Account
+                                                    Search</button>
                                             </div>
                                         </div>
                                     </div>
                                     <div class="people-toolbar">
                                         <div class="search-container" style="max-width: 400px;">
-                                            <input type="text" class="search-input" id="prospecting-search" placeholder="Search by name, title, or company...">
+                                            <input type="text" class="search-input" id="prospecting-search"
+                                                placeholder="Search by name, title, or company...">
                                             <button class="search-btn" id="prospecting-search-btn">
-                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                                    stroke="currentColor" stroke-width="2">
                                                     <circle cx="11" cy="11" r="8"></circle>
                                                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                                                 </svg>
                                             </button>
                                         </div>
-                                        <div id="prospecting-filters" style="display: flex; gap: 10px; margin-left: 10px;">
+                                        <div id="prospecting-filters"
+                                            style="display: flex; gap: 10px; margin-left: 10px;">
                                             <!-- Dynamic filters will be injected here -->
                                         </div>
                                     </div>
@@ -596,12 +625,16 @@
                                                     </tr>
                                                 </thead>
                                                 <tbody id="prospecting-table-body">
-                                                    <tr><td colspan="6" style="text-align: center; padding: 20px;">Use the search bar to find prospects</td></tr>
+                                                    <tr>
+                                                        <td colspan="6" style="text-align: center; padding: 20px;">Use
+                                                            the search bar to find prospects</td>
+                                                    </tr>
                                                 </tbody>
                                             </table>
                                         </div>
                                         <div class="table-footer">
-                                            <div id="prospecting-pagination-summary" class="pagination-summary" aria-live="polite"></div>
+                                            <div id="prospecting-pagination-summary" class="pagination-summary"
+                                                aria-live="polite"></div>
                                             <div id="prospecting-pagination" class="table-pagination"></div>
                                         </div>
                                     </div>
@@ -3629,7 +3662,9 @@
                                                         title="Notes" aria-label="Notes">
                                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                                                             stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                                            <path
+                                                                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z">
+                                                            </path>
                                                             <polyline points="14,2 14,8 20,8"></polyline>
                                                             <line x1="16" y1="13" x2="8" y2="13"></line>
                                                             <line x1="16" y1="17" x2="8" y2="17"></line>
@@ -3660,11 +3695,15 @@
                             <div class="widget-card">
                                 <h4 class="widget-title">Quick Actions</h4>
                                 <div class="quick-actions">
-                                    <button class="action-btn" data-action="create" data-type="contact">Add
+                                    <button class="action-btn modern-reveal premium-borderline"
+                                        style="animation-delay: 0.1s;" data-action="create" data-type="contact">Add
                                         Contact</button>
-                                    <button class="action-btn" data-action="create" data-type="account">Add
+                                    <button class="action-btn modern-reveal premium-borderline"
+                                        style="animation-delay: 0.2s;" data-action="create" data-type="account">Add
                                         Account</button>
-                                    <button class="action-btn" data-action="create" data-type="bulk-import">Bulk Import
+                                    <button class="action-btn modern-reveal premium-borderline"
+                                        style="animation-delay: 0.3s;" data-action="create" data-type="bulk-import">Bulk
+                                        Import
                                         CSV</button>
                                 </div>
                             </div>
@@ -4585,7 +4624,7 @@
                     script.setAttribute('data-load-ok', 'true');
                     if (window.PC_DEBUG === true) {
                         const end = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-                        console.log('[LazyLoad] Loaded script', { src: baseSrc, ms: Math.round(end - start) });
+                        // Success log removed for cleaner production logs
                     }
                     resolve(true);
                 };
@@ -4633,7 +4672,7 @@
                 'scripts/pages/task-detail.js',    // NEW - load task-detail for Today's Tasks clicks
                 'scripts/pages/account-detail.js', // NEW - load account-detail for account navigation
                 'scripts/pages/contact-detail.js', // NEW - load contact-detail for contact navigation
-                'scripts/background-contacts-loader.js', 
+                'scripts/background-contacts-loader.js',
                 'scripts/background-accounts-loader.js',
                 'scripts/background-calls-loader.js',
                 'scripts/background-emails-loader.js',
@@ -4656,7 +4695,7 @@
                 return promise.then(() => window.loadScript(src));
             }, Promise.resolve()).then(() => {
                 window.crmScriptsLoaded = true;
-                
+
                 // Pre-warm commonly used page scripts in the background
                 // Uses requestIdleCallback to avoid blocking the main thread
                 if ('requestIdleCallback' in window) {
@@ -4808,7 +4847,7 @@
             if (isDev) {
                 const cacheBuster = '?v=' + Date.now();
                 window.__PC_CACHE_BUSTER = cacheBuster;
-                console.log('[Dev] Cache busting enabled:', cacheBuster);
+                // console.log('[Dev] Cache busting enabled:', cacheBuster);
             }
         })();
     </script>
@@ -5199,6 +5238,7 @@
             });
         })();
     </script>
+    <script src="scripts/active-call-manager.js"></script>
 </body>
 
 </html>

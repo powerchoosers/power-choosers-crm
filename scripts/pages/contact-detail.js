@@ -891,7 +891,7 @@
         break;
       }
       default:
-        // console.log('Unknown widget action:', which, 'for contact', contactId);
+      // console.log('Unknown widget action:', which, 'for contact', contactId);
     }
   }
 
@@ -2876,7 +2876,7 @@
   async function loadContactActivities() {
     const peoplePage = document.getElementById('people-page');
     const containerId = 'contact-activity-timeline';
-    
+
     // H1 Fix: Wait a moment for navigateToPage to finish adding .active class
     // Increased to 500ms to handle "Back" button navigation transitions
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -5314,7 +5314,7 @@
     const total = Array.isArray(state._rcCalls) ? state._rcCalls.length : 0;
     if (!total) { rcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>'); updateRecentCallsPager(0, 0); return; }
     const slice = getRecentCallsPageSlice();
-    rcUpdateListAnimated(list, slice.map(call => rcItemHtml(call)).join(''));
+    rcUpdateListAnimated(list, slice.map((call, index) => rcItemHtml(call, index)).join(''));
     // delegate click to handle dynamic rerenders
     list.querySelectorAll('.rc-insights').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -5456,7 +5456,7 @@
     return arr.filter(Boolean);
   }
 
-  function rcItemHtml(c) {
+  function rcItemHtml(c, index = 0) {
     // Prefer contact name; if absent (company call), show company once
     const hasContact = !!(c.contactId && c.contactName);
     const rawCompany = String(c.accountName || c.company || '');
@@ -5490,8 +5490,9 @@
     // Only append company if we have a real contact and company differs
     const title = `${name}${(hasContact && rawCompany && rawCompany !== displayName) ? ` • ${company}` : ''}`;
 
+    const delay = (index * 0.05).toFixed(2);
     return `
-      <div class="rc-item">
+      <div class="rc-item modern-reveal premium-borderline" style="animation-delay: ${delay}s;">
         <div class="rc-meta">
           <div class="rc-title">${title}</div>
           <div class="rc-sub">${when} • <span class="rc-duration">${durStr}</span> • <span class="phone-number" 

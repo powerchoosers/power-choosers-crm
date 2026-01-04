@@ -102,7 +102,7 @@
       queryWithOwnership,
       ADMIN_EMAIL
     };
-    console.log('[DataManager] Initialized');
+    // console.log('[DataManager] Initialized');
   } catch (error) {
     console.error('[DataManager] Initialization error:', error);
   }

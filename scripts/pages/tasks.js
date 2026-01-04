@@ -330,13 +330,13 @@
       if (window.BackgroundTasksLoader) {
         // CRITICAL FIX: Force reload BackgroundTasksLoader to ensure we have latest data
         // This matches what Today's Tasks widget does to get all 236 tasks
-        console.log('[Tasks] Force reloading BackgroundTasksLoader to get complete task list...');
+        // console.log('[Tasks] Force reloading BackgroundTasksLoader to get complete task list...');
         await window.BackgroundTasksLoader.forceReload();
         firebaseTasks = window.BackgroundTasksLoader.getTasksData() || [];
         state.hasMore = window.BackgroundTasksLoader.hasMore();
 
 
-        console.log('[Tasks] Loaded', firebaseTasks.length, 'tasks from BackgroundTasksLoader after force reload');
+        // console.log('[Tasks] Loaded', firebaseTasks.length, 'tasks from BackgroundTasksLoader after force reload');
       } else {
         // Fallback to direct Firestore query if background loader not available (with ownership filters)
         if (window.firebaseDB) {
@@ -399,8 +399,7 @@
       console.warn('Could not load tasks from BackgroundTasksLoader:', error);
     }
 
-    // Debug logging
-    console.log(`[Tasks] Loaded ${userTasks.length} tasks from localStorage, ${firebaseTasks.length} tasks from Firebase`);
+    // // console.log(`[Tasks] Loaded ${userTasks.length} tasks from localStorage, ${firebaseTasks.length} tasks from Firebase`);
 
     // Merge all tasks - CRITICAL FIX: Always prefer Firebase as the source of truth
     // Firebase tasks override any stale local copies with the same ID
@@ -435,7 +434,7 @@
 
     state.data = rows;
     state.filtered = sortTasksChronologically(rows);
-    console.log(`[Tasks] Total tasks loaded: ${rows.length}`);
+    // console.log(`[Tasks] Total tasks loaded: ${rows.length}`);
     render();
 
     // CRITICAL FIX: Notify Today's Tasks widget and other components that tasks have been updated
@@ -459,13 +458,13 @@
     }
 
     try {
-      console.log('[Tasks] Loading more tasks...');
+      // console.log('[Tasks] Loading more tasks...');
       const result = await window.BackgroundTasksLoader.loadMore();
 
       if (result.loaded > 0) {
         // Reload data to get updated tasks
         await loadData();
-        console.log('[Tasks] Loaded', result.loaded, 'more tasks');
+        // console.log('[Tasks] Loaded', result.loaded, 'more tasks');
       } else {
         state.hasMore = false;
       }
@@ -558,7 +557,7 @@
       });
 
 
-      console.log('[Tasks] Filtered', linkedInTasks.length, 'LinkedIn sequence tasks from existing Firebase tasks');
+      // console.log('[Tasks] Filtered', linkedInTasks.length, 'LinkedIn sequence tasks from existing Firebase tasks');
     } catch (error) {
       console.error('[Tasks] Error filtering LinkedIn sequence tasks:', error);
     }
@@ -687,7 +686,7 @@
         // If this is a sequence task, trigger next step creation
         if (task && task.isSequenceTask) {
           try {
-            console.log('[Tasks] Completed sequence task, creating next step...', task.id);
+            // console.log('[Tasks] Completed sequence task, creating next step...', task.id);
             const baseUrl = getApiBaseUrl();
             const response = await fetch(`${baseUrl}/api/complete-sequence-task`, {
               method: 'POST',
@@ -697,12 +696,12 @@
             const result = await response.json();
 
             if (result.success) {
-              console.log('[Tasks] Next step created:', result.nextStepType);
+              // console.log('[Tasks] Next step created:', result.nextStepType);
               if (result.nextStepType === 'task') {
                 // Force refresh BackgroundTasksLoader so the new task is available immediately
                 if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
                   try {
-                    console.log('[Tasks] Forcing BackgroundTasksLoader refresh for new sequence task...');
+                    // console.log('[Tasks] Forcing BackgroundTasksLoader refresh for new sequence task...');
                     await window.BackgroundTasksLoader.forceReload();
                   } catch (reloadError) {
                     console.warn('[Tasks] Failed to force reload BackgroundTasksLoader:', reloadError);
@@ -749,7 +748,7 @@
               const batch = db.batch();
               taskDocs.forEach(doc => batch.delete(doc.ref));
               await batch.commit();
-              console.log(`[Tasks] Successfully deleted ${taskDocs.length} task document(s) from Firestore:`, id);
+              // console.log(`[Tasks] Successfully deleted ${taskDocs.length} task document(s) from Firestore:`, id);
             } else {
               console.warn('[Tasks] Task not found in Firestore for deletion:', id);
             }
@@ -1272,7 +1271,7 @@
 
     if (adminOnly) {
       container.querySelector('#bulk-assign').addEventListener('click', () => {
-        console.log('Bulk assign', Array.from(state.selected));
+        // console.log('Bulk assign', Array.from(state.selected));
         // TODO: Implement bulk assign functionality
       });
     }
@@ -1598,7 +1597,7 @@
         // CRITICAL FIX: Invalidate cache after task creation to prevent stale data
         if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
           await window.CacheManager.invalidate('tasks');
-          console.log('[Tasks] Invalidated tasks cache after creation');
+          // console.log('[Tasks] Invalidated tasks cache after creation');
         }
       }
     } catch (err) {
@@ -1684,7 +1683,7 @@
           const filteredLegacy = legacyTasks.filter(t => t && t.id !== taskId);
           localStorage.setItem('userTasks', JSON.stringify(filteredLegacy));
 
-          console.log('[Tasks] Cleaned up deleted task from localStorage:', taskId);
+          // console.log('[Tasks] Cleaned up deleted task from localStorage:', taskId);
         } catch (e) {
           console.warn('[Tasks] Could not clean up deleted task from localStorage:', e);
         }
@@ -1693,13 +1692,13 @@
       // CRITICAL FIX: If a task was rescheduled, force refresh all caches to get updated dueDate/dueTime
       // This ensures the task appears in its new position and is removed from its old position
       if (rescheduled && taskId) {
-        console.log('[Tasks] Task rescheduled, forcing refresh of all caches...', taskId);
+        // console.log('[Tasks] Task rescheduled, forcing refresh of all caches...', taskId);
         
         // Remove from BackgroundTasksLoader cache immediately (will be reloaded with fresh data)
         if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.removeTask === 'function') {
           try {
             window.BackgroundTasksLoader.removeTask(taskId);
-            console.log('[Tasks] Removed rescheduled task from BackgroundTasksLoader cache');
+            // console.log('[Tasks] Removed rescheduled task from BackgroundTasksLoader cache');
           } catch (e) {
             console.warn('[Tasks] Failed to remove task from BackgroundTasksLoader:', e);
           }
@@ -1709,7 +1708,7 @@
         if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
           try {
             await window.BackgroundTasksLoader.forceReload();
-            console.log('[Tasks] BackgroundTasksLoader refreshed after reschedule');
+            // console.log('[Tasks] BackgroundTasksLoader refreshed after reschedule');
           } catch (e) {
             console.warn('[Tasks] Failed to refresh BackgroundTasksLoader after reschedule:', e);
           }
@@ -1719,7 +1718,7 @@
         if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
           try {
             await window.CacheManager.invalidate('tasks');
-            console.log('[Tasks] Invalidated tasks cache after reschedule');
+            // console.log('[Tasks] Invalidated tasks cache after reschedule');
           } catch (e) {
             console.warn('[Tasks] Failed to invalidate cache after reschedule:', e);
           }
@@ -1731,11 +1730,11 @@
 
       // CRITICAL FIX: If a new task was created (e.g., next step in sequence), refresh BackgroundTasksLoader
       if (newTaskCreated) {
-        console.log('[Tasks] New task created from sequence, refreshing BackgroundTasksLoader...', { nextStepType });
+        // console.log('[Tasks] New task created from sequence, refreshing BackgroundTasksLoader...', { nextStepType });
         if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
           try {
             await window.BackgroundTasksLoader.forceReload();
-            console.log('[Tasks] BackgroundTasksLoader refreshed after new task creation');
+            // console.log('[Tasks] BackgroundTasksLoader refreshed after new task creation');
           } catch (e) {
             console.warn('[Tasks] Failed to refresh BackgroundTasksLoader:', e);
           }
@@ -1745,7 +1744,7 @@
         if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
           try {
             await window.CacheManager.invalidate('tasks');
-            console.log('[Tasks] Invalidated tasks cache after new task creation');
+            // console.log('[Tasks] Invalidated tasks cache after new task creation');
           } catch (e) {
             console.warn('[Tasks] Failed to invalidate cache:', e);
           }
@@ -1760,7 +1759,7 @@
     // Listen for background tasks loader events
     document.addEventListener('pc:tasks-loaded', async (event) => {
       const { newTaskCreated, count, cached, fromFirestore } = (event && event.detail) || {};
-      console.log('[Tasks] Background tasks loaded, checking for updates...', { newTaskCreated });
+      // // console.log('[Tasks] Background tasks loaded, checking for updates...', { newTaskCreated });
       
       // If the Tasks page rendered from localStorage (123) before the loader was ready (245),
       // re-run loadData once to hydrate the table with the full loader set.
@@ -1775,7 +1774,7 @@
       // If a new task was created, force reload BackgroundTasksLoader first
       if (newTaskCreated && window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
         try {
-          console.log('[Tasks] New task created, forcing BackgroundTasksLoader refresh...');
+          // console.log('[Tasks] New task created, forcing BackgroundTasksLoader refresh...');
           await window.BackgroundTasksLoader.forceReload();
           // Only reload if we're on the tasks page and a new task was actually created
           await loadData();
@@ -1814,7 +1813,7 @@
           const filteredLegacy = legacyTasks.filter(t => t && t.id !== taskId);
           localStorage.setItem('userTasks', JSON.stringify(filteredLegacy));
 
-          console.log('[Tasks] Cleaned up deleted task from localStorage (cross-browser sync):', taskId);
+          // console.log('[Tasks] Cleaned up deleted task from localStorage (cross-browser sync):', taskId);
 
           // Refresh the page if we're on the tasks page
           await loadData();

@@ -40,6 +40,15 @@
         error: console.error
     };
 
+    // [AGENT FIX] Auto-enable debug mode on localhost if not explicitly disabled
+    try {
+        if (isLocalhost && localStorage.getItem('pc-debug-logs') !== 'false') {
+            window.PC_DEBUG = true;
+            localStorage.setItem('pc-debug-logs', 'true');
+            console.log('[Debug Bridge] Auto-enabled debug mode on localhost');
+        }
+    } catch (_) { }
+
     function isDebugEnabled() {
         try {
             return (
