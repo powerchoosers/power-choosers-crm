@@ -1201,6 +1201,12 @@ class PowerChoosersCRM {
             this.updateWidgetPanel(this.currentPage);
         } catch (_) { /* noop */ }
 
+        // Verify widget panel exists
+        const widgetPanel = document.getElementById('widget-panel');
+        if (!widgetPanel) {
+            console.error('[Widget Panel] NOT FOUND in DOM!');
+        }
+
         // Pre-warm modal animations for smooth first use (performance optimization)
         setTimeout(() => this.preWarmModalAnimations(), 500);
     }
@@ -2035,11 +2041,14 @@ class PowerChoosersCRM {
             position: fixed;
             top: 90px;
             right: 25px;
-            background: var(--grey-800);
+            background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border);
             color: var(--text-inverse);
             padding: 16px 20px;
             border-radius: var(--border-radius);
-            box-shadow: var(--shadow-lg);
+            box-shadow: var(--glass-shadow);
             z-index: 10000;
             font-size: 0.875rem;
             opacity: 0;
@@ -2388,6 +2397,7 @@ class PowerChoosersCRM {
         } else {
             if (widgetPanel) {
                 widgetPanel.style.display = 'block';
+                widgetPanel.style.flex = '1'; // Ensure 3:1 ratio with main content
                 widgetPanel.classList.add('is-visible');
             }
             if (mainContentEl) {

@@ -1,26 +1,6 @@
 
 'use strict';
 
-// Silence verbose logs from this module unless explicitly enabled via localStorage CRM_DEBUG_ACCOUNT_DETAIL=1
-// This shadowed console only affects this file, not the whole app
-var __ACCOUNT_DETAIL_ORIG_CONSOLE__ = window.console || {};
-function __accountDetailDebugEnabled__() {
-  if (window.PC_DEBUG) return true; // Respect global debug flag
-  try {
-    const v = localStorage.getItem('CRM_DEBUG_ACCOUNT_DETAIL');
-    if (v != null) return v === '1' || v === 'true';
-  } catch (_) { }
-  return !!window.CRM_DEBUG_ACCOUNT_DETAIL;
-}
-// eslint-disable-next-line no-redeclare
-var console = {
-  log: function () { if (__accountDetailDebugEnabled__()) __ACCOUNT_DETAIL_ORIG_CONSOLE__.log.apply(__ACCOUNT_DETAIL_ORIG_CONSOLE__, arguments); },
-  warn: __ACCOUNT_DETAIL_ORIG_CONSOLE__.warn || function () { },
-  error: __ACCOUNT_DETAIL_ORIG_CONSOLE__.error || function () { },
-  info: function () { if (__accountDetailDebugEnabled__()) __ACCOUNT_DETAIL_ORIG_CONSOLE__.info.apply(__ACCOUNT_DETAIL_ORIG_CONSOLE__, arguments); },
-  debug: function () { if (__accountDetailDebugEnabled__()) __ACCOUNT_DETAIL_ORIG_CONSOLE__.debug.apply(__ACCOUNT_DETAIL_ORIG_CONSOLE__, arguments); }
-};
-
 // Account Detail page module
 (function () {
   // Prevent duplicate initialization
@@ -859,13 +839,10 @@ var console = {
 
   // Helper to safely get people data - now simplified with background loader
   async function getPeopleDataSafe() {
-    const log = window.console.log.bind(window.console); // Bypass log silencing
-
     // Priority 1: Background loader (always available, loads on app init)
     if (window.BackgroundContactsLoader) {
       const data = window.BackgroundContactsLoader.getContactsData();
       if (data && data.length > 0) {
-        log('[AccountDetail] Got', data.length, 'contacts from BackgroundContactsLoader');
         return data;
       }
     }
@@ -874,7 +851,6 @@ var console = {
     if (typeof window.getPeopleData === 'function') {
       const data = window.getPeopleData() || [];
       if (data.length > 0) {
-        log('[AccountDetail] Got', data.length, 'contacts from window.getPeopleData');
         return data;
       }
     }
@@ -884,7 +860,6 @@ var console = {
       try {
         const cached = await window.CacheManager.get('contacts');
         if (cached && Array.isArray(cached) && cached.length > 0) {
-          log('[AccountDetail] Got', cached.length, 'contacts from CacheManager');
           return cached;
         }
       } catch (err) {
@@ -897,15 +872,13 @@ var console = {
   }
 
   async function renderAccountContacts(account, page = 1, pageSize = 4) {
-    const log = window.console.log.bind(window.console); // Bypass log silencing
-
     // OPTIMIZED: Query only this account's contacts from Firestore
     // This fixes the issue where contacts not in "first 100" won't show up
     // and dramatically reduces reads (5 reads instead of 2,300)
     let allContacts = [];
 
     if (!account) {
-      log('[AccountDetail] ERROR: No account provided to renderAccountContacts');
+      window.console.error('[AccountDetail] ERROR: No account provided to renderAccountContacts');
       return '<div class="contacts-placeholder">No contacts found</div>';
     }
 
@@ -916,11 +889,9 @@ var console = {
     // OPTIMIZATION: Check cache first to avoid slow Firestore queries
     if (window._accountContactsCache && window._accountContactsCache[accountId]) {
       allContacts = window._accountContactsCache[accountId];
-      log('[AccountDetail] Using cached contacts for account:', accountId, 'count:', allContacts.length);
     } else if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
       // OPTIMIZATION: Use BackgroundContactsLoader (instant) instead of Firestore (15+ seconds)
       const allCachedContacts = window.BackgroundContactsLoader.getContactsData() || [];
-      log('[AccountDetail] Using BackgroundContactsLoader for fast filtering, total:', allCachedContacts.length);
 
       // Filter client-side (much faster than Firestore query)
       const norm = (s) => String(s || '').toLowerCase()
@@ -941,8 +912,6 @@ var console = {
       if (!window._accountContactsCache) window._accountContactsCache = {};
       window._accountContactsCache[accountId] = allContacts;
 
-      log('[AccountDetail] Filtered to', allContacts.length, 'contacts from BackgroundContactsLoader');
-
       // CRITICAL: Skip Firestore query if BackgroundContactsLoader was available
       // Even if 0 contacts found, we trust the loader (prevents 16+ second freeze)
       // Return early - don't fall through to Firestore
@@ -952,7 +921,7 @@ var console = {
     // This should almost never happen since BackgroundContactsLoader loads on app init
     if (allContacts.length === 0 && !window.BackgroundContactsLoader && window.firebaseDB) {
       try {
-        log('[AccountDetail] Querying Firestore for contacts of account:', accountName);
+        // window.console.log('[AccountDetail] Querying Firestore for contacts of account:', accountName);
 
         // Query by accountId first (most reliable)
         let snapshot = await window.firebaseDB.collection('contacts')
@@ -960,17 +929,17 @@ var console = {
           .get();
 
         allContacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        log('[AccountDetail] Found', allContacts.length, 'contacts by accountId');
+        // window.console.log('[AccountDetail] Found', allContacts.length, 'contacts by accountId');
 
         // If no results, try by company name (fallback)
         if (allContacts.length === 0 && accountName) {
-          log('[AccountDetail] No contacts found by accountId, trying companyName:', accountName);
+          // window.console.log('[AccountDetail] No contacts found by accountId, trying companyName:', accountName);
           snapshot = await window.firebaseDB.collection('contacts')
             .where('companyName', '==', accountName)
             .get();
 
           allContacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          log('[AccountDetail] Found', allContacts.length, 'contacts by companyName');
+          // window.console.log('[AccountDetail] Found', allContacts.length, 'contacts by companyName');
         }
 
         // Cache the results for this account
@@ -978,12 +947,12 @@ var console = {
         window._accountContactsCache[accountId] = allContacts;
 
       } catch (error) {
-        log('[AccountDetail] Error querying contacts:', error);
+        window.console.error('[AccountDetail] Error querying contacts:', error);
 
         // FALLBACK: Try background loader if Firestore query fails
         if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
           const allCachedContacts = window.BackgroundContactsLoader.getContactsData() || [];
-          log('[AccountDetail] Fallback: Got', allCachedContacts.length, 'contacts from BackgroundContactsLoader');
+          // window.console.log('[AccountDetail] Fallback: Got', allCachedContacts.length, 'contacts from BackgroundContactsLoader');
 
           // Filter client-side as fallback
           const norm = (s) => String(s || '').toLowerCase()
@@ -999,15 +968,15 @@ var console = {
             const contactCompany = contact.companyName || contact.accountName || '';
             return norm(contactCompany) === normalizedAccountName;
           });
-          log('[AccountDetail] Fallback: Filtered to', allContacts.length, 'contacts');
+          // window.console.log('[AccountDetail] Fallback: Filtered to', allContacts.length, 'contacts');
         }
       }
     }
 
-    log('[AccountDetail] renderAccountContacts: account=', accountName, 'contacts found=', allContacts.length);
+    // window.console.log('[AccountDetail] renderAccountContacts: account=', accountName, 'contacts found=', allContacts.length);
 
     if (allContacts.length === 0) {
-      log('[AccountDetail] No contacts found for this account');
+      // window.console.log('[AccountDetail] No contacts found for this account');
       return '<div class="contacts-placeholder">No contacts found for this account</div>';
     }
 
@@ -1015,7 +984,7 @@ var console = {
       // Contacts are already filtered by account, no need to filter again
       const associatedContacts = allContacts;
 
-      log('[AccountDetail] Rendering', associatedContacts.length, 'contacts');
+      // window.console.log('[AccountDetail] Rendering', associatedContacts.length, 'contacts');
 
       // Store all contacts in state for pagination
       state._allContacts = associatedContacts;
@@ -1031,7 +1000,7 @@ var console = {
       // Don't update pagination here - DOM elements don't exist yet
       // Will be updated after DOM insertion
 
-      return pageContacts.map(contact => {
+      return pageContacts.map((contact, index) => {
         const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.name || 'Unknown Contact';
         const title = contact.title || '';
         const email = contact.email || '';

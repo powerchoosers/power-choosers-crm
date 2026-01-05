@@ -78,35 +78,50 @@
         padding-bottom: 4px; /* 4px + 8px from prospect-actions = 12px, matches top padding */
       }
       .search-results-container .search-category {
-        background: var(--bg-item, #2f343a);
-        border: 1px solid var(--grey-700, #3a3f45);
-        border-radius: var(--border-radius, 8px);
+        background: #323943; /* Matches --grey-700 for a seamless look */
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
         margin-bottom: 16px;
         margin-left: 0;
         margin-right: 0;
         overflow: hidden;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
       }
       .search-results-container .search-category:last-child {
         margin-bottom: 0;
       }
       .search-results-container .search-category .category-header {
-        padding: 10px 12px;
-        background: rgba(0, 0, 0, 0.15);
-        border-bottom: 1px solid var(--grey-700, #3a3f45);
+        padding: 10px 14px;
+        background: rgba(0, 0, 0, 0.2);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         margin: 0;
+        color: var(--grey-400);
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
       }
       .search-results-container .search-result-item {
-        padding: 10px 12px;
+        padding: 12px 14px;
         margin: 0;
         background: transparent;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.25);
-        transition: background 0.15s ease;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        transition: all 0.2s ease;
       }
       .search-results-container .search-result-item:last-child {
         border-bottom: none;
       }
       .search-results-container .search-result-item:hover {
         background: rgba(255, 255, 255, 0.03);
+      }
+      .search-result-item .result-title {
+        color: var(--text-main);
+        font-weight: 500;
+        font-size: 0.9rem;
+      }
+      .search-result-item .result-subtitle {
+        color: var(--grey-500);
+        font-size: 0.8rem;
       }
       .search-result-item .result-main {
         display: flex;

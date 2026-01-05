@@ -3354,7 +3354,7 @@ function injectModernStyles() {
         #settings-page #save-settings-btn:hover:not(:disabled) {
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(255, 140, 0, 0.4);
-            background: linear-gradient(135deg, #e55a2b 0%, #ff8c42 100%) !important;
+            background: linear-gradient(135deg, var(--orange-primary) 0%, #ff8c42 100%) !important;
         }
         
         #settings-page #save-settings-btn:disabled {
@@ -3623,7 +3623,7 @@ function injectModernStyles() {
         }
         
         #settings-page .btn-primary:hover {
-            background: #e55a2b;
+            background: var(--orange-subtle, #f18335);
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
         }
