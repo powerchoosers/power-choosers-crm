@@ -7,8 +7,8 @@ export class GmailService {
     constructor() {
         this.gmail = null;
         this.lastInitializedEmail = null; // Cache to avoid re-initializing for same user
-        this.fromEmail = process.env.GMAIL_SENDER_EMAIL || 'l.patterson@powerchoosers.com';
-        this.fromName = process.env.GMAIL_SENDER_NAME || 'Lewis Patterson';
+        this.fromEmail = process.env.GMAIL_SENDER_EMAIL || '';
+        this.fromName = process.env.GMAIL_SENDER_NAME || 'Power Choosers CRM';
     }
     
     /**

@@ -92,12 +92,18 @@ export default async function handler(req, res) {
     }
 
     // Determine owner email (required for Firestore rules compliance)
-    // Use userEmail if provided, otherwise fallback to from address or default
+    // Use userEmail if provided, otherwise fallback to from address
     const ownerEmail = (userEmail && typeof userEmail === 'string' && userEmail.trim()) 
       ? userEmail.toLowerCase().trim() 
       : (from && typeof from === 'string' && from.includes('@'))
         ? from.toLowerCase().trim()
-        : 'l.patterson@powerchoosers.com'; // Admin fallback
+        : null; // No fallback to admin - let it fail if no user identity
+
+    if (!ownerEmail) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing user identity (userEmail or from address)' }));
+      return;
+    }
 
     // Create email record in Firestore BEFORE sending (for tracking)
     if (db && deliverability.enableTracking) {

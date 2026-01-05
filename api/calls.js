@@ -191,7 +191,7 @@ async function upsertCallInFirestore(payload) {
   const hasExistingOwner = current.ownerId && current.ownerId.trim();
   const finalOwnerEmail = (userEmail && userEmail.trim()) 
     ? userEmail.toLowerCase().trim() 
-    : (hasExistingOwner ? current.ownerId : 'l.patterson@powerchoosers.com');
+    : (hasExistingOwner ? current.ownerId : 'unassigned');
   
   merged.ownerId = finalOwnerEmail;
   merged.assignedTo = finalOwnerEmail;

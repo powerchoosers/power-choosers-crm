@@ -881,10 +881,10 @@ export default async function handler(req, res) {
                     aiPrompt: nextStep.emailSettings?.aiPrompt || nextStep.data?.aiPrompt || nextStep.aiPrompt || nextStep.content || 'Write a professional email',
                     aiMode: nextStep.data?.aiMode || nextStep.emailSettings?.aiMode || 'standard',
                     // CRITICAL: Set ownership fields for Firestore rules compliance
-                    // Fallback to admin if emailData.ownerId not provided
-                    ownerId: (emailData.ownerId || 'l.patterson@powerchoosers.com').toLowerCase().trim(),
-                    assignedTo: (emailData.assignedTo || emailData.ownerId || 'l.patterson@powerchoosers.com').toLowerCase().trim(),
-                    createdBy: (emailData.createdBy || emailData.ownerId || 'l.patterson@powerchoosers.com').toLowerCase().trim(),
+                    // Fallback to unassigned if emailData.ownerId not provided
+                    ownerId: (emailData.ownerId || 'unassigned').toLowerCase().trim(),
+                    assignedTo: (emailData.assignedTo || emailData.ownerId || 'unassigned').toLowerCase().trim(),
+                    createdBy: (emailData.createdBy || emailData.ownerId || 'unassigned').toLowerCase().trim(),
                     createdAt: admin.firestore.FieldValue.serverTimestamp()
                   });
 
@@ -953,10 +953,10 @@ export default async function handler(req, res) {
                     isSequenceTask: true,
                     notes: nextStep.data?.note || '',
                     // CRITICAL: Set ownership fields for Firestore rules compliance
-                    // Fallback to admin if emailData.ownerId not provided
-                    ownerId: (emailData.ownerId || 'l.patterson@powerchoosers.com').toLowerCase().trim(),
-                    assignedTo: (emailData.assignedTo || emailData.ownerId || 'l.patterson@powerchoosers.com').toLowerCase().trim(),
-                    createdBy: (emailData.createdBy || emailData.ownerId || 'l.patterson@powerchoosers.com').toLowerCase().trim(),
+                    // Fallback to unassigned if emailData.ownerId not provided
+                    ownerId: (emailData.ownerId || 'unassigned').toLowerCase().trim(),
+                    assignedTo: (emailData.assignedTo || emailData.ownerId || 'unassigned').toLowerCase().trim(),
+                    createdBy: (emailData.createdBy || emailData.ownerId || 'unassigned').toLowerCase().trim(),
                     createdAt: admin.firestore.FieldValue.serverTimestamp(),
                     timestamp: admin.firestore.FieldValue.serverTimestamp()
                   });
@@ -1033,9 +1033,9 @@ export default async function handler(req, res) {
           provider: data.provider || 'gmail',
           updatedAt: new Date().toISOString(),
           // Preserve ownership fields
-          ownerId: data.ownerId || 'l.patterson@powerchoosers.com',
-          assignedTo: data.assignedTo || data.ownerId || 'l.patterson@powerchoosers.com',
-          createdBy: data.createdBy || data.ownerId || 'l.patterson@powerchoosers.com',
+          ownerId: data.ownerId || 'unassigned',
+          assignedTo: data.assignedTo || data.ownerId || 'unassigned',
+          createdBy: data.createdBy || data.ownerId || 'unassigned',
           reconStatus: 'auto-finalized-from-sending'
         };
 

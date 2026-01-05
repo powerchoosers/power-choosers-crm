@@ -336,10 +336,14 @@ export default async function handler(req, res) {
     const recipientEmail = extractEmailAddress(emailData.to || '');
 
     // Validate recipient email (required for Firestore rules compliance)
-    // If no valid recipient email found, assign to admin as fallback
+    // If no valid recipient email found, log warning (do not fallback to admin)
     const ownerEmail = (recipientEmail && recipientEmail.includes('@')) 
       ? recipientEmail 
-      : 'l.patterson@powerchoosers.com'; // Admin fallback for invalid emails
+      : null;
+
+    if (!ownerEmail) {
+      logger.warn('[InboundEmail] No valid recipient email found for ownership assignment:', { to: emailData.to });
+    }
 
     // Save to Firebase with proper error handling
     try {
@@ -348,9 +352,9 @@ export default async function handler(req, res) {
         threadId,
         // CRITICAL: Set ownership fields for Firestore rules compliance
         // ownerId must match authenticated user's email for non-admin access
-        ownerId: ownerEmail,
-        assignedTo: ownerEmail,
-        createdBy: ownerEmail,
+        ownerId: ownerEmail || 'unassigned',
+        assignedTo: ownerEmail || 'unassigned',
+        createdBy: ownerEmail || 'system',
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       };

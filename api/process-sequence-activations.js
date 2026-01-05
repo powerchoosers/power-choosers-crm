@@ -303,10 +303,10 @@ async function processSingleActivation(activationId, isProduction) {
           aiPrompt: step.emailSettings?.aiPrompt || step.data?.aiPrompt || step.aiPrompt || step.content || 'Write a professional email',
           aiMode: defaultAiMode,
           // CRITICAL: Set ownership fields for Firestore rules compliance
-          // Fallback to admin if ownerId/userId not provided
-          ownerId: (data.ownerId || data.userId || 'l.patterson@powerchoosers.com').toLowerCase().trim(),
-          assignedTo: (data.ownerId || data.userId || 'l.patterson@powerchoosers.com').toLowerCase().trim(),
-          createdBy: (data.ownerId || data.userId || 'l.patterson@powerchoosers.com').toLowerCase().trim(),
+          // Fallback to unassigned if ownerId/userId not provided
+          ownerId: (data.ownerId || data.userId || 'unassigned').toLowerCase().trim(),
+          assignedTo: (data.ownerId || data.userId || 'unassigned').toLowerCase().trim(),
+          createdBy: (data.ownerId || data.userId || 'unassigned').toLowerCase().trim(),
           createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
       }
@@ -408,10 +408,10 @@ async function processSingleActivation(activationId, isProduction) {
           isSequenceTask: true,
           notes: firstTaskStep.data?.note || '',
           // CRITICAL: Set ownership fields for Firestore rules compliance
-          // Fallback to admin if ownerId/userId not provided
-          ownerId: (data.ownerId || data.userId || 'l.patterson@powerchoosers.com').toLowerCase().trim(),
-          assignedTo: (data.ownerId || data.userId || 'l.patterson@powerchoosers.com').toLowerCase().trim(),
-          createdBy: (data.ownerId || data.userId || 'l.patterson@powerchoosers.com').toLowerCase().trim(),
+          // Fallback to unassigned if ownerId/userId not provided
+          ownerId: (data.ownerId || data.userId || 'unassigned').toLowerCase().trim(),
+          assignedTo: (data.ownerId || data.userId || 'unassigned').toLowerCase().trim(),
+          createdBy: (data.ownerId || data.userId || 'unassigned').toLowerCase().trim(),
           createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
       }
