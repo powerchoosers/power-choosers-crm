@@ -345,14 +345,21 @@ class AuthManager {
     showLogin() {
         const loginOverlay = document.getElementById('login-overlay');
         const crmContent = document.getElementById('crm-content');
+        const topBar = document.querySelector('.top-bar');
         
         if (loginOverlay) loginOverlay.style.display = 'flex';
         if (crmContent) crmContent.style.display = 'none';
+        
+        // Hide top bar on login screen
+        if (topBar) {
+            topBar.classList.remove('visible');
+        }
     }
 
     async showCRM() {
         const loginOverlay = document.getElementById('login-overlay');
         const crmContent = document.getElementById('crm-content');
+        const topBar = document.querySelector('.top-bar');
         
         // Hide login overlay immediately
         if (loginOverlay) {
@@ -362,6 +369,11 @@ class AuthManager {
         // Show CRM content
         if (crmContent) {
             crmContent.style.display = 'block';
+        }
+
+        // Fade in top bar with the rest of the CRM
+        if (topBar) {
+            topBar.classList.add('visible');
         }
         
         // Load CRM scripts lazily (only once)
