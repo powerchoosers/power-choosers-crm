@@ -4621,14 +4621,14 @@ body {
 .list-card:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-lg);
-    background: var(--bg-item) !important;
+    background: var(--bg-card-hover) !important;
 }
 
 .dashboard-card:hover::after,
 .stat-card:hover::after,
 .widget-card:hover::after,
 .list-card:hover::after {
-    opacity: 1; /* Brighten edge on hover */
+    opacity: 0.7; /* Slightly toned down from 1.0 */
 }
 .toast-container {
     position: fixed;
@@ -12327,8 +12327,8 @@ body {
 .news-item:hover,
 .lead-item:hover,
 .activity-item:hover {
-    background: var(--bg-secondary);
-    border-color: var(--accent-color);
+    background: rgba(255, 255, 255, 0.03); /* More subtle hover than var(--bg-secondary) */
+    border-color: rgba(255, 255, 255, 0.1);
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     position: relative;
