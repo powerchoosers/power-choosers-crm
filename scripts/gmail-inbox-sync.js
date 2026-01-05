@@ -104,7 +104,7 @@
       if (accessToken) {
         window._googleAccessToken = accessToken;
         try {
-          localStorage.setItem('google_access_token', accessToken);
+          localStorage.setItem('pc:googleAccessToken', accessToken);
         } catch (storageErr) {
           // Ignore storage errors
         }
@@ -422,10 +422,10 @@
       unread: message.labelIds?.includes('UNREAD') || false,
       
       // CRITICAL: Set ownership fields for Firestore rules compliance
-      // Fallback to admin if userEmail is empty
-      ownerId: (userEmail && userEmail.trim()) ? userEmail.toLowerCase().trim() : 'l.patterson@powerchoosers.com',
-      assignedTo: (userEmail && userEmail.trim()) ? userEmail.toLowerCase().trim() : 'l.patterson@powerchoosers.com',
-      createdBy: (userEmail && userEmail.trim()) ? userEmail.toLowerCase().trim() : 'l.patterson@powerchoosers.com',
+      // Use current user email
+      ownerId: userEmail.toLowerCase().trim(),
+      assignedTo: userEmail.toLowerCase().trim(),
+      createdBy: userEmail.toLowerCase().trim(),
       
       // Timestamps - CRITICAL: Use actual email date for sorting
       // 'date' and 'receivedAt' should be the actual email timestamp for proper chronological sorting
@@ -693,7 +693,57 @@
     };
   }
 
-  // Auto-sync disabled - functionality no longer needed
+  // Auto-sync: Trigger sync when user opens the emails page
+  function initAutoSync() {
+    console.log('[GmailSync] Initializing auto-sync check...');
+    
+    // Check if we're on a page that should trigger sync
+    const path = window.location.pathname.toLowerCase();
+    const isEmailsPage = path.includes('crm-dashboard') || 
+                         path.includes('emails') ||
+                         path === '/' ||
+                         path === '/index.html';
+    
+    console.log('[GmailSync] Path check:', { path, isEmailsPage });
+    
+    if (isEmailsPage) {
+      // Delay initial sync to let other modules load
+      console.log('[GmailSync] Scheduling auto-sync in 5s...');
+      setTimeout(async () => {
+        const available = isGmailSyncAvailable();
+        const user = firebase.auth().currentUser;
+        
+        console.log('[GmailSync] Auto-sync check:', { 
+          available, 
+          hasUser: !!user,
+          userEmail: user?.email,
+          providerData: user?.providerData?.map(p => p.providerId)
+        });
+
+        if (available) {
+          console.log('[GmailSync] Auto-sync triggered on page load');
+          const result = await syncGmailInbox({ maxMessages: 20 });
+          console.log('[GmailSync] Auto-sync result:', result);
+        } else {
+          console.warn('[GmailSync] Auto-sync skipped: Gmail sync not available for this user session');
+          
+          // If user is logged in but doesn't have Google provider, maybe they need to link?
+          if (user && !user.providerData.find(p => p.providerId === 'google.com')) {
+            console.log('[GmailSync] User is logged in but not via Google provider. Provider data:', user.providerData);
+          }
+        }
+      }, 5000);
+    } else {
+      console.log('[GmailSync] Not on a sync-triggering page');
+    }
+  }
+
+  // Initialize auto-sync if not already syncing
+  if (document.readyState === 'complete') {
+    initAutoSync();
+  } else {
+    window.addEventListener('load', initAutoSync);
+  }
 
   /**
    * Fetch and decode an attachment for display
@@ -778,10 +828,15 @@
     return est;
   }
 
-  // Export public API (minimal)
+  // Export public API
   window.GmailInboxSync = {
     isAvailable: isGmailSyncAvailable,
-    getStatus: getSyncStatus
+    getStatus: getSyncStatus,
+    sync: syncGmailInbox,
+    forceSync: forceSync,
+    backfill: backfill,
+    estimate: estimate,
+    getAttachment: getAttachment
   };
 })();
 

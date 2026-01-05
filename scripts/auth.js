@@ -102,7 +102,7 @@ class AuthManager {
         } catch(_) {}
             
             // Check domain restriction (case-insensitive)
-            const domainCheck = emailLower.endsWith('@powerchoosers.com');
+            const domainCheck = emailLower.endsWith('@powerchoosers.com') || emailLower.endsWith('@powerchoosrs.com');
             if (!domainCheck) {
                 console.warn('[Auth] ✗ Unauthorized domain:', user.email);
                 this.showError('Access restricted to Power Choosers employees (@powerchoosers.com)');
@@ -209,7 +209,7 @@ class AuthManager {
     
     async ensureAgentRecord(user, emailLower) {
         // Only create agent records for PowerChoosers domain users
-        if (!emailLower.endsWith('@powerchoosers.com')) {
+        if (!emailLower.endsWith('@powerchoosers.com') && !emailLower.endsWith('@powerchoosrs.com')) {
             return;
         }
         
@@ -280,13 +280,17 @@ class AuthManager {
             
             // Store Google access token for Gmail API access (client-side sync)
             if (result.credential && result.credential.accessToken) {
+                console.log('[Auth] Google access token received via popup');
                 window._googleAccessToken = result.credential.accessToken;
                 // Persist to localStorage so it survives page refreshes
                 try {
                     localStorage.setItem('pc:googleAccessToken', result.credential.accessToken);
+                    console.log('[Auth] Token persisted to localStorage');
                 } catch (storageErr) {
                     console.warn('[Auth] Could not persist token to localStorage:', storageErr);
                 }
+            } else {
+                console.warn('[Auth] No Google access token in sign-in result. Provider data:', result.user?.providerData?.map(p => p.providerId));
             }
             
             // Show success message

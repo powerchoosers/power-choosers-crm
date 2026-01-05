@@ -17,7 +17,19 @@
   function isCurrentUserAdmin() {
     if (window.currentUserRole === 'admin') return true;
     const email = getCurrentUserEmail();
-    return email === ADMIN_EMAIL;
+    if (!email) return false;
+    
+    // Explicitly check for known admin emails or role in localStorage
+    const admins = ['l.patterson@powerchoosers.com'];
+    if (admins.includes(email)) return true;
+    
+    // Check if role is persisted in localStorage
+    try {
+      const persistedRole = localStorage.getItem('pc:userRole');
+      if (persistedRole === 'admin') return true;
+    } catch (_) {}
+
+    return false;
   }
 
   // Add ownership fields to data object
@@ -53,15 +65,18 @@
 
     // If not admin, filter by ownership
     if (!isCurrentUserAdmin()) {
-      // Employee can see records where they are owner OR assignee
-      // Note: Firestore doesn't support OR queries easily, so we'll do two queries
+      // Employee can see records where they are owner OR assignee OR the record is unassigned
+      // Note: Firestore doesn't support OR queries easily across different fields with different values
+      // so we'll do three queries to be thorough
       const ownedQuery = query.where('ownerId', '==', userEmail);
       const assignedQuery = query.where('assignedTo', '==', userEmail);
+      const unassignedQuery = query.where('ownerId', '==', 'unassigned');
       
-      // Execute both queries
-      const [ownedSnapshot, assignedSnapshot] = await Promise.all([
+      // Execute all queries
+      const [ownedSnapshot, assignedSnapshot, unassignedSnapshot] = await Promise.all([
         ownedQuery.get(),
-        assignedQuery.get()
+        assignedQuery.get(),
+        unassignedQuery.get()
       ]);
       
       // Merge results and deduplicate
@@ -70,6 +85,11 @@
         resultsMap.set(doc.id, { id: doc.id, ...doc.data() });
       });
       assignedSnapshot.forEach(doc => {
+        if (!resultsMap.has(doc.id)) {
+          resultsMap.set(doc.id, { id: doc.id, ...doc.data() });
+        }
+      });
+      unassignedSnapshot.forEach(doc => {
         if (!resultsMap.has(doc.id)) {
           resultsMap.set(doc.id, { id: doc.id, ...doc.data() });
         }
