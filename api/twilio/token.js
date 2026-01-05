@@ -97,6 +97,14 @@ export default async function handler(req, res) {
       return;
     }
     
+    logger.debug('[TwilioAuth] Token generation request', { 
+      identity,
+      accountSid: accountSid.substring(0, 5) + '...',
+      apiKeySid: apiKeySid.substring(0, 5) + '...',
+      appSid: appSid.substring(0, 5) + '...',
+      timestamp: new Date().toISOString()
+    });
+
     // Create access token with explicit expiration (1 hour)
     const AccessToken = twilio.jwt.AccessToken;
     const VoiceGrant = AccessToken.VoiceGrant;

@@ -63,6 +63,8 @@ STYLE RULES:
 3. BULLET POINTS: Use for any list of 3+ items
 4. BOLD KEY STATS: Wrap important numbers in <strong> tags (e.g., "<strong>30% of your annual bill</strong>")
 5. NO GENERIC ADVICE: Instead of "Consider energy audits," say "Schedule an audit before March 31 to capture the ITC tax credit deadline"
+6. NO MARKDOWN: Output pure HTML. Do NOT use ## for headers (use <h2>/<h3>). Do NOT use ** for bold (use <strong>).
+7. NO CITATIONS: Do NOT include citations like [1], [2], etc. The content must be clean reading.
 
 EMOTIONAL TRIGGERS (Use at least ONE):
 - FEAR OF LOSS: "Missing this window means overpaying for 12 months"
@@ -499,6 +501,15 @@ function parseAIResponse(responseText) {
     const keywords = String(parsed.keywords || '').trim();
     let content = String(parsed.content || '').trim();
 
+    // Clean up content (remove Markdown artifacts and citations)
+    content = content
+      // Remove citations like [1], [2], [1, 2], [ 1 ]
+      .replace(/\[\s*\d+(?:,\s*\d+)*\s*\]/g, '')
+      // Convert Markdown headers to HTML if present
+      .replace(/^##\s+(.*$)/gm, '<h2>$1</h2>')
+      .replace(/^###\s+(.*$)/gm, '<h3>$1</h3>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
     // Ensure content includes resource funnel link (but don't force specific tools if not relevant)
     if (!content.includes('/resources') && !content.includes('Resources Page') && !content.includes('tdu-delivery-charges') && !content.includes('guide-2026')) {
       // Add generic resource funnel section if missing
@@ -681,18 +692,9 @@ export default async function handler(req, res) {
     // Parse response
     const generatedPost = parseAIResponse(responseText);
 
-    logger.log('[AI Post Generation] Successfully generated post:', {
-      title: generatedPost.title,
-      category: generatedPost.category,
-      contentLength: generatedPost.content.length
-    });
-
     // Return generated post
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      success: true,
-      post: generatedPost
-    }));
+    res.end(JSON.stringify(generatedPost));
 
   } catch (error) {
     logger.error('[AI Post Generation] Error:', error);

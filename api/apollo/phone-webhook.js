@@ -6,14 +6,13 @@
  */
 
 import { cors } from './_utils.js';
-import logger from '../_logger.js';
+import { db } from '../_firebase.js';
 
-// In-memory store for phone numbers (personId -> phone data)
-// In production, you'd want to use Redis or Firebase
-const phoneStore = new Map();
+// In-memory fallback (only for local dev without Firestore)
+const memoryStore = new Map();
 
-// Store phone data for 30 minutes before auto-cleanup
-const PHONE_DATA_TTL = 30 * 60 * 1000;
+// Store phone data for 30 minutes
+const PHONE_DATA_TTL_MS = 30 * 60 * 1000;
 
 export default async function handler(req, res) {
   // Handle CORS
@@ -27,23 +26,38 @@ export default async function handler(req, res) {
   }
 
   try {
-    logger.log('[Apollo Phone Webhook] 📞 Received webhook request');
-    logger.log('[Apollo Phone Webhook] Headers:', JSON.stringify(req.headers, null, 2));
-    logger.log('[Apollo Phone Webhook] Body:', JSON.stringify(req.body, null, 2));
-
     // Apollo sends the phone data in the request body
-    const phoneData = req.body;
+    let phoneData = req.body;
 
     if (!phoneData || !phoneData.person) {
-      logger.warn('[Apollo Phone Webhook] ⚠️ No person data in webhook payload');
+      // Check if the body itself is the person object (sometimes Apollo sends flattened structure)
+      if (phoneData && phoneData.id && (phoneData.phone_numbers || phoneData.email)) {
+        phoneData = { person: phoneData };
+      } else if (phoneData && phoneData.matches) {
+         // Handle potential matches array
+         if (phoneData.matches.length > 0) {
+            phoneData = { person: phoneData.matches[0] };
+         }
+      } else if (phoneData && phoneData.people && Array.isArray(phoneData.people)) {
+         // Handle people array (bulk enrichment format)
+         if (phoneData.people.length > 0) {
+            phoneData = { person: phoneData.people[0] };
+         }
+      } else {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid webhook payload - no person data' }));
+        return;
+      }
+    }
+
+    if (!phoneData.person) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Invalid webhook payload - no person data' }));
+      res.end(JSON.stringify({ error: 'Invalid webhook payload - structure found but empty' }));
       return;
     }
 
     const personId = phoneData.person.id;
     if (!personId) {
-      logger.warn('[Apollo Phone Webhook] ⚠️ No person ID in webhook payload');
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Invalid webhook payload - no person ID' }));
       return;
@@ -51,36 +65,36 @@ export default async function handler(req, res) {
 
     // Extract phone numbers
     const phones = phoneData.person.phone_numbers || [];
-    
-    logger.log(`[Apollo Phone Webhook] ✅ Storing ${phones.length} phone(s) for person: ${personId}`);
-    
-    // Store in memory with timestamp
-    phoneStore.set(personId, {
+
+    const payload = {
       personId,
       phones,
-      receivedAt: Date.now(),
-      expiresAt: Date.now() + PHONE_DATA_TTL
-    });
+      receivedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + PHONE_DATA_TTL_MS).toISOString()
+    };
 
-    // Schedule cleanup
-    setTimeout(() => {
-      if (phoneStore.has(personId)) {
-        logger.log(`[Apollo Phone Webhook] 🧹 Cleaning up expired phone data for: ${personId}`);
-        phoneStore.delete(personId);
+    // Store in Firestore (distributed state)
+    if (db) {
+      try {
+        await db.collection('apollo_phones').doc(personId).set(payload);
+      } catch (dbError) {
+        // Fallback to memory
+        memoryStore.set(personId, payload);
       }
-    }, PHONE_DATA_TTL);
+    } else {
+      // Fallback to memory for local dev
+      memoryStore.set(personId, payload);
+    }
 
     // Respond to Apollo
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       success: true, 
       message: 'Phone numbers received',
-      personId,
-      phoneCount: phones.length
+      personId
     }));
 
   } catch (error) {
-    logger.error('[Apollo Phone Webhook] ❌ Error processing webhook:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       error: 'Internal server error', 
@@ -89,41 +103,33 @@ export default async function handler(req, res) {
   }
 }
 
-// Export function to retrieve phone data
-export function getPhoneData(personId) {
-  const data = phoneStore.get(personId);
-  
-  if (!data) {
-    return null;
-  }
-
-  // Check if expired
-  if (Date.now() > data.expiresAt) {
-    phoneStore.delete(personId);
-    return null;
-  }
-
-  return data;
-}
-
-// Export function to check all stored phone data (for debugging)
-export function getAllPhoneData() {
-  const now = Date.now();
-  const active = [];
-  
-  phoneStore.forEach((data, personId) => {
-    if (now <= data.expiresAt) {
-      active.push(data);
-    } else {
-      phoneStore.delete(personId);
+// Export function to retrieve phone data (asynchronous)
+export async function getPhoneData(personId) {
+  // Try Firestore first
+  if (db) {
+    try {
+      const doc = await db.collection('apollo_phones').doc(personId).get();
+      if (doc.exists) {
+        const data = doc.data();
+        // Check expiry
+        if (new Date(data.expiresAt) > new Date()) {
+          return data;
+        } else {
+          // Optional: delete expired doc
+          db.collection('apollo_phones').doc(personId).delete().catch(() => {});
+          return null;
+        }
+      }
+    } catch (e) {
     }
-  });
+  }
+
+  // Fallback to memory store
+  const data = memoryStore.get(personId);
+  if (data && new Date(data.expiresAt) > new Date()) {
+    return data;
+  }
   
-  return active;
+  return null;
 }
-
-
-
-
-
 

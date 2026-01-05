@@ -25,7 +25,7 @@ export default async function handler(req, res) {
       unit: 'kWh'
     };
 
-    logger.log(`[TX Price] Returning pricing data${refresh ? ' (refreshed)' : ''}:`, texasPricingData);
+    // logger.log(`[TX Price] Returning pricing data${refresh ? ' (refreshed)' : ''}:`, texasPricingData);
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(texasPricingData));
