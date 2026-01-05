@@ -8,6 +8,7 @@ import logger from './_logger.js';
 import { GmailService } from './email/gmail-service.js';
 
 const ADMIN_EMAIL = 'l.patterson@powerchoosers.com';
+const DEFAULT_OWNER = 'unassigned';
 
 export default async function handler(req, res) {
   // Handle CORS
@@ -94,7 +95,9 @@ export default async function handler(req, res) {
         email: emailLower,
         workDirectPhone: phoneTrimmed,
         company: companyNameTrimmed,
-        ownerId: ADMIN_EMAIL,
+        ownerId: DEFAULT_OWNER,
+        assignedTo: DEFAULT_OWNER,
+        createdBy: DEFAULT_OWNER,
         createdAt: serverTimestamp,
         timestamp: serverTimestamp
       };
@@ -112,7 +115,9 @@ export default async function handler(req, res) {
     if (accountsSnapshot.empty) {
       const newAccount = {
         name: companyNameTrimmed,
-        ownerId: ADMIN_EMAIL,
+        ownerId: DEFAULT_OWNER,
+        assignedTo: DEFAULT_OWNER,
+        createdBy: DEFAULT_OWNER,
         createdAt: serverTimestamp,
         timestamp: serverTimestamp
       };
@@ -140,7 +145,9 @@ export default async function handler(req, res) {
       account: companyNameTrimmed,
       status: 'pending',
       notes: taskNotes,
-      ownerId: ADMIN_EMAIL,
+      ownerId: DEFAULT_OWNER,
+      assignedTo: DEFAULT_OWNER,
+      createdBy: DEFAULT_OWNER,
       createdAt: serverTimestamp,
       timestamp: serverTimestamp
     };

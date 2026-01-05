@@ -187,10 +187,10 @@ export default async function handler(req, res) {
                 aiPrompt: nextStep.emailSettings?.aiPrompt || nextStep.data?.aiPrompt || nextStep.aiPrompt || 'Write a professional email',
                 aiMode: defaultAiMode,
                 // CRITICAL: Set ownership fields for Firestore rules compliance
-                // Fallback to admin if task.ownerId not provided
-                ownerId: (task.ownerId || 'l.patterson@powerchoosers.com').toLowerCase().trim(),
-                assignedTo: (task.assignedTo || task.ownerId || 'l.patterson@powerchoosers.com').toLowerCase().trim(),
-                createdBy: (task.ownerId || 'l.patterson@powerchoosers.com').toLowerCase().trim(),
+                // Fallback to unassigned if task.ownerId not provided
+                ownerId: (task.ownerId || 'unassigned').toLowerCase().trim(),
+                assignedTo: (task.assignedTo || task.ownerId || 'unassigned').toLowerCase().trim(),
+                createdBy: (task.ownerId || 'unassigned').toLowerCase().trim(),
                 createdAt: admin.firestore.FieldValue.serverTimestamp()
             };
 
@@ -253,10 +253,10 @@ export default async function handler(req, res) {
                 isSequenceTask: true,
                 notes: nextStep.data?.note || '',
                 // CRITICAL: Set ownership fields for Firestore rules compliance
-                // Fallback to admin if task.ownerId not provided
-                ownerId: (task.ownerId || 'l.patterson@powerchoosers.com').toLowerCase().trim(),
-                assignedTo: (task.assignedTo || task.ownerId || 'l.patterson@powerchoosers.com').toLowerCase().trim(),
-                createdBy: (task.ownerId || 'l.patterson@powerchoosers.com').toLowerCase().trim(),
+                // Fallback to unassigned if task.ownerId not provided
+                ownerId: (task.ownerId || 'unassigned').toLowerCase().trim(),
+                assignedTo: (task.assignedTo || task.ownerId || 'unassigned').toLowerCase().trim(),
+                createdBy: (task.ownerId || 'unassigned').toLowerCase().trim(),
                 createdAt: admin.firestore.FieldValue.serverTimestamp()
             };
 

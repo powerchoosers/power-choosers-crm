@@ -313,10 +313,10 @@ export default async function handler(req, res) {
                 isSequenceTask: true,
                 notes: nextTaskStep.data?.note || '',
                 // CRITICAL: Set ownership fields for Firestore rules compliance
-                // Fallback to admin if member.ownerId not provided
-                ownerId: (member.ownerId || 'l.patterson@powerchoosers.com').toLowerCase().trim(),
-                assignedTo: (member.ownerId || 'l.patterson@powerchoosers.com').toLowerCase().trim(),
-                createdBy: (member.ownerId || 'l.patterson@powerchoosers.com').toLowerCase().trim(),
+                // Fallback to unassigned if member.ownerId not provided
+                ownerId: (member.ownerId || 'unassigned').toLowerCase().trim(),
+                assignedTo: (member.ownerId || 'unassigned').toLowerCase().trim(),
+                createdBy: (member.ownerId || 'unassigned').toLowerCase().trim(),
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 timestamp: admin.firestore.FieldValue.serverTimestamp(), // CRITICAL: Required for orderBy query in BackgroundTasksLoader
                 backfilled: true // Mark as backfilled for tracking

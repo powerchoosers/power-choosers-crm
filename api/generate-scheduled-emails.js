@@ -1757,9 +1757,9 @@ export default async function handler(req, res) {
               lastGenerationAttempt: Date.now(),
               generationFailureReason: `${reason} (failed ${attempts} times)`,
               generationAttempts: attempts,
-              ownerId: emailData.ownerId || 'l.patterson@powerchoosers.com',
-              assignedTo: emailData.assignedTo || emailData.ownerId || 'l.patterson@powerchoosers.com',
-              createdBy: emailData.createdBy || emailData.ownerId || 'l.patterson@powerchoosers.com'
+              ownerId: emailData.ownerId || null,
+              assignedTo: emailData.assignedTo || emailData.ownerId || null,
+              createdBy: emailData.createdBy || emailData.ownerId || 'system'
             });
             
             errors.push({
@@ -1773,9 +1773,9 @@ export default async function handler(req, res) {
               lastGenerationAttempt: Date.now(),
               generationFailureReason: reason,
               generationAttempts: attempts,
-              ownerId: emailData.ownerId || 'l.patterson@powerchoosers.com',
-              assignedTo: emailData.assignedTo || emailData.ownerId || 'l.patterson@powerchoosers.com',
-              createdBy: emailData.createdBy || emailData.ownerId || 'l.patterson@powerchoosers.com'
+              ownerId: emailData.ownerId || null,
+              assignedTo: emailData.assignedTo || emailData.ownerId || null,
+              createdBy: emailData.createdBy || emailData.ownerId || 'system'
             });
             
             errors.push({
@@ -2441,9 +2441,9 @@ export default async function handler(req, res) {
         
         // CRITICAL: Ensure ownership fields are set for Firestore rules compliance
         // If missing, set to admin fallback (should not happen, but safety check)
-        updateData.ownerId = emailData.ownerId || 'l.patterson@powerchoosers.com';
-        updateData.assignedTo = emailData.assignedTo || emailData.ownerId || 'l.patterson@powerchoosers.com';
-        updateData.createdBy = emailData.createdBy || emailData.ownerId || 'l.patterson@powerchoosers.com';
+        updateData.ownerId = emailData.ownerId || null;
+        updateData.assignedTo = emailData.assignedTo || emailData.ownerId || null;
+        updateData.createdBy = emailData.createdBy || emailData.ownerId || 'system';
         
         await emailDoc.ref.update(updateData);
         
