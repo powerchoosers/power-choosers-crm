@@ -762,7 +762,7 @@ class SettingsPage {
                     }
                 } catch (_) { }
                 const email = getCurrentUserEmail();
-                return window.currentUserRole === 'admin' || email === 'l.patterson@powerchoosers.com';
+                return window.currentUserRole === 'admin';
             };
 
             const email = getCurrentUserEmail();

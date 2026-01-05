@@ -2674,7 +2674,12 @@
       // Get sender details from settings
       const settings = (window.SettingsPage?.getSettings?.()) || {};
       const g = settings?.general || {};
-      const senderEmail = g.email || 'l.patterson@powerchoosers.com';
+      const senderEmail = g.email || window.currentUserEmail || firebase.auth().currentUser?.email;
+      
+      if (!senderEmail) {
+        throw new Error('Could not determine sender email. Please ensure you are logged in or check your settings.');
+      }
+
       const senderName = (g.firstName && g.lastName)
         ? `${g.firstName} ${g.lastName}`.trim()
         : (g.agentName || 'Power Choosers Team');

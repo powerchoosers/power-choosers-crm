@@ -299,7 +299,7 @@
                 return email.toLowerCase().trim();
               }
             }
-            return 'l.patterson@powerchoosers.com';
+            return window.currentUserEmail || firebase.auth().currentUser?.email || 'l.patterson@powerchoosers.com';
           };
           const userEmail = getUserEmail();
 
