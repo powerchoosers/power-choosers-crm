@@ -33,6 +33,8 @@ window.SharedCIProcessor = (function() {
             return false;
         }
 
+        console.log(`[SharedCI:${context}] Processing call:`, { callSid, recordingSid });
+
         try {
             // Set loading state
             btn.innerHTML = svgSpinner();
@@ -105,6 +107,7 @@ window.SharedCIProcessor = (function() {
             }
 
             const result = await response.json();
+            console.log(`[SharedCI:${context}] CI processing initiated:`, result);
 
             // Update button to show processing state
             btn.innerHTML = svgSpinner();
@@ -118,6 +121,7 @@ window.SharedCIProcessor = (function() {
                 
                 // If transcript already existed and is completed, trigger immediate poll to get results
                 if (result.existing && result.status === 'completed') {
+                    console.log(`[SharedCI:${context}] Existing completed transcript found, fetching results immediately`);
                     
                     // Immediately trigger poll to get results
                     try {
@@ -201,6 +205,7 @@ window.SharedCIProcessor = (function() {
         };
 
         const finalizeReady = (call) => {
+            console.log(`[SharedCI:${context}] Processing complete for:`, callSid);
 
             // Reset button to ready state
             btn.innerHTML = svgEye();
@@ -304,6 +309,8 @@ window.SharedCIProcessor = (function() {
                         callSid: callSid 
                     })
                 }).catch(() => {}); // Fire and forget
+                
+                console.log(`[SharedCI:${context}] Background processing triggered for transcript:`, transcriptSid);
             } else {
                 // Fallback to callSid only (poll-ci-analysis will need to resolve transcriptSid)
             await fetch(`${base}/api/twilio/poll-ci-analysis`, {
@@ -311,6 +318,8 @@ window.SharedCIProcessor = (function() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ callSid })
                 }).catch(() => {});
+            
+                console.log(`[SharedCI:${context}] Background processing triggered for call:`, callSid);
             }
         } catch (error) {
             console.warn(`[SharedCI:${context}] Background trigger failed:`, error);

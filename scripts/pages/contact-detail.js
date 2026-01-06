@@ -110,7 +110,7 @@
       if (editBtn && editBtn.dataset.action === 'edit-contact' && document.getElementById('contact-detail-header') && !document.getElementById('account-details-page')) {
         e.preventDefault();
         e.stopPropagation();
-        // console.log('[ContactDetail] Edit contact button clicked via delegation');
+        console.log('[ContactDetail] Edit contact button clicked via delegation');
         openEditContactModal();
         return;
       }
@@ -231,17 +231,18 @@
 
   // Save service addresses array to linked account from contact detail
   async function saveAccountServiceAddresses(addresses) {
-    // console.log('[Contact Detail] saveAccountServiceAddresses called:', { addresses });
+    console.log('[Contact Detail] saveAccountServiceAddresses called:', { addresses });
     const db = window.firebaseDB;
     const accountId = state._linkedAccountId;
-    // console.log('[Contact Detail] Linked account ID:', accountId);
+    console.log('[Contact Detail] Linked account ID:', accountId);
+
     if (!accountId) {
-      // console.log('[Contact Detail] No linked account ID found');
+      console.log('[Contact Detail] No linked account ID found');
       return;
     }
 
     const payload = { serviceAddresses: addresses, updatedAt: Date.now() };
-    // console.log('[Contact Detail] Payload to save:', payload);
+    console.log('[Contact Detail] Payload to save:', payload);
 
     // Update local cache if we have it
     try {
@@ -253,13 +254,13 @@
             accounts[idx].serviceAddresses = addresses;
             accounts[idx].updatedAt = new Date();
           } catch (_) { }
-          // console.log('[Contact Detail] Updated local cache for account service addresses:', accountId);
+          console.log('[Contact Detail] Updated local cache for account service addresses:', accountId);
         }
       }
     } catch (_) { }
 
     if (!db) {
-      // console.log('[Contact Detail] No database, dispatching service-addresses-updated event');
+      console.log('[Contact Detail] No database, dispatching service-addresses-updated event');
       try { document.dispatchEvent(new CustomEvent('pc:service-addresses-updated', { detail: { entity: 'account', id: accountId, addresses } })); } catch (_) { }
       return;
     }
@@ -267,7 +268,7 @@
     try {
       await db.collection('accounts').doc(accountId).update(payload);
       window.crm?.showToast && window.crm.showToast('Saved');
-      // console.log('[Contact Detail] Dispatching service-addresses-updated event:', { entity: 'account', id: accountId, addresses });
+      console.log('[Contact Detail] Dispatching service-addresses-updated event:', { entity: 'account', id: accountId, addresses });
       try {
         const event = new CustomEvent('pc:service-addresses-updated', { detail: { entity: 'account', id: accountId, addresses } });
         document.dispatchEvent(event);
@@ -459,27 +460,25 @@
         right: 8px;
         top: calc(50% + 12px);
         transform: translateY(-50%) !important;
-        background: var(--bg-item);
-        border: 1px solid var(--border-light);
+        background: transparent;
+        border: none;
         color: var(--text-secondary);
         cursor: pointer;
         padding: 0;
-        border-radius: var(--border-radius);
-        transition: all 0.2s ease;
+        border-radius: 4px;
+        transition: color var(--transition-fast), background-color var(--transition-fast);
         z-index: 1;
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 24px;
-        height: 24px;
+        width: 20px;
+        height: 20px;
         line-height: 1;
         transform-origin: center center;
-        box-sizing: border-box;
       }
       .task-popover .calendar-toggle-btn:hover {
         color: var(--text-primary);
-        background: var(--bg-hover);
-        border-color: var(--accent-color);
+        background: transparent;
         top: calc(50% + 12px);
         transform: translateY(-50%) !important;
         box-shadow: none !important;
@@ -753,7 +752,7 @@
               linkedin: updates.linkedin,
               updatedAt: Date.now()
             });
-            // console.log('[EditContact] Updated account LinkedIn from contact');
+            console.log('[EditContact] Updated account LinkedIn from contact');
           } catch (err) {
             console.warn('[EditContact] Failed to update account LinkedIn:', err);
           }
@@ -771,7 +770,7 @@
             ...window._essentialContactsData[idx],
             ...updates
           };
-          // console.log('[ContactDetail] Updated essential data');
+          console.log('[ContactDetail] Updated essential data');
         }
       }
 
@@ -783,7 +782,7 @@
             if (idx >= 0) {
               contacts[idx] = { ...contacts[idx], ...updates };
               window.CacheManager.set('contacts', contacts);
-              // console.log('[ContactDetail] Updated cache');
+              console.log('[ContactDetail] Updated cache');
             }
           }
         }).catch(() => { });
@@ -824,7 +823,7 @@
             }
           } catch (_) { /* noop */ }
         }
-        // console.log('Widget: Notes for contact', contactId);
+        console.log('Widget: Notes for contact', contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Notes'); } catch (_) { }
         break;
       }
@@ -840,7 +839,7 @@
             }
           } catch (_) { /* noop */ }
         }
-        // console.log('Widget: Energy Health Check for contact', contactId);
+        console.log('Widget: Energy Health Check for contact', contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Energy Health Check'); } catch (_) { }
         break;
       }
@@ -856,7 +855,7 @@
             }
           } catch (_) { /* noop */ }
         }
-        // console.log('Widget: Deal Calculator for contact', contactId);
+        console.log('Widget: Deal Calculator for contact', contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Deal Calculator'); } catch (_) { }
         break;
       }
@@ -872,7 +871,7 @@
             }
           } catch (_) { /* noop */ }
         }
-        // console.log('Widget: Prospect for contact', contactId);
+        console.log('Widget: Prospect for contact', contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Prospect'); } catch (_) { }
         break;
       }
@@ -888,12 +887,12 @@
             }
           } catch (_) { /* noop */ }
         }
-        // console.log('Widget: Google Maps for contact', contactId);
+        console.log('Widget: Google Maps for contact', contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Google Maps'); } catch (_) { }
         break;
       }
       default:
-      // console.log('Unknown widget action:', which, 'for contact', contactId);
+        console.log('Unknown widget action:', which, 'for contact', contactId);
     }
   }
 
@@ -913,9 +912,9 @@
     const company = c.companyName || '';
 
     const nextBiz = getNextBusinessDayISO();
-    // console.log('nextBiz ISO string:', nextBiz);
+    console.log('nextBiz ISO string:', nextBiz);
     const nextBizDate = new Date(nextBiz + 'T00:00:00'); // Add time to avoid timezone issues
-    // console.log('nextBiz formatted for input:', `${(nextBizDate.getMonth() + 1).toString().padStart(2, '0')}/${nextBizDate.getDate().toString().padStart(2, '0')}/${nextBizDate.getFullYear()}`);
+    console.log('nextBiz formatted for input:', `${(nextBizDate.getMonth() + 1).toString().padStart(2, '0')}/${nextBizDate.getDate().toString().padStart(2, '0')}/${nextBizDate.getFullYear()}`);
 
     const currentTasksHtml = renderExistingTasksForContact(c.id, fullName);
 
@@ -1106,7 +1105,7 @@
         // Always allow backspace, delete, navigation keys, and space
         const alwaysAllowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab', 'Enter', 'Escape', ' ', 'Space', 'Spacebar'];
         if (alwaysAllowed.includes(e.key) || e.ctrlKey || e.metaKey) {
-          // try { console.log('[TimeInput] keydown allow', { key: e.key, reason: 'alwaysAllowed' }); } catch (_) { }
+          try { console.log('[TimeInput] keydown allow', { key: e.key, reason: 'alwaysAllowed' }); } catch (_) { }
           return; // Allow the event to proceed
         }
 
@@ -1116,11 +1115,11 @@
 
         // If the current value is a complete time format and user is trying to add characters at the end
         if (complete && cursorPos >= value.length) {
-          // try { console.log('[TimeInput] keydown block', { key: e.key, value, cursorPos, complete }); } catch (_) { }
+          try { console.log('[TimeInput] keydown block', { key: e.key, value, cursorPos, complete }); } catch (_) { }
           e.preventDefault();
           return false;
         }
-        // try { console.log('[TimeInput] keydown pass', { key: e.key, value, cursorPos, complete }); } catch (_) { }
+        try { console.log('[TimeInput] keydown pass', { key: e.key, value, cursorPos, complete }); } catch (_) { }
       });
 
       // Helper function to check if time format is complete
@@ -1344,21 +1343,21 @@
 
       // Scroll to the time/date form row when calendar opens
       setTimeout(() => {
-        // console.log('Attempting to scroll to form row...');
+        console.log('Attempting to scroll to form row...');
         const tpBody = pop.querySelector('.tp-body');
 
         // Find the Time/Due date form row by looking for the Time label
         const timeLabel = pop.querySelector('label:has(input[name="dueTime"])');
         const formRow = timeLabel ? timeLabel.closest('.form-row') : null;
 
-        // console.log('tpBody found:', !!tpBody);
-        // console.log('timeLabel found:', !!timeLabel);
-        // console.log('formRow found:', !!formRow);
+        console.log('tpBody found:', !!tpBody);
+        console.log('timeLabel found:', !!timeLabel);
+        console.log('formRow found:', !!formRow);
 
         if (tpBody && formRow) {
-          // console.log('Both elements found, attempting scroll...');
-          // console.log('tpBody scrollTop before:', tpBody.scrollTop);
-          // console.log('formRow offsetTop:', formRow.offsetTop);
+          console.log('Both elements found, attempting scroll...');
+          console.log('tpBody scrollTop before:', tpBody.scrollTop);
+          console.log('formRow offsetTop:', formRow.offsetTop);
 
           // Scroll to align the actual Time label top with the container top
           const anchorEl = timeLabel || formRow; // prefer the Time label; fallback to row
@@ -1369,20 +1368,20 @@
             const deltaTop = anchorRect.top - containerRect.top; // pixels from visible top
             const targetScrollTop = Math.max(0, tpBody.scrollTop + deltaTop - 0); // no padding
 
-            // console.log('containerRect.top:', containerRect.top);
-            // console.log('anchorRect.top:', anchorRect.top);
-            // console.log('deltaTop:', deltaTop);
-            // console.log('targetScrollTop:', targetScrollTop);
+            console.log('containerRect.top:', containerRect.top);
+            console.log('anchorRect.top:', anchorRect.top);
+            console.log('deltaTop:', deltaTop);
+            console.log('targetScrollTop:', targetScrollTop);
 
             tpBody.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
           } else {
-            // console.log('Anchor label not found, scrolling to top');
+            console.log('Anchor label not found, scrolling to top');
             tpBody.scrollTo({ top: 0, behavior: 'smooth' });
           }
 
-          // console.log('tpBody.scrollTo called');
+          console.log('tpBody.scrollTo called');
         } else {
-          // console.log('Missing elements - tpBody:', !!tpBody, 'formRow:', !!formRow);
+          console.log('Missing elements - tpBody:', !!tpBody, 'formRow:', !!formRow);
         }
       }, 300); // Increased delay to ensure calendar is fully rendered
     }
@@ -1671,7 +1670,7 @@
     const d = new Date();
     const dayOfWeek = d.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
 
-    // console.log('Current date:', d.toDateString(), 'Day of week:', dayOfWeek);
+    console.log('Current date:', d.toDateString(), 'Day of week:', dayOfWeek);
 
     // If today is Friday (5), next business day is Monday (+3 days)
     if (dayOfWeek === 5) {
@@ -1690,7 +1689,7 @@
       d.setDate(d.getDate() + 1);
     }
 
-    // console.log('Next business day:', d.toDateString());
+    console.log('Next business day:', d.toDateString());
     return d.toISOString().split('T')[0];
   }
 
@@ -1934,13 +1933,8 @@
     const accountDataPromise = findAssociatedAccount(contact);
     const companyPhonePromise = accountDataPromise.then(linkedAccount => getCompanyPhone(contact, linkedAccount));
 
+    // Store contact immediately
     state.currentContact = contact;
-    state._suppressAttachEvents = true;
-    state._preloadedAccount = null;
-    state._preloadedCompanyPhone = null;
-    state._linkedAccountId = null;
-
-    try { await renderContactDetail(); } catch (e) { console.error('Error in initial render:', e); }
 
     // Wait for account data to load
     const [linkedAccount, companyPhone] = await Promise.all([
@@ -1948,13 +1942,11 @@
       companyPhonePromise
     ]);
 
+    // Store pre-loaded data for render
     state._preloadedAccount = linkedAccount;
     state._preloadedCompanyPhone = companyPhone;
     state._linkedAccountId = linkedAccount?.id || null;
     state.currentContact = contact;
-
-    try { await renderContactDetail(); } catch (e) { console.error('Error in second render:', e); }
-    state._suppressAttachEvents = false;
 
     // Broadcast that contact detail is loaded so dependent widgets can rebind
     try { document.dispatchEvent(new CustomEvent('pc:contact-loaded', { detail: { id: contact.id } })); } catch (_) { }
@@ -2018,7 +2010,7 @@
     // Attach contact detail events after DOM is ready
     // Using requestAnimationFrame ensures DOM is painted before attaching events
     requestAnimationFrame(() => {
-      if (!state._suppressAttachEvents && !state._contactDetailEventsAttached && state.currentContact?.id) {
+      if (!state._contactDetailEventsAttached && state.currentContact?.id) {
         attachContactDetailEvents();
       }
     });
@@ -2155,7 +2147,7 @@
       const contactsData = window.BackgroundContactsLoader.getContactsData() || [];
       const found = contactsData.find(c => c.id === contactId);
       if (found) {
-        // console.log('[ContactDetail] ✓ Found contact in BackgroundContactsLoader cache:', found.name || found.firstName + ' ' + found.lastName);
+        console.log('[ContactDetail] ✓ Found contact in BackgroundContactsLoader cache:', found.name || found.firstName + ' ' + found.lastName);
         return found;
       }
     }
@@ -2318,7 +2310,7 @@
         const accountsData = window.BackgroundAccountsLoader.getAccountsData() || [];
         const found = accountsData.find(a => a.id === accountId);
         if (found) {
-          // console.log('[ContactDetail] ✓ Found linked account in BackgroundAccountsLoader cache:', found.name || found.accountName);
+          console.log('[ContactDetail] ✓ Found linked account in BackgroundAccountsLoader cache:', found.name || found.accountName);
           // Cache the result
           if (cacheKey) {
             state._accountCache = state._accountCache || {};
@@ -2363,7 +2355,7 @@
                 return accName === normalizedCompany;
               });
               if (found) {
-                // console.log('[ContactDetail] ✓ Found linked account in BackgroundAccountsLoader cache (by name):', found.name || found.accountName);
+                console.log('[ContactDetail] ✓ Found linked account in BackgroundAccountsLoader cache (by name):', found.name || found.accountName);
                 // Cache the result
                 if (cacheKey) {
                   if (!state._accountCache) state._accountCache = {};
@@ -2632,9 +2624,8 @@
               </button>
               <div id="widgets-drawer" class="widgets-drawer" role="menu" aria-label="Contact widgets">
                 <button type="button" class="widget-item" data-widget="lusha" title="Prospect" aria-label="Prospect">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  <svg width="16" height="16" viewBox="0 0 48 48" fill="currentColor" aria-hidden="true">
+                    <path d="M46.117,23.081l-0.995-0.04H45.12C34.243,22.613,25.387,13.757,24.959,2.88l-0.04-0.996	C24.9,1.39,24.494,1,24,1s-0.9,0.39-0.919,0.883l-0.04,0.996c-0.429,10.877-9.285,19.733-20.163,20.162l-0.995,0.04	C1.39,23.1,1,23.506,1,24s0.39,0.9,0.884,0.919l0.995,0.039c10.877,0.43,19.733,9.286,20.162,20.163l0.04,0.996	C23.1,46.61,23.506,47,24,47s0.9-0.39,0.919-0.883l0.04-0.996c0.429-10.877,9.285-19.733,20.162-20.163l0.995-0.039	C46.61,24.9,47,24.494,47,24S46.61,23.1,46.117,23.081z"/>
                   </svg>
                 </button>
                 <button type="button" class="widget-item" data-widget="maps" title="Google Maps" aria-label="Google Maps">
@@ -2656,11 +2647,8 @@
                 </button>
                 <button type="button" class="widget-item" data-widget="notes" title="Notes" aria-label="Notes">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14,2 14,8 20,8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                    <polyline points="10,9 9,9 8,9"></polyline>
+                    <path d="M4 4h12a2 2 0 0 1 2 2v14l-4 4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>
+                    <path d="M14 20v-4a2 2 0 0 1 2-2h4"/>
                   </svg>
                 </button>
               </div>
@@ -2794,7 +2782,7 @@
     if (els.mainContent && bodyEl) {
       els.mainContent.prepend(bodyEl);
     }
-    if (!state._suppressAttachEvents) attachContactDetailEvents();
+    attachContactDetailEvents();
     // Delegate insights button clicks to ensure it works across rerenders
     try {
       const rcList = document.getElementById('contact-recent-calls-list');
@@ -2875,19 +2863,11 @@
     return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
   }
 
-  async function loadContactActivities() {
-    const peoplePage = document.getElementById('people-page');
-    const containerId = 'contact-activity-timeline';
-
-    // H1 Fix: Wait a moment for navigateToPage to finish adding .active class
-    // Increased to 500ms to handle "Back" button navigation transitions
-    await new Promise(resolve => setTimeout(resolve, 500));
-
+  function loadContactActivities() {
     if (!window.ActivityManager || !state.currentContact) return;
 
     const contactId = state.currentContact.id;
-    // Pass forceRefresh=true to bypass visibility checks during navigation
-    window.ActivityManager.renderActivities(containerId, 'contact', contactId, true);
+    window.ActivityManager.renderActivities('contact-activity-timeline', 'contact', contactId);
 
     // Setup pagination
     setupContactActivityPagination(contactId);
@@ -2906,7 +2886,7 @@
       document.addEventListener('pc:call-logged', (event) => {
         const callData = event.detail;
         if (callData && callData.contactId === state.currentContact?.id) {
-          // console.log('[ContactDetail] Call logged for this contact, refreshing activities');
+          console.log('[ContactDetail] Call logged for this contact, refreshing activities');
 
           // Immediately refresh recent calls section
           if (window.ActivityManager && typeof window.ActivityManager.renderActivities === 'function') {
@@ -2926,7 +2906,7 @@
       // Listen for call insights ready (after transcript processing completes)
       document.addEventListener('pc:call-insights-ready', (event) => {
         const { callSid, call } = event.detail || {};
-        // console.log('[ContactDetail] Call insights ready:', callSid);
+        console.log('[ContactDetail] Call insights ready:', callSid);
 
         // Update the call in our local cache
         if (Array.isArray(state._rcCalls) && callSid) {
@@ -3152,7 +3132,7 @@
   // Handle company phone clicks with strict company-mode flow (AI-suggested approach)
   function handleCompanyPhoneClick(phoneElement, contact) {
     try {
-      // console.log('[Contact Detail] Company phone clicked, setting strict company-mode context');
+      console.log('[Contact Detail] Company phone clicked, setting strict company-mode context');
 
       // Build account context from contact's associated account (AI-suggested approach)
       const accountId = contact.accountId || contact.account_id;
@@ -3251,39 +3231,39 @@
       };
 
       // Debug logging to see what context is being set
-      // // console.log('[Contact Detail] Resolved account data:', {
-      //   accountId: accountId,
-      //   accountName: accountName,
-      //   resolvedAccount: resolvedAccount,
-      //   resolvedDomain: resolvedDomain,
-      //   contactData: {
-      //     city: contact.city,
-      //     state: contact.state,
-      //     locationCity: contact.locationCity,
-      //     locationState: contact.locationState
-      //   },
-      //   finalContext: contextPayload
-      // });
+      console.log('[Contact Detail] Resolved account data:', {
+        accountId: accountId,
+        accountName: accountName,
+        resolvedAccount: resolvedAccount,
+        resolvedDomain: resolvedDomain,
+        contactData: {
+          city: contact.city,
+          state: contact.state,
+          locationCity: contact.locationCity,
+          locationState: contact.locationState
+        },
+        finalContext: contextPayload
+      });
 
       // Additional debug: log all available account fields if we found an account
       if (resolvedAccount) {
-        // // console.log('[Contact Detail] Account fields available:', {
-        //   id: resolvedAccount.id,
-        //   accountName: resolvedAccount.accountName,
-        //   name: resolvedAccount.name,
-        //   companyName: resolvedAccount.companyName,
-        //   city: resolvedAccount.city,
-        //   locationCity: resolvedAccount.locationCity,
-        //   state: resolvedAccount.state,
-        //   locationState: resolvedAccount.locationState,
-        //   website: resolvedAccount.website,
-        //   domain: resolvedAccount.domain,
-        //   logoUrl: resolvedAccount.logoUrl,
-        //   allFields: Object.keys(resolvedAccount)
-        // });
+        console.log('[Contact Detail] Account fields available:', {
+          id: resolvedAccount.id,
+          accountName: resolvedAccount.accountName,
+          name: resolvedAccount.name,
+          companyName: resolvedAccount.companyName,
+          city: resolvedAccount.city,
+          locationCity: resolvedAccount.locationCity,
+          state: resolvedAccount.state,
+          locationState: resolvedAccount.locationState,
+          website: resolvedAccount.website,
+          domain: resolvedAccount.domain,
+          logoUrl: resolvedAccount.logoUrl,
+          allFields: Object.keys(resolvedAccount)
+        });
       }
 
-      // console.log('[Contact Detail] Setting company phone context:', contextPayload);
+      console.log('[Contact Detail] Setting company phone context:', contextPayload);
       window.Widgets.setCallContext(contextPayload);
 
       // Mark that we've set a specific context to prevent generic click-to-call from overriding
@@ -3301,7 +3281,7 @@
   // Handle contact phone clicks with proper contact context
   function handleContactPhoneClick(phoneElement, contact) {
     try {
-      // console.log('[Contact Detail] Contact phone clicked, setting contact context');
+      console.log('[Contact Detail] Contact phone clicked, setting contact context');
 
       // Get the phone type from the data attribute
       const phoneType = phoneElement.closest('.info-row')?.getAttribute('data-phone-type') || 'mobile';
@@ -3519,7 +3499,7 @@
               if (accountObj) {
                 try {
                   window._prefetchedAccountForDetail = accountObj;
-                  // console.log('[ContactDetail] Prefetched account for return navigation:', accountObj.name || accountObj.accountName);
+                  console.log('[ContactDetail] Prefetched account for return navigation:', accountObj.name || accountObj.accountName);
                 } catch (_) { }
               }
 
@@ -3562,7 +3542,7 @@
                   document.dispatchEvent(new CustomEvent('pc:task-detail-restore', {
                     detail: window.__taskDetailRestoreData
                   }));
-                  // console.log('[ContactDetail] Dispatched task-detail restore event');
+                  console.log('[ContactDetail] Dispatched task-detail restore event');
                   window.__taskDetailRestoreData = null;
                 }
               } catch (_) { }
@@ -3627,7 +3607,7 @@
                       }
                     });
                     document.dispatchEvent(ev);
-                    // console.log('[ContactDetail] Dispatched pc:list-detail-restore event (ready) after', attempts, 'attempts');
+                    console.log('[ContactDetail] Dispatched pc:list-detail-restore event (ready) after', attempts, 'attempts');
                     return;
                   }
                 } catch (_) { }
@@ -3790,7 +3770,7 @@
                       if (returnData.sequenceMembersCache) {
                         window.SequenceBuilder.state.sequenceMembersCache = returnData.sequenceMembersCache;
                       }
-                      // console.log(`[ContactDetail] Restored pagination state: page=${page}, loaded=${returnData.stepsLoadedMembers?.length || 0}`);
+                      console.log(`[ContactDetail] Restored pagination state: page=${page}, loaded=${returnData.stepsLoadedMembers?.length || 0}`);
                     }
 
                     // Show the sequence with preserved state
@@ -3841,7 +3821,7 @@
                           }
                         }
 
-                        // console.log(`[ContactDetail] Restored scroll: pageY=${savedScrollY}, tableScroll=${savedTableScroll}`);
+                        console.log(`[ContactDetail] Restored scroll: pageY=${savedScrollY}, tableScroll=${savedTableScroll}`);
                       });
                     }, 300);
 
@@ -3920,24 +3900,24 @@
               if (window.peopleModule) {
                 // Ensure data is loaded before filtering
                 const peopleState = window.peopleModule.state || {};
-                // console.log('[ContactDetail] People state check:', {
-                //   loaded: peopleState.loaded,
-                //   dataLength: peopleState.data?.length || 0
-                // });
+                console.log('[ContactDetail] People state check:', {
+                  loaded: peopleState.loaded,
+                  dataLength: peopleState.data?.length || 0
+                });
 
                 // Check if data is actually loaded (not just the flag)
                 if (!peopleState.data || peopleState.data.length === 0) {
-                  // console.log('[ContactDetail] People data empty, forcing reload');
+                  console.log('[ContactDetail] People data empty, forcing reload');
 
                   // Reset loaded flag if data is empty
                   if (peopleState.loaded) {
-                    // console.log('[ContactDetail] Resetting loaded flag');
+                    console.log('[ContactDetail] Resetting loaded flag');
                     peopleState.loaded = false;
                   }
 
                   if (typeof window.peopleModule.loadDataOnce === 'function') {
                     window.peopleModule.loadDataOnce().then(() => {
-                      // console.log('[ContactDetail] People data reloaded');
+                      console.log('[ContactDetail] People data reloaded');
                       if (typeof window.peopleModule.applyFilters === 'function') {
                         window.peopleModule.applyFilters();
                       }
@@ -3952,7 +3932,7 @@
                   // Data exists, just filter and rebind
                   if (typeof window.peopleModule.applyFilters === 'function') {
                     try {
-                      // console.log('[ContactDetail] Forcing people table re-render');
+                      console.log('[ContactDetail] Forcing people table re-render');
                       window.peopleModule.applyFilters();
                     } catch (e) {
                       console.error('[ContactDetail] Failed to re-render people table:', e);
@@ -4001,24 +3981,24 @@
         if (window.peopleModule) {
           // Ensure data is loaded before filtering
           const peopleState = window.peopleModule.state || {};
-          // console.log('[ContactDetail] People state check (default):', {
-          //   loaded: peopleState.loaded,
-          //   dataLength: peopleState.data?.length || 0
-          // });
+          console.log('[ContactDetail] People state check (default):', {
+            loaded: peopleState.loaded,
+            dataLength: peopleState.data?.length || 0
+          });
 
           // Check if data is actually loaded (not just the flag)
           if (!peopleState.data || peopleState.data.length === 0) {
-            // console.log('[ContactDetail] People data empty, forcing reload');
+            console.log('[ContactDetail] People data empty, forcing reload');
 
             // Reset loaded flag if data is empty
             if (peopleState.loaded) {
-              // console.log('[ContactDetail] Resetting loaded flag');
+              console.log('[ContactDetail] Resetting loaded flag');
               peopleState.loaded = false;
             }
 
             if (typeof window.peopleModule.loadDataOnce === 'function') {
               window.peopleModule.loadDataOnce().then(() => {
-                // console.log('[ContactDetail] People data reloaded');
+                console.log('[ContactDetail] People data reloaded');
                 if (typeof window.peopleModule.applyFilters === 'function') {
                   window.peopleModule.applyFilters();
                 }
@@ -4033,7 +4013,7 @@
             // Data exists, just filter and rebind
             if (typeof window.peopleModule.applyFilters === 'function') {
               try {
-                // console.log('[ContactDetail] Forcing people table re-render');
+                console.log('[ContactDetail] Forcing people table re-render');
                 window.peopleModule.applyFilters();
               } catch (e) {
                 console.error('[ContactDetail] Failed to re-render people table:', e);
@@ -4083,10 +4063,6 @@
         // If focus moves outside the wrap, start close timer
         if (!widgetsWrap.contains(e.relatedTarget)) closeSoon();
       });
-
-      try {
-        if (widgetsBtn.matches(':hover') || widgetsWrap.matches(':hover')) openNow();
-      } catch (_) { }
     }
 
     // Widget drawer item clicks
@@ -4433,12 +4409,12 @@
 
     // Add supplier suggestions for electricity supplier field
     if (field === 'electricitySupplier') {
-      // console.log('[Contact Detail] Adding supplier suggestions for field:', field);
-      // console.log('[Contact Detail] window.addSupplierSuggestions available:', !!window.addSupplierSuggestions);
-      // console.log('[Contact Detail] window.SupplierNames available:', !!window.SupplierNames, 'count:', window.SupplierNames?.length);
+      console.log('[Contact Detail] Adding supplier suggestions for field:', field);
+      console.log('[Contact Detail] window.addSupplierSuggestions available:', !!window.addSupplierSuggestions);
+      console.log('[Contact Detail] window.SupplierNames available:', !!window.SupplierNames, 'count:', window.SupplierNames?.length);
       if (window.addSupplierSuggestions) {
         window.addSupplierSuggestions(input, 'contact-supplier-list');
-        // console.log('[Contact Detail] Supplier suggestions added to input');
+        console.log('[Contact Detail] Supplier suggestions added to input');
       } else {
         console.warn('[Contact Detail] window.addSupplierSuggestions not available');
       }
@@ -4533,12 +4509,12 @@
 
     // Add supplier suggestions for electricity supplier field
     if (field === 'electricitySupplier') {
-      // console.log('[Contact Detail] Adding supplier suggestions for account field:', field);
-      // console.log('[Contact Detail] window.addSupplierSuggestions available:', !!window.addSupplierSuggestions);
-      // console.log('[Contact Detail] window.SupplierNames available:', !!window.SupplierNames, 'count:', window.SupplierNames?.length);
+      console.log('[Contact Detail] Adding supplier suggestions for account field:', field);
+      console.log('[Contact Detail] window.addSupplierSuggestions available:', !!window.addSupplierSuggestions);
+      console.log('[Contact Detail] window.SupplierNames available:', !!window.SupplierNames, 'count:', window.SupplierNames?.length);
       if (window.addSupplierSuggestions) {
         window.addSupplierSuggestions(input, 'contact-account-supplier-list');
-        // console.log('[Contact Detail] Supplier suggestions added to account field input');
+        console.log('[Contact Detail] Supplier suggestions added to account field input');
       } else {
         console.warn('[Contact Detail] window.addSupplierSuggestions not available for account field');
       }
@@ -4591,8 +4567,8 @@
       // Notify other components (Health widget) to sync
       try {
         const eventDetail = { entity: 'account', id: state._linkedAccountId, field, value: val };
-        // console.log('[Contact Detail] Dispatching energy-updated event from commit:', eventDetail);
-        // console.log('[Contact Detail] Event detail for supplier field:', { field, value: val, entity: 'account', id: state._linkedAccountId });
+        console.log('[Contact Detail] Dispatching energy-updated event from commit:', eventDetail);
+        console.log('[Contact Detail] Event detail for supplier field:', { field, value: val, entity: 'account', id: state._linkedAccountId });
         document.dispatchEvent(new CustomEvent('pc:energy-updated', { detail: eventDetail }));
       } catch (e) {
         console.error('[Contact Detail] Error dispatching energy-updated event:', e);
@@ -4726,7 +4702,7 @@
       phoneOptions.push({ type: 'mobile', value: '', field: 'mobile' });
     }
 
-    // console.log('[Contact Detail] Phone options created:', phoneOptions);
+    console.log('[Contact Detail] Phone options created:', phoneOptions);
 
     wrap.classList.add('editing');
 
@@ -4748,7 +4724,7 @@
     dropdown.style.marginTop = '4px';
     dropdown.style.maxHeight = '200px';
     dropdown.style.overflowY = 'auto';
-    // console.log('[Contact Detail] Created phone dropdown with', phoneOptions.length, 'options');
+    console.log('[Contact Detail] Created phone dropdown with', phoneOptions.length, 'options');
 
     phoneOptions.forEach((option, index) => {
       const item = document.createElement('div');
@@ -4778,10 +4754,10 @@
         <span class="phone-number" style="font-size: 0.9rem; color: ${index === 0 ? 'rgba(255, 255, 255, 0.9)' : 'var(--text-secondary)'};">${escapeHtml(displayText)}</span>
       `;
 
-      // console.log('[Contact Detail] Created dropdown item:', option.type, option.value);
+      console.log('[Contact Detail] Created dropdown item:', option.type, option.value);
 
       item.addEventListener('click', () => {
-        // console.log('[Contact Detail] Phone dropdown item clicked:', option);
+        console.log('[Contact Detail] Phone dropdown item clicked:', option);
 
         // Remove selected class from all items
         dropdown.querySelectorAll('.phone-dropdown-item').forEach(el => {
@@ -4801,11 +4777,11 @@
           input.value = option.value;
           input.dataset.selectedType = option.type;
           input.dataset.selectedField = option.field;
-          // // console.log('[Contact Detail] Input updated:', {
-          //   value: input.value,
-          //   selectedType: input.dataset.selectedType,
-          //   selectedField: input.dataset.selectedField
-          // });
+          console.log('[Contact Detail] Input updated:', {
+            value: input.value,
+            selectedType: input.dataset.selectedType,
+            selectedField: input.dataset.selectedField
+          });
         }
 
         // Update the field label to show visual confirmation
@@ -4821,7 +4797,7 @@
           };
           const newLabel = typeLabels[option.type] || 'PHONE';
           fieldLabel.textContent = newLabel;
-          // console.log('[Contact Detail] Field label updated to:', newLabel);
+          console.log('[Contact Detail] Field label updated to:', newLabel);
         }
       });
 
@@ -4872,7 +4848,7 @@
     inputWrap.appendChild(input);
     inputWrap.appendChild(helperText);
     inputWrap.appendChild(dropdown);
-    // console.log('[Contact Detail] Created input wrapper and appended dropdown');
+    console.log('[Contact Detail] Created input wrapper and appended dropdown');
 
     // Create actions
     const actions = wrap.querySelector('.info-actions');
@@ -4911,13 +4887,11 @@
 
     input.addEventListener('keydown', onKey);
     saveBtn.addEventListener('click', async () => {
-      /*
-      // console.log('[Contact Detail] Save button clicked with:', {
+      console.log('[Contact Detail] Save button clicked with:', {
         value: input.value,
         selectedField: input.dataset.selectedField,
         selectedType: input.dataset.selectedType
       });
-      */
       await commitPhoneEdit(wrap, input.value, input.dataset.selectedField, input.dataset.selectedType);
     });
     cancelBtn.addEventListener('click', () => {
@@ -4942,9 +4916,9 @@
 
   async function commitPhoneEdit(wrap, value, field, type) {
     const normalizedValue = normalizePhone(value);
-    // console.log('[Contact Detail] commitPhoneEdit called with:', { value, field, type, normalizedValue });
+    console.log('[Contact Detail] commitPhoneEdit called with:', { value, field, type, normalizedValue });
 
-    // console.log('[Contact Detail] Calling saveField with:', { field, normalizedValue });
+    console.log('[Contact Detail] Calling saveField with:', { field, normalizedValue });
     // Prevent accidental clearing when selecting an "Add <type>" option without entering a value
     if (!normalizedValue || !String(normalizedValue).trim()) {
       try { window.crm?.showToast && window.crm.showToast('Enter a phone number or press Escape to cancel'); } catch (_) { }
@@ -4961,7 +4935,7 @@
     // Update the contact data
     if (state.currentContact) {
       state.currentContact[field] = normalizedValue;
-      // console.log('[Contact Detail] Updated contact data:', state.currentContact[field]);
+      console.log('[Contact Detail] Updated contact data:', state.currentContact[field]);
     }
 
     // Update the field display to show the new field name and value
@@ -4974,18 +4948,18 @@
         'otherPhone': 'OTHER PHONE'
       };
       fieldLabel.textContent = typeLabels[field] || 'PHONE';
-      // console.log('[Contact Detail] Updated field label to:', fieldLabel.textContent);
+      console.log('[Contact Detail] Updated field label to:', fieldLabel.textContent);
     }
 
     // Update the field value display with formatted version
     const formattedDisplay = formatPhoneForDisplay(normalizedValue);
     updateFieldText(wrap, formattedDisplay);
-    // console.log('[Contact Detail] Updated field text to:', normalizedValue);
+    console.log('[Contact Detail] Updated field text to:', normalizedValue);
 
     // Re-render the phone row with new primary phone
     const phoneRow = wrap.closest('.info-row');
     if (phoneRow) {
-      // console.log('[Contact Detail] Re-rendering phone row');
+      console.log('[Contact Detail] Re-rendering phone row');
       const newPhoneRow = renderPhoneRow(state.currentContact);
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = newPhoneRow;
@@ -5014,14 +4988,14 @@
 
   // Commit edit for Account fields (Energy & Contract) shown on Contact Detail
   async function commitEditAccountField(wrap, field, value) {
-    // console.log('[Contact Detail] commitEditAccountField called:', { field, value, type: typeof value });
+    console.log('[Contact Detail] commitEditAccountField called:', { field, value, type: typeof value });
     let outVal = value;
     if (field === 'contractEndDate') {
-      // console.log('[Contact Detail] Processing contractEndDate:', { original: value });
+      console.log('[Contact Detail] Processing contractEndDate:', { original: value });
       outVal = toMDY(value);
-      // console.log('[Contact Detail] Converted to MDY:', { converted: outVal });
+      console.log('[Contact Detail] Converted to MDY:', { converted: outVal });
     }
-    // console.log('[Contact Detail] Saving to Firebase:', { field, outVal });
+    console.log('[Contact Detail] Saving to Firebase:', { field, outVal });
     await saveAccountField(field, outVal);
     updateFieldText(wrap, outVal);
   }
@@ -5204,7 +5178,7 @@
     const contactPage = document.getElementById('contact-detail-page');
     const isVisible = contactPage && contactPage.classList.contains('active') && !contactPage.hidden;
     if (!isVisible) {
-      // console.log('[ContactDetail] Skipping calls load - page not visible');
+      console.log('[ContactDetail] Skipping calls load - page not visible');
       return;
     }
 
@@ -5244,7 +5218,7 @@
       const j = await r.json().catch(() => ({}));
       const calls = (j && j.ok && Array.isArray(j.calls)) ? j.calls : [];
 
-      // console.log(`[Contact Detail] Loaded ${calls.length} targeted calls for contact ${contactId}`);
+      console.log(`[Contact Detail] Loaded ${calls.length} targeted calls for contact ${contactId}`);
 
       // Calls are already filtered and sorted by the API
       const filtered = calls;
@@ -5253,14 +5227,14 @@
       try { state._rcCalls = filtered; } catch (_) { }
       try { if (typeof state._rcPage !== 'number' || !state._rcPage) state._rcPage = 1; } catch (_) { }
       // DEBUG: show mapping coverage
-      // try {
-      //   console.log('[Contact Detail][Recent Calls] Contact:', {
-      //     contactId,
-      //     name: [state.currentContact?.firstName, state.currentContact?.lastName].filter(Boolean).join(' ') || state.currentContact?.name,
-      //     phones: nums
-      //   });
-      //   console.log('[Contact Detail][Recent Calls] Filtered calls:', filtered.map(c => ({ id: c.id, to: c.to, from: c.from, contactName: c.contactName, accountName: c.accountName })));
-      // } catch (_) { }
+      try {
+        console.log('[Contact Detail][Recent Calls] Contact:', {
+          contactId,
+          name: [state.currentContact?.firstName, state.currentContact?.lastName].filter(Boolean).join(' ') || state.currentContact?.name,
+          phones: nums
+        });
+        console.log('[Contact Detail][Recent Calls] Filtered calls:', filtered.map(c => ({ id: c.id, to: c.to, from: c.from, contactName: c.contactName, accountName: c.accountName })));
+      } catch (_) { }
       // Enrich each call with direction and pretty counterparty number like the Calls page
       const bizList = Array.isArray(window.CRM_BUSINESS_NUMBERS) ? window.CRM_BUSINESS_NUMBERS.map(n => String(n || '').replace(/\D/g, '').slice(-10)).filter(Boolean) : [];
       const isBiz = (p) => bizList.includes(p);
@@ -5316,7 +5290,7 @@
     const total = Array.isArray(state._rcCalls) ? state._rcCalls.length : 0;
     if (!total) { rcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>'); updateRecentCallsPager(0, 0); return; }
     const slice = getRecentCallsPageSlice();
-    rcUpdateListAnimated(list, slice.map((call, index) => rcItemHtml(call, index)).join(''));
+    rcUpdateListAnimated(list, slice.map(call => rcItemHtml(call)).join(''));
     // delegate click to handle dynamic rerenders
     list.querySelectorAll('.rc-insights').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -5458,7 +5432,7 @@
     return arr.filter(Boolean);
   }
 
-  function rcItemHtml(c, index = 0) {
+  function rcItemHtml(c) {
     // Prefer contact name; if absent (company call), show company once
     const hasContact = !!(c.contactId && c.contactName);
     const rawCompany = String(c.accountName || c.company || '');
@@ -5492,9 +5466,8 @@
     // Only append company if we have a real contact and company differs
     const title = `${name}${(hasContact && rawCompany && rawCompany !== displayName) ? ` • ${company}` : ''}`;
 
-    const delay = (index * 0.05).toFixed(2);
     return `
-      <div class="rc-item modern-reveal premium-borderline" style="animation-delay: ${delay}s;">
+      <div class="rc-item">
         <div class="rc-meta">
           <div class="rc-title">${title}</div>
           <div class="rc-sub">${when} • <span class="rc-duration">${durStr}</span> • <span class="phone-number" 
@@ -5522,7 +5495,7 @@
       const success = await window.SharedCIProcessor.processCall(callSid, recordingSid, btn, {
         context: 'contact-detail',
         onSuccess: (call) => {
-          // console.log('[ContactDetail] CI processing completed:', call);
+          console.log('[ContactDetail] CI processing completed:', call);
 
           // Update state cache so future renders show full insights
           try {
@@ -8138,3 +8111,6 @@
   window.ContactDetail.openContactTaskPopover = openContactTaskPopover;
 
 })();
+
+
+

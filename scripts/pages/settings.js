@@ -401,15 +401,18 @@ class SettingsPage {
                 // If we found hostedPhotoURL in localStorage but not in state, restore it
                 if (hostedFromLocalStorage && !hostedFromState) {
                     this.state.settings.general.hostedPhotoURL = hostedFromLocalStorage;
+                    console.log('[Settings] Restored hostedPhotoURL from localStorage in ensureGoogleUserData:', hostedFromLocalStorage);
                 }
 
                 // Only auto-host if:
                 // 1. PhotoURL changed AND no manual upload exists, OR
                 // 2. PhotoURL matches but no hosted version exists at all
                 if (user.photoURL !== currentPhotoURL && !hasManualUpload) {
+                    console.log('[Settings] Google photoURL changed and no manual upload, hosting avatar...');
                     await this.hostGoogleAvatar(user.photoURL);
                 } else if (user.photoURL === currentPhotoURL && !hasManualUpload) {
                     // PhotoURL matches but no hosted version exists, host it
+                    console.log('[Settings] PhotoURL exists but no hosted version in ensureGoogleUserData, hosting avatar...');
                     await this.hostGoogleAvatar(user.photoURL);
                 } else if (hasManualUpload) {
                     // Manual upload exists - preserve it, just update photoURL for tracking
@@ -418,6 +421,7 @@ class SettingsPage {
                     if (!this.state.settings.general.hostedPhotoURL && hostedFromLocalStorage) {
                         this.state.settings.general.hostedPhotoURL = hostedFromLocalStorage;
                     }
+                    console.log('[Settings] Manual upload exists, preserving hostedPhotoURL:', this.state.settings.general.hostedPhotoURL);
                 }
             }
 
@@ -729,52 +733,45 @@ class SettingsPage {
 
     async loadSettings() {
         try {
-            const getAuthUser = () => {
-                try {
-                    if (window.firebase && window.firebase.auth) {
-                        return window.firebase.auth().currentUser;
-                    }
-                    if (firebase && firebase.auth) {
-                        return firebase.auth().currentUser;
-                    }
-                } catch (_) { }
-                return null;
-            };
-            const getCurrentUserEmail = () => {
+            // Helper functions
+            const getUserEmail = () => {
                 try {
                     if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
-                        const e = window.DataManager.getCurrentUserEmail();
-                        if (e && typeof e === 'string' && e.trim()) return e.toLowerCase().trim();
+                        return window.DataManager.getCurrentUserEmail();
                     }
-                } catch (_) { }
-                const authUser = getAuthUser();
-                const e2 = authUser && authUser.email ? authUser.email : (window.currentUserEmail || '');
-                return (e2 || '').toLowerCase().trim();
+                    return (window.currentUserEmail || '').toLowerCase();
+                } catch (_) {
+                    return (window.currentUserEmail || '').toLowerCase();
+                }
             };
-            const getCurrentUserId = () => {
-                const authUser = getAuthUser();
-                return authUser ? authUser.uid : null;
-            };
+            const getDocId = (email, admin) => admin ? 'user-settings' : `user-settings-${email}`;
             const isAdmin = () => {
                 try {
                     if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') {
                         return window.DataManager.isCurrentUserAdmin();
                     }
-                } catch (_) { }
-                const email = getCurrentUserEmail();
-                return window.currentUserRole === 'admin';
+                    return window.currentUserRole === 'admin';
+                } catch (_) {
+                    return window.currentUserRole === 'admin';
+                }
             };
 
-            const email = getCurrentUserEmail();
-            const userId = getCurrentUserId();
+            // Current user context (used for cache + Firestore)
+            const email = getUserEmail();
             const isAdminUser = isAdmin();
 
-            if (!isAdminUser && !email) {
-                console.warn('[Settings] loadSettings: No user email found, aborting load to prevent overwriting with defaults.');
-                return;
+            // Guard: Ensure we have a user context before loading settings
+            // This prevents loading/saving "empty" defaults if auth is still initializing
+            if (!email && !isAdminUser) {
+                // Try one more time to get user from auth directly
+                const currentUser = firebase.auth().currentUser;
+                if (!currentUser) {
+                    console.warn('[Settings] loadSettings: No user email found (and not admin), aborting load to prevent overwriting with defaults.');
+                    return;
+                }
             }
 
-            const docId = isAdminUser ? 'user-settings' : `user-settings-${email}`;
+            const docId = getDocId(email, isAdminUser);
 
             // First try to load from CacheManager (cache-first)
             if (window.CacheManager) {
@@ -819,6 +816,7 @@ class SettingsPage {
                                 const hostedFromLocalStorage = localStorage.getItem('pc-hosted-photo');
                                 if (hostedFromLocalStorage) {
                                     this.state.settings.general.hostedPhotoURL = hostedFromLocalStorage;
+                                    console.log('[Settings] Restored hostedPhotoURL from localStorage after cache load');
                                 }
                             }
                             // Ensure imageSize is initialized if missing
@@ -832,6 +830,7 @@ class SettingsPage {
                             if (hosted) {
                                 try { localStorage.setItem('pc-hosted-photo', hosted); } catch (_) { }
                             }
+                            console.log('[Settings] Loaded from CacheManager cache', { bridgeToMobile: this.state.settings.bridgeToMobile, hostedPhotoURL: this.state.settings.general.hostedPhotoURL });
                             // Sync header avatar after cache load
                             if (window.authManager?.refreshProfilePhoto) {
                                 setTimeout(() => window.authManager.refreshProfilePhoto(), 50);
@@ -847,103 +846,168 @@ class SettingsPage {
             // Fallback to Firebase if cache miss
             if (window.firebaseDB) {
                 try {
+                    // Try per-user settings first (for employees), then fallback to 'user-settings' (admin/legacy)
+                    const getUserEmail = () => {
+                        try {
+                            if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+                                return window.DataManager.getCurrentUserEmail();
+                            }
+                            return (window.currentUserEmail || '').toLowerCase();
+                        } catch (_) {
+                            return (window.currentUserEmail || '').toLowerCase();
+                        }
+                    };
+                    const isAdmin = () => {
+                        try {
+                            if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') {
+                                return window.DataManager.isCurrentUserAdmin();
+                            }
+                            return window.currentUserRole === 'admin';
+                        } catch (_) {
+                            return window.currentUserRole === 'admin';
+                        }
+                    };
+
+                    const email = getUserEmail();
+
+                    // Try per-user settings doc first (employees), then fallback to 'user-settings' (admin/legacy)
                     let settingsDoc = null;
-                    let loadedFromLegacy = false;
 
                     if (!isAdminUser && email) {
                         try {
-                            const perUserDoc = await window.firebaseDB.collection('settings').doc(docId).get();
-                            if (perUserDoc.exists) {
-                                settingsDoc = perUserDoc;
+                            settingsDoc = await window.firebaseDB.collection('settings').doc(docId).get();
+                            // If document doesn't exist (for new employees), that's fine - we'll create it on save
+                            if (!settingsDoc.exists) {
+                                settingsDoc = null; // Clear so we skip to defaults + Google data
+                            }
+                        } catch (err) {
+                            // Permission errors are expected if document doesn't exist or user doesn't own it
+                            if (err.code === 'permission-denied') {
                             } else {
-                                try {
-                                    const legacyDoc = await window.firebaseDB.collection('settings').doc('user-settings').get();
-                                    if (legacyDoc.exists) {
-                                        const legacyData = legacyDoc.data() || {};
-                                        const legacyOwnerId = (legacyData.ownerId || '').toLowerCase();
-                                        const legacyUserId = legacyData.userId;
-                                        if (legacyOwnerId === email || (legacyUserId && legacyUserId === userId)) {
-                                            settingsDoc = legacyDoc;
-                                            loadedFromLegacy = true;
-                                        }
-                                    }
-                                } catch (legacyErr) {
-                                    if (legacyErr && legacyErr.code !== 'permission-denied') {
-                                        console.warn('[Settings] Error loading legacy settings:', legacyErr);
-                                    }
-                                }
+                                console.warn('[Settings] Error loading per-user settings, trying legacy:', err);
                             }
-                        } catch (err) {
-                            if (err && err.code !== 'permission-denied') {
-                                console.warn('[Settings] Error loading per-user settings:', err);
-                            }
+                            settingsDoc = null; // Clear so we skip to defaults
                         }
-                    } else if (isAdminUser) {
+                    }
+
+                    // Fallback to legacy 'user-settings' if per-user doc doesn't exist or user is admin
+                    if ((!settingsDoc || !settingsDoc.exists) && isAdminUser) {
                         try {
-                            const adminDoc = await window.firebaseDB.collection('settings').doc(docId).get();
-                            if (adminDoc.exists) settingsDoc = adminDoc;
+                            settingsDoc = await window.firebaseDB.collection('settings').doc(docId).get();
                         } catch (err) {
-                            console.warn('[Settings] Cannot load settings doc:', err);
+                            console.warn('[Settings] Cannot load legacy settings doc:', err);
+                            settingsDoc = null;
                         }
                     }
 
                     if (settingsDoc && settingsDoc.exists) {
                         const firebaseSettings = settingsDoc.data();
 
-                        this.state.settings = {
-                            ...this.state.settings,
-                            ...firebaseSettings,
-                            bridgeToMobile: firebaseSettings.bridgeToMobile === true
-                        };
-                        if (!this.state.settings.general) {
-                            this.state.settings.general = {};
-                        }
-                        if (!this.state.settings.general.hostedPhotoURL) {
-                            const hostedFromLocalStorage = localStorage.getItem('pc-hosted-photo');
-                            if (hostedFromLocalStorage) {
-                                this.state.settings.general.hostedPhotoURL = hostedFromLocalStorage;
-                                console.log('[Settings] Restored hostedPhotoURL from localStorage after Firebase load');
-                            }
-                        }
-                        if (!this.state.settings.emailSignature) {
-                            this.state.settings.emailSignature = { text: '', image: null, imageSize: { width: 200, height: 100 } };
-                        } else if (!this.state.settings.emailSignature.imageSize) {
-                            this.state.settings.emailSignature.imageSize = { width: 200, height: 100 };
-                        }
-
-                        if (loadedFromLegacy && !isAdminUser && email) {
-                            try {
-                                const migrated = {
+                        // Check ownership for non-admin users (only for legacy 'user-settings' doc)
+                        if (!isAdmin() && docId === 'user-settings') {
+                            const email = getUserEmail();
+                            const settingsOwnerId = (firebaseSettings.ownerId || '').toLowerCase();
+                            const settingsUserId = firebaseSettings.userId;
+                            const currentUserId = window.firebase && window.firebase.auth && window.firebase.auth().currentUser ? window.firebase.auth().currentUser.uid : null;
+                            if (settingsOwnerId !== email && settingsUserId !== currentUserId) {
+                                console.warn('[Settings] Firebase settings not owned by current user, using defaults');
+                                // Continue to localStorage fallback
+                            } else {
+                                // Merge settings, ensuring bridgeToMobile is preserved as boolean
+                                this.state.settings = {
+                                    ...this.state.settings,
                                     ...firebaseSettings,
-                                    ownerId: email,
-                                    userId: userId || firebaseSettings.userId || null,
-                                    lastUpdated: new Date().toISOString(),
-                                    updatedBy: 'migration'
+                                    bridgeToMobile: firebaseSettings.bridgeToMobile === true // Ensure boolean
                                 };
-                                migrated.bridgeToMobile = migrated.bridgeToMobile === true;
-                                await window.firebaseDB.collection('settings').doc(docId).set(migrated, { merge: false });
-                            } catch (migrateErr) {
-                                console.warn('[Settings] Legacy settings migration failed:', migrateErr);
+                                // Ensure general object exists and hostedPhotoURL is preserved
+                                if (!this.state.settings.general) {
+                                    this.state.settings.general = {};
+                                }
+                                // Restore hostedPhotoURL from localStorage if missing in state
+                                if (!this.state.settings.general.hostedPhotoURL) {
+                                    const hostedFromLocalStorage = localStorage.getItem('pc-hosted-photo');
+                                    if (hostedFromLocalStorage) {
+                                        this.state.settings.general.hostedPhotoURL = hostedFromLocalStorage;
+                                        console.log('[Settings] Restored hostedPhotoURL from localStorage after Firebase load (non-admin)');
+                                    }
+                                }
+                                // Ensure emailSignature exists and imageSize is initialized if missing
+                                if (!this.state.settings.emailSignature) {
+                                    this.state.settings.emailSignature = { text: '', image: null, imageSize: { width: 200, height: 100 } };
+                                } else if (!this.state.settings.emailSignature.imageSize) {
+                                    this.state.settings.emailSignature.imageSize = { width: 200, height: 100 };
+                                }
+
+                                // Cache the settings for future use
+                                if (window.CacheManager) {
+                                    try {
+                                        await window.CacheManager.set('settings', [{ id: docId, ...firebaseSettings }]);
+                                    } catch (error) {
+                                        console.warn('[Settings] Failed to cache settings:', error);
+                                    }
+                                }
+
+                                // Persist hosted photo locally for header fallback
+                                const hosted = firebaseSettings?.general?.hostedPhotoURL || this.state.settings.general.hostedPhotoURL;
+                                if (hosted) {
+                                    try { localStorage.setItem('pc-hosted-photo', hosted); } catch (_) { }
+                                }
+
+                                // Sync header avatar after load
+                                if (window.authManager?.refreshProfilePhoto) {
+                                    setTimeout(() => window.authManager.refreshProfilePhoto(), 50);
+                                }
+                                return;
                             }
-                        }
-
-                        if (window.CacheManager) {
-                            try {
-                                await window.CacheManager.set('settings', [{ id: docId, ...firebaseSettings }]);
-                            } catch (error) {
-                                console.warn('[Settings] Failed to cache settings:', error);
+                        } else {
+                            // Merge settings, ensuring bridgeToMobile is preserved as boolean
+                            this.state.settings = {
+                                ...this.state.settings,
+                                ...firebaseSettings,
+                                bridgeToMobile: firebaseSettings.bridgeToMobile === true // Ensure boolean
+                            };
+                            // Ensure general object exists and hostedPhotoURL is preserved
+                            if (!this.state.settings.general) {
+                                this.state.settings.general = {};
                             }
-                        }
+                            // Restore hostedPhotoURL from localStorage if missing in state
+                            if (!this.state.settings.general.hostedPhotoURL) {
+                                const hostedFromLocalStorage = localStorage.getItem('pc-hosted-photo');
+                                if (hostedFromLocalStorage) {
+                                    this.state.settings.general.hostedPhotoURL = hostedFromLocalStorage;
+                                    console.log('[Settings] Restored hostedPhotoURL from localStorage after Firebase load');
+                                }
+                            }
+                            // Ensure emailSignature exists and imageSize is initialized if missing
+                            if (!this.state.settings.emailSignature) {
+                                this.state.settings.emailSignature = { text: '', image: null, imageSize: { width: 200, height: 100 } };
+                            } else if (!this.state.settings.emailSignature.imageSize) {
+                                this.state.settings.emailSignature.imageSize = { width: 200, height: 100 };
+                            }
+                            console.log('[Settings] Loaded from Firebase', { bridgeToMobile: this.state.settings.bridgeToMobile, hostedPhotoURL: this.state.settings.general.hostedPhotoURL });
 
-                        const hosted = firebaseSettings?.general?.hostedPhotoURL || this.state.settings.general.hostedPhotoURL;
-                        if (hosted) {
-                            try { localStorage.setItem('pc-hosted-photo', hosted); } catch (_) { }
-                        }
+                            // Cache the settings for future use
+                            if (window.CacheManager) {
+                                try {
+                                    await window.CacheManager.set('settings', [{ id: docId, ...firebaseSettings }]);
+                                    console.log('[Settings] Cached settings for future use');
+                                } catch (error) {
+                                    console.warn('[Settings] Failed to cache settings:', error);
+                                }
+                            }
 
-                        if (window.authManager?.refreshProfilePhoto) {
-                            setTimeout(() => window.authManager.refreshProfilePhoto(), 50);
+                            // Persist hosted photo locally for header fallback
+                            const hosted = firebaseSettings?.general?.hostedPhotoURL;
+                            if (hosted) {
+                                try { localStorage.setItem('pc-hosted-photo', hosted); } catch (_) { }
+                            }
+
+                            // Sync header avatar after load
+                            if (window.authManager?.refreshProfilePhoto) {
+                                setTimeout(() => window.authManager.refreshProfilePhoto(), 50);
+                            }
+                            return;
                         }
-                        return;
                     }
                 } catch (error) {
                     // Permission errors are expected for non-admin users accessing settings they don't own
@@ -1033,15 +1097,18 @@ class SettingsPage {
                 // If we found hostedPhotoURL in localStorage but not in state, restore it
                 if (hostedFromLocalStorage && !hostedFromState) {
                     this.state.settings.general.hostedPhotoURL = hostedFromLocalStorage;
+                    console.log('[Settings] Restored hostedPhotoURL from localStorage:', hostedFromLocalStorage);
                 }
 
                 // Only auto-host if:
                 // 1. PhotoURL changed AND no manual upload exists, OR
                 // 2. PhotoURL matches but no hosted version exists at all (and no localStorage backup)
                 if (user.photoURL !== currentPhotoURL && !hasManualUpload) {
+                    console.log('[Settings] Google photoURL changed and no manual upload, hosting avatar...');
                     await this.hostGoogleAvatar(user.photoURL);
                 } else if (user.photoURL === currentPhotoURL && !hasManualUpload) {
                     // PhotoURL matches but no hosted version exists anywhere, host it
+                    console.log('[Settings] PhotoURL exists but no hosted version, hosting avatar...');
                     await this.hostGoogleAvatar(user.photoURL);
                 } else if (hasManualUpload) {
                     // Manual upload exists - preserve it, just update photoURL for tracking
@@ -1050,6 +1117,7 @@ class SettingsPage {
                     if (!this.state.settings.general.hostedPhotoURL && hostedFromLocalStorage) {
                         this.state.settings.general.hostedPhotoURL = hostedFromLocalStorage;
                     }
+                    console.log('[Settings] Manual upload exists, preserving hostedPhotoURL:', this.state.settings.general.hostedPhotoURL);
                 }
             }
         } else {
@@ -1072,26 +1140,25 @@ class SettingsPage {
 
         // CRITICAL: Never overwrite manually uploaded photos unless explicitly forced
         if (hasManualUpload && !forceRefresh) {
+            console.log('[Settings] Manual upload exists, skipping Google avatar hosting to preserve user upload');
             return;
         }
 
         // Only skip if hostedPhotoURL exists AND photo hasn't changed AND not forcing refresh
         if (this.state.settings.general.hostedPhotoURL && !photoChanged && !forceRefresh) {
+            console.log('[Settings] Avatar already hosted and photoURL unchanged, skipping re-host');
             return;
         }
 
         // Update stored photoURL to track changes
         if (photoChanged) {
+            console.log('[Settings] Google photoURL changed, re-hosting avatar...');
             this.state.settings.general.photoURL = googlePhotoURL;
         }
 
         try {
             // Send Google URL to server to download and re-host
-            const apiBase = (() => {
-                const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-                const isPort3000 = window.location.port === '3000';
-                return (isLocalhost && isPort3000) ? '' : 'https://power-choosers-crm-792458658491.us-south1.run.app';
-            })();
+            const apiBase = 'https://power-choosers-crm-792458658491.us-south1.run.app';
             const uploadResponse = await fetch(`${apiBase}/api/upload/host-google-avatar`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1111,6 +1178,8 @@ class SettingsPage {
                     if (window.authManager && typeof window.authManager.refreshProfilePhoto === 'function') {
                         window.authManager.refreshProfilePhoto();
                     }
+
+                    console.log('[Settings] Avatar hosted successfully:', imageUrl);
                 }
             } else {
                 console.warn('[Settings] Upload failed, using Google URL directly');
@@ -1166,43 +1235,18 @@ class SettingsPage {
             this.state.settings.aiTemplates = aiTemplateFields;
 
             // Get user email and determine docId (needed for both Firebase and cache)
-            const authUser = (() => {
-                try {
-                    if (window.firebase && window.firebase.auth) {
-                        return window.firebase.auth().currentUser;
-                    }
-                    if (firebase && firebase.auth) {
-                        return firebase.auth().currentUser;
-                    }
-                } catch (_) { }
-                return null;
-            })();
+            const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
+                ? window.DataManager.getCurrentUserEmail()
+                : ((window.currentUserEmail || '').toLowerCase());
 
-            const userEmail = (() => {
-                try {
-                    if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
-                        const e = window.DataManager.getCurrentUserEmail();
-                        if (e && typeof e === 'string' && e.trim()) return e.toLowerCase().trim();
-                    }
-                } catch (_) { }
-                const e2 = (window.currentUserEmail || authUser?.email || '');
-                return (e2 || '').toLowerCase().trim();
-            })();
-
-            const userId = authUser ? authUser.uid : null;
+            const user = window.firebase && window.firebase.auth ? window.firebase.auth().currentUser : null;
+            const userId = user ? user.uid : null;
 
             // Use per-user doc ID so each employee has their own settings
             // Admin uses 'user-settings' (legacy), employees use 'user-settings-{email}'
             const isAdmin = (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function')
                 ? window.DataManager.isCurrentUserAdmin()
-                : (window.currentUserRole === 'admin' || userEmail === 'l.patterson@powerchoosers.com');
-
-            if (!isAdmin && !userEmail) {
-                if (window.showToast) {
-                    window.showToast('Please sign in fully, then try saving again.', 'error');
-                }
-                throw new Error('Cannot save settings: missing user email');
-            }
+                : (window.currentUserRole === 'admin');
 
             const docId = isAdmin ? 'user-settings' : `user-settings-${userEmail}`;
 
@@ -1258,13 +1302,16 @@ class SettingsPage {
                     // CRITICAL: Ensure general.hostedPhotoURL is preserved (manually uploaded photos)
                     // This ensures each agent's uploaded photo is saved per-user
                     if (this.state.settings.general && this.state.settings.general.hostedPhotoURL) {
-                    if (!settingsToSave.general) {
-                        settingsToSave.general = {};
+                        if (!settingsToSave.general) {
+                            settingsToSave.general = {};
+                        }
+                        settingsToSave.general.hostedPhotoURL = this.state.settings.general.hostedPhotoURL;
+                        console.log('[Settings] Preserving hostedPhotoURL in saveSettings:', settingsToSave.general.hostedPhotoURL);
                     }
-                    settingsToSave.general.hostedPhotoURL = this.state.settings.general.hostedPhotoURL;
-                }
 
+                    console.log('[Settings] Attempting to save settings to Firestore:', { docId, isAdmin, userEmail, userId });
                     await window.firebaseDB.collection('settings').doc(docId).set(settingsToSave, { merge: false });
+                    console.log('[Settings] Successfully saved settings to Firestore');
 
                 } catch (firebaseError) {
                     console.error('[Settings] Firebase save error:', firebaseError);
@@ -3354,7 +3401,7 @@ function injectModernStyles() {
         #settings-page #save-settings-btn:hover:not(:disabled) {
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(255, 140, 0, 0.4);
-            background: linear-gradient(135deg, var(--orange-primary) 0%, #ff8c42 100%) !important;
+            background: linear-gradient(135deg, #e55a2b 0%, #ff8c42 100%) !important;
         }
         
         #settings-page #save-settings-btn:disabled {
@@ -3623,7 +3670,7 @@ function injectModernStyles() {
         }
         
         #settings-page .btn-primary:hover {
-            background: var(--orange-subtle, #f18335);
+            background: #e55a2b;
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
         }

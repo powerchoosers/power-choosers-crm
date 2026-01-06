@@ -210,7 +210,7 @@
     // COST-EFFECTIVE: Update BackgroundListsLoader cache locally (zero Firestore reads)
     if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.addListLocally === 'function') {
       window.BackgroundListsLoader.addListLocally(newItem);
-      // console.log('[ListsOverview] ✓ Updated BackgroundListsLoader cache locally');
+      console.log('[ListsOverview] ✓ Updated BackgroundListsLoader cache locally');
     }
 
     // COST-EFFECTIVE: Update CacheManager locally (IndexedDB write only, no Firestore read)
@@ -218,7 +218,7 @@
       window.CacheManager.updateRecord('lists', newItem.id, newItem).catch(err => 
         console.warn('[ListsOverview] Cache update failed:', err)
       );
-      // console.log('[ListsOverview] ✓ Updated CacheManager cache locally');
+      console.log('[ListsOverview] ✓ Updated CacheManager cache locally');
     }
 
     // COST-EFFECTIVE: Dispatch event for cross-component sync (free, no cost)
@@ -226,7 +226,7 @@
       document.dispatchEvent(new CustomEvent('pc:list-created', {
         detail: { id: newItem.id, list: newItem, kind }
       }));
-      // console.log('[ListsOverview] ✓ Dispatched pc:list-created event');
+      console.log('[ListsOverview] ✓ Dispatched pc:list-created event');
     } catch (e) {
       console.warn('[ListsOverview] Failed to dispatch event:', e);
     }
@@ -409,7 +409,7 @@
         state.accountLists = mergeListsById(state.accountLists, accountLists);
         state.loadedAccounts = true;
         
-        // console.log('[ListsOverview] ✓ Loaded', peopleLists.length, 'people lists and', accountLists.length, 'account lists from BackgroundListsLoader cache (zero cost)');
+        console.log('[ListsOverview] ✓ Loaded', peopleLists.length, 'people lists and', accountLists.length, 'account lists from BackgroundListsLoader cache (zero cost)');
         
         // Preload members for both kinds if needed (uses cache if available)
         if (typeof window.__preloadListMembers === 'function') {
@@ -466,7 +466,7 @@
             await new Promise(resolve => setTimeout(resolve, 100));
             listsData = window.BackgroundListsLoader.getListsData() || [];
             if (listsData.length > 0) {
-              // console.log('[ListsOverview] ✓ BackgroundListsLoader ready after', (attempt + 1) * 100, 'ms with', listsData.length, 'lists (zero cost)');
+              console.log('[ListsOverview] ✓ BackgroundListsLoader ready after', (attempt + 1) * 100, 'ms with', listsData.length, 'lists (zero cost)');
               break;
             }
           }
@@ -483,7 +483,7 @@
             }
           });
           
-          // console.log('[ListsOverview] ✓ Loaded', filteredLists.length, 'lists from BackgroundListsLoader for kind:', kind, '(zero cost)');
+          console.log('[ListsOverview] ✓ Loaded', filteredLists.length, 'lists from BackgroundListsLoader for kind:', kind, '(zero cost)');
           
           // Ensure global cache exists
           try { window.listMembersCache = window.listMembersCache || {}; } catch (_) {}
@@ -628,7 +628,7 @@
               }
               state.loadedAccounts = true;
             }
-            // console.log('[ListsOverview] ✓ Preserved cache data on error (zero cost)');
+            console.log('[ListsOverview] ✓ Preserved cache data on error (zero cost)');
           }
         } catch (cacheErr) {
           console.warn('[ListsOverview] Cache fallback failed:', cacheErr);
@@ -711,7 +711,7 @@
           state.peopleLists = items;
           state.loadedPeople = true;
           
-          // console.log(`[ListsOverview] ✓ Updated people lists from listener: ${previousCount} → ${items.length}`);
+          console.log(`[ListsOverview] ✓ Updated people lists from listener: ${previousCount} → ${items.length}`);
           
           // Re-render if we're viewing people lists
           if (state.kind === 'people') {
@@ -824,7 +824,7 @@
           state.accountLists = items;
           state.loadedAccounts = true;
           
-          // console.log(`[ListsOverview] ✓ Updated account lists from listener: ${previousCount} → ${items.length}`);
+          console.log(`[ListsOverview] ✓ Updated account lists from listener: ${previousCount} → ${items.length}`);
           
           // Re-render if we're viewing account lists
           if (state.kind === 'accounts') {
@@ -1278,12 +1278,10 @@
         
         // Break if both are loaded
         if (contactsData.length > 0 && accountsData.length > 0) {
-          /*
-          // console.log('[ListsOverview] ✓ Background loaders ready after', (attempt + 1) * 100, 'ms', {
+          console.log('[ListsOverview] ✓ Background loaders ready after', (attempt + 1) * 100, 'ms', {
             contacts: contactsData.length,
             accounts: accountsData.length
           });
-          */
           break;
         }
       }
@@ -1873,7 +1871,7 @@
     
     if (tasks.length) {
       try { await Promise.all(tasks); } catch (_) {}
-      // console.log('[ListsOverview] ✓ Preloaded members for', tasks.length, 'lists');
+      console.log('[ListsOverview] ✓ Preloaded members for', tasks.length, 'lists');
     }
   }
   
@@ -1891,7 +1889,7 @@
         out.people = cached.people instanceof Set ? cached.people : new Set(cached.people || []);
         out.accounts = cached.accounts instanceof Set ? cached.accounts : new Set(cached.accounts || []);
         out.loaded = true;
-        // console.log(`[ListsOverview] ✓ Loaded members for ${listId} from in-memory cache`, { people: out.people.size, accounts: out.accounts.size });
+        console.log(`[ListsOverview] ✓ Loaded members for ${listId} from in-memory cache`, { people: out.people.size, accounts: out.accounts.size });
         return out;
       }
     }
@@ -1927,7 +1925,7 @@
       try {
         window.listMembersCache = window.listMembersCache || {};
         window.listMembersCache[listId] = out;
-        // console.log(`[ListsOverview] ✓ Updated in-memory cache for ${listId}`, { people: out.people.size, accounts: out.accounts.size });
+        console.log(`[ListsOverview] ✓ Updated in-memory cache for ${listId}`, { people: out.people.size, accounts: out.accounts.size });
       } catch (cacheErr) {
         console.warn('[ListsOverview] In-memory cache update failed:', cacheErr);
       }
@@ -2303,7 +2301,7 @@
       const listId = detail.listId || detail.targetListId || null;
       if (listId && window.listMembersCache) {
         delete window.listMembersCache[listId];
-        // console.log('[ListsOverview] ✓ Cleared in-memory cache for list (account-created):', listId);
+        console.log('[ListsOverview] ✓ Cleared in-memory cache for list (account-created):', listId);
       }
       // Force a lightweight reload of lists
       state.loadedAccounts = false;
@@ -2319,7 +2317,7 @@
       const listId = detail.listId || detail.targetListId || null;
       if (listId && window.listMembersCache) {
         delete window.listMembersCache[listId];
-        // console.log('[ListsOverview] ✓ Cleared in-memory cache for list (account-updated):', listId);
+        console.log('[ListsOverview] ✓ Cleared in-memory cache for list (account-updated):', listId);
       }
       // Refresh account lists view if currently showing accounts
       if (state.kind === 'accounts') {
@@ -2363,7 +2361,7 @@
       // Clear in-memory cache for this list
       if (listId && window.listMembersCache) {
         delete window.listMembersCache[listId];
-        // console.log('[ListsOverview] ✓ Cleared in-memory cache for', listId);
+        console.log('[ListsOverview] ✓ Cleared in-memory cache for', listId);
       }
       
       // Force reload of list data
@@ -2371,7 +2369,7 @@
       state.loadedAccounts = false;
       await ensureLoadedThenRender();
       
-      // console.log('[ListsOverview] ✓ Reloaded lists after bulk import');
+      console.log('[ListsOverview] ✓ Reloaded lists after bulk import');
     } catch (e) {
       console.error('[ListsOverview] Error handling bulk import complete:', e);
     }
@@ -2530,7 +2528,7 @@
       if (updated) {
         // Re-render to show updated count
         applyFilters();
-        // console.log('[ListsOverview] ✓ Updated list count immediately from event (no Firestore reads):', finalCount || newCount || 'unknown');
+        console.log('[ListsOverview] ✓ Updated list count immediately from event (no Firestore reads):', finalCount || newCount || 'unknown');
       } else {
         console.warn('[ListsOverview] List not found in current state:', listId);
         // List not in current view - refresh from BackgroundListsLoader
@@ -2610,7 +2608,7 @@
             }).catch(err => console.warn('[ListsOverview] CacheManager update failed:', err));
           }
           
-          // console.log('[ListsOverview] ✓ Updated list count locally:', { id, oldCount: currentCount, newCount, isActualCount });
+          console.log('[ListsOverview] ✓ Updated list count locally:', { id, oldCount: currentCount, newCount, isActualCount });
           
           // Re-render the affected list card
           renderFilteredItems(state.kind === 'people' ? state.peopleLists : state.accountLists);
@@ -2637,7 +2635,7 @@
       }
     });
     document._listsUpdateListenerBound = true;
-    // console.log('[ListsOverview] ✓ Bound pc:list-updated event listener');
+    console.log('[ListsOverview] ✓ Bound pc:list-updated event listener');
   }
 })();
 
@@ -2659,7 +2657,7 @@
         out.accounts = cached.accounts instanceof Set ? cached.accounts : new Set(cached.accounts || []);
         out.loaded = true;
         if (console.timeEnd) console.timeEnd(`[ListsOverview] preload fetch ${listId}`);
-        // console.log(`[ListsOverview] ✓ Loaded members for ${listId} from in-memory cache`, { people: out.people.size, accounts: out.accounts.size });
+        console.log(`[ListsOverview] ✓ Loaded members for ${listId} from in-memory cache`, { people: out.people.size, accounts: out.accounts.size });
         return out;
       }
     }
@@ -2706,7 +2704,7 @@
     try {
       window.listMembersCache = window.listMembersCache || {};
       window.listMembersCache[listId] = out;
-      // console.log(`[ListsOverview] ✓ Updated in-memory cache for ${listId}`, { people: out.people.size, accounts: out.accounts.size });
+      console.log(`[ListsOverview] ✓ Updated in-memory cache for ${listId}`, { people: out.people.size, accounts: out.accounts.size });
     } catch (cacheErr) {
       console.warn('[ListsOverview] In-memory cache update failed:', cacheErr);
     }

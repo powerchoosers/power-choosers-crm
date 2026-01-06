@@ -411,7 +411,7 @@
         linkedInTasks.push(task);
       });
 
-      // console.log('[TaskDetail] Loaded', linkedInTasks.length, 'LinkedIn sequence tasks for navigation');
+      console.log('[TaskDetail] Loaded', linkedInTasks.length, 'LinkedIn sequence tasks for navigation');
     } catch (error) {
       console.error('[TaskDetail] Error loading LinkedIn sequence tasks:', error);
     }
@@ -608,21 +608,19 @@
         align-items: center; 
         gap: 8px;
       }
-      /* Ensure action buttons align perfectly with title */
+      /* Move only the action buttons up to align with Complete Task button */
       #task-detail-page .contact-header-profile > .quick-action-btn,
       #task-detail-page .contact-header-profile > .header-action-divider,
       #task-detail-page .contact-header-profile > .list-seq-group {
         position: relative;
-        top: 0; /* Align on same line */
+        top: -8px;
         z-index: 10;
       }
-      /* Center the text content vertically with proper spacing */
+      /* Center the text content vertically */
       #task-detail-page .contact-header-text {
         display: flex;
         flex-direction: column;
         justify-content: center;
-        padding: 4px 0; /* Add vertical padding to prevent text cutoff */
-        min-height: 40px; /* Ensure minimum height for text content */
       }
       /* Reset margin added globally so spacing is controlled here */
       #task-detail-page .linkedin-header-btn { margin-left: 0; margin-right: 0; }
@@ -646,20 +644,20 @@
       width: 36px;
       height: 36px;
       padding: 0;
-      cursor: pointer;
-      pointer-events: auto;
+      cursor: pointer !important;
+      pointer-events: auto !important;
       background: var(--bg-item);
       border: 1px solid var(--border-light);
-      border-radius: var(--border-radius);
-      color: var(--text-secondary);
+      border-radius: 8px;
+      color: var(--text-primary);
       transition: all var(--transition-fast);
     }
     #task-detail-page .quick-action-btn:hover {
-      background: var(--bg-hover);
-      color: var(--text-primary);
-      border-color: var(--accent-color);
+      background: var(--bg-hover) !important;
+      color: var(--text-primary) !important;
+      border-color: var(--border-medium) !important;
       transform: translateY(-1px);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      box-shadow: var(--shadow-sm);
     }
     `;
     // Append to head so rules actually apply
@@ -713,48 +711,38 @@
     if (isAcctTask) {
       // Account task: only "Add to List" and "Add Task" buttons
       actionButtonsHTML = `
-        <button class="quick-action-btn list-header-btn" id="task-add-to-list" title="Add to list" aria-label="Add to list" aria-haspopup="dialog">
+        \u003cbutton class=\"quick-action-btn list-header-btn\" id=\"task-add-to-list\" title=\"Add to list\" aria-label=\"Add to list\" aria-haspopup=\"dialog\"\u003e
           ${listSvg}
-        </button>
-        <button class="quick-action-btn task-header-btn" id="task-add-task" title="Add task" aria-label="Add task" aria-haspopup="dialog">
+        \u003c/button\u003e
+        \u003cbutton class=\"quick-action-btn task-header-btn\" id=\"task-add-task\" title=\"Add task\" aria-label=\"Add task\" aria-haspopup=\"dialog\"\u003e
           ${taskSvg}
-        </button>`;
+        \u003c/button\u003e`;
     } else {
       // Contact task: "Add to List", "Add to Sequence", and "Add Task" buttons
       actionButtonsHTML = `
-        <button class="quick-action-btn list-header-btn" id="task-add-to-list" title="Add to list" aria-label="Add to list" aria-haspopup="dialog">
+        \u003cbutton class=\"quick-action-btn list-header-btn\" id=\"task-add-to-list\" title=\"Add to list\" aria-label=\"Add to list\" aria-haspopup=\"dialog\"\u003e
           ${listSvg}
-        </button>
-        <button class="quick-action-btn sequence-header-btn" id="task-add-to-sequence" title="Add to sequence" aria-label="Add to sequence" aria-haspopup="dialog">
+        \u003c/button\u003e
+        \u003cbutton class=\"quick-action-btn sequence-header-btn\" id=\"task-add-to-sequence\" title=\"Add to sequence\" aria-label=\"Add to sequence\" aria-haspopup=\"dialog\"\u003e
           ${sequenceSvg}
-        </button>
-        <button class="quick-action-btn task-header-btn" id="task-add-task" title="Add task" aria-label="Add task" aria-haspopup="dialog">
+        \u003c/button\u003e
+        \u003cbutton class=\"quick-action-btn task-header-btn\" id=\"task-add-task\" title=\"Add task\" aria-label=\"Add task\" aria-haspopup=\"dialog\"\u003e
           ${taskSvg}
-        </button>`;
+        \u003c/button\u003e`;
     }
 
     // Complete header buttons HTML
     return `
-      <button class="quick-action-btn reschedule-header-btn" id="task-reschedule-btn" title="Reschedule" aria-label="Reschedule task">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-          <line x1="16" y1="2" x2="16" y2="6"></line>
-          <line x1="8" y1="2" x2="8" y2="6"></line>
-          <line x1="3" y1="10" x2="21" y2="10"></line>
-          <line x1="9" y1="14" x2="11" y2="14"></line>
-          <line x1="13" y1="18" x2="15" y2="18"></line>
-        </svg>
-      </button>
-      <button class="quick-action-btn website-header-btn" data-action="website" title="Visit website" aria-label="Visit website">
+      \u003cbutton class=\"quick-action-btn website-header-btn\" data-action=\"website\" title=\"Visit website\" aria-label=\"Visit website\"\u003e
         ${websiteSvg}
-      </button>
-      <button class="quick-action-btn linkedin-header-btn" data-action="linkedin" title="View on LinkedIn" aria-label="View on LinkedIn">
+      \u003c/button\u003e
+      \u003cbutton class=\"quick-action-btn linkedin-header-btn\" data-action=\"linkedin\" title=\"View on LinkedIn\" aria-label=\"View on LinkedIn\"\u003e
         ${linkedInSvg}
-      </button>
-      <span class="header-action-divider" aria-hidden="true"></span>
-      <div class="list-seq-group">
+      \u003c/button\u003e
+      \u003cspan class=\"header-action-divider\" aria-hidden=\"true\"\u003e\u003c/span\u003e
+      \u003cdiv class=\"list-seq-group\"\u003e
         ${actionButtonsHTML}
-      </div>`;
+      \u003c/div\u003e`;
   }
 
   function injectTaskDetailStyles() {
@@ -767,184 +755,35 @@
       /* Task Detail Page Layout */
       #task-detail-page .page-header {
         display: flex;
-        align-items: center;
+        justify-content: space-between;
+        align-items: flex-start;
         width: 100%;
-        padding: var(--spacing-base);
+        padding: 25px 25px 25px 25px;
         margin: 0;
-        background: transparent;
-        border-bottom: 1px solid var(--border-light);
+        gap: 20px; /* Space between back button and title section */
       }
 
       #task-detail-page .page-title-section {
         display: flex;
-        align-items: center;
-        justify-content: space-between;
-        width: 100%;
-        margin-bottom: 0 !important;
-        gap: 20px;
-      }
-
-      #task-detail-page .contact-header-info {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        min-width: 0;
-        flex: 1;
-      }
-
-      #task-detail-page .contact-header-profile {
-        display: inline-flex;
-        align-items: center;
+        align-items: flex-start;
         gap: 12px;
-        min-width: 0;
-        flex: 1;
-        min-height: 40px; /* Minimum height, but allow growth */
-      }
-
-      #task-detail-page .avatar-circle-small {
-        width: 40px;
-        height: 40px;
-        min-width: 40px;
-        min-height: 40px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        background: var(--orange-subtle);
-        color: #fff;
-        font-weight: 600;
-        font-size: 16px;
-        letter-spacing: 0.5px;
-      }
-
-      #task-detail-page .company-logo-header,
-      #task-detail-page .company-favicon-header {
-        width: 40px;
-        height: 40px;
-        min-width: 40px;
-        min-height: 40px;
-        border-radius: 6px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-        flex-shrink: 0;
-        background: var(--bg-hover);
-      }
-
-      #task-detail-page .company-logo-header img,
-      #task-detail-page .company-favicon-header img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-      }
-
-      #task-detail-page .contact-header-text {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        min-width: 0;
-        flex: 0 1 auto; /* Don't force growth, but allow shrink */
-        padding: 4px 0; /* Add vertical padding to prevent text cutoff */
-        min-height: 40px; /* Ensure minimum height for text content */
-      }
-
-      #task-detail-page .page-title {
-        margin: 0;
-        font-size: 1.25rem; /* Slightly smaller to match contact detail better */
-        font-weight: 700;
-        color: var(--text-primary);
-        line-height: 1.1;
-        letter-spacing: -0.025em;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      #task-detail-page .contact-subtitle,
-      #task-detail-page .task-contact-info {
-        font-size: 0.85rem;
-        color: var(--text-secondary);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        margin: 0;
-        font-weight: 400;
-        line-height: 1.2;
-      }
-
-      #task-detail-page .task-contact-info {
-        margin-top: 1px;
-      }
-
-      #task-detail-page .page-actions {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-left: 20px;
-        flex-shrink: 0;
-      }
-
-      #task-detail-page .page-actions .btn-primary,
-      #task-detail-page .page-actions .btn-secondary {
-        height: 36px;
-        padding: 0 16px;
-        font-size: 0.85rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: var(--border-radius);
-      }
-
-      #task-detail-page .page-actions .btn-icon,
-      #task-detail-page .page-actions .quick-action-btn {
-        width: 36px;
-        height: 36px;
-        min-width: 36px;
-        min-height: 36px;
-        padding: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: var(--border-radius);
-      }
-
-      #task-detail-page .task-navigation {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      /* Page actions separator - vertical line between button groups */
-      #task-detail-page .page-actions-separator {
-        width: 1px;
-        height: 24px;
-        background: var(--border-light);
-        margin: 0;
-        flex-shrink: 0;
+        flex: 0 0 auto;
+        justify-content: flex-start;
+        margin-left: 45px; /* Move the entire title section to the right */
+        margin-top: -10px; /* Move glyph and text up 10px total */
       }
       #task-detail-page .page-content { 
         display: grid; 
-        grid-template-columns: 450px 1fr; /* Log Call side (left) narrow, Contact Info side (right) flexible */
+        grid-template-columns: 450px 1fr; /* Left column narrow, right column flexible */
         grid-template-rows: 1fr; /* Make the row fill the available height */
         column-gap: 0px; /* Remove column gap to eliminate visual space */
         row-gap: 25px;
         padding: 0; /* No padding on parent - let children handle their own spacing */
-        flex: 1; /* Grow to fill available space in page-container */
-        min-height: 0; /* Allow the grid to shrink and enable internal scrolling */
+        height: calc(100vh - 140px); /* Account for header height */
         overflow: hidden; /* Restore hidden overflow for proper scrolling */
         justify-items: stretch; /* ensure items fill their grid tracks */
         align-items: start;     /* align items to the top */
         width: 100%; /* Ensure full width */
-      }
-      /* Ensure container has glassmorphism while the page background matches dashboard */
-      #task-detail-page .page-container {
-        /* Use standard height calculation from main.css */
-        height: calc(100vh - var(--topbar-height) - (var(--spacing-base) * 2));
-        display: flex;
-        flex-direction: column;
-        margin-bottom: 0;
       }
       /* Override any global styles that might affect grid gap */
       #task-detail-page .page-content > .main-content {
@@ -961,12 +800,15 @@
         height: 100%; /* fill grid row height */
         overflow-y: auto; /* independent scroll */
         overscroll-behavior: contain;
-        padding: 25px; /* Consistent 25px padding on all sides */
+        padding-top: 25px;  /* 25px distance from header at top */
+        padding-bottom: 25px; /* 25px breathing room at bottom under last card */
+        padding-right: 25px; /* 25px padding from cards to scrollbar */
+        padding-left: 25px; /* 25px distance from left edge to cards */
         /* Allow the left column to fully occupy its grid track (no artificial max width) */
         max-width: none;
         width: 100%;
-        background: rgba(0, 0, 0, 0.12); /* Subtle darkening for 2-tone effect */
         border-right: 1px solid var(--border-light); /* Vertical divider */
+        margin-right: 25px; /* Spacing from the border to right column content */
       }
       #task-detail-page .sidebar-content { 
         display: flex; 
@@ -976,8 +818,12 @@
         height: 100%; /* fill grid row height */
         overflow-y: auto; /* independent scroll */
         overscroll-behavior: contain;
-        padding: 25px; /* Consistent 25px padding on all sides */
-        margin: 0;
+        padding-top: 25px; /* 25px distance from header at top */
+        padding-right: 25px; /* 25px padding from cards to scrollbar */
+        padding-left: 25px; /* 25px distance from left edge to contact info */
+        margin-top: 0; /* Remove any extra top margin */
+        margin-right: 0; /* Remove any right margin */
+        margin-left: 0; /* Remove any left margin */
         align-items: stretch; /* Align to top */
         width: 100%; /* Ensure full width */
       }
@@ -1007,7 +853,7 @@
       
       /* Contact Information Grid */
       #task-detail-page .contact-info-section { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius-lg); padding: var(--spacing-base); margin: 0; width: 100%; box-shadow: var(--elevation-card); }
-      #task-detail-page .contact-info-section .section-title { font-weight: 700; font-size: 1rem; color: var(--text-primary); margin: 0 0 var(--spacing-base) 0; letter-spacing: -0.025em; }
+      #task-detail-page .contact-info-section .section-title { font-weight: 600; font-size: 1rem; color: var(--text-primary); margin: 0 0 var(--spacing-base) 0; }
       #task-detail-page .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-sm) var(--spacing-md); }
       #task-detail-page .info-row { display: flex; flex-direction: column; gap: 4px; }
       #task-detail-page .info-label { color: var(--text-secondary); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
@@ -1023,10 +869,17 @@
       #task-detail-page .activity-section { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius-lg); padding: var(--spacing-base); margin: 0; box-shadow: var(--elevation-card); }
       #task-detail-page .activity-section .section-title { font-weight: 600; font-size: 1rem; color: var(--text-primary); margin: 0 0 var(--spacing-base) 0; }
       
-      /* Activity Timeline - uses global .activities-list styling */
+      /* Activity Timeline */
+      #task-detail-page .activity-section { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius-lg); padding: var(--spacing-base); margin: 0; }
+      #task-detail-page .activity-timeline { display: flex; flex-direction: column; gap: var(--spacing-sm); }
+      #task-detail-page .activity-item { display: flex; align-items: start; gap: var(--spacing-sm); padding: var(--spacing-sm); border: 1px solid var(--border-light); border-radius: var(--border-radius); background: var(--bg-item); }
+      #task-detail-page .activity-icon { width: 24px; height: 24px; border-radius: 50%; background: var(--bg-hover); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+      #task-detail-page .activity-content { flex: 1; }
+      #task-detail-page .activity-title { font-weight: 600; color: var(--text-primary); font-size: 0.9rem; }
+      #task-detail-page .activity-time { color: var(--text-secondary); font-size: 0.8rem; }
+      #task-detail-page .activity-placeholder { text-align: center; padding: var(--spacing-lg) 0; color: var(--text-secondary); }
       
       /* Avatar Styles - Match People Page */
-      #task-detail-page .avatar-circle-small,
       #task-detail-page .avatar-initials {
         width: 40px;
         height: 40px;
@@ -1040,29 +893,26 @@
         justify-content: center;
         font-size: 16px;
         flex-shrink: 0;
+        vertical-align: middle;
       }
       
-      #task-detail-page .company-logo-header {
-        width: 40px;
-        height: 40px;
-        border-radius: var(--border-radius-sm);
-        background: var(--bg-item);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        border: 1px solid var(--border-light);
+      /* Absolutely positioned avatar - positioned relative to title section */
+      #task-detail-page .contact-header-text {
+        position: relative;
       }
-      #task-detail-page .company-logo-header img {
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
-        border-radius: var(--border-radius-sm);
+      
+      #task-detail-page .avatar-absolute {
+        position: absolute;
+        left: -50px;
+        top: 8px;
+        z-index: 1;
       }
       
       /* Contact Details Container - normal flow, no flex */
       #task-detail-page .contact-details-normal {
         line-height: 1.4;
+        position: relative;
+        z-index: 0;
       }
       
       /* Task Contact Info - Ensure proper alignment */
@@ -1079,6 +929,13 @@
         margin-right: 0;
       }
       
+      /* Widget Separator */
+      #task-detail-page .widgets-separator {
+        width: 1px;
+        height: 24px;
+        background: var(--border-light);
+        margin: 0;
+      }
       
       /* Widgets Wrap */
       #task-detail-page .widgets-wrap {
@@ -1109,7 +966,7 @@
       /* Widget Button Hover */
       #task-detail-page #task-open-widgets:hover {
         background: var(--bg-secondary);
-        border-color: var(--accent-color) !important;
+        border-color: var(--accent-color);
         transform: translateY(-1px);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       }
@@ -1185,15 +1042,14 @@
         border-radius: var(--border-radius);
         background: var(--bg-item);
         border: 1px solid var(--border-light);
-        color: var(--text-secondary);
+        color: var(--text-inverse);
         cursor: pointer;
         transition: all 0.2s ease;
       }
       
       #task-detail-page .widgets-drawer .widget-item:hover {
         background: var(--bg-secondary);
-        border-color: var(--accent-color) !important;
-        color: var(--text-primary);
+        border-color: var(--accent-color);
         transform: translateY(-1px);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       }
@@ -1219,9 +1075,9 @@
       }
       
       #task-detail-page .btn-icon {
-        width: 36px;
-        height: 36px;
-        border-radius: var(--border-radius);
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
         background: var(--bg-item);
         border: 1px solid var(--border-light);
         color: var(--text-secondary);
@@ -1229,22 +1085,18 @@
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition: var(--transition-fast);
       }
       
       #task-detail-page .btn-icon:hover {
-        background: var(--bg-secondary);
+        background: var(--bg-hover);
         color: var(--text-primary);
-        border-color: var(--accent-color) !important;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        border-color: var(--grey-500);
       }
       
       #task-detail-page .btn-icon:disabled {
         opacity: 0.4;
         cursor: not-allowed;
-        transform: none !important;
-        box-shadow: none !important;
       }
       
       #task-detail-page .btn-icon:disabled:hover {
@@ -1253,36 +1105,28 @@
         border-color: var(--border-light);
       }
 
-      /* Reschedule button: identical to quick-action-btn for consistency */
+      /* Reschedule button: square, same height as action button, pagination styling */
       #task-detail-page #task-reschedule-btn {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         width: 36px;
         height: 36px;
-        min-width: 36px;
-        min-height: 36px;
         padding: 0;
-        cursor: pointer;
-        pointer-events: auto;
-        background: var(--bg-item);
-        border: 1px solid var(--border-light);
-        border-radius: var(--border-radius);
-        color: var(--text-secondary);
-        transition: all var(--transition-fast);
-        box-sizing: border-box;
+        border-radius: 8px;
+        background: var(--bg-hover);
+        border: 1px solid transparent;
+        color: var(--text-primary);
+        transition: var(--transition-fast);
       }
       #task-detail-page #task-reschedule-btn:hover {
-        background: var(--bg-hover);
-        color: var(--text-primary);
-        border-color: var(--accent-color);
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        background: var(--bg-item);
+        border-color: var(--border-light);
+        color: var(--text-inverse);
       }
       #task-detail-page #task-reschedule-btn svg {
         width: 18px;
         height: 18px;
-        display: block;
       }
       
       /* Contact Link Styles */
@@ -1358,16 +1202,10 @@
         transition: var(--transition-fast);
       }
       
-      #task-detail-page .icon-btn-sm:hover {
-        background: var(--bg-hover);
-        border-color: var(--accent-color) !important;
-        color: var(--text-inverse);
-      }
-      
       #task-detail-page .btn-icon-add:hover {
         background: var(--bg-hover);
         color: var(--text-primary);
-        border-color: var(--accent-color) !important;
+        border-color: var(--grey-500);
       }
       
       #task-detail-page .contacts-list {
@@ -1389,7 +1227,7 @@
       
       #task-detail-page .contact-item:hover {
         background: var(--bg-hover);
-        border-color: var(--accent-color) !important;
+        border-color: var(--grey-500);
       }
       
       #task-detail-page .contact-avatar {
@@ -1586,13 +1424,32 @@
       widgetsDrawer._bound = '1';
     }
 
+    // Listen for activity refresh events to update Recent Activity immediately
+    if (!document._taskDetailActivityRefreshBound) {
+      document.addEventListener('pc:activities-refresh', async (e) => {
+        const { entityType, entityId, forceRefresh } = e.detail || {};
+        if (!state.currentTask) return;
+
+        // Check if this refresh is relevant to the current task
+        const isRelevant =
+          entityType === 'global' ||
+          (entityType === 'account' && state.currentTask.accountId === entityId) ||
+          (entityType === 'contact' && state.currentTask.contactId === entityId);
+
+        if (isRelevant && window.ActivityManager) {
+          console.log('[TaskDetail] Activity refresh event received, refreshing activities');
+          await loadRecentActivityForTask();
+        }
+      });
+      document._taskDetailActivityRefreshBound = true;
+    }
+
     // CRITICAL: Listen for task deletion events (e.g. sequence removal) to auto-navigate
     if (!document._taskDetailDeletionBound) {
       document.addEventListener('pc:task-deleted', async (e) => {
-        const { taskId, source } = e.detail || {};
-        if (source === 'task-detail') return;
+        const { taskId } = e.detail || {};
         if (state.currentTask && taskId === state.currentTask.id && !state.navigating) {
-          // console.log('[TaskDetail] Current task was deleted (e.g. sequence removal), navigating to next task...');
+          console.log('[TaskDetail] Current task was deleted (e.g. sequence removal), navigating to next task...');
           try {
             // Small delay to ensure any prior state transitions complete
             await new Promise(resolve => setTimeout(resolve, 200));
@@ -1643,7 +1500,7 @@
             }
           } catch (_) { /* noop */ }
         }
-        // console.log('Widget: Prospect for', accountId ? 'account' : 'contact', accountId || contactId);
+        console.log('Widget: Prospect for', accountId ? 'account' : 'contact', accountId || contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Prospect'); } catch (_) { }
         break;
       }
@@ -1661,7 +1518,7 @@
             }
           } catch (_) { /* noop */ }
         }
-        // console.log('Widget: Google Maps for', accountId ? 'account' : 'contact', accountId || contactId);
+        console.log('Widget: Google Maps for', accountId ? 'account' : 'contact', accountId || contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Google Maps'); } catch (_) { }
         break;
       }
@@ -1680,7 +1537,7 @@
             }
           } catch (_) { /* noop */ }
         }
-        // console.log('Widget: Energy Health Check for', accountId ? 'account' : 'contact', accountId || contactId);
+        console.log('Widget: Energy Health Check for', accountId ? 'account' : 'contact', accountId || contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Energy Health Check'); } catch (_) { }
         break;
       }
@@ -1699,7 +1556,7 @@
             }
           } catch (_) { /* noop */ }
         }
-        // console.log('Widget: Deal Calculator for', accountId ? 'account' : 'contact', accountId || contactId);
+        console.log('Widget: Deal Calculator for', accountId ? 'account' : 'contact', accountId || contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Deal Calculator'); } catch (_) { }
         break;
       }
@@ -1719,12 +1576,12 @@
             }
           } catch (_) { /* noop */ }
         }
-        // console.log('Widget: Notes for contact', contactId);
+        console.log('Widget: Notes for contact', contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Notes'); } catch (_) { }
         break;
       }
       default:
-        // console.log('Unknown widget action:', which);
+        console.log('Unknown widget action:', which);
     }
   }
 
@@ -1747,7 +1604,7 @@
             }
             // Dispatch account details restore event
             document.dispatchEvent(new CustomEvent('pc:account-details-restore', { detail: restore || {} }));
-            // console.log('[Task Detail] Restored account details state:', restore);
+            console.log('[Task Detail] Restored account details state:', restore);
           } catch (_) { }
         }, 80);
         return;
@@ -1762,7 +1619,7 @@
             if (restore.taskId && window.TaskDetail && typeof window.TaskDetail.open === 'function') {
               window.TaskDetail.open(restore.taskId, restore.source || 'dashboard');
             }
-            // console.log('[Task Detail] Restored task detail state:', restore);
+            console.log('[Task Detail] Restored task detail state:', restore);
           } catch (_) { }
         }, 80);
         return;
@@ -1814,7 +1671,7 @@
             }
             // Dispatch dashboard restore event
             document.dispatchEvent(new CustomEvent('pc:dashboard-restore', { detail: restore || {} }));
-            // console.log('[Task Detail] Restored dashboard state:', restore);
+            console.log('[Task Detail] Restored dashboard state:', restore);
           } catch (_) { }
         }, 80);
         return;
@@ -1829,39 +1686,6 @@
 
   async function handleTaskComplete() {
     if (!state.currentTask) return;
-
-    // CRITICAL FIX: Identify the next task in the global queue BEFORE deleting the current one
-    // This must be done before any deletion logic runs
-    let nextQueueTaskId = null;
-    try {
-      // Use the shared queue generator to ensure consistent sorting
-      const queue = await getSortedTasksQueue();
-      // Filter out completed tasks just in case
-      const activeQueue = queue.filter(t => t.status !== 'completed');
-      
-      const currentIndex = activeQueue.findIndex(t => t.id === state.currentTask.id);
-      
-      if (currentIndex !== -1 && currentIndex < activeQueue.length - 1) {
-        // Next task is the one immediately following current task
-        nextQueueTaskId = activeQueue[currentIndex + 1].id;
-        // console.log('[TaskDetail] Pre-identified next task in queue (Priority 1):', nextQueueTaskId);
-      } else if (activeQueue.length > 0 && currentIndex === -1) {
-        // If current task is not in the queue (e.g. freshly loaded), go to the first available task
-        nextQueueTaskId = activeQueue[0].id;
-        // console.log('[TaskDetail] Current task not in queue, defaulting to first available:', nextQueueTaskId);
-      } else if (currentIndex !== -1 && currentIndex === activeQueue.length - 1 && activeQueue.length > 1) {
-         // If we are at the end, maybe go to the first one? Or just null (end of queue)
-         // Let's try to go to the first one if it's different
-         if (activeQueue[0].id !== state.currentTask.id) {
-            nextQueueTaskId = activeQueue[0].id;
-         }
-      }
-    } catch (e) {
-      console.warn('[TaskDetail] Failed to pre-calculate next task:', e);
-    }
-
-    let nextSequenceTaskId = null;
-    let nextSequenceTaskData = null;
 
     // CRITICAL: Verify ownership before deletion
     if (!isAdmin()) {
@@ -1897,7 +1721,7 @@
     // Trigger sequence next step BEFORE deleting the current task so the API can read it
     if (state.currentTask && (state.currentTask.isSequenceTask || state.currentTask.sequenceId)) {
       try {
-        // console.log('[TaskDetail] Completed sequence task, creating next step...', state.currentTask.id);
+        console.log('[TaskDetail] Completed sequence task, creating next step...', state.currentTask.id);
         const baseUrl = getApiBaseUrl();
         const response = await fetch(`${baseUrl}/api/complete-sequence-task`, {
           method: 'POST',
@@ -1907,49 +1731,51 @@
         const result = await response.json();
 
         if (result.success) {
-          // console.log('[TaskDetail] Next step created:', result.nextStepType, result);
+          console.log('[TaskDetail] Next step created:', result.nextStepType, result);
 
-          if (result.nextStepType === 'task' && result.taskId) {
-            nextSequenceTaskId = result.taskId;
-
-            try {
-              if (window.firebaseDB) {
-                try {
-                  const nextDoc = await window.firebaseDB.collection('tasks').doc(nextSequenceTaskId).get();
-                  if (nextDoc && nextDoc.exists) {
-                    nextSequenceTaskData = { id: nextDoc.id, ...nextDoc.data() };
-                  }
-                } catch (_) { }
-
-                if (!nextSequenceTaskData) {
-                  try {
-                    const snap = await window.firebaseDB.collection('tasks')
-                      .where('id', '==', nextSequenceTaskId)
-                      .limit(1)
-                      .get();
-                    if (snap && !snap.empty) {
-                      const doc = snap.docs[0];
-                      nextSequenceTaskData = { id: doc.id, ...doc.data() };
-                    }
-                  } catch (_) { }
-                }
+          if (result.nextStepType && (result.nextStepType.includes('linkedin') || result.nextStepType.includes('phone') || result.nextStepType.includes('task'))) {
+            if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
+              try {
+                console.log('[TaskDetail] Forcing BackgroundTasksLoader refresh to pick up new task...');
+                await window.BackgroundTasksLoader.forceReload();
+                console.log('[TaskDetail] BackgroundTasksLoader refreshed successfully');
+              } catch (reloadError) {
+                console.warn('[TaskDetail] Failed to refresh BackgroundTasksLoader:', reloadError);
               }
+            }
 
-              if (nextSequenceTaskData && window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
-                await window.CacheManager.updateRecord('tasks', nextSequenceTaskData.id, nextSequenceTaskData);
+            if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+              try {
+                await window.CacheManager.invalidate('tasks');
+                console.log('[TaskDetail] Invalidated tasks cache after next step creation');
+              } catch (cacheError) {
+                console.warn('[TaskDetail] Failed to invalidate cache:', cacheError);
               }
-            } catch (_) { }
-          }
+            }
 
-          if (result.nextStepType) {
             window.dispatchEvent(new CustomEvent('tasksUpdated', {
               detail: {
                 source: 'sequenceTaskCompletion',
-                newTaskCreated: result.nextStepType === 'task',
-                nextStepType: result.nextStepType,
-                taskData: nextSequenceTaskData
+                taskId: state.currentTask.id,
+                deleted: true,
+                newTaskCreated: true,
+                nextStepType: result.nextStepType
               }
             }));
+
+            document.dispatchEvent(new CustomEvent('pc:tasks-loaded', {
+              detail: { source: 'sequenceTaskCompletion', newTaskCreated: true }
+            }));
+
+            // Dispatch activity refresh for immediate UI update
+            try {
+              const task = state.currentTask;
+              const entityType = task.accountId ? 'account' : (task.contactId ? 'contact' : 'global');
+              const entityId = task.accountId || task.contactId;
+              document.dispatchEvent(new CustomEvent('pc:activities-refresh', {
+                detail: { entityType, entityId, forceRefresh: true }
+              }));
+            } catch (_) { }
           }
         } else {
           console.warn('[TaskDetail] Failed to create next step:', result.message || result.error);
@@ -1976,7 +1802,7 @@
         try {
           const removed = window.BackgroundTasksLoader.removeTask(state.currentTask.id);
           if (removed) {
-            // console.log('[TaskDetail] Removed task from BackgroundTasksLoader cache');
+            console.log('[TaskDetail] Removed task from BackgroundTasksLoader cache');
           }
         } catch (e) {
           console.warn('[TaskDetail] Could not remove task from BackgroundTasksLoader:', e);
@@ -2034,10 +1860,12 @@
 
           // Delete using the document reference
           await taskDoc.ref.delete();
-          // console.log('[TaskDetail] Successfully deleted task from Firestore:', state.currentTask.id);
+          console.log('[TaskDetail] Successfully deleted task from Firestore:', state.currentTask.id);
 
-          if (window.CacheManager && typeof window.CacheManager.deleteRecord === 'function') {
-            await window.CacheManager.deleteRecord('tasks', state.currentTask.id);
+          // CRITICAL FIX: Invalidate cache after deletion to prevent stale data
+          if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+            await window.CacheManager.invalidate('tasks');
+            console.log('[TaskDetail] Invalidated tasks cache after deletion');
           }
         } else {
           console.warn('[TaskDetail] Task not found in Firestore for deletion:', state.currentTask.id);
@@ -2052,13 +1880,25 @@
     if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.removeTask === 'function') {
       try {
         window.BackgroundTasksLoader.removeTask(state.currentTask.id);
-        // console.log('[TaskDetail] Removed task from BackgroundTasksLoader cache');
+        console.log('[TaskDetail] Removed task from BackgroundTasksLoader cache');
       } catch (e) {
         console.warn('[TaskDetail] Could not remove task from BackgroundTasksLoader:', e);
       }
     }
 
-    await new Promise(resolve => setTimeout(resolve, 50));
+    // CRITICAL FIX: Invalidate cache BEFORE refreshing widget to prevent stale data
+    try {
+      if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+        await window.CacheManager.invalidate('tasks');
+        console.log('[TaskDetail] Invalidated tasks cache after completion');
+      }
+    } catch (cacheError) {
+      console.warn('[TaskDetail] Failed to invalidate cache:', cacheError);
+    }
+
+    // CRITICAL FIX: Small delay to ensure Firebase deletion and cache invalidation complete
+    // This prevents race condition where loadTodaysTasks() queries Firebase before deletion completes
+    await new Promise(resolve => setTimeout(resolve, 200));
 
     // Show success message
     if (window.crm && typeof window.crm.showToast === 'function') {
@@ -2071,9 +1911,8 @@
         // Force reload BackgroundTasksLoader to ensure fresh data
         if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
           try {
-            window.BackgroundTasksLoader.forceReload()
-              .then(() => { /* console.log('[TaskDetail] Forced BackgroundTasksLoader reload before refreshing widget') */ })
-              .catch((reloadError) => console.warn('[TaskDetail] Failed to force reload BackgroundTasksLoader:', reloadError));
+            await window.BackgroundTasksLoader.forceReload();
+            console.log('[TaskDetail] Forced BackgroundTasksLoader reload before refreshing widget');
           } catch (reloadError) {
             console.warn('[TaskDetail] Failed to force reload BackgroundTasksLoader:', reloadError);
           }
@@ -2094,24 +1933,14 @@
       detail: { taskId: state.currentTask.id, source: 'task-detail' }
     }));
 
-      // Navigate to next task instead of going back
+    // Navigate to next task instead of going back
     try {
       // Clean up any existing avatars/icons before navigation
       cleanupExistingAvatarsAndIcons();
 
       // Small delay to ensure task deletion has been processed
       await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // CRITICAL FIX: Prioritize global queue navigation over sequence creation
-      // This ensures user flows through their daily list instead of getting stuck in a sequence loop
-      if (nextQueueTaskId) {
-        await loadTaskData(nextQueueTaskId);
-      } else if (nextSequenceTaskId) {
-        await loadTaskData(nextSequenceTaskId);
-      } else {
-        // Fallback to standard navigation (might fail if list is empty)
-        await navigateToAdjacentTask('next');
-      }
+      await navigateToAdjacentTask('next');
     } catch (e) {
       console.warn('Could not navigate to next task, falling back to previous page:', e);
       // Fallback: navigate back if no next task available
@@ -2215,21 +2044,21 @@
       }
       .reschedule-popover .form-actions { display:flex; justify-content:flex-end; gap:8px; }
       .reschedule-popover .btn-primary { height:32px; padding:0 12px; border-radius: var(--border-radius-sm); background: var(--orange-primary); color: var(--text-inverse); border:1px solid var(--orange-primary); font-weight:600; }
-      .reschedule-popover .btn-primary:hover { background: var(--orange-dark, #e67e00); border-color: var(--accent-color) !important; filter: brightness(0.95); }
-      .reschedule-popover .btn-text { height:32px; padding:0 12px; border-radius: var(--border-radius-sm); background: transparent; color: var(--text-secondary); border:1px solid transparent; transition: var(--transition-fast); }
-      .reschedule-popover .btn-text:hover { background: var(--grey-700); color: var(--text-inverse); border-color: var(--accent-color) !important; }
+      .reschedule-popover .btn-primary:hover { background: var(--orange-dark, #e67e00); border-color: var(--orange-dark, #e67e00); filter: brightness(0.95); }
+      .reschedule-popover .btn-text { height:32px; padding:0 12px; border-radius: var(--border-radius-sm); background: transparent; color: var(--text-secondary); border:1px solid transparent; }
+      .reschedule-popover .btn-text:hover { background: var(--grey-700); color: var(--text-inverse); }
       .reschedule-popover .close-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; min-width: 28px; min-height: 28px; padding: 0; background: var(--bg-item); color: var(--grey-300); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); line-height: 1; font-size: 16px; font-weight: 600; cursor: pointer; transition: var(--transition-fast); box-sizing: border-box; }
-      .reschedule-popover .close-btn:hover { background: var(--grey-600); color: var(--text-inverse); border-color: var(--accent-color) !important; }
+      .reschedule-popover .close-btn:hover { background: var(--grey-600); color: var(--text-inverse); }
       .reschedule-popover .calendar-toolbar { display: none; margin-top: 8px; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius); box-shadow: var(--elevation-card); padding: 8px; }
       .reschedule-popover .calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
       .reschedule-popover .calendar-month-year { font-weight: 600; }
       .reschedule-popover .calendar-nav-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; transition: var(--transition-fast); }
-      .reschedule-popover .calendar-nav-btn:hover { background: var(--bg-secondary); border-color: var(--accent-color) !important; box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+      .reschedule-popover .calendar-nav-btn:hover { background: var(--bg-secondary); border-color: var(--accent-color); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
       .reschedule-popover .calendar-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
       .reschedule-popover .calendar-weekday { text-align: center; font-size: 11px; color: var(--text-secondary); font-weight: 600; }
       .reschedule-popover .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-      .reschedule-popover .calendar-grid button { padding: 6px 0; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; transition: var(--transition-fast); }
-      .reschedule-popover .calendar-grid button:hover { background: var(--bg-secondary); border-color: var(--accent-color) !important; }
+      .reschedule-popover .calendar-grid button { padding: 6px 0; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; }
+      .reschedule-popover .calendar-grid button:hover { background: var(--bg-secondary); }
       .reschedule-popover .calendar-grid > div:empty { background: transparent; border: none; }
       .reschedule-popover .calendar-grid button.today { border-color: var(--orange-primary); }
       .reschedule-popover .calendar-grid button.selected { background: var(--orange-primary); color: #fff; border-color: var(--orange-primary); }
@@ -2525,7 +2354,7 @@
     if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.removeTask === 'function') {
       try {
         window.BackgroundTasksLoader.removeTask(task.id);
-        // console.log('[TaskDetail] Removed rescheduled task from BackgroundTasksLoader cache');
+        console.log('[TaskDetail] Removed rescheduled task from BackgroundTasksLoader cache');
       } catch (e) {
         console.warn('[TaskDetail] Failed to remove task from BackgroundTasksLoader:', e);
       }
@@ -2549,7 +2378,7 @@
     if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
       try {
         await window.CacheManager.invalidate('tasks');
-        // console.log('[TaskDetail] Invalidated tasks cache after reschedule');
+        console.log('[TaskDetail] Invalidated tasks cache after reschedule');
       } catch (_) { }
     }
 
@@ -2560,7 +2389,7 @@
     if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
       try {
         await window.BackgroundTasksLoader.forceReload();
-        // console.log('[TaskDetail] BackgroundTasksLoader reloaded after reschedule');
+        console.log('[TaskDetail] BackgroundTasksLoader reloaded after reschedule');
       } catch (e) {
         console.warn('[TaskDetail] Failed to refresh BackgroundTasksLoader after reschedule', e);
       }
@@ -2652,199 +2481,10 @@
         timestamp: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
       });
 
-      // console.log('Task notes saved to recent activities:', activityData);
+      console.log('Task notes saved to recent activities:', activityData);
     } catch (error) {
       console.error('Error saving task notes to recent activities:', error);
     }
-  }
-
-  async function getSortedTasksQueue() {
-    // Get all tasks from the same source (localStorage + Firebase) with ownership filtering
-    let allTasks = [];
-
-    // Load from localStorage (with ownership filtering)
-    try {
-      const key = getUserTasksKey();
-      const userTasks = JSON.parse(localStorage.getItem(key) || '[]');
-      allTasks = filterTasksByOwnership(userTasks);
-
-      // Fallback to legacy key
-      if (allTasks.length === 0) {
-        const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
-        allTasks = filterTasksByOwnership(legacyTasks);
-      }
-    } catch (_) { allTasks = []; }
-
-    // Load from BackgroundTasksLoader (cache-first, cost-efficient)
-    if (window.BackgroundTasksLoader) {
-      try {
-        const cachedTasks = window.BackgroundTasksLoader.getTasksData() || [];
-        const filteredCached = filterTasksByOwnership(cachedTasks);
-
-        // Merge with localStorage (local takes precedence for duplicates)
-        const allTasksMap = new Map();
-        allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
-        filteredCached.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
-        allTasks = Array.from(allTasksMap.values());
-      } catch (e) {
-        console.warn('Could not load tasks from BackgroundTasksLoader:', e);
-      }
-    }
-
-    // CRITICAL FIX: Always add LinkedIn sequence tasks (regardless of BackgroundTasksLoader)
-    try {
-      const linkedInTasks = await getLinkedInTasksFromSequences();
-      const allTasksMap = new Map();
-      allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
-      linkedInTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
-      allTasks = Array.from(allTasksMap.values());
-    } catch (e) {
-      console.warn('Could not load LinkedIn tasks for navigation:', e);
-    }
-
-    // Only query Firebase if BackgroundTasksLoader doesn't have enough data
-    if (allTasks.length < 10 && window.firebaseDB) {
-      try {
-        let firebaseTasks = [];
-
-        if (!isAdmin()) {
-          const email = getUserEmail();
-          if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
-            firebaseTasks = await window.DataManager.queryWithOwnership('tasks');
-            firebaseTasks = firebaseTasks.slice(0, 200);
-          } else if (email) {
-            // Fallback: two separate queries
-            const [ownedSnap, assignedSnap] = await Promise.all([
-              window.firebaseDB.collection('tasks')
-                .where('ownerId', '==', email)
-                .orderBy('timestamp', 'desc')
-                .limit(100)
-                .get(),
-              window.firebaseDB.collection('tasks')
-                .where('assignedTo', '==', email)
-                .orderBy('timestamp', 'desc')
-                .limit(100)
-                .get()
-            ]);
-
-            const tasksMap = new Map();
-            ownedSnap.docs.forEach(doc => {
-              const data = doc.data();
-              tasksMap.set(doc.id, {
-                id: doc.id,
-                ...data,
-                createdAt: data.createdAt || (data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now(),
-                status: data.status || 'pending'
-              });
-            });
-            assignedSnap.docs.forEach(doc => {
-              if (!tasksMap.has(doc.id)) {
-                const data = doc.data();
-                tasksMap.set(doc.id, {
-                  id: doc.id,
-                  ...data,
-                  createdAt: data.createdAt || (data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now(),
-                  status: data.status || 'pending'
-                });
-              }
-            });
-            firebaseTasks = Array.from(tasksMap.values());
-          }
-        } else {
-          // Admin: unrestricted query
-          const snapshot = await window.firebaseDB.collection('tasks')
-            .orderBy('timestamp', 'desc')
-            .limit(200)
-            .get();
-          firebaseTasks = snapshot.docs.map(doc => {
-            const data = doc.data() || {};
-            const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
-            return { ...data, id: (data.id || doc.id), createdAt, status: data.status || 'pending' };
-          });
-        }
-
-        // Merge with existing tasks
-        const allTasksMap = new Map();
-        allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
-        firebaseTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
-
-        // CRITICAL FIX: Add LinkedIn sequence tasks (in case they weren't loaded earlier)
-        const linkedInTasks = await getLinkedInTasksFromSequences();
-        linkedInTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
-
-        allTasks = Array.from(allTasksMap.values());
-      } catch (e) {
-        console.warn('Could not load tasks from Firebase for navigation:', e);
-      }
-    }
-
-    // Filter to today's and overdue pending tasks (same logic as Today's Tasks widget)
-    const today = new Date();
-    const localMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-
-    const parseDateStrict = (dateStr) => {
-      if (!dateStr) return null;
-      try {
-        if (dateStr.includes('/')) {
-          const [mm, dd, yyyy] = dateStr.split('/').map(n => parseInt(n, 10));
-          if (!isNaN(mm) && !isNaN(dd) && !isNaN(yyyy)) return new Date(yyyy, mm - 1, dd);
-        } else if (dateStr.includes('-')) {
-          const [yyyy, mm, dd] = dateStr.split('-').map(n => parseInt(n, 10));
-          if (!isNaN(mm) && !isNaN(dd) && !isNaN(yyyy)) return new Date(yyyy, mm - 1, dd);
-        }
-        const d = new Date(dateStr);
-        if (!isNaN(d)) return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-      } catch (_) { /* noop */ }
-      return null;
-    };
-
-    const todaysTasks = allTasks.filter(task => {
-      if ((task.status || 'pending') !== 'pending') return false;
-      const d = parseDateStrict(task.dueDate);
-      if (!d) return false;
-      return d.getTime() <= localMidnight.getTime();
-    });
-
-    // Sort by due date/time (earliest to latest)
-    todaysTasks.sort((a, b) => {
-      const da = parseDateStrict(a.dueDate);
-      const db = parseDateStrict(b.dueDate);
-      if (da && db) {
-        const dd = da - db;
-        if (dd !== 0) return dd;
-      } else if (da && !db) {
-        return -1;
-      } else if (!da && db) {
-        return 1;
-      }
-
-      const parseTimeToMinutes = (timeStr) => {
-        if (!timeStr || typeof timeStr !== 'string') return NaN;
-        const m = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-        if (!m) return NaN;
-        let h = parseInt(m[1], 10);
-        const mins = parseInt(m[2], 10);
-        const ap = m[3].toUpperCase();
-        if (h === 12) h = 0;
-        if (ap === 'PM') h += 12;
-        return h * 60 + mins;
-      };
-
-      const ta = parseTimeToMinutes(a.dueTime);
-      const tb = parseTimeToMinutes(b.dueTime);
-      const taValid = !isNaN(ta), tbValid = !isNaN(tb);
-      if (taValid && tbValid) {
-        const td = ta - tb; if (td !== 0) return td;
-      } else if (taValid && !tbValid) {
-        return -1;
-      } else if (!taValid && tbValid) {
-        return 1;
-      }
-
-      return (a.createdAt || 0) - (b.createdAt || 0);
-    });
-
-    return todaysTasks;
   }
 
   async function navigateToAdjacentTask(direction) {
@@ -2852,14 +2492,197 @@
 
     // Prevent multiple rapid clicks
     if (state.navigating) {
-      // console.log('Navigation already in progress, ignoring click');
+      console.log('Navigation already in progress, ignoring click');
       return;
     }
 
     state.navigating = true;
 
     try {
-      const todaysTasks = await getSortedTasksQueue();
+      // Get all tasks from the same source (localStorage + Firebase) with ownership filtering
+      let allTasks = [];
+
+      // Load from localStorage (with ownership filtering)
+      try {
+        const key = getUserTasksKey();
+        const userTasks = JSON.parse(localStorage.getItem(key) || '[]');
+        allTasks = filterTasksByOwnership(userTasks);
+
+        // Fallback to legacy key
+        if (allTasks.length === 0) {
+          const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+          allTasks = filterTasksByOwnership(legacyTasks);
+        }
+      } catch (_) { allTasks = []; }
+
+      // Load from BackgroundTasksLoader (cache-first, cost-efficient)
+      if (window.BackgroundTasksLoader) {
+        try {
+          const cachedTasks = window.BackgroundTasksLoader.getTasksData() || [];
+          const filteredCached = filterTasksByOwnership(cachedTasks);
+
+          // Merge with localStorage (local takes precedence for duplicates)
+          const allTasksMap = new Map();
+          allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
+          filteredCached.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+          allTasks = Array.from(allTasksMap.values());
+        } catch (e) {
+          console.warn('Could not load tasks from BackgroundTasksLoader:', e);
+        }
+      }
+
+      // CRITICAL FIX: Always add LinkedIn sequence tasks (regardless of BackgroundTasksLoader)
+      try {
+        const linkedInTasks = await getLinkedInTasksFromSequences();
+        const allTasksMap = new Map();
+        allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
+        linkedInTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+        allTasks = Array.from(allTasksMap.values());
+      } catch (e) {
+        console.warn('Could not load LinkedIn tasks for navigation:', e);
+      }
+
+      // Only query Firebase if BackgroundTasksLoader doesn't have enough data
+      if (allTasks.length < 10 && window.firebaseDB) {
+        try {
+          let firebaseTasks = [];
+
+          if (!isAdmin()) {
+            const email = getUserEmail();
+            if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
+              firebaseTasks = await window.DataManager.queryWithOwnership('tasks');
+              firebaseTasks = firebaseTasks.slice(0, 200);
+            } else if (email) {
+              // Fallback: two separate queries
+              const [ownedSnap, assignedSnap] = await Promise.all([
+                window.firebaseDB.collection('tasks')
+                  .where('ownerId', '==', email)
+                  .orderBy('timestamp', 'desc')
+                  .limit(100)
+                  .get(),
+                window.firebaseDB.collection('tasks')
+                  .where('assignedTo', '==', email)
+                  .orderBy('timestamp', 'desc')
+                  .limit(100)
+                  .get()
+              ]);
+
+              const tasksMap = new Map();
+              ownedSnap.docs.forEach(doc => {
+                const data = doc.data();
+                tasksMap.set(doc.id, {
+                  id: doc.id,
+                  ...data,
+                  createdAt: data.createdAt || (data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now(),
+                  status: data.status || 'pending'
+                });
+              });
+              assignedSnap.docs.forEach(doc => {
+                if (!tasksMap.has(doc.id)) {
+                  const data = doc.data();
+                  tasksMap.set(doc.id, {
+                    id: doc.id,
+                    ...data,
+                    createdAt: data.createdAt || (data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now(),
+                    status: data.status || 'pending'
+                  });
+                }
+              });
+              firebaseTasks = Array.from(tasksMap.values());
+            }
+          } else {
+            // Admin: unrestricted query
+            const snapshot = await window.firebaseDB.collection('tasks')
+              .orderBy('timestamp', 'desc')
+              .limit(200)
+              .get();
+            firebaseTasks = snapshot.docs.map(doc => {
+              const data = doc.data() || {};
+              const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
+              return { ...data, id: (data.id || doc.id), createdAt, status: data.status || 'pending' };
+            });
+          }
+
+          // Merge with existing tasks
+          const allTasksMap = new Map();
+          allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
+          firebaseTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+
+          // CRITICAL FIX: Add LinkedIn sequence tasks (in case they weren't loaded earlier)
+          const linkedInTasks = await getLinkedInTasksFromSequences();
+          linkedInTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+
+          allTasks = Array.from(allTasksMap.values());
+        } catch (e) {
+          console.warn('Could not load tasks from Firebase for navigation:', e);
+        }
+      }
+
+      // Filter to today's and overdue pending tasks (same logic as Today's Tasks widget)
+      const today = new Date();
+      const localMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+      const parseDateStrict = (dateStr) => {
+        if (!dateStr) return null;
+        try {
+          if (dateStr.includes('/')) {
+            const [mm, dd, yyyy] = dateStr.split('/').map(n => parseInt(n, 10));
+            if (!isNaN(mm) && !isNaN(dd) && !isNaN(yyyy)) return new Date(yyyy, mm - 1, dd);
+          } else if (dateStr.includes('-')) {
+            const [yyyy, mm, dd] = dateStr.split('-').map(n => parseInt(n, 10));
+            if (!isNaN(mm) && !isNaN(dd) && !isNaN(yyyy)) return new Date(yyyy, mm - 1, dd);
+          }
+          const d = new Date(dateStr);
+          if (!isNaN(d)) return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        } catch (_) { /* noop */ }
+        return null;
+      };
+
+      const todaysTasks = allTasks.filter(task => {
+        if ((task.status || 'pending') !== 'pending') return false;
+        const d = parseDateStrict(task.dueDate);
+        if (!d) return false;
+        return d.getTime() <= localMidnight.getTime();
+      });
+
+      // Sort by due date/time (earliest to latest)
+      todaysTasks.sort((a, b) => {
+        const da = parseDateStrict(a.dueDate);
+        const db = parseDateStrict(b.dueDate);
+        if (da && db) {
+          const dd = da - db;
+          if (dd !== 0) return dd;
+        } else if (da && !db) {
+          return -1;
+        } else if (!da && db) {
+          return 1;
+        }
+
+        const parseTimeToMinutes = (timeStr) => {
+          if (!timeStr || typeof timeStr !== 'string') return NaN;
+          const m = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+          if (!m) return NaN;
+          let h = parseInt(m[1], 10);
+          const mins = parseInt(m[2], 10);
+          const ap = m[3].toUpperCase();
+          if (h === 12) h = 0;
+          if (ap === 'PM') h += 12;
+          return h * 60 + mins;
+        };
+
+        const ta = parseTimeToMinutes(a.dueTime);
+        const tb = parseTimeToMinutes(b.dueTime);
+        const taValid = !isNaN(ta), tbValid = !isNaN(tb);
+        if (taValid && tbValid) {
+          const td = ta - tb; if (td !== 0) return td;
+        } else if (taValid && !tbValid) {
+          return -1;
+        } else if (!taValid && tbValid) {
+          return 1;
+        }
+
+        return (a.createdAt || 0) - (b.createdAt || 0);
+      });
 
       // Find current task index
       const currentIndex = todaysTasks.findIndex(task => task.id === state.currentTask.id);
@@ -2867,7 +2690,7 @@
       // If current task not found (e.g., just completed), find the appropriate next task
       let targetIndex;
       if (currentIndex === -1) {
-        // console.log('Current task not found in filtered list (likely just completed)');
+        console.log('Current task not found in filtered list (likely just completed)');
         if (direction === 'next') {
           // For next navigation after completion, go to the first remaining task
           targetIndex = 0;
@@ -2886,14 +2709,14 @@
 
       // Check bounds - don't navigate if at the end
       if (targetIndex < 0 || targetIndex >= todaysTasks.length) {
-        // console.log(`Navigation ${direction} blocked: targetIndex ${targetIndex}, total tasks ${todaysTasks.length}`);
+        console.log(`Navigation ${direction} blocked: targetIndex ${targetIndex}, total tasks ${todaysTasks.length}`);
         return;
       }
 
       // Navigate to the target task
       const targetTask = todaysTasks[targetIndex];
       if (targetTask && targetTask.id) {
-        // console.log(`Navigating ${direction} from task ${currentIndex} to task ${targetIndex}: ${targetTask.title}`);
+        console.log(`Navigating ${direction} from task ${currentIndex} to task ${targetIndex}: ${targetTask.title}`);
 
         // Clean up any existing avatars/icons before loading new task
         cleanupExistingAvatarsAndIcons();
@@ -3150,11 +2973,6 @@
     state.account = null;
     state._taskAccountFound = false;
     state._taskAccountNotFound = false;
-    // Clear currentTask to prevent UI from rendering stale data during load
-    // But keep ID if needed? No, loadTaskData takes taskId as arg.
-    if (state.currentTask && state.currentTask.id !== taskId) {
-       state.currentTask = null;
-    }
     state.loadingTask = true;
 
     try {
@@ -3220,6 +3038,9 @@
       if (!task && window._essentialTasksData) {
         const filteredEssential = filterTasksByOwnership(window._essentialTasksData);
         task = filteredEssential.find(t => t.id === taskId);
+        if (task) {
+          console.log('[TaskDetail] Using pre-loaded task data');
+        }
       }
 
       // If not found, try BackgroundTasksLoader (cache-first, cost-efficient)
@@ -3240,9 +3061,9 @@
           }
 
           if (task) {
-            // console.log('[TaskDetail] Using BackgroundTasksLoader cached data');
+            console.log('[TaskDetail] Using BackgroundTasksLoader cached data');
           } else {
-            // console.log('[TaskDetail] Task not found in BackgroundTasksLoader cache, will try Firebase');
+            console.log('[TaskDetail] Task not found in BackgroundTasksLoader cache, will try Firebase');
           }
         } catch (e) {
           console.warn('Could not load task from BackgroundTasksLoader:', e);
@@ -3252,6 +3073,8 @@
       // If not found, try Firebase (with ownership filtering)
       if (!task && window.firebaseDB) {
         try {
+          console.log('[TaskDetail] Loading task from Firebase:', taskId);
+
           // CRITICAL FIX: Try multiple strategies to find the task
           // Strategy 1: Try to get document directly by ID (if taskId is a document ID)
           try {
@@ -3262,7 +3085,7 @@
               if (isAdmin() || !data.ownerId && !data.assignedTo) {
                 // Admin or no ownership fields - allow
                 task = { ...data, id: data.id || directDoc.id };
-                // console.log('[TaskDetail] Found task by document ID:', directDoc.id);
+                console.log('[TaskDetail] Found task by document ID:', directDoc.id);
               } else {
                 const email = getUserEmail();
                 const ownerId = (data.ownerId || '').toLowerCase();
@@ -3270,13 +3093,13 @@
                 const createdBy = (data.createdBy || '').toLowerCase();
                 if (ownerId === email || assignedTo === email || createdBy === email) {
                   task = { ...data, id: data.id || directDoc.id };
-                  // console.log('[TaskDetail] Found task by document ID (ownership verified):', directDoc.id);
+                  console.log('[TaskDetail] Found task by document ID (ownership verified):', directDoc.id);
                 }
               }
             }
           } catch (directError) {
-              // console.log('[TaskDetail] Direct document lookup failed, trying queries:', directError);
-            }
+            console.log('[TaskDetail] Direct document lookup failed, trying queries:', directError);
+          }
 
           // Strategy 2: Query by 'id' field (if taskId is stored as a field)
           if (!task) {
@@ -3287,7 +3110,7 @@
                 const allTasks = await window.DataManager.queryWithOwnership('tasks');
                 task = allTasks.find(t => (t.id === taskId) || (t.id && String(t.id) === String(taskId)));
                 if (task) {
-                  // console.log('[TaskDetail] Found task via DataManager.queryWithOwnership');
+                  console.log('[TaskDetail] Found task via DataManager.queryWithOwnership');
                 }
               } else if (email) {
                 // Fallback: try queries with 'id' field
@@ -3309,12 +3132,12 @@
                     const doc = ownedSnap.docs[0];
                     const data = doc.data();
                     task = { ...data, id: data.id || doc.id };
-                    // console.log('[TaskDetail] Found task via ownerId query:', doc.id);
+                    console.log('[TaskDetail] Found task via ownerId query:', doc.id);
                   } else if (!assignedSnap.empty) {
                     const doc = assignedSnap.docs[0];
                     const data = doc.data();
                     task = { ...data, id: data.id || doc.id };
-                    // console.log('[TaskDetail] Found task via assignedTo query:', doc.id);
+                    console.log('[TaskDetail] Found task via assignedTo query:', doc.id);
                   }
                 } catch (queryError) {
                   console.warn('[TaskDetail] Query by id field failed (may not be indexed):', queryError);
@@ -3332,6 +3155,7 @@
                   const doc = snapshot.docs[0];
                   const data = doc.data();
                   task = { ...data, id: data.id || doc.id };
+                  console.log('[TaskDetail] Found task via admin query:', doc.id);
                 }
               } catch (queryError) {
                 console.warn('[TaskDetail] Admin query by id field failed (may not be indexed):', queryError);
@@ -3341,7 +3165,7 @@
 
           // Strategy 3: Load all tasks and find by ID (fallback if queries fail)
           if (!task) {
-            // console.log('[TaskDetail] Trying fallback: load all tasks and find by ID');
+            console.log('[TaskDetail] Trying fallback: load all tasks and find by ID');
             try {
               let allTasks = [];
               if (!isAdmin()) {
@@ -3390,7 +3214,7 @@
               });
 
               if (task) {
-                // console.log('[TaskDetail] Found task via fallback search through all tasks');
+                console.log('[TaskDetail] Found task via fallback search through all tasks');
               }
             } catch (fallbackError) {
               console.warn('[TaskDetail] Fallback search failed:', fallbackError);
@@ -3402,6 +3226,7 @@
               task.timestamp.toDate().getTime() : task.timestamp) || Date.now();
             task.createdAt = createdAt;
             task.status = task.status || 'pending';
+            console.log('[TaskDetail] Task loaded successfully:', { id: task.id, type: task.type, title: task.title });
           } else {
             console.warn('[TaskDetail] Task not found in Firebase after all strategies:', taskId);
           }
@@ -3412,7 +3237,7 @@
 
       if (!task) {
         console.error('[TaskDetail] Task not found after all attempts:', taskId);
-        /* console.log('[TaskDetail] Debug info:', {
+        console.log('[TaskDetail] Debug info:', {
           taskId,
           hasFirebase: !!window.firebaseDB,
           hasBackgroundLoader: !!window.BackgroundTasksLoader,
@@ -3420,12 +3245,12 @@
           localStorageKey: getUserTasksKey(),
           localStorageCount: (JSON.parse(localStorage.getItem(getUserTasksKey()) || '[]')).length,
           legacyLocalStorageCount: (JSON.parse(localStorage.getItem('userTasks') || '[]')).length
-        }); */
+        });
 
         // CRITICAL FIX: Try force reloading cache before giving up
         try {
           if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
-            // console.log('[TaskDetail] Task not found in cache, forcing cache reload...');
+            console.log('[TaskDetail] Task not found in cache, forcing cache reload...');
             await window.BackgroundTasksLoader.forceReload();
 
             // Try one more time after reload
@@ -3434,7 +3259,7 @@
             task = filteredReloaded.find(t => t && (t.id === taskId || String(t.id) === String(taskId)));
 
             if (task) {
-              // console.log('[TaskDetail] Found task after force reload');
+              console.log('[TaskDetail] Found task after force reload');
             } else {
               console.warn('[TaskDetail] Task still not found after force reload');
             }
@@ -3458,7 +3283,7 @@
       // CRITICAL FIX: Validate task data before normalization
       if (typeof task !== 'object' || !task.id) {
         console.error('[TaskDetail] Invalid task data:', task);
-        // console.log('[TaskDetail] Task object keys:', task ? Object.keys(task) : 'null');
+        console.log('[TaskDetail] Task object keys:', task ? Object.keys(task) : 'null');
         showTaskError('Invalid task data. Please refresh the page.');
         state.loadingTask = false;
         return;
@@ -3475,13 +3300,13 @@
       task.contactId = task.contactId || '';
       task.accountId = task.accountId || '';
 
-      /* console.log('[TaskDetail] Task validated and normalized:', {
+      console.log('[TaskDetail] Task validated and normalized:', {
         id: task.id,
         type: task.type,
         title: task.title,
         hasContact: !!task.contact,
         hasAccount: !!task.account
-      }); */
+      });
 
       // Normalize legacy task shapes/titles/types
       const normType = (t) => {
@@ -3510,23 +3335,23 @@
       state.currentTask = task;
       state.taskType = task.type;
 
-      /* console.log('[TaskDetail] Task loaded, preparing to render:', {
+      console.log('[TaskDetail] Task loaded, preparing to render:', {
         id: task.id,
         type: task.type,
         title: task.title,
         contact: task.contact,
         account: task.account
-      }); */
+      });
 
       // Load contact/account data - AWAIT to ensure data is loaded before rendering
       await loadContactAccountData(task);
 
-      /* console.log('[TaskDetail] Contact/account data loading complete:', {
+      console.log('[TaskDetail] Contact/account data loading complete:', {
         hasContact: !!state.contact,
         hasAccount: !!state.account,
         contactId: state.contact?.id,
         accountId: state.account?.id
-      }); */
+      });
 
       // CRITICAL FIX: Ensure DOM is ready before rendering
       if (!els.content) {
@@ -3542,6 +3367,7 @@
       // Render the task page
       try {
         renderTaskPage();
+        console.log('[TaskDetail] Task page rendered successfully');
       } catch (renderError) {
         console.error('[TaskDetail] Error rendering task page:', renderError);
         showTaskError('Failed to render task. Please refresh the page.');
@@ -3634,7 +3460,7 @@
         console.warn('[TaskDetail] Failed to dispatch tasksUpdated for stale task cleanup:', e);
       }
 
-      // console.log('[TaskDetail] Cleaned up stale task locally:', taskId);
+      console.log('[TaskDetail] Cleaned up stale task locally:', taskId);
     } catch (e) {
       console.warn('[TaskDetail] Unexpected error during stale task cleanup:', e);
     }
@@ -3651,14 +3477,14 @@
     // Method 1: Try CacheManager first (most reliable - always available)
     if (window.CacheManager && typeof window.CacheManager.get === 'function') {
       try {
-        // console.log('[TaskDetail] Loading contacts/accounts from CacheManager...');
+        console.log('[TaskDetail] Loading contacts/accounts from CacheManager...');
         const [cachedContacts, cachedAccounts] = await Promise.all([
           window.CacheManager.get('contacts').catch(() => []),
           window.CacheManager.get('accounts').catch(() => [])
         ]);
         contactsData = cachedContacts || [];
         accountsData = cachedAccounts || [];
-        // console.log('[TaskDetail] CacheManager returned', contactsData.length, 'contacts,', accountsData.length, 'accounts');
+        console.log('[TaskDetail] CacheManager returned', contactsData.length, 'contacts,', accountsData.length, 'accounts');
       } catch (e) {
         console.warn('[TaskDetail] CacheManager failed:', e);
       }
@@ -3667,36 +3493,36 @@
     // Method 2: Try getPeopleData/getAccountsData (page module data)
     if (contactsData.length === 0 && typeof window.getPeopleData === 'function') {
       contactsData = window.getPeopleData() || [];
-      // console.log('[TaskDetail] getPeopleData returned', contactsData.length, 'contacts');
+      console.log('[TaskDetail] getPeopleData returned', contactsData.length, 'contacts');
     }
     if (accountsData.length === 0 && typeof window.getAccountsData === 'function') {
       accountsData = window.getAccountsData(true) || [];
-      // console.log('[TaskDetail] getAccountsData returned', accountsData.length, 'accounts');
+      console.log('[TaskDetail] getAccountsData returned', accountsData.length, 'accounts');
     }
 
     // Method 3: Try BackgroundContactsLoader/BackgroundAccountsLoader if available
     if (contactsData.length === 0 && window.BackgroundContactsLoader) {
       contactsData = window.BackgroundContactsLoader.getContactsData() || [];
-      // console.log('[TaskDetail] BackgroundContactsLoader returned', contactsData.length, 'contacts');
+      console.log('[TaskDetail] BackgroundContactsLoader returned', contactsData.length, 'contacts');
     }
     if (accountsData.length === 0 && window.BackgroundAccountsLoader) {
       accountsData = window.BackgroundAccountsLoader.getAccountsData() || [];
-      // console.log('[TaskDetail] BackgroundAccountsLoader returned', accountsData.length, 'accounts');
+      console.log('[TaskDetail] BackgroundAccountsLoader returned', accountsData.length, 'accounts');
     }
 
     // Method 4: If still no data, wait a bit and retry with CacheManager
     if ((contactsData.length === 0 || accountsData.length === 0) && window.CacheManager) {
-      // console.log('[TaskDetail] Waiting for cache to populate...');
+      console.log('[TaskDetail] Waiting for cache to populate...');
       await new Promise(resolve => setTimeout(resolve, 500));
 
       try {
         if (contactsData.length === 0) {
           contactsData = await window.CacheManager.get('contacts').catch(() => []) || [];
-          // console.log('[TaskDetail] Retry: CacheManager returned', contactsData.length, 'contacts');
+          console.log('[TaskDetail] Retry: CacheManager returned', contactsData.length, 'contacts');
         }
         if (accountsData.length === 0) {
           accountsData = await window.CacheManager.get('accounts').catch(() => []) || [];
-          // console.log('[TaskDetail] Retry: CacheManager returned', accountsData.length, 'accounts');
+          console.log('[TaskDetail] Retry: CacheManager returned', accountsData.length, 'accounts');
         }
       } catch (e) {
         console.warn('[TaskDetail] Retry CacheManager failed:', e);
@@ -3711,7 +3537,7 @@
         // Try to find by contactId first
         if (task.contactId && contactsData.length > 0) {
           contact = contactsData.find(p => p.id === task.contactId);
-          // if (contact) console.log('[TaskDetail] Found contact by ID:', task.contactId);
+          if (contact) console.log('[TaskDetail] Found contact by ID:', task.contactId);
         }
 
         // Fallback: try to find by name
@@ -3720,19 +3546,19 @@
             const fullName = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
             return fullName && fullName.toLowerCase() === String(task.contact).toLowerCase();
           });
-          // if (contact) console.log('[TaskDetail] Found contact by name:', task.contact);
+          if (contact) console.log('[TaskDetail] Found contact by name:', task.contact);
         }
 
         // LAST RESORT: Direct Firebase query if cache/loaders failed
         if (!contact && window.firebaseDB) {
-          // console.log('[TaskDetail] Cache miss - querying Firebase directly for contact...');
+          console.log('[TaskDetail] Cache miss - querying Firebase directly for contact...');
           try {
             // Try by ID first (direct document lookup - most efficient)
             if (task.contactId) {
               const doc = await window.firebaseDB.collection('contacts').doc(task.contactId).get();
               if (doc.exists) {
                 contact = { id: doc.id, ...doc.data() };
-                // console.log('[TaskDetail] ✓ Found contact via direct Firebase query by ID');
+                console.log('[TaskDetail] ✓ Found contact via direct Firebase query by ID');
               }
             }
 
@@ -3751,7 +3577,7 @@
                 if (!snap.empty) {
                   const doc = snap.docs[0];
                   contact = { id: doc.id, ...doc.data() };
-                  // console.log('[TaskDetail] ✓ Found contact via Firebase query by name');
+                  console.log('[TaskDetail] ✓ Found contact via Firebase query by name');
                 }
               }
             }
@@ -3762,7 +3588,7 @@
 
         if (contact) {
           state.contact = contact;
-          // console.log('[TaskDetail] ✓ Loaded contact data:', contact.id, contact.firstName, contact.lastName);
+          console.log('[TaskDetail] ✓ Loaded contact data:', contact.id, contact.firstName, contact.lastName);
         } else {
           console.warn('[TaskDetail] ✗ Could not find contact:', task.contactId || task.contact, '(searched', contactsData.length, 'contacts + Firebase)');
         }
@@ -3780,6 +3606,7 @@
         // Try to find by accountId first
         if (task.accountId && accountsData.length > 0) {
           account = accountsData.find(a => a.id === task.accountId);
+          if (account) console.log('[TaskDetail] Found account by ID:', task.accountId);
         }
 
         // Fallback: try to find by name
@@ -3788,17 +3615,19 @@
             const accountName = a.accountName || a.name || a.companyName || '';
             return accountName && accountName.toLowerCase() === String(task.account).toLowerCase();
           });
+          if (account) console.log('[TaskDetail] Found account by name:', task.account);
         }
 
         // LAST RESORT: Direct Firebase query if cache/loaders failed
         if (!account && window.firebaseDB) {
-          // console.log('[TaskDetail] Cache miss - querying Firebase directly for account...');
+          console.log('[TaskDetail] Cache miss - querying Firebase directly for account...');
           try {
             // Try by ID first (direct document lookup - most efficient)
             if (task.accountId) {
               const doc = await window.firebaseDB.collection('accounts').doc(task.accountId).get();
               if (doc.exists) {
                 account = { id: doc.id, ...doc.data() };
+                console.log('[TaskDetail] ✓ Found account via direct Firebase query by ID');
               }
             }
 
@@ -3812,7 +3641,7 @@
               if (!snap.empty) {
                 const doc = snap.docs[0];
                 account = { id: doc.id, ...doc.data() };
-                // console.log('[TaskDetail] ✓ Found account via Firebase query by accountName');
+                console.log('[TaskDetail] ✓ Found account via Firebase query by accountName');
               }
 
               // Also try 'name' field as fallback
@@ -3824,6 +3653,7 @@
                 if (!snap2.empty) {
                   const doc = snap2.docs[0];
                   account = { id: doc.id, ...doc.data() };
+                  console.log('[TaskDetail] ✓ Found account via Firebase query by name field');
                 }
               }
             }
@@ -3836,7 +3666,7 @@
           state.account = account;
           // Mark that we successfully found the account for this task
           state._taskAccountFound = true;
-          // console.log('[TaskDetail] ✓ Loaded account data:', account.id, account.accountName || account.name);
+          console.log('[TaskDetail] ✓ Loaded account data:', account.id, account.accountName || account.name);
         } else {
           // CRITICAL FIX: Explicitly set state.account to null when account is not found
           // This prevents stale account data from previous tasks from persisting
@@ -3863,35 +3693,45 @@
     let retries = 0;
 
     const tryRender = () => {
-      // Target the profile container for flex alignment
-      const profileContainer = document.querySelector('#task-detail-page .contact-header-profile');
-      if (profileContainer) {
-        // Cleanup existing avatar/icon elements in the profile container
-        const existingElements = profileContainer.querySelectorAll('.avatar-initials, .company-favicon-header, .avatar-circle-small, .company-logo-header');
-        existingElements.forEach(el => el.remove());
+      // CRITICAL FIX: Scope selector to task-detail-page if not already scoped
+      const scopedSelector = elementSelector.includes('#task-detail-page')
+        ? elementSelector
+        : `#task-detail-page ${elementSelector}`;
+      const titleSection = document.querySelector(scopedSelector);
+      if (titleSection) {
+        // Cleanup existing elements
+        const existingElements = titleSection.querySelectorAll('.avatar-initials, .company-favicon-header, .avatar-absolute, [class*="avatar"], [class*="favicon"]');
+        existingElements.forEach(el => {
+          if (el && el.parentNode) {
+            el.remove();
+          }
+        });
 
-        // Create the wrapper - no absolute positioning, let flex handle it
-        let wrapper;
-        if (isAvatar) {
-          // For avatars, create a div with the initials
-          wrapper = document.createElement('div');
-          wrapper.className = 'avatar-circle-small';
-          wrapper.setAttribute('aria-hidden', 'true');
-          wrapper.textContent = htmlContent; // htmlContent is just the initials text
-        } else {
-          // For company icons, htmlContent is already a complete HTML string from generateCompanyIconHTML
-          // Create a wrapper div to contain it
-          wrapper = document.createElement('div');
-          wrapper.className = 'company-logo-header';
-          wrapper.innerHTML = htmlContent;
-        }
+        // Also check for absolutely positioned elements
+        const allChildren = titleSection.querySelectorAll('*');
+        allChildren.forEach(child => {
+          if (child.style && child.style.position === 'absolute' &&
+            (child.classList.contains('avatar-absolute') ||
+              child.querySelector('.avatar-initials') ||
+              child.querySelector('.company-favicon-header'))) {
+            child.remove();
+          }
+        });
 
-        // Prepend so it appears before the text
-        profileContainer.prepend(wrapper);
+        // Add the new element
+        const wrapper = isAvatar
+          ? `<span class="avatar-initials avatar-absolute" aria-hidden="true">${htmlContent}</span>`
+          : `<div class="company-favicon-header avatar-absolute" aria-hidden="true">${htmlContent}</div>`;
+
+        titleSection.insertAdjacentHTML('beforeend', wrapper);
 
         // Add icon-loaded class
         requestAnimationFrame(() => {
-          wrapper.classList.add('icon-loaded');
+          const element = titleSection.querySelector(isAvatar ? '.avatar-initials' : '.company-favicon-header');
+          if (element) {
+            element.classList.add('icon-loaded');
+            console.log(`[TaskDetail] Successfully rendered ${isAvatar ? 'avatar' : 'icon'}`);
+          }
         });
 
         return true;
@@ -3913,21 +3753,45 @@
 
   // Robust cleanup function to remove all existing avatars/icons
   function cleanupExistingAvatarsAndIcons() {
-    const profileContainer = document.querySelector('#task-detail-page .contact-header-profile');
-    if (!profileContainer) return;
+    // CRITICAL FIX: Scope selector to task-detail-page
+    const titleSection = document.querySelector('#task-detail-page .contact-header-text');
+    if (!titleSection) return;
 
+    // Remove all possible avatar/icon elements
     const selectors = [
       '.avatar-initials',
-      '.avatar-circle-small',
       '.company-favicon-header',
-      '.company-logo-header',
-      '.avatar-absolute'
+      '.avatar-absolute',
+      '[class*="avatar"]',
+      '[class*="favicon"]',
+      '[class*="company-logo"]',
+      '[class*="company-icon"]'
     ];
 
     selectors.forEach(selector => {
-      const elements = profileContainer.querySelectorAll(selector);
-      elements.forEach(el => el.remove());
+      const elements = titleSection.querySelectorAll(selector);
+      elements.forEach(el => {
+        if (el && el.parentNode) {
+          el.remove();
+        }
+      });
     });
+
+    // Also check for any absolutely positioned elements that might be avatars
+    const allChildren = titleSection.querySelectorAll('*');
+    allChildren.forEach(child => {
+      if (child.style && child.style.position === 'absolute' &&
+        (child.classList.contains('avatar-absolute') ||
+          child.querySelector('.avatar-initials') ||
+          child.querySelector('.company-favicon-header') ||
+          child.querySelector('[class*="avatar"]') ||
+          child.querySelector('[class*="favicon"]'))) {
+        child.remove();
+      }
+    });
+
+    // Force a reflow to ensure DOM is clean
+    titleSection.offsetHeight;
   }
 
   // Inject header buttons into the task detail page header
@@ -3949,7 +3813,7 @@
     const buttonsHTML = renderTaskHeaderButtons();
     if (buttonsHTML) {
       header.insertAdjacentHTML('beforeend', buttonsHTML);
-      // console.log('[TaskDetail] Header action buttons injected successfully');
+      console.log('[TaskDetail] Header action buttons injected successfully');
     }
   }
 
@@ -3961,11 +3825,11 @@
       return;
     }
 
-    // console.log('[TaskDetail] Rendering task page for task:', {
-    //   id: state.currentTask.id,
-    //   type: state.currentTask.type,
-    //   title: state.currentTask.title
-    // });
+    console.log('[TaskDetail] Rendering task page for task:', {
+      id: state.currentTask.id,
+      type: state.currentTask.type,
+      title: state.currentTask.title
+    });
 
     // CRITICAL: Ensure DOM refs are initialized
     if (!els.content) {
@@ -4023,17 +3887,11 @@
         };
         const domain = account?.domain ? String(account.domain).replace(/^https?:\/\//, '').replace(/\/$/, '').replace(/^www\./i, '') : deriveDomain(account?.website || '');
         const logoUrl = account?.logoUrl || '';
-
         const companyIconSize = 40; // Larger icon for header
         let companyIconHTML = '';
         try {
           if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
-            companyIconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ 
-              logoUrl, 
-              domain, 
-              website: account?.website || '',
-              size: companyIconSize 
-            });
+            companyIconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: companyIconSize });
           }
         } catch (_) { /* noop */ }
 
@@ -4063,7 +3921,7 @@
         }
 
         // Add company icon/favicon to header using retry helper
-        renderAvatarOrIcon('', companyIconHTML, false);
+        renderAvatarOrIcon('#task-detail-page .contact-header-text', companyIconHTML, false);
 
         // CRITICAL FIX: Subtitle is already updated above, but ensure it's set here too
         if (els.subtitle) {
@@ -4084,7 +3942,7 @@
           contactInfoEl = document.createElement('div');
           contactInfoEl.id = 'task-contact-info';
           contactInfoEl.className = 'task-contact-info';
-          contactInfoEl.style.cssText = 'color: var(--text-secondary); font-size: 14px;';
+          contactInfoEl.style.cssText = 'margin-top: 0px; color: var(--text-secondary); font-size: 14px;';
 
           // CRITICAL FIX: Scope selector to task-detail-page
           const titleSection = document.querySelector('#task-detail-page .contact-header-text');
@@ -4154,7 +4012,7 @@
           return e ? e[0].toUpperCase() : '?';
         })();
 
-        // console.log('Contact task - Contact name:', contactName, 'Initials:', initials);
+        console.log('Contact task - Contact name:', contactName, 'Initials:', initials);
 
         // Update the main title to include clickable contact name
         if (els.title && contactName) {
@@ -4164,22 +4022,22 @@
           // Priority 1: Use state.contact if available (most reliable)
           if (state.contact && state.contact.id) {
             finalContactId = state.contact.id;
-            // console.log('[TaskDetail] Using contactId from state.contact:', finalContactId);
+            console.log('[TaskDetail] Using contactId from state.contact:', finalContactId);
           }
           // Priority 2: Use person.id if found from lookup
           else if (person && person.id) {
             finalContactId = person.id;
-            // console.log('[TaskDetail] Using contactId from person lookup:', finalContactId);
+            console.log('[TaskDetail] Using contactId from person lookup:', finalContactId);
           }
           // Priority 3: Use task contactId
           else if (contactId) {
             finalContactId = contactId;
-            // console.log('[TaskDetail] Using contactId from task:', finalContactId);
+            console.log('[TaskDetail] Using contactId from task:', finalContactId);
           }
           // Priority 4: Check person._id as fallback
           else if (person && person._id) {
             finalContactId = person._id;
-            // console.log('[TaskDetail] Using contactId from person._id:', finalContactId);
+            console.log('[TaskDetail] Using contactId from person._id:', finalContactId);
           }
           // Priority 5: Last resort - try to find contact by name in BackgroundContactsLoader
           else if (contactName && window.BackgroundContactsLoader) {
@@ -4191,21 +4049,21 @@
               });
               if (foundContact && foundContact.id) {
                 finalContactId = foundContact.id;
-                // console.log('[TaskDetail] Found contactId from BackgroundContactsLoader:', finalContactId);
+                console.log('[TaskDetail] Found contactId from BackgroundContactsLoader:', finalContactId);
               }
             } catch (e) {
               console.warn('[TaskDetail] Error finding contact in BackgroundContactsLoader:', e);
             }
           }
 
-          /* console.log('[TaskDetail] Rendering contact link:', {
+          console.log('[TaskDetail] Rendering contact link:', {
             contactName,
             contactId: finalContactId,
             hasPerson: !!person,
             personId: person?.id,
             hasStateContact: !!state.contact,
             stateContactId: state.contact?.id
-          }); */
+          });
 
           // CRITICAL FIX: Always render the link, even without ID (handler will try to resolve it)
           const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(finalContactId || '')}" data-contact-name="${escapeHtml(contactName)}" style="cursor: pointer;">${escapeHtml(contactName)}</a>`;
@@ -4228,11 +4086,11 @@
           requestAnimationFrame(() => {
             const contactLink = els.title.querySelector('.contact-link');
             if (contactLink) {
-              // // console.log('[TaskDetail] ✓ Contact link rendered successfully:', {
-              //   contactId: contactLink.getAttribute('data-contact-id'),
-              //   contactName: contactLink.getAttribute('data-contact-name'),
-              //   hasHandler: !!document._taskDetailContactHandlersBound
-              // });
+              console.log('[TaskDetail] ✓ Contact link rendered successfully:', {
+                contactId: contactLink.getAttribute('data-contact-id'),
+                contactName: contactLink.getAttribute('data-contact-name'),
+                hasHandler: !!document._taskDetailContactHandlersBound
+              });
 
               // Verify event handler is set up
               if (!document._taskDetailContactHandlersBound) {
@@ -4284,13 +4142,28 @@
         // Set the contact details content
         contactInfoEl.innerHTML = `<div class="contact-details-normal">${contactDetailsHTML}</div>`;
 
-        // Add avatar to the left of contact name (as sibling, not child)
+        // Add absolutely positioned avatar to the main title container using retry helper
         // Ensure we have valid initials
         const finalInitials = initials && initials !== '?' ? initials : (contactName ? contactName.charAt(0).toUpperCase() : 'C');
-        // console.log('Contact task - Rendering avatar with initials:', finalInitials);
+        console.log('Contact task - Rendering avatar with initials:', finalInitials);
 
-        // Render avatar using the proper helper (adds as sibling to .contact-header-text)
-        renderAvatarOrIcon('', escapeHtml(finalInitials), true);
+        // Render avatar with retry - ensure it's inside .contact-header-text
+        // CRITICAL FIX: Use scoped selector within task-detail-page
+        const titleSection = document.querySelector('#task-detail-page .contact-header-text');
+        if (titleSection) {
+          // Clean up any existing avatars first
+          const existingAvatars = titleSection.querySelectorAll('.avatar-initials, .avatar-absolute');
+          existingAvatars.forEach(el => el.remove());
+
+          // Create avatar element
+          const avatarHTML = `<span class="avatar-initials avatar-absolute" aria-hidden="true" style="position: absolute; left: -50px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; background: var(--orange-subtle); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; letter-spacing: 0.5px;">${escapeHtml(finalInitials)}</span>`;
+          titleSection.insertAdjacentHTML('beforeend', avatarHTML);
+          console.log('[TaskDetail] Avatar rendered successfully with initials:', finalInitials);
+        } else {
+          // Fallback to retry helper if element not found
+          console.warn('[TaskDetail] .contact-header-text not found, using retry helper');
+          renderAvatarOrIcon('#task-detail-page .contact-header-text', escapeHtml(finalInitials), true);
+        }
       }
     } else if (state.taskType === 'li-connect' || state.taskType === 'li-message' || state.taskType === 'li-view-profile' || state.taskType === 'li-interact-post' ||
       state.taskType === 'linkedin-connect' || state.taskType === 'linkedin-message' || state.taskType === 'linkedin-view' || state.taskType === 'linkedin-interact') {
@@ -4348,7 +4221,7 @@
         return e ? e[0].toUpperCase() : '?';
       })();
 
-      // console.log('LinkedIn task - Contact name:', contactName, 'Initials:', initials);
+      console.log('LinkedIn task - Contact name:', contactName, 'Initials:', initials);
 
       // Update the main title to include clickable contact name
       if (els.title && contactName) {
@@ -4359,22 +4232,22 @@
         // Priority 1: Use state.contact if available (most reliable)
         if (state.contact && state.contact.id) {
           finalContactId = state.contact.id;
-          // console.log('[TaskDetail] LinkedIn: Using contactId from state.contact:', finalContactId);
+          console.log('[TaskDetail] LinkedIn: Using contactId from state.contact:', finalContactId);
         }
         // Priority 2: Use person.id if found from lookup
         else if (person && person.id) {
           finalContactId = person.id;
-          // console.log('[TaskDetail] LinkedIn: Using contactId from person lookup:', finalContactId);
+          console.log('[TaskDetail] LinkedIn: Using contactId from person lookup:', finalContactId);
         }
         // Priority 3: Use task contactId
         else if (taskContactId) {
           finalContactId = taskContactId;
-          // console.log('[TaskDetail] LinkedIn: Using contactId from task:', finalContactId);
+          console.log('[TaskDetail] LinkedIn: Using contactId from task:', finalContactId);
         }
         // Priority 4: Check person._id as fallback
         else if (person && person._id) {
           finalContactId = person._id;
-          // console.log('[TaskDetail] LinkedIn: Using contactId from person._id:', finalContactId);
+          console.log('[TaskDetail] LinkedIn: Using contactId from person._id:', finalContactId);
         }
         // Priority 5: Last resort - try to find contact by name in BackgroundContactsLoader
         else if (contactName && window.BackgroundContactsLoader) {
@@ -4386,21 +4259,21 @@
             });
             if (foundContact && foundContact.id) {
               finalContactId = foundContact.id;
-              // console.log('[TaskDetail] LinkedIn: Found contactId from BackgroundContactsLoader:', finalContactId);
+              console.log('[TaskDetail] LinkedIn: Found contactId from BackgroundContactsLoader:', finalContactId);
             }
           } catch (e) {
             console.warn('[TaskDetail] LinkedIn: Error finding contact in BackgroundContactsLoader:', e);
           }
         }
 
-        // console.log('[TaskDetail] Rendering LinkedIn contact link:', {
-        //   contactName,
-        //   contactId: finalContactId,
-        //   hasPerson: !!person,
-        //   personId: person?.id,
-        //   hasStateContact: !!state.contact,
-        //   stateContactId: state.contact?.id
-        // });
+        console.log('[TaskDetail] Rendering LinkedIn contact link:', {
+          contactName,
+          contactId: finalContactId,
+          hasPerson: !!person,
+          personId: person?.id,
+          hasStateContact: !!state.contact,
+          stateContactId: state.contact?.id
+        });
 
         const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(finalContactId || '')}" data-contact-name="${escapeHtml(contactName)}" style="cursor: pointer;">${escapeHtml(contactName)}</a>`;
         // Determine action text based on task type (contact name goes in the middle)
@@ -4494,12 +4367,27 @@
       // Set the contact details content
       contactInfoEl.innerHTML = `<div class="contact-details-normal">${contactDetailsHTML}</div>`;
 
-      // Add avatar to the left of contact name (as sibling, not child)
+      // Add absolutely positioned avatar to the main title container
       const finalInitials = initials && initials !== '?' ? initials : (contactName ? contactName.charAt(0).toUpperCase() : 'C');
       console.log('LinkedIn task - Rendering avatar with initials:', finalInitials);
 
-      // Render avatar using the proper helper (adds as sibling to .contact-header-text)
-      renderAvatarOrIcon('', escapeHtml(finalInitials), true);
+      // Render avatar with retry - ensure it's inside .contact-header-text
+      // CRITICAL FIX: Use scoped selector within task-detail-page
+      const titleSection = document.querySelector('#task-detail-page .contact-header-text');
+      if (titleSection) {
+        // Clean up any existing avatars first
+        const existingAvatars = titleSection.querySelectorAll('.avatar-initials, .avatar-absolute');
+        existingAvatars.forEach(el => el.remove());
+
+        // Create avatar element
+        const avatarHTML = `<span class="avatar-initials avatar-absolute" aria-hidden="true" style="position: absolute; left: -50px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; background: var(--orange-subtle); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; letter-spacing: 0.5px;">${escapeHtml(finalInitials)}</span>`;
+        titleSection.insertAdjacentHTML('beforeend', avatarHTML);
+        console.log('[TaskDetail] LinkedIn avatar rendered successfully with initials:', finalInitials);
+      } else {
+        // Fallback to retry helper if element not found
+        console.warn('[TaskDetail] .contact-header-text not found, using retry helper');
+        renderAvatarOrIcon('#task-detail-page .contact-header-text', escapeHtml(finalInitials), true);
+      }
     } else {
       // For other non-phone-call tasks, set title and subtitle normally
       if (els.title) {
@@ -4548,11 +4436,20 @@
       }
     });
 
+    // Verify links exist (for debugging)
+    const companyLinks = document.querySelectorAll('#task-detail-page .company-link');
+    const contactLinks = document.querySelectorAll('#task-detail-page .contact-link');
+    if (companyLinks.length > 0 || contactLinks.length > 0) {
+      console.log(`[TaskDetail] Found ${companyLinks.length} company links and ${contactLinks.length} contact links (handlers use event delegation)`);
+    }
+
     // Load widgets
     loadTaskWidgets();
 
-    // Load recent activity data (contact or account tasks)
-    loadRecentActivityForTask({ forceRefresh: true });
+    // Load recent activity data for phone tasks
+    if (state.taskType === 'phone-call') {
+      loadRecentActivityForTask();
+    }
 
     // If phone task, embed contact details on the right
     try {
@@ -4752,7 +4649,7 @@
       }
     }, { capture: true });
 
-    // console.log('[TaskDetail] Header button handlers bound via event delegation');
+    console.log('[TaskDetail] Header button handlers bound via event delegation');
   }
 
   function setupCompanyLinkHandlers() {
@@ -4774,7 +4671,7 @@
       const accountId = companyLink.getAttribute('data-account-id');
       const accountName = companyLink.getAttribute('data-account-name');
 
-      // console.log('[TaskDetail] Company link clicked:', { accountId, accountName });
+      console.log('[TaskDetail] Company link clicked:', { accountId, accountName });
 
       // Capture task detail state for back navigation
       if (state.currentTask) {
@@ -4807,7 +4704,7 @@
               return accName === searchName || accName.includes(searchName) || searchName.includes(accName);
             });
             if (account && account.id) {
-              // console.log('[TaskDetail] Found account by name:', account.id);
+              console.log('[TaskDetail] Found account by name:', account.id);
               window.AccountDetail.show(account.id);
             } else {
               console.warn('[TaskDetail] Account not found:', accountName);
@@ -4865,11 +4762,7 @@
 
     // CRITICAL FIX: Setup inline editing after every DOM replacement
     // This must be called after each render since DOM elements are replaced
-    // Use requestAnimationFrame to ensure DOM is ready
-    requestAnimationFrame(() => {
-      console.log('[TaskDetail] Setting up inline editing for new content...');
-      setupInlineEditing();
-    });
+    setupInlineEditing();
 
     // Attach event handlers for task-specific buttons after rendering
     setTimeout(() => {
@@ -4936,7 +4829,7 @@
 
     // Use the same LinkedIn logic as contact-detail.js
     if (person && person.linkedin) {
-      // console.log('[TaskDetail] Using contact personal LinkedIn:', person.linkedin);
+      console.log('[TaskDetail] Using contact personal LinkedIn:', person.linkedin);
       try {
         window.open(person.linkedin, '_blank', 'noopener');
       } catch (e) {
@@ -4950,8 +4843,8 @@
       const fullName = person ? ([person.firstName, person.lastName].filter(Boolean).join(' ') || person.name || '') : contactName;
       const query = encodeURIComponent(fullName);
       const url = `https://www.linkedin.com/search/results/people/?keywords=${query}`;
-      // console.log('[TaskDetail] No personal LinkedIn, searching for person:', fullName);
-      // console.log('[TaskDetail] LinkedIn search URL:', url);
+      console.log('[TaskDetail] No personal LinkedIn, searching for person:', fullName);
+      console.log('[TaskDetail] LinkedIn search URL:', url);
       try {
         window.open(url, '_blank', 'noopener');
       } catch (e) {
@@ -5195,7 +5088,7 @@
         <!-- Recent Activity -->
         <div class="activity-section">
           <h3 class="section-title">Recent Activity</h3>
-          <div class="activities-list" id="task-activity-timeline">
+          <div class="activity-timeline" id="task-activity-timeline">
             <div class="activity-placeholder">
               <div class="placeholder-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -5493,7 +5386,7 @@
         <!-- Recent Activity -->
         <div class="activity-section">
           <h3 class="section-title">Recent Activity</h3>
-          <div class="activities-list" id="task-activity-timeline">
+          <div class="activity-timeline" id="task-activity-timeline">
             <div class="activity-placeholder">
               <div class="placeholder-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -5796,7 +5689,7 @@
         <!-- Recent Activity -->
         <div class="activity-section">
           <h3 class="section-title">Recent Activity</h3>
-          <div class="activities-list" id="task-activity-timeline">
+          <div class="activity-timeline" id="task-activity-timeline">
             <div class="activity-placeholder">
               <div class="placeholder-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -6065,6 +5958,8 @@
         suggestedContactName: ''
       };
 
+      console.log('[Task Detail] Setting company phone context:', contextPayload);
+
       // Set the context in the phone widget (same pattern as account-detail.js)
       if (window.Widgets && typeof window.Widgets.setCallContext === 'function') {
         window.Widgets.setCallContext(contextPayload);
@@ -6103,13 +5998,9 @@
   }
 
   // Load recent activity for the task (account or contact)
-  async function loadRecentActivityForTask(opts = {}) {
-    await new Promise(resolve => setTimeout(resolve, 500));
-
+  async function loadRecentActivityForTask() {
     const timelineEl = document.getElementById('task-activity-timeline');
     if (!timelineEl) return;
-
-    const forceRefresh = !!(opts && opts.forceRefresh);
 
     // Check if this is an account task or contact task
     const isAcctTask = isAccountTask(state.currentTask);
@@ -6138,7 +6029,7 @@
           }
 
           if (finalAccountId) {
-            await window.ActivityManager.renderActivities('task-activity-timeline', 'account', finalAccountId, forceRefresh);
+            await window.ActivityManager.renderActivities('task-activity-timeline', 'account', finalAccountId, true);
             // Ensure activities know they're being clicked from task-detail
             window._activityClickSource = 'task-detail';
           } else {
@@ -6193,7 +6084,7 @@
           // Find the contact ID from the contact name
           const contactId = findContactIdByName(contactName);
           if (contactId) {
-            await window.ActivityManager.renderActivities('task-activity-timeline', 'contact', contactId, forceRefresh);
+            await window.ActivityManager.renderActivities('task-activity-timeline', 'contact', contactId, true);
             // Ensure activities know they're being clicked from task-detail
             window._activityClickSource = 'task-detail';
           } else {
@@ -6410,7 +6301,7 @@
     const haveAddBtnHandler = typeof document._taskDetailAddContactHandler === 'function';
 
     if (document._taskDetailContactHandlersBound && haveLinkHandler && haveAddBtnHandler) {
-      // console.log('[TaskDetail] Contact handlers already bound, skipping');
+      console.log('[TaskDetail] Contact handlers already bound, skipping');
       return;
     }
 
@@ -6418,7 +6309,7 @@
       console.warn('[TaskDetail] Contact handler guard was set but listeners were missing. Rebinding now.');
     }
 
-    // console.log('[TaskDetail] Setting up contact link handlers');
+    console.log('[TaskDetail] Setting up contact link handlers');
 
     const contactLinkHandler = (e) => {
       // FIX: Skip navigation if click originated from a button inside the link
@@ -6472,7 +6363,7 @@
           });
 
           if (contact && contact.id) {
-            // console.log('[TaskDetail] Found contact by name:', contact.id);
+            console.log('[TaskDetail] Found contact by name:', contact.id);
             // Update the link with the found ID
             contactLink.setAttribute('data-contact-id', contact.id);
             // Retry the click with the ID
@@ -6525,7 +6416,7 @@
             });
             if (contact && contact.id) {
               finalContactId = contact.id;
-              // console.log('[TaskDetail] Found contact by name via BackgroundContactsLoader:', finalContactId);
+              console.log('[TaskDetail] Found contact by name via BackgroundContactsLoader:', finalContactId);
             }
           }
         } catch (error) {
@@ -6568,7 +6459,7 @@
             const tryShowContact = () => {
               if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
                 try {
-                  // console.log('[TaskDetail] Opening contact detail for ID:', finalContactId);
+                  console.log('[TaskDetail] Opening contact detail for ID:', finalContactId);
                   window.ContactDetail.show(finalContactId);
                 } catch (error) {
                   console.error('[TaskDetail] Error showing contact:', error);
@@ -6707,6 +6598,7 @@
 
       // Only refresh if the updated contact matches the task's contact
       if (id === taskContactId || id === stateContactId) {
+        console.log('[TaskDetail] Contact updated, reloading contact data:', id);
 
         try {
           // Reload contact data from Firestore to get latest changes
@@ -6715,7 +6607,7 @@
             if (contactDoc.exists) {
               const updatedContact = { id: contactDoc.id, ...contactDoc.data() };
               state.contact = updatedContact;
-              // console.log('[TaskDetail] ✓ Reloaded contact data:', updatedContact.firstName, updatedContact.lastName);
+              console.log('[TaskDetail] ✓ Reloaded contact data:', updatedContact.firstName, updatedContact.lastName);
 
               // Re-render the task page to show updated contact information
               renderTaskPage();
@@ -6761,7 +6653,6 @@
   // ==== Inline editing functions for Account Information and Energy & Contract ====
   function setupInlineEditing() {
     const infoGrids = document.querySelectorAll('#task-detail-page .info-grid');
-    
     infoGrids.forEach(infoGrid => {
       if (infoGrid && !infoGrid._bound) {
         infoGrid.addEventListener('click', async (e) => {
@@ -7109,7 +7000,7 @@
             if (accountDoc.exists) {
               const updatedAccount = { id: accountDoc.id, ...accountDoc.data() };
               state.account = updatedAccount;
-              // console.log('[TaskDetail] ✓ Reloaded account data:', updatedAccount.accountName || updatedAccount.name);
+              console.log('[TaskDetail] ✓ Reloaded account data:', updatedAccount.accountName || updatedAccount.name);
 
               // Re-render the task page to show updated account information
               renderTaskPage();
@@ -7166,6 +7057,7 @@
             if (accountDoc.exists) {
               const updatedAccount = { id: accountDoc.id, ...accountDoc.data() };
               state.account = updatedAccount;
+              console.log('[TaskDetail] ✓ Reloaded account data after energy update');
 
               // Re-render the task page to show updated energy information
               renderTaskPage();
@@ -7311,7 +7203,7 @@
             if (accountDoc.exists) {
               const updatedAccount = { id: accountDoc.id, ...accountDoc.data() };
               state.account = updatedAccount;
-              // console.log('[TaskDetail] ✓ Reloaded account data after returning from account-detail');
+              console.log('[TaskDetail] ✓ Reloaded account data after returning from account-detail');
 
               // Re-render the task page to show updated account information
               renderTaskPage();
@@ -7393,3 +7285,4 @@
   }
 
 })();
+

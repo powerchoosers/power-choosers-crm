@@ -17,19 +17,7 @@
   function isCurrentUserAdmin() {
     if (window.currentUserRole === 'admin') return true;
     const email = getCurrentUserEmail();
-    if (!email) return false;
-    
-    // Explicitly check for known admin emails or role in localStorage
-    const admins = ['l.patterson@powerchoosers.com'];
-    if (admins.includes(email)) return true;
-    
-    // Check if role is persisted in localStorage
-    try {
-      const persistedRole = localStorage.getItem('pc:userRole');
-      if (persistedRole === 'admin') return true;
-    } catch (_) {}
-
-    return false;
+    return email === ADMIN_EMAIL;
   }
 
   // Add ownership fields to data object
@@ -65,18 +53,15 @@
 
     // If not admin, filter by ownership
     if (!isCurrentUserAdmin()) {
-      // Employee can see records where they are owner OR assignee OR the record is unassigned
-      // Note: Firestore doesn't support OR queries easily across different fields with different values
-      // so we'll do three queries to be thorough
+      // Employee can see records where they are owner OR assignee
+      // Note: Firestore doesn't support OR queries easily, so we'll do two queries
       const ownedQuery = query.where('ownerId', '==', userEmail);
       const assignedQuery = query.where('assignedTo', '==', userEmail);
-      const unassignedQuery = query.where('ownerId', '==', 'unassigned');
       
-      // Execute all queries
-      const [ownedSnapshot, assignedSnapshot, unassignedSnapshot] = await Promise.all([
+      // Execute both queries
+      const [ownedSnapshot, assignedSnapshot] = await Promise.all([
         ownedQuery.get(),
-        assignedQuery.get(),
-        unassignedQuery.get()
+        assignedQuery.get()
       ]);
       
       // Merge results and deduplicate
@@ -85,11 +70,6 @@
         resultsMap.set(doc.id, { id: doc.id, ...doc.data() });
       });
       assignedSnapshot.forEach(doc => {
-        if (!resultsMap.has(doc.id)) {
-          resultsMap.set(doc.id, { id: doc.id, ...doc.data() });
-        }
-      });
-      unassignedSnapshot.forEach(doc => {
         if (!resultsMap.has(doc.id)) {
           resultsMap.set(doc.id, { id: doc.id, ...doc.data() });
         }
@@ -122,7 +102,7 @@
       queryWithOwnership,
       ADMIN_EMAIL
     };
-    // console.log('[DataManager] Initialized');
+    console.log('[DataManager] Initialized');
   } catch (error) {
     console.error('[DataManager] Initialization error:', error);
   }

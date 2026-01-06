@@ -31,6 +31,7 @@ class BackgroundLoaderCoordinator {
    */
   async coordinateLoading() {
     if (this.loading) {
+      console.log('[Coordinator] Loading already in progress, waiting...');
       // Wait for existing loading to complete
       await Promise.all(Array.from(this.loadingPromises.values()));
       return;
@@ -38,6 +39,7 @@ class BackgroundLoaderCoordinator {
 
     this.loading = true;
     this.loadStartTime = Date.now();
+    console.log('[Coordinator] Starting coordinated background loading...');
     try {
       // Load collections in priority order
       for (const collection of this.loadingOrder) {
@@ -48,6 +50,7 @@ class BackgroundLoaderCoordinator {
       }
 
       const totalTime = Date.now() - this.loadStartTime;
+      console.log(`[Coordinator] ✓ All background loading completed in ${totalTime}ms`);
     } catch (error) {
       console.error('[Coordinator] Error during coordinated loading:', error);
     } finally {
@@ -64,12 +67,14 @@ class BackgroundLoaderCoordinator {
       return this.loadingPromises.get(collection);
     }
 
+    console.log(`[Coordinator] Loading ${collection}...`);
     const loadPromise = this._performLoad(collection);
     this.loadingPromises.set(collection, loadPromise);
 
     try {
       await loadPromise;
       this.loadedCollections.add(collection);
+      console.log(`[Coordinator] ✓ ${collection} loaded successfully`);
     } catch (error) {
       console.error(`[Coordinator] Failed to load ${collection}:`, error);
     } finally {
@@ -120,6 +125,8 @@ class BackgroundLoaderCoordinator {
    * Force refresh a specific collection
    */
   async refreshCollection(collection) {
+    console.log(`[Coordinator] Force refreshing ${collection}...`);
+
     if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
       await window.CacheManager.invalidate(collection);
     }
@@ -152,6 +159,7 @@ class BackgroundLoaderCoordinator {
 // Initialize global coordinator
 if (typeof window !== 'undefined') {
   window.BackgroundLoaderCoordinator = new BackgroundLoaderCoordinator();
+  console.log('[Coordinator] Background loader coordinator initialized');
 }
 
 

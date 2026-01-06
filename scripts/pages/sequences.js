@@ -306,8 +306,8 @@
             return email.toLowerCase().trim();
         }
         }
-        // Fallback to current user if possible, then admin
-        return window.currentUserEmail || firebase.auth().currentUser?.email || 'l.patterson@powerchoosers.com';
+        // Fallback to admin if userEmail cannot be determined
+        return 'l.patterson@powerchoosers.com';
       };
       const userEmail = getUserEmail();
 
@@ -575,7 +575,7 @@
               return email.toLowerCase().trim();
             }
           }
-          return window.currentUserEmail || firebase.auth().currentUser?.email || 'l.patterson@powerchoosers.com';
+          return 'l.patterson@powerchoosers.com';
         };
         const finalUserEmail = getUserEmail();
 

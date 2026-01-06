@@ -38,7 +38,7 @@
         // Load real notifications from storage
         loadRealNotifications();
         
-        // console.log('[Notifications] System initialized');
+        console.log('[Notifications] System initialized');
     }
 
     // Toggle dropdown visibility
@@ -233,7 +233,7 @@
     function viewAllNotifications() {
         closeDropdown();
         // Could navigate to a dedicated notifications page
-        // console.log('[Notifications] View all notifications clicked');
+        console.log('[Notifications] View all notifications clicked');
     }
 
     // Get time ago string
@@ -320,7 +320,7 @@
                 updateBadge();
                 renderNotifications();
                 saveToLocalStorage();
-                // Notifications loaded log removed for cleaner production logs
+                console.log('[Notifications] Loaded', notifications.length, 'notifications from Firestore');
             };
 
             const refOwner = email ? db.collection('notifications')
@@ -423,7 +423,7 @@
                 .doc(`${userId}_${notification.id}`)
                 .set(notificationDoc, { merge: true });
 
-            // console.log('[Notifications] Saved to Firestore:', notification.title);
+            console.log('[Notifications] Saved to Firestore:', notification.title);
         } catch (error) {
             console.error('[Notifications] Failed to save to Firestore:', error);
             // Fallback to localStorage
@@ -445,7 +445,7 @@
                     read: notification.read
                 });
 
-            // console.log('[Notifications] Updated in Firestore:', notification.id);
+            console.log('[Notifications] Updated in Firestore:', notification.id);
         } catch (error) {
             console.error('[Notifications] Failed to update in Firestore:', error);
         }
