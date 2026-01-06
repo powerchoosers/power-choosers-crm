@@ -5303,7 +5303,6 @@
             if (acctName) c.accountName = acctName;
           }
         } catch (_) { }
-        try { if (window.CRM_DEBUG_CALLS) console.log('[Contact Detail][enrich]', { id: c.id, direction: c.direction, number: c.counterpartyPretty, contactName: c.contactName, accountName: c.accountName }); } catch (_) { }
       });
       renderRecentCallsPage();
       bindRecentCallsPager();
