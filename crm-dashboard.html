@@ -4,6 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>window.PC_DEBUG = true;</script>
+    <script src="scripts/debug-bridge.js"></script>
     <title>Power Choosers CRM</title>
     <meta name="description"
         content="Power Choosers CRM - Manage your energy procurement accounts and customer relationships">
@@ -33,15 +35,14 @@
     <script>
         // Verify SDK loading
         window.addEventListener('load', () => {
-            if (typeof Twilio !== 'undefined' && Twilio.Device) {
-                console.log('[Twilio] SDK loaded successfully from unpkg CDN');
-            } else {
+            if (!(typeof Twilio !== 'undefined' && Twilio.Device)) {
                 console.error('[Twilio] SDK failed to load from unpkg CDN');
             }
         });
     </script>
     <script>
         // API base will be set later based on environment
+        console.log('[Debug Bridge] CRM Dashboard HTML loaded');
     </script>
     <script>
         // Algolia Configuration
@@ -53,7 +54,6 @@
                 accounts: 'accounts'
             }
         };
-        console.log('[Algolia] Configuration loaded');
     </script>
     <script>
         // Optional: Configure your Twilio/Business phone numbers so Calls page can identify the counterparty correctly
@@ -65,7 +65,6 @@
                 const nums = Array.isArray(JSON.parse(raw || '[]')) ? JSON.parse(raw || '[]') : [];
                 if (nums.length) {
                     window.CRM_BUSINESS_NUMBERS = nums;
-                    console.log('[CRM] Business numbers:', nums);
                 }
             } catch (e) { /* ignore */ }
         })();
@@ -99,6 +98,23 @@
                         </path>
                     </svg>
                 </button>
+
+                <!-- Active Call Display (Hidden by default) -->
+                <div id="active-call-display" class="active-call-display" style="display: none;">
+                    <div class="active-call-info">
+                        <span class="active-call-status-dot"></span>
+                        <span class="active-call-contact" id="active-call-contact-text"></span>
+                        <span class="active-call-timer" id="active-call-timer">00:00</span>
+                    </div>
+                    <button class="active-call-end-btn" id="active-call-end-btn" title="End Call">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path
+                                d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z">
+                            </path>
+                        </svg>
+                    </button>
+                </div>
             </div>
             <div class="top-bar-right">
                 <button class="icon-btn" id="scripts-btn" title="Phone Scripts">
@@ -175,19 +191,58 @@
         <div id="global-search-modal" class="global-search-modal" hidden>
             <div class="search-modal-content">
                 <div class="search-results-container">
-                    <div class="search-loading" id="search-loading" hidden>
-                        <div class="loading-spinner"></div>
-                        <span>Searching...</span>
+                    <div class="prospect-actions">
+                        <button class="prospect-btn" id="prospect-people-btn">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            Prospect People
+                        </button>
+                        <button class="prospect-btn" id="prospect-accounts-btn">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path
+                                    d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1">
+                                </path>
+                            </svg>
+                            Prospect Accounts
+                        </button>
+                    </div>
+                    <div class="search-skeleton skeleton-shimmer" id="search-skeleton" hidden>
+                        <div class="skeleton-category">
+                            <div class="skeleton-header">
+                                <div class="skeleton-line title-line"></div>
+                            </div>
+                            <div class="skeleton-item">
+                                <div class="skeleton-avatar"></div>
+                                <div class="skeleton-content">
+                                    <div class="skeleton-line text-line-long"></div>
+                                    <div class="skeleton-line text-line-short"></div>
+                                </div>
+                            </div>
+                            <div class="skeleton-item">
+                                <div class="skeleton-avatar"></div>
+                                <div class="skeleton-content">
+                                    <div class="skeleton-line text-line-long"></div>
+                                    <div class="skeleton-line text-line-short"></div>
+                                </div>
+                            </div>
+                            <div class="skeleton-item">
+                                <div class="skeleton-avatar"></div>
+                                <div class="skeleton-content">
+                                    <div class="skeleton-line text-line-long"></div>
+                                    <div class="skeleton-line text-line-short"></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="search-results" id="search-results"></div>
                     <div class="search-empty" id="search-empty" hidden>
-                        <div class="empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none"
-                                xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="11" cy="11" r="8" stroke="white" stroke-width="2" />
-                                <line x1="21" y1="21" x2="16.65" y2="16.65" stroke="white" stroke-width="2" />
-                            </svg></div>
-                        <div class="empty-text">No results found</div>
-                        <div class="empty-subtext">Try adjusting your search terms</div>
+                        <!-- Empty state content handled by prospect buttons at top -->
                     </div>
                 </div>
             </div>
@@ -257,6 +312,14 @@
                                 </path>
                             </svg>
                             <span class="nav-text">Accounts</span>
+                        </a>
+                        <a href="#prospecting" class="nav-item" data-page="prospecting">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                            <span class="nav-text">Prospecting</span>
                         </a>
                         <a href="#lists" class="nav-item" data-page="lists">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -392,14 +455,16 @@
                                 <div class="dashboard-card">
                                     <h3 class="card-title">Suggested Leads</h3>
                                     <div class="leads-list">
-                                        <div class="lead-item">
+                                        <div class="lead-item modern-reveal premium-borderline"
+                                            style="animation-delay: 0.1s;">
                                             <div class="lead-info">
                                                 <div class="lead-name">Acme Manufacturing</div>
                                                 <div class="lead-details">Industrial • 500kW avg usage</div>
                                             </div>
                                             <div class="lead-score">92%</div>
                                         </div>
-                                        <div class="lead-item">
+                                        <div class="lead-item modern-reveal premium-borderline"
+                                            style="animation-delay: 0.2s;">
                                             <div class="lead-info">
                                                 <div class="lead-name">Downtown Office Complex</div>
                                                 <div class="lead-details">Commercial • 300kW avg usage</div>
@@ -507,6 +572,71 @@
                                         <div class="empty-title">Sequence builder</div>
                                         <div class="empty-desc">Select or create a sequence to begin building. This is a
                                             placeholder inspired by Apollo.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Prospecting Page -->
+                        <div class="page" id="prospecting-page" data-page="prospecting" hidden>
+                            <div class="page-container">
+                                <div class="page-header">
+                                    <div class="page-title-section">
+                                        <h2 class="page-title">Prospecting</h2>
+                                        <div class="page-actions">
+                                            <div class="view-toggle" id="prospecting-view-toggle">
+                                                <button class="toggle-btn filter-tab active" data-view="people">People
+                                                    Search</button>
+                                                <button class="toggle-btn filter-tab" data-view="accounts">Account
+                                                    Search</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="people-toolbar">
+                                        <div class="search-container" style="max-width: 400px;">
+                                            <input type="text" class="search-input" id="prospecting-search"
+                                                placeholder="Search by name, title, or company...">
+                                            <button class="search-btn" id="prospecting-search-btn">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                                    stroke="currentColor" stroke-width="2">
+                                                    <circle cx="11" cy="11" r="8"></circle>
+                                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                        <div id="prospecting-filters"
+                                            style="display: flex; gap: 10px; margin-left: 10px;">
+                                            <!-- Dynamic filters will be injected here -->
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="page-content">
+                                    <div class="table-container">
+                                        <div class="table-scroll">
+                                            <table class="data-table" id="prospecting-table">
+                                                <thead>
+                                                    <tr id="prospecting-table-header">
+                                                        <th>Name</th>
+                                                        <th>Title</th>
+                                                        <th>Company</th>
+                                                        <th>Location</th>
+                                                        <th>Email</th>
+                                                        <th>Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="prospecting-table-body">
+                                                    <tr>
+                                                        <td colspan="6" style="text-align: center; padding: 20px;">Use
+                                                            the search bar to find prospects</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <div class="table-footer">
+                                            <div id="prospecting-pagination-summary" class="pagination-summary"
+                                                aria-live="polite"></div>
+                                            <div id="prospecting-pagination" class="table-pagination"></div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1141,7 +1271,6 @@
                                     <div class="page-title-section">
                                         <h2 class="page-title">All Tasks</h2>
                                         <div class="page-actions">
-                                            <button class="btn-secondary">Sequences</button>
                                             <button class="btn-primary create-task-btn">Create Task</button>
                                         </div>
                                     </div>
@@ -1155,8 +1284,6 @@
                                         </div>
                                         <div class="filter-actions">
                                             <input type="text" placeholder="Search tasks..." class="search-input-small">
-                                            <button class="btn-text">Clear</button>
-                                            <span class="results-count">25 tasks</span>
                                         </div>
                                     </div>
                                 </div>
@@ -1611,8 +1738,7 @@
                                             data...</p>
                                     </div>
                                     <div class="error-message"
-                                        style="display: none; background: #fee; border: 1px solid #fcc; color: #c33; padding: 16px; border-radius: 8px; margin: 16px 0;">
-                                    </div>
+                                        style="display: none; background: var(--bg-error); border: 1px solid var(--border-error); color: var(--text-error); padding: 16px; border-radius: 8px; margin: 16px 0;"></div>
 
                                     <div class="client-dashboard">
                                         <!-- Overview Stats -->
@@ -3379,7 +3505,7 @@
                                                         </p>
 
                                                         <div class="settings-field"
-                                                            style="background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 12px; border-radius: 4px; margin-bottom: 16px;">
+                                                            style="background: var(--bg-warning); border: 1px solid var(--border-warning); color: var(--text-warning); padding: 12px; border-radius: 4px; margin-bottom: 16px;">
                                                             <strong>⚠️ Important:</strong> This tool uses direct Algolia
                                                             API calls to bypass Firebase extension issues. You'll need
                                                             your Algolia Application ID and Admin API Key.
@@ -3447,99 +3573,113 @@
                             <div class="page" id="task-detail-page" data-page="task-detail">
                                 <div class="page-container">
                                     <div class="page-header" id="task-detail-header">
-                                        <button class="back-btn back-btn--icon" id="task-detail-back-btn"
-                                            aria-label="Back to Tasks">
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                                stroke="currentColor" stroke-width="2" aria-hidden="true"
-                                                focusable="false">
-                                                <path d="M19 12H5M12 19l-7-7 7-7"></path>
-                                            </svg>
-                                        </button>
                                         <div class="page-title-section">
-                                            <div class="contact-header-profile">
-                                                <div class="contact-header-text">
-                                                    <h2 class="page-title" id="task-detail-title">Task Details</h2>
-                                                    <div class="contact-subtitle" id="task-detail-subtitle">Loading
-                                                        task...</div>
+                                            <div class="contact-header-info">
+                                                <button class="back-btn back-btn--icon" id="task-detail-back-btn"
+                                                    aria-label="Back to Tasks">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                        stroke="currentColor" stroke-width="2" aria-hidden="true"
+                                                        focusable="false">
+                                                        <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                                                    </svg>
+                                                </button>
+                                                <div class="contact-header-profile">
+                                                    <div class="contact-header-text">
+                                                        <h2 class="page-title contact-page-title" id="task-detail-title">Task Details</h2>
+                                                        <div class="contact-subtitle" id="task-detail-subtitle">Loading task...</div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div class="page-actions">
-                                            <button class="btn-secondary" id="task-reschedule-btn">Reschedule</button>
-                                            <div class="task-navigation">
-                                                <button class="btn-primary" id="task-complete-btn">Complete
-                                                    Task</button>
-                                                <button class="btn-icon" id="task-prev-btn" aria-label="Previous Task"
-                                                    title="Previous Task">
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                                        stroke="currentColor" stroke-width="2">
-                                                        <path d="M15 18l-6-6 6-6" />
+                                            <div class="page-actions">
+                                                <button class="quick-action-btn reschedule-header-btn" id="task-reschedule-btn" title="Reschedule" aria-label="Reschedule task">
+                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                                                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                                                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                                                        <line x1="9" y1="14" x2="11" y2="14"></line>
+                                                        <line x1="13" y1="18" x2="15" y2="18"></line>
                                                     </svg>
                                                 </button>
-                                                <button class="btn-icon" id="task-next-btn" aria-label="Next Task"
-                                                    title="Next Task">
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                                        stroke="currentColor" stroke-width="2">
-                                                        <path d="M9 18l6-6-6-6" />
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                            <div class="widgets-separator"></div>
-                                            <div class="widgets-wrap">
-                                                <button class="btn-primary" id="task-open-widgets" title="Widgets"
-                                                    aria-label="Widgets" aria-haspopup="menu" aria-expanded="false"
-                                                    aria-controls="task-widgets-drawer">
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                                        stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                                        <rect x="3" y="3" width="6" height="6" />
-                                                        <rect x="15" y="3" width="6" height="6" />
-                                                        <rect x="3" y="15" width="6" height="6" />
-                                                        <rect x="15" y="15" width="6" height="6" />
-                                                    </svg>
-                                                </button>
-                                                <div id="task-widgets-drawer" class="widgets-drawer" role="menu"
-                                                    aria-label="Task widgets">
-                                                    <button type="button" class="widget-item" data-widget="lusha"
-                                                        title="Prospect" aria-label="Prospect">
-                                                        <svg width="16" height="16" viewBox="0 0 48 48"
-                                                            fill="currentColor" aria-hidden="true">
-                                                            <path
-                                                                d="M46.117,23.081l-0.995-0.04H45.12C34.243,22.613,25.387,13.757,24.959,2.88l-0.04-0.996	C24.9,1.39,24.494,1,24,1s-0.9,0.39-0.919,0.883l-0.04,0.996c-0.429,10.877-9.285,19.733-20.163,20.162l-0.995,0.04	C1.39,23.1,1,23.506,1,24s0.39,0.9,0.884,0.919l0.995,0.039c10.877,0.43,19.733,9.286,20.162,20.163l0.04,0.996	C23.1,46.61,23.506,47,24,47s0.9-0.39,0.919-0.883l0.04-0.996c0.429-10.877,9.285-19.733,20.162-20.163l0.995-0.039	C46.61,24.9,47,24.494,47,24S46.61,23.1,46.117,23.081z" />
+                                                <div class="page-actions-separator"></div>
+                                                <div class="task-navigation">
+                                                    <button class="btn-icon" id="task-prev-btn" aria-label="Previous Task"
+                                                        title="Previous Task">
+                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                            stroke="currentColor" stroke-width="2">
+                                                            <path d="M15 18l-6-6 6-6" />
                                                         </svg>
                                                     </button>
-                                                    <button type="button" class="widget-item" data-widget="maps"
-                                                        title="Google Maps" aria-label="Google Maps">
+                                                    <button class="btn-icon" id="task-next-btn" aria-label="Next Task"
+                                                        title="Next Task">
+                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                            stroke="currentColor" stroke-width="2">
+                                                            <path d="M9 18l6-6-6-6" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                                <button class="btn-primary" id="task-complete-btn">Complete Task</button>
+                                                <div class="page-actions-separator"></div>
+                                                <div class="widgets-wrap">
+                                                    <button class="btn-primary" id="task-open-widgets" title="Widgets"
+                                                        aria-label="Widgets" aria-haspopup="menu" aria-expanded="false"
+                                                        aria-controls="task-widgets-drawer">
                                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                                                             stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                                                            <circle cx="12" cy="10" r="3" />
+                                                            <rect x="3" y="3" width="6" height="6" />
+                                                            <rect x="15" y="3" width="6" height="6" />
+                                                            <rect x="3" y="15" width="6" height="6" />
+                                                            <rect x="15" y="15" width="6" height="6" />
                                                         </svg>
                                                     </button>
-                                                    <button type="button" class="widget-item" data-widget="health"
-                                                        title="Energy Health Check" aria-label="Energy Health Check">
-                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                                            stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                                                        </svg>
-                                                    </button>
-                                                    <button type="button" class="widget-item" data-widget="deal"
-                                                        title="Deal Calculator" aria-label="Deal Calculator">
-                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                                            stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                                            <line x1="12" y1="1" x2="12" y2="23"></line>
-                                                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6">
-                                                            </path>
-                                                        </svg>
-                                                    </button>
-                                                    <button type="button" class="widget-item" data-widget="notes"
-                                                        title="Notes" aria-label="Notes">
-                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                                            stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                                            <path
-                                                                d="M4 4h12a2 2 0 0 1 2 2v14l-4 4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
-                                                            <path d="M14 20v-4a2 2 0 0 1 2-2h4" />
-                                                        </svg>
-                                                    </button>
+                                                    <div id="task-widgets-drawer" class="widgets-drawer" role="menu"
+                                                        aria-label="Task widgets">
+                                                        <button type="button" class="widget-item" data-widget="lusha"
+                                                            title="Prospect" aria-label="Prospect">
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                                stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                                <circle cx="11" cy="11" r="8"></circle>
+                                                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                                            </svg>
+                                                        </button>
+                                                        <button type="button" class="widget-item" data-widget="maps"
+                                                            title="Google Maps" aria-label="Google Maps">
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                                stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                                                                <circle cx="12" cy="10" r="3" />
+                                                            </svg>
+                                                        </button>
+                                                        <button type="button" class="widget-item" data-widget="health"
+                                                            title="Energy Health Check" aria-label="Energy Health Check">
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                                stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                                                            </svg>
+                                                        </button>
+                                                        <button type="button" class="widget-item" data-widget="deal"
+                                                            title="Deal Calculator" aria-label="Deal Calculator">
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                                stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6">
+                                                                </path>
+                                                            </svg>
+                                                        </button>
+                                                        <button type="button" class="widget-item" data-widget="notes"
+                                                            title="Notes" aria-label="Notes">
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                                stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                                <path
+                                                                    d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z">
+                                                                </path>
+                                                                <polyline points="14,2 14,8 20,8"></polyline>
+                                                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                                                <polyline points="10,9 9,9 8,9"></polyline>
+                                                            </svg>
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -3564,11 +3704,15 @@
                             <div class="widget-card">
                                 <h4 class="widget-title">Quick Actions</h4>
                                 <div class="quick-actions">
-                                    <button class="action-btn" data-action="create" data-type="contact">Add
+                                    <button class="action-btn modern-reveal premium-borderline"
+                                        style="animation-delay: 0.1s;" data-action="create" data-type="contact">Add
                                         Contact</button>
-                                    <button class="action-btn" data-action="create" data-type="account">Add
+                                    <button class="action-btn modern-reveal premium-borderline"
+                                        style="animation-delay: 0.2s;" data-action="create" data-type="account">Add
                                         Account</button>
-                                    <button class="action-btn" data-action="create" data-type="bulk-import">Bulk Import
+                                    <button class="action-btn modern-reveal premium-borderline"
+                                        style="animation-delay: 0.3s;" data-action="create" data-type="bulk-import">Bulk
+                                        Import
                                         CSV</button>
                                 </div>
                             </div>
@@ -4458,28 +4602,46 @@
         window.crmScriptsLoaded = false;
         window._loadedPageScripts = new Set();
 
-        // Helper to load a single script
         window.loadScript = function (src) {
-            return new Promise((resolve, reject) => {
-                // Check if already loaded
+            return new Promise((resolve) => {
                 const baseSrc = String(src || '');
-                const alreadyLoaded = Array.from(document.querySelectorAll('script[data-src-base]'))
-                    .some(s => s.getAttribute('data-src-base') === baseSrc);
-                if (alreadyLoaded) {
-                    resolve();
+                const cacheBuster = (function () {
+                    try {
+                        const raw = window.__PC_CACHE_BUSTER;
+                        if (!raw) return '';
+                        const b = String(raw).replace(/^[?&]/, '');
+                        if (!b) return '';
+                        return (baseSrc.includes('?') ? '&' : '?') + b;
+                    } catch (_) {
+                        return '';
+                    }
+                })();
+                const finalSrc = baseSrc + cacheBuster;
+                const existing = Array.from(document.querySelectorAll('script[data-src-base]'))
+                    .find(s => s.getAttribute('data-src-base') === baseSrc && s.getAttribute('data-load-ok') === 'true');
+                if (existing) {
+                    resolve(true);
                     return;
                 }
 
+                const start = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+
                 const script = document.createElement('script');
-                script.src = baseSrc;
+                script.src = finalSrc;
                 script.setAttribute('data-src-base', baseSrc);
                 script.onload = () => {
-                    console.log('[LazyLoad] ✓ Loaded:', baseSrc);
-                    resolve();
+                    script.setAttribute('data-load-ok', 'true');
+                    if (window.PC_DEBUG === true) {
+                        const end = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+                        // Success log removed for cleaner production logs
+                    }
+                    resolve(true);
                 };
                 script.onerror = () => {
+                    script.setAttribute('data-load-ok', 'false');
+                    try { script.remove(); } catch (_) { }
                     console.warn('[LazyLoad] Failed to load:', baseSrc);
-                    resolve(); // Continue even if one fails
+                    resolve(false);
                 };
                 document.body.appendChild(script);
             });
@@ -4488,11 +4650,8 @@
         // Load core CRM scripts (essentials only)
         window.loadCRMScripts = function () {
             if (window.crmScriptsLoaded) {
-                console.log('[LazyLoad] Scripts already loaded');
                 return Promise.resolve();
             }
-
-            console.log('[LazyLoad] Loading core CRM scripts...');
 
             // Core scripts loaded immediately (cache manager MUST be first)
             const coreScripts = [
@@ -4522,7 +4681,7 @@
                 'scripts/pages/task-detail.js',    // NEW - load task-detail for Today's Tasks clicks
                 'scripts/pages/account-detail.js', // NEW - load account-detail for account navigation
                 'scripts/pages/contact-detail.js', // NEW - load contact-detail for contact navigation
-                'scripts/background-contacts-loader.js', 
+                'scripts/background-contacts-loader.js',
                 'scripts/background-accounts-loader.js',
                 'scripts/background-calls-loader.js',
                 'scripts/background-emails-loader.js',
@@ -4545,13 +4704,11 @@
                 return promise.then(() => window.loadScript(src));
             }, Promise.resolve()).then(() => {
                 window.crmScriptsLoaded = true;
-                console.log('[LazyLoad] ✓ Core CRM scripts loaded!');
-                
+
                 // Pre-warm commonly used page scripts in the background
                 // Uses requestIdleCallback to avoid blocking the main thread
                 if ('requestIdleCallback' in window) {
                     requestIdleCallback(() => {
-                        console.log('[LazyLoad] Pre-warming People & Accounts scripts...');
                         // Pre-fetch scripts without executing init
                         window._loadedPageScripts = window._loadedPageScripts || new Set();
                         const prewarmScripts = [
@@ -4626,25 +4783,24 @@
 
             const scripts = pageScriptMap[pageName];
             if (!scripts) {
-                console.log(`[LazyLoad] No scripts needed for page: ${pageName}`);
                 return;
             }
 
-            // Check if already loaded
             if (window._loadedPageScripts.has(pageName)) {
-                console.log(`[LazyLoad] Page scripts already loaded for: ${pageName}`);
                 return;
             }
 
-            console.log(`[LazyLoad] Loading scripts for page: ${pageName}`);
-
-            // Load scripts for this page
+            let allOk = true;
             for (const src of scripts) {
-                await window.loadScript(src);
+                const ok = await window.loadScript(src);
+                if (!ok) allOk = false;
             }
 
-            window._loadedPageScripts.add(pageName);
-            console.log(`[LazyLoad] ✓ Page scripts loaded for: ${pageName}`);
+            if (allOk) {
+                window._loadedPageScripts.add(pageName);
+            } else {
+                console.warn('[LazyLoad] One or more scripts failed for page:', pageName);
+            }
         };
     </script>
     <!-- API Base URL (global) -->
@@ -4700,7 +4856,7 @@
             if (isDev) {
                 const cacheBuster = '?v=' + Date.now();
                 window.__PC_CACHE_BUSTER = cacheBuster;
-                console.log('[Dev] Cache busting enabled:', cacheBuster);
+                // console.log('[Dev] Cache busting enabled:', cacheBuster);
             }
         })();
     </script>
@@ -5035,7 +5191,6 @@
                 </button>
             </div>
         </div>
-    </div>
     </div><!-- End #crm-content -->
 
     <script>
@@ -5044,7 +5199,7 @@
             try {
                 // Set Google Maps API key directly
                 window.GOOGLE_MAPS_API = 'AIzaSyCydOVPsFnyY83M5ABb2lBZWcMqh4wqV2k';
-                console.log('Google Maps API key configured');
+                // console.log('Google Maps API key configured');
             } catch (e) {
                 console.warn('Google Maps API key init error:', e);
             }
@@ -5053,6 +5208,9 @@
 
     <!-- Client Management Dashboard Script -->
     <script src="scripts/pages/client-management.js"></script>
+
+    <!-- Prospecting Page Script -->
+    <script src="scripts/pages/prospecting.js"></script>
 
     <!-- Agents Management Scripts -->
     <script src="scripts/pages/agents.js"></script>
@@ -5088,6 +5246,7 @@
             });
         })();
     </script>
+    <script src="scripts/active-call-manager.js"></script>
 </body>
 
 </html>

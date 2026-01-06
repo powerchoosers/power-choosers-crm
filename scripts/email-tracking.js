@@ -27,7 +27,7 @@ class EmailTrackingManager {
 
     startTrackingEventPolling() {
         // SendGrid webhooks handle tracking events - no polling needed
-        console.log('[EmailTracking] Using SendGrid webhooks for tracking events');
+        // Tracking initialization log removed for cleaner production logs
     }
 
     /**
@@ -112,7 +112,7 @@ class EmailTrackingManager {
             }
             this._unsubscribers.push(unsubscribe);
 
-            console.log('[EmailTracking] Started real-time listeners for email opens/clicks');
+            // Real-time listeners log removed for cleaner production logs
         } catch (error) {
             console.error('[EmailTracking] Error starting email tracking listeners:', error);
         }

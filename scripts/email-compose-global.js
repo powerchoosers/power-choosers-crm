@@ -5138,14 +5138,14 @@
             }
           });
           document.dispatchEvent(refreshEvent);
-          console.log('[EmailCompose] Dispatched pc:activities-refresh for sent email');
+          if (window.PC_DEBUG) console.log('[EmailCompose] Dispatched pc:activities-refresh for sent email');
 
           // Also dispatch emails-updated for ActivityManager
           const emailsUpdatedEvent = new CustomEvent('pc:emails-updated', {
             detail: { contactId, accountId }
           });
           document.dispatchEvent(emailsUpdatedEvent);
-          console.log('[EmailCompose] Dispatched pc:emails-updated for sent email');
+          if (window.PC_DEBUG) console.log('[EmailCompose] Dispatched pc:emails-updated for sent email');
         } catch (err) {
           console.warn('[EmailCompose] Failed to dispatch activity events:', err);
         }

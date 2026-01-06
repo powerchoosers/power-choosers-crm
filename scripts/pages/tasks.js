@@ -330,13 +330,13 @@
       if (window.BackgroundTasksLoader) {
         // CRITICAL FIX: Force reload BackgroundTasksLoader to ensure we have latest data
         // This matches what Today's Tasks widget does to get all 236 tasks
-        console.log('[Tasks] Force reloading BackgroundTasksLoader to get complete task list...');
+        // console.log('[Tasks] Force reloading BackgroundTasksLoader to get complete task list...');
         await window.BackgroundTasksLoader.forceReload();
         firebaseTasks = window.BackgroundTasksLoader.getTasksData() || [];
         state.hasMore = window.BackgroundTasksLoader.hasMore();
 
 
-        console.log('[Tasks] Loaded', firebaseTasks.length, 'tasks from BackgroundTasksLoader after force reload');
+        // console.log('[Tasks] Loaded', firebaseTasks.length, 'tasks from BackgroundTasksLoader after force reload');
       } else {
         // Fallback to direct Firestore query if background loader not available (with ownership filters)
         if (window.firebaseDB) {
@@ -399,8 +399,7 @@
       console.warn('Could not load tasks from BackgroundTasksLoader:', error);
     }
 
-    // Debug logging
-    console.log(`[Tasks] Loaded ${userTasks.length} tasks from localStorage, ${firebaseTasks.length} tasks from Firebase`);
+    // // console.log(`[Tasks] Loaded ${userTasks.length} tasks from localStorage, ${firebaseTasks.length} tasks from Firebase`);
 
     // Merge all tasks - CRITICAL FIX: Always prefer Firebase as the source of truth
     // Firebase tasks override any stale local copies with the same ID
@@ -435,7 +434,7 @@
 
     state.data = rows;
     state.filtered = sortTasksChronologically(rows);
-    console.log(`[Tasks] Total tasks loaded: ${rows.length}`);
+    // console.log(`[Tasks] Total tasks loaded: ${rows.length}`);
     render();
 
     // CRITICAL FIX: Notify Today's Tasks widget and other components that tasks have been updated
@@ -459,13 +458,13 @@
     }
 
     try {
-      console.log('[Tasks] Loading more tasks...');
+      // console.log('[Tasks] Loading more tasks...');
       const result = await window.BackgroundTasksLoader.loadMore();
 
       if (result.loaded > 0) {
         // Reload data to get updated tasks
         await loadData();
-        console.log('[Tasks] Loaded', result.loaded, 'more tasks');
+        // console.log('[Tasks] Loaded', result.loaded, 'more tasks');
       } else {
         state.hasMore = false;
       }
@@ -558,7 +557,7 @@
       });
 
 
-      console.log('[Tasks] Filtered', linkedInTasks.length, 'LinkedIn sequence tasks from existing Firebase tasks');
+      // console.log('[Tasks] Filtered', linkedInTasks.length, 'LinkedIn sequence tasks from existing Firebase tasks');
     } catch (error) {
       console.error('[Tasks] Error filtering LinkedIn sequence tasks:', error);
     }
@@ -591,7 +590,58 @@
 
   function getPageItems() { const s = (state.currentPage - 1) * state.pageSize; return state.filtered.slice(s, s + state.pageSize); }
 
-  function paginate() { if (!els.pag) return; const total = state.filtered.length; const pages = Math.max(1, Math.ceil(total / state.pageSize)); state.currentPage = Math.min(state.currentPage, pages); if (els.summary) { const st = total === 0 ? 0 : (state.currentPage - 1) * state.pageSize + 1; const en = Math.min(state.currentPage * state.pageSize, total); els.summary.textContent = `${st}-${en} of ${total}`; } let html = ''; const btn = (l, d, p) => `<button class="page-btn" ${d ? 'disabled' : ''} data-page="${p}">${l}</button>`; html += btn('Prev', state.currentPage === 1, state.currentPage - 1); for (let p = 1; p <= pages; p++) { html += `<button class="page-btn ${p === state.currentPage ? 'active' : ''}" data-page="${p}">${p}</button>`; } html += btn('Next', state.currentPage === pages, state.currentPage + 1); els.pag.innerHTML = html; els.pag.querySelectorAll('.page-btn').forEach(b => b.addEventListener('click', () => { const n = parseInt(b.getAttribute('data-page') || '1', 10); if (!isNaN(n) && n >= 1 && n <= pages) { state.currentPage = n; render(); } })); }
+  function getTotalPages() { return Math.max(1, Math.ceil(state.filtered.length / state.pageSize)); }
+
+  function renderPagination() {
+    if (!els.pag) return;
+    const totalPages = getTotalPages();
+    const current = Math.min(state.currentPage, totalPages);
+    state.currentPage = current;
+    const total = state.filtered.length;
+    const start = total === 0 ? 0 : (current - 1) * state.pageSize + 1;
+    const end = total === 0 ? 0 : Math.min(total, current * state.pageSize);
+
+    // Use unified pagination component
+    if (window.crm && window.crm.createPagination) {
+      window.crm.createPagination(current, totalPages, (page) => {
+        state.currentPage = page;
+        render();
+        // Scroll to top after page change via unified paginator
+        try {
+          requestAnimationFrame(() => {
+            const scroller = (els.page && els.page.querySelector) ? els.page.querySelector('.table-scroll') : null;
+            if (scroller && typeof scroller.scrollTo === 'function') scroller.scrollTo({ top: 0, behavior: 'auto' });
+            else if (scroller) scroller.scrollTop = 0;
+            const main = document.getElementById('main-content');
+            if (main && typeof main.scrollTo === 'function') main.scrollTo({ top: 0, behavior: 'auto' });
+            const contentArea = document.querySelector('.content-area');
+            if (contentArea && typeof contentArea.scrollTo === 'function') contentArea.scrollTo({ top: 0, behavior: 'auto' });
+            window.scrollTo(0, 0);
+          });
+        } catch (_) { /* noop */ }
+      }, els.pag.id);
+    } else {
+      // Fallback to simple pagination if unified component not available
+      let html = '';
+      const btn = (l, d, p) => `<button class="pagination-arrow" ${d ? 'disabled' : ''} data-page="${p}">${l}</button>`;
+      html += btn('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"></polyline></svg>', current <= 1, current - 1);
+      html += `<div class="pagination-current">${current}</div>`;
+      html += btn('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,18 15,12 9,6"></polyline></svg>', current >= totalPages, current + 1);
+      
+      els.pag.innerHTML = `<div class="unified-pagination">${html}</div>`;
+      els.pag.querySelectorAll('button[data-page]').forEach(b => b.addEventListener('click', () => {
+        const n = parseInt(b.getAttribute('data-page') || '1', 10);
+        if (!isNaN(n) && n >= 1 && n <= totalPages) {
+          state.currentPage = n;
+          render();
+        }
+      }));
+    }
+
+    if (els.summary) {
+      els.summary.textContent = `Showing ${start}\u2013${end} of ${total} tasks`;
+    }
+  }
 
   function render() {
     if (!els.tbody) return; state.filtered = sortTasksChronologically(state.filtered); const rows = getPageItems(); els.tbody.innerHTML = rows.map(r => rowHtml(r)).join('');
@@ -636,7 +686,7 @@
         // If this is a sequence task, trigger next step creation
         if (task && task.isSequenceTask) {
           try {
-            console.log('[Tasks] Completed sequence task, creating next step...', task.id);
+            // console.log('[Tasks] Completed sequence task, creating next step...', task.id);
             const baseUrl = getApiBaseUrl();
             const response = await fetch(`${baseUrl}/api/complete-sequence-task`, {
               method: 'POST',
@@ -646,12 +696,12 @@
             const result = await response.json();
 
             if (result.success) {
-              console.log('[Tasks] Next step created:', result.nextStepType);
+              // console.log('[Tasks] Next step created:', result.nextStepType);
               if (result.nextStepType === 'task') {
                 // Force refresh BackgroundTasksLoader so the new task is available immediately
                 if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
                   try {
-                    console.log('[Tasks] Forcing BackgroundTasksLoader refresh for new sequence task...');
+                    // console.log('[Tasks] Forcing BackgroundTasksLoader refresh for new sequence task...');
                     await window.BackgroundTasksLoader.forceReload();
                   } catch (reloadError) {
                     console.warn('[Tasks] Failed to force reload BackgroundTasksLoader:', reloadError);
@@ -698,7 +748,7 @@
               const batch = db.batch();
               taskDocs.forEach(doc => batch.delete(doc.ref));
               await batch.commit();
-              console.log(`[Tasks] Successfully deleted ${taskDocs.length} task document(s) from Firestore:`, id);
+              // console.log(`[Tasks] Successfully deleted ${taskDocs.length} task document(s) from Firestore:`, id);
             } else {
               console.warn('[Tasks] Task not found in Firestore for deletion:', id);
             }
@@ -721,7 +771,7 @@
     }));
     // Header select state
     if (els.selectAll) { const pageIds = new Set(rows.map(r => r.id)); const allSelected = [...pageIds].every(id => state.selected.has(id)); els.selectAll.checked = allSelected && rows.length > 0; }
-    paginate(); updateBulkBar();
+    renderPagination(); updateBulkBar();
   }
 
   // Update task titles to descriptive format
@@ -1221,7 +1271,7 @@
 
     if (adminOnly) {
       container.querySelector('#bulk-assign').addEventListener('click', () => {
-        console.log('Bulk assign', Array.from(state.selected));
+        // console.log('Bulk assign', Array.from(state.selected));
         // TODO: Implement bulk assign functionality
       });
     }
@@ -1499,8 +1549,8 @@
           return email.toLowerCase().trim();
         }
       }
-      // Fallback to admin if userEmail cannot be determined
-      return 'l.patterson@powerchoosers.com';
+      // Fallback to current user if possible, then admin
+      return window.currentUserEmail || firebase.auth().currentUser?.email || 'l.patterson@powerchoosers.com';
     };
     const userEmail = getUserEmail();
 
@@ -1547,7 +1597,7 @@
         // CRITICAL FIX: Invalidate cache after task creation to prevent stale data
         if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
           await window.CacheManager.invalidate('tasks');
-          console.log('[Tasks] Invalidated tasks cache after creation');
+          // console.log('[Tasks] Invalidated tasks cache after creation');
         }
       }
     } catch (err) {
@@ -1633,7 +1683,7 @@
           const filteredLegacy = legacyTasks.filter(t => t && t.id !== taskId);
           localStorage.setItem('userTasks', JSON.stringify(filteredLegacy));
 
-          console.log('[Tasks] Cleaned up deleted task from localStorage:', taskId);
+          // console.log('[Tasks] Cleaned up deleted task from localStorage:', taskId);
         } catch (e) {
           console.warn('[Tasks] Could not clean up deleted task from localStorage:', e);
         }
@@ -1642,13 +1692,13 @@
       // CRITICAL FIX: If a task was rescheduled, force refresh all caches to get updated dueDate/dueTime
       // This ensures the task appears in its new position and is removed from its old position
       if (rescheduled && taskId) {
-        console.log('[Tasks] Task rescheduled, forcing refresh of all caches...', taskId);
+        // console.log('[Tasks] Task rescheduled, forcing refresh of all caches...', taskId);
         
         // Remove from BackgroundTasksLoader cache immediately (will be reloaded with fresh data)
         if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.removeTask === 'function') {
           try {
             window.BackgroundTasksLoader.removeTask(taskId);
-            console.log('[Tasks] Removed rescheduled task from BackgroundTasksLoader cache');
+            // console.log('[Tasks] Removed rescheduled task from BackgroundTasksLoader cache');
           } catch (e) {
             console.warn('[Tasks] Failed to remove task from BackgroundTasksLoader:', e);
           }
@@ -1658,7 +1708,7 @@
         if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
           try {
             await window.BackgroundTasksLoader.forceReload();
-            console.log('[Tasks] BackgroundTasksLoader refreshed after reschedule');
+            // console.log('[Tasks] BackgroundTasksLoader refreshed after reschedule');
           } catch (e) {
             console.warn('[Tasks] Failed to refresh BackgroundTasksLoader after reschedule:', e);
           }
@@ -1668,7 +1718,7 @@
         if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
           try {
             await window.CacheManager.invalidate('tasks');
-            console.log('[Tasks] Invalidated tasks cache after reschedule');
+            // console.log('[Tasks] Invalidated tasks cache after reschedule');
           } catch (e) {
             console.warn('[Tasks] Failed to invalidate cache after reschedule:', e);
           }
@@ -1680,11 +1730,11 @@
 
       // CRITICAL FIX: If a new task was created (e.g., next step in sequence), refresh BackgroundTasksLoader
       if (newTaskCreated) {
-        console.log('[Tasks] New task created from sequence, refreshing BackgroundTasksLoader...', { nextStepType });
+        // console.log('[Tasks] New task created from sequence, refreshing BackgroundTasksLoader...', { nextStepType });
         if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
           try {
             await window.BackgroundTasksLoader.forceReload();
-            console.log('[Tasks] BackgroundTasksLoader refreshed after new task creation');
+            // console.log('[Tasks] BackgroundTasksLoader refreshed after new task creation');
           } catch (e) {
             console.warn('[Tasks] Failed to refresh BackgroundTasksLoader:', e);
           }
@@ -1694,7 +1744,7 @@
         if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
           try {
             await window.CacheManager.invalidate('tasks');
-            console.log('[Tasks] Invalidated tasks cache after new task creation');
+            // console.log('[Tasks] Invalidated tasks cache after new task creation');
           } catch (e) {
             console.warn('[Tasks] Failed to invalidate cache:', e);
           }
@@ -1709,7 +1759,7 @@
     // Listen for background tasks loader events
     document.addEventListener('pc:tasks-loaded', async (event) => {
       const { newTaskCreated, count, cached, fromFirestore } = (event && event.detail) || {};
-      console.log('[Tasks] Background tasks loaded, checking for updates...', { newTaskCreated });
+      // // console.log('[Tasks] Background tasks loaded, checking for updates...', { newTaskCreated });
       
       // If the Tasks page rendered from localStorage (123) before the loader was ready (245),
       // re-run loadData once to hydrate the table with the full loader set.
@@ -1724,7 +1774,7 @@
       // If a new task was created, force reload BackgroundTasksLoader first
       if (newTaskCreated && window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
         try {
-          console.log('[Tasks] New task created, forcing BackgroundTasksLoader refresh...');
+          // console.log('[Tasks] New task created, forcing BackgroundTasksLoader refresh...');
           await window.BackgroundTasksLoader.forceReload();
           // Only reload if we're on the tasks page and a new task was actually created
           await loadData();
@@ -1763,7 +1813,7 @@
           const filteredLegacy = legacyTasks.filter(t => t && t.id !== taskId);
           localStorage.setItem('userTasks', JSON.stringify(filteredLegacy));
 
-          console.log('[Tasks] Cleaned up deleted task from localStorage (cross-browser sync):', taskId);
+          // console.log('[Tasks] Cleaned up deleted task from localStorage (cross-browser sync):', taskId);
 
           // Refresh the page if we're on the tasks page
           await loadData();

@@ -1,9 +1,11 @@
 'use strict';
-(function () {
+(function() {
+  console.log('[EmailDetail] Script loaded and executing...');
   const state = {
     currentEmail: null,
     loadingEmail: false
   };
+  window.emailCache = window.emailCache || new Map();
   const els = {};
   let senderNameClickHandler = null;
   let senderNameKeyHandler = null;
@@ -11,24 +13,23 @@
   function markEmailLoading() {
     const el = els.page;
     if (!el) return;
-    // Fade out old content first
-    el.classList.add('email-fading-out');
-    setTimeout(() => {
-      el.classList.remove('email-fading-out');
-      el.classList.add('email-loading');
-      el.classList.remove('email-loaded');
-    }, 300);
+    // Go straight to loading state without the 300ms fade-out delay
+    el.classList.add('email-loading');
+    el.classList.remove('email-loaded');
   }
 
   function markEmailLoaded() {
     const el = els.page;
     if (!el) return;
+    const startTime = performance.now();
+    console.log('[Performance] markEmailLoaded() triggered - starting 600ms fade-in buffer');
     // Add loaded class to trigger content fade-in
     el.classList.add('email-loaded');
     // Keep skeleton visible until content has fully faded in, then remove it
     window.setTimeout(() => {
       el.classList.remove('email-loading');
-    }, 600); // Wait for content fade-in (400ms) + buffer
+      console.log(`[Performance] markEmailLoaded() animation buffer finished in ${Math.round(performance.now() - startTime)}ms`);
+    }, 50); // Optimized: reduced to 50ms for near-instant transition
   }
 
   // Favicon and Account caches - Using shared cache from main.js if available
@@ -259,10 +260,27 @@
 
   // Show email detail
   async function show(emailId) {
+    console.log(`[Performance] window.EmailDetail.show called with: ${emailId}`);
+    const startTime = performance.now();
+    console.log(`[Performance] show() started for emailId: ${emailId}`);
+    if (window.PC_DEBUG === true && window.PCDebug && typeof window.PCDebug.log === 'function') {
+      const t0 = window.__pcEmailDetailOpen && window.__pcEmailDetailOpen.emailId === emailId ? window.__pcEmailDetailOpen.t0 : null;
+      const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      window.PCDebug.log('[Perf: EmailDetail] show() start', {
+        emailId,
+        msSinceNavigate: (typeof t0 === 'number') ? Math.round(now - t0) : null
+      });
+    }
     if (!initDomRefs()) return;
 
     // CRITICAL: Prevent race conditions
-    if (state.loadingEmail) return;
+    if (state.loadingEmail) {
+      console.log('[Performance] show() aborted - already loading');
+      if (window.PC_DEBUG === true && window.PCDebug && typeof window.PCDebug.warn === 'function') {
+        window.PCDebug.warn('[Perf: EmailDetail] show() aborted - already loading', { emailId });
+      }
+      return;
+    }
     state.loadingEmail = true;
 
     // Trigger loading animation
@@ -276,17 +294,36 @@
     }
 
     try {
-      // Load email data from Firebase
-      const emailDoc = await firebase.firestore().collection('emails').doc(emailId).get();
+      let emailData;
+      if (window.emailCache && window.emailCache.has(emailId)) {
+        console.log('[Performance] Using cached email data for:', emailId);
+        emailData = window.emailCache.get(emailId);
+      } else {
+        // Load email data from Firebase
+        const fetchStart = performance.now();
+        const emailDoc = await firebase.firestore().collection('emails').doc(emailId).get();
+        console.log(`[Performance] Firestore get() completed in ${Math.round(performance.now() - fetchStart)}ms`);
+        if (window.PC_DEBUG === true && window.PCDebug && typeof window.PCDebug.log === 'function') {
+          window.PCDebug.log('[Perf: EmailDetail] Firestore get() completed', {
+            emailId,
+            ms: Math.round(performance.now() - fetchStart)
+          });
+        }
 
-      if (!emailDoc.exists) {
-        console.error('Email not found:', emailId);
-        state.loadingEmail = false;
-        goBack();
-        return;
+        if (!emailDoc.exists) {
+          console.error('Email not found:', emailId);
+          if (window.PC_DEBUG === true && window.PCDebug && typeof window.PCDebug.error === 'function') {
+            window.PCDebug.error('[Perf: EmailDetail] Email not found', { emailId });
+          }
+          state.loadingEmail = false;
+          goBack();
+          return;
+        }
+
+        emailData = emailDoc.data();
+        if (!window.emailCache) window.emailCache = new Map();
+        window.emailCache.set(emailId, emailData);
       }
-
-      const emailData = emailDoc.data();
       state.currentEmail = {
         id: emailId,
         ...emailData,
@@ -326,6 +363,7 @@
       }
 
       // Populate email details immediately
+      console.log('[Performance] Triggering populateEmailDetails');
       populateEmailDetails(state.currentEmail);
 
       // Add tracking icons for sent emails (before scheduled email actions)
@@ -338,15 +376,32 @@
         resetScheduledEmailActions();
       }
 
-      // Mark as read
-      await markAsRead(emailId);
+      // Mark as read (non-blocking to speed up UI transition)
+      markAsRead(emailId);
 
       // Trigger loaded animation
       markEmailLoaded();
       state.loadingEmail = false;
+      console.log(`[Performance] show() total time: ${Math.round(performance.now() - startTime)}ms`);
+
+      if (window.PC_DEBUG === true && window.PCDebug && typeof window.PCDebug.log === 'function') {
+        const t0 = window.__pcEmailDetailOpen && window.__pcEmailDetailOpen.emailId === emailId ? window.__pcEmailDetailOpen.t0 : null;
+        const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        window.PCDebug.log('[Perf: EmailDetail] show() done', {
+          emailId,
+          totalMs: Math.round(performance.now() - startTime),
+          msSinceNavigate: (typeof t0 === 'number') ? Math.round(now - t0) : null
+        });
+      }
 
     } catch (error) {
       console.error('Failed to load email:', error);
+      if (window.PC_DEBUG === true && window.PCDebug && typeof window.PCDebug.error === 'function') {
+        window.PCDebug.error('[Perf: EmailDetail] show() failed', {
+          emailId,
+          error: (error && error.message) ? error.message : String(error)
+        });
+      }
       state.loadingEmail = false;
       goBack();
     }
@@ -361,7 +416,7 @@
     if (populateTimeout) clearTimeout(populateTimeout);
     populateTimeout = setTimeout(() => {
       actuallyPopulateEmailDetails(email);
-    }, 150); // Fast initial render
+    }, 10); // Optimized: reduced from 150ms to 10ms for immediate render
   }
 
   // Specialized populate for when logos are discovered
@@ -370,7 +425,7 @@
     if (logoPopulateTimeout) clearTimeout(logoPopulateTimeout);
     logoPopulateTimeout = setTimeout(() => {
       actuallyPopulateEmailDetails(email);
-    }, 1000); // Batch logo updates
+    }, 200); // Optimized: reduced from 1000ms to 200ms
   }
 
   // Helper function to get account logoUrl from recipient email
@@ -415,6 +470,8 @@
 
   function actuallyPopulateEmailDetails(email) {
     if (!email) return;
+    const startTime = performance.now();
+    console.log(`[Performance] actuallyPopulateEmailDetails started for email: ${email.id}`);
 
     // Avoid redundant populates if the email hasn't changed AND the logo state hasn't changed
     const emailTimestamp = email.updatedAt || email.timestamp || '';
@@ -436,6 +493,7 @@
     
     // Only skip if the detail view already has content and the state is identical
     if (stateKey === lastPopulatedEmailId && els.emailContent?.innerHTML?.trim()) {
+      console.log('[Performance] actuallyPopulateEmailDetails skipped - redundant');
       return;
     }
     lastPopulatedEmailId = stateKey;
@@ -720,7 +778,15 @@
       } else if (!isOurEmail && rawHtml && rawHtml.trim() && looksLikeHtml) {
         // Received email with proper HTML - use it
         console.log('[EmailDetail] Using HTML path: received email');
+        const sanitizeStart = performance.now();
         contentHtml = sanitizeEmailHtml(rawHtml);
+        if (window.PC_DEBUG === true) {
+          console.log('[Performance] sanitizeEmailHtml completed', {
+            timeMs: Math.round(performance.now() - sanitizeStart),
+            emailId: email.id,
+            rawHtmlLength: (rawHtml || '').length
+          });
+        }
       } else if (isOurEmail && rawText && rawText.trim()) {
         // Sent email with text but NO signature marker in HTML - use text to preserve line breaks
         console.log('[EmailDetail] Using TEXT path: rawText with signature extraction');
@@ -994,26 +1060,132 @@
         }
       }
 
+      els.emailContent.innerHTML = contentHtml;
+
       // Add sent-email-preview class for sent emails to render with white background
       // This makes the preview match how recipients see the email in their inbox
       if (isSentEmail || email.type === 'sent' || email.status === 'sent') {
         els.emailContent.classList.add('sent-email-preview');
+        
+        console.log('[Performance] Starting optimized DOM cleanup');
+        const cleanupStart = performance.now();
+        
+        // Optimized single-pass cleanup
+        cleanupEmailDom(els.emailContent);
+        
+        // Preserve signature inline colors
+        preserveSignatureColors(els.emailContent);
+        
+        console.log(`[Performance] DOM cleanup finished in ${Math.round(performance.now() - cleanupStart)}ms`);
       } else {
         els.emailContent.classList.remove('sent-email-preview');
       }
+    }
+    console.log(`[Performance] actuallyPopulateEmailDetails finished in ${Math.round(performance.now() - startTime)}ms`);
+  }
 
-      els.emailContent.innerHTML = contentHtml;
-
-      // CRITICAL: For sent emails, strip white/light backgrounds from ALL child elements
-      // This prevents visible white blocks that don't match the container background
-      // The main container already has white background, so nested elements should be transparent
-      if (isSentEmail || email.type === 'sent' || email.status === 'sent') {
-        stripNestedBackgrounds(els.emailContent);
-        removeBrokenOrTinyImages(els.emailContent);
-        removeEmptyWhiteBlocks(els.emailContent);
-        // CRITICAL: Preserve signature inline colors - force them with !important
-        preserveSignatureColors(els.emailContent);
+  // Optimized single-pass DOM cleanup to prevent layout thrashing
+  function cleanupEmailDom(container) {
+    if (!container) return;
+    
+    const cleanupStart = performance.now();
+    const elements = Array.from(container.querySelectorAll('*'));
+    if (window.PC_DEBUG === true) {
+      console.log('[Performance] cleanupEmailDom querySelectorAll', {
+        elementCount: elements.length,
+        timeMs: Math.round(performance.now() - cleanupStart)
+      });
+    }
+    
+    const loopStart = performance.now();
+    const toRemove = new Set();
+    
+    // 1. Identify signatures once
+    const signatureContainer = container.querySelector('[data-signature="true"]');
+    const elementsInSignatures = new Set();
+    if (signatureContainer) {
+      elementsInSignatures.add(signatureContainer);
+      signatureContainer.querySelectorAll('*').forEach(el => elementsInSignatures.add(el));
+    }
+    
+    // 2. Main pass: Background stripping and Images
+    elements.forEach(el => {
+      const inSignature = elementsInSignatures.has(el);
+      
+      if (!inSignature) {
+        const originalStyle = el.getAttribute('style') || '';
+        if (originalStyle && (originalStyle.includes('background') || originalStyle.includes('important'))) {
+          const newStyle = originalStyle
+            .replace(/background-image\s*:\s*[^;]+;?/gi, '')
+            .replace(/background(-color)?\s*:\s*[^;]+;?/gi, '')
+            .replace(/!\s*important/gi, '')
+            .trim();
+            
+          if (newStyle !== originalStyle) {
+            if (!newStyle) el.removeAttribute('style');
+            else el.setAttribute('style', newStyle);
+          }
+        }
+        if (el.hasAttribute('bgcolor')) el.removeAttribute('bgcolor');
+        if (el.hasAttribute('background')) el.removeAttribute('background');
       }
+      
+      // Broken/Tiny images
+      if (el.tagName === 'IMG') {
+        const src = (el.getAttribute('src') || '').trim();
+        if (!src || src === '#' || src.toLowerCase().startsWith('cid:') || /base64,([a-z0-9+\/=]{0,20})?r0lgodlhaqaba/i.test(src)) {
+          toRemove.add(el);
+          return;
+        }
+        el.onerror = () => el.remove();
+      }
+    });
+
+    // 3. Reverse pass for empty blocks (can be expensive on huge HTML)
+    const shouldRunEmptyBlockPass = elements.length <= 2500;
+    if (shouldRunEmptyBlockPass) {
+      for (let i = elements.length - 1; i >= 0; i--) {
+        const el = elements[i];
+        if (toRemove.has(el) || elementsInSignatures.has(el)) continue;
+        
+        const tag = el.tagName;
+        if (['DIV', 'P', 'SPAN', 'TABLE', 'TR', 'TD'].includes(tag)) {
+          let hasVisibleContent = false;
+          
+          for (let j = 0; j < el.childNodes.length; j++) {
+            const node = el.childNodes[j];
+            if (node.nodeType === Node.TEXT_NODE) {
+              if (node.textContent.trim().length > 0) {
+                hasVisibleContent = true;
+                break;
+              }
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+              if (!toRemove.has(node)) {
+                const childTag = node.tagName;
+                if (!['DIV', 'P', 'SPAN', 'TABLE', 'TR', 'TD'].includes(childTag) || node.childNodes.length > 0) {
+                  hasVisibleContent = true;
+                  break;
+                }
+              }
+            }
+          }
+          
+          if (!hasVisibleContent) {
+            toRemove.add(el);
+          }
+        }
+      }
+    }
+    
+    // 4. Batch removals
+    toRemove.forEach(el => el.remove());
+    if (window.PC_DEBUG === true) {
+      console.log('[Performance] cleanupEmailDom finished', {
+        loopTimeMs: Math.round(performance.now() - loopStart),
+        totalTimeMs: Math.round(performance.now() - cleanupStart),
+        elementCount: elements.length,
+        emptyBlockPass: shouldRunEmptyBlockPass
+      });
     }
   }
 
@@ -1024,8 +1196,9 @@
     
     const signature = container.querySelector('[data-signature="true"]');
     if (!signature) return;
-    
-    console.log('[EmailDetail] Preserving signature colors...');
+
+    const debugEnabled = window.PC_DEBUG === true;
+    if (debugEnabled) console.log('[EmailDetail] Preserving signature colors...');
     
     // Get all elements inside signature
     const elements = signature.querySelectorAll('*');
@@ -1040,7 +1213,7 @@
         const adjusted = adjustColorForDarkTheme(colorValue);
         // Force this color with !important using JavaScript
         el.style.setProperty('color', adjusted, 'important');
-        console.log('[EmailDetail] Preserved color:', adjusted, 'on', el.tagName);
+        if (debugEnabled) console.log('[EmailDetail] Preserved color:', adjusted, 'on', el.tagName);
       }
     });
     
@@ -1071,7 +1244,7 @@
     }
 
     // Handle rgb(...) values
-    const rgbMatch = colorValue.match(/^rgb\\s*\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*\\)$/i);
+    const rgbMatch = colorValue.match(/^rgb\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/i);
     if (rgbMatch) {
       const r = parseInt(rgbMatch[1], 10);
       const g = parseInt(rgbMatch[2], 10);
@@ -1096,177 +1269,6 @@
     const ng = lighten(g);
     const nb = lighten(b);
     return `rgb(${nr}, ${ng}, ${nb})`;
-  }
-
-  // Strip white/light backgrounds from nested elements to prevent visible blocks
-  function stripNestedBackgrounds(container) {
-    if (!container) return;
-
-    // Get all child elements (inline styles + attributes)
-    const elements = container.querySelectorAll('*');
-
-    elements.forEach(el => {
-      const originalStyle = el.getAttribute('style') || '';
-      const styleLower = originalStyle.toLowerCase();
-
-      // Detect white / near-white backgrounds in inline styles
-      const hasWhiteBg = /background(-color)?:\s*(#fff(?:fff)?|white|#fefefe|#f8f8f8|#fcfcfc|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\)|rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*(0?\.\d+|1)\s*\))/i.test(styleLower);
-
-      // Remove any inline background/background-image regardless of color and strip !important
-      // Skip cleaning inside signature so we don't kill the orange divider
-      if (el.closest('[data-signature="true"]')) {
-        return;
-      }
-      const newStyle = originalStyle
-        .replace(/background-image\s*:\s*[^;]+;?/gi, '')
-        .replace(/background(-color)?\s*:\s*[^;]+;?/gi, '')
-        .replace(/!\s*important/gi, '')
-        .trim();
-
-      if (newStyle && newStyle !== originalStyle) {
-        el.setAttribute('style', newStyle);
-      } else if (!newStyle) {
-        el.removeAttribute('style');
-      }
-
-      el.style.background = 'transparent';
-      el.style.backgroundColor = 'transparent';
-      el.style.backgroundImage = 'none';
-
-      // Remove deprecated attributes that set background colors
-      if (el.hasAttribute('bgcolor')) {
-        el.removeAttribute('bgcolor');
-        el.style.backgroundColor = 'transparent';
-      }
-      if (el.hasAttribute('background')) {
-        el.removeAttribute('background');
-        el.style.background = 'transparent';
-      }
-    });
-
-    // Clear body/html backgrounds embedded in email HTML
-    const body = container.querySelector('body');
-    const html = container.querySelector('html');
-    [body, html].forEach(node => {
-      if (node) {
-        node.style.background = 'transparent';
-        node.style.backgroundColor = 'transparent';
-      }
-    });
-
-    // SECOND PASS: Clear computed backgrounds (white or otherwise) and images
-    elements.forEach(el => {
-      try {
-        if (el.closest('[data-signature="true"]')) return;
-        const cs = window.getComputedStyle(el);
-        const bgImg = (cs.backgroundImage || '').toLowerCase();
-        const bgColor = cs.backgroundColor || '';
-        const hasBgImg = bgImg && bgImg !== 'none';
-        const hasBgColor = bgColor && bgColor !== 'rgba(0, 0, 0, 0)';
-
-        if (hasBgImg || hasBgColor) {
-          el.style.backgroundColor = 'transparent';
-          el.style.background = 'transparent';
-          el.style.backgroundImage = 'none';
-
-          // If the element is effectively empty and small, remove it entirely
-          const hasMedia = el.querySelector('img, svg');
-          const text = (el.textContent || '').trim();
-          if (!hasMedia && !text && el.clientWidth <= 80 && el.clientHeight <= 120) {
-            el.remove();
-          }
-        }
-      } catch (_) {
-        // ignore
-      }
-    });
-
-    // Also remove backgrounds from blockquotes (common in email threads)
-    const blockquotes = container.querySelectorAll('blockquote');
-    blockquotes.forEach(bq => {
-      bq.style.backgroundColor = 'transparent';
-      bq.style.background = 'transparent';
-      bq.style.border = 'none';
-      bq.style.paddingLeft = '0';
-      bq.style.marginLeft = '0';
-    });
-  }
-
-  // Remove broken/empty/tiny inline images that render as white blocks (e.g., missing avatars or 1x1 pixels)
-  function removeBrokenOrTinyImages(container) {
-    if (!container) return;
-    const imgs = Array.from(container.querySelectorAll('img'));
-    imgs.forEach(img => {
-      const src = (img.getAttribute('src') || '').trim();
-      // Remove CID inline refs or empty sources
-      if (!src || src === '#' || src.toLowerCase().startsWith('cid:')) {
-        img.remove();
-        return;
-      }
-      // Remove known 1x1 tracking pixels
-      if (/base64,([a-z0-9+\/=]{0,20})?r0lgodlhaqaba/i.test(src)) {
-        img.remove();
-        return;
-      }
-      // On error, remove the image to avoid empty white boxes
-      img.onerror = () => {
-        img.remove();
-      };
-      // After load, remove if tiny (likely a pixel or broken placeholder)
-      const tryRemoveTiny = () => {
-        const w = img.naturalWidth || img.width || 0;
-        const h = img.naturalHeight || img.height || 0;
-        if ((w > 0 && h > 0 && (w <= 2 && h <= 2)) || (w <= 1 || h <= 1)) {
-          img.remove();
-        }
-      };
-      if (img.complete) {
-        tryRemoveTiny();
-      } else {
-        img.addEventListener('load', tryRemoveTiny, { once: true });
-      }
-    });
-  }
-
-  // Remove empty, small, white-background blocks (common leftover containers/placeholders)
-  function removeEmptyWhiteBlocks(container) {
-    if (!container) return;
-    const elements = Array.from(container.querySelectorAll('*'));
-    elements.forEach(el => {
-      // Skip images (handled separately) and line breaks (we need <br> for manual line spacing)
-      if (el.tagName === 'IMG' || el.tagName === 'BR') return;
-
-      // Treat nbsp-only content as empty
-      const textRaw = (el.textContent || '');
-      const text = textRaw.replace(/\u00a0/g, '').trim();
-      const hasMedia = el.querySelector('img, svg, video, audio, canvas, iframe');
-      if (text || hasMedia) return;
-
-      const rect = el.getBoundingClientRect();
-      const w = rect.width || el.clientWidth || 0;
-      const h = rect.height || el.clientHeight || 0;
-
-      // Consider narrow columns even if tall (e.g., placeholder cells)
-      const narrowColumn = w <= 140;
-      if (!narrowColumn) return;
-
-      const style = window.getComputedStyle(el);
-      const bgColor = style.backgroundColor || '';
-      const hasBgColor = bgColor && bgColor !== 'rgba(0, 0, 0, 0)';
-      const hasBgImage = (style.backgroundImage || '').toLowerCase() !== 'none';
-
-      // Also check inline styles for any background declaration
-      const inlineStyle = (el.getAttribute('style') || '').toLowerCase();
-      const inlineHasBg = /background(-color)?\s*:/i.test(inlineStyle);
-
-      const insideSignature = el.closest('[data-signature="true"]');
-      const withinSigThreshold = insideSignature ? w <= 60 : true;
-
-      // Remove if empty + has bg color or image or is tiny
-      if ((hasBgColor || hasBgImage || inlineHasBg || w <= 80 || h <= 120) && withinSigThreshold) {
-        el.remove();
-      }
-    });
   }
 
   // Go back to previous page based on navigation source
@@ -2672,7 +2674,12 @@
       // Get sender details from settings
       const settings = (window.SettingsPage?.getSettings?.()) || {};
       const g = settings?.general || {};
-      const senderEmail = g.email || 'l.patterson@powerchoosers.com';
+      const senderEmail = g.email || window.currentUserEmail || firebase.auth().currentUser?.email;
+      
+      if (!senderEmail) {
+        throw new Error('Could not determine sender email. Please ensure you are logged in or check your settings.');
+      }
+
       const senderName = (g.firstName && g.lastName)
         ? `${g.firstName} ${g.lastName}`.trim()
         : (g.agentName || 'Power Choosers Team');
@@ -4304,13 +4311,14 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
   // Decode quoted-printable content (from old emails.js)
   function decodeQuotedPrintable(text) {
     if (!text) return '';
+    const input = String(text);
+    const needsDecode = /=(?:\r?\n|[0-9A-F]{2})/i.test(input) || /=0D/i.test(input);
+    if (!needsDecode) return input.trim();
 
-    return text
-      .replace(/=\r?\n/g, '') // Remove soft line breaks
-      .replace(/=([0-9A-F]{2})/g, (match, hex) => {
-        return String.fromCharCode(parseInt(hex, 16));
-      })
-      .replace(/=0D/g, '\r') // Replace =0D with carriage returns
+    return input
+      .replace(/=\r?\n/g, '')
+      .replace(/=([0-9A-F]{2})/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+      .replace(/=0D/gi, '\r')
       .trim();
   }
 
@@ -4318,55 +4326,88 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
   function sanitizeEmailHtml(html) {
     if (!html) return '<p>No content available</p>';
 
+    const debugEnabled = window.PC_DEBUG === true;
     try {
-      // First decode quoted-printable
-      let decodedHtml = decodeQuotedPrintable(html);
+      const input = String(html);
+      const needsDecode = /=(?:\r?\n|[0-9A-F]{2})/i.test(input) || /=0D/i.test(input) || /(href|src)=3D/i.test(input);
+
+      const decodeStart = performance.now();
+      let decodedHtml = needsDecode ? decodeQuotedPrintable(input) : input;
+      const decodeTime = Math.round(performance.now() - decodeStart);
 
       // Drop head and its children to avoid meta parsing errors
-      decodedHtml = decodedHtml.replace(/<head[\s\S]*?>[\s\S]*?<\/head>/gi, '');
-      // Remove meta, script, link, base tags anywhere
-      decodedHtml = decodedHtml.replace(/<\s*(meta|script|link|base)[^>]*>[\s\S]*?<\/\s*\1\s*>/gi, '');
-      decodedHtml = decodedHtml.replace(/<\s*(meta|script|link|base)[^>]*>/gi, '');
+      const regexStart = performance.now();
+      if (/<head[\s>]/i.test(decodedHtml)) {
+        decodedHtml = decodedHtml.replace(/<head[\s\S]*?>[\s\S]*?<\/head>/gi, '');
+      }
+      if (/<\s*(meta|script|link|base)[\s>]/i.test(decodedHtml)) {
+        decodedHtml = decodedHtml.replace(/<\s*(meta|script|link|base)[^>]*>[\s\S]*?<\/\s*\1\s*>/gi, '');
+        decodedHtml = decodedHtml.replace(/<\s*(meta|script|link|base)[^>]*>/gi, '');
+      }
 
       // AGGRESSIVE quoted-printable cleanup
-      decodedHtml = decodedHtml
-        .replace(/href=3D"/gi, 'href="')
-        .replace(/src=3D"/gi, 'src="')
-        .replace(/href="3D"/gi, 'href="')
-        .replace(/src="3D"/gi, 'src="')
-        .replace(/=3D/gi, '=');
+      if (/=3D|href=3D|src=3D|"3D"/i.test(decodedHtml)) {
+        decodedHtml = decodedHtml
+          .replace(/href=3D"/gi, 'href="')
+          .replace(/src=3D"/gi, 'src="')
+          .replace(/href="3D"/gi, 'href="')
+          .replace(/src="3D"/gi, 'src="')
+          .replace(/=3D/gi, '=');
+      }
 
       // Fix the specific pattern we're seeing: 3D%22
-      decodedHtml = decodedHtml
-        .replace(/href=3D%22/gi, 'href="')
-        .replace(/src=3D%22/gi, 'src="')
-        .replace(/href="3D%22/gi, 'href="')
-        .replace(/src="3D%22/gi, 'src="');
+      if (/3D%22/i.test(decodedHtml)) {
+        decodedHtml = decodedHtml
+          .replace(/href=3D%22/gi, 'href="')
+          .replace(/src=3D%22/gi, 'src="')
+          .replace(/href="3D%22/gi, 'href="')
+          .replace(/src="3D%22/gi, 'src="');
+      }
 
       // Fix malformed URLs that start with encoding artifacts
-      decodedHtml = decodedHtml
-        .replace(/(href|src)="3D"?([^"]*)/gi, '$1="$2')
-        .replace(/(href|src)=3D%22([^"]*)/gi, '$1="$2');
+      if (/(href|src)="3D"?|=3D%22/i.test(decodedHtml)) {
+        decodedHtml = decodedHtml
+          .replace(/(href|src)="3D"?([^"]*)/gi, '$1="$2')
+          .replace(/(href|src)=3D%22([^"]*)/gi, '$1="$2');
+      }
 
       // Upgrade insecure src/href to https
-      decodedHtml = decodedHtml.replace(/(\s(?:src|href)=")http:\/\//gi, '$1https://');
+      if (/(\s(?:src|href)=")http:\/\//i.test(decodedHtml)) {
+        decodedHtml = decodedHtml.replace(/(\s(?:src|href)=")http:\/\//gi, '$1https://');
+      }
       // Prevent navigation JS URLs
-      decodedHtml = decodedHtml.replace(/href="javascript:[^"]*"/gi, 'href="#"');
+      if (/href="javascript:/i.test(decodedHtml)) {
+        decodedHtml = decodedHtml.replace(/href="javascript:[^"]*"/gi, 'href="#"');
+      }
 
       // Additional basic sanitization
-      decodedHtml = decodedHtml
-        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-        .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
-        .replace(/on\w+="[^"]*"/gi, '')
-        .replace(/javascript:/gi, '')
-        .replace(/data:text\/html/gi, '');
+      if (/<script\b|<iframe\b|on\w+="|javascript:|data:text\/html/i.test(decodedHtml)) {
+        decodedHtml = decodedHtml
+          .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+          .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+          .replace(/on\w+="[^"]*"/gi, '')
+          .replace(/javascript:/gi, '')
+          .replace(/data:text\/html/gi, '');
+      }
 
       // Remove legacy tracking pixels to avoid 404s and any custom tracking
       // Custom path: /api/email/track/<id>
       // Legacy path: *.vercel.app/api/email/track/<id>
-      decodedHtml = decodedHtml
-        .replace(/<img[^>]*src=["'][^"']*\/api\/email\/track\/[^"']+["'][^>]*>/gi, '')
-        .replace(/<img[^>]*src=["'][^"']*vercel\.app\/api\/email\/track\/[^"']+["'][^>]*>/gi, '');
+      if (/\/api\/email\/track\/|vercel\.app\/api\/email\/track\//i.test(decodedHtml)) {
+        decodedHtml = decodedHtml
+          .replace(/<img[^>]*src=["'][^"']*\/api\/email\/track\/[^"']+["'][^>]*>/gi, '')
+          .replace(/<img[^>]*src=["'][^"']*vercel\.app\/api\/email\/track\/[^"']+["'][^>]*>/gi, '');
+      }
+
+      const regexTime = Math.round(performance.now() - regexStart);
+      if (debugEnabled) {
+        console.log('[Performance] sanitizeEmailHtml', {
+          decodeTimeMs: decodeTime,
+          regexTimeMs: regexTime,
+          inputLength: input.length,
+          needsDecode
+        });
+      }
 
       // If no content after sanitization, show fallback
       if (!decodedHtml.trim() || decodedHtml.trim() === '') {
@@ -4840,7 +4881,11 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
 
   // Initialize
   function init() {
-    if (!initDomRefs()) return;
+    console.log('[EmailDetail] init() called');
+    if (!initDomRefs()) {
+      console.warn('[EmailDetail] init() failed - DOM refs not found');
+      return;
+    }
     attachEvents();
   }
 

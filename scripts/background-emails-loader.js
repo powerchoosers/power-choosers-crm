@@ -22,6 +22,15 @@
   let lastLoadedDoc = null; // For pagination
   let hasMoreData = true; // For pagination
   let _scheduledLoadedOnce = false; // Track if scheduled emails have been loaded
+  let loadedFromCache = false;
+
+  const ADMIN_INITIAL_LIMIT = 200;
+  const PAGE_LIMIT = 100;
+  const EMPLOYEE_INITIAL_LIMIT = 200;
+  let _employeeCursorOwner = null;
+  let _employeeCursorAssigned = null;
+  let _employeeHasMoreOwner = false;
+  let _employeeHasMoreAssigned = false;
   
   // In-memory cache for folder counts (30 second expiry)
   const folderCountCache = new Map();
@@ -41,7 +50,12 @@
       if (!v) return null;
       if (typeof v === 'number') return v;
       if (typeof v.toDate === 'function') return v.toDate().getTime();
-      if (typeof v === 'string') return new Date(v).getTime();
+      if (typeof v === 'string') {
+        const s = v.trim();
+        if (/^\d{10,}$/.test(s)) return parseInt(s, 10);
+        const t = new Date(s).getTime();
+        return Number.isFinite(t) ? t : null;
+      }
       return null;
     } catch (_) { return null; }
   };
@@ -105,6 +119,74 @@
     };
   }
 
+  function upgradeCachedEmails(list) {
+    const upgraded = [];
+    let changed = false;
+    for (const item of (list || [])) {
+      if (!item || !item.id) continue;
+      const beforeScheduled = item.scheduledSendTime;
+      const beforeTimestamp = item.timestamp;
+      const beforeDate = item.date;
+      const normalized = normalizeEmailDoc(item.id, item);
+      if (beforeScheduled !== normalized.scheduledSendTime || beforeTimestamp !== normalized.timestamp || beforeDate !== normalized.date) {
+        changed = true;
+      }
+      upgraded.push(normalized);
+    }
+    return { upgraded, changed };
+  }
+
+  async function setAdminCursorFromOldestLoaded() {
+    try {
+      if (!window.firebaseDB) return;
+      if (!emailsData || emailsData.length === 0) return;
+      const withCreatedAt = emailsData
+        .map(e => ({ id: e && e.id, t: e && e.createdAt ? new Date(e.createdAt).getTime() : 0 }))
+        .filter(x => x.id && Number.isFinite(x.t) && x.t > 0)
+        .sort((a, b) => a.t - b.t);
+      const oldest = withCreatedAt[0];
+      if (!oldest) return;
+      const snap = await window.firebaseDB.collection('emails').doc(oldest.id).get();
+      if (snap && snap.exists) {
+        lastLoadedDoc = snap;
+      }
+    } catch (e) {
+      console.warn('[BackgroundEmailsLoader] Failed to set pagination cursor from oldest loaded email:', e);
+    }
+  }
+
+  async function setEmployeeCursorsFromOldestLoaded() {
+    try {
+      if (!window.firebaseDB) return;
+      const email = (window.currentUserEmail || '').toLowerCase().trim();
+      if (!email) return;
+      if (!emailsData || emailsData.length === 0) return;
+
+      const pickOldestId = (predicate) => {
+        const withCreatedAt = emailsData
+          .filter(predicate)
+          .map(e => ({ id: e && e.id, t: e && e.createdAt ? new Date(e.createdAt).getTime() : 0 }))
+          .filter(x => x.id && Number.isFinite(x.t) && x.t > 0)
+          .sort((a, b) => a.t - b.t);
+        return withCreatedAt[0] ? withCreatedAt[0].id : null;
+      };
+
+      const oldestOwnedId = pickOldestId(e => String(e && e.ownerId || '').toLowerCase() === email);
+      const oldestAssignedId = pickOldestId(e => String(e && e.assignedTo || '').toLowerCase() === email);
+
+      if (oldestOwnedId) {
+        const snap = await window.firebaseDB.collection('emails').doc(oldestOwnedId).get();
+        if (snap && snap.exists) _employeeCursorOwner = snap;
+      }
+      if (oldestAssignedId) {
+        const snap = await window.firebaseDB.collection('emails').doc(oldestAssignedId).get();
+        if (snap && snap.exists) _employeeCursorAssigned = snap;
+      }
+    } catch (e) {
+      console.warn('[BackgroundEmailsLoader] Failed to set employee pagination cursors from cache:', e);
+    }
+  }
+
   // Ensure all scheduled emails (up to ~200) are loaded into memory so the Scheduled tab
   // is always complete and responsive, regardless of how many other emails exist.
   async function ensureAllScheduledEmailsLoaded() {
@@ -161,7 +243,10 @@
       
       _scheduledLoadedOnce = true;
     } catch (e) {
-      console.warn('[BackgroundEmailsLoader] Failed to ensure all scheduled emails are loaded:', e);
+      console.warn('[BackgroundEmailsLoader] Failed to ensure all scheduled emails are loaded:', e.message || e);
+      if (e.message && e.message.includes('index')) {
+        console.error('[BackgroundEmailsLoader] INDEX ERROR: ', e.message);
+      }
     }
   }
   
@@ -172,50 +257,52 @@
     }
     
     try {
-      // Clear old cache format (scheduledSendTime was string, now it's number)
-      if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
-        await window.CacheManager.invalidate('emails');
-      }
       if (window.currentUserRole !== 'admin') {
-        // Employee: scope by ownership
-        let raw = [];
-        if (window.DataManager && typeof window.DataManager.queryWithOwnership==='function') {
-          raw = await window.DataManager.queryWithOwnership('emails');
-        } else {
-          const email = window.currentUserEmail || '';
-          const db = window.firebaseDB;
-          const [ownedSnap, assignedSnap] = await Promise.all([
-            db.collection('emails').where('ownerId','==',email).limit(100).get(),
-            db.collection('emails').where('assignedTo','==',email).limit(100).get()
-          ]);
-          const map = new Map();
-          ownedSnap.forEach(d=>map.set(d.id,{ id:d.id, ...d.data() }));
-          assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id,{ id:d.id, ...d.data() }); });
-          raw = Array.from(map.values());
-        }
-        emailsData = raw.map((data) => normalizeEmailDoc(data.id || data.id, data));
-        // Sort newest first
-        emailsData.sort((a,b)=> new Date(b.timestamp||0) - new Date(a.timestamp||0));
+        const email = (window.currentUserEmail || '').toLowerCase().trim();
+        const db = window.firebaseDB;
+        const [ownedSnap, assignedSnap] = await Promise.all([
+          db.collection('emails').where('ownerId', '==', email).orderBy('createdAt', 'desc').limit(EMPLOYEE_INITIAL_LIMIT).get().catch(e => {
+            return { docs: [], size: 0 };
+          }),
+          db.collection('emails').where('assignedTo', '==', email).orderBy('createdAt', 'desc').limit(EMPLOYEE_INITIAL_LIMIT).get().catch(e => {
+            return { docs: [], size: 0 };
+          })
+        ]);
+
+        const map = new Map(emailsData.map(e => [e.id, e]));
+        ownedSnap.forEach(doc => map.set(doc.id, normalizeEmailDoc(doc.id, doc.data())));
+        assignedSnap.forEach(doc => map.set(doc.id, normalizeEmailDoc(doc.id, doc.data())));
+
+        emailsData = Array.from(map.values()).sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+
+        _employeeCursorOwner = ownedSnap.docs.length ? ownedSnap.docs[ownedSnap.docs.length - 1] : null;
+        _employeeCursorAssigned = assignedSnap.docs.length ? assignedSnap.docs[assignedSnap.docs.length - 1] : null;
+        _employeeHasMoreOwner = ownedSnap.docs.length === EMPLOYEE_INITIAL_LIMIT;
+        _employeeHasMoreAssigned = assignedSnap.docs.length === EMPLOYEE_INITIAL_LIMIT;
+        hasMoreData = _employeeHasMoreOwner || _employeeHasMoreAssigned;
       } else {
-        // Admin: Load initial 200 emails to cover more date range (pagination will load more as needed)
         const snapshot = await window.firebaseDB.collection('emails')
           .orderBy('createdAt', 'desc')
-          .limit(200)
+          .limit(ADMIN_INITIAL_LIMIT)
           .get();
-        
-        emailsData = snapshot.docs.map(doc => normalizeEmailDoc(doc.id, doc.data()));
-        
-        // Sort by timestamp (actual sent/received date) instead of createdAt for better date continuity
+        const fetched = snapshot.docs.map(doc => normalizeEmailDoc(doc.id, doc.data()));
+
+        const map = new Map(emailsData.map(e => [e.id, e]));
+        fetched.forEach(e => map.set(e.id, e));
+        emailsData = Array.from(map.values());
+
         emailsData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        
-        // Track pagination state
+
         if (snapshot.docs.length > 0) {
           lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
-          hasMoreData = snapshot.docs.length === 200;
+          hasMoreData = snapshot.docs.length === ADMIN_INITIAL_LIMIT;
         } else {
           hasMoreData = false;
         }
 
+        if (emailsData.length > snapshot.docs.length) {
+          await setAdminCursorFromOldestLoaded();
+        }
       }
       
       // Ensure ALL scheduled emails (up to 200) are present in memory so the Scheduled tab is complete
@@ -236,87 +323,10 @@
         if (window.currentUserRole !== 'admin') startRealtimeListenerScoped(window.currentUserEmail || ''); else startRealtimeListener();
       }, 2000); // 2 second delay
     } catch (error) {
-      console.error('[BackgroundEmailsLoader] Failed to load from Firestore:', error);
-    }
-  }
-
-  // Load more emails (pagination) - similar to background-contacts-loader.js
-  async function loadMoreEmails() {
-    if (!hasMoreData) {
-      return { loaded: 0, hasMore: false };
-    }
-    
-    if (!window.firebaseDB) {
-      console.warn('[BackgroundEmailsLoader] firebaseDB not available');
-      return { loaded: 0, hasMore: false };
-    }
-    
-    try {
-      if (window.currentUserRole !== 'admin') {
-        // For employees, we already scoped and disabled pagination (100 limit)
-        return { loaded: 0, hasMore: false };
+      console.error('[BackgroundEmailsLoader] Failed to load from Firestore:', error.message || error);
+      if (error.message && error.message.includes('index')) {
+        console.error('[BackgroundEmailsLoader] INDEX ERROR - CREATE HERE: ', error.message);
       }
-      
-      if (!lastLoadedDoc) {
-        console.warn('[BackgroundEmailsLoader] No lastLoadedDoc, cannot paginate');
-        return { loaded: 0, hasMore: false };
-      }
-
-      const snapshot = await window.firebaseDB.collection('emails')
-        .orderBy('createdAt', 'desc')
-        .startAfter(lastLoadedDoc)
-        .limit(100)
-        .get();
-      
-      const newEmails = snapshot.docs.map(doc => {
-        const data = doc.data();
-        const createdAt = tsToIso(data.createdAt);
-        const updatedAt = tsToIso(data.updatedAt);
-        const sentAt = tsToIso(data.sentAt);
-        const receivedAt = tsToIso(data.receivedAt);
-        const scheduledSendTime = tsToMs(data.scheduledSendTime); // Keep as milliseconds for numeric comparison
-        const generatedAt = tsToIso(data.generatedAt);
-        const timestamp = sentAt || receivedAt || createdAt || new Date().toISOString();
-        return {
-          id: doc.id,
-          ...data,
-          createdAt,
-          updatedAt,
-          sentAt,
-          receivedAt,
-          scheduledSendTime,
-          generatedAt,
-          timestamp,
-          emailType: data.type || (data.provider === 'sendgrid_inbound' || data.provider === 'gmail_api' ? 'received' : 'sent')
-        };
-      });
-      
-      // Append to existing data
-      emailsData = [...emailsData, ...newEmails];
-      
-      // Update pagination tracking
-      if (snapshot.docs.length > 0) {
-        lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
-        hasMoreData = snapshot.docs.length === 100;
-      } else {
-        hasMoreData = false;
-      }
-      
-      
-      // Update cache
-      if (window.CacheManager && typeof window.CacheManager.set === 'function') {
-        await window.CacheManager.set('emails', emailsData);
-      }
-      
-      // Notify listeners
-      document.dispatchEvent(new CustomEvent('pc:emails-loaded-more', { 
-        detail: { count: newEmails.length, total: emailsData.length, hasMore: hasMoreData } 
-      }));
-      
-      return { loaded: newEmails.length, hasMore: hasMoreData };
-    } catch (error) {
-      console.error('[BackgroundEmailsLoader] Failed to load more:', error);
-      return { loaded: 0, hasMore: false };
     }
   }
 
@@ -788,11 +798,15 @@
       try {
         const cached = await window.CacheManager.get('emails');
         if (cached && Array.isArray(cached) && cached.length > 0) {
+          const { upgraded, changed } = upgradeCachedEmails(cached);
+          if (changed && window.CacheManager && typeof window.CacheManager.set === 'function') {
+            window.CacheManager.set('emails', upgraded).catch(() => {});
+          }
           try {
             const email = window.currentUserEmail || '';
             if (window.currentUserRole !== 'admin' && email) {
               const e = String(email).toLowerCase();
-              emailsData = (cached||[]).filter(x => {
+              emailsData = (upgraded||[]).filter(x => {
                 // Only check ownership fields (ownerId, assignedTo)
                 // Don't check 'from' - that's the sender, not the owner
                 const ownerId = String(x && x.ownerId || '').toLowerCase();
@@ -800,34 +814,24 @@
                 return ownerId === e || assignedTo === e;
               });
             } else {
-              emailsData = cached;
+              emailsData = upgraded;
             }
           } catch(_) { emailsData = cached; }
+
+          loadedFromCache = true;
+          // Loaded emails from cache
           
           // Check if there are more emails in Firestore (even if we loaded from cache)
           // For admin users: if we have 100 emails (batch size), assume there might be more
           // For non-admin: assume cache has all their data
           if (window.currentUserRole === 'admin') {
             // If we have 100 emails (our batch size), there might be more
-            if (emailsData.length >= 100) {
+            if (emailsData.length >= ADMIN_INITIAL_LIMIT) {
               hasMoreData = true; // Assume there might be more
               // Try to get lastLoadedDoc by querying for the oldest email
               // This ensures we can paginate correctly
               try {
-                const sorted = [...emailsData].sort((a, b) => {
-                  const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-                  const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-                  return aTime - bTime; // Oldest first
-                });
-                const oldestEmail = sorted[0];
-                if (oldestEmail && oldestEmail.id && window.firebaseDB) {
-                  // Get the document by ID (simpler than querying by createdAt)
-                  const docRef = window.firebaseDB.collection('emails').doc(oldestEmail.id);
-                  const docSnap = await docRef.get();
-                  if (docSnap.exists) {
-                    lastLoadedDoc = docSnap;
-                  }
-                }
+                await setAdminCursorFromOldestLoaded();
               } catch (error) {
                 console.warn('[BackgroundEmailsLoader] Could not set lastLoadedDoc from cache:', error);
                 // If we can't set it now, loadMore will try to reload from Firestore
@@ -839,9 +843,19 @@
               lastLoadedDoc = null;
             }
           } else {
-            // For non-admin users, assume cache has all their data (they have limited access)
             lastLoadedDoc = null;
-            hasMoreData = false;
+            const e = (window.currentUserEmail || '').toLowerCase().trim();
+            const ownedCount = e ? emailsData.filter(x => String(x && x.ownerId || '').toLowerCase() === e).length : 0;
+            const assignedCount = e ? emailsData.filter(x => String(x && x.assignedTo || '').toLowerCase() === e).length : 0;
+            _employeeHasMoreOwner = ownedCount >= EMPLOYEE_INITIAL_LIMIT;
+            _employeeHasMoreAssigned = assignedCount >= EMPLOYEE_INITIAL_LIMIT;
+            hasMoreData = _employeeHasMoreOwner || _employeeHasMoreAssigned;
+            if (hasMoreData) {
+              await setEmployeeCursorsFromOldestLoaded();
+            } else {
+              _employeeCursorOwner = null;
+              _employeeCursorAssigned = null;
+            }
           }
           
           // Ensure scheduled emails are present even when served from cache
@@ -878,11 +892,15 @@
         if (window.CacheManager) {
           const cached = await window.CacheManager.get('emails');
           if (cached && Array.isArray(cached) && cached.length > 0) {
+            const { upgraded, changed } = upgradeCachedEmails(cached);
+            if (changed && window.CacheManager && typeof window.CacheManager.set === 'function') {
+              window.CacheManager.set('emails', upgraded).catch(() => {});
+            }
             try {
               const email = window.currentUserEmail || '';
               if (window.currentUserRole !== 'admin' && email) {
                 const e = String(email).toLowerCase();
-                emailsData = (cached||[]).filter(x => {
+                emailsData = (upgraded||[]).filter(x => {
                   // Only check ownership fields (ownerId, assignedTo)
                   // Don't check 'from' - that's the sender, not the owner
                   const ownerId = String(x && x.ownerId || '').toLowerCase();
@@ -890,32 +908,23 @@
                   return ownerId === e || assignedTo === e;
                 });
               } else {
-                emailsData = cached;
+                emailsData = upgraded;
               }
             } catch(_) { emailsData = cached; }
+
+            loadedFromCache = true;
+            // Loaded emails from cache (delayed path)
             
             // Ensure scheduled emails are present even when served from cache (delayed path)
             await ensureAllScheduledEmailsLoaded();
             
             // Check if there are more emails (same logic as main cache load)
             if (window.currentUserRole === 'admin') {
-              if (emailsData.length >= 100) {
+              if (emailsData.length >= ADMIN_INITIAL_LIMIT) {
                 hasMoreData = true;
                 // Try to get lastLoadedDoc by document ID
                 try {
-                  const sorted = [...emailsData].sort((a, b) => {
-                    const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-                    const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-                    return aTime - bTime;
-                  });
-                  const oldestEmail = sorted[0];
-                  if (oldestEmail && oldestEmail.id && window.firebaseDB) {
-                    const docRef = window.firebaseDB.collection('emails').doc(oldestEmail.id);
-                    const docSnap = await docRef.get();
-                    if (docSnap.exists) {
-                      lastLoadedDoc = docSnap;
-                    }
-                  }
+                  await setAdminCursorFromOldestLoaded();
                 } catch (error) {
                   console.warn('[BackgroundEmailsLoader] Could not set lastLoadedDoc from cache (delayed):', error);
                   lastLoadedDoc = null;
@@ -926,7 +935,18 @@
               }
             } else {
               lastLoadedDoc = null;
-              hasMoreData = false;
+              const e = (window.currentUserEmail || '').toLowerCase().trim();
+              const ownedCount = e ? emailsData.filter(x => String(x && x.ownerId || '').toLowerCase() === e).length : 0;
+              const assignedCount = e ? emailsData.filter(x => String(x && x.assignedTo || '').toLowerCase() === e).length : 0;
+              _employeeHasMoreOwner = ownedCount >= EMPLOYEE_INITIAL_LIMIT;
+              _employeeHasMoreAssigned = assignedCount >= EMPLOYEE_INITIAL_LIMIT;
+              hasMoreData = _employeeHasMoreOwner || _employeeHasMoreAssigned;
+              if (hasMoreData) {
+                await setEmployeeCursorsFromOldestLoaded();
+              } else {
+                _employeeCursorOwner = null;
+                _employeeCursorAssigned = null;
+              }
             }
             
             document.dispatchEvent(new CustomEvent('pc:emails-loaded', { 
@@ -963,51 +983,84 @@
     
     try {
       if (window.currentUserRole !== 'admin') {
-        // For employees, pagination is disabled (they get all their emails in initial load)
-        return { loaded: 0, hasMore: false };
+        const email = (window.currentUserEmail || '').toLowerCase().trim();
+        const db = window.firebaseDB;
+        let loaded = 0;
+
+        if ((_employeeHasMoreOwner && !_employeeCursorOwner) || (_employeeHasMoreAssigned && !_employeeCursorAssigned)) {
+          await setEmployeeCursorsFromOldestLoaded();
+        }
+
+        const map = new Map(emailsData.map(e => [e.id, e]));
+
+        if (_employeeHasMoreOwner && _employeeCursorOwner) {
+          const ownedSnap = await db.collection('emails')
+            .where('ownerId', '==', email)
+            .orderBy('createdAt', 'desc')
+            .startAfter(_employeeCursorOwner)
+            .limit(PAGE_LIMIT)
+            .get();
+          ownedSnap.forEach(doc => {
+            loaded++;
+            map.set(doc.id, normalizeEmailDoc(doc.id, doc.data()));
+          });
+          _employeeCursorOwner = ownedSnap.docs.length ? ownedSnap.docs[ownedSnap.docs.length - 1] : _employeeCursorOwner;
+          _employeeHasMoreOwner = ownedSnap.docs.length === PAGE_LIMIT;
+        }
+
+        if (_employeeHasMoreAssigned && _employeeCursorAssigned) {
+          const assignedSnap = await db.collection('emails')
+            .where('assignedTo', '==', email)
+            .orderBy('createdAt', 'desc')
+            .startAfter(_employeeCursorAssigned)
+            .limit(PAGE_LIMIT)
+            .get();
+          assignedSnap.forEach(doc => {
+            loaded++;
+            map.set(doc.id, normalizeEmailDoc(doc.id, doc.data()));
+          });
+          _employeeCursorAssigned = assignedSnap.docs.length ? assignedSnap.docs[assignedSnap.docs.length - 1] : _employeeCursorAssigned;
+          _employeeHasMoreAssigned = assignedSnap.docs.length === PAGE_LIMIT;
+        }
+
+        emailsData = Array.from(map.values()).sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+        hasMoreData = _employeeHasMoreOwner || _employeeHasMoreAssigned;
+
+        if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+          await window.CacheManager.set('emails', emailsData);
+        }
+
+        document.dispatchEvent(new CustomEvent('pc:emails-loaded-more', {
+          detail: { count: loaded, total: emailsData.length, hasMore: hasMoreData }
+        }));
+
+        return { loaded, hasMore: hasMoreData };
       }
       
       if (!lastLoadedDoc) {
-        console.warn('[BackgroundEmailsLoader] No lastLoadedDoc for pagination');
-        return { loaded: 0, hasMore: false };
+        await setAdminCursorFromOldestLoaded();
+        if (!lastLoadedDoc) {
+          console.warn('[BackgroundEmailsLoader] No lastLoadedDoc for pagination (attempted init)');
+          return { loaded: 0, hasMore: false };
+        }
       }
       
       const snapshot = await window.firebaseDB.collection('emails')
         .orderBy('createdAt', 'desc')
         .startAfter(lastLoadedDoc)
-        .limit(100)
+        .limit(PAGE_LIMIT)
         .get();
       
-      const newEmails = snapshot.docs.map(doc => {
-        const data = doc.data();
-        const createdAt = tsToIso(data.createdAt);
-        const updatedAt = tsToIso(data.updatedAt);
-        const sentAt = tsToIso(data.sentAt);
-        const receivedAt = tsToIso(data.receivedAt);
-        const scheduledSendTime = tsToMs(data.scheduledSendTime); // Keep as milliseconds for numeric comparison
-        const generatedAt = tsToIso(data.generatedAt);
-        const timestamp = sentAt || receivedAt || createdAt || new Date().toISOString();
-        return {
-          id: doc.id,
-          ...data,
-          createdAt,
-          updatedAt,
-          sentAt,
-          receivedAt,
-          scheduledSendTime,
-          generatedAt,
-          timestamp,
-          emailType: data.type || (data.provider === 'sendgrid_inbound' || data.provider === 'gmail_api' ? 'received' : 'sent')
-        };
-      });
+      const newEmails = snapshot.docs.map(doc => normalizeEmailDoc(doc.id, doc.data()));
       
-      // Append to existing data
-      emailsData = [...emailsData, ...newEmails];
+      const map = new Map(emailsData.map(e => [e.id, e]));
+      newEmails.forEach(e => map.set(e.id, e));
+      emailsData = Array.from(map.values()).sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
       
       // Update pagination tracking
       if (snapshot.docs.length > 0) {
         lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
-        hasMoreData = snapshot.docs.length === 100;
+        hasMoreData = snapshot.docs.length === PAGE_LIMIT;
       } else {
         hasMoreData = false;
       }
@@ -1074,7 +1127,8 @@
     invalidateFolderCountCache: invalidateFolderCountCache,
     getInMemoryCountByFolder: getInMemoryCountByFolder,
     removeEmailById: removeEmailById,
-    updateEmailStatus: updateEmailStatus
+    updateEmailStatus: updateEmailStatus,
+    isFromCache: () => loadedFromCache
   };
   
 })();
