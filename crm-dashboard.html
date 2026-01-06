@@ -3505,7 +3505,7 @@
                                                         </p>
 
                                                         <div class="settings-field"
-                                                            style="background: var(--bg-warning); border: 1px solid var(--border-warning); color: var(--text-warning); padding: 12px; border-radius: 4px; margin-bottom: 16px;"></div>
+                                                            style="background: var(--bg-warning); border: 1px solid var(--border-warning); color: var(--text-warning); padding: 12px; border-radius: 4px; margin-bottom: 16px;">
                                                             <strong>⚠️ Important:</strong> This tool uses direct Algolia
                                                             API calls to bypass Firebase extension issues. You'll need
                                                             your Algolia Application ID and Admin API Key.
@@ -3573,103 +3573,113 @@
                             <div class="page" id="task-detail-page" data-page="task-detail">
                                 <div class="page-container">
                                     <div class="page-header" id="task-detail-header">
-                                        <button class="back-btn back-btn--icon" id="task-detail-back-btn"
-                                            aria-label="Back to Tasks">
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                                stroke="currentColor" stroke-width="2" aria-hidden="true"
-                                                focusable="false">
-                                                <path d="M19 12H5M12 19l-7-7 7-7"></path>
-                                            </svg>
-                                        </button>
                                         <div class="page-title-section">
-                                            <div class="contact-header-profile">
-                                                <div class="contact-header-text">
-                                                    <h2 class="page-title" id="task-detail-title">Task Details</h2>
-                                                    <div class="contact-subtitle" id="task-detail-subtitle">Loading
-                                                        task...</div>
+                                            <div class="contact-header-info">
+                                                <button class="back-btn back-btn--icon" id="task-detail-back-btn"
+                                                    aria-label="Back to Tasks">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                        stroke="currentColor" stroke-width="2" aria-hidden="true"
+                                                        focusable="false">
+                                                        <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                                                    </svg>
+                                                </button>
+                                                <div class="contact-header-profile">
+                                                    <div class="contact-header-text">
+                                                        <h2 class="page-title contact-page-title" id="task-detail-title">Task Details</h2>
+                                                        <div class="contact-subtitle" id="task-detail-subtitle">Loading task...</div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div class="page-actions">
-                                            <button class="btn-secondary" id="task-reschedule-btn">Reschedule</button>
-                                            <div class="task-navigation">
-                                                <button class="btn-primary" id="task-complete-btn">Complete
-                                                    Task</button>
-                                                <button class="btn-icon" id="task-prev-btn" aria-label="Previous Task"
-                                                    title="Previous Task">
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                                        stroke="currentColor" stroke-width="2">
-                                                        <path d="M15 18l-6-6 6-6" />
+                                            <div class="page-actions">
+                                                <button class="quick-action-btn reschedule-header-btn" id="task-reschedule-btn" title="Reschedule" aria-label="Reschedule task">
+                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                                                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                                                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                                                        <line x1="9" y1="14" x2="11" y2="14"></line>
+                                                        <line x1="13" y1="18" x2="15" y2="18"></line>
                                                     </svg>
                                                 </button>
-                                                <button class="btn-icon" id="task-next-btn" aria-label="Next Task"
-                                                    title="Next Task">
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                                        stroke="currentColor" stroke-width="2">
-                                                        <path d="M9 18l6-6-6-6" />
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                            <div class="widgets-separator"></div>
-                                            <div class="widgets-wrap">
-                                                <button class="btn-primary" id="task-open-widgets" title="Widgets"
-                                                    aria-label="Widgets" aria-haspopup="menu" aria-expanded="false"
-                                                    aria-controls="task-widgets-drawer">
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                                        stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                                        <rect x="3" y="3" width="6" height="6" />
-                                                        <rect x="15" y="3" width="6" height="6" />
-                                                        <rect x="3" y="15" width="6" height="6" />
-                                                        <rect x="15" y="15" width="6" height="6" />
-                                                    </svg>
-                                                </button>
-                                                <div id="task-widgets-drawer" class="widgets-drawer" role="menu"
-                                                    aria-label="Task widgets">
-                                                    <button type="button" class="widget-item" data-widget="lusha"
-                                                        title="Prospect" aria-label="Prospect">
+                                                <div class="page-actions-separator"></div>
+                                                <div class="task-navigation">
+                                                    <button class="btn-icon" id="task-prev-btn" aria-label="Previous Task"
+                                                        title="Previous Task">
                                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                                            stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                                            <circle cx="11" cy="11" r="8"></circle>
-                                                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                                            stroke="currentColor" stroke-width="2">
+                                                            <path d="M15 18l-6-6 6-6" />
                                                         </svg>
                                                     </button>
-                                                    <button type="button" class="widget-item" data-widget="maps"
-                                                        title="Google Maps" aria-label="Google Maps">
+                                                    <button class="btn-icon" id="task-next-btn" aria-label="Next Task"
+                                                        title="Next Task">
                                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                                            stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                                                            <circle cx="12" cy="10" r="3" />
+                                                            stroke="currentColor" stroke-width="2">
+                                                            <path d="M9 18l6-6-6-6" />
                                                         </svg>
                                                     </button>
-                                                    <button type="button" class="widget-item" data-widget="health"
-                                                        title="Energy Health Check" aria-label="Energy Health Check">
+                                                </div>
+                                                <button class="btn-primary" id="task-complete-btn">Complete Task</button>
+                                                <div class="page-actions-separator"></div>
+                                                <div class="widgets-wrap">
+                                                    <button class="btn-primary" id="task-open-widgets" title="Widgets"
+                                                        aria-label="Widgets" aria-haspopup="menu" aria-expanded="false"
+                                                        aria-controls="task-widgets-drawer">
                                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                                                             stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                                                            <rect x="3" y="3" width="6" height="6" />
+                                                            <rect x="15" y="3" width="6" height="6" />
+                                                            <rect x="3" y="15" width="6" height="6" />
+                                                            <rect x="15" y="15" width="6" height="6" />
                                                         </svg>
                                                     </button>
-                                                    <button type="button" class="widget-item" data-widget="deal"
-                                                        title="Deal Calculator" aria-label="Deal Calculator">
-                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                                            stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                                            <line x1="12" y1="1" x2="12" y2="23"></line>
-                                                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6">
-                                                            </path>
-                                                        </svg>
-                                                    </button>
-                                                    <button type="button" class="widget-item" data-widget="notes"
-                                                        title="Notes" aria-label="Notes">
-                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                                            stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                                            <path
-                                                                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z">
-                                                            </path>
-                                                            <polyline points="14,2 14,8 20,8"></polyline>
-                                                            <line x1="16" y1="13" x2="8" y2="13"></line>
-                                                            <line x1="16" y1="17" x2="8" y2="17"></line>
-                                                            <polyline points="10,9 9,9 8,9"></polyline>
-                                                        </svg>
-                                                    </button>
+                                                    <div id="task-widgets-drawer" class="widgets-drawer" role="menu"
+                                                        aria-label="Task widgets">
+                                                        <button type="button" class="widget-item" data-widget="lusha"
+                                                            title="Prospect" aria-label="Prospect">
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                                stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                                <circle cx="11" cy="11" r="8"></circle>
+                                                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                                            </svg>
+                                                        </button>
+                                                        <button type="button" class="widget-item" data-widget="maps"
+                                                            title="Google Maps" aria-label="Google Maps">
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                                stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                                                                <circle cx="12" cy="10" r="3" />
+                                                            </svg>
+                                                        </button>
+                                                        <button type="button" class="widget-item" data-widget="health"
+                                                            title="Energy Health Check" aria-label="Energy Health Check">
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                                stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                                                            </svg>
+                                                        </button>
+                                                        <button type="button" class="widget-item" data-widget="deal"
+                                                            title="Deal Calculator" aria-label="Deal Calculator">
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                                stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6">
+                                                                </path>
+                                                            </svg>
+                                                        </button>
+                                                        <button type="button" class="widget-item" data-widget="notes"
+                                                            title="Notes" aria-label="Notes">
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                                stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                                <path
+                                                                    d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z">
+                                                                </path>
+                                                                <polyline points="14,2 14,8 20,8"></polyline>
+                                                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                                                <polyline points="10,9 9,9 8,9"></polyline>
+                                                            </svg>
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -5181,7 +5191,6 @@
                 </button>
             </div>
         </div>
-    </div>
     </div><!-- End #crm-content -->
 
     <script>

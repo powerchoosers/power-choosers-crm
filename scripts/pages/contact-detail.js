@@ -459,25 +459,27 @@
         right: 8px;
         top: calc(50% + 12px);
         transform: translateY(-50%) !important;
-        background: transparent;
-        border: none;
+        background: var(--bg-item);
+        border: 1px solid var(--border-light);
         color: var(--text-secondary);
         cursor: pointer;
         padding: 0;
-        border-radius: 4px;
-        transition: color var(--transition-fast), background-color var(--transition-fast);
+        border-radius: var(--border-radius);
+        transition: all 0.2s ease;
         z-index: 1;
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 20px;
-        height: 20px;
+        width: 24px;
+        height: 24px;
         line-height: 1;
         transform-origin: center center;
+        box-sizing: border-box;
       }
       .task-popover .calendar-toggle-btn:hover {
         color: var(--text-primary);
-        background: transparent;
+        background: var(--bg-hover);
+        border-color: var(--accent-color);
         top: calc(50% + 12px);
         transform: translateY(-50%) !important;
         box-shadow: none !important;

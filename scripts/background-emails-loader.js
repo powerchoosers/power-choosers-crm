@@ -243,7 +243,10 @@
       
       _scheduledLoadedOnce = true;
     } catch (e) {
-      console.warn('[BackgroundEmailsLoader] Failed to ensure all scheduled emails are loaded:', e);
+      console.warn('[BackgroundEmailsLoader] Failed to ensure all scheduled emails are loaded:', e.message || e);
+      if (e.message && e.message.includes('index')) {
+        console.error('[BackgroundEmailsLoader] INDEX ERROR: ', e.message);
+      }
     }
   }
   
@@ -258,8 +261,12 @@
         const email = (window.currentUserEmail || '').toLowerCase().trim();
         const db = window.firebaseDB;
         const [ownedSnap, assignedSnap] = await Promise.all([
-          db.collection('emails').where('ownerId', '==', email).orderBy('createdAt', 'desc').limit(EMPLOYEE_INITIAL_LIMIT).get(),
-          db.collection('emails').where('assignedTo', '==', email).orderBy('createdAt', 'desc').limit(EMPLOYEE_INITIAL_LIMIT).get()
+          db.collection('emails').where('ownerId', '==', email).orderBy('createdAt', 'desc').limit(EMPLOYEE_INITIAL_LIMIT).get().catch(e => {
+            return { docs: [], size: 0 };
+          }),
+          db.collection('emails').where('assignedTo', '==', email).orderBy('createdAt', 'desc').limit(EMPLOYEE_INITIAL_LIMIT).get().catch(e => {
+            return { docs: [], size: 0 };
+          })
         ]);
 
         const map = new Map(emailsData.map(e => [e.id, e]));
@@ -316,7 +323,10 @@
         if (window.currentUserRole !== 'admin') startRealtimeListenerScoped(window.currentUserEmail || ''); else startRealtimeListener();
       }, 2000); // 2 second delay
     } catch (error) {
-      console.error('[BackgroundEmailsLoader] Failed to load from Firestore:', error);
+      console.error('[BackgroundEmailsLoader] Failed to load from Firestore:', error.message || error);
+      if (error.message && error.message.includes('index')) {
+        console.error('[BackgroundEmailsLoader] INDEX ERROR - CREATE HERE: ', error.message);
+      }
     }
   }
 

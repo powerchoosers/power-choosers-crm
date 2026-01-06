@@ -213,6 +213,17 @@ class PowerChoosersCRM {
             }
         };
 
+        const isAdmin = () => {
+            try {
+                if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') {
+                    return window.DataManager.isCurrentUserAdmin();
+                }
+                return window.currentUserRole === 'admin';
+            } catch (_) {
+                return false;
+            }
+        };
+
         const userEmail = getUserEmail();
         if (!userEmail) {
             console.warn('[CRM] No user email found, skipping email generation listener');
@@ -223,9 +234,16 @@ class PowerChoosersCRM {
         // Only show notifications for emails generated in the last 5 minutes
         const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
 
-        const emailsQuery = window.firebaseDB.collection('emails')
+        let emailsQuery = window.firebaseDB.collection('emails')
             .where('type', '==', 'scheduled')
-            .where('status', '==', 'pending_approval')
+            .where('status', '==', 'pending_approval');
+
+        // Non-admins can only listen to their own emails due to security rules
+        if (!isAdmin()) {
+            emailsQuery = emailsQuery.where('ownerId', '==', userEmail.toLowerCase());
+        }
+
+        emailsQuery = emailsQuery
             .where('generatedAt', '>=', fiveMinutesAgo)
             .orderBy('generatedAt', 'desc')
             .limit(50); // Limit to recent emails only

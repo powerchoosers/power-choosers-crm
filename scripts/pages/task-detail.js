@@ -608,19 +608,21 @@
         align-items: center; 
         gap: 8px;
       }
-      /* Move only the action buttons up to align with Complete Task button */
+      /* Ensure action buttons align perfectly with title */
       #task-detail-page .contact-header-profile > .quick-action-btn,
       #task-detail-page .contact-header-profile > .header-action-divider,
       #task-detail-page .contact-header-profile > .list-seq-group {
         position: relative;
-        top: -8px;
+        top: 0; /* Align on same line */
         z-index: 10;
       }
-      /* Center the text content vertically */
+      /* Center the text content vertically with proper spacing */
       #task-detail-page .contact-header-text {
         display: flex;
         flex-direction: column;
         justify-content: center;
+        padding: 4px 0; /* Add vertical padding to prevent text cutoff */
+        min-height: 40px; /* Ensure minimum height for text content */
       }
       /* Reset margin added globally so spacing is controlled here */
       #task-detail-page .linkedin-header-btn { margin-left: 0; margin-right: 0; }
@@ -644,20 +646,20 @@
       width: 36px;
       height: 36px;
       padding: 0;
-      cursor: pointer !important;
-      pointer-events: auto !important;
+      cursor: pointer;
+      pointer-events: auto;
       background: var(--bg-item);
       border: 1px solid var(--border-light);
-      border-radius: 8px;
-      color: var(--text-primary);
+      border-radius: var(--border-radius);
+      color: var(--text-secondary);
       transition: all var(--transition-fast);
     }
     #task-detail-page .quick-action-btn:hover {
-      background: var(--bg-hover) !important;
-      color: var(--text-primary) !important;
-      border-color: #ffffff !important;
+      background: var(--bg-hover);
+      color: var(--text-primary);
+      border-color: var(--accent-color);
       transform: translateY(-1px);
-      box-shadow: var(--shadow-sm);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
     `;
     // Append to head so rules actually apply
@@ -711,38 +713,48 @@
     if (isAcctTask) {
       // Account task: only "Add to List" and "Add Task" buttons
       actionButtonsHTML = `
-        \u003cbutton class=\"quick-action-btn list-header-btn\" id=\"task-add-to-list\" title=\"Add to list\" aria-label=\"Add to list\" aria-haspopup=\"dialog\"\u003e
+        <button class="quick-action-btn list-header-btn" id="task-add-to-list" title="Add to list" aria-label="Add to list" aria-haspopup="dialog">
           ${listSvg}
-        \u003c/button\u003e
-        \u003cbutton class=\"quick-action-btn task-header-btn\" id=\"task-add-task\" title=\"Add task\" aria-label=\"Add task\" aria-haspopup=\"dialog\"\u003e
+        </button>
+        <button class="quick-action-btn task-header-btn" id="task-add-task" title="Add task" aria-label="Add task" aria-haspopup="dialog">
           ${taskSvg}
-        \u003c/button\u003e`;
+        </button>`;
     } else {
       // Contact task: "Add to List", "Add to Sequence", and "Add Task" buttons
       actionButtonsHTML = `
-        \u003cbutton class=\"quick-action-btn list-header-btn\" id=\"task-add-to-list\" title=\"Add to list\" aria-label=\"Add to list\" aria-haspopup=\"dialog\"\u003e
+        <button class="quick-action-btn list-header-btn" id="task-add-to-list" title="Add to list" aria-label="Add to list" aria-haspopup="dialog">
           ${listSvg}
-        \u003c/button\u003e
-        \u003cbutton class=\"quick-action-btn sequence-header-btn\" id=\"task-add-to-sequence\" title=\"Add to sequence\" aria-label=\"Add to sequence\" aria-haspopup=\"dialog\"\u003e
+        </button>
+        <button class="quick-action-btn sequence-header-btn" id="task-add-to-sequence" title="Add to sequence" aria-label="Add to sequence" aria-haspopup="dialog">
           ${sequenceSvg}
-        \u003c/button\u003e
-        \u003cbutton class=\"quick-action-btn task-header-btn\" id=\"task-add-task\" title=\"Add task\" aria-label=\"Add task\" aria-haspopup=\"dialog\"\u003e
+        </button>
+        <button class="quick-action-btn task-header-btn" id="task-add-task" title="Add task" aria-label="Add task" aria-haspopup="dialog">
           ${taskSvg}
-        \u003c/button\u003e`;
+        </button>`;
     }
 
     // Complete header buttons HTML
     return `
-      \u003cbutton class=\"quick-action-btn website-header-btn\" data-action=\"website\" title=\"Visit website\" aria-label=\"Visit website\"\u003e
+      <button class="quick-action-btn reschedule-header-btn" id="task-reschedule-btn" title="Reschedule" aria-label="Reschedule task">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+          <line x1="9" y1="14" x2="11" y2="14"></line>
+          <line x1="13" y1="18" x2="15" y2="18"></line>
+        </svg>
+      </button>
+      <button class="quick-action-btn website-header-btn" data-action="website" title="Visit website" aria-label="Visit website">
         ${websiteSvg}
-      \u003c/button\u003e
-      \u003cbutton class=\"quick-action-btn linkedin-header-btn\" data-action=\"linkedin\" title=\"View on LinkedIn\" aria-label=\"View on LinkedIn\"\u003e
+      </button>
+      <button class="quick-action-btn linkedin-header-btn" data-action="linkedin" title="View on LinkedIn" aria-label="View on LinkedIn">
         ${linkedInSvg}
-      \u003c/button\u003e
-      \u003cspan class=\"header-action-divider\" aria-hidden=\"true\"\u003e\u003c/span\u003e
-      \u003cdiv class=\"list-seq-group\"\u003e
+      </button>
+      <span class="header-action-divider" aria-hidden="true"></span>
+      <div class="list-seq-group">
         ${actionButtonsHTML}
-      \u003c/div\u003e`;
+      </div>`;
   }
 
   function injectTaskDetailStyles() {
@@ -755,35 +767,184 @@
       /* Task Detail Page Layout */
       #task-detail-page .page-header {
         display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
+        align-items: center;
         width: 100%;
-        padding: 25px 25px 25px 25px;
+        padding: var(--spacing-base);
         margin: 0;
-        gap: 20px; /* Space between back button and title section */
+        background: transparent;
+        border-bottom: 1px solid var(--border-light);
       }
 
       #task-detail-page .page-title-section {
         display: flex;
-        align-items: flex-start;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        margin-bottom: 0 !important;
+        gap: 20px;
+      }
+
+      #task-detail-page .contact-header-info {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        min-width: 0;
+        flex: 1;
+      }
+
+      #task-detail-page .contact-header-profile {
+        display: inline-flex;
+        align-items: center;
         gap: 12px;
-        flex: 0 0 auto;
-        justify-content: flex-start;
-        margin-left: 45px; /* Move the entire title section to the right */
-        margin-top: -10px; /* Move glyph and text up 10px total */
+        min-width: 0;
+        flex: 1;
+        min-height: 40px; /* Minimum height, but allow growth */
+      }
+
+      #task-detail-page .avatar-circle-small {
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+        min-height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        background: var(--orange-subtle);
+        color: #fff;
+        font-weight: 600;
+        font-size: 16px;
+        letter-spacing: 0.5px;
+      }
+
+      #task-detail-page .company-logo-header,
+      #task-detail-page .company-favicon-header {
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+        min-height: 40px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        flex-shrink: 0;
+        background: var(--bg-hover);
+      }
+
+      #task-detail-page .company-logo-header img,
+      #task-detail-page .company-favicon-header img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      #task-detail-page .contact-header-text {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-width: 0;
+        flex: 0 1 auto; /* Don't force growth, but allow shrink */
+        padding: 4px 0; /* Add vertical padding to prevent text cutoff */
+        min-height: 40px; /* Ensure minimum height for text content */
+      }
+
+      #task-detail-page .page-title {
+        margin: 0;
+        font-size: 1.25rem; /* Slightly smaller to match contact detail better */
+        font-weight: 700;
+        color: var(--text-primary);
+        line-height: 1.1;
+        letter-spacing: -0.025em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      #task-detail-page .contact-subtitle,
+      #task-detail-page .task-contact-info {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin: 0;
+        font-weight: 400;
+        line-height: 1.2;
+      }
+
+      #task-detail-page .task-contact-info {
+        margin-top: 1px;
+      }
+
+      #task-detail-page .page-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-left: 20px;
+        flex-shrink: 0;
+      }
+
+      #task-detail-page .page-actions .btn-primary,
+      #task-detail-page .page-actions .btn-secondary {
+        height: 36px;
+        padding: 0 16px;
+        font-size: 0.85rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--border-radius);
+      }
+
+      #task-detail-page .page-actions .btn-icon,
+      #task-detail-page .page-actions .quick-action-btn {
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        min-height: 36px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--border-radius);
+      }
+
+      #task-detail-page .task-navigation {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      /* Page actions separator - vertical line between button groups */
+      #task-detail-page .page-actions-separator {
+        width: 1px;
+        height: 24px;
+        background: var(--border-light);
+        margin: 0;
+        flex-shrink: 0;
       }
       #task-detail-page .page-content { 
         display: grid; 
-        grid-template-columns: 450px 1fr; /* Left column narrow, right column flexible */
+        grid-template-columns: 450px 1fr; /* Log Call side (left) narrow, Contact Info side (right) flexible */
         grid-template-rows: 1fr; /* Make the row fill the available height */
         column-gap: 0px; /* Remove column gap to eliminate visual space */
         row-gap: 25px;
         padding: 0; /* No padding on parent - let children handle their own spacing */
-        height: calc(100vh - 140px); /* Account for header height */
+        flex: 1; /* Grow to fill available space in page-container */
+        min-height: 0; /* Allow the grid to shrink and enable internal scrolling */
         overflow: hidden; /* Restore hidden overflow for proper scrolling */
         justify-items: stretch; /* ensure items fill their grid tracks */
         align-items: start;     /* align items to the top */
         width: 100%; /* Ensure full width */
+      }
+      /* Ensure container has glassmorphism while the page background matches dashboard */
+      #task-detail-page .page-container {
+        /* Use standard height calculation from main.css */
+        height: calc(100vh - var(--topbar-height) - (var(--spacing-base) * 2));
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 0;
       }
       /* Override any global styles that might affect grid gap */
       #task-detail-page .page-content > .main-content {
@@ -800,15 +961,12 @@
         height: 100%; /* fill grid row height */
         overflow-y: auto; /* independent scroll */
         overscroll-behavior: contain;
-        padding-top: 25px;  /* 25px distance from header at top */
-        padding-bottom: 25px; /* 25px breathing room at bottom under last card */
-        padding-right: 25px; /* 25px padding from cards to scrollbar */
-        padding-left: 25px; /* 25px distance from left edge to cards */
+        padding: 25px; /* Consistent 25px padding on all sides */
         /* Allow the left column to fully occupy its grid track (no artificial max width) */
         max-width: none;
         width: 100%;
+        background: rgba(0, 0, 0, 0.12); /* Subtle darkening for 2-tone effect */
         border-right: 1px solid var(--border-light); /* Vertical divider */
-        margin-right: 25px; /* Spacing from the border to right column content */
       }
       #task-detail-page .sidebar-content { 
         display: flex; 
@@ -818,12 +976,8 @@
         height: 100%; /* fill grid row height */
         overflow-y: auto; /* independent scroll */
         overscroll-behavior: contain;
-        padding-top: 25px; /* 25px distance from header at top */
-        padding-right: 25px; /* 25px padding from cards to scrollbar */
-        padding-left: 25px; /* 25px distance from left edge to contact info */
-        margin-top: 0; /* Remove any extra top margin */
-        margin-right: 0; /* Remove any right margin */
-        margin-left: 0; /* Remove any left margin */
+        padding: 25px; /* Consistent 25px padding on all sides */
+        margin: 0;
         align-items: stretch; /* Align to top */
         width: 100%; /* Ensure full width */
       }
@@ -853,7 +1007,7 @@
       
       /* Contact Information Grid */
       #task-detail-page .contact-info-section { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius-lg); padding: var(--spacing-base); margin: 0; width: 100%; box-shadow: var(--elevation-card); }
-      #task-detail-page .contact-info-section .section-title { font-weight: 600; font-size: 1rem; color: var(--text-primary); margin: 0 0 var(--spacing-base) 0; }
+      #task-detail-page .contact-info-section .section-title { font-weight: 700; font-size: 1rem; color: var(--text-primary); margin: 0 0 var(--spacing-base) 0; letter-spacing: -0.025em; }
       #task-detail-page .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-sm) var(--spacing-md); }
       #task-detail-page .info-row { display: flex; flex-direction: column; gap: 4px; }
       #task-detail-page .info-label { color: var(--text-secondary); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
@@ -872,6 +1026,7 @@
       /* Activity Timeline - uses global .activities-list styling */
       
       /* Avatar Styles - Match People Page */
+      #task-detail-page .avatar-circle-small,
       #task-detail-page .avatar-initials {
         width: 40px;
         height: 40px;
@@ -885,26 +1040,29 @@
         justify-content: center;
         font-size: 16px;
         flex-shrink: 0;
-        vertical-align: middle;
       }
       
-      /* Absolutely positioned avatar - positioned relative to title section */
-      #task-detail-page .contact-header-text {
-        position: relative;
+      #task-detail-page .company-logo-header {
+        width: 40px;
+        height: 40px;
+        border-radius: var(--border-radius-sm);
+        background: var(--bg-item);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        border: 1px solid var(--border-light);
       }
-      
-      #task-detail-page .avatar-absolute {
-        position: absolute;
-        left: -50px;
-        top: 8px;
-        z-index: 1;
+      #task-detail-page .company-logo-header img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        border-radius: var(--border-radius-sm);
       }
       
       /* Contact Details Container - normal flow, no flex */
       #task-detail-page .contact-details-normal {
         line-height: 1.4;
-        position: relative;
-        z-index: 0;
       }
       
       /* Task Contact Info - Ensure proper alignment */
@@ -921,13 +1079,6 @@
         margin-right: 0;
       }
       
-      /* Widget Separator */
-      #task-detail-page .widgets-separator {
-        width: 1px;
-        height: 24px;
-        background: var(--border-light);
-        margin: 0;
-      }
       
       /* Widgets Wrap */
       #task-detail-page .widgets-wrap {
@@ -958,7 +1109,7 @@
       /* Widget Button Hover */
       #task-detail-page #task-open-widgets:hover {
         background: var(--bg-secondary);
-        border-color: #ffffff !important;
+        border-color: var(--accent-color) !important;
         transform: translateY(-1px);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       }
@@ -1034,14 +1185,15 @@
         border-radius: var(--border-radius);
         background: var(--bg-item);
         border: 1px solid var(--border-light);
-        color: var(--text-inverse);
+        color: var(--text-secondary);
         cursor: pointer;
         transition: all 0.2s ease;
       }
       
       #task-detail-page .widgets-drawer .widget-item:hover {
         background: var(--bg-secondary);
-        border-color: #ffffff !important;
+        border-color: var(--accent-color) !important;
+        color: var(--text-primary);
         transform: translateY(-1px);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       }
@@ -1067,9 +1219,9 @@
       }
       
       #task-detail-page .btn-icon {
-        width: 32px;
-        height: 32px;
-        border-radius: 6px;
+        width: 36px;
+        height: 36px;
+        border-radius: var(--border-radius);
         background: var(--bg-item);
         border: 1px solid var(--border-light);
         color: var(--text-secondary);
@@ -1077,18 +1229,22 @@
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        transition: var(--transition-fast);
+        transition: all 0.2s ease;
       }
       
       #task-detail-page .btn-icon:hover {
-        background: var(--bg-hover);
+        background: var(--bg-secondary);
         color: var(--text-primary);
-        border-color: #ffffff !important;
+        border-color: var(--accent-color) !important;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       }
       
       #task-detail-page .btn-icon:disabled {
         opacity: 0.4;
         cursor: not-allowed;
+        transform: none !important;
+        box-shadow: none !important;
       }
       
       #task-detail-page .btn-icon:disabled:hover {
@@ -1097,28 +1253,36 @@
         border-color: var(--border-light);
       }
 
-      /* Reschedule button: square, same height as action button, pagination styling */
+      /* Reschedule button: identical to quick-action-btn for consistency */
       #task-detail-page #task-reschedule-btn {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         width: 36px;
         height: 36px;
+        min-width: 36px;
+        min-height: 36px;
         padding: 0;
-        border-radius: 8px;
-        background: var(--bg-hover);
-        border: 1px solid transparent;
-        color: var(--text-primary);
-        transition: var(--transition-fast);
+        cursor: pointer;
+        pointer-events: auto;
+        background: var(--bg-item);
+        border: 1px solid var(--border-light);
+        border-radius: var(--border-radius);
+        color: var(--text-secondary);
+        transition: all var(--transition-fast);
+        box-sizing: border-box;
       }
       #task-detail-page #task-reschedule-btn:hover {
-        background: var(--bg-item);
-        border-color: #ffffff !important;
-        color: var(--text-inverse);
+        background: var(--bg-hover);
+        color: var(--text-primary);
+        border-color: var(--accent-color);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       }
       #task-detail-page #task-reschedule-btn svg {
         width: 18px;
         height: 18px;
+        display: block;
       }
       
       /* Contact Link Styles */
@@ -1196,14 +1360,14 @@
       
       #task-detail-page .icon-btn-sm:hover {
         background: var(--bg-hover);
-        border-color: #ffffff !important;
+        border-color: var(--accent-color) !important;
         color: var(--text-inverse);
       }
       
       #task-detail-page .btn-icon-add:hover {
         background: var(--bg-hover);
         color: var(--text-primary);
-        border-color: #ffffff !important;
+        border-color: var(--accent-color) !important;
       }
       
       #task-detail-page .contacts-list {
@@ -1225,7 +1389,7 @@
       
       #task-detail-page .contact-item:hover {
         background: var(--bg-hover);
-        border-color: #ffffff !important;
+        border-color: var(--accent-color) !important;
       }
       
       #task-detail-page .contact-avatar {
@@ -2051,21 +2215,21 @@
       }
       .reschedule-popover .form-actions { display:flex; justify-content:flex-end; gap:8px; }
       .reschedule-popover .btn-primary { height:32px; padding:0 12px; border-radius: var(--border-radius-sm); background: var(--orange-primary); color: var(--text-inverse); border:1px solid var(--orange-primary); font-weight:600; }
-      .reschedule-popover .btn-primary:hover { background: var(--orange-dark, #e67e00); border-color: #ffffff !important; filter: brightness(0.95); }
+      .reschedule-popover .btn-primary:hover { background: var(--orange-dark, #e67e00); border-color: var(--accent-color) !important; filter: brightness(0.95); }
       .reschedule-popover .btn-text { height:32px; padding:0 12px; border-radius: var(--border-radius-sm); background: transparent; color: var(--text-secondary); border:1px solid transparent; transition: var(--transition-fast); }
-      .reschedule-popover .btn-text:hover { background: var(--grey-700); color: var(--text-inverse); border-color: #ffffff !important; }
+      .reschedule-popover .btn-text:hover { background: var(--grey-700); color: var(--text-inverse); border-color: var(--accent-color) !important; }
       .reschedule-popover .close-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; min-width: 28px; min-height: 28px; padding: 0; background: var(--bg-item); color: var(--grey-300); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); line-height: 1; font-size: 16px; font-weight: 600; cursor: pointer; transition: var(--transition-fast); box-sizing: border-box; }
-      .reschedule-popover .close-btn:hover { background: var(--grey-600); color: var(--text-inverse); border-color: #ffffff !important; }
+      .reschedule-popover .close-btn:hover { background: var(--grey-600); color: var(--text-inverse); border-color: var(--accent-color) !important; }
       .reschedule-popover .calendar-toolbar { display: none; margin-top: 8px; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius); box-shadow: var(--elevation-card); padding: 8px; }
       .reschedule-popover .calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
       .reschedule-popover .calendar-month-year { font-weight: 600; }
       .reschedule-popover .calendar-nav-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; transition: var(--transition-fast); }
-      .reschedule-popover .calendar-nav-btn:hover { background: var(--bg-secondary); border-color: #ffffff !important; box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+      .reschedule-popover .calendar-nav-btn:hover { background: var(--bg-secondary); border-color: var(--accent-color) !important; box-shadow: 0 2px 8px rgba(0,0,0,.1); }
       .reschedule-popover .calendar-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
       .reschedule-popover .calendar-weekday { text-align: center; font-size: 11px; color: var(--text-secondary); font-weight: 600; }
       .reschedule-popover .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
       .reschedule-popover .calendar-grid button { padding: 6px 0; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; transition: var(--transition-fast); }
-      .reschedule-popover .calendar-grid button:hover { background: var(--bg-secondary); border-color: #ffffff !important; }
+      .reschedule-popover .calendar-grid button:hover { background: var(--bg-secondary); border-color: var(--accent-color) !important; }
       .reschedule-popover .calendar-grid > div:empty { background: transparent; border: none; }
       .reschedule-popover .calendar-grid button.today { border-color: var(--orange-primary); }
       .reschedule-popover .calendar-grid button.selected { background: var(--orange-primary); color: #fff; border-color: var(--orange-primary); }
@@ -3699,44 +3863,35 @@
     let retries = 0;
 
     const tryRender = () => {
-      // CRITICAL FIX: Scope selector to task-detail-page if not already scoped
-      const scopedSelector = elementSelector.includes('#task-detail-page')
-        ? elementSelector
-        : `#task-detail-page ${elementSelector}`;
-      const titleSection = document.querySelector(scopedSelector);
-      if (titleSection) {
-        // Cleanup existing elements
-        const existingElements = titleSection.querySelectorAll('.avatar-initials, .company-favicon-header, .avatar-absolute, [class*="avatar"], [class*="favicon"]');
-        existingElements.forEach(el => {
-          if (el && el.parentNode) {
-            el.remove();
-          }
-        });
+      // Target the profile container for flex alignment
+      const profileContainer = document.querySelector('#task-detail-page .contact-header-profile');
+      if (profileContainer) {
+        // Cleanup existing avatar/icon elements in the profile container
+        const existingElements = profileContainer.querySelectorAll('.avatar-initials, .company-favicon-header, .avatar-circle-small, .company-logo-header');
+        existingElements.forEach(el => el.remove());
 
-        // Also check for absolutely positioned elements
-        const allChildren = titleSection.querySelectorAll('*');
-        allChildren.forEach(child => {
-          if (child.style && child.style.position === 'absolute' &&
-            (child.classList.contains('avatar-absolute') ||
-              child.querySelector('.avatar-initials') ||
-              child.querySelector('.company-favicon-header'))) {
-            child.remove();
-          }
-        });
+        // Create the wrapper - no absolute positioning, let flex handle it
+        let wrapper;
+        if (isAvatar) {
+          // For avatars, create a div with the initials
+          wrapper = document.createElement('div');
+          wrapper.className = 'avatar-circle-small';
+          wrapper.setAttribute('aria-hidden', 'true');
+          wrapper.textContent = htmlContent; // htmlContent is just the initials text
+        } else {
+          // For company icons, htmlContent is already a complete HTML string from generateCompanyIconHTML
+          // Create a wrapper div to contain it
+          wrapper = document.createElement('div');
+          wrapper.className = 'company-logo-header';
+          wrapper.innerHTML = htmlContent;
+        }
 
-        // Add the new element
-        const wrapper = isAvatar
-          ? `<span class="avatar-initials avatar-absolute" aria-hidden="true">${htmlContent}</span>`
-          : `<div class="company-favicon-header avatar-absolute" aria-hidden="true">${htmlContent}</div>`;
-
-        titleSection.insertAdjacentHTML('beforeend', wrapper);
+        // Prepend so it appears before the text
+        profileContainer.prepend(wrapper);
 
         // Add icon-loaded class
         requestAnimationFrame(() => {
-          const element = titleSection.querySelector(isAvatar ? '.avatar-initials' : '.company-favicon-header');
-          if (element) {
-            element.classList.add('icon-loaded');
-          }
+          wrapper.classList.add('icon-loaded');
         });
 
         return true;
@@ -3758,45 +3913,21 @@
 
   // Robust cleanup function to remove all existing avatars/icons
   function cleanupExistingAvatarsAndIcons() {
-    // CRITICAL FIX: Scope selector to task-detail-page
-    const titleSection = document.querySelector('#task-detail-page .contact-header-text');
-    if (!titleSection) return;
+    const profileContainer = document.querySelector('#task-detail-page .contact-header-profile');
+    if (!profileContainer) return;
 
-    // Remove all possible avatar/icon elements
     const selectors = [
       '.avatar-initials',
+      '.avatar-circle-small',
       '.company-favicon-header',
-      '.avatar-absolute',
-      '[class*="avatar"]',
-      '[class*="favicon"]',
-      '[class*="company-logo"]',
-      '[class*="company-icon"]'
+      '.company-logo-header',
+      '.avatar-absolute'
     ];
 
     selectors.forEach(selector => {
-      const elements = titleSection.querySelectorAll(selector);
-      elements.forEach(el => {
-        if (el && el.parentNode) {
-          el.remove();
-        }
-      });
+      const elements = profileContainer.querySelectorAll(selector);
+      elements.forEach(el => el.remove());
     });
-
-    // Also check for any absolutely positioned elements that might be avatars
-    const allChildren = titleSection.querySelectorAll('*');
-    allChildren.forEach(child => {
-      if (child.style && child.style.position === 'absolute' &&
-        (child.classList.contains('avatar-absolute') ||
-          child.querySelector('.avatar-initials') ||
-          child.querySelector('.company-favicon-header') ||
-          child.querySelector('[class*="avatar"]') ||
-          child.querySelector('[class*="favicon"]'))) {
-        child.remove();
-      }
-    });
-
-    // Force a reflow to ensure DOM is clean
-    titleSection.offsetHeight;
   }
 
   // Inject header buttons into the task detail page header
@@ -3932,7 +4063,7 @@
         }
 
         // Add company icon/favicon to header using retry helper
-        renderAvatarOrIcon('#task-detail-page .contact-header-text', companyIconHTML, false);
+        renderAvatarOrIcon('', companyIconHTML, false);
 
         // CRITICAL FIX: Subtitle is already updated above, but ensure it's set here too
         if (els.subtitle) {
@@ -3953,7 +4084,7 @@
           contactInfoEl = document.createElement('div');
           contactInfoEl.id = 'task-contact-info';
           contactInfoEl.className = 'task-contact-info';
-          contactInfoEl.style.cssText = 'margin-top: 0px; color: var(--text-secondary); font-size: 14px;';
+          contactInfoEl.style.cssText = 'color: var(--text-secondary); font-size: 14px;';
 
           // CRITICAL FIX: Scope selector to task-detail-page
           const titleSection = document.querySelector('#task-detail-page .contact-header-text');
@@ -4153,28 +4284,13 @@
         // Set the contact details content
         contactInfoEl.innerHTML = `<div class="contact-details-normal">${contactDetailsHTML}</div>`;
 
-        // Add absolutely positioned avatar to the main title container using retry helper
+        // Add avatar to the left of contact name (as sibling, not child)
         // Ensure we have valid initials
         const finalInitials = initials && initials !== '?' ? initials : (contactName ? contactName.charAt(0).toUpperCase() : 'C');
         // console.log('Contact task - Rendering avatar with initials:', finalInitials);
 
-        // Render avatar with retry - ensure it's inside .contact-header-text
-        // CRITICAL FIX: Use scoped selector within task-detail-page
-        const titleSection = document.querySelector('#task-detail-page .contact-header-text');
-        if (titleSection) {
-          // Clean up any existing avatars first
-          const existingAvatars = titleSection.querySelectorAll('.avatar-initials, .avatar-absolute');
-          existingAvatars.forEach(el => el.remove());
-
-          // Create avatar element
-          const avatarHTML = `<span class="avatar-initials avatar-absolute" aria-hidden="true" style="position: absolute; left: -50px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; background: var(--orange-subtle); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; letter-spacing: 0.5px;">${escapeHtml(finalInitials)}</span>`;
-          titleSection.insertAdjacentHTML('beforeend', avatarHTML);
-          // console.log('[TaskDetail] Avatar rendered successfully with initials:', finalInitials);
-        } else {
-          // Fallback to retry helper if element not found
-          console.warn('[TaskDetail] .contact-header-text not found, using retry helper');
-          renderAvatarOrIcon('#task-detail-page .contact-header-text', escapeHtml(finalInitials), true);
-        }
+        // Render avatar using the proper helper (adds as sibling to .contact-header-text)
+        renderAvatarOrIcon('', escapeHtml(finalInitials), true);
       }
     } else if (state.taskType === 'li-connect' || state.taskType === 'li-message' || state.taskType === 'li-view-profile' || state.taskType === 'li-interact-post' ||
       state.taskType === 'linkedin-connect' || state.taskType === 'linkedin-message' || state.taskType === 'linkedin-view' || state.taskType === 'linkedin-interact') {
@@ -4378,27 +4494,12 @@
       // Set the contact details content
       contactInfoEl.innerHTML = `<div class="contact-details-normal">${contactDetailsHTML}</div>`;
 
-      // Add absolutely positioned avatar to the main title container
+      // Add avatar to the left of contact name (as sibling, not child)
       const finalInitials = initials && initials !== '?' ? initials : (contactName ? contactName.charAt(0).toUpperCase() : 'C');
       console.log('LinkedIn task - Rendering avatar with initials:', finalInitials);
 
-      // Render avatar with retry - ensure it's inside .contact-header-text
-      // CRITICAL FIX: Use scoped selector within task-detail-page
-      const titleSection = document.querySelector('#task-detail-page .contact-header-text');
-      if (titleSection) {
-        // Clean up any existing avatars first
-        const existingAvatars = titleSection.querySelectorAll('.avatar-initials, .avatar-absolute');
-        existingAvatars.forEach(el => el.remove());
-
-        // Create avatar element
-        const avatarHTML = `<span class="avatar-initials avatar-absolute" aria-hidden="true" style="position: absolute; left: -50px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; background: var(--orange-subtle); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; letter-spacing: 0.5px;">${escapeHtml(finalInitials)}</span>`;
-        titleSection.insertAdjacentHTML('beforeend', avatarHTML);
-        console.log('[TaskDetail] LinkedIn avatar rendered successfully with initials:', finalInitials);
-      } else {
-        // Fallback to retry helper if element not found
-        console.warn('[TaskDetail] .contact-header-text not found, using retry helper');
-        renderAvatarOrIcon('#task-detail-page .contact-header-text', escapeHtml(finalInitials), true);
-      }
+      // Render avatar using the proper helper (adds as sibling to .contact-header-text)
+      renderAvatarOrIcon('', escapeHtml(finalInitials), true);
     } else {
       // For other non-phone-call tasks, set title and subtitle normally
       if (els.title) {
