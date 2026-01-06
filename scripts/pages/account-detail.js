@@ -1794,7 +1794,6 @@
     const isVisible = accountPage && accountPage.style.display !== 'none' && !accountPage.hidden;
 
     if (!isVisible) {
-      console.debug('[Account Detail] Page not visible, skipping refresh to prevent freeze');
       return;
     }
 
@@ -2013,6 +2012,61 @@
 
   const ARC_PAGE_SIZE = 5;
   function arcGetSlice() { const a = Array.isArray(state._arcCalls) ? state._arcCalls : []; const p = Math.max(1, parseInt(state._arcPage || 1, 10)); const s = (p - 1) * ARC_PAGE_SIZE; return a.slice(s, s + ARC_PAGE_SIZE); }
+  function arcTryApplySingleNewCallPatch(list, slice) {
+    try {
+      if (!list || !Array.isArray(slice) || slice.length < 2) return false;
+      if (parseInt(state._arcPage || 1, 10) !== 1) return false;
+      if (state._isScrolling) return false;
+      if (state._arcOpenIds && state._arcOpenIds.size > 0) return false;
+      if (list.querySelector && list.querySelector('.rc-details')) return false;
+
+      const existing = Array.from(list.querySelectorAll('.rc-item'));
+      if (existing.length !== slice.length) return false;
+
+      const oldIds = existing.map((el) => String(el.getAttribute('data-id') || '').trim()).filter(Boolean);
+      if (oldIds.length !== slice.length) return false;
+
+      const newIds = slice.map((c) => String((c && (c.id || c.twilioSid || c.callSid || c.sid)) || '').trim()).filter(Boolean);
+      if (newIds.length !== slice.length) return false;
+
+      if (oldIds[0] === newIds[0]) return false;
+      for (let i = 0; i < newIds.length - 1; i++) {
+        if (oldIds[i] !== newIds[i + 1]) return false;
+      }
+
+      const wrap = document.createElement('div');
+      wrap.innerHTML = rcItemHtml(slice[0], 0);
+      const newEl = wrap.firstElementChild;
+      if (!newEl) return false;
+      try {
+        newEl.classList.add('rc-slide-in-top');
+        newEl.style.animationDelay = '0s';
+      } catch (_) { }
+
+      const firstItem = existing[0];
+      if (!firstItem || !firstItem.parentNode) return false;
+      firstItem.parentNode.insertBefore(newEl, firstItem);
+
+      const lastItem = existing[existing.length - 1];
+      if (lastItem) {
+        try {
+          lastItem.classList.add('rc-slide-out-bottom');
+          lastItem.style.animationDelay = '0s';
+        } catch (_) { }
+        setTimeout(() => {
+          try {
+            if (lastItem && lastItem.parentNode) lastItem.parentNode.removeChild(lastItem);
+          } catch (_) { }
+        }, 240);
+      }
+
+      try { const ov = list.querySelector('.rc-loading-overlay'); if (ov) ov.remove(); } catch (_) { }
+      try { window.ClickToCall?.processSpecificPhoneElements?.(); } catch (_) { }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
   function arcRenderPage() {
     const list = document.getElementById('account-recent-calls-list'); if (!list) return;
 
@@ -2038,33 +2092,15 @@
         try { const ov = list.querySelector('.rc-loading-overlay'); if (ov) ov.remove(); } catch (_) { }
         return;
       }
+      if (arcTryApplySingleNewCallPatch(list, slice)) {
+        if (list.dataset) list.dataset.pcRecentCallsSig = sig;
+        const totalPages = Math.max(1, Math.ceil(total / ARC_PAGE_SIZE));
+        arcUpdatePager(state._arcPage || 1, totalPages);
+        return;
+      }
       if (list.dataset) list.dataset.pcRecentCallsSig = sig;
     } catch (_) { }
     arcUpdateListAnimated(list, slice.map((call, index) => rcItemHtml(call, index)).join(''));
-    // delegate click to handle dynamic rerenders (prevent duplicate listeners)
-    list.querySelectorAll('.rc-insights').forEach(btn => {
-      if (!btn._insightsListenerBound) {
-        btn.addEventListener('click', (e) => {
-          e.preventDefault(); e.stopPropagation();
-          const id = btn.getAttribute('data-id');
-          const call = (state._arcCalls || []).find(x => String(x.id || x.twilioSid || x.callSid || '') === String(id));
-          if (!call) return;
-
-          // Check if this is a not-processed call that needs CI processing
-          if (btn.classList.contains('not-processed')) {
-            // Use the correct property names from the call object
-            const callSid = call.id || call.twilioSid || call.callSid;
-            const recordingSid = call.recordingSid || call.recording_id;
-            triggerAccountCI(callSid, recordingSid, btn);
-            return;
-          }
-
-          // Otherwise, toggle the details as usual
-          toggleRcDetails(btn, call);
-        });
-        btn._insightsListenerBound = true;
-      }
-    });
     const totalPages = Math.max(1, Math.ceil(total / ARC_PAGE_SIZE));
     arcUpdatePager(state._arcPage || 1, totalPages);
 
@@ -2156,7 +2192,7 @@
         </div>
         <div class="rc-actions">
           <span class="rc-outcome">${outcome}</span>
-          <button type="button" class="rc-icon-btn rc-insights ${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'not-processed' : ''}" data-id="${escapeHtml(String(c.id || ''))}" aria-label="View insights" title="${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'Process Call' : 'View AI insights'}">${svgEye()}</button>
+          <button type="button" class="rc-icon-btn rc-insights ${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'not-processed' : ''}" data-id="${idAttr}" aria-label="View insights" title="${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'Process Call' : 'View AI insights'}">${svgEye()}</button>
         </div>
       </div>`;
   }
@@ -6547,5 +6583,3 @@
   // Backward-compat global alias used by some modules
   try { window.showAccountDetail = showAccountDetail; } catch (_) { }
 })();
-
-
