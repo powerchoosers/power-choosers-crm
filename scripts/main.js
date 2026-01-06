@@ -4,8 +4,7 @@
 
 (function suppressNoisyFirestoreHandshakeErrors() {
     try {
-        // Firestore suppression check start removed for cleaner production logs
-        const shouldSuppress = localStorage.getItem('pc-suppress-fs-400') !== 'false' && !window.PC_DEBUG;
+        const shouldSuppress = localStorage.getItem('pc-suppress-fs-400') !== 'false';
         if (!shouldSuppress) return;
         const originalConsoleError = window.console && window.console.error ? window.console.error.bind(window.console) : null;
         if (originalConsoleError) {
@@ -16,8 +15,8 @@
                         if (a && a.stack) return String(a.stack);
                         return String(a);
                     }).join(' ');
-                    // Hide Firestore WebChannel Listen/Write/channel 400 noise only
-                    if (/google\.firestore\.v1\.Firestore\/(Listen|Write)\/channel|WebChannel.*400|(Listen|Write)\/channel.*400/i.test(text)) return;
+                    // Hide Firestore WebChannel Listen/channel 400 noise only
+                    if (/google\.firestore\.v1\.Firestore\/Listen\/channel|WebChannel.*400|Listen\/channel.*400/i.test(text)) return;
                 } catch (_) { /* noop */ }
                 return originalConsoleError.apply(this, args);
             };
@@ -26,7 +25,7 @@
         window.addEventListener('unhandledrejection', (e) => {
             try {
                 const msg = String((e && e.reason && (e.reason.message || e.reason)) || '');
-                if (/google\.firestore\.v1\.Firestore\/(Listen|Write)\/channel|WebChannel.*400|(Listen|Write)\/channel.*400/i.test(msg)) {
+                if (/google\.firestore\.v1\.Firestore\/Listen\/channel|WebChannel.*400|Listen\/channel.*400/i.test(msg)) {
                     e.preventDefault();
                 }
             } catch (_) { /* noop */ }
@@ -37,6 +36,25 @@
 class PowerChoosersCRM {
     constructor() {
         this.currentPage = 'dashboard';
+
+        // Debug logging helper
+        window.__crmLog = (location, message, data) => {
+            try {
+                fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sessionId: 'debug-session',
+                        runId: 'quick-actions-debug',
+                        hypothesisId: 'QA1',
+                        location,
+                        message,
+                        data: data || {},
+                        timestamp: Date.now()
+                    })
+                }).catch(() => {});
+            } catch (_) {}
+        };
         this.sidebar = document.getElementById('sidebar');
 
         // Sidebar hover state
@@ -73,6 +91,7 @@ class PowerChoosersCRM {
         document.addEventListener('pc:task-deleted', async (e) => {
             const { taskId } = e.detail || {};
             if (taskId) {
+                console.log('[CRM] Task deleted, refreshing Today\'s Tasks widget:', taskId);
                 // Clean up from localStorage
                 try {
                     const getUserEmail = () => {
@@ -122,6 +141,7 @@ class PowerChoosersCRM {
 
             // Handle both deletions and general updates (like when tasks page loads fresh data)
             if ((deleted && taskId) || source === 'tasksPageLoad' || source === 'taskCreation') {
+                console.log('[CRM] Tasks updated via tasksUpdated event, refreshing Today\'s Tasks widget:', { taskId, deleted, source });
                 if (typeof this.loadTodaysTasks === 'function') {
                     this.loadTodaysTasks();
                 }
@@ -168,6 +188,8 @@ class PowerChoosersCRM {
 
     // Initialize dashboard data and widgets in correct order
     async initializeDashboardData() {
+        console.log('[CRM] Initializing dashboard data...');
+
         // STEP 0: Show skeletons immediately before any data loading
         const taskLists = document.querySelectorAll('.tasks-list');
         const newsList = document.querySelector('.news-list');
@@ -190,6 +212,7 @@ class PowerChoosersCRM {
     startEmailGenerationListener() {
         // Guard: Prevent duplicate listeners
         if (this._emailGenerationUnsubscribe) {
+            console.log('[CRM] Email generation listener already active, skipping');
             return;
         }
 
@@ -213,37 +236,21 @@ class PowerChoosersCRM {
             }
         };
 
-        const isAdmin = () => {
-            try {
-                if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') {
-                    return window.DataManager.isCurrentUserAdmin();
-                }
-                return window.currentUserRole === 'admin';
-            } catch (_) {
-                return false;
-            }
-        };
-
         const userEmail = getUserEmail();
         if (!userEmail) {
             console.warn('[CRM] No user email found, skipping email generation listener');
             return;
         }
 
+        console.log('[CRM] Starting email generation listener for:', userEmail);
+
         // Listen for emails with status 'pending_approval' that were recently generated
         // Only show notifications for emails generated in the last 5 minutes
         const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
 
-        let emailsQuery = window.firebaseDB.collection('emails')
+        const emailsQuery = window.firebaseDB.collection('emails')
             .where('type', '==', 'scheduled')
-            .where('status', '==', 'pending_approval');
-
-        // Non-admins can only listen to their own emails due to security rules
-        if (!isAdmin()) {
-            emailsQuery = emailsQuery.where('ownerId', '==', userEmail.toLowerCase());
-        }
-
-        emailsQuery = emailsQuery
+            .where('status', '==', 'pending_approval')
             .where('generatedAt', '>=', fiveMinutesAgo)
             .orderBy('generatedAt', 'desc')
             .limit(50); // Limit to recent emails only
@@ -299,6 +306,8 @@ class PowerChoosersCRM {
 
     // Load dashboard widgets after data is ready
     loadDashboardWidgets() {
+        console.log('[CRM] Loading dashboard widgets...');
+
         // STEP 1: Immediately render skeletons for all widgets
         const taskLists = document.querySelectorAll('.tasks-list');
         const newsList = document.querySelector('.news-list');
@@ -324,7 +333,7 @@ class PowerChoosersCRM {
             this.loadTodaysTasks();
         }
         this.loadEnergyNews();
-
+        
         // Load activities with a small delay to ensure initial skeleton is seen if load is instant
         setTimeout(() => {
             this.loadHomeActivities();
@@ -339,6 +348,7 @@ class PowerChoosersCRM {
         if (window.ActivityManager && document.getElementById('dashboard-page')?.classList.contains('active')) {
             // Also check if contacts are ready - filtering relies on them, but we can render partials without them
             // The ActivityManager handles the "strict" filtering gracefully (just shows less or unlinked items)
+            console.log('[CRM] Rendering home activities (Progressive Load)...');
             window.ActivityManager.renderActivities('home-activity-timeline', 'global', null, forceRefresh);
         }
     }
@@ -356,12 +366,14 @@ class PowerChoosersCRM {
             // Prevent refreshes immediately after page load (cooldown period)
             const timeSincePageLoad = Date.now() - pageLoadTime;
             if (timeSincePageLoad < COOLDOWN_PERIOD) {
+                console.log(`[CRM] Skipping activity refresh - too soon after page load (${timeSincePageLoad}ms < ${COOLDOWN_PERIOD}ms)`);
                 return;
             }
 
             // Debounce the refresh
             if (this._activityRefreshTimer) clearTimeout(this._activityRefreshTimer);
             this._activityRefreshTimer = setTimeout(() => {
+                console.log('[CRM] Background data updated, refreshing activities...');
                 // Force refresh to pick up new background data and re-apply filters
                 this.loadHomeActivities(true);
             }, 1000);
@@ -377,6 +389,8 @@ class PowerChoosersCRM {
 
     // Pre-load essential data for widgets and navigation
     async preloadEssentialData() {
+        console.log('[CRM] Pre-loading essential data for widgets...');
+
         try {
             // Load accounts data for account navigation and activity logos
             if (window.CacheManager && typeof window.CacheManager.get === 'function') {
@@ -395,6 +409,7 @@ class PowerChoosersCRM {
                         }
                         return window._essentialAccountsData;  // Return limited set for widgets
                     };
+                    console.log('[CRM] ✓ Pre-loaded 200 accounts (from', accountsData.length, 'total) - full data available on demand');
                 }
             }
 
@@ -414,6 +429,7 @@ class PowerChoosersCRM {
                         }
                         return window._essentialContactsData;  // Return limited set for widgets
                     };
+                    console.log('[CRM] ✓ Pre-loaded 200 contacts (from', contactsData.length, 'total) - full data available on demand');
                 }
             }
 
@@ -423,9 +439,11 @@ class PowerChoosersCRM {
                 await window.tasksModule.loadDataOnce();
                 const tasksData = window.tasksModule.getTasksData();
                 window._essentialTasksData = tasksData;
+                console.log('[CRM] ✓ Pre-loaded', tasksData.length, 'tasks from tasks module');
             } else if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.getTasksData === 'function') {
                 // Use BackgroundTasksLoader if available (already handles ownership)
                 window._essentialTasksData = window.BackgroundTasksLoader.getTasksData() || [];
+                console.log('[CRM] ✓ Pre-loaded', window._essentialTasksData.length, 'tasks from BackgroundTasksLoader');
             } else if (window.firebaseDB) {
                 // Fallback: load directly from Firebase with ownership filters
                 let tasksData = [];
@@ -500,6 +518,7 @@ class PowerChoosersCRM {
                     } catch (e) {
                         window._essentialTasksData = tasksData;
                     }
+                    console.log('[CRM] ✓ Pre-loaded', window._essentialTasksData.length, 'tasks from Firebase');
                 } catch (error) {
                     console.warn('[CRM] Could not pre-load tasks from Firebase:', error);
                     // Fallback to localStorage only
@@ -516,11 +535,14 @@ class PowerChoosersCRM {
                             });
                         }
                         window._essentialTasksData = localTasks;
+                        console.log('[CRM] ✓ Pre-loaded', window._essentialTasksData.length, 'tasks from localStorage fallback');
                     } catch (e) {
                         window._essentialTasksData = [];
                     }
                 }
             }
+
+            console.log('[CRM] ✓✓✓ All essential data pre-loaded successfully');
         } catch (error) {
             console.error('[CRM] Error pre-loading essential data:', error);
         }
@@ -533,6 +555,7 @@ class PowerChoosersCRM {
             try {
                 this._emailGenerationUnsubscribe();
                 this._emailGenerationUnsubscribe = null;
+                console.log('[CRM] Stopped email generation listener');
             } catch (error) {
                 console.warn('[CRM] Error stopping email generation listener:', error);
             }
@@ -540,10 +563,13 @@ class PowerChoosersCRM {
     }
 
     cleanupPageMemory(previousPage) {
+        console.log('[CRM] Cleaning up memory for:', previousPage);
+
         try {
             // Don't clean up dashboard - it's always potentially active
             // Dashboard widgets need persistent state for task rendering and activities
             if (previousPage === 'dashboard') {
+                console.log('[CRM] Skipping dashboard cleanup - preserving widget state');
                 return;
             }
 
@@ -557,6 +583,8 @@ class PowerChoosersCRM {
             if (previousPage === 'calls' && window.callsModule?.cleanup) {
                 window.callsModule.cleanup();
             }
+
+            console.log('[CRM] Memory cleanup complete for:', previousPage);
         } catch (error) {
             console.warn('[CRM] Error during memory cleanup:', error);
         }
@@ -564,11 +592,14 @@ class PowerChoosersCRM {
 
     // Memory monitoring for development
     startMemoryMonitoring() {
+        console.log('[CRM] Memory monitoring enabled (to disable, run: localStorage.removeItem("debug-memory"))');
+
         setInterval(() => {
             if (performance.memory) {
                 const used = Math.round(performance.memory.usedJSHeapSize / 1048576);
                 const total = Math.round(performance.memory.totalJSHeapSize / 1048576);
                 const limit = Math.round(performance.memory.jsHeapSizeLimit / 1048576);
+                console.log(`[Memory] ${used}MB / ${total}MB (limit: ${limit}MB)`);
 
                 // Warn if approaching 80% of limit
                 if (used > limit * 0.8) {
@@ -852,12 +883,18 @@ class PowerChoosersCRM {
                             }
 
                             // Navigate to account details page
+                            console.log('[Add Account] Attempting navigation to account details for ID:', ref.id);
+                            console.log('[Add Account] AccountDetail available:', !!window.AccountDetail);
+                            console.log('[Add Account] AccountDetail.show available:', !!(window.AccountDetail && typeof window.AccountDetail.show === 'function'));
+
                             if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
                                 // Prefetch the account data for immediate display
                                 window._prefetchedAccountForDetail = Object.assign({}, uiDoc, { id: ref.id });
+                                console.log('[Add Account] Calling AccountDetail.show with ID:', ref.id);
                                 window.AccountDetail.show(ref.id);
                             } else {
                                 // Try to navigate to account-details page and then show the account
+                                console.log('[Add Account] AccountDetail not available, using fallback navigation');
                                 if (window.crm && typeof window.crm.navigateToPage === 'function') {
                                     window.crm.navigateToPage('account-details');
 
@@ -867,6 +904,7 @@ class PowerChoosersCRM {
                                     const retryInterval = setInterval(() => {
                                         retryCount++;
                                         if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+                                            console.log('[Add Account] Retry successful, showing account detail');
                                             window._prefetchedAccountForDetail = Object.assign({}, uiDoc, { id: ref.id });
                                             window.AccountDetail.show(ref.id);
                                             clearInterval(retryInterval);
@@ -1116,7 +1154,7 @@ class PowerChoosersCRM {
                                         linkedin: doc.linkedin,
                                         updatedAt: now
                                     });
-                                    // Successfully updated
+                                    console.log('[AddContact] Updated account LinkedIn from contact');
                                 } catch (err) {
                                     console.warn('[AddContact] Failed to update account LinkedIn:', err);
                                 }
@@ -1135,6 +1173,7 @@ class PowerChoosersCRM {
                             // IMMEDIATELY inject into essential data
                             if (window._essentialContactsData) {
                                 window._essentialContactsData.push(newContact);
+                                console.log('[Contact] Added to essential data');
                             }
 
                             // IMMEDIATELY update cache
@@ -1143,6 +1182,7 @@ class PowerChoosersCRM {
                                     if (contacts && Array.isArray(contacts)) {
                                         contacts.push(newContact);
                                         window.CacheManager.set('contacts', contacts);
+                                        console.log('[Contact] Updated cache');
                                     }
                                 }).catch(() => { });
                             }
@@ -1218,12 +1258,6 @@ class PowerChoosersCRM {
         try {
             this.updateWidgetPanel(this.currentPage);
         } catch (_) { /* noop */ }
-
-        // Verify widget panel exists
-        const widgetPanel = document.getElementById('widget-panel');
-        if (!widgetPanel) {
-            console.error('[Widget Panel] NOT FOUND in DOM!');
-        }
 
         // Pre-warm modal animations for smooth first use (performance optimization)
         setTimeout(() => this.preWarmModalAnimations(), 500);
@@ -1311,7 +1345,6 @@ class PowerChoosersCRM {
     }
 
     async navigateToPage(pageName, params = {}) {
-        // console.log('[Navigation] Navigating to:', pageName, { params, from: this.currentPage });
         const fromPage = this.currentPage;
 
         // Clean up previous page memory BEFORE navigating
@@ -1324,8 +1357,6 @@ class PowerChoosersCRM {
             const url = new URL(window.location);
             url.searchParams.set('emailId', params.emailId);
             window.history.pushState({}, '', url);
-
-
         }
 
         let scriptsLoaded = false;
@@ -1347,7 +1378,6 @@ class PowerChoosersCRM {
             // Hide all pages
             document.querySelectorAll('.page').forEach(page => {
                 page.classList.remove('active');
-                page.hidden = true;
             });
 
             // Remove active class from all nav items
@@ -1358,7 +1388,6 @@ class PowerChoosersCRM {
             // Show target page
             const targetPage = document.getElementById(`${pageName}-page`);
             if (targetPage) {
-                targetPage.hidden = false;
                 targetPage.classList.add('active');
             }
 
@@ -1474,19 +1503,11 @@ class PowerChoosersCRM {
 
         await scriptsPromise;
 
-
-
         if (hadSkeleton) {
             clearTableSkeleton(skeletonTbody);
         }
 
         // Special handling for specific pages
-        if (pageName === 'prospecting') {
-            if (window.ProspectingPage && typeof window.ProspectingPage.init === 'function') {
-                window.ProspectingPage.init();
-            }
-        }
-
         if (pageName === 'people' && window.peopleModule) {
             if (typeof window.peopleModule.rebindDynamic === 'function') {
                 window.peopleModule.rebindDynamic();
@@ -1585,6 +1606,8 @@ class PowerChoosersCRM {
 
                 window._callScriptsNavigationSource = currentPage;
                 window._callScriptsReturn = returnState;
+
+                console.log('[Main] Stored call scripts navigation source:', currentPage, 'with state:', returnState);
             }
 
             // Initialize the module
@@ -1601,6 +1624,7 @@ class PowerChoosersCRM {
         if (pageName === 'list-detail') {
             // DON'T re-init if we're restoring from back navigation
             if (window.__restoringListDetail) {
+                console.log('[Main] Skipping ListDetail.init() - restoring from back navigation');
                 return;
             }
 
@@ -1625,7 +1649,6 @@ class PowerChoosersCRM {
             // Check if we have an emailId parameter to show
             const urlParams = new URLSearchParams(window.location.search);
             const emailId = urlParams.get('emailId');
-
             if (emailId && window.EmailDetail && typeof window.EmailDetail.show === 'function') {
                 window.EmailDetail.show(emailId);
             }
@@ -1663,6 +1686,8 @@ class PowerChoosersCRM {
                 refreshBtn.style.opacity = '0.5';
                 refreshBtn.disabled = true;
 
+                console.log('[CRM] Refreshing all data...');
+
                 // Invalidate all caches
                 if (window.CacheManager && typeof window.CacheManager.invalidateAll === 'function') {
                     await window.CacheManager.invalidateAll();
@@ -1699,6 +1724,8 @@ class PowerChoosersCRM {
                 refreshBtn.disabled = false;
             }
         });
+
+        console.log('[CRM] Refresh button initialized');
     }
 
     // Sidebar Hover Effects
@@ -1847,6 +1874,7 @@ class PowerChoosersCRM {
     performSearch(query) {
         if (!query.trim()) return;
 
+        console.log(`Searching for: ${query}`);
         // TODO: Implement actual search functionality
         this.showToast(`Searching for "${query}"...`);
     }
@@ -2059,14 +2087,11 @@ class PowerChoosersCRM {
             position: fixed;
             top: 90px;
             right: 25px;
-            background: var(--glass-bg);
-            backdrop-filter: var(--glass-blur);
-            -webkit-backdrop-filter: var(--glass-blur);
-            border: 1px solid var(--glass-border);
+            background: var(--grey-800);
             color: var(--text-inverse);
             padding: 16px 20px;
             border-radius: var(--border-radius);
-            box-shadow: var(--glass-shadow);
+            box-shadow: var(--shadow-lg);
             z-index: 10000;
             font-size: 0.875rem;
             opacity: 0;
@@ -2415,7 +2440,6 @@ class PowerChoosersCRM {
         } else {
             if (widgetPanel) {
                 widgetPanel.style.display = 'block';
-                widgetPanel.style.flex = '1'; // Ensure 3:1 ratio with main content
                 widgetPanel.classList.add('is-visible');
             }
             if (mainContentEl) {
@@ -2430,12 +2454,15 @@ class PowerChoosersCRM {
     setupWidgetInteractions() {
         // Quick Actions
         const quickActionBtns = document.querySelectorAll('.action-btn');
+        __crmLog('setupWidgetInteractions', 'Quick Actions binding', {
+            buttonsFound: quickActionBtns.length,
+            buttonsText: Array.from(quickActionBtns).map(btn => btn.textContent.trim())
+        });
         quickActionBtns.forEach(btn => {
             if (!btn._quickActionBound) {
                 btn.addEventListener('click', () => {
-                    const rawText = btn.textContent;
-                    // Normalize text: remove line breaks/tabs and collapse multiple spaces
-                    const action = rawText.replace(/[\n\r\t]+/g, ' ').replace(/\s+/g, ' ').trim();
+                    const action = btn.textContent.trim();
+                    __crmLog('setupWidgetInteractions', 'Quick Action clicked', { action });
                     this.handleQuickAction(action);
                 });
                 btn._quickActionBound = true;
@@ -2508,16 +2535,20 @@ class PowerChoosersCRM {
     }
 
     handleQuickAction(action) {
+        __crmLog('handleQuickAction', 'Action received', { action });
         switch (action) {
             case 'Add Contact':
+                __crmLog('handleQuickAction', 'Creating Add Contact modal', {});
                 this.showModal('add-contact');
                 break;
             case 'Add Account':
+                __crmLog('handleQuickAction', 'Creating Add Account modal', {});
                 // Capture current page state before opening modal for back button navigation
                 this.captureCurrentPageState();
                 this.showModal('add-account');
                 break;
             case 'Bulk Import CSV':
+                __crmLog('handleQuickAction', 'Creating Bulk Import modal', {});
                 this.createBulkImportModal();
                 break;
             default:
@@ -2576,6 +2607,7 @@ class PowerChoosersCRM {
 
             // Store the captured state for use in account creation
             window._addAccountReturn = pageState;
+            console.log('[Quick Actions] Captured page state for Add Account:', pageState);
         } catch (e) {
             console.error('Failed to capture current page state:', e);
             // Fallback to basic state
@@ -2880,6 +2912,10 @@ class PowerChoosersCRM {
         const nextBtn1 = modal.querySelector('#csv-next-step-1');
         if (nextBtn1) {
             nextBtn1.addEventListener('click', () => {
+                console.log('Next button clicked, CSV data:', modal._csvData);
+                console.log('CSV headers:', modal._csvHeaders);
+                console.log('CSV rows:', modal._csvRows);
+
                 if (modal._csvData) {
                     this.generateFieldMapping(modal);
                     this.showCSVStep(modal, 2);
@@ -2978,6 +3014,11 @@ class PowerChoosersCRM {
             modal._csvData = text;
             modal._csvHeaders = headers;
             modal._csvRows = rows;
+
+            console.log('CSV data stored successfully:');
+            console.log('Headers:', headers);
+            console.log('Rows count:', rows.length);
+            console.log('First few rows:', rows.slice(0, 2));
 
             // Update UI
             this.displayFileInfo(modal, file, rows.length);
@@ -3169,6 +3210,8 @@ class PowerChoosersCRM {
     }
 
     showCSVStep(modal, stepNumber) {
+        console.log(`Switching to step ${stepNumber}`);
+
         // Hide all steps immediately
         modal.querySelectorAll('.csv-step-content').forEach(step => {
             if (step.id !== `csv-step-${stepNumber}`) {
@@ -3180,6 +3223,7 @@ class PowerChoosersCRM {
         // Show target step
         const targetStep = modal.querySelector(`#csv-step-${stepNumber}`);
         if (targetStep) {
+            console.log(`Found target step: ${targetStep.id}`);
             targetStep.hidden = false;
 
             // Trigger fade-in animation
@@ -3204,6 +3248,9 @@ class PowerChoosersCRM {
     }
 
     generateFieldMapping(modal) {
+        console.log('generateFieldMapping called');
+        console.log('CSV headers:', modal._csvHeaders);
+
         if (!modal._csvHeaders) {
             console.error('No CSV headers found!');
             return;
@@ -3211,6 +3258,9 @@ class PowerChoosersCRM {
 
         const previewTable = modal.querySelector('#csv-preview-table');
         const mappingList = modal.querySelector('#csv-field-mapping');
+
+        console.log('Preview table element:', previewTable);
+        console.log('Mapping list element:', mappingList);
 
         // Generate preview table
         if (previewTable) {
@@ -3234,12 +3284,15 @@ class PowerChoosersCRM {
 
             tableHTML += '</tbody></table>';
             previewTable.innerHTML = tableHTML;
+            console.log('Preview table HTML generated:', tableHTML.substring(0, 200) + '...');
         }
 
         // Generate field mapping
         if (mappingList) {
             const importType = modal._importType || 'contacts';
+            console.log('Import type:', importType);
             const crmFields = this.getCRMFields(importType);
+            console.log('CRM fields:', crmFields);
             let mappingHTML = '';
 
             modal._csvHeaders.forEach((header, index) => {
@@ -3261,6 +3314,7 @@ class PowerChoosersCRM {
             });
 
             mappingList.innerHTML = mappingHTML;
+            console.log('Mapping HTML generated:', mappingHTML.substring(0, 200) + '...');
             // Restore saved mappings if available
             const stored = this.loadFieldMappingFromStorage(modal);
             this.applyStoredFieldMappings(modal, stored);
@@ -3516,6 +3570,7 @@ class PowerChoosersCRM {
         // Store selection in modal dataset
         modal.dataset.selectedListId = listId;
         modal.dataset.selectedListName = listName;
+        console.log('List selection saved:', listId, listName);
 
         // Update selected state in dropdown
         const allItems = dropdown.querySelectorAll('.csv-list-item:not(.create-new)');
@@ -3667,8 +3722,10 @@ class PowerChoosersCRM {
         // Get selected list ID from modal dataset (new custom dropdown)
         const listId = modal.dataset.selectedListId;
         if (!listId) {
+            console.log('No list selected, skipping list assignment for record:', recordId);
             return;
         }
+        console.log('Assigning record to list:', recordId, 'listId:', listId);
 
         try {
             const importType = modal._importType || 'contacts';
@@ -3744,6 +3801,7 @@ class PowerChoosersCRM {
                 const newRecordIds = recordIds.filter(id => !existingIds.has(id));
 
                 if (newRecordIds.length === 0) {
+                    console.log(`All ${recordIds.length} ${targetType} already in list ${listId}`);
                     continue;
                 }
 
@@ -3805,6 +3863,8 @@ class PowerChoosersCRM {
                         updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date()
                     });
 
+                    console.log(`✓ Updated list ${listId} with actual count: ${actualCount} ${targetType}`);
+
                     // Update BackgroundListsLoader cache immediately (cost-effective: no Firestore read)
                     if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
                         window.BackgroundListsLoader.updateListCountLocally(listId, actualCount);
@@ -3852,10 +3912,13 @@ class PowerChoosersCRM {
                     }
                 }
 
+                console.log(`✓ Batch assigned ${newRecordIds.length} ${targetType} to list ${listId} (${recordIds.length - newRecordIds.length} already existed)`);
+
                 // 5. Invalidate cache for this list so list detail page will refresh
                 if (window.CacheManager && typeof window.CacheManager.invalidateListCache === 'function') {
                     try {
                         await window.CacheManager.invalidateListCache(listId);
+                        console.log(`✓ Cache invalidated for list ${listId}`);
                     } catch (cacheError) {
                         console.warn('Cache invalidation failed:', cacheError);
                     }
@@ -4135,6 +4198,7 @@ class PowerChoosersCRM {
             // Pre-fetch existing contacts for duplicate detection (once, not per row)
             let existingContacts = [];
             if (updateExisting && modal._importType === 'contacts' && window.ContactMerger) {
+                console.log('Fetching existing contacts for duplicate detection...');
                 const email = window.currentUserEmail || '';
                 if (window.currentUserRole !== 'admin' && email) {
                     // Non-admin: use scoped query with limits
@@ -4155,6 +4219,7 @@ class PowerChoosersCRM {
                         ...doc.data()
                     }));
                 }
+                console.log(`Loaded ${existingContacts.length} existing contacts for comparison`);
             }
 
             // Initialize batch list assignment collection
@@ -4379,6 +4444,7 @@ class PowerChoosersCRM {
 
             // Process batch list assignments (much more efficient than individual assignments)
             if (listAssignments.length > 0) {
+                console.log(`Processing batch list assignments for ${listAssignments.length} records...`);
                 await this.batchAssignToList(db, listAssignments);
             }
 
@@ -4386,13 +4452,26 @@ class PowerChoosersCRM {
             let userApprovedQueuedMerges = true;
             try {
                 const totalQueued = queuedContactMerges.length + queuedAccountMerges.length;
+                console.log('=== IMPORT DEBUG ===');
+                console.log('Main processing complete. Imported:', imported, 'Enriched:', enriched, 'Failed:', failed);
+                console.log('Queued merges - Contacts:', queuedContactMerges.length, 'Accounts:', queuedAccountMerges.length);
+                console.log('List assignments pending:', listAssignments.length);
+                console.log('Total queued merges:', totalQueued);
 
                 if (totalQueued > 0) {
+                    console.log('About to show merge confirmation modal...');
+
+                    // TEMPORARY: Skip modal for testing - uncomment the next line to bypass modal
+                    // userApprovedQueuedMerges = true; console.log('Modal bypassed for testing');
+
                     userApprovedQueuedMerges = await this.showQueuedMergeSummaryModal({
                         contacts: queuedContactMerges,
                         accounts: queuedAccountMerges,
                         importType: modal._importType
                     });
+                    console.log('Merge modal completed. User approved:', userApprovedQueuedMerges);
+                } else {
+                    console.log('No queued merges, proceeding to results...');
                 }
             } catch (error) {
                 console.error('Error in queued merge processing:', error);
@@ -4458,6 +4537,7 @@ class PowerChoosersCRM {
 
             // Process queued merge list assignments
             if (queuedMergeAssignments.length > 0) {
+                console.log(`Processing queued merge list assignments for ${queuedMergeAssignments.length} records...`);
                 await this.batchAssignToList(db, queuedMergeAssignments);
             }
 
@@ -4488,6 +4568,8 @@ class PowerChoosersCRM {
                         recordCount: actualCount,
                         updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date()
                     });
+
+                    console.log(`✓ Updated list ${listId} with actual count: ${actualCount} ${targetType}`);
 
                     // Update BackgroundListsLoader cache (cost-effective: no Firestore read)
                     if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
@@ -4520,12 +4602,14 @@ class PowerChoosersCRM {
                 // Clear in-memory cache (most important - IndexedDB can lag)
                 if (window.listMembersCache && window.listMembersCache[listId]) {
                     delete window.listMembersCache[listId];
+                    console.log(`✓ Cleared in-memory cache for list ${listId}`);
                 }
 
                 // Also clear IndexedDB cache
                 if (window.CacheManager && typeof window.CacheManager.invalidateListCache === 'function') {
                     try {
                         await window.CacheManager.invalidateListCache(listId);
+                        console.log(`✓ Cache invalidated for affected list ${listId}`);
                     } catch (cacheError) {
                         console.warn('Cache invalidation failed for list', listId, ':', cacheError);
                     }
@@ -4536,25 +4620,33 @@ class PowerChoosersCRM {
                     document.dispatchEvent(new CustomEvent('pc:bulk-import-complete', {
                         detail: { listId, type: modal._importType }
                     }));
+                    console.log(`✓ Dispatched bulk import complete event for ${listId}`);
                 } catch (e) {
                     console.warn('Failed to dispatch bulk import event:', e);
                 }
             }
 
             // Show results
+            console.log('=== SHOWING RESULTS ===');
+            console.log('About to show results. Imported:', imported, 'Enriched:', enriched, 'Failed:', failed);
+
             if (progressDiv) {
+                console.log('Hiding progress div');
                 progressDiv.hidden = true;
             }
 
             if (resultsDiv) {
+                console.log('Showing results div');
                 resultsDiv.hidden = false;
                 resultsDiv.style.display = 'block';
                 resultsDiv.style.visibility = 'visible';
                 resultsDiv.style.opacity = '1';
                 resultsDiv.style.position = 'relative';
                 resultsDiv.style.zIndex = '10';
+                console.log('Results div shown, imported:', imported, 'enriched:', enriched, 'failed:', failed);
 
                 const summaryDiv = modal.querySelector('#csv-results-summary');
+                console.log('Summary div found:', summaryDiv);
                 if (summaryDiv) {
                     const recordType = modal._importType === 'accounts' ? 'accounts' : 'contacts';
                     let resultMessage = '<strong>Import Complete!</strong><br>';
@@ -4571,6 +4663,7 @@ class PowerChoosersCRM {
                     resultMessage += 'You can now close this dialog.';
 
                     summaryDiv.innerHTML = resultMessage;
+                    console.log('Results message set:', resultMessage);
 
                     // Force a reflow to ensure the results are visible
                     setTimeout(() => {
@@ -4609,6 +4702,7 @@ class PowerChoosersCRM {
 
             // Refresh list detail page if we're viewing a list and records were added to lists
             if ((imported > 0 || enriched > 0) && modal.dataset.selectedListId) {
+                console.log('Refreshing list views after import. Selected list:', modal.dataset.selectedListId);
                 // Refresh list detail page if we're viewing a list
                 if (window.ListDetail && window.ListDetail.refreshListMembership) {
                     window.ListDetail.refreshListMembership();
@@ -4618,6 +4712,8 @@ class PowerChoosersCRM {
                 if (window.ListsOverview && window.ListsOverview.refreshCounts) {
                     window.ListsOverview.refreshCounts();
                 }
+            } else {
+                console.log('No list refresh needed. Imported:', imported, 'Enriched:', enriched, 'Selected list:', modal.dataset.selectedListId);
             }
 
         } catch (error) {
@@ -4642,7 +4738,9 @@ class PowerChoosersCRM {
         return new Promise((resolve) => {
             try {
                 const total = contacts.length + accounts.length;
+                console.log('Creating merge confirmation modal for', total, 'records');
                 if (total === 0) {
+                    console.log('No merges to show, resolving immediately');
                     return resolve(true);
                 }
                 const overlay = document.createElement('div');
@@ -4658,6 +4756,7 @@ class PowerChoosersCRM {
                 overlay.style.height = '100%';
                 overlay.style.zIndex = '9999';
                 overlay.style.backgroundColor = 'rgba(45, 45, 45, 0.8)';
+                console.log('Modal HTML created, generating content...');
                 overlay.innerHTML = `
                   <div class="pc-modal__backdrop" data-close="queued-merge" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(45, 45, 45, 0.8);"></div>
                   <div class="pc-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="merge-batch-title" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 8px; padding: 20px; max-width: 600px; max-height: 80vh; overflow: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
@@ -4687,19 +4786,25 @@ class PowerChoosersCRM {
                       <button type="button" class="btn-primary" data-action="enrich">Enrich</button>
                     </div>
                   </div>`;
+                console.log('Modal HTML generated, appending to DOM...');
                 document.body.appendChild(overlay);
+                console.log('Modal appended to DOM, should be visible now');
 
                 const close = (val) => {
+                    console.log('Modal closing with value:', val);
                     try { overlay.parentNode && overlay.parentNode.removeChild(overlay); } catch (_) { };
                     resolve(val);
                 };
 
+                console.log('Setting up modal event handlers...');
                 overlay.querySelectorAll('[data-close="queued-merge"]').forEach(btn => btn.addEventListener('click', () => close(false)));
                 overlay.querySelector('[data-action="cancel"]').addEventListener('click', () => close(false));
                 overlay.querySelector('[data-action="enrich"]').addEventListener('click', () => close(true));
+                console.log('Modal event handlers set up, waiting for user interaction...');
 
                 // Fallback timeout to prevent infinite hanging (30 seconds)
                 setTimeout(() => {
+                    console.log('Modal timeout reached, auto-approving merges');
                     close(true);
                 }, 30000);
             } catch (_) { resolve(true); }
@@ -4932,6 +5037,7 @@ class PowerChoosersCRM {
 
         // START COORDINATED BACKGROUND LOADING
         if (window.BackgroundLoaderCoordinator) {
+            console.log('[CRM] Starting coordinated background data loading...');
             window.BackgroundLoaderCoordinator.coordinateLoading().catch(error => {
                 console.error('[CRM] Background loading failed:', error);
             });
@@ -4949,6 +5055,7 @@ class PowerChoosersCRM {
             this.loadEnergyNews()
         ];
         Promise.all(loaders).then(() => {
+            console.log('[CRM] Tasks and News loaded together');
         });
 
         // OPTIMIZED: Increased from 5 to 10 minutes to reduce API calls and Cloud Run costs
@@ -4969,6 +5076,8 @@ class PowerChoosersCRM {
     // Email Automation Monitor - checks for emails that need generation/sending
     startEmailAutomation() {
         if (this.emailAutomationInterval) return; // Already running
+
+        console.log('[CRM] Starting email automation monitor...');
 
         // OPTIMIZED: Increased from 2 to 5 minutes to reduce Cloud Run costs
         // Note: Cloud Scheduler cron jobs handle email automation in production
@@ -5001,6 +5110,8 @@ class PowerChoosersCRM {
             const needsGenerationSnapshot = await needsGenerationQuery.get();
 
             if (!needsGenerationSnapshot.empty) {
+                console.log(`[CRM Automation] Found ${needsGenerationSnapshot.size} emails needing generation`);
+
                 // Trigger generation
                 try {
                     const baseUrl = window.API_BASE_URL || window.location.origin || '';
@@ -5012,6 +5123,7 @@ class PowerChoosersCRM {
 
                     if (response.ok) {
                         const result = await response.json();
+                        console.log(`[CRM Automation] Generated ${result.count} emails`);
 
                         // Optional: Show toast notification
                         if (result.count > 0 && this.showToast) {
@@ -5038,6 +5150,8 @@ class PowerChoosersCRM {
             const readyToSendSnapshot = await readyToSendQuery.get();
 
             if (!readyToSendSnapshot.empty) {
+                console.log(`[CRM Automation] Found ${readyToSendSnapshot.size} emails ready to send`);
+
                 // Trigger sending
                 try {
                     const baseUrl = window.API_BASE_URL || window.location.origin || '';
@@ -5048,6 +5162,7 @@ class PowerChoosersCRM {
 
                     if (response.ok) {
                         const result = await response.json();
+                        console.log(`[CRM Automation] Sent ${result.count} emails`);
 
                         // Optional: Show toast notification
                         if (result.count > 0 && this.showToast) {
@@ -5074,6 +5189,7 @@ class PowerChoosersCRM {
         if (this.emailAutomationInterval) {
             clearInterval(this.emailAutomationInterval);
             this.emailAutomationInterval = null;
+            console.log('[CRM] Email automation monitor stopped');
         }
     }
 
@@ -5208,6 +5324,8 @@ class PowerChoosersCRM {
 
                 linkedInTasks.push(task);
             });
+
+            console.log('[CRM] Loaded', linkedInTasks.length, 'LinkedIn sequence tasks for Today\'s Tasks widget');
         } catch (error) {
             console.error('[CRM] Error loading LinkedIn sequence tasks:', error);
         }
@@ -5217,7 +5335,7 @@ class PowerChoosersCRM {
 
     renderTaskSkeletons(count = 3) {
         return Array(count).fill(0).map(() => `
-            <div class="task-item modern-reveal premium-borderline" style="opacity: 0.7; pointer-events: none; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 10px; display: flex; align-items: center; min-height: 60px; padding: 12px 16px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); animation-fill-mode: forwards;">
+            <div class="task-item" style="opacity: 0.6; pointer-events: none; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 10px; display: flex; align-items: center; min-height: 60px; padding: 12px 16px;">
                 <div class="task-info" style="flex: 1;">
                     <div class="skeleton-text medium skeleton-shimmer" style="margin-bottom: 8px; height: 14px;"></div>
                     <div class="skeleton-text short skeleton-shimmer" style="height: 12px;"></div>
@@ -5229,7 +5347,7 @@ class PowerChoosersCRM {
 
     renderNewsSkeletons(count = 3) {
         return Array(count).fill(0).map(() => `
-            <div class="news-item modern-reveal premium-borderline" style="opacity: 0.7; pointer-events: none; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 10px; min-height: 84px; display: flex; flex-direction: column; justify-content: center; padding: 12px 16px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); animation-fill-mode: forwards;">
+            <div class="news-item" style="opacity: 0.6; pointer-events: none; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 10px; min-height: 84px; display: flex; flex-direction: column; justify-content: center; padding: 12px 16px;">
                 <div class="news-title skeleton-text skeleton-shimmer" style="width: 95%; margin-bottom: 12px; height: 16px;"></div>
                 <div class="news-time skeleton-text short skeleton-shimmer" style="height: 12px;"></div>
             </div>
@@ -5240,7 +5358,7 @@ class PowerChoosersCRM {
         return Array(count).fill(0).map((_, index) => {
             const delay = (index * 0.1).toFixed(2);
             return `
-                <div class="task-item skeleton-task modern-reveal premium-borderline" style="opacity: 0.7; pointer-events: none; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 8px; min-height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; animation-delay: ${delay}s; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); animation-fill-mode: forwards;">
+                <div class="task-item skeleton-task" style="opacity: 0.6; pointer-events: none; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 8px; min-height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; animation-delay: ${delay}s;">
                     <div class="task-info" style="flex: 1;">
                         <div class="task-name skeleton-text skeleton-shimmer" style="width: 85%; margin-bottom: 6px; height: 14px;"></div>
                         <div class="task-time skeleton-text short skeleton-shimmer" style="height: 12px; width: 60%;"></div>
@@ -5257,11 +5375,13 @@ class PowerChoosersCRM {
         // Prevent multiple calls within 2 seconds AND while actively loading
         const currentTime = Date.now();
         if (this._lastTasksLoad && (currentTime - this._lastTasksLoad) < 2000) {
+            console.log('[CRM] Tasks load debounced - too soon since last load');
             return;
         }
 
         // If already loading, queue this request but don't start a new one
         if (this._tasksLoading) {
+            console.log('[CRM] Tasks already loading, queuing request...');
             // Queue the request to run after current load completes
             if (!this._queuedTasksLoad) {
                 this._queuedTasksLoad = () => this.loadTodaysTasks(skipFirebase);
@@ -5363,37 +5483,37 @@ class PowerChoosersCRM {
                 localTasks = [];
 
             } else {
-                // Try namespaced key first (matches tasks.js/task-detail.js patterns)
-                const email = getUserEmail();
-                const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
-                const namespacedTasks = JSON.parse(localStorage.getItem(namespacedKey) || '[]');
-                localTasks = Array.isArray(namespacedTasks) ? namespacedTasks : [];
+            // Try namespaced key first (matches tasks.js/task-detail.js patterns)
+            const email = getUserEmail();
+            const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
+            const namespacedTasks = JSON.parse(localStorage.getItem(namespacedKey) || '[]');
+            localTasks = Array.isArray(namespacedTasks) ? namespacedTasks : [];
 
 
-                // CRITICAL: Filter by ownership for non-admin users (localStorage bypasses Firestore rules)
-                if (!isAdmin() && localTasks.length > 0) {
-                    const beforeCount = localTasks.length;
-                    localTasks = localTasks.filter(t => {
-                        if (!t) return false;
-                        const ownerId = (t.ownerId || '').toLowerCase();
-                        const assignedTo = (t.assignedTo || '').toLowerCase();
-                        const createdBy = (t.createdBy || '').toLowerCase();
-                        return ownerId === email || assignedTo === email || createdBy === email;
-                    });
-
-                }
-
-                // CRITICAL: Filter out completed tasks from localStorage cache (they shouldn't show in Today's Tasks)
-                // Use broader completion markers than just status to avoid schema drift.
-                const beforeCompletionFilter = localTasks.length;
+            // CRITICAL: Filter by ownership for non-admin users (localStorage bypasses Firestore rules)
+            if (!isAdmin() && localTasks.length > 0) {
+                const beforeCount = localTasks.length;
                 localTasks = localTasks.filter(t => {
                     if (!t) return false;
-                    const status = String(t.status || 'pending').toLowerCase();
-                    if (status === 'completed' || status === 'done') return false;
-                    if (t.completed === true || t.isCompleted === true) return false;
-                    if (t.completedAt || t.completed_at) return false;
-                    return true;
+                    const ownerId = (t.ownerId || '').toLowerCase();
+                    const assignedTo = (t.assignedTo || '').toLowerCase();
+                    const createdBy = (t.createdBy || '').toLowerCase();
+                    return ownerId === email || assignedTo === email || createdBy === email;
                 });
+
+            }
+
+            // CRITICAL: Filter out completed tasks from localStorage cache (they shouldn't show in Today's Tasks)
+            // Use broader completion markers than just status to avoid schema drift.
+            const beforeCompletionFilter = localTasks.length;
+            localTasks = localTasks.filter(t => {
+                if (!t) return false;
+                const status = String(t.status || 'pending').toLowerCase();
+                if (status === 'completed' || status === 'done') return false;
+                if (t.completed === true || t.isCompleted === true) return false;
+                if (t.completedAt || t.completed_at) return false;
+                return true;
+            });
 
 
             }
@@ -5406,8 +5526,8 @@ class PowerChoosersCRM {
             const coordinatorReady = !!(window.BackgroundLoaderCoordinator && window.BackgroundLoaderCoordinator.isLoaded && window.BackgroundLoaderCoordinator.isLoaded('tasks'));
             if (!isAdmin() && !coordinatorReady && localTasks.length > 0) {
                 this.renderTodaysTasks(localTasks, parseDateStrict, parseTimeToMinutes, today);
-            }
-        } catch (_) { }
+        }
+        } catch (_) {}
 
         // If not skipping Firebase, fetch Firebase data in background and update
         if (!skipFirebase) {
@@ -5629,6 +5749,7 @@ class PowerChoosersCRM {
                     }
 
                     // FINAL RENDER: Re-render with complete merged data (this will be the stable final render)
+                    console.log('[CRM] Final render with merged Firebase data');
                     this.renderTodaysTasks(finalMergedTasks, parseDateStrict, parseTimeToMinutes, today);
                 }
             } catch (e) {
@@ -5648,6 +5769,7 @@ class PowerChoosersCRM {
 
         // CRITICAL FIX: Handle queued requests after loading completes
         if (this._queuedTasksLoad) {
+            console.log('[CRM] Processing queued tasks load request...');
             const queuedRequest = this._queuedTasksLoad;
             this._queuedTasksLoad = null;
             // Do NOT use timeouts; use microtask queue to avoid re-entrancy without artificial delays.
@@ -5663,7 +5785,7 @@ class PowerChoosersCRM {
 
         const tasksList = document.querySelector('.tasks-list');
         if (!tasksList) {
-            return;
+return;
         }
 
         // Pagination navigation should not replay entry animations or trigger re-fetch/skeletons.
@@ -5672,6 +5794,12 @@ class PowerChoosersCRM {
         this._todaysTasksPaginationNav = false;
 
 
+        // CRITICAL FIX: Prevent multiple renders within the same load cycle
+        if (this._hasRenderedForCurrentLoad) {
+            console.log('[CRM] Already rendered for current load cycle, skipping duplicate render');
+            return;
+        }
+        this._hasRenderedForCurrentLoad = true;
 
         // allTasks is already merged and deduped by the caller (local first, then Firebase)
 
@@ -5721,15 +5849,6 @@ class PowerChoosersCRM {
             return (a.createdAt || 0) - (b.createdAt || 0);
         });
 
-        // Smart Render Check: Avoid re-rendering if data hasn't changed (prevents flicker/scroll jumps)
-        // This replaces the old "block all updates" logic which broke pagination and live updates.
-        const currentFingerprint = todaysTasks.map(t => t.id + ':' + (t.status || '') + ':' + (t.dueDate || '')).join('|');
-        if (!isPaginationNav && this._lastRenderedFingerprint === currentFingerprint && this._hasRenderedForCurrentLoad) {
-            return;
-        }
-        this._lastRenderedFingerprint = currentFingerprint;
-        this._hasRenderedForCurrentLoad = true;
-
         // Initialize pagination state if not exists
         if (!this.todaysTasksPagination) {
             this.todaysTasksPagination = {
@@ -5766,11 +5885,11 @@ class PowerChoosersCRM {
                 // CRITICAL FIX: Set priority to 'sequence' for sequence tasks (matches tasks.js logic)
                 const isSequenceTask = !!task.isSequenceTask || !!task.isLinkedInTask;
                 const priorityValue = isSequenceTask ? 'sequence' : (task.priority || '');
-
+                
                 // Add staggered delay for modern reveal (skip on pagination clicks for "clean" page turns)
                 const delay = (index * 0.05).toFixed(2);
                 const revealStyle = isPaginationNav ? '' : `style="animation-delay: ${delay}s;"`;
-                const revealClass = isPaginationNav ? '' : 'modern-reveal premium-borderline';
+                const revealClass = isPaginationNav ? '' : 'modern-reveal';
 
                 return `
                     <div class="task-item ${revealClass}" data-task-id="${task.id}" style="cursor: pointer;" ${revealStyle}>
@@ -5806,14 +5925,14 @@ class PowerChoosersCRM {
             `;
         }
 
-        document.querySelectorAll('.tasks-list').forEach(list => {
+        document.querySelectorAll('.tasks-list').forEach(list => { 
             // Smooth height transition logic
             const currentHeight = list.offsetHeight;
             list.style.height = currentHeight + 'px';
-
+            
             // Set new content
             list.innerHTML = tasksHtml;
-
+            
             // Measure new height
             requestAnimationFrame(() => {
                 list.style.height = list.scrollHeight + 'px';
@@ -5845,6 +5964,7 @@ class PowerChoosersCRM {
                                         todaysTasksScroll: document.querySelector('.tasks-list')?.scrollTop || 0
                                     }
                                 };
+                                console.log('[Dashboard] Captured state for task detail navigation:', window._dashboardReturn);
                             } catch (_) { /* noop */ }
                         } else if (current === 'accounts') {
                             // Capture accounts state for proper back navigation
@@ -5875,6 +5995,7 @@ class PowerChoosersCRM {
                                 }
 
                                 window._accountsReturn = accountsState;
+                                console.log('[Accounts] Captured state for task detail navigation:', window._accountsReturn);
                             } catch (_) { /* noop */ }
                         } else if (current === 'people') {
                             // Capture people state for proper back navigation
@@ -5904,6 +6025,7 @@ class PowerChoosersCRM {
                                 }
 
                                 window._peopleReturn = peopleState;
+                                console.log('[People] Captured state for task detail navigation:', window._peopleReturn);
                             } catch (_) { /* noop */ }
                         } else if (current === 'tasks') {
                             // Capture tasks state for proper back navigation
@@ -5924,6 +6046,7 @@ class PowerChoosersCRM {
                                 }
 
                                 window._tasksReturn = tasksState;
+                                console.log('[Tasks] Captured state for task detail navigation:', window._tasksReturn);
                             } catch (_) { /* noop */ }
                         }
 
@@ -5956,11 +6079,11 @@ class PowerChoosersCRM {
                     if (action === 'prev' && this.todaysTasksPagination.currentPage > 1) {
                         this.todaysTasksPagination.currentPage--;
                         this._todaysTasksPaginationNav = true;
-                        this.renderTodaysTasks(allTasks, parseDateStrict, parseTimeToMinutes, today);
+this.renderTodaysTasks(allTasks, parseDateStrict, parseTimeToMinutes, today);
                     } else if (action === 'next' && this.todaysTasksPagination.currentPage < totalPages) {
                         this.todaysTasksPagination.currentPage++;
                         this._todaysTasksPaginationNav = true;
-                        this.renderTodaysTasks(allTasks, parseDateStrict, parseTimeToMinutes, today);
+this.renderTodaysTasks(allTasks, parseDateStrict, parseTimeToMinutes, today);
                     }
                 });
             });
@@ -6057,7 +6180,7 @@ class PowerChoosersCRM {
     }
 
     async loadEnergyNews() {
-        // DEBOUNCING: Prevent multiple calls within 5 seconds
+// DEBOUNCING: Prevent multiple calls within 5 seconds
         const now = Date.now();
         const newsList = document.querySelector('.news-list');
         const lastRef = document.getElementById('news-last-refreshed');
@@ -6065,13 +6188,15 @@ class PowerChoosersCRM {
 
         // If the UI is currently skeletons, do NOT debounce; otherwise the list can get stuck.
         if (this._lastNewsLoad && (now - this._lastNewsLoad) < 5000 && !hasSkeleton) {
-            return;
+            console.log('[CRM] News load debounced - too soon since last load');
+return;
         }
         this._lastNewsLoad = now;
 
         // CHECK CACHE FIRST: Use cached news if available and recent (< 10 minutes)
         if (this._cachedNews && this._cachedNews.timestamp && (now - this._cachedNews.timestamp) < (10 * 60 * 1000)) {
-            // Render cached news immediately
+            console.log('[CRM] Using cached energy news');
+// Render cached news immediately
             if (newsList && this._cachedNews.items) {
                 const newsHtml = this._cachedNews.items.map((it, index) => {
                     const title = this.escapeHtml(it.title || '');
@@ -6091,7 +6216,7 @@ class PowerChoosersCRM {
                 }).join('');
 
                 newsList.innerHTML = newsHtml;
-                if (lastRef && this._cachedNews.lastRefreshed) {
+if (lastRef && this._cachedNews.lastRefreshed) {
                     const dt = new Date(this._cachedNews.lastRefreshed);
                     lastRef.textContent = `Last updated: ${dt.toLocaleTimeString()}`;
                 }
@@ -6101,6 +6226,7 @@ class PowerChoosersCRM {
 
         // Prevent double-rendering - only skip if currently loading
         if (this._newsLoading) {
+            console.log('[CRM] News already loading, skipping duplicate call');
             return;
         }
         this._newsLoading = true;
@@ -6168,7 +6294,7 @@ class PowerChoosersCRM {
                     const revealStyle = `style="animation-delay: ${delay}s;"`;
 
                     return `
-                        <a class="news-item modern-reveal premium-borderline" href="${safeHref}" target="_blank" rel="noopener noreferrer" ${revealStyle}>
+                        <a class="news-item modern-reveal" href="${safeHref}" target="_blank" rel="noopener noreferrer" ${revealStyle}>
                             <div class="news-title">${title}</div>
                             <div class="news-time">${escapeHtml(time)}</div>
                         </a>
@@ -6213,6 +6339,7 @@ class PowerChoosersCRM {
         const hasSkeletonOrLoading = container?.querySelector('.loading-spinner') || container?.querySelector('.activity-skeletons') || container?.querySelector('.skeleton-shimmer');
         if (!forceRefresh && container?.children.length > 0 && !hasSkeletonOrLoading) {
             // Activities are already loaded (not skeleton), just setup pagination
+            console.log('[CRM] Activities already loaded, skipping duplicate render');
             this.setupHomeActivityPagination();
             return;
         }
@@ -6223,7 +6350,7 @@ class PowerChoosersCRM {
             : window.ActivityManager.renderActivities('home-activity-timeline', 'global');
 
         Promise.resolve(renderPromise).then(() => {
-            this.setupHomeActivityPagination();
+        this.setupHomeActivityPagination();
         }).catch(() => {
             // Keep silent - ActivityManager handles its own error UI
         });
@@ -6283,479 +6410,169 @@ class PowerChoosersCRM {
 }
 
 // Global helper function for accounts icon fallback
-window.__pcAccountsIcon = (size = 28) => {
-    const s = Math.max(parseInt(size, 10) || 28, 16);
-    return `<span class="company-favicon company-favicon--fallback icon-loaded" data-icon-observed="true" aria-hidden="true" style="background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); border-radius: 6px; width: ${s}px; height: ${s}px; display: flex; align-items: center; justify-content: center;">
-         <svg data-icon-observed="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-             <path d="M3 21h18"/>
-             <path d="M5 21V7l8-4 8 4v14"/>
-             <path d="M8 10a2 2 0 1 0 4 0"/>
-             <path d="M8 14a2 2 0 1 0 4 0"/>
-             <path d="M8 18a2 2 0 1 0 4 0"/>
-             <path d="M16 10a2 2 0 1 0 4 0"/>
-             <path d="M16 14a2 2 0 1 0 4 0"/>
-             <path d="M16 18a2 2 0 1 0 4 0"/>
-         </svg>
-     </span>`;
+window.__pcAccountsIcon = () => {
+    return `<span class="company-favicon company-favicon--fallback" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1"></path>
+        </svg>
+    </span>`;
 };
 
 // Enhanced favicon system with multiple fallback sources
 window.__pcFaviconHelper = {
     // Shared cache for accounts discovered during the current session
     discoveredAccounts: new Map(),
-    // Shared cache for domains that are currently being tried to prevent restarting cycle on re-render
-    tryingDomains: new Map(),
     // Shared cache for generated favicon metadata to ensure stable IDs across pages
     faviconMetadata: new Map(),
-    // Shared cache for domains that have failed all favicon sources to prevent repeated cycling
-    failedDomains: (function () {
-        try {
-            const cached = sessionStorage.getItem('pc-failed-domains');
-            return cached ? new Set(JSON.parse(cached)) : new Set();
-        } catch (_) { return new Set(); }
-    })(),
-    // Shared cache for specific logo URLs that have failed to avoid re-trying them
-    failedLogos: (function () {
-        try {
-            const cached = sessionStorage.getItem('pc-failed-logos');
-            return cached ? new Set(JSON.parse(cached)) : new Set();
-        } catch (_) { return new Set(); }
-    })(),
-
-    _saveCache: function () {
-        try {
-            sessionStorage.setItem('pc-failed-domains', JSON.stringify([...this.failedDomains]));
-            sessionStorage.setItem('pc-failed-logos', JSON.stringify([...this.failedLogos]));
-            sessionStorage.setItem('pc-trying-domains', JSON.stringify([...this.tryingDomains])); // Persist trying index
-        } catch (_) { }
-    },
-
-    // Pre-warm favicon cache for a domain
-    preWarm: function (domain) {
-        try {
-            const clean = this.normalizeDomain(domain);
-            if (!clean || this.failedDomains.has(clean)) return;
-
-            // If we don't have an index yet, start at 0
-            if (!this.tryingDomains.has(clean)) {
-                this.tryingDomains.set(clean, 0);
-                this._saveCache();
-            }
-
-            // Create a hidden image to trigger browser cache
-            const img = new Image();
-            const requestSize = 128;
-            img.src = `https://logo.clearbit.com/${encodeURIComponent(clean)}`;
-
-            // Also pre-warm Google as the most reliable secondary
-            const img2 = new Image();
-            img2.src = `https://www.google.com/s2/favicons?sz=${requestSize}&domain=${encodeURIComponent(clean)}`;
-        } catch (_) { }
-    },
-
-    normalizeDomain: function (value) {
-        try {
-            if (!value) return '';
-            let s = String(value).trim();
-            if (!s) return '';
-            if (/^https?:\/\//i.test(s)) {
-                try {
-                    const u = new URL(s);
-                    s = (u && u.hostname) ? u.hostname : '';
-                } catch (_) {
-                    s = s.replace(/^https?:\/\//i, '');
-                }
-            }
-            s = s.replace(/^www\./i, '');
-            s = s.split(/[/?#]/)[0];
-            s = s.replace(/:\d+$/, '');
-            return String(s || '').trim().toLowerCase();
-        } catch (_) {
-            return '';
-        }
-    },
-    normalizeLogoUrl: function (value) {
-        try {
-            if (!value) return '';
-            let s = String(value).trim();
-            if (!s) return '';
-            if (/^(null|undefined|none)$/i.test(s)) return '';
-            if (/^gs:\/\//i.test(s)) return '';
-            if (/^\/\//.test(s)) return `https:${s}`;
-            if (/^https?:\/\//i.test(s)) {
-                if (/^http:\/\//i.test(s) && typeof window !== 'undefined' && window.location && window.location.protocol === 'https:') {
-                    return `https://${s.replace(/^http:\/\//i, '')}`;
-                }
-                return s;
-            }
-            if (/^data:/i.test(s)) return s;
-            if (/^blob:/i.test(s)) return s;
-            if (/^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(s)) return `https://${s}`;
-            if (/^(\.|\.\.|\/)/.test(s) && typeof window !== 'undefined' && window.location && window.location.href) {
-                try {
-                    return new URL(s, window.location.href).href;
-                } catch (_) {
-                    return '';
-                }
-            }
-            return '';
-        } catch (_) {
-            return '';
-        }
-    },
-
-    sanitizeUrlForLog: function (value) {
-        try {
-            if (!value) return '';
-            const s = String(value).trim();
-            if (!s) return '';
-            if (!/^https?:\/\//i.test(s)) return s;
-            const u = new URL(s);
-            u.search = '';
-            u.hash = '';
-            return u.toString();
-        } catch (_) {
-            return '';
-        }
-    },
 
     // Prefer explicit account/company logo URL; fallback to computed favicon chain
     generateCompanyIconHTML: function (opts) {
         try {
             const size = parseInt((opts && opts.size) || 64, 10) || 64;
-            let logoUrl = this.normalizeLogoUrl((opts && opts.logoUrl) ? String(opts.logoUrl).trim() : '');
-            let domain = this.normalizeDomain((opts && opts.domain) ? String(opts.domain).trim() : '');
-            const website = (opts && opts.website) ? String(opts.website).trim() : '';
+            const logoUrl = (opts && opts.logoUrl) ? String(opts.logoUrl).trim() : '';
+            const domain = (opts && opts.domain) ? String(opts.domain).trim().replace(/^https?:\/\//, '').replace(/\/$/, '') : '';
             const idSuffix = (opts && opts.idSuffix) ? String(opts.idSuffix) : '';
 
-            // If domain is missing but website exists, derive it
-            if (!domain && website) {
-                domain = this.normalizeDomain(website);
-            }
-
-            const fallbackIcon = window.__pcAccountsIcon(size);
-
-            // [AGENT FIX] Removed early check for failedDomains. We should try logoUrl first.
-            // If logoUrl is missing or fails, generateFaviconHTML will handle the failedDomains check.
 
             if (logoUrl) {
-                const normalizedLogo = this.normalizeLogoUrl(logoUrl);
-
-                // [AGENT FIX] Prioritize logoUrl! Only skip if this SPECIFIC URL has failed previously.
-                // Do NOT skip just because we have a working favicon (tryingDomains), or we'll never show the logo.
-                const isLogoFailed = normalizedLogo && this.failedLogos && this.failedLogos.has(normalizedLogo);
-
-                if (isLogoFailed) {
-                    if (domain) return this.generateFaviconHTML(domain, size, idSuffix);
-                }
-
-                // If this is a bare domain instead of a URL, go to favicon system
+                // Only treat as domain if it's clearly a bare domain (no protocol, no path)
                 const looksLikeBareDomain = /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(logoUrl) && !/\s/.test(logoUrl) && !logoUrl.includes('/');
                 let parsed = null;
                 try { parsed = /^https?:\/\//i.test(logoUrl) ? new URL(logoUrl) : null; } catch (_) { parsed = null; }
+                const path = parsed ? (parsed.pathname || '') : '';
+                const looksLikeImagePath = /\.(png|jpe?g|gif|webp|svg|ico)(\?.*)?$/i.test(path);
 
                 // Only use favicon fallback for bare domains, not for URLs
                 if (looksLikeBareDomain) {
-                    const clean = this.normalizeDomain(logoUrl);
+                    const clean = String(logoUrl).replace(/^www\./i, '');
                     if (clean) return this.generateFaviconHTML(clean, size, idSuffix);
                 }
                 // Otherwise treat as a direct image URL; fallback to favicon on error
-                const cleanDomain = this.normalizeDomain(domain || (parsed ? parsed.hostname : ''));
-
-                const safeDomain = String(cleanDomain || '').replace(/'/g, "\\'");
-                const safeSuffix = String(idSuffix || '').replace(/'/g, "\\'");
-
-                // Immediate Visibility: If we have a direct logo URL and it hasn't failed yet, 
-                // don't hide it with 'favicon-loading'. This reduces the perceived delay.
-                const isLikelyGood = !this.failedLogos.has(normalizedLogo);
-                const containerClass = isLikelyGood ? 'company-favicon-container favicon-loaded' : 'company-favicon-container favicon-loading';
-                const imgVisibility = isLikelyGood ? 'visibility:visible;' : 'visibility:hidden;';
-
-                return `<span class="${containerClass}" style="width:${size}px;height:${size}px;">
-                            <img class="company-favicon ${isLikelyGood ? 'icon-loaded' : ''}" 
-                                 src="${logoUrl}" 
-                                 alt="" 
-                                 referrerpolicy="no-referrer" 
-                                 loading="lazy"
-                                 data-source-index="0"
-                                 data-display-size="${size}"
-                                 data-domain="${cleanDomain}"
-                                 style="width:${size}px;height:${size}px;object-fit:cover;border-radius:6px;flex-shrink:0;pointer-events:none;background-color:rgba(255,255,255,0.05);${imgVisibility}"
-                                 onload="window.__pcFaviconHelper.onFaviconLoadEl(this)"
-                                 onerror="window.__pcFaviconHelper.onLogoErrorEl(this,'${safeDomain}',${size},'${safeSuffix}')" />
-                            <span class="company-favicon-fallback">${fallbackIcon}</span>
-                        </span>`;
+                const cleanDomain = domain || (parsed ? parsed.hostname.replace(/^www\./i, '') : '');
+                
+                // Use a stable ID based on logo URL and an optional suffix to ensure uniqueness across rows
+                const urlHash = String(logoUrl).split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0);
+                const containerId = `logo-${(cleanDomain || 'x').replace(/[^a-z0-9]/gi, '')}-${Math.abs(urlHash)}${idSuffix ? '-' + idSuffix : ''}`;
+                
+                return `<img class="company-favicon" 
+                             id="${containerId}"
+                             src="${logoUrl}" 
+                             alt="" 
+                             referrerpolicy="no-referrer" 
+                             loading="lazy"
+                             style="width:${size}px;height:${size}px;object-fit:cover;border-radius:6px;flex-shrink:0;pointer-events:none;background-color:rgba(255,255,255,0.05);"
+                             onerror="window.__pcFaviconHelper.onLogoError('${containerId}','${cleanDomain}',${size},'${idSuffix}')">`;
             }
             if (domain) {
                 return this.generateFaviconHTML(domain, size, idSuffix);
             }
-            return `<span class="company-favicon-container favicon-failed" style="width:${size}px;height:${size}px;"><span class="company-favicon-fallback">${fallbackIcon}</span></span>`;
-        } catch (_) {
-            const size = parseInt((opts && opts.size) || 64, 10) || 64;
-            const fallbackIcon = window.__pcAccountsIcon(size);
-            return `<span class="company-favicon-container favicon-failed" style="width:${size}px;height:${size}px;"><span class="company-favicon-fallback">${fallbackIcon}</span></span>`;
-        }
+            return window.__pcAccountsIcon();
+        } catch (_) { return window.__pcAccountsIcon(); }
     },
     onLogoError: function (containerId, domain, size, idSuffix = '') {
         try {
-            const img = (typeof containerId === 'string') ? document.getElementById(containerId) : containerId;
-            return this.onLogoErrorEl(img, domain, size, idSuffix);
-        } catch (_) { }
-    },
-    onLogoErrorEl: function (img, domain, size, idSuffix = '') {
-        try {
+            const img = document.getElementById(containerId);
             if (!img) return;
-            const src = String(img.currentSrc || img.src || '').trim();
-
-            // Mark this specific logo URL as failed so we don't try it again on next render
-            if (src && /^https?:\/\//i.test(src)) {
-                try {
-                    this.failedLogos.add(src);
-                    this._saveCache();
-                } catch (_) { }
-            }
-
-            let cleanDomain = this.normalizeDomain(domain);
-            const requestSize = Math.max((parseInt(size, 10) || 0) * 2, 64);
-            const container = img.closest ? img.closest('.company-favicon-container') : null;
-
-            if (container) container.classList.add('favicon-loading');
-
-            try {
-                img.style.visibility = 'hidden';
-                img.style.display = 'none';
-            } catch (_) { }
-
-            if (!cleanDomain) {
-                try {
-                    const src = String(img.currentSrc || img.src || '').trim();
-                    if (/^https?:\/\//i.test(src)) {
-                        const u = new URL(src);
-                        cleanDomain = this.normalizeDomain(u.hostname);
-                    }
-                } catch (_) { }
-            }
-
-            if (!cleanDomain) {
-                if (container) {
-                    container.classList.remove('favicon-loading');
-                    container.classList.add('favicon-failed');
-                }
-                try { img.style.display = 'none'; } catch (_) { }
-                return;
-            }
-
-            const faviconSources = [
-                `https://www.google.com/s2/favicons?sz=${requestSize}&domain=${encodeURIComponent(cleanDomain)}`,
-                `https://logo.clearbit.com/${encodeURIComponent(cleanDomain)}`,
-                `https://favicons.githubusercontent.com/${encodeURIComponent(cleanDomain)}`,
-                `https://api.faviconkit.com/${encodeURIComponent(cleanDomain)}/${requestSize}`,
-                `https://favicon.yandex.net/favicon/${encodeURIComponent(cleanDomain)}`,
-                `https://icons.duckduckgo.com/ip3/${encodeURIComponent(cleanDomain)}.ico`,
-                `https://${cleanDomain}/favicon.ico`
-            ];
-
-            // PERSISTENCE FIX: Check if we are already trying a specific index for this domain
-            const startingIndex = this.tryingDomains.get(cleanDomain) || 0;
-            const useIndex = startingIndex < faviconSources.length ? startingIndex : 0;
-
-            // Ensure we mark this domain as "trying favicons" so next render skips the broken logo
-            this.tryingDomains.set(cleanDomain, useIndex);
-
-            try { img.classList.remove('icon-loaded'); } catch (_) { }
-            img.dataset.sourceIndex = String(useIndex);
-            img.dataset.displaySize = String(size);
-            img.dataset.domain = cleanDomain;
-            try { img.setAttribute('onload', 'window.__pcFaviconHelper.onFaviconLoadEl(this)'); } catch (_) { }
-            try { img.setAttribute('onerror', `window.__pcFaviconHelper.onFaviconErrorEl(this,'${String(cleanDomain).replace(/'/g, "\\'")}',${parseInt(size, 10) || 0})`); } catch (_) { }
-            try {
-                img.style.display = '';
-                img.style.visibility = 'hidden';
-            } catch (_) { }
-            img.src = faviconSources[useIndex];
+            const parent = img.parentNode;
+            const doReplace = () => {
+                const html = this.generateFaviconHTML(domain, size, idSuffix);
+                const div = document.createElement('div');
+                div.innerHTML = html;
+                const replacement = div.firstElementChild;
+                if (parent && replacement) parent.replaceChild(replacement, img);
+                else if (img) img.src = `https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(domain)}`;
+            };
+            // Fade out before replacement for smoother UX
+            try { img.classList.add('icon-unloading'); } catch (_) { }
+            setTimeout(doReplace, 120);
         } catch (_) { }
     },
     // Generate favicon HTML with multiple fallback sources
     generateFaviconHTML: function (domain, size = 64, idSuffix = '') {
-        const cleanDomain = this.normalizeDomain(domain);
-        const fallbackIcon = window.__pcAccountsIcon(size);
-
-        if (!cleanDomain || (this.failedDomains && this.failedDomains.has(cleanDomain))) {
-            return `<span class="company-favicon-container favicon-failed" style="width:${size}px;height:${size}px;"><span class="company-favicon-fallback">${fallbackIcon}</span></span>`;
+        if (!domain) {
+            return window.__pcAccountsIcon();
         }
 
-        const requestSize = Math.max((parseInt(size, 10) || 0) * 2, 64);
-
-        // PERSISTENCE FIX: Check if we are already trying a specific index for this domain
-        const startingIndex = this.tryingDomains.get(cleanDomain) || 0;
+        const cleanDomain = domain.replace(/^www\./i, '');
+        const fallbackIcon = window.__pcAccountsIcon();
 
         // Multiple favicon sources to try - ordered by quality and reliability
         const faviconSources = [
             `https://logo.clearbit.com/${encodeURIComponent(cleanDomain)}`, // Best for company logos
-            `https://www.google.com/s2/favicons?sz=${requestSize}&domain=${encodeURIComponent(cleanDomain)}`, // Google's service
+            `https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(cleanDomain)}`, // Google's service
             `https://favicons.githubusercontent.com/${encodeURIComponent(cleanDomain)}`, // GitHub's service  
-            `https://api.faviconkit.com/${encodeURIComponent(cleanDomain)}/${requestSize}`, // FaviconKit API
+            `https://api.faviconkit.com/${encodeURIComponent(cleanDomain)}/${size}`, // FaviconKit API
             `https://favicon.yandex.net/favicon/${encodeURIComponent(cleanDomain)}`, // Yandex service
             `https://icons.duckduckgo.com/ip3/${encodeURIComponent(cleanDomain)}.ico`, // DuckDuckGo
             `https://${cleanDomain}/favicon.ico` // Direct favicon
         ];
 
-        const safeDomain = String(cleanDomain || '').replace(/'/g, "\\'");
-        const useIndex = startingIndex < faviconSources.length ? startingIndex : 0;
+        // Create a stable ID for this favicon container based on domain, size and optional suffix
+        // This prevents flickering repaints during re-renders if the domain hasn't changed
+        // but ensures uniqueness across rows if a suffix is provided.
+        const containerId = `favicon-${cleanDomain.replace(/[^a-zA-Z0-9]/g, '')}-${size}${idSuffix ? '-' + idSuffix : ''}`;
 
-        // Warm Start: If we already have a persistent index, don't hide the icon with 'favicon-loading'
-        // This prevents the "flip-back" flicker during rapid re-renders
-        const isWarmStart = this.tryingDomains.has(cleanDomain);
-        const containerClass = isWarmStart ? 'company-favicon-container favicon-loaded' : 'company-favicon-container favicon-loading';
-        const imgVisibility = isWarmStart ? 'visibility:visible;' : 'visibility:hidden;';
-
-        return `<span class="${containerClass}" style="width:${size}px;height:${size}px;">
-                    <img class="company-favicon ${isWarmStart ? 'icon-loaded' : ''}" 
-                         src="${faviconSources[useIndex]}" 
-                         alt="" 
-                         referrerpolicy="no-referrer" 
-                         loading="lazy"
-                         data-source-index="${useIndex}"
-                         data-display-size="${size}"
-                         data-domain="${cleanDomain}"
-                         style="width:${size}px;height:${size}px;object-fit:cover;border-radius:6px;flex-shrink:0;pointer-events:none;background-color:rgba(255,255,255,0.05);${imgVisibility}"
-                         onload="window.__pcFaviconHelper.onFaviconLoadEl(this)"
-                         onerror="window.__pcFaviconHelper.onFaviconErrorEl(this,'${safeDomain}',${parseInt(size, 10) || 0})" />
-                    <span class="company-favicon-fallback">${fallbackIcon}</span>
-                </span>`;
+        return `
+            <img class="company-favicon" 
+                 id="${containerId}"
+                 src="${faviconSources[0]}" 
+                 alt="" 
+                 referrerpolicy="no-referrer" 
+                 loading="lazy"
+                 style="width:${size}px;height:${size}px;object-fit:cover;border-radius:6px;flex-shrink:0;pointer-events:none;background-color:rgba(255,255,255,0.05);"
+                 onload="window.__pcFaviconHelper.onFaviconLoad('${containerId}')"
+                 onerror="window.__pcFaviconHelper.onFaviconError('${containerId}', '${cleanDomain}', ${size})" />
+        `;
     },
 
     // Handle successful favicon load
     onFaviconLoad: function (containerId) {
-        const img = (typeof containerId === 'string') ? document.getElementById(containerId) : containerId;
-        return this.onFaviconLoadEl(img);
-    },
-    onFaviconLoadEl: function (img) {
-        if (!img) return;
-        const displaySize = parseInt(img.dataset.displaySize || ((img.style && img.style.width) ? String(img.style.width).replace('px', '') : ''), 10) || 0;
-        const dom = this.normalizeDomain(img.dataset.domain || '');
-        const sourceIndex = img.dataset.sourceIndex || '0';
-        if (!img.dataset.sourceIndex) img.dataset.sourceIndex = '0';
-
-        // Placeholder Detection: Google returns a 16x16 globe if no favicon is found.
-        // Since we requested sz=64 (or larger), a 16x16 result is a generic placeholder.
-        if (dom && img.naturalWidth > 0) {
-            const isGoogle = img.src.includes('google.com/s2/favicons');
-            const isPlaceholder = (isGoogle && img.naturalWidth === 16);
-
-            if (isPlaceholder || img.naturalWidth < 16) {
-                setTimeout(() => {
-                    try { window.__pcFaviconHelper.onFaviconErrorEl(img, dom, displaySize); } catch (_) { }
-                }, 0);
-                return;
-            }
+        const img = document.getElementById(containerId);
+        if (img) {
+            // Use requestAnimationFrame to ensure smooth animation
+            requestAnimationFrame(() => {
+                img.classList.add('icon-loaded');
+            });
         }
-
-        // Successfully loaded, ensure it's not in the failed cache
-        // PERSISTENCE FIX: We keep it in tryingDomains even on success so that re-renders 
-        // use the same successful index instead of restarting at 0
-        if (dom) {
-            try {
-                this.failedDomains.delete(dom);
-                // Double-check that we are actually persisting the successful index
-                this.tryingDomains.set(dom, parseInt(sourceIndex, 10));
-            } catch (_) { }
-        }
-
-        requestAnimationFrame(() => {
-            try { img.style.display = ''; } catch (_) { }
-            try { img.style.visibility = 'visible'; } catch (_) { }
-            img.classList.add('icon-loaded');
-            const container = img.closest ? img.closest('.company-favicon-container') : null;
-            if (container) {
-                container.classList.remove('favicon-loading');
-                container.classList.add('favicon-loaded');
-                container.classList.remove('favicon-failed');
-            }
-        });
     },
 
     // Handle favicon load error and try next source
     onFaviconError: function (containerId, domain, size) {
-        const img = (typeof containerId === 'string') ? document.getElementById(containerId) : containerId;
-        return this.onFaviconErrorEl(img, domain, size);
-    },
-    onFaviconErrorEl: function (img, domain, size) {
+        const img = document.getElementById(containerId);
         if (!img) return;
-
-        const cleanDomain = this.normalizeDomain(domain);
-
-        const container = img.closest ? img.closest('.company-favicon-container') : null;
-        if (container) {
-            container.classList.add('favicon-loading');
-            container.classList.remove('favicon-loaded');
-        }
-
-        try { img.style.visibility = 'hidden'; } catch (_) { }
-        try { img.style.display = 'none'; } catch (_) { }
-        if (!cleanDomain) {
-            if (container) {
-                container.classList.remove('favicon-loading');
-                container.classList.add('favicon-failed');
-                try { img.style.display = 'none'; } catch (_) { }
-            }
-            return;
-        }
 
         // Get current source index from data attribute
         let currentIndex = parseInt(img.dataset.sourceIndex || '0');
         if (isNaN(currentIndex)) currentIndex = 0;
         currentIndex++;
 
-        const requestSize = Math.max((parseInt(size, 10) || 0) * 2, 64);
-
         // Try next favicon source - same order as generateFaviconHTML
         const faviconSources = [
-            `https://logo.clearbit.com/${encodeURIComponent(cleanDomain)}`,
-            `https://www.google.com/s2/favicons?sz=${requestSize}&domain=${encodeURIComponent(cleanDomain)}`,
-            `https://favicons.githubusercontent.com/${encodeURIComponent(cleanDomain)}`,
-            `https://api.faviconkit.com/${encodeURIComponent(cleanDomain)}/${requestSize}`,
-            `https://favicon.yandex.net/favicon/${encodeURIComponent(cleanDomain)}`,
-            `https://icons.duckduckgo.com/ip3/${encodeURIComponent(cleanDomain)}.ico`,
-            `https://${cleanDomain}/favicon.ico`
+            `https://logo.clearbit.com/${encodeURIComponent(domain)}`,
+            `https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(domain)}`,
+            `https://favicons.githubusercontent.com/${encodeURIComponent(domain)}`,
+            `https://api.faviconkit.com/${encodeURIComponent(domain)}/${size}`,
+            `https://favicon.yandex.net/favicon/${encodeURIComponent(domain)}`,
+            `https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico`,
+            `https://${domain}/favicon.ico`
         ];
 
         if (currentIndex < faviconSources.length) {
-            // Update the tryingDomains map to persist across re-renders
-            if (cleanDomain) {
-                this.tryingDomains.set(cleanDomain, currentIndex);
-            }
-
             // Fade out then try next source for smoother transition
             try { img.classList.add('icon-unloading'); } catch (_) { }
             setTimeout(() => {
                 img.dataset.sourceIndex = currentIndex.toString();
-                try {
-                    img.style.display = '';
-                    img.style.visibility = 'hidden';
-                } catch (_) { }
                 img.src = faviconSources[currentIndex];
                 try { img.classList.remove('icon-unloading'); } catch (_) { }
             }, 120);
         } else {
-            if (cleanDomain) {
-                try {
-                    this.failedDomains.add(cleanDomain);
-                    this.tryingDomains.delete(cleanDomain);
-                    this._saveCache();
-                } catch (_) { }
-            }
-            if (container) {
-                container.classList.remove('favicon-loading');
-                container.classList.add('favicon-failed');
-                try { img.style.display = 'none'; } catch (_) { }
-                return;
-            }
-
+            // All sources failed, show fallback icon with a graceful fade-out
             try { img.classList.add('icon-unloading'); } catch (_) { }
             setTimeout(() => {
                 img.classList.add('favicon-failed');
                 img.style.display = 'none';
+                const fallbackIcon = window.__pcAccountsIcon();
+                img.insertAdjacentHTML('afterend', fallbackIcon);
             }, 120);
         }
     }
@@ -6777,26 +6594,7 @@ window.__pcIconAnimator = {
         const loadImage = (img) => {
             // Prevent duplicate processing
             if (img.dataset.iconObserved) return;
-
-            // Skip non-images (like the fallback span) that are already marked as loaded
-            if (img.tagName !== 'IMG' && img.classList.contains('icon-loaded')) {
-                img.dataset.iconObserved = 'true';
-                return;
-            }
-
             img.dataset.iconObserved = 'true';
-
-            const isFaviconHelperManaged = (() => {
-                try {
-                    if (!img.classList || !img.classList.contains('company-favicon')) return false;
-                    if (!img.closest || !img.closest('.company-favicon-container')) return false;
-                    const onErrorAttr = img.getAttribute ? (img.getAttribute('onerror') || '') : '';
-                    if (!/__pcFaviconHelper\./.test(onErrorAttr)) return false;
-                    return !!(img.dataset && (img.dataset.domain || img.dataset.sourceIndex || img.dataset.displaySize));
-                } catch (_) {
-                    return false;
-                }
-            })();
 
             // Ensure image starts hidden for animation
             if (!img.classList.contains('icon-loaded')) {
@@ -6810,16 +6608,6 @@ window.__pcIconAnimator = {
                     // For cached images, add a small delay to ensure smooth fade-in
                     requestAnimationFrame(() => {
                         requestAnimationFrame(() => {
-                            if (isFaviconHelperManaged && window.__pcFaviconHelper) {
-                                if (typeof window.__pcFaviconHelper.onFaviconLoadEl === 'function') {
-                                    try { window.__pcFaviconHelper.onFaviconLoadEl(img); } catch (_) { }
-                                    return;
-                                }
-                                if (typeof window.__pcFaviconHelper.onFaviconLoad === 'function' && img.id) {
-                                    try { window.__pcFaviconHelper.onFaviconLoad(img.id); } catch (_) { }
-                                    return;
-                                }
-                            }
                             img.classList.add('icon-loaded');
                         });
                     });
@@ -6835,7 +6623,6 @@ window.__pcIconAnimator = {
             img.addEventListener('load', () => {
                 requestAnimationFrame(() => {
                     requestAnimationFrame(() => {
-                        if (isFaviconHelperManaged) return;
                         img.classList.add('icon-loaded');
                     });
                 });
@@ -6845,7 +6632,6 @@ window.__pcIconAnimator = {
             img.addEventListener('error', () => {
                 requestAnimationFrame(() => {
                     requestAnimationFrame(() => {
-                        if (isFaviconHelperManaged) return;
                         img.classList.add('icon-loaded');
                     });
                 });
@@ -6945,7 +6731,7 @@ if (document.readyState === 'loading') {
                 const style = document.createElement('style');
                 style.id = 'pc-icon-animations';
                 style.textContent = `
-                    .company-favicon:not(.company-favicon--fallback), .logo, .avatar-circle, .avatar-initials, .company-favicon-header:not(.company-favicon--fallback) { opacity: 0; transition: opacity 0.2s ease; }
+                    .company-favicon, .logo, .avatar-circle, .avatar-initials, .company-favicon-header { opacity: 0; transition: opacity 0.2s ease; }
                     .icon-loaded { opacity: 1 !important; }
                     .icon-unloading { opacity: 0 !important; }
                 `;
@@ -6961,7 +6747,7 @@ if (document.readyState === 'loading') {
             const style = document.createElement('style');
             style.id = 'pc-icon-animations';
             style.textContent = `
-                .company-favicon:not(.company-favicon--fallback), .logo, .avatar-circle, .avatar-initials, .company-favicon-header:not(.company-favicon--fallback) { opacity: 0; transition: opacity 0.2s ease; }
+                .company-favicon, .logo, .avatar-circle, .avatar-initials, .company-favicon-header { opacity: 0; transition: opacity 0.2s ease; }
                 .icon-loaded { opacity: 1 !important; }
                 .icon-unloading { opacity: 0 !important; }
             `;
@@ -7226,12 +7012,15 @@ function injectEmailSignature() {
         sel.removeAllRanges();
         sel.addRange(range);
     } else {
+        // Debug: Check if signature is actually being retrieved
+        console.log('[Signature] No signature found - checking settings...');
         // Try to get signature directly from localStorage as fallback
         try {
             const savedSettings = localStorage.getItem('crm-settings');
             if (savedSettings) {
                 const settings = JSON.parse(savedSettings);
                 const signatureData = settings.emailSignature;
+                console.log('[Signature] Settings from localStorage:', signatureData);
 
                 if (signatureData && (signatureData.text || signatureData.image)) {
                     let signatureHtml = '<div contenteditable="false" data-signature="true" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">';
@@ -7255,6 +7044,10 @@ function injectEmailSignature() {
                         const alreadyHasGuard = currentContent.indexOf('data-signature-guard="true"') !== -1;
                         bodyInput.innerHTML = currentContent + (alreadyHasGuard ? '' : guard) + signatureHtml;
                     }
+
+                    console.log('[Signature] Added signature from localStorage');
+                } else {
+                    console.log('[Signature] No signature data found in settings');
                 }
             }
         } catch (error) {
@@ -7284,9 +7077,13 @@ function addSignatureToAIContent(content, isHtmlMode = false) {
 function initializeCRM() {
     // Prevent multiple initialization
     if (window.crm) {
+        console.log('[Main] PowerChoosersCRM already initialized, skipping...');
         return;
     }
+
+    console.log('[Main] Initializing PowerChoosersCRM...');
     window.crm = new PowerChoosersCRM();
+    console.log('[Main] ✓ PowerChoosersCRM initialized');
 
     // Add compose button listener for signature injection (with guard)
     const composeBtn = document.getElementById('compose-email-btn');
@@ -7335,13 +7132,6 @@ function initializeCRM() {
         window.initGlobalSearch();
     }
 
-    // NEW: Handle deep linking to specific pages on initial load
-    const urlParams = new URLSearchParams(window.location.search);
-    const emailId = urlParams.get('emailId');
-    if (emailId && window.crm) {
-        // console.log('[CRM] Deep link detected: emailId =', emailId);
-        window.crm.navigateToPage('email-detail', { emailId: emailId });
-    }
 }
 
 // Call immediately if DOM is already loaded, otherwise wait
@@ -7356,3 +7146,7 @@ if (document.readyState === 'loading') {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = PowerChoosersCRM;
 }
+
+
+
+

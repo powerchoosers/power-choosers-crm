@@ -45,6 +45,7 @@
       }
       
       teamMembers = members;
+      console.log('[BulkAssignment] Loaded team members:', teamMembers.length);
       return members;
     } catch (error) {
       console.error('[BulkAssignment] Error loading team members:', error);
@@ -55,11 +56,14 @@
   // Initialize bulk assignment for a page
   async function initBulkAssignment(collectionType) {
     if (!window.DataManager || !window.DataManager.isCurrentUserAdmin()) {
+      console.log('[BulkAssignment] Not admin - skipping initialization');
       return;
     }
 
     currentCollectionType = collectionType;
     await loadTeamMembers();
+    
+    console.log(`[BulkAssignment] Initialized for ${collectionType}`);
   }
 
   // Show quick assignment dropdown
@@ -248,7 +252,8 @@
     const count = currentSelectedIds.length;
     
     const assigneeLower = (assigneeEmail || '').toLowerCase();
-    
+    console.log(`[BulkAssignment] Assigning ${count} ${currentCollectionType} to ${assigneeLower}`);
+
     try {
       // Update each selected item
       currentSelectedIds.forEach(itemId => {
@@ -277,6 +282,7 @@
         detail: { count, assigneeEmail, collectionType: currentCollectionType }
       }));
       
+      console.log('[BulkAssignment] ✅ Assignment complete');
     } catch (error) {
       console.error('[BulkAssignment] Error assigning leads:', error);
       if (window.crm && typeof window.crm.showToast === 'function') {
@@ -315,6 +321,7 @@
       return;
     }
     
+    console.log(`[BulkAssignment] Rendering assign menu for ${selectedIds.length} ${currentCollectionType}`);
     showQuickAssignDropdown(selectedIds, anchorElement);
   }
 
@@ -329,6 +336,6 @@
     get _currentCollection() { return currentCollectionType; }
   };
 
-  // console.log('[BulkAssignment] Module loaded');
+  console.log('[BulkAssignment] Module loaded');
 })();
 

@@ -38,6 +38,7 @@ class CacheManager {
 
       request.onsuccess = () => {
         this.db = request.result;
+        console.log('[CacheManager] IndexedDB initialized');
         resolve(this.db);
       };
 
@@ -55,6 +56,8 @@ class CacheManager {
         if (!db.objectStoreNames.contains('_meta')) {
           db.createObjectStore('_meta', { keyPath: 'collection' });
         }
+
+        console.log('[CacheManager] IndexedDB schema created');
       };
     });
 
@@ -81,6 +84,7 @@ class CacheManager {
 
       await new Promise((resolve, reject) => {
         tx.oncomplete = () => {
+          console.log(`[CacheManager] ✓ Cached list members for ${listId}: ${data[0].people.length} people, ${data[0].accounts.length} accounts`);
           resolve();
         };
         tx.onerror = () => reject(tx.error);
@@ -109,13 +113,15 @@ class CacheManager {
 
           const age = Date.now() - cached.timestamp;
           const fresh = age < this.listMembersExpiry;
-  
+
           if (fresh) {
+            console.log(`[CacheManager] ✓ List members cache HIT for ${listId} (${Math.round(age / 1000)}s old)`);
             resolve({
               people: new Set(cached.people || []),
               accounts: new Set(cached.accounts || [])
             });
           } else {
+            console.log(`[CacheManager] List members cache EXPIRED for ${listId} (${Math.round(age / 1000)}s old)`);
             resolve(null);
           }
         };
@@ -141,6 +147,7 @@ class CacheManager {
 
       await new Promise((resolve, reject) => {
         tx.oncomplete = () => {
+          console.log(`[CacheManager] ✓ Invalidated list members cache for ${listId}`);
           resolve();
         };
         tx.onerror = () => reject(tx.error);
@@ -185,6 +192,7 @@ class CacheManager {
 
           const age = Date.now() - meta.timestamp;
           const fresh = age < expiry;
+          console.log(`[CacheManager] Cache for ${collection}: ${fresh ? 'FRESH' : 'EXPIRED'} (${Math.round(age / 1000)}s old, expiry: ${Math.round(expiry / 1000)}s)`);
           resolve(fresh);
         };
 
@@ -206,6 +214,7 @@ class CacheManager {
 
     // REQUEST DEDUPLICATION: If another request for this collection is in flight, wait for it
     if (this.activeRequests.has(collection)) {
+      console.log(`[CacheManager] Waiting for in-flight ${collection} request...`);
       this._incrementStat(collection, 'duplicates');
       return this.activeRequests.get(collection);
     }
@@ -234,11 +243,13 @@ class CacheManager {
         // Return cached data
         const cached = await this.getFromCache(collection);
         if (cached && cached.length > 0) {
+          console.log(`[CacheManager] ✓ Returning ${cached.length} ${collection} from cache`);
           this._incrementStat(collection, 'hits');
           return cached;
         }
       }
       // Cache miss or expired - fetch from Firestore
+      console.log(`[CacheManager] Cache miss for ${collection}, fetching from Firestore...`);
       this._incrementStat(collection, 'misses');
       const data = await this.fetchFromFirestore(collection);
 
@@ -342,6 +353,7 @@ class CacheManager {
       if (collection === 'accounts' && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function' && window.currentUserRole) {
         try {
           const data = await window.DataManager.queryWithOwnership('accounts');
+          console.log(`[CacheManager] Fetched ${data.length} ${collection} from Firestore (DataManager)`);
           return data;
         } catch (error) {
           console.error('[CacheManager] DataManager query failed, falling back:', error);
@@ -349,7 +361,7 @@ class CacheManager {
       }
 
       // Use scoped queries for user-specific collections
-      if (['contacts', 'tasks', 'accounts', 'emails', 'lists', 'sequences', 'calls', 'agent_activities', 'deals'].includes(collection)) {
+      if (['contacts', 'tasks', 'accounts', 'emails', 'lists', 'sequences'].includes(collection)) {
         const email = window.currentUserEmail || '';
         if (window.currentUserRole !== 'admin' && email) {
           // Non-admin: use scoped queries - check multiple ownership fields
@@ -365,16 +377,15 @@ class CacheManager {
             queries.push(window.firebaseDB.collection(collection).where('createdBy', '==', email).get());
           }
 
-          const snapshots = await Promise.all(queries.map(q => q.catch(e => {
-            return { docs: [], empty: true, size: 0 };
-          })));
+          const snapshots = await Promise.all(queries);
           const map = new Map();
 
-          snapshots.forEach((snap, idx) => {
+          snapshots.forEach(snap => {
             snap.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
           });
 
           const data = Array.from(map.values());
+          console.log(`[CacheManager] Fetched ${data.length} ${collection} from Firestore (scoped)`);
           return data;
         } else {
           // OPTIMIZED: Admin query with limit to prevent loading entire collection
@@ -382,16 +393,18 @@ class CacheManager {
           // 5000 is reasonable for most collections while keeping costs down
           const snapshot = await window.firebaseDB.collection(collection).limit(5000).get();
           const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          console.log(`[CacheManager] Fetched ${data.length} ${collection} from Firestore (admin, limited)`);
           const endTime = performance.now();
           return data;
         }
       }
-  
+
       // For other collections, use standard query (admin only) with limit
       if (window.currentUserRole === 'admin') {
         // OPTIMIZED: Add limit to prevent loading entire collection
         const snapshot = await window.firebaseDB.collection(collection).limit(5000).get();
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log(`[CacheManager] Fetched ${data.length} ${collection} from Firestore (admin, limited)`);
         return data;
       } else {
         console.warn(`[CacheManager] Non-admin access denied for collection: ${collection}`);
@@ -489,6 +502,8 @@ class CacheManager {
         metaTx.oncomplete = () => resolve();
         metaTx.onerror = () => reject(metaTx.error);
       });
+
+      console.log(`[CacheManager] ✓ Cached ${data.length} ${collection} records`);
     } catch (error) {
       console.error(`[CacheManager] Error caching ${collection}:`, error);
     }
@@ -496,51 +511,30 @@ class CacheManager {
 
   // Update a single record in cache (for real-time updates)
   async updateRecord(collection, id, changes) {
-    if (!id || !changes) return false;
+    if (!id || !changes) return;
 
     try {
       await this.init();
-      if (!this.db || this.db.version === 0) return false;
+      const tx = this.db.transaction([collection], 'readwrite');
+      const store = tx.objectStore(collection);
 
-      const ok = await new Promise((resolve) => {
-        const tx = this.db.transaction([collection], 'readwrite');
-        const store = tx.objectStore(collection);
+      // Get existing record
+      const getRequest = store.get(id);
 
-        const getRequest = store.get(id);
+      getRequest.onsuccess = () => {
+        const existing = getRequest.result || { id };
+        const updated = { ...existing, ...changes, updatedAt: changes.updatedAt || new Date() };
 
-        getRequest.onsuccess = () => {
-          const existing = getRequest.result || { id };
-          const updated = { ...existing, ...changes, updatedAt: changes.updatedAt || new Date() };
-          store.put(updated);
-        };
+        // Update record
+        store.put(updated);
+        console.log(`[CacheManager] ✓ Updated ${collection}/${id} in cache`);
+      };
 
-        getRequest.onerror = () => {
-          console.error(`[CacheManager] Error updating ${collection}/${id}:`, getRequest.error);
-          resolve(false);
-        };
-
-        tx.oncomplete = () => {
-          resolve(true);
-        };
-
-        tx.onerror = () => {
-          console.error(`[CacheManager] Error updating ${collection}/${id}:`, tx.error);
-          resolve(false);
-        };
-      });
-
-      if (ok) {
-        try {
-          const metaTx = this.db.transaction(['_meta'], 'readwrite');
-          const metaStore = metaTx.objectStore('_meta');
-          metaStore.put({ collection, timestamp: Date.now() });
-        } catch (_) { }
-      }
-
-      return ok;
+      getRequest.onerror = () => {
+        console.error(`[CacheManager] Error updating ${collection}/${id}:`, getRequest.error);
+      };
     } catch (error) {
       console.error(`[CacheManager] Error updating record in cache:`, error);
-      return false;
     }
   }
 
@@ -556,6 +550,7 @@ class CacheManager {
 
       await new Promise((resolve, reject) => {
         tx.oncomplete = () => {
+          console.log(`[CacheManager] ✓ Deleted ${collection}/${id} from cache`);
           resolve();
         };
         tx.onerror = () => reject(tx.error);
@@ -589,6 +584,8 @@ class CacheManager {
         metaTx.oncomplete = () => resolve();
         metaTx.onerror = () => reject(metaTx.error);
       });
+
+      console.log(`[CacheManager] ✓ Invalidated cache for ${collection}`);
     } catch (error) {
       console.error(`[CacheManager] Error invalidating ${collection}:`, error);
     }
@@ -596,9 +593,11 @@ class CacheManager {
 
   // Invalidate all caches
   async invalidateAll() {
+    console.log('[CacheManager] Invalidating all caches...');
     for (const collection of this.collections) {
       await this.invalidate(collection);
     }
+    console.log('[CacheManager] ✓ All caches invalidated');
   }
 
   // Get cache statistics with debugging info
@@ -666,6 +665,7 @@ class CacheManager {
 
       await new Promise((resolve, reject) => {
         tx.oncomplete = () => {
+          console.log(`[CacheManager] ✓ Cached metrics for agent ${agentEmail}`);
           resolve();
         };
         tx.onerror = () => reject(tx.error);
@@ -692,6 +692,7 @@ class CacheManager {
             return;
           }
 
+          console.log(`[CacheManager] ✓ Agent metrics cache HIT for ${agentEmail}`);
           resolve(cached);
         };
 
@@ -722,6 +723,7 @@ class CacheManager {
 
       await new Promise((resolve, reject) => {
         tx.oncomplete = () => {
+          console.log(`[CacheManager] ✓ Cached ${activities.length} activities for agent ${agentEmail}`);
           resolve();
         };
         tx.onerror = () => reject(tx.error);
@@ -748,6 +750,7 @@ class CacheManager {
             return;
           }
 
+          console.log(`[CacheManager] ✓ Agent activities cache HIT for ${agentEmail}`);
           resolve(cached.activities || []);
         };
 
@@ -776,6 +779,7 @@ class CacheManager {
 
       await new Promise((resolve, reject) => {
         tx.oncomplete = () => {
+          console.log(`[CacheManager] ✓ Cached ${numbers.length} Twilio numbers`);
           resolve();
         };
         tx.onerror = () => reject(tx.error);
@@ -801,6 +805,7 @@ class CacheManager {
             return;
           }
 
+          console.log(`[CacheManager] ✓ Twilio numbers cache HIT`);
           resolve(cached.numbers || []);
         };
 
@@ -829,6 +834,7 @@ class CacheManager {
 
       await new Promise((resolve, reject) => {
         tx.oncomplete = () => {
+          console.log(`[CacheManager] ✓ Cached ${emails.length} SendGrid emails`);
           resolve();
         };
         tx.onerror = () => reject(tx.error);
@@ -854,6 +860,7 @@ class CacheManager {
             return;
           }
 
+          console.log(`[CacheManager] ✓ SendGrid emails cache HIT`);
           resolve(cached.emails || []);
         };
 
@@ -885,6 +892,7 @@ class CacheManager {
         };
 
         store.put(updated);
+        console.log(`[CacheManager] ✓ Updated agent status for ${agentEmail}: ${status}`);
       };
 
       getRequest.onerror = () => {
@@ -909,7 +917,7 @@ class CacheManager {
         timestamp: activity.timestamp || new Date()
       });
 
-
+      console.log(`[CacheManager] ✓ Added agent activity: ${activity.type}`);
     } catch (error) {
       console.error(`[CacheManager] Error adding agent activity:`, error);
     }
@@ -919,13 +927,15 @@ class CacheManager {
 // Initialize global cache manager
 if (typeof window !== 'undefined') {
   window.CacheManager = new CacheManager();
+  console.log('[CacheManager] Global cache manager initialized');
 
   // Debug helper: view cache stats
   window.getCacheStats = async () => {
     const stats = await window.CacheManager.getStats();
-    // console.table(stats); // silenced
+    console.table(stats);
     return stats;
   };
 }
+
 
 

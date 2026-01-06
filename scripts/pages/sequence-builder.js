@@ -5699,7 +5699,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         }
         
         .email-settings .btn-primary:hover {
-          background: var(--orange-subtle, #f18335);
+          background: #e55a2b;
           transform: translateY(-1px);
         }
         

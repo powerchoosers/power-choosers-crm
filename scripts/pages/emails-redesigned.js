@@ -65,6 +65,12 @@
           try {
             // Only reload if we're on the emails page
             if (els.page && els.page.style.display !== 'none') {
+              // IMPORTANT: use showImmediately=true so realtime updates actually
+              // re-render the table (scheduled → sent, new emails, etc.).
+              // Previously this called loadData() without the flag, which updated
+              // in-memory data but didn't call applyFilters()/render(), forcing
+              // a manual refresh or tab toggle for users to see changes.
+              console.log('[EmailsPage] Real-time update detected, refreshing...');
               loadData(true);
             }
           } catch (_) { }
@@ -81,6 +87,7 @@
       });
       document.addEventListener('pc:emails-updated', debouncedLoadData);
       document._emailsRealtimeBound = true;
+      console.log('[EmailsPage] Real-time listeners bound');
     } catch (_) { }
   }
 
@@ -111,10 +118,12 @@
         tab.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopImmediatePropagation();
+          console.log('[EmailsPage] Tab clicked:', tab.dataset.folder);
           els.filterTabs.forEach(t => t.classList.remove('active'));
           tab.classList.add('active');
           state.currentFolder = tab.dataset.folder;
           state.currentPage = 1;
+          console.log('[EmailsPage] Current folder set to:', state.currentFolder);
 
           // Show/hide Generate Now button
           updateGenerateButtonVisibility();
@@ -185,11 +194,13 @@
   // Load email data from BackgroundEmailsLoader (cache-first)
   async function loadData(showImmediately = false) {
     if (state.isLoading) {
+      console.log('[EmailsPage] Already loading, skipping duplicate request');
       return;
     }
 
     try {
       state.isLoading = true;
+      console.log('[EmailsPage] Loading emails from BackgroundEmailsLoader...');
 
       let emailsData = [];
 
@@ -197,6 +208,7 @@
       if (window.BackgroundEmailsLoader) {
         emailsData = window.BackgroundEmailsLoader.getEmailsData() || [];
         state.hasMore = window.BackgroundEmailsLoader.hasMore ? window.BackgroundEmailsLoader.hasMore() : false;
+        console.log('[EmailsPage] Got', emailsData.length, 'emails from BackgroundEmailsLoader', state.hasMore ? '(more available)' : '(all loaded)');
 
         if (emailsData.length > 0) {
           processAndSetData(emailsData);
@@ -220,17 +232,7 @@
 
       // Priority 3: Firebase fallback
       if (state.data.length === 0) {
-        let baseQuery = firebase.firestore().collection('emails');
-        const userEmail = (window.currentUserEmail || '').toLowerCase();
-        const isAdmin = window.currentUserRole === 'admin';
-
-        if (!isAdmin && userEmail) {
-          // Non-admin: query by ownerId OR assignedTo (requires two queries or index)
-          // For simplicity in fallback, we'll just query by ownerId
-          baseQuery = baseQuery.where('ownerId', '==', userEmail);
-        }
-
-        const firestoreData = await baseQuery
+        const firestoreData = await firebase.firestore().collection('emails')
           .orderBy('createdAt', 'desc')
           .limit(100)
           .get()
@@ -240,10 +242,7 @@
             timestamp: doc.data().sentAt || doc.data().receivedAt || doc.data().createdAt,
             emailType: doc.data().type || (doc.data().provider === 'sendgrid_inbound' || doc.data().provider === 'gmail_api' ? 'received' : 'sent')
           })))
-          .catch(err => {
-            console.warn('[EmailsPage] Fallback query failed:', err.message);
-            return [];
-          });
+          .catch(() => []);
 
         if (firestoreData.length > 0) {
           processAndSetData(firestoreData);
@@ -309,6 +308,18 @@
     // OPTIMIZATION: Lazy sort - only sort when needed (not on every data load)
     // Sorting will happen in getPageItems() or applyFilters() when actually displaying
     // This saves ~10-20ms on cold start
+
+    console.log('[EmailsPage] Processed', state.data.length, 'emails');
+
+    // Log sample types for debugging
+    if (state.data.length > 0) {
+      const typeCounts = {};
+      state.data.forEach(email => {
+        const key = email.type || email.emailType || 'unknown';
+        typeCounts[key] = (typeCounts[key] || 0) + 1;
+      });
+      console.log('[EmailsPage] Email types breakdown:', typeCounts);
+    }
   }
 
   // Apply filters based on current folder and search
@@ -327,6 +338,8 @@
 
     let filtered = [...state.data];
 
+    console.log('[EmailsPage] Filtering emails. Total:', state.data.length, 'Current folder:', state.currentFolder);
+
     // ... existing filter logic ...
     // Filter by folder
     if (state.currentFolder === 'inbox') {
@@ -340,6 +353,7 @@
           (!email.type && !email.emailType && !email.isSentEmail)) &&
           !email.deleted;
       });
+      console.log('[EmailsPage] Inbox filter applied. Filtered count:', filtered.length);
     } else if (state.currentFolder === 'sent') {
       filtered = filtered.filter(email => {
         // Accept multiple indicators for sent emails to support legacy and new records
@@ -352,6 +366,7 @@
         );
         return isSent && !email.deleted;
       });
+      console.log('[EmailsPage] Sent filter applied. Filtered count:', filtered.length);
     } else if (state.currentFolder === 'scheduled') {
       // OPTIMIZATION: Pre-compute Date.now() once instead of calling it for each email
       const now = Date.now();
@@ -422,10 +437,13 @@
       // OPTIMIZATION: Lazy sort - only sort when rendering (moved to getPageItems)
       // Don't sort here on every filter - saves ~10-20ms for large datasets
       state.scheduledNeedsSort = true;
+      console.log('[EmailsPage] Scheduled filter applied. Filtered count:', filtered.length);
     } else if (state.currentFolder === 'starred') {
       filtered = filtered.filter(email => email.starred && !email.deleted);
+      console.log('[EmailsPage] Starred filter applied. Filtered count:', filtered.length);
     } else if (state.currentFolder === 'trash') {
       filtered = filtered.filter(email => email.deleted);
+      console.log('[EmailsPage] Trash filter applied. Filtered count:', filtered.length);
     }
 
     // Filter by search
@@ -455,7 +473,7 @@
 
     // Check if we need to load more data to fill the current page
     const neededForPage = state.currentPage * state.pageSize;
-    const searchTermNow = els.searchInput?.value?.trim() || '';
+    console.log('[EmailsPage] Filter check - filtered:', state.filtered.length, 'needed:', neededForPage, 'hasMore:', state.hasMore, 'loader available:', !!window.BackgroundEmailsLoader);
 
     // Update folder total count asynchronously (do not block UI)
     updateFolderCount().catch(() => { });
@@ -465,7 +483,7 @@
     // so we never need to paginate for this folder.
     const shouldLoadMore = (
       state.currentFolder !== 'scheduled' &&
-      (state.currentPage > 1 || (searchTermNow && state.filtered.length < state.pageSize)) &&
+      state.currentPage > 1 && // Only try to load more for pages beyond the first
       state.filtered.length < neededForPage &&
       state.hasMore &&
       window.BackgroundEmailsLoader &&
@@ -473,18 +491,21 @@
     );
 
     if (shouldLoadMore) {
+      console.log('[EmailsPage] Not enough filtered results, loading more...');
       // Load more data until we have enough filtered results
       loadMoreUntilEnough();
     } else if (!skipRender) {
+      if (state.filtered.length < neededForPage) {
+        console.log('[EmailsPage] Not enough results but cannot load more:', {
+          filtered: state.filtered.length,
+          needed: neededForPage,
+          hasMore: state.hasMore,
+          loaderExists: !!window.BackgroundEmailsLoader,
+          loadMoreExists: !!(window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.loadMore === 'function')
+        });
+      }
       render();
     }
-  }
-
-  function getPaginationTotalRecords() {
-    const base = state.filtered.length;
-    if (!state.hasMore) return base;
-    const min = state.currentPage * state.pageSize + 1;
-    return Math.max(base, min);
   }
 
   // Update total count for the current folder without loading all records
@@ -516,6 +537,7 @@
   // Load more emails until we have enough filtered results for the current page
   async function loadMoreUntilEnough() {
     if (state.isLoadingMore) {
+      console.log('[EmailsPage] Already loading more, skipping duplicate request');
       return;
     }
 
@@ -524,16 +546,20 @@
       const neededForPage = state.currentPage * state.pageSize;
       // OPTIMIZATION: Only load what we need for the current page, no aggressive preloading
       const targetCount = neededForPage;
-      const searchTermNow = els.searchInput?.value?.trim() || '';
       let attempts = 0;
-      const maxAttempts = searchTermNow ? 25 : 10;
+      const maxAttempts = 10; // Reduced from 20/50 for faster response
+
+      console.log('[EmailsPage] loadMoreUntilEnough started - filtered:', state.filtered.length, 'needed:', neededForPage, 'target:', targetCount);
 
       while (state.filtered.length < targetCount && state.hasMore && attempts < maxAttempts) {
         attempts++;
+        console.log(`[EmailsPage] Loading more emails (attempt ${attempts}/${maxAttempts})...`);
         const result = await window.BackgroundEmailsLoader.loadMore();
         if (!result || result.loaded === 0) {
+          console.log('[EmailsPage] No more emails to load');
           break;
         }
+        console.log(`[EmailsPage] Loaded ${result.loaded} more emails, total now: ${state.data.length}`);
 
         // Reload data from background loader with deduplication
         const updatedData = window.BackgroundEmailsLoader.getEmailsData() || [];
@@ -545,9 +571,13 @@
 
         // If we have enough now, break
         if (state.filtered.length >= targetCount || !state.hasMore) {
+          console.log(`[EmailsPage] Stopping load - filtered: ${state.filtered.length}, needed: ${neededForPage}, hasMore: ${state.hasMore}`);
           break;
         }
       }
+
+      console.log(`[EmailsPage] loadMoreUntilEnough complete - filtered: ${state.filtered.length}, needed: ${neededForPage}`);
+
       // Update folder count after loading more (especially important for scheduled)
       updateFolderCount().catch(() => { });
     } finally {
@@ -587,6 +617,7 @@
       !state.isLoadingMore &&
       window.BackgroundEmailsLoader &&
       typeof window.BackgroundEmailsLoader.loadMore === 'function') {
+      console.log(`[EmailsPage] getPageItems: Not enough filtered results (${state.filtered.length}) for page ${state.currentPage} (need ${neededForPage}), loading more...`);
       // Trigger async loading (non-blocking)
       loadMoreUntilEnough().catch(error => {
         console.error('[EmailsPage] Failed to load more in getPageItems:', error);
@@ -619,7 +650,7 @@
     if (logoRenderTimeout) clearTimeout(logoRenderTimeout);
     logoRenderTimeout = setTimeout(() => {
       actuallyRender();
-    }, 300); // Reduced to 300ms to match regular render and reduce flicker
+    }, 1000); // Wait 1 second to batch all logo hits together
   }
 
   // Rename original render to actuallyRender
@@ -630,7 +661,6 @@
     
     // Simple hash to see if we actually need to update the DOM
     // Include logoUrl from the discovered cache so we re-render when a logo is found
-    // Also include failure cache state to prevent flicker
     const currentDataHash = rows.map(r => {
       const recipientEmail = Array.isArray(r.to) ? r.to[0] : (r.to || r.from || '');
       const domain = extractDomain(recipientEmail);
@@ -638,21 +668,16 @@
       const discoveredInfo = domainAccountInfoCache.get(normalizedDomain);
       const logoPart = discoveredInfo ? (discoveredInfo.logoUrl || 'no-logo') : 'pending';
       
-      const isFailed = window.__pcFaviconHelper && (
-        (domain && window.__pcFaviconHelper.failedDomains.has(domain)) ||
-        (discoveredInfo?.logoUrl && window.__pcFaviconHelper.failedLogos.has(discoveredInfo.logoUrl))
-      );
-      
       // Include displayName in the hash so we re-render when a name lookup completes
       const displayName = extractName(recipientEmail);
       
-      return `${r.id}-${r.updatedAt || r.timestamp}-${r.status}-${r.unread}-${r.starred}-${logoPart}-${displayName}-${isFailed ? 'failed' : 'ok'}`;
+      return `${r.id}-${r.updatedAt || r.timestamp}-${r.status}-${r.unread}-${r.starred}-${logoPart}-${displayName}`;
     }).join('|');
     const isSearchActive = !!(els.searchInput?.value?.trim());
     
     // Only skip if data is identical AND we aren't in a state that requires fresh render (like search)
     // and if we already have content in the tbody
-    if (currentDataHash === lastRenderedDataHash && els.tbody.children.length > 0) {
+    if (currentDataHash === lastRenderedDataHash && els.tbody.children.length > 0 && !isSearchActive) {
       return;
     }
     lastRenderedDataHash = currentDataHash;
@@ -671,16 +696,15 @@
     // Update summary and count
     // Use folder total count (queried from Firestore), fallback to filtered length in search mode
     const searchTermNow = els.searchInput?.value?.trim() || '';
-    const loadedTotal = state.filtered.length;
-    const totalLabel = `${loadedTotal}${state.hasMore ? '+' : ''}`;
+    const totalToShow = searchTermNow ? state.filtered.length : (state.folderCount || state.filtered.length);
     if (els.summary) {
-      const start = rows.length === 0 ? 0 : (state.currentPage - 1) * state.pageSize + 1;
-      const end = rows.length === 0 ? 0 : (start + rows.length - 1);
-      els.summary.textContent = `${start}-${end} of ${totalLabel} emails`;
+      const start = totalToShow === 0 ? 0 : (state.currentPage - 1) * state.pageSize + 1;
+      const end = Math.min(state.currentPage * state.pageSize, totalToShow);
+      els.summary.textContent = `${start}-${end} of ${totalToShow} emails`;
     }
 
     if (els.count) {
-      els.count.textContent = `${totalLabel} emails`;
+      els.count.textContent = `${totalToShow} emails`;
     }
 
     // Update select all checkbox
@@ -740,7 +764,7 @@
     if (accountLookupPromises.has(normalizedDomain) || accountLookupFailures.has(normalizedDomain)) {
       return accountLookupPromises.get(normalizedDomain);
     }
-    
+
     const dbAvailable = !!window.firebaseDB && typeof window.firebaseDB.collection === 'function';
 
     const promise = (async () => {
@@ -873,7 +897,6 @@
       if (!recipientDomain) return { logoUrl: null, domain: null, matchedSource: 'none' };
 
       const normalizedRecipientDomain = normalizeDomainString(recipientDomain);
-      
       const backgroundAccounts = (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function')
         ? window.BackgroundAccountsLoader.getAccountsData() || []
         : [];
@@ -929,9 +952,14 @@
       // Get account info for recipient
       const accountInfo = getRecipientAccountInfo(recipientEmail);
       
+      // STABLE CACHE KEY: Use the recipient email address only.
+      // This is the most stable identifier we have for a row's recipient.
+      // It ensures that even if domains or logos are discovered later, 
+      // we don't switch cache entries and cause flickering.
       const cacheKey = `favicon-${recipientEmail.toLowerCase()}-28`;
+      
       const cachedEntry = faviconCache.get(cacheKey);
-
+      
       // SMART CACHE CHECK: If we have a cached entry, but it lacks a logo and we just found one, 
       // we MUST regenerate to show the new logo.
       const shouldForceRegenerate = cachedEntry && !cachedEntry.logoUrl && accountInfo.logoUrl;
@@ -960,20 +988,12 @@
       const senderEmail = email.from;
       const senderDomain = extractDomain(senderEmail);
       displayName = extractName(senderEmail) || 'Unknown';
-
-      // Get account info for sender (to get logoUrl if available)
-      const accountInfo = getRecipientAccountInfo(senderEmail);
       
       // STABLE CACHE KEY for received emails
       const cacheKey = `favicon-${(senderEmail || senderDomain || 'unknown').toLowerCase()}-28`;
 
       const cachedEntry = faviconCache.get(cacheKey);
-      
-      // SMART CACHE CHECK: If we have a cached entry, but it lacks a logo and we just found one, 
-      // we MUST regenerate to show the new logo.
-      const shouldForceRegenerate = cachedEntry && !cachedEntry.logoUrl && accountInfo.logoUrl;
-
-      if (cachedEntry && !shouldForceRegenerate) {
+      if (cachedEntry) {
         avatarHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
           logoUrl: cachedEntry.logoUrl,
           domain: cachedEntry.domain,
@@ -982,14 +1002,13 @@
         });
       } else {
         avatarHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
-          logoUrl: accountInfo.logoUrl,
-          domain: accountInfo.domain || senderDomain,
+          domain: senderDomain,
           size: 28,
           idSuffix: email.id
         });
         faviconCache.set(cacheKey, {
-          logoUrl: accountInfo.logoUrl || null,
-          domain: accountInfo.domain || senderDomain || null
+          logoUrl: null,
+          domain: senderDomain || null
         });
       }
     }
@@ -1136,15 +1155,6 @@
 
   // View email in detail page
   function viewEmail(emailId) {
-    // OPTIMIZATION: Prime the cache with the data we already have!
-    // This avoids the 2-5s Firestore fetch on the detail page.
-    const email = state.data.find(e => e.id === emailId);
-    if (email) {
-       window.emailCache = window.emailCache || new Map();
-       // Clone it to be safe, though not strictly necessary
-       window.emailCache.set(emailId, { ...email });
-    }
-
     // Store current state for back navigation
     window._emailsNavigationState = {
       currentFolder: state.currentFolder,
@@ -1253,6 +1263,8 @@
       if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.removeEmailById === 'function') {
         window.BackgroundEmailsLoader.removeEmailById(emailId);
       }
+      
+      console.log(`[EmailsPage] Deleted scheduled email: ${emailId}`);
     } catch (error) {
       console.error('[EmailsPage] Failed to delete scheduled email:', error);
       throw error;
@@ -1353,6 +1365,8 @@
               createdBy: emailData.createdBy,
               createdAt: firebase.firestore.FieldValue.serverTimestamp ? firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString()
             });
+
+            console.log(`[EmailsPage] Created next step email (step ${nextStepIndex}) for contact ${contactId}`);
           }
         }
       }
@@ -1417,6 +1431,7 @@
       }
 
       const result = await response.json();
+      console.log('[EmailsPage] Sent scheduled email immediately:', result);
 
       // Show success message
       if (window.crm && window.crm.showToast) {
@@ -1617,7 +1632,9 @@
   function renderPagination() {
     if (!els.pagination) return;
 
-    const totalRecords = getPaginationTotalRecords();
+    // Use folder total count (queried, not fully loaded) unless search is active
+    const searchTermNow = els.searchInput?.value?.trim() || '';
+    const totalRecords = searchTermNow ? state.filtered.length : (state.folderCount || state.filtered.length);
     const totalPages = Math.max(1, Math.ceil(totalRecords / state.pageSize));
     const currentPage = Math.min(state.currentPage, totalPages);
 
@@ -2133,6 +2150,8 @@
               window.BackgroundEmailsLoader.removeEmailById(id);
             }
             
+            console.log(`[EmailsPage] Deleted email: ${id} (type: ${email?.type || 'unknown'})`)
+
             // Remove from local state
             const emailIndex = state.data.findIndex(e => e.id === id);
             if (emailIndex !== -1) {
@@ -2472,6 +2491,7 @@
       }
 
       const result = await response.json();
+      console.log('[EmailsPage] Generated scheduled emails:', result);
 
       // Show email generation notification
       if (window.ToastManager && result.success && result.count > 0) {
@@ -2501,11 +2521,14 @@
 
   // Initialize
   async function init() {
+    console.log('[EmailsPage] Initializing...');
     if (!initDomRefs()) {
       console.error('[EmailsPage] Failed to initialize DOM references');
       return;
     }
+    console.log('[EmailsPage] DOM references initialized');
     attachEvents();
+    console.log('[EmailsPage] Events attached');
 
     // If BackgroundEmailsLoader already has data (from cache), use it immediately
     if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.getEmailsData === 'function') {
@@ -2517,6 +2540,8 @@
 
     // Render whatever we have (may be empty on very first cold start)
     applyFilters().catch(err => console.error('[Emails] Initial applyFilters failed:', err));
+
+    console.log('[EmailsPage] Initialization complete (non-blocking)');
   }
 
   // Reload emails from background loader
@@ -2640,6 +2665,7 @@
           }
         }
       } else {
+        console.log('No scheduled emails found in Firebase.');
         if (window.crm && window.crm.showToast) {
           window.crm.showToast('⚠️ No scheduled emails found in Firebase. Sequence may not have created emails.', 'warning');
         }

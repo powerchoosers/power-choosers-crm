@@ -96,7 +96,11 @@
     document.getElementById('employee-welcome-dismiss').addEventListener('click', () => {
       dismissWelcome();
     });
+
+    console.log('[EmployeeWelcome] Welcome screen shown');
   }
+
+  // Dismiss welcome screen
   function dismissWelcome() {
     const overlay = document.getElementById('employee-welcome-overlay');
     if (overlay) {
@@ -107,6 +111,7 @@
     }
 
     localStorage.setItem(getStorageKey(), 'true');
+    console.log('[EmployeeWelcome] Welcome dismissed');
   }
 
   // Check if the user has any accessible data
@@ -180,5 +185,7 @@
   } else {
     init();
   }
+
+  console.log('[EmployeeWelcome] Module loaded');
 })();
 

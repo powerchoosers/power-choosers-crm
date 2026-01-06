@@ -27,11 +27,14 @@ class AuthManager {
             this.auth = firebase.auth();
             try {
                 await this.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+                console.log('[Auth] Set auth persistence to LOCAL');
             } catch (persistErr) {
                 console.warn('[Auth] Could not set LOCAL persistence, using default', persistErr);
             }
             this.initialized = true;
             
+            console.log('[Auth] Firebase Auth initialized');
+
             // Check for redirect result (when returning from Google sign-in)
             // Only check once per page load to avoid loops
             if (!window._redirectResultChecked) {
@@ -39,6 +42,8 @@ class AuthManager {
                 try {
                     const result = await this.auth.getRedirectResult();
                     if (result.user) {
+                        console.log('[Auth] Redirect sign-in successful:', result.user.email);
+                        
                         // Store Google access token for Gmail API access (client-side sync)
                         // Note: With redirect, the credential.accessToken might not be available
                         // We'll try to get it, but if not available, Gmail sync will use popup re-auth
@@ -47,9 +52,12 @@ class AuthManager {
                             // Persist to localStorage so it survives page refreshes
                             try {
                                 localStorage.setItem('pc:googleAccessToken', result.credential.accessToken);
+                                console.log('[Auth] Stored Google access token for Gmail sync (persisted)');
                             } catch (storageErr) {
                                 console.warn('[Auth] Could not persist token to localStorage:', storageErr);
                             }
+                        } else {
+                            console.log('[Auth] No Google access token in redirect result - Gmail sync will use popup if needed');
                         }
                     } else {
                         // Check if there's an error in the result
@@ -60,6 +68,7 @@ class AuthManager {
                 } catch (redirectErr) {
                     // No redirect result or error - this is normal if user hasn't signed in yet
                     if (redirectErr.code !== 'auth/operation-not-allowed') {
+                        console.log('[Auth] No redirect result (normal if not returning from sign-in)');
                     }
                 }
             }
@@ -69,6 +78,7 @@ class AuthManager {
                 const persistedToken = localStorage.getItem('pc:googleAccessToken');
                 if (persistedToken && !window._googleAccessToken) {
                     window._googleAccessToken = persistedToken;
+                    console.log('[Auth] Restored Google access token from localStorage');
                 }
             } catch (storageErr) {
                 console.warn('[Auth] Could not load token from localStorage:', storageErr);
@@ -86,14 +96,17 @@ class AuthManager {
     }
 
     async handleAuthStateChange(user) {
+      console.log('[Auth] ==> handleAuthStateChange triggered, user:', user ? user.email : 'null');
       this.user = user;
 
       if (user) {
         this.startTokenRefreshLoop();
+        console.log('[Auth] User object:', {email: user.email, uid: user.uid});
         const emailLower = user.email ? user.email.toLowerCase() : '';
         try {
           const prev = localStorage.getItem('pc:lastUserEmail') || '';
           if (prev && prev !== emailLower) {
+            console.log('[Auth] Detected account switch. Invalidating all caches...');
             if (window.CacheManager && typeof window.CacheManager.invalidateAll === 'function') {
               await window.CacheManager.invalidateAll();
             }
@@ -102,7 +115,7 @@ class AuthManager {
         } catch(_) {}
             
             // Check domain restriction (case-insensitive)
-            const domainCheck = emailLower.endsWith('@powerchoosers.com') || emailLower.endsWith('@powerchoosrs.com');
+            const domainCheck = emailLower.endsWith('@powerchoosers.com');
             if (!domainCheck) {
                 console.warn('[Auth] ✗ Unauthorized domain:', user.email);
                 this.showError('Access restricted to Power Choosers employees (@powerchoosers.com)');
@@ -110,21 +123,29 @@ class AuthManager {
                 return;
             }
             
+            console.log('[Auth] ✓ Domain authorized:', user.email);
+            
             // Ensure user profile exists and get role
+            console.log('[Auth] Creating/fetching user profile...');
             try {
                 await this.ensureUserProfile(user);
+                console.log('[Auth] ✓ User profile ready');
             } catch (error) {
                 console.error('[Auth] ✗ Error with user profile:', error);
             }
             
+            console.log('[Auth] Calling showCRM()...');
             await this.showCRM();
             
+            console.log('[Auth] Updating user profile UI...');
             this.updateUserProfile(user);
             
             // Update admin-only elements visibility
             this.updateAdminOnlyElements();
             
+            console.log('[Auth] ✓ Auth flow complete');
         } else {
+        console.log('[Auth] No user - showing login');
         try {
           if (window.CacheManager && typeof window.CacheManager.invalidateAll === 'function') {
             await window.CacheManager.invalidateAll();
@@ -145,6 +166,7 @@ class AuthManager {
             try {
                 if (this.user) {
                     await this.user.getIdToken(true);
+                    console.log('[Auth] Token refreshed proactively');
                 }
             } catch (err) {
                 console.warn('[Auth] Token refresh failed (will retry):', err);
@@ -181,6 +203,8 @@ class AuthManager {
                     lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 
+                console.log(`[Auth] Created ${role} profile for ${emailLower}`);
+                
                 // Auto-create agent record for PowerChoosers users
                 await this.ensureAgentRecord(user, emailLower);
             } else {
@@ -198,6 +222,8 @@ class AuthManager {
             const userData = profile.data();
             window.currentUserRole = userData.role;
             window.currentUserEmail = emailLower;
+            
+            console.log(`[Auth] User role: ${userData.role}`);
         } catch (error) {
             console.error('[Auth] Error ensuring user profile:', error);
             // Fallback to determining role from email
@@ -209,7 +235,7 @@ class AuthManager {
     
     async ensureAgentRecord(user, emailLower) {
         // Only create agent records for PowerChoosers domain users
-        if (!emailLower.endsWith('@powerchoosers.com') && !emailLower.endsWith('@powerchoosrs.com')) {
+        if (!emailLower.endsWith('@powerchoosers.com')) {
             return;
         }
         
@@ -245,6 +271,7 @@ class AuthManager {
                 };
                 
                 await agentRef.set(agentData);
+                console.log(`[Auth] Auto-created agent record for ${emailLower}`);
             } else {
                 // Agent exists - just update lastActive timestamp if needed
                 const agentData = agentDoc.data();
@@ -276,21 +303,21 @@ class AuthManager {
 
             // Use popup authentication - more reliable than redirect
             // Popup works better for both localhost and production without requiring redirect URL configuration
+            console.log('[Auth] Attempting popup authentication...');
             const result = await this.auth.signInWithPopup(provider);
+            console.log('[Auth] Popup authentication completed');
+            console.log('[Auth] Sign-in successful:', result.user.email);
             
             // Store Google access token for Gmail API access (client-side sync)
             if (result.credential && result.credential.accessToken) {
-                console.log('[Auth] Google access token received via popup');
                 window._googleAccessToken = result.credential.accessToken;
                 // Persist to localStorage so it survives page refreshes
                 try {
                     localStorage.setItem('pc:googleAccessToken', result.credential.accessToken);
-                    console.log('[Auth] Token persisted to localStorage');
+                    console.log('[Auth] Stored Google access token for Gmail sync (persisted)');
                 } catch (storageErr) {
                     console.warn('[Auth] Could not persist token to localStorage:', storageErr);
                 }
-            } else {
-                console.warn('[Auth] No Google access token in sign-in result. Provider data:', result.user?.providerData?.map(p => p.providerId));
             }
             
             // Show success message
@@ -308,6 +335,7 @@ class AuthManager {
                 this.showError('Sign-in cancelled. Please try again.');
             } else if (error.code === 'auth/popup-blocked') {
                 // If popup is blocked, try redirect as fallback
+                console.log('[Auth] Popup blocked, trying redirect as fallback...');
                 try {
                     await this.auth.signInWithRedirect(provider);
                     // Page will redirect, so code after this won't execute
@@ -325,11 +353,13 @@ class AuthManager {
       try {
         this.stopTokenRefreshLoop();
         await this.auth.signOut();
+        console.log('[Auth] Sign-out successful');
         
         // Clear Google access token from storage
         try {
           localStorage.removeItem('pc:googleAccessToken');
           window._googleAccessToken = null;
+          console.log('[Auth] Cleared Google access token');
         } catch (storageErr) {
           console.warn('[Auth] Could not clear token from storage:', storageErr);
         }
@@ -349,41 +379,34 @@ class AuthManager {
     showLogin() {
         const loginOverlay = document.getElementById('login-overlay');
         const crmContent = document.getElementById('crm-content');
-        const topBar = document.querySelector('.top-bar');
         
         if (loginOverlay) loginOverlay.style.display = 'flex';
         if (crmContent) crmContent.style.display = 'none';
-        
-        // Hide top bar on login screen
-        if (topBar) {
-            topBar.classList.remove('visible');
-        }
     }
 
     async showCRM() {
+        console.log('[Auth] showCRM() called');
         const loginOverlay = document.getElementById('login-overlay');
         const crmContent = document.getElementById('crm-content');
-        const topBar = document.querySelector('.top-bar');
         
         // Hide login overlay immediately
         if (loginOverlay) {
             loginOverlay.style.display = 'none';
+            console.log('[Auth] Login overlay hidden');
         }
         
         // Show CRM content
         if (crmContent) {
             crmContent.style.display = 'block';
-        }
-
-        // Fade in top bar with the rest of the CRM
-        if (topBar) {
-            topBar.classList.add('visible');
+            console.log('[Auth] CRM content shown');
         }
         
         // Load CRM scripts lazily (only once)
         if (typeof window.loadCRMScripts === 'function') {
+            console.log('[Auth] Loading CRM scripts...');
             try {
                 await window.loadCRMScripts();
+                console.log('[Auth] ✓ CRM scripts loaded and ready');
             } catch (error) {
                 console.error('[Auth] ✗ Failed to load CRM scripts:', error);
                 alert('Error loading CRM scripts. Please refresh the page.');
@@ -734,6 +757,7 @@ class AuthManager {
     // Refresh profile photo (called when settings updates hostedPhotoURL)
     refreshProfilePhoto() {
         if (this.user) {
+            console.log('[Auth] Refreshing profile photo from settings...');
             this.updateUserProfile(this.user);
             // Re-setup editable container for dropdown pic only (not header pic)
             setTimeout(() => {
@@ -775,10 +799,14 @@ class AuthManager {
     }
 
     updateAdminOnlyElements() {
-        const isAdmin = (window.currentUserRole === 'admin');
-        document.querySelectorAll('.admin-only').forEach(el => {
-            el.style.display = isAdmin ? 'flex' : 'none';
+        const isAdmin = window.currentUserRole === 'admin';
+        const adminOnlyElements = document.querySelectorAll('.admin-only');
+        
+        adminOnlyElements.forEach(element => {
+            element.style.display = isAdmin ? 'flex' : 'none';
         });
+        
+        console.log(`[Auth] Updated admin-only elements visibility: ${isAdmin ? 'visible' : 'hidden'}`);
     }
 }
 

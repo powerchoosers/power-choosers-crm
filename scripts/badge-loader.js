@@ -101,7 +101,7 @@ class BadgeLoader {
     this.statusCache.clear();
     if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
       await window.CacheManager.invalidate(this.cacheKey);
-      // console.log('[BadgeLoader] Call status cache invalidated');
+      console.log('[BadgeLoader] Call status cache invalidated');
     }
   }
 
@@ -116,6 +116,6 @@ class BadgeLoader {
 // Initialize global badge loader
 if (typeof window !== 'undefined') {
   window.BadgeLoader = new BadgeLoader();
-  // console.log('[BadgeLoader] Global badge loader initialized');
+  console.log('[BadgeLoader] Global badge loader initialized');
 }
 
