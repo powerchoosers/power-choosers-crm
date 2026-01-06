@@ -2820,18 +2820,29 @@
     startRecentCallsLiveHooks();
 
     // Add periodic refresh to ensure eye icons update when recordings are ready
-    let refreshInterval = null;
-    let lastRefreshTime = 0;
+    try {
+      if (state._rcRefreshInterval) {
+        clearInterval(state._rcRefreshInterval);
+        state._rcRefreshInterval = null;
+      }
+    } catch (_) { }
+    if (typeof state._rcLastRefreshTime !== 'number') state._rcLastRefreshTime = 0;
     const startPeriodicRefresh = () => {
-      if (refreshInterval) clearInterval(refreshInterval);
-      refreshInterval = setInterval(() => {
+      try {
+        if (state._rcRefreshInterval) clearInterval(state._rcRefreshInterval);
+      } catch (_) { }
+      state._rcRefreshInterval = setInterval(() => {
+        const contactPage = document.getElementById('contact-detail-page');
+        const isActive = contactPage && contactPage.classList.contains('active') && !contactPage.hidden;
+        if (!isActive) return;
+
         // Only refresh if we're not already refreshing, not scrolling, no insights are open, and enough time has passed
         const hasOpenInsights = state._rcOpenIds && state._rcOpenIds.size > 0;
         const now = Date.now();
-        const timeSinceLastRefresh = now - lastRefreshTime;
+        const timeSinceLastRefresh = now - (Number(state._rcLastRefreshTime) || 0);
 
         if (!state._rcReloadInFlight && !state._rcIsScrolling && !hasOpenInsights && timeSinceLastRefresh >= 60000) {
-          lastRefreshTime = now;
+          state._rcLastRefreshTime = now;
           loadRecentCallsForContact();
         }
       }, 60000); // Check every 60 seconds
@@ -2841,17 +2852,21 @@
     startPeriodicRefresh();
 
     // Cleanup interval when page is unloaded
-    window.addEventListener('beforeunload', () => {
-      if (refreshInterval) {
-        clearInterval(refreshInterval);
-        refreshInterval = null;
-      }
-    });
+    if (!document._rcBeforeUnloadBound) {
+      window.addEventListener('beforeunload', () => {
+        try {
+          if (state._rcRefreshInterval) {
+            clearInterval(state._rcRefreshInterval);
+            state._rcRefreshInterval = null;
+          }
+        } catch (_) { }
+      });
+      document._rcBeforeUnloadBound = '1';
+    }
 
     // Process click-to-call for phone numbers with a slight delay to ensure DOM is ready
     setTimeout(() => {
       try {
-        console.debug('[Contact Detail] Processing click-to-call for phone numbers');
         window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements();
       } catch (e) {
         console.warn('[Contact Detail] Click-to-call processing failed:', e);
@@ -3004,7 +3019,6 @@
     const isVisible = contactPage && contactPage.style.display !== 'none' && !contactPage.hidden;
 
     if (!isVisible) {
-      console.debug('[Contact Detail] Page not visible, skipping refresh to prevent freeze');
       return;
     }
 
@@ -5316,23 +5330,83 @@
     const total = Array.isArray(state._rcCalls) ? state._rcCalls.length : 0;
     if (!total) { rcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>'); updateRecentCallsPager(0, 0); return; }
     const slice = getRecentCallsPageSlice();
-    rcUpdateListAnimated(list, slice.map((call, index) => rcItemHtml(call, index)).join(''));
-    // delegate click to handle dynamic rerenders
-    list.querySelectorAll('.rc-insights').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault(); e.stopPropagation();
-        const id = btn.getAttribute('data-id');
-        const call = (state._rcCalls || []).find(x => String(x.id) === String(id));
-        if (!call) return;
-        if (btn.classList.contains('not-processed')) {
-          const callSid = call.id || call.twilioSid || call.callSid;
-          const recordingSid = call.recordingSid || call.recording_id;
-          triggerContactCI(callSid, recordingSid, btn);
-          return;
+    const tryApplySingleNewCallPatch = () => {
+      try {
+        if (!Array.isArray(slice) || slice.length < 2) return false;
+        if (parseInt(state._rcPage || 1, 10) !== 1) return false;
+        if (list.querySelector && list.querySelector('.rc-details')) return false;
+
+        const existing = Array.from(list.querySelectorAll('.rc-item'));
+        if (existing.length !== slice.length) return false;
+
+        const oldIds = existing.map((el) => String(el.getAttribute('data-id') || '').trim()).filter(Boolean);
+        if (oldIds.length !== slice.length) return false;
+
+        const newIds = slice.map((c) => String((c && (c.id || c.twilioSid || c.callSid || c.sid)) || '').trim()).filter(Boolean);
+        if (newIds.length !== slice.length) return false;
+
+        if (oldIds[0] === newIds[0]) return false;
+        for (let i = 0; i < newIds.length - 1; i++) {
+          if (oldIds[i] !== newIds[i + 1]) return false;
         }
-        toggleRcDetails(btn, call);
-      });
-    });
+
+        const wrap = document.createElement('div');
+        wrap.innerHTML = rcItemHtml(slice[0], 0);
+        const newEl = wrap.firstElementChild;
+        if (!newEl) return false;
+        try {
+          newEl.setAttribute('data-id', newIds[0]);
+          newEl.classList.add('rc-slide-in-top');
+          newEl.style.animationDelay = '0s';
+        } catch (_) { }
+
+        const firstItem = existing[0];
+        if (!firstItem || !firstItem.parentNode) return false;
+        firstItem.parentNode.insertBefore(newEl, firstItem);
+
+        const lastItem = existing[existing.length - 1];
+        if (lastItem) {
+          try {
+            lastItem.classList.add('rc-slide-out-bottom');
+            lastItem.style.animationDelay = '0s';
+          } catch (_) { }
+          setTimeout(() => {
+            try {
+              if (lastItem && lastItem.parentNode) lastItem.parentNode.removeChild(lastItem);
+            } catch (_) { }
+          }, 240);
+        }
+
+        try { const ov = list.querySelector('.rc-loading-overlay'); if (ov) ov.remove(); } catch (_) { }
+        try { window.ClickToCall?.processSpecificPhoneElements?.(); } catch (_) { }
+        return true;
+      } catch (_) {
+        return false;
+      }
+    };
+    try {
+      const key = slice.map((c) => {
+        const id = String((c && (c.id || c.twilioSid || c.callSid || c.sid)) || '');
+        const status = String((c && (c.status || c.outcome || '')) || '');
+        const dur = String((c && (c.durationSec || c.duration || 0)) || 0);
+        const t = c && c.transcript ? '1' : '0';
+        const ai = c && (c.aiInsights || c.conversationalIntelligence) ? '1' : '0';
+        return `${id}|${status}|${dur}|${t}|${ai}`;
+      }).join('||');
+      const sig = `${String(state.currentContact && state.currentContact.id || '')}::p${String(state._rcPage || 1)}::${key}`;
+      if (list.dataset && list.dataset.pcRecentCallsSig === sig) {
+        try { const ov = list.querySelector('.rc-loading-overlay'); if (ov) ov.remove(); } catch (_) { }
+        return;
+      }
+      if (tryApplySingleNewCallPatch()) {
+        if (list.dataset) list.dataset.pcRecentCallsSig = sig;
+        const totalPages = Math.max(1, Math.ceil(total / RC_PAGE_SIZE));
+        updateRecentCallsPager(state._rcPage || 1, totalPages);
+        return;
+      }
+      if (list.dataset) list.dataset.pcRecentCallsSig = sig;
+    } catch (_) { }
+    rcUpdateListAnimated(list, slice.map((call, index) => rcItemHtml(call, index)).join(''));
     const totalPages = Math.max(1, Math.ceil(total / RC_PAGE_SIZE));
     updateRecentCallsPager(state._rcPage || 1, totalPages);
   }
@@ -5439,19 +5513,6 @@
     next.disabled = (current >= total);
   }
 
-  function safeReloadRecentCallsWithRetries() {
-    try { if (_rcRetryTimer) { clearTimeout(_rcRetryTimer); _rcRetryTimer = null; } } catch (_) { }
-    let attempts = 0;
-    const run = () => {
-      attempts++;
-      try { loadRecentCallsForContact(); } catch (_) { }
-      if (attempts < 10) { // ~8–10s coverage with 900ms spacing
-        _rcRetryTimer = setTimeout(run, 900);
-      }
-    };
-    run();
-  }
-
   function collectContactPhones(c) {
     const arr = [c.mobile, c.workDirectPhone, c.otherPhone];
     try { const company = getCompanyPhone(c); if (company) arr.push(company); } catch (_) { }
@@ -5494,7 +5555,7 @@
 
     const delay = (index * 0.05).toFixed(2);
     return `
-      <div class="rc-item modern-reveal premium-borderline" style="animation-delay: ${delay}s;">
+      <div class="rc-item modern-reveal premium-borderline" data-id="${idAttr}" style="animation-delay: ${delay}s;">
         <div class="rc-meta">
           <div class="rc-title">${title}</div>
           <div class="rc-sub">${when} • <span class="rc-duration">${durStr}</span> • <span class="phone-number" 
@@ -5505,7 +5566,7 @@
         </div>
         <div class="rc-actions">
           <span class="rc-outcome">${outcome}</span>
-          <button type="button" class="rc-icon-btn rc-insights ${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'not-processed' : ''}" data-id="${escapeHtml(String(c.id || ''))}" aria-label="View insights" title="${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'Process Call' : 'View AI insights'}">${svgEye()}</button>
+          <button type="button" class="rc-icon-btn rc-insights ${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'not-processed' : ''}" data-id="${idAttr}" aria-label="View insights" title="${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'Process Call' : 'View AI insights'}">${svgEye()}</button>
         </div>
       </div>`;
   }

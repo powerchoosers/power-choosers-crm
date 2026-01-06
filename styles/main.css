@@ -20726,6 +20726,43 @@ input.row-select[type="checkbox"]:focus-visible {
     transition: all 0.2s ease !important;
 }
 
+@keyframes pcRcSlideInTop {
+    from {
+        transform: translate3d(0, -14px, 0);
+        opacity: 0;
+    }
+
+    to {
+        transform: translate3d(0, 0, 0);
+        opacity: 1;
+    }
+}
+
+@keyframes pcRcSlideOutBottom {
+    from {
+        transform: translate3d(0, 0, 0);
+        opacity: 1;
+    }
+
+    to {
+        transform: translate3d(0, 14px, 0);
+        opacity: 0;
+    }
+}
+
+.rc-item.rc-slide-in-top {
+    animation: pcRcSlideInTop 260ms cubic-bezier(0.22, 1, 0.36, 1) both !important;
+    opacity: 1 !important;
+    will-change: transform, opacity;
+}
+
+.rc-item.rc-slide-out-bottom {
+    animation: pcRcSlideOutBottom 220ms cubic-bezier(0.4, 0, 1, 1) both !important;
+    opacity: 1 !important;
+    pointer-events: none;
+    will-change: transform, opacity;
+}
+
 .tasks-list,
 .news-list,
 .activities-list {
