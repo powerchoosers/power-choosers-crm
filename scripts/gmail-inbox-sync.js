@@ -98,8 +98,20 @@
       provider.addScope('https://www.googleapis.com/auth/gmail.readonly');
       
       const result = await firebase.auth().signInWithPopup(provider);
-      const credential = firebase.auth.GoogleAuthProvider.credentialFromResult(result);
-      const accessToken = credential.accessToken;
+      
+      console.log('[GmailSync] Re-auth result received:', { 
+        hasResult: !!result, 
+        hasCredential: !!(result && result.credential),
+        hasUser: !!(result && result.user)
+      });
+      
+      if (!result || !result.credential) {
+        console.warn('[GmailSync] Re-auth result or credential is null');
+        _isReauthenticating = false;
+        return null;
+      }
+      
+      const accessToken = result.credential.accessToken;
       
       if (accessToken) {
         window._googleAccessToken = accessToken;

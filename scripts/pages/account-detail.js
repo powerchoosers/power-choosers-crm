@@ -5826,8 +5826,8 @@
       .task-popover .dropdown-toggle-btn:hover { color: var(--text-primary); background: transparent; transform: translateY(-50%) !important; }
 
       /* Fixed positioning for calendar icon - no transform on hover (scoped to task-popover) */
-      .task-popover .calendar-toggle-btn { position: absolute; right: 8px; top: calc(50% + 12px); transform: translateY(-50%) !important; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: var(--text-muted); border: none; cursor: pointer; transition: color var(--transition-fast), background-color var(--transition-fast); line-height: 1; transform-origin: center center; padding: 0; }
-      .task-popover .calendar-toggle-btn:hover { color: var(--text-primary); background: transparent; top: calc(50% + 12px); transform: translateY(-50%) !important; box-shadow: none !important; transition: none !important; }
+      .task-popover .calendar-toggle-btn { position: absolute; right: 8px; top: calc(50% + 12px); transform: translateY(-50%) !important; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: var(--bg-item); color: var(--text-muted); border: 1px solid var(--border-light); cursor: pointer; transition: all 0.2s ease; line-height: 1; transform-origin: center center; padding: 0; box-sizing: border-box; }
+      .task-popover .calendar-toggle-btn:hover { color: var(--text-primary); background: var(--bg-hover); border-color: var(--accent-color); top: calc(50% + 12px); transform: translateY(-50%) !important; box-shadow: none !important; transition: none !important; }
       .task-popover .calendar-toggle-btn svg { width: 16px; height: 16px; display: block; }
 
       .dropdown-toolbar, .calendar-toolbar { display: none; margin-top: 8px; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius); box-shadow: var(--elevation-card); padding: 8px; }

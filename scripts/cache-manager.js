@@ -349,7 +349,7 @@ class CacheManager {
       }
 
       // Use scoped queries for user-specific collections
-      if (['contacts', 'tasks', 'accounts', 'emails', 'lists', 'sequences'].includes(collection)) {
+      if (['contacts', 'tasks', 'accounts', 'emails', 'lists', 'sequences', 'calls', 'agent_activities', 'deals'].includes(collection)) {
         const email = window.currentUserEmail || '';
         if (window.currentUserRole !== 'admin' && email) {
           // Non-admin: use scoped queries - check multiple ownership fields
@@ -365,10 +365,12 @@ class CacheManager {
             queries.push(window.firebaseDB.collection(collection).where('createdBy', '==', email).get());
           }
 
-          const snapshots = await Promise.all(queries);
+          const snapshots = await Promise.all(queries.map(q => q.catch(e => {
+            return { docs: [], empty: true, size: 0 };
+          })));
           const map = new Map();
 
-          snapshots.forEach(snap => {
+          snapshots.forEach((snap, idx) => {
             snap.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
           });
 

@@ -220,7 +220,17 @@
 
       // Priority 3: Firebase fallback
       if (state.data.length === 0) {
-        const firestoreData = await firebase.firestore().collection('emails')
+        let baseQuery = firebase.firestore().collection('emails');
+        const userEmail = (window.currentUserEmail || '').toLowerCase();
+        const isAdmin = window.currentUserRole === 'admin';
+
+        if (!isAdmin && userEmail) {
+          // Non-admin: query by ownerId OR assignedTo (requires two queries or index)
+          // For simplicity in fallback, we'll just query by ownerId
+          baseQuery = baseQuery.where('ownerId', '==', userEmail);
+        }
+
+        const firestoreData = await baseQuery
           .orderBy('createdAt', 'desc')
           .limit(100)
           .get()
@@ -230,7 +240,10 @@
             timestamp: doc.data().sentAt || doc.data().receivedAt || doc.data().createdAt,
             emailType: doc.data().type || (doc.data().provider === 'sendgrid_inbound' || doc.data().provider === 'gmail_api' ? 'received' : 'sent')
           })))
-          .catch(() => []);
+          .catch(err => {
+            console.warn('[EmailsPage] Fallback query failed:', err.message);
+            return [];
+          });
 
         if (firestoreData.length > 0) {
           processAndSetData(firestoreData);
