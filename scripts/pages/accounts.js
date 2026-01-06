@@ -5,6 +5,7 @@
 var __ACCOUNTS_ORIG_CONSOLE__ = window.console || {};
 function __accountsDebugEnabled__(){
   try {
+    if (window.PC_DEBUG) return true;
     const v = localStorage.getItem('CRM_DEBUG_ACCOUNTS');
     if (v != null) return v === '1' || v === 'true';
   } catch(_) {}
@@ -43,7 +44,7 @@ var console = {
     document.addEventListener('pc:accounts-restore', (ev) => {
       try {
         const detail = ev && ev.detail ? ev.detail : {};
-        console.log('[Accounts] Restoring state from back button:', detail);
+        // console.log('[Accounts] Restoring state from back button:', detail);
         
         // Set restoration flag immediately to prevent any interference
         try { 
@@ -55,23 +56,23 @@ var console = {
         const targetPage = Math.max(1, parseInt(detail.currentPage || detail.page || state.currentPage || 1, 10));
         if (targetPage !== state.currentPage) {
           state.currentPage = targetPage;
-          console.log('[Accounts] Restored page to:', targetPage);
+          // console.log('[Accounts] Restored page to:', targetPage);
         }
         
         // Restore search term
         if (detail.searchTerm && els.quickSearch) {
           els.quickSearch.value = detail.searchTerm;
-          console.log('[Accounts] Restored search term:', detail.searchTerm);
+          // console.log('[Accounts] Restored search term:', detail.searchTerm);
         }
         
         // Restore sorting
         if (detail.sortColumn) {
           state.sortColumn = detail.sortColumn;
-          console.log('[Accounts] Restored sort column:', detail.sortColumn);
+          // console.log('[Accounts] Restored sort column:', detail.sortColumn);
         }
         if (detail.sortDirection) {
           state.sortDirection = detail.sortDirection;
-          console.log('[Accounts] Restored sort direction:', detail.sortDirection);
+          // console.log('[Accounts] Restored sort direction:', detail.sortDirection);
         }
         
         // Re-render with restored state - wait for sufficient data
@@ -81,19 +82,19 @@ var console = {
           const checkDataAndApply = () => {
           if (state.data && state.data.length >= neededAccounts) {
             // Page is already rendered correctly by loadDataOnce() - no need to re-render!
-            console.log('[Accounts] Restore: Data already loaded for page', targetPage, '- skipping render to prevent flicker');
+            // console.log('[Accounts] Restore: Data already loaded for page', targetPage, '- skipping render to prevent flicker');
             // Mark as animated to prevent row animations on restore
             state.hasAnimated = true;
           } else if (state.data && state.data.length > 0) {
             // We have some data but not enough - need to load more
-            console.log('[Accounts] Restore: Need more data. Have', state.data.length, 'need', neededAccounts);
+            // console.log('[Accounts] Restore: Need more data. Have', state.data.length, 'need', neededAccounts);
             
             // Ensure we have enough data from allAccountsCache
             if (state.allAccountsCache && state.allAccountsCache.length >= neededAccounts) {
               state.data = state.allAccountsCache.slice(0, neededAccounts);
               state.filtered = state.data.slice();
               applyFilters();
-              console.log('[Accounts] Restore: Loaded additional data from cache');
+              // console.log('[Accounts] Restore: Loaded additional data from cache');
             } else {
               // Retry if data is still loading
               setTimeout(checkDataAndApply, 100);
@@ -123,13 +124,13 @@ var console = {
             try { window.scrollTo(0, y); } catch (_) {}
           }, 500);
           
-          console.log('[Accounts] Restored scroll position to:', y);
+          // console.log('[Accounts] Restored scroll position to:', y);
         }
 
         // Re-initialize drag and drop after restoration
         setTimeout(() => {
           try {
-            console.log('[Accounts] Re-initializing drag and drop after restore');
+            // console.log('[Accounts] Re-initializing drag and drop after restore');
             initAccountsHeaderDnD();
             attachAccountsHeaderDnDHooks();
           } catch (e) {
@@ -143,7 +144,7 @@ var console = {
             try { 
               if (window.__restoringAccounts) {
                 window.__restoringAccounts = false; 
-                console.log('[Accounts] ✓ Cleared restoration flag - navigation complete');
+                // console.log('[Accounts] ✓ Cleared restoration flag - navigation complete');
                 // No need for additional render() - applyFilters() already rendered
               }
             } catch(_){} 
@@ -164,13 +165,13 @@ var console = {
                 }
               });
               if (restoredCount > 0) {
-                console.log('[Accounts] Restored', restoredCount, 'selected items');
+                // console.log('[Accounts] Restored', restoredCount, 'selected items');
               }
             } catch (_) {}
           }, 300); // Increased delay for better reliability
         }
         
-        console.log('[Accounts] State restored successfully');
+        // console.log('[Accounts] State restored successfully');
       } catch (e) { 
         console.error('[Accounts] Error restoring state:', e);
       }
@@ -184,7 +185,7 @@ var console = {
     setTimeout(() => {
       try {
         if (window.__accountsRestoreData && !window.__restoringAccounts) {
-          console.log('[Accounts] Fallback: Found global restore data, applying:', window.__accountsRestoreData);
+          // console.log('[Accounts] Fallback: Found global restore data, applying:', window.__accountsRestoreData);
           const restore = window.__accountsRestoreData;
           
           // Set restoration flag
@@ -413,7 +414,7 @@ var console = {
           // Also update BackgroundAccountsLoader cache
           if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.addAccount === 'function') {
             window.BackgroundAccountsLoader.addAccount({ id, ...doc });
-            console.log('[Accounts] Updated BackgroundAccountsLoader cache with new account:', id);
+            // console.log('[Accounts] Updated BackgroundAccountsLoader cache with new account:', id);
           }
           
           applyFilters();
@@ -756,7 +757,7 @@ var console = {
                 window._accountsReturn = currentState;
               }
               
-              console.log('[Accounts] Captured state for back navigation:', window._accountsReturn);
+              // console.log('[Accounts] Captured state for back navigation:', window._accountsReturn);
             } catch (_) { /* noop */ }
             window.AccountDetail.show(id);
           }
@@ -782,7 +783,7 @@ var console = {
           // SEAMLESS AUTO-LOAD: Check if we need data for this page
           const neededIndex = (next - 1) * state.pageSize + state.pageSize - 1;
           if (neededIndex >= state.data.length && state.hasMore && !state.searchMode) {
-            console.log('[Accounts] Loading more accounts for page', next, '...');
+            // console.log('[Accounts] Loading more accounts for page', next, '...');
             
             // Show brief loading indicator
             if (els.tbody) {
@@ -835,7 +836,7 @@ var console = {
           if (!window.__restoringAccounts) {
             render();
           } else {
-            console.log('[Accounts] Skipping render due to active restoration - account update will be applied when restoration completes');
+            // console.log('[Accounts] Skipping render due to active restoration - account update will be applied when restoration completes');
           }
         } catch (_) { /* noop */ }
       };
@@ -877,7 +878,7 @@ var console = {
     if (!state.hasMore || state.searchMode) return;
 
     try {
-      console.log('[Accounts] Loading more accounts...');
+      // console.log('[Accounts] Loading more accounts...');
       let moreAccounts = [];
 
       // Check if we have cached data first
@@ -888,7 +889,7 @@ var console = {
         );
         moreAccounts = nextBatch;
         state.hasMore = state.data.length + nextBatch.length < state.allAccountsCache.length;
-        console.log(`[Accounts] Loaded ${nextBatch.length} more accounts from cache`);
+        // console.log(`[Accounts] Loaded ${nextBatch.length} more accounts from cache`);
       } else if (state.lastDoc || (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.loadMore === 'function')) {
         // Load from Firestore using background loader (if available) or direct query
         if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.loadMore === 'function') {
@@ -897,7 +898,7 @@ var console = {
             const allAccounts = window.BackgroundAccountsLoader.getAccountsData();
             state.data = allAccounts;
             state.hasMore = result.hasMore;
-            console.log(`[Accounts] Loaded ${result.loaded} more accounts from background loader. Total: ${state.data.length}`);
+            // console.log(`[Accounts] Loaded ${result.loaded} more accounts from background loader. Total: ${state.data.length}`);
           } else {
             state.hasMore = false;
           }
@@ -911,7 +912,7 @@ var console = {
           moreAccounts = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
           state.lastDoc = snapshot.docs[snapshot.docs.length - 1];
           state.hasMore = moreAccounts.length === 100;
-          console.log(`[Accounts] Loaded ${moreAccounts.length} more accounts from Firestore`);
+          // console.log(`[Accounts] Loaded ${moreAccounts.length} more accounts from Firestore`);
         }
       }
 
@@ -922,7 +923,7 @@ var console = {
         // Clear full cache to save memory if we have 500+ records loaded
         if (state.data.length > 500 && state.allAccountsCache) {
           state.allAccountsCache = null;
-          console.log('[Accounts] Cleared full cache to save memory (keeping', state.data.length, 'loaded records)');
+          // console.log('[Accounts] Cleared full cache to save memory (keeping', state.data.length, 'loaded records)');
         }
       }
 
@@ -936,7 +937,7 @@ var console = {
   async function loadDataOnce() {
     // RESTORE: If state is empty but allAccountsCache exists, restore it
     if ((!state.data || state.data.length === 0) && state.allAccountsCache && state.allAccountsCache.length > 0) {
-      console.log('[Accounts] Restoring from allAccountsCache:', state.allAccountsCache.length, 'accounts');
+      // console.log('[Accounts] Restoring from allAccountsCache:', state.allAccountsCache.length, 'accounts');
       // Load ALL cached accounts for proper pagination
       state.data = state.allAccountsCache;
       state.filtered = state.data.slice();
@@ -956,12 +957,12 @@ var console = {
       // Get data from background loader (already loaded on app init)
       if (window.BackgroundAccountsLoader) {
         accountsData = window.BackgroundAccountsLoader.getAccountsData() || [];
-        console.log('[Accounts] Got', accountsData.length, 'accounts from BackgroundAccountsLoader');
+        // console.log('[Accounts] Got', accountsData.length, 'accounts from BackgroundAccountsLoader');
       }
       
       // If no background loader, try legacy method
       if (accountsData.length === 0 && window.CacheManager && typeof window.CacheManager.get === 'function') {
-        console.log('[Accounts] Background loader empty, falling back to CacheManager...');
+        // console.log('[Accounts] Background loader empty, falling back to CacheManager...');
         accountsData = await window.CacheManager.get('accounts') || [];
       }
       
@@ -974,7 +975,7 @@ var console = {
       let targetPage = 1;
       if (window.__restoringAccounts && window._accountsReturn) {
         targetPage = Math.max(1, parseInt(window._accountsReturn.currentPage || window._accountsReturn.page || 1, 10));
-        console.log('[Accounts] Restoring to page:', targetPage, 'from back navigation');
+        // console.log('[Accounts] Restoring to page:', targetPage, 'from back navigation');
       }
       
       // SMART LAZY LOADING: 
@@ -989,16 +990,16 @@ var console = {
       state.data = accountsData.slice(0, initialBatchSize);
       state.filtered = state.data.slice();
       state.hasMore = accountsData.length > initialBatchSize;
-      console.log('[Accounts] Initial render with', state.data.length, 'of', accountsData.length, 'accounts (hasMore:', state.hasMore, ')');
+      // console.log('[Accounts] Initial render with', state.data.length, 'of', accountsData.length, 'accounts (hasMore:', state.hasMore, ')');
       
       state.loaded = true;
       state.errorMsg = '';
       
       // Set current page (either 1 for normal load, or target page for restoration)
       state.currentPage = targetPage;
-      console.log('[Accounts] Set initial page to:', targetPage);
+      // console.log('[Accounts] Set initial page to:', targetPage);
       
-      console.log(`[Accounts] Loaded ${state.data.length} of ${accountsData.length} accounts (${state.hasMore ? 'more available' : 'all loaded'})`);
+      // console.log(`[Accounts] Loaded ${state.data.length} of ${accountsData.length} accounts (${state.hasMore ? 'more available' : 'all loaded'})`);
       // Extra guard: if restoring hint is set but stale, clear it
       if (window.__restoringAccountsUntil && Date.now() > window.__restoringAccountsUntil) {
         try { window.__restoringAccounts = false; window.__restoringAccountsUntil = 0; } catch(_) {}
@@ -1052,7 +1053,7 @@ var console = {
           // (loadDataOnce already populated the data)
           if (_snapshotFirstFire) {
             _snapshotFirstFire = false;
-            console.log('[Accounts] onSnapshot first fire - skipping render to prevent flicker');
+            // console.log('[Accounts] onSnapshot first fire - skipping render to prevent flicker');
             return;
           }
           
@@ -1069,11 +1070,11 @@ var console = {
           if (!window.__restoringAccounts) {
           applyFilters();
           } else {
-            console.log('[Accounts] Skipping render due to active restoration - account update will be applied when restoration completes');
+            // console.log('[Accounts] Skipping render due to active restoration - account update will be applied when restoration completes');
           }
         } catch (_) { /* noop */ }
       }, (err) => {
-        console.warn('[Accounts] onSnapshot error', err);
+        // console.warn('[Accounts] onSnapshot error', err);
       });
       } else {
         // Non-admin: scoped listener
@@ -1105,7 +1106,7 @@ var console = {
               }
             } catch (_) { /* noop */ }
           }, (err) => {
-            console.warn('[Accounts] owned accounts onSnapshot error', err);
+            // console.warn('[Accounts] owned accounts onSnapshot error', err);
           });
           
           const assignedUnsub = assignedQuery.onSnapshot((snap) => {
@@ -1128,7 +1129,7 @@ var console = {
               }
             } catch (_) { /* noop */ }
           }, (err) => {
-            console.warn('[Accounts] assigned accounts onSnapshot error', err);
+            // console.warn('[Accounts] assigned accounts onSnapshot error', err);
           });
           
           // Store both unsubscribers
@@ -1139,7 +1140,7 @@ var console = {
         }
       }
     } catch (e) {
-      console.warn('[Accounts] Failed to start live listener', e);
+      // console.warn('[Accounts] Failed to start live listener', e);
     }
   }
 
@@ -1248,7 +1249,14 @@ var console = {
     const domainMatch = contains(domainQ);
     
 
-    state.filtered = state.data.filter((a) => {
+    // Use full cache for searching if available and we have a query
+    // This ensures we find records that aren't in the initial 100 loaded items
+    let sourceData = state.data;
+    if (anyFiltersActive && state.allAccountsCache && state.allAccountsCache.length > state.data.length) {
+      sourceData = state.allAccountsCache;
+    }
+
+    state.filtered = sourceData.filter((a) => {
       const acctName = a.accountName || a.name || a.companyName || '';
       const hasPhone = !!(a.companyPhone || a.phone || a.primaryPhone || a.mainPhone);
       const domain = a.domain || a.website || a.site || '';
@@ -1800,7 +1808,7 @@ var console = {
         accountCallStatusCache.set(key, value);
       });
       
-      console.log('[Accounts] Updated call status for', Object.keys(callStatus).length, 'items');
+      // console.log('[Accounts] Updated call status for', Object.keys(callStatus).length, 'items');
     } catch (error) {
       console.error('[Accounts] Failed to update call status:', error);
     }
@@ -1908,7 +1916,7 @@ var console = {
     } else if (window.callsModule && typeof window.callsModule.getCallsData === 'function') {
       callsData = window.callsModule.getCallsData() || [];
     }
-    console.log('[Accounts] Page init - calls data available:', callsData?.length || 0, 'calls');
+    // // console.log('[Accounts] Page init - calls data available:', callsData?.length || 0, 'calls');
     
     // Load saved order and prep header
     accountsColumnOrder = loadAccountsColumnOrder();
@@ -1983,6 +1991,7 @@ var console = {
                   }
                 }
                 
+                /*
                 console.log('[Accounts][DEBUG] Setting call context:', {
                   accountId: aid,
                   accountName: name,
@@ -1990,6 +1999,7 @@ var console = {
                   contactName: contactName,
                   phone: phone
                 });
+                */
                 
                 // Always force company-mode when calling from Accounts list
                 window.Widgets.setCallContext({ 
@@ -2012,15 +2022,15 @@ var console = {
             try { window.open(`tel:${encodeURIComponent(phone)}`); } catch (e) { /* noop */ }
           }
         }
-        console.log('Call account', { id, phone, name });
+        // console.log('Call account', { id, phone, name });
         break;
       }
       case 'addlist': {
-        console.log('Add to list', { id });
+        // console.log('Add to list', { id });
         break;
       }
       case 'ai': {
-        console.log('Research with AI', { id });
+        // console.log('Research with AI', { id });
         break;
       }
       case 'linkedin': {
@@ -2028,14 +2038,14 @@ var console = {
         const name = btn.getAttribute('data-name') || '';
         if (!url && name) url = `https://www.linkedin.com/search/results/companies/?keywords=${encodeURIComponent(name)}`;
         if (url) { try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ } }
-        console.log('Open LinkedIn', { id, url });
+        // console.log('Open LinkedIn', { id, url });
         break;
       }
       case 'website': {
         let url = btn.getAttribute('data-website') || '';
         if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
         if (url) { try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ } }
-        console.log('Open website', { id, url });
+        // console.log('Open website', { id, url });
         break;
       }
       default:
@@ -2299,10 +2309,10 @@ var console = {
       hideBulkActionsBar();
       if (els.selectAll) { els.selectAll.checked = false; els.selectAll.indeterminate = false; }
     });
-    container.querySelector('#bulk-email').addEventListener('click', () => console.log('Bulk email', Array.from(state.selected)));
-    container.querySelector('#bulk-sequence').addEventListener('click', () => console.log('Bulk add to sequence', Array.from(state.selected)));
-    container.querySelector('#bulk-call').addEventListener('click', () => console.log('Bulk call', Array.from(state.selected)));
-    container.querySelector('#bulk-addlist').addEventListener('click', () => console.log('Bulk add to list', Array.from(state.selected)));
+    container.querySelector('#bulk-email').addEventListener('click', () => { /* // console.log('Bulk email', Array.from(state.selected)) */ });
+    container.querySelector('#bulk-sequence').addEventListener('click', () => { /* // console.log('Bulk add to sequence', Array.from(state.selected)) */ });
+    container.querySelector('#bulk-call').addEventListener('click', () => { /* // console.log('Bulk call', Array.from(state.selected)) */ });
+    container.querySelector('#bulk-addlist').addEventListener('click', () => { /* // console.log('Bulk add to list', Array.from(state.selected)) */ });
     
     // Assign button handler (admin only)
     const assignBtn = container.querySelector('#bulk-assign');
@@ -2314,8 +2324,8 @@ var console = {
       });
     }
     
-    container.querySelector('#bulk-export').addEventListener('click', () => console.log('Bulk export', Array.from(state.selected)));
-    container.querySelector('#bulk-ai').addEventListener('click', () => console.log('Bulk research with AI', Array.from(state.selected)));
+    container.querySelector('#bulk-export').addEventListener('click', () => { /* // console.log('Bulk export', Array.from(state.selected)) */ });
+    container.querySelector('#bulk-ai').addEventListener('click', () => { /* // console.log('Bulk research with AI', Array.from(state.selected)) */ });
     const delBtn = container.querySelector('#bulk-delete');
     if (delBtn) delBtn.addEventListener('click', () => openBulkDeleteConfirm());
   }
@@ -2459,16 +2469,17 @@ var console = {
                   } catch (_) { /* ignore cache errors */ }
                 });
                 
-                console.log(`[Accounts] Deleted ${contactsDeleted} contact(s) associated with account ${id}`);
+                // console.log(`[Accounts] Deleted ${contactsDeleted} contact(s) associated with account ${id}`);
               }
             } catch (contactDeleteError) {
-              console.warn(`[Accounts] Failed to delete contacts for account ${id}:`, contactDeleteError);
+              // console.warn(`[Accounts] Failed to delete contacts for account ${id}:`, contactDeleteError);
               // Continue with account deletion even if contact deletion fails
             }
             
             // Delete the account
             await window.firebaseDB.collection('accounts').doc(id).delete();
             completed++;
+            // console.log(`[Accounts] Deleted ${contactsDeleted} contact(s) associated with account ${id}`);
             
             if (progressToast) {
               const message = contactsDeleted > 0 
@@ -2672,7 +2683,7 @@ var console = {
   try {
     document.addEventListener('bulk-assignment-complete', (event) => {
       if (event.detail && event.detail.collectionType === 'accounts') {
-        console.log('[Accounts] Bulk assignment complete, refreshing...');
+        // console.log('[Accounts] Bulk assignment complete, refreshing...');
         state.loaded = false;
         loadDataOnce();
       }
@@ -2686,7 +2697,7 @@ var console = {
     document._accountsCallLoggedBound = true;
     document.addEventListener('pc:call-logged', (event) => {
       const { call, targetPhone, accountId, contactId } = event.detail || {};
-      console.log('[Accounts] Call logged event received:', { targetPhone, accountId, contactId });
+      // // console.log('[Accounts] Call logged event received:', { targetPhone, accountId, contactId });
       
       // 0. Invalidate call status cache for affected items
       const keysToInvalidate = [];
@@ -2703,13 +2714,13 @@ var console = {
       });
       
       if (keysToInvalidate.length > 0) {
-        console.log('[Accounts] Invalidated call status cache for:', keysToInvalidate);
+        // // console.log('[Accounts] Invalidated call status cache for:', keysToInvalidate);
       }
       
       // 1. Add call to in-memory cache if available
       if (call && window.callsModule && window.callsModule.state && Array.isArray(window.callsModule.state.data)) {
         window.callsModule.state.data.push(call);
-        console.log('[Accounts] Added call to cache, total calls now:', window.callsModule.state.data.length);
+        // // console.log('[Accounts] Added call to cache, total calls now:', window.callsModule.state.data.length);
       }
       
       // 2. Normalize the target phone for matching
@@ -2766,12 +2777,12 @@ var console = {
           if (badge) {
             badge.remove();
             badgesRemoved++;
-            console.log('[Accounts] Removed "No Calls" badge from account:', rowAccountId);
+            // console.log('[Accounts] Removed "No Calls" badge from account:', rowAccountId);
           }
         }
       });
       
-      console.log('[Accounts] Total badges removed:', badgesRemoved);
+      // console.log('[Accounts] Total badges removed:', badgesRemoved);
     });
   }
 
@@ -2787,13 +2798,13 @@ var console = {
     getCurrentState,
     getState: function() { return state; },
     cleanup: function() {
-      console.log('[Accounts] Cleaning up UI state...');
+      // console.log('[Accounts] Cleaning up UI state...');
       // Don't clear allAccountsCache - keep it for navigation between pages
       // state.allAccountsCache = null;
       state.data = [];      // Clear paginated view
       state.filtered = [];  // Clear filtered view
       // Keep hasAnimated = true to prevent favicon animations on subsequent visits
-      console.log('[Accounts] UI state cleaned');
+      // console.log('[Accounts] UI state cleaned');
     }
   };
 

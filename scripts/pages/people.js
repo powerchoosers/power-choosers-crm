@@ -299,7 +299,7 @@
                 return email.toLowerCase().trim();
               }
             }
-            return 'l.patterson@powerchoosers.com';
+            return window.currentUserEmail || firebase.auth().currentUser?.email || 'l.patterson@powerchoosers.com';
           };
           const userEmail = getUserEmail();
 
@@ -1981,7 +1981,7 @@
       state.hasMore = contactsArray.length > initialBatchSize;
       
       state.loaded = true;
-      console.log('[People] Initial render with', state.data.length, 'of', contactsArray.length, 'contacts (hasMore:', state.hasMore, ')');
+      // console.log('[People] Initial render with', state.data.length, 'of', contactsArray.length, 'contacts (hasMore:', state.hasMore, ')');
       
       // Check if we're restoring from back navigation
       if (window.__restoringPeople && window._peopleReturn) {
@@ -2113,7 +2113,7 @@
           return c;
         });
         state.hasMore = state.data.length + nextBatch.length < state.allContactsCache.length;
-        console.log(`[People] Loaded ${nextBatch.length} more contacts from cache (enriched)`);
+        // console.log(`[People] Loaded ${nextBatch.length} more contacts from cache (enriched)`);
       } else if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.loadMore === 'function') {
         // Use BackgroundContactsLoader for seamless pagination
         const result = await window.BackgroundContactsLoader.loadMore();
@@ -2171,7 +2171,7 @@
         // Clear full cache to save memory if we have 500+ records loaded
         if (state.data.length > 500 && state.allContactsCache) {
           state.allContactsCache = null;
-          console.log('[People] Cleared full cache to save memory (keeping', state.data.length, 'loaded records)');
+          // console.log('[People] Cleared full cache to save memory (keeping', state.data.length, 'loaded records)');
         }
       }
     } catch (error) {
@@ -2403,7 +2403,7 @@
         const prev = els.fCity.getAttribute('data-ph') || 'e.g., Austin, Dallas';
         els.fCity.setAttribute('placeholder', prev);
       }
-      try { console.log('[Filters][DEBUG] city placeholder', els.fCity.getAttribute('placeholder')); } catch(_) {}
+
     }
   }
   function addCityToken(label){ 
@@ -2642,6 +2642,30 @@
   let renderPending = false;
   let lastRenderPage = null;
 
+  function upgradeCompanyFavicons(root) {
+    try {
+      const scope = root || document;
+      const imgs = scope.querySelectorAll('img.company-favicon');
+      imgs.forEach((img) => {
+        try {
+          if (!img || (img.closest && img.closest('.company-favicon-container'))) return;
+          const link = img.closest ? img.closest('a.company-link') : null;
+          const domain = (link && link.dataset && link.dataset.domain) ? String(link.dataset.domain || '').trim() : '';
+          if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
+            const html = window.__pcFaviconHelper.generateCompanyIconHTML({ domain, size: 32 });
+            if (html && String(html).trim()) {
+              img.outerHTML = html;
+              return;
+            }
+          }
+          if (typeof window.__pcAccountsIcon === 'function') {
+            img.outerHTML = window.__pcAccountsIcon(32);
+          }
+        } catch (_) { }
+      });
+    } catch (_) { }
+  }
+
   async function render() {
     // Skip if same page and already rendered (prevents triple-render)
     if (lastRenderPage === state.currentPage && renderPending) return;
@@ -2671,6 +2695,8 @@
     }
     
     els.tbody.innerHTML = rows || emptyHtml();
+
+    upgradeCompanyFavicons(els.tbody);
     
     // Trigger fade-zoom animation ONLY on first render
     if (!state.hasAnimated && rows) {
@@ -3108,7 +3134,7 @@
         peopleCallStatusCache.set(key, value);
       });
       
-      console.log('[People] Updated call status for', Object.keys(callStatus).length, 'items');
+      // console.log('[People] Updated call status for', Object.keys(callStatus).length, 'items');
     } catch (error) {
       console.error('[People] Failed to update call status:', error);
     }
@@ -3166,7 +3192,7 @@
       select: `<td class="col-select"><input type="checkbox" class="row-select" data-id="${escapeHtml(c.id)}" aria-label="Select contact"${checked}></td>`,
       name: `<td class="name-cell" data-contact-id="${escapeHtml(c.id)}"><div class="name-cell__wrap"><span class="avatar-initials" aria-hidden="true">${escapeHtml(initials)}</span><span class="name-text">${escapeHtml(fullName)}</span>${badges}</div></td>`,
       title: `<td>${escapeHtml(title)}</td>`,
-      company: `<td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${(() => { try { const accounts = (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function' && window.BackgroundAccountsLoader.getAccountsData()) || (typeof window.getAccountsData === 'function' && window.getAccountsData()) || []; const acct = accounts.find(a => a.accountName === company || a.name === company) || {}; let dom = String(acct.domain || acct.website || favDomain || '').trim(); if (/^https?:\/\//i.test(dom)) { try { dom = new URL(dom).hostname; } catch(_) { dom = dom.replace(/^https?:\/\//i, '').split('/')[0]; } } dom = dom ? dom.replace(/^www\./i, '') : ''; const logoUrl = acct.logoUrl || acct.logoURL || ''; if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') { const html = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain: dom, size: 32 }); return html && String(html).trim() ? html : '<span class="company-favicon placeholder" aria-hidden="true"></span>'; } if (dom && window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateFaviconHTML === 'function') { const html = window.__pcFaviconHelper.generateFaviconHTML(dom, 32); return html && String(html).trim() ? html : '<span class="company-favicon placeholder" aria-hidden="true"></span>'; } if (dom) { return '<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=32&domain=' + encodeURIComponent(dom) + '" alt="" aria-hidden="true" referrerpolicy="no-referrer" loading="lazy" style="pointer-events:none" onerror="this.style.display=\'none\'" />'; } return '<span class="company-favicon placeholder" aria-hidden="true"></span>'; } catch(_) { return '<span class="company-favicon placeholder" aria-hidden="true"></span>'; } })()}<span class="company-name">${escapeHtml(company)}</span></span></a></td>`,
+      company: `<td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${(() => { try { const accounts = (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function' && window.BackgroundAccountsLoader.getAccountsData()) || (typeof window.getAccountsData === 'function' && window.getAccountsData()) || []; const acct = accounts.find(a => a.accountName === company || a.name === company) || {}; const logoUrl = acct.logoUrl || acct.logoURL || ''; const dom = acct.domain || acct.website || favDomain || ''; if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') { return window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain: dom, size: 32 }); } return (window.__pcAccountsIcon ? window.__pcAccountsIcon(32) : '<span class="company-favicon placeholder" aria-hidden="true"></span>'); } catch(_) { return (window.__pcAccountsIcon ? window.__pcAccountsIcon(32) : '<span class="company-favicon placeholder" aria-hidden="true"></span>'); } })()}<span class="company-name">${escapeHtml(company)}</span></span></a></td>`,
       email: `<td>${escapeHtml(email)}</td>`,
       phone: `<td class="phone-cell" data-phone="${escapeHtml(phone)}">${phone ? `<span class="phone-link">${escapeHtml(formatPhoneForDisplay(phone))}</span>` : ''}</td>`,
       location: `<td>${location}</td>`,
@@ -3263,7 +3289,7 @@
           // 1. Unsubscribe from Firestore (CRITICAL)
           if (typeof _unsubscribePeople === 'function') {
             try { _unsubscribePeople(); _unsubscribePeople = null; } catch(_) {}
-            console.log('[People] Unsubscribed from Firestore');
+            // console.log('[People] Unsubscribed from Firestore');
           }
 
           // 2. Disconnect observers (CRITICAL)
@@ -3336,7 +3362,7 @@
   try {
     document.addEventListener('bulk-assignment-complete', (event) => {
       if (event.detail && event.detail.collectionType === 'contacts') {
-        console.log('[People] Bulk assignment complete, refreshing...');
+        // console.log('[People] Bulk assignment complete, refreshing...');
         state.loaded = false;
         loadDataOnce();
       }
@@ -3350,7 +3376,7 @@
     document._peopleCallLoggedBound = true;
     document.addEventListener('pc:call-logged', (event) => {
       const { call, targetPhone, accountId, contactId } = event.detail || {};
-      console.log('[People] Call logged event received:', { targetPhone, accountId, contactId });
+      // console.log('[People] Call logged event received:', { targetPhone, accountId, contactId });
       
       // 0. Invalidate call status cache for affected items
       const keysToInvalidate = [];
@@ -3367,7 +3393,7 @@
       });
       
       if (keysToInvalidate.length > 0) {
-        console.log('[People] Invalidated call status cache for:', keysToInvalidate);
+        // console.log('[People] Invalidated call status cache for:', keysToInvalidate);
       }
       
       // 1. Add call to in-memory cache if available
@@ -3428,7 +3454,7 @@
           if (badge) {
             badge.remove();
             badgesRemoved++;
-            console.log('[People] Removed "No Calls" badge from contact:', rowContactId);
+            // console.log('[People] Removed "No Calls" badge from contact:', rowContactId);
           }
         }
       });
@@ -4806,8 +4832,7 @@
     // state.data = [];      // Keep paginated view for restoration
     // state.filtered = [];  // Keep filtered view for restoration
     // Keep hasAnimated = true to prevent icon animations on subsequent visits
-    console.log('[People] UI state cleaned (preserving data for back navigation)');
+    // console.log('[People] UI state cleaned (preserving data for back navigation)');
   };
 })();
-
 

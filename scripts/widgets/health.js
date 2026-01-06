@@ -57,82 +57,54 @@
   function readDetailFieldDOM(field){
     try {
       const id = document.getElementById('account-detail-view') ? 'account-detail-view' : (document.getElementById('contact-detail-view') ? 'contact-detail-view' : '');
-      console.log('[Health Widget] readDetailFieldDOM for field:', field, 'detail view:', id);
       if (!id) {
-        console.log('[Health Widget] No detail view found');
         return '';
       }
       const root = document.getElementById(id);
       const el = root && root.querySelector(`.info-value-wrap[data-field="${field}"] .info-value-text`);
       const text = el ? el.textContent.trim() : '';
       const result = text === '--' ? '' : text;
-      console.log('[Health Widget] readDetailFieldDOM result:', { field, text, result });
       return result;
     } catch(e) { 
-      console.log('[Health Widget] Error in readDetailFieldDOM:', e);
       return ''; 
     }
   }
 
   function getLinkedAccountId(currentEntityType, currentEntityId) {
     try {
-      console.log('[Health Widget] getLinkedAccountId called');
-      
       // First try to get from window.ContactDetail.state._linkedAccountId
       if (window.ContactDetail && window.ContactDetail.state) {
-        console.log('[Health Widget] ContactDetail.state exists:', !!window.ContactDetail.state);
-        console.log('[Health Widget] ContactDetail.state._linkedAccountId:', window.ContactDetail.state._linkedAccountId);
         if (window.ContactDetail.state._linkedAccountId) {
           const accountId = window.ContactDetail.state._linkedAccountId;
-          console.log('[Health Widget] Found account ID from ContactDetail.state:', accountId);
           return accountId;
         }
-      } else {
-        console.log('[Health Widget] ContactDetail or state not available');
       }
       
       // Fallback: Try to get from the current contact's accountId field
       if (currentEntityType === 'contact' && currentEntityId && typeof window.getPeopleData === 'function') {
-        console.log('[Health Widget] Attempting fallback method - getPeopleData available:', typeof window.getPeopleData);
         const people = window.getPeopleData() || [];
-        console.log('[Health Widget] People data length:', people.length);
         const contact = people.find(p => String(p.id || '') === String(currentEntityId));
-        console.log('[Health Widget] Found contact:', !!contact, 'Contact data:', contact);
         if (contact && (contact.accountId || contact.account_id)) {
           const accountId = contact.accountId || contact.account_id;
-          console.log('[Health Widget] Found account ID from contact data:', accountId);
           return accountId;
-        } else {
-          console.log('[Health Widget] No accountId found in contact data');
         }
-      } else {
-        console.log('[Health Widget] Fallback conditions not met:', {
-          isContact: currentEntityType === 'contact',
-          hasEntityId: !!currentEntityId,
-          hasGetPeopleData: typeof window.getPeopleData === 'function'
-        });
       }
       
       // Try to get the linked account ID from the contact detail page DOM
       const contactDetailView = document.getElementById('contact-detail-view');
-      console.log('[Health Widget] contact-detail-view found:', !!contactDetailView);
       
       // Broad DOM scan: anywhere on the page
       const anyAccountLink = document.querySelector('[data-account-id]');
-      console.log('[Health Widget] Global data-account-id element found:', !!anyAccountLink, anyAccountLink);
       if (anyAccountLink) {
         const accountId = anyAccountLink.getAttribute('data-account-id');
-        console.log('[Health Widget] Found account ID from global DOM scan:', accountId);
         return accountId;
       }
       
       if (contactDetailView) {
         // Look for the linked account ID inside the contact view
         const accountLink = contactDetailView.querySelector('[data-account-id]');
-        console.log('[Health Widget] accountLink element found inside contact view:', !!accountLink);
         if (accountLink) {
           const accountId = accountLink.getAttribute('data-account-id');
-          console.log('[Health Widget] Found account ID from contact view DOM:', accountId);
           return accountId;
         }
         
@@ -140,26 +112,19 @@
         try {
           const companyLink = contactDetailView.querySelector('#contact-company-link');
           const companyName = companyLink ? (companyLink.getAttribute('data-account-name') || companyLink.textContent || '').trim() : '';
-          console.log('[Health Widget] Company name from DOM for fallback:', companyName);
           if (companyName && typeof window.getAccountsData === 'function') {
             const accounts = window.getAccountsData() || [];
             const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
             const key = norm(companyName);
             const match = accounts.find(a => norm(a.accountName || a.name || a.companyName) === key);
             if (match && match.id) {
-              console.log('[Health Widget] Matched account by company name fallback:', match.id, match);
               return match.id;
             }
           }
-        } catch(e) { console.log('[Health Widget] Company name fallback error:', e); }
-        
-        console.log('[Health Widget] No account ID found in DOM');
-      } else {
-        console.log('[Health Widget] No contact-detail-view found');
+        } catch(e) { }
       }
       return null;
     } catch(e) { 
-      console.log('[Health Widget] Error in getLinkedAccountId:', e);
       return null; 
     }
   }
@@ -484,52 +449,36 @@
     const onEnergyUpdated = (e) => {
       try {
         const d = e.detail || {};
-        console.log('[Health Widget] Received energy-updated event:', d);
-        console.log('[Health Widget] Current entityType:', entityType, 'entityId:', entityId);
         
         // For contacts, energy data is stored in the linked account, so we need to check both
         let matches = false;
         if (entityType === 'contact') {
           // Check if this is an account update for the linked account
           const linkedAccountId = getLinkedAccountId(entityType, entityId);
-          console.log('[Health Widget] Contact mode - linkedAccountId:', linkedAccountId);
           matches = (d.entity === 'account') && (String(d.id||'') === String(linkedAccountId||''));
-          console.log('[Health Widget] Contact mode - matches:', matches, 'event entity:', d.entity, 'event id:', d.id, 'linked id:', linkedAccountId);
         } else {
           // For accounts, match directly
           matches = (d.entity === entityType) && (String(d.id||'') === String(entityId||''));
-          console.log('[Health Widget] Account mode - matches:', matches, 'event entity:', d.entity, 'event id:', d.id, 'current id:', entityId);
         }
         if (!matches) {
-          console.log('[Health Widget] Event does not match, ignoring');
           return;
         }
         
-        console.log('[Health Widget] Event matches! Updating widget inputs for field:', d.field, 'value:', d.value);
-        
         // Update widget inputs based on the field that was updated
-        console.log('[Health Widget] Updating widget inputs for field:', d.field, 'value:', d.value);
         if (d.field === 'electricitySupplier' && supplierInput) {
-          console.log('[Health Widget] Updating supplier input from:', supplierInput.value, 'to:', (d.value || '').trim());
           supplierInput.value = (d.value || '').trim();
-          console.log('[Health Widget] Updated supplier input to:', supplierInput.value);
         }
         if (d.field === 'annualUsage' && annualUsageInput) {
           annualUsageInput.value = (d.value || '').trim();
-          console.log('[Health Widget] Updated annual usage input to:', annualUsageInput.value);
         }
         if (d.field === 'currentRate' && currentRateInput) {
           currentRateInput.value = (d.value || '');
-          console.log('[Health Widget] Updated current rate input to:', currentRateInput.value);
         }
         if (d.field === 'contractEndDate' && contractEndInput) {
           const contractVal = d.value || '';
-          console.log('[Health Widget] Contract end date update - raw value:', contractVal);
           // Date inputs require YYYY-MM-DD format, not MM/DD/YYYY
           const formattedValue = contractVal ? toISODate(contractVal) : '';
-          console.log('[Health Widget] Contract end date update - formatted value (ISO):', formattedValue);
           contractEndInput.value = formattedValue;
-          console.log('[Health Widget] Updated contract end input to:', contractEndInput.value);
         }
         
         // Re-run validations to update UI state
@@ -538,15 +487,12 @@
       } catch(_) {}
     };
     
-    console.log('[Health Widget] Setting up pc:energy-updated event listener');
-    
     // Remove any existing listener to prevent duplicates
     document.removeEventListener('pc:energy-updated', onEnergyUpdated);
     document.addEventListener('pc:energy-updated', onEnergyUpdated);
     
     // Add a small delay to ensure event listener is fully registered
     setTimeout(() => {
-      console.log('[Health Widget] Event listener setup complete');
     }, 100);
     
     // Clean up listener when widget is closed
@@ -879,8 +825,6 @@
     // Save to Firebase function
     async function saveToFirebase(field, value) {
       try {
-        console.log('[Health Widget] Saving to Firebase:', { field, value, entityType, entityId });
-        
         let targetEntityId = entityId;
         let targetEntityType = entityType;
         
@@ -890,24 +834,19 @@
           if (linkedAccountId) {
             targetEntityId = linkedAccountId;
             targetEntityType = 'account';
-            console.log('[Health Widget] Contact mode - saving to linked account:', linkedAccountId);
           } else {
-            console.log('[Health Widget] No linked account found for contact');
             return;
           }
         }
         
         const db = window.firebaseDB;
         if (!db) {
-          console.log('[Health Widget] No Firebase database available');
           return;
         }
         
         const payload = { [field]: value, updatedAt: Date.now() };
-        console.log('[Health Widget] Saving payload:', { targetEntityId, payload });
         
         await db.collection('accounts').doc(targetEntityId).update(payload);
-        console.log('[Health Widget] Firebase save successful');
         
         // Update local cache if available
         if (typeof window.getAccountsData === 'function') {
@@ -915,18 +854,14 @@
           const idx = accounts.findIndex(a => a.id === targetEntityId);
           if (idx !== -1) {
             try { accounts[idx][field] = value; } catch(_) {}
-            console.log('[Health Widget] Updated local cache for account:', targetEntityId);
           }
         }
         
         // Dispatch energy-updated event to sync other components
         try { 
           const eventDetail = { entity: 'account', id: targetEntityId, field, value };
-          console.log('[Health Widget] About to dispatch energy-updated event:', eventDetail);
           document.dispatchEvent(new CustomEvent('pc:energy-updated', { detail: eventDetail })); 
-          console.log('[Health Widget] Dispatched energy-updated event successfully');
         } catch(e) { 
-          console.log('[Health Widget] Error dispatching event:', e);
         }
         
       } catch (error) {
@@ -1076,13 +1011,6 @@
 
     // Pre-populate from entity data if available (supplier, current rate, contract end)
     try {
-      console.log('[Health Widget] Pre-populating widget data for entityType:', entityType, 'entityId:', entityId);
-      console.log('[Health Widget] Widget initialization context - window.ContactDetail exists:', !!window.ContactDetail);
-      console.log('[Health Widget] Widget initialization context - window.AccountDetail exists:', !!window.AccountDetail);
-      if (window.ContactDetail && window.ContactDetail.state) {
-        console.log('[Health Widget] ContactDetail.state._linkedAccountId:', window.ContactDetail.state._linkedAccountId);
-      }
-      
       // Update entity name first
       updateEntityName();
       
@@ -1090,8 +1018,6 @@
       const domSupplier = readDetailFieldDOM('electricitySupplier');
       const domRate = readDetailFieldDOM('currentRate');
       const domContract = readDetailFieldDOM('contractEndDate');
-      
-      console.log('[Health Widget] DOM data read:', { domSupplier, domRate, domContract });
       
       // Priority 2: For contacts, try to read from linked account data
       let supplier = domSupplier;
@@ -1104,11 +1030,9 @@
           const accounts = window.getAccountsData() || [];
           const linkedAccount = accounts.find(a => String(a.id || '') === String(linkedAccountId));
           if (linkedAccount) {
-            console.log('[Health Widget] Found linked account data:', linkedAccount);
             if (!supplier && linkedAccount.electricitySupplier) supplier = linkedAccount.electricitySupplier;
             if (!rate && linkedAccount.currentRate) rate = linkedAccount.currentRate;
             if (!contract && linkedAccount.contractEndDate) contract = linkedAccount.contractEndDate;
-            console.log('[Health Widget] Updated from linked account:', { supplier, rate, contract });
           }
         }
       }
@@ -1327,14 +1251,6 @@
 
   // Test function for debugging - can be called from browser console
   window.testHealthWidget = function() {
-    console.log('[Health Widget] Test function called');
-    console.log('[Health Widget] Current entityType:', entityType);
-    console.log('[Health Widget] Current entityId:', entityId);
-    console.log('[Health Widget] getLinkedAccountId test:', getLinkedAccountId(entityType, entityId));
-    console.log('[Health Widget] Widget element exists:', !!document.getElementById('energy-health-widget'));
-    console.log('[Health Widget] ContactDetail exists:', !!window.ContactDetail);
-    console.log('[Health Widget] ContactDetail.state exists:', !!(window.ContactDetail && window.ContactDetail.state));
-    console.log('[Health Widget] getPeopleData exists:', typeof window.getPeopleData);
     return {
       entityType,
       entityId,

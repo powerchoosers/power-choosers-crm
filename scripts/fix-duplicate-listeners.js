@@ -37,10 +37,6 @@
     // NEW: Unguarded listeners found in other files
     '_clickToCallPageLoadedBound',
     '_mainActivitiesRefreshBound',
-    '_taskDetailContactCreatedBound',
-    '_taskDetailContactUpdatedBound',
-    '_taskDetailPageLoadedBound',
-    '_taskDetailRestoreBound',
     '_tasksAutoTaskBound1',
     '_tasksAutoTaskBound2',
     '_phoneEnergyUpdatedBound',
@@ -206,13 +202,6 @@
     // uses document-level delegation and must be attached once on first page load.
     // The guard in sequence-builder.js itself prevents duplicates on subsequent renders.
     
-    // NEW: Task Detail page event listener guards (task-detail.js)
-    '_taskDetailContactHandlersBound',
-    '_taskDetailPhoneHandlersBound',
-    '_taskDetailContactCreationBound',
-    '_taskDetailAccountUpdateBound',
-    '_taskDetailAccountDetailsRestoreBound',
-    
     // NEW: Email Detail page event listener guards (email-detail.js)
     '_emailDetailSendNowBound'
   ];
@@ -285,4 +274,3 @@
   // Log rate monitoring disabled to prevent all logs appearing from this file
   
 })();
-
