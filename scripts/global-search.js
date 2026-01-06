@@ -73,31 +73,45 @@
       .search-results-container {
         padding: 12px 12px 24px 12px;
         box-sizing: border-box;
+        max-height: 820px;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: var(--border-medium) transparent;
+      }
+      .search-results-container::-webkit-scrollbar {
+        width: 6px;
+      }
+      .search-results-container::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .search-results-container::-webkit-scrollbar-thumb {
+        background-color: var(--border-medium);
+        border-radius: 10px;
       }
       .search-results-container.showing-empty {
         padding-bottom: 4px; /* 4px + 8px from prospect-actions = 12px, matches top padding */
       }
       .search-results-container .search-category {
-        background: #323943; /* Matches --grey-700 for a seamless look */
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: var(--bg-card, rgba(61, 68, 78, 0.8));
+        border: 1px solid var(--border-medium, rgba(255, 255, 255, 0.1));
         border-radius: 12px;
         margin-bottom: 16px;
         margin-left: 0;
         margin-right: 0;
         overflow: hidden;
-        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+        box-shadow: var(--shadow-md, 0 8px 24px rgba(0, 0, 0, 0.3));
       }
       .search-results-container .search-category:last-child {
         margin-bottom: 0;
       }
       .search-results-container .search-category .category-header {
         padding: 10px 14px;
-        background: rgba(0, 0, 0, 0.2);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        background: rgba(255, 255, 255, 0.05);
+        border-bottom: 1px solid var(--border-light, rgba(255, 255, 255, 0.06));
         margin: 0;
-        color: var(--grey-400);
+        color: var(--text-secondary);
         font-size: 0.75rem;
-        font-weight: 600;
+        font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.05em;
       }
@@ -105,14 +119,14 @@
         padding: 12px 14px;
         margin: 0;
         background: transparent;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        border-bottom: 1px solid var(--border-light, rgba(255, 255, 255, 0.06));
         transition: all 0.2s ease;
       }
       .search-results-container .search-result-item:last-child {
         border-bottom: none;
       }
       .search-results-container .search-result-item:hover {
-        background: rgba(255, 255, 255, 0.03);
+        background: var(--bg-card-hover, rgba(71, 78, 88, 0.9));
       }
       .search-result-item .result-title {
         color: var(--text-main);
@@ -120,7 +134,7 @@
         font-size: 0.9rem;
       }
       .search-result-item .result-subtitle {
-        color: var(--grey-500);
+        color: var(--grey-400);
         font-size: 0.8rem;
       }
       .search-result-item .result-main {
@@ -185,11 +199,11 @@
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        background: var(--bg-item, #2f343a);
-        border: 1px solid var(--grey-700, #3a3f45);
-        border-radius: var(--border-radius, 8px);
-        padding: 6px 10px;
-        color: var(--text-secondary, rgba(255, 255, 255, 0.8));
+        background: var(--bg-item, #4e5661);
+        border: 1px solid var(--border-medium, rgba(255, 255, 255, 0.1));
+        border-radius: 20px;
+        padding: 6px 14px;
+        color: var(--text-primary, #fff);
         font-size: 11px;
         font-weight: 700;
         letter-spacing: 0.08em;
@@ -199,9 +213,9 @@
       }
 
       .search-results-container .search-all-btn:hover {
-        background: var(--bg-hover, #3a3f45);
-        border-color: var(--border-medium, #4a4f55);
-        color: var(--text-primary, #fff);
+        background: var(--bg-hover, rgba(255, 255, 255, 0.1));
+        border-color: var(--accent-orange, #f18335);
+        color: #ffffff;
         transform: translateY(-1px);
       }
 
@@ -217,9 +231,9 @@
         justify-content: center;
         width: 32px;
         height: 32px;
-        border-radius: var(--border-radius, 8px);
+        border-radius: 50%;
         background: rgba(255, 255, 255, 0.05);
-        border: 1px solid var(--grey-700, #3a3f45);
+        border: 1px solid var(--border-medium, rgba(255, 255, 255, 0.1));
         color: var(--text-secondary, rgba(255, 255, 255, 0.7));
         cursor: pointer;
         transition: all 0.2s ease;
