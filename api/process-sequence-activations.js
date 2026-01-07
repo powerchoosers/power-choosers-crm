@@ -240,148 +240,116 @@ async function processSingleActivation(activationId, isProduction) {
     // Filter out nulls
     const validContacts = contactsData.filter(c => c !== null);
 
-    // Create scheduled emails ONLY for the FIRST step (step 0)
-    // Future steps will be created after previous steps are sent
-    const emailsToCreate = [];
+    const makeSafePart = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9_-]/g, '_').slice(0, 120);
+    const makeSequenceStepId = (prefix, sequenceId, contactId, stepIndex) => {
+      return `${prefix}-seq-${makeSafePart(sequenceId)}-${makeSafePart(contactId)}-${String(stepIndex)}`;
+    };
+
     const failedContactIds = [];
+    const steps = sequence.steps || [];
 
-    // Find the first auto-email step
-    let firstAutoEmailStep = null;
-    let firstAutoEmailStepIndex = -1;
+    let firstActiveStep = null;
+    let firstActiveStepIndex = -1;
+    let cumulativeDelayMs = 0;
 
-    for (let i = 0; i < (sequence.steps?.length || 0); i++) {
-      if (sequence.steps[i].type === 'auto-email') {
-        firstAutoEmailStep = sequence.steps[i];
-        firstAutoEmailStepIndex = i;
-        break;
-      }
+    for (let stepIndex = 0; stepIndex < steps.length; stepIndex++) {
+      const step = steps[stepIndex];
+      if (step.paused) continue;
+      cumulativeDelayMs += (step.delayMinutes || 0) * 60 * 1000;
+      firstActiveStep = step;
+      firstActiveStepIndex = stepIndex;
+      break;
     }
 
-    if (!firstAutoEmailStep) {
-      logAlways(`[ProcessSequenceActivations] No auto-email steps found in sequence ${data.sequenceId} - checking for tasks`);
-      // Do not return early, proceed to task creation
+    if (!firstActiveStep) {
+      await activationRef.update({
+        processedContacts: contactIds.length,
+        status: 'completed',
+        processingStartedAt: admin.firestore.FieldValue.delete(),
+        completedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      return;
     }
 
-    if (firstAutoEmailStep) {
-      // Determine default AI mode for this step (Standard vs HTML).
-      // We look at step.data.aiMode first (set by sequence-builder preview),
-      // then fall back to standard so emails default to NEPQ-style plain emails.
+    const isEmailStep = firstActiveStep.type === 'auto-email' || firstActiveStep.type === 'manual-email';
+    const isTaskStep = ['phone-call', 'li-connect', 'li-message', 'li-view-profile', 'li-interact-post', 'task'].includes(firstActiveStep.type);
+    const scheduledTime = Date.now() + cumulativeDelayMs;
+
+    let emailsCreated = 0;
+    let tasksCreated = 0;
+
+    if (isEmailStep) {
       const defaultAiMode =
-        firstAutoEmailStep.data?.aiMode ||
-        firstAutoEmailStep.emailSettings?.aiMode ||
+        firstActiveStep.data?.aiMode ||
+        firstActiveStep.emailSettings?.aiMode ||
         'standard';
 
-      for (const contact of validContacts) {
+      const emailCreates = validContacts.map(async (contact) => {
         if (!contact.email) {
           failedContactIds.push(contact.id);
-          continue;
+          return;
         }
 
-        // Create email ONLY for the first auto-email step
-        const step = firstAutoEmailStep;
-        const stepIndex = firstAutoEmailStepIndex;
-
-        const delayMs = (step.delayMinutes || 0) * 60 * 1000;
-        const scheduledSendTime = Date.now() + delayMs;
-
-        const emailId = `email-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-        emailsToCreate.push({
+        const emailId = makeSequenceStepId('email', data.sequenceId, contact.id, firstActiveStepIndex);
+        const payload = {
           id: emailId,
           type: 'scheduled',
           status: 'not_generated',
-          scheduledSendTime,
+          scheduledSendTime: scheduledTime,
           contactId: contact.id,
           contactName: contact.firstName ? `${contact.firstName} ${contact.lastName || ''}`.trim() : contact.name,
           contactCompany: contact.company || contact.companyName || '',
           to: contact.email,
           sequenceId: data.sequenceId,
           sequenceName: sequence.name,
-          stepIndex,
-          totalSteps: sequence.steps?.length || 1,
+          stepIndex: firstActiveStepIndex,
+          totalSteps: steps.length || 1,
           activationId,
-          aiPrompt: step.emailSettings?.aiPrompt || step.data?.aiPrompt || step.aiPrompt || step.content || 'Write a professional email',
+          aiPrompt: firstActiveStep.emailSettings?.aiPrompt || firstActiveStep.data?.aiPrompt || firstActiveStep.aiPrompt || firstActiveStep.content || 'Write a professional email',
           aiMode: defaultAiMode,
-          // CRITICAL: Set ownership fields for Firestore rules compliance
-          // Fallback to unassigned if ownerId/userId not provided
           ownerId: (data.ownerId || data.userId || 'unassigned').toLowerCase().trim(),
           assignedTo: (data.ownerId || data.userId || 'unassigned').toLowerCase().trim(),
           createdBy: (data.ownerId || data.userId || 'unassigned').toLowerCase().trim(),
           createdAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-      }
+        };
 
-      // Write emails in batches
-      if (emailsToCreate.length > 0) {
-        logAlways(`Creating ${emailsToCreate.length} emails for activation ${activationId}`);
-        for (let i = 0; i < emailsToCreate.length; i += BATCH_SIZE) {
-          const chunk = emailsToCreate.slice(i, i + BATCH_SIZE);
-          const batch = db.batch();
-
-          chunk.forEach(email => {
-            const ref = db.collection('emails').doc(email.id);
-            batch.set(ref, email);
-          });
-
-          await batch.commit();
-          logAlways(`Created ${chunk.length} emails (batch ${Math.floor(i / BATCH_SIZE) + 1})`);
+        try {
+          await db.collection('emails').doc(emailId).create(payload);
+          emailsCreated++;
+        } catch (e) {
+          if (!isProduction) {
+            if (e && (e.code === 6 || String(e.message || '').includes('ALREADY_EXISTS'))) {
+              logger.log(`[ProcessSequenceActivations] Email already exists for ${contact.id} (step ${firstActiveStepIndex})`);
+            } else {
+              logger.warn(`[ProcessSequenceActivations] Failed to create email for ${contact.id}: ${e?.message || e}`);
+            }
+          }
         }
-      } else {
-        logAlways(`No emails to create for activation ${activationId} (all contacts missing email or no email steps)`);
-      }
-    }
+      });
 
-    // CREATE TASKS for FIRST non-email step only (progressive task creation like emails)
-    const tasksToCreate = [];
+      await Promise.all(emailCreates);
+      logAlways(`Created ${emailsCreated} first-step emails for activation ${activationId}`);
+    } else if (isTaskStep) {
+      const taskCreates = validContacts.map(async (contact) => {
+        const taskId = makeSequenceStepId('task', data.sequenceId, contact.id, firstActiveStepIndex);
+        const dueDate = new Date(scheduledTime);
 
-    // Find the first task-type step (non-email)
-    let firstTaskStep = null;
-    let firstTaskStepIndex = -1;
-    let cumulativeDelayMs = 0;
+        let taskType = firstActiveStep.type;
+        let taskTitle = firstActiveStep.data?.note || firstActiveStep.name || firstActiveStep.label || '';
 
-    for (let stepIndex = 0; stepIndex < (sequence.steps?.length || 0); stepIndex++) {
-      const step = sequence.steps[stepIndex];
-
-      // Skip paused steps
-      if (step.paused) continue;
-
-      // Calculate cumulative delay
-      cumulativeDelayMs += (step.delayMinutes || 0) * 60 * 1000;
-
-      // Check if this is a task-type step
-      const isTaskStep = ['phone-call', 'li-connect', 'li-message', 'li-view-profile', 'li-interact-post', 'task'].includes(step.type);
-
-      if (isTaskStep) {
-        firstTaskStep = step;
-        firstTaskStepIndex = stepIndex;
-        break; // Only create the FIRST task
-      }
-    }
-
-    // Create the first task for each contact
-    if (firstTaskStep) {
-      for (const contact of validContacts) {
-        const taskId = `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        const dueTimestamp = Date.now() + cumulativeDelayMs;
-        const dueDate = new Date(dueTimestamp);
-
-        // Determine task type and title
-        let taskType = firstTaskStep.type;
-        let taskTitle = firstTaskStep.data?.note || firstTaskStep.name || firstTaskStep.label || '';
-
-        if (firstTaskStep.type === 'phone-call') {
+        if (firstActiveStep.type === 'phone-call') {
           taskType = 'phone-call';
           taskTitle = taskTitle || 'Call contact';
-        } else if (firstTaskStep.type === 'li-connect') {
+        } else if (firstActiveStep.type === 'li-connect') {
           taskType = 'linkedin-connect';
           taskTitle = taskTitle || 'Connect on LinkedIn';
-        } else if (firstTaskStep.type === 'li-message') {
+        } else if (firstActiveStep.type === 'li-message') {
           taskType = 'linkedin-message';
           taskTitle = taskTitle || 'Send LinkedIn message';
-        } else if (firstTaskStep.type === 'li-view-profile') {
+        } else if (firstActiveStep.type === 'li-view-profile') {
           taskType = 'linkedin-view';
           taskTitle = taskTitle || 'View LinkedIn profile';
-        } else if (firstTaskStep.type === 'li-interact-post') {
+        } else if (firstActiveStep.type === 'li-interact-post') {
           taskType = 'linkedin-interact';
           taskTitle = taskTitle || 'Interact with LinkedIn post';
         } else {
@@ -389,49 +357,46 @@ async function processSingleActivation(activationId, isProduction) {
           taskTitle = taskTitle || 'Complete task';
         }
 
-        tasksToCreate.push({
+        const payload = {
           id: taskId,
           title: taskTitle,
           contact: contact.firstName ? `${contact.firstName} ${contact.lastName || ''}`.trim() : contact.name || '',
           contactId: contact.id,
           account: contact.company || contact.companyName || '',
           type: taskType,
-          priority: firstTaskStep.data?.priority || 'sequence',
+          priority: firstActiveStep.data?.priority || 'sequence',
           dueDate: dueDate.toLocaleDateString(),
           dueTime: dueDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-          dueTimestamp: dueTimestamp,
+          dueTimestamp: scheduledTime,
           status: 'pending',
           sequenceId: data.sequenceId,
           sequenceName: sequence.name,
-          stepId: firstTaskStep.id,
-          stepIndex: firstTaskStepIndex,
+          stepId: firstActiveStep.id,
+          stepIndex: firstActiveStepIndex,
           isSequenceTask: true,
-          notes: firstTaskStep.data?.note || '',
-          // CRITICAL: Set ownership fields for Firestore rules compliance
-          // Fallback to unassigned if ownerId/userId not provided
+          notes: firstActiveStep.data?.note || '',
           ownerId: (data.ownerId || data.userId || 'unassigned').toLowerCase().trim(),
           assignedTo: (data.ownerId || data.userId || 'unassigned').toLowerCase().trim(),
           createdBy: (data.ownerId || data.userId || 'unassigned').toLowerCase().trim(),
           createdAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-      }
-    }
+        };
 
-    // Write tasks in batches
-    if (tasksToCreate.length > 0) {
-      logAlways(`Creating ${tasksToCreate.length} first-step tasks for activation ${activationId}`);
-      for (let i = 0; i < tasksToCreate.length; i += BATCH_SIZE) {
-        const chunk = tasksToCreate.slice(i, i + BATCH_SIZE);
-        const batch = db.batch();
+        try {
+          await db.collection('tasks').doc(taskId).create(payload);
+          tasksCreated++;
+        } catch (e) {
+          if (!isProduction) {
+            if (e && (e.code === 6 || String(e.message || '').includes('ALREADY_EXISTS'))) {
+              logger.log(`[ProcessSequenceActivations] Task already exists for ${contact.id} (step ${firstActiveStepIndex})`);
+            } else {
+              logger.warn(`[ProcessSequenceActivations] Failed to create task for ${contact.id}: ${e?.message || e}`);
+            }
+          }
+        }
+      });
 
-        chunk.forEach(task => {
-          const ref = db.collection('tasks').doc(task.id);
-          batch.set(ref, task);
-        });
-
-        await batch.commit();
-        logAlways(`Created ${chunk.length} first-step tasks (batch ${Math.floor(i / BATCH_SIZE) + 1})`);
-      }
+      await Promise.all(taskCreates);
+      logAlways(`Created ${tasksCreated} first-step tasks for activation ${activationId}`);
     }
 
     // Update activation progress
@@ -443,11 +408,11 @@ async function processSingleActivation(activationId, isProduction) {
       status: isDone ? 'completed' : 'processing',
       processingStartedAt: isDone ? admin.firestore.FieldValue.delete() : data.processingStartedAt,
       completedAt: isDone ? admin.firestore.FieldValue.serverTimestamp() : null,
-      'progress.emailsCreated': admin.firestore.FieldValue.increment(emailsToCreate.length),
+      'progress.emailsCreated': admin.firestore.FieldValue.increment(emailsCreated),
       failedContactIds: failedContactIds.length > 0 ? admin.firestore.FieldValue.arrayUnion(...failedContactIds) : data.failedContactIds || []
     });
 
-    logAlways(`Updated activation ${activationId}: ${newProcessedCount}/${contactIds.length} contacts, ${emailsToCreate.length} emails created, status: ${isDone ? 'completed' : 'processing'}`);
+    logAlways(`Updated activation ${activationId}: ${newProcessedCount}/${contactIds.length} contacts, ${emailsCreated} emails created, status: ${isDone ? 'completed' : 'processing'}`);
 
   } catch (error) {
     logger.error(`[ProcessSequenceActivations] Error processing activation ${activationId}:`, error);
