@@ -10,6 +10,14 @@ const gmailService = new GmailService();
 // Max time we'll allow an email to remain "sending" before auto-finalizing
 const STALE_SENDING_MS = 10 * 60 * 1000; // 10 minutes
 
+function makeSafeIdPart(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9_-]/g, '_').slice(0, 120);
+}
+
+function makeSequenceStepId(prefix, sequenceId, contactId, stepIndex) {
+  return `${prefix}-seq-${makeSafeIdPart(sequenceId)}-${makeSafeIdPart(contactId)}-${String(stepIndex)}`;
+}
+
 // Helper: finalize an email as sent with retries and merge fallback
 async function finalizeAsSent(emailDoc, payload) {
   const emailId = emailDoc.id;
@@ -835,6 +843,18 @@ export default async function handler(req, res) {
         // This keeps the tasks/emails list clean, showing only what's due next
         if (emailData.sequenceId && typeof emailData.stepIndex === 'number') {
           try {
+            if (emailData.contactId) {
+              const memberQuery = await db.collection('sequenceMembers')
+                .where('sequenceId', '==', emailData.sequenceId)
+                .where('targetId', '==', emailData.contactId)
+                .limit(1)
+                .get();
+
+              if (memberQuery.empty) {
+                continue;
+              }
+            }
+
             // Get sequence details
             const sequenceDoc = await db.collection('sequences').doc(emailData.sequenceId).get();
             if (sequenceDoc.exists) {
@@ -863,9 +883,11 @@ export default async function handler(req, res) {
                 if (nextStep.type === 'auto-email') {
                   const nextScheduledSendTime = scheduledTime;
 
-                  const nextEmailId = `email-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                  const nextEmailId = makeSequenceStepId('email', emailData.sequenceId, emailData.contactId, nextStepIndex);
 
-                  await db.collection('emails').doc(nextEmailId).set({
+                  try {
+                    await db.collection('emails').doc(nextEmailId).create({
+                    id: nextEmailId,
                     type: 'scheduled',
                     status: 'not_generated',
                     scheduledSendTime: nextScheduledSendTime,
@@ -886,7 +908,12 @@ export default async function handler(req, res) {
                     assignedTo: (emailData.assignedTo || emailData.ownerId || 'unassigned').toLowerCase().trim(),
                     createdBy: (emailData.createdBy || emailData.ownerId || 'unassigned').toLowerCase().trim(),
                     createdAt: admin.firestore.FieldValue.serverTimestamp()
-                  });
+                    });
+                  } catch (e) {
+                    if (!(e && (e.code === 6 || String(e.message || '').includes('ALREADY_EXISTS')))) {
+                      throw e;
+                    }
+                  }
 
                   logger.debug(`[SendScheduledEmails] Created next step email (step ${nextStepIndex}) for contact ${emailData.contactId}`);
                 }
@@ -907,7 +934,7 @@ export default async function handler(req, res) {
                     logger.warn('[SendScheduledEmails] Failed to load contact data:', contactError);
                   }
 
-                  const taskId = `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                  const taskId = makeSequenceStepId('task', emailData.sequenceId, emailData.contactId, nextStepIndex);
                   const dueDate = new Date(scheduledTime);
 
                   // Determine task type and title
@@ -933,8 +960,8 @@ export default async function handler(req, res) {
                     taskType = 'task';
                     taskTitle = taskTitle || 'Complete task';
                   }
-
-                  await db.collection('tasks').doc(taskId).set({
+                  try {
+                    await db.collection('tasks').doc(taskId).create({
                     id: taskId,
                     title: taskTitle,
                     contact: contactName,
@@ -959,7 +986,12 @@ export default async function handler(req, res) {
                     createdBy: (emailData.createdBy || emailData.ownerId || 'unassigned').toLowerCase().trim(),
                     createdAt: admin.firestore.FieldValue.serverTimestamp(),
                     timestamp: admin.firestore.FieldValue.serverTimestamp()
-                  });
+                    });
+                  } catch (e) {
+                    if (!(e && (e.code === 6 || String(e.message || '').includes('ALREADY_EXISTS')))) {
+                      throw e;
+                    }
+                  }
 
                   logger.debug(`[SendScheduledEmails] Created next step task (step ${nextStepIndex}, type: ${taskType}) for contact ${emailData.contactId}`);
                 }

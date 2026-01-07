@@ -26,6 +26,10 @@ export default async function handler(req, res) {
     }
 
     const logAlways = (msg) => logger.log(`[CompleteSequenceTask] [${new Date().toISOString()}] ${msg}`);
+    const makeSafePart = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9_-]/g, '_').slice(0, 120);
+    const makeSequenceStepId = (prefix, sequenceId, contactId, stepIndex) => {
+        return `${prefix}-seq-${makeSafePart(sequenceId)}-${makeSafePart(contactId)}-${String(stepIndex)}`;
+    };
 
     try {
         if (!db) {
@@ -65,6 +69,18 @@ export default async function handler(req, res) {
             res.end(JSON.stringify({
                 success: true,
                 message: 'Not a sequence task, no next step to create'
+            }));
+            return;
+        }
+
+        if (task.nextStepCreated && task.nextStepType && task.nextStepId) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                success: true,
+                nextStepType: task.nextStepType,
+                emailId: task.nextStepType === 'email' ? task.nextStepId : undefined,
+                taskId: task.nextStepType === 'task' ? task.nextStepId : undefined,
+                message: 'Next step already created'
             }));
             return;
         }
@@ -168,7 +184,7 @@ export default async function handler(req, res) {
                 return;
             }
 
-            const emailId = `email-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const emailId = makeSequenceStepId('email', task.sequenceId, contact.id, nextStepIndex);
             const defaultAiMode = nextStep.data?.aiMode || nextStep.emailSettings?.aiMode || 'standard';
 
             const emailData = {
@@ -194,7 +210,27 @@ export default async function handler(req, res) {
                 createdAt: admin.firestore.FieldValue.serverTimestamp()
             };
 
-            await db.collection('emails').doc(emailId).set(emailData);
+            try {
+                await db.collection('emails').doc(emailId).create(emailData);
+            } catch (e) {
+                if (e && (e.code === 6 || String(e.message || '').includes('ALREADY_EXISTS'))) {
+                    logAlways(`Email ${emailId} already exists for next step (stepIndex: ${nextStepIndex})`);
+                } else {
+                    throw e;
+                }
+            }
+
+            try {
+                await taskDoc.ref.set({
+                    nextStepCreated: true,
+                    nextStepType: 'email',
+                    nextStepId: emailId,
+                    nextStepIndex: nextStepIndex,
+                    nextStepCreatedAt: admin.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+            } catch (e) {
+                logAlways(`Failed to persist next-step metadata on task ${taskId}: ${e?.message || e}`);
+            }
 
             logAlways(`Created email ${emailId} for next step (stepIndex: ${nextStepIndex})`);
 
@@ -208,7 +244,7 @@ export default async function handler(req, res) {
 
         } else {
             // CREATE TASK (phone-call, LinkedIn, etc.)
-            const newTaskId = `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const newTaskId = makeSequenceStepId('task', task.sequenceId, contact.id, nextStepIndex);
 
             // Determine task type and title
             let taskType = nextStep.type;
@@ -260,7 +296,27 @@ export default async function handler(req, res) {
                 createdAt: admin.firestore.FieldValue.serverTimestamp()
             };
 
-            await db.collection('tasks').doc(newTaskId).set(newTaskData);
+            try {
+                await db.collection('tasks').doc(newTaskId).create(newTaskData);
+            } catch (e) {
+                if (e && (e.code === 6 || String(e.message || '').includes('ALREADY_EXISTS'))) {
+                    logAlways(`Task ${newTaskId} already exists for next step (stepIndex: ${nextStepIndex})`);
+                } else {
+                    throw e;
+                }
+            }
+
+            try {
+                await taskDoc.ref.set({
+                    nextStepCreated: true,
+                    nextStepType: 'task',
+                    nextStepId: newTaskId,
+                    nextStepIndex: nextStepIndex,
+                    nextStepCreatedAt: admin.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+            } catch (e) {
+                logAlways(`Failed to persist next-step metadata on task ${taskId}: ${e?.message || e}`);
+            }
 
             logAlways(`Created task ${newTaskId} for next step (stepIndex: ${nextStepIndex})`);
 
