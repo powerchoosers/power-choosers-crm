@@ -1084,9 +1084,6 @@
         let cursorAdjustment = formattedValue.length - sanitized.length;
         let newCursorPos = Math.max(0, (cursorPos ?? formattedValue.length) + cursorAdjustment);
 
-        // Debugging
-        try { console.log('[TimeInput] input', { raw: rawBefore, sanitized, formatted: formattedValue, lastKey: _timeLastKey, cursorBefore: cursorPos, cursorAfter: newCursorPos }); } catch (_) { }
-
         // Set the formatted value
         e.target.value = formattedValue;
 
@@ -1909,6 +1906,18 @@
       window.AccountDetail.state.currentAccount = null;
     }
 
+    // Immediately enter detail-mode UI to prevent header bleed-through
+    try {
+      const tableContainer = els.mainContent ? els.mainContent.querySelector('.table-container') : null;
+      if (tableContainer) {
+        tableContainer.classList.add('hidden');
+      } else {
+        try { state.prevPeopleContent = els.mainContent ? els.mainContent.innerHTML : ''; } catch (_) { state.prevPeopleContent = ''; }
+      }
+      hideToolbar();
+      if (els.page) { els.page.classList.add('contact-detail-mode'); }
+    } catch (_) { }
+
     // Find contact in people data, or use provided temporary contact
     let contact = null;
     if (tempContact && typeof tempContact === 'object') {
@@ -1924,11 +1933,20 @@
 
     if (!contact) {
       console.error('Contact not found:', contactId);
+      try {
+        showToolbar();
+        if (els.page) { els.page.classList.remove('contact-detail-mode'); }
+        const tableContainer = els.mainContent ? els.mainContent.querySelector('.table-container') : null;
+        if (tableContainer) tableContainer.classList.remove('hidden');
+      } catch (_) { }
       return;
     }
 
     // Ensure the new contact has a stable id immediately for downstream actions (lists, notes)
     if (!contact.id && contactId) contact.id = contactId;
+
+    // Seed preferred phone selection early so initial render reflects it
+    try { state.preferredPhoneField = String(contact.preferredPhoneField || '').trim(); } catch (_) { state.preferredPhoneField = ''; }
 
     // PRE-LOAD: Start account data fetch in parallel
     const accountDataPromise = findAssociatedAccount(contact);
@@ -2024,20 +2042,7 @@
     });
     // Preload notes content early for smooth Notes widget open
     try { preloadNotesForContact(contact.id); } catch (_) { /* noop */ }
-    // Non-destructive: hide the existing table/list instead of replacing all HTML
-    const tableContainer = els.mainContent.querySelector('.table-container');
-    if (tableContainer) {
-      tableContainer.classList.add('hidden');
-    } else {
-      // Fallback: cache full content in case structure changed
-      try { state.prevPeopleContent = els.mainContent ? els.mainContent.innerHTML : ''; } catch (_) { state.prevPeopleContent = ''; }
-    }
-    hideToolbar();
-    // Enable scrollable content area while in contact detail
-    if (els.page) { els.page.classList.add('contact-detail-mode'); }
-    // Seed preferred phone selection from persisted value so the primary phone row reflects it immediately
-    try { state.preferredPhoneField = String(contact.preferredPhoneField || '').trim(); } catch (_) { state.preferredPhoneField = ''; }
-    await renderContactDetail();
+
 
     // Setup energy update listener for real-time sync with Health Widget
     try {
@@ -2123,7 +2128,7 @@
   function hideToolbar() {
     const peoplePage = document.querySelector('#people-page');
     if (peoplePage) {
-      const pageHeader = peoplePage.querySelector('.page-header');
+      const pageHeader = peoplePage.querySelector('.page-container > .page-header');
       if (pageHeader) pageHeader.classList.add('hidden');
     }
   }
@@ -2131,7 +2136,7 @@
   function showToolbar() {
     const peoplePage = document.querySelector('#people-page');
     if (peoplePage) {
-      const pageHeader = peoplePage.querySelector('.page-header');
+      const pageHeader = peoplePage.querySelector('.page-container > .page-header');
       if (pageHeader) pageHeader.classList.remove('hidden');
     }
   }
@@ -5612,10 +5617,6 @@
       return;
     }
 
-    // If no recordingSid provided, the API will look it up by callSid
-    if (!recordingSid) {
-      try { console.log('[ContactDetail] No recordingSid provided, API will look up recording for callSid:', callSid); } catch (_) { }
-    }
     try {
       // Show loading spinner on the button (scoped, consistent across pages)
       try {
@@ -7939,7 +7940,6 @@
           logoUrl: '',
           isCompanyPhone: false
         });
-        console.log('[Contact Detail] Cleared phone widget context to prevent leakage');
       }
     } catch (_) { }
   }
@@ -7963,7 +7963,6 @@
           // If names match and we're on the contact detail page, update the state
           if (currentName && newName && currentName.toLowerCase() === newName.toLowerCase() &&
             currentCompany && newCompany && currentCompany.toLowerCase() === newCompany.toLowerCase()) {
-            console.log('[Contact Detail] Updating state with new contact ID:', id);
             state.currentContact.id = id;
             state.currentContact = { ...state.currentContact, ...doc, id };
 
@@ -7992,7 +7991,6 @@
         // This ensures add-to-list functionality works after contact creation
         const isOnContactDetailPage = document.getElementById('contact-detail-view') !== null;
         if (id && isOnContactDetailPage) {
-          console.log('[Contact Detail] Re-attaching event handlers for contact creation:', id);
           // Reset event attachment flag to force re-attachment
           state._contactDetailEventsAttached = false;
           // Re-attach event handlers with proper timing
@@ -8013,14 +8011,12 @@
 
   // Add toMDY function for date formatting
   function toMDY(v) {
-    console.log('[Contact Detail] toMDY called with:', v);
     const d = parseDateFlexible(v);
     if (!d) return v ? String(v) : '';
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     const yyyy = d.getFullYear();
     const result = `${mm}/${dd}/${yyyy}`;
-    console.log('[Contact Detail] toMDY result:', result);
     return result;
   }
 
@@ -8057,8 +8053,6 @@
 
   // Cleanup function to remove event listeners and reset state
   function cleanup() {
-    console.log('[ContactDetail] Cleaning up module...');
-
     // Remove all tracked event listeners
     eventListeners.forEach(({ type, handler, target }) => {
       try {
@@ -8080,8 +8074,6 @@
 
     // Reset state flags
     state._contactDetailEventsAttached = false;
-
-    console.log('[ContactDetail] Cleanup complete');
   }
 
   // Export functions for use by people.js
@@ -8093,15 +8085,6 @@
     state: state,
     // Expose cleanup function for hot reload support
     _cleanup: cleanup
-  };
-
-  // Debug function to test phone input functionality
-  window.testPhoneInput = function (value, cursorPos = 0) {
-    console.log('Testing phone input:', { value, cursorPos });
-    console.log('isTypingExtension:', isTypingExtension(value, cursorPos));
-    console.log('parsePhoneWithExtension:', parsePhoneWithExtension(value));
-    console.log('formatPhoneNumberForInput:', formatPhoneNumberForInput(value));
-    console.log('formatPhoneForDisplay:', formatPhoneForDisplay(value));
   };
 
   // ===== Email Validation Modal for Contact Detail =====

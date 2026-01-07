@@ -2421,7 +2421,7 @@ class ActivityManager {
           if (container.innerHTML.includes('loading-spinner')) {
             container.innerHTML = this.renderEmptyState();
           }
-        }, 100);
+        }, 2000);
 
         // Show pagination if there are multiple pages
         this.updatePagination(containerId, totalPages);
@@ -2752,9 +2752,15 @@ class ActivityManager {
     if (entityType === 'contact' && entityId) {
       window._emailNavigationSource = 'contact-detail';
       window._emailNavigationContactId = entityId;
+      try { window._emailNavigationContactScroll = window.scrollY || 0; } catch (_) { }
     } else if (entityType === 'task' && entityId) {
       window._emailNavigationSource = 'task-detail';
       window._emailNavigationTaskId = entityId;
+      try { window._emailNavigationTaskScroll = window.scrollY || 0; } catch (_) { }
+    } else if (entityType === 'account' && entityId) {
+      window._emailNavigationSource = 'account-detail';
+      window._emailNavigationAccountId = entityId;
+      try { window._emailNavigationAccountScroll = window.scrollY || 0; } catch (_) { }
     } else if (entityType === 'global' || !entityType) {
       // Check if we're on dashboard/home page
       const currentPage = window.crm?.currentPage || '';
@@ -3548,8 +3554,75 @@ class ActivityManager {
     }
   }
 
+  inferEmailNavigationSource() {
+    const scroll = (() => {
+      try { return window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0; } catch (_) { return 0; }
+    })();
+
+    let inferred = null;
+
+    const taskId = window.TaskDetail?.state?.currentTask?.id || null;
+    const contactId = window.ContactDetail?.state?.currentContact?.id || null;
+    const accountId = window.AccountDetail?.state?.currentAccount?.id || null;
+    const crmPage = window.crm?.currentPage || '';
+
+    const isActivePage = (id) => {
+      try {
+        const page = document.getElementById(id);
+        return !!(page && page.classList && page.classList.contains('active') && !page.hidden);
+      } catch (_) {
+        return false;
+      }
+    };
+
+    const contactPageActive = isActivePage('contact-detail-page');
+    const taskPageActive = isActivePage('task-detail-page');
+    const accountPageActive = isActivePage('account-details-page');
+
+    if (contactPageActive && contactId) {
+      inferred = 'contact-detail';
+      window._emailNavigationSource = 'contact-detail';
+      window._emailNavigationContactId = contactId;
+      window._emailNavigationContactScroll = scroll;
+    } else if (taskPageActive && taskId) {
+      inferred = 'task-detail';
+      window._emailNavigationSource = 'task-detail';
+      window._emailNavigationTaskId = taskId;
+      window._emailNavigationTaskScroll = scroll;
+    } else if (accountPageActive && accountId) {
+      inferred = 'account-detail';
+      window._emailNavigationSource = 'account-detail';
+      window._emailNavigationAccountId = accountId;
+      window._emailNavigationAccountScroll = scroll;
+    } else if (crmPage === 'people') {
+      inferred = 'people';
+      window._emailNavigationSource = 'people';
+    } else if (crmPage === 'dashboard' || crmPage === 'home') {
+      inferred = 'home';
+      window._emailNavigationSource = 'home';
+    } else if (contactId) {
+      inferred = 'contact-detail';
+      window._emailNavigationSource = 'contact-detail';
+      window._emailNavigationContactId = contactId;
+      window._emailNavigationContactScroll = scroll;
+    } else if (accountId) {
+      inferred = 'account-detail';
+      window._emailNavigationSource = 'account-detail';
+      window._emailNavigationAccountId = accountId;
+      window._emailNavigationAccountScroll = scroll;
+    } else if (taskId) {
+      inferred = 'task-detail';
+      window._emailNavigationSource = 'task-detail';
+      window._emailNavigationTaskId = taskId;
+      window._emailNavigationTaskScroll = scroll;
+    }
+
+    return inferred;
+  }
+
   primeCacheAndNavigate(entityType, entityId, data) {
     if (entityType === 'email') {
+      this.inferEmailNavigationSource();
       if (!window.emailCache) window.emailCache = new Map();
       if (data) {
         window.emailCache.set(entityId, data);
@@ -3656,6 +3729,7 @@ class ActivityManager {
     } else if (entityType === 'email') {
       // Navigate to email detail
       if (window.crm && typeof window.crm.navigateToPage === 'function') {
+        this.inferEmailNavigationSource();
         window.crm.navigateToPage('email-detail', { emailId: entityId });
       }
     } else if (entityType === 'task') {

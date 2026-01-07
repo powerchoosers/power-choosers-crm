@@ -8,7 +8,7 @@ class CacheManager {
     this.db = null;
     // INCREASED CACHE EXPIRY: 4-8 hours instead of 45 minutes for better performance
     this.cacheExpiry = 8 * 60 * 60 * 1000; // 8 hours in milliseconds (default for most collections)
-    this.tasksCacheExpiry = 2 * 60 * 60 * 1000; // 2 hours for tasks (still volatile but reasonable)
+    this.tasksCacheExpiry = 8 * 60 * 60 * 1000; // 8 hours for tasks (budget-friendly)
     this.emailsCacheExpiry = 4 * 60 * 60 * 1000; // 4 hours for emails (moderate volatility)
     this.collections = ['contacts', 'accounts', 'calls', 'calls-raw', 'tasks', 'sequences', 'lists', 'deals', 'settings', 'badge-data', 'emails', 'agents', 'agent_activities'];
     // List members change relatively often, but we also have explicit invalidation events
@@ -350,7 +350,7 @@ class CacheManager {
 
       // Use scoped queries for user-specific collections
       if (['contacts', 'tasks', 'accounts', 'emails', 'lists', 'sequences', 'calls', 'agent_activities', 'deals'].includes(collection)) {
-        const email = window.currentUserEmail || '';
+        const email = (window.currentUserEmail || '').toLowerCase();
         if (window.currentUserRole !== 'admin' && email) {
           // Non-admin: use scoped queries - check multiple ownership fields
           const queries = [];
@@ -362,6 +362,10 @@ class CacheManager {
 
           // For lists, also check createdBy field (legacy field)
           if (collection === 'lists') {
+            queries.push(window.firebaseDB.collection(collection).where('createdBy', '==', email).get());
+          }
+
+          if (collection === 'tasks') {
             queries.push(window.firebaseDB.collection(collection).where('createdBy', '==', email).get());
           }
 
@@ -927,5 +931,3 @@ if (typeof window !== 'undefined') {
     return stats;
   };
 }
-
-

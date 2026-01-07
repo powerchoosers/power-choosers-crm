@@ -5108,74 +5108,39 @@ class PowerChoosersCRM {
         };
 
         try {
-            if (!window.firebaseDB) {
+            const allFirebaseTasks = window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.getTasksData === 'function'
+                ? (window.BackgroundTasksLoader.getTasksData() || [])
+                : [];
+            if (!Array.isArray(allFirebaseTasks) || allFirebaseTasks.length === 0) {
+                console.warn('[Tasks] BackgroundTasksLoader not ready, skipping LinkedIn sequence filtering');
                 return linkedInTasks;
             }
 
-            // Query tasks collection for sequence tasks
-            const tasksQuery = window.firebaseDB.collection('tasks')
-                .where('sequenceId', '!=', null)
-                .get();
+            allFirebaseTasks.forEach(task => {
+                if (!task || !task.sequenceId) return;
 
-            const tasksSnapshot = await tasksQuery;
-
-            if (tasksSnapshot.empty) {
-                return linkedInTasks;
-            }
-
-            tasksSnapshot.forEach(doc => {
-                const taskData = doc.data();
-
-                // Only include LinkedIn task types
-                const taskType = String(taskData.type || '').toLowerCase();
+                const taskType = String(task.type || '').toLowerCase();
                 if (!taskType.includes('linkedin') && !taskType.includes('li-')) {
                     return;
                 }
 
-                // Filter by ownership (non-admin users)
                 if (!isAdmin()) {
-                    const ownerId = (taskData.ownerId || '').toLowerCase();
-                    const assignedTo = (taskData.assignedTo || '').toLowerCase();
-                    const createdBy = (taskData.createdBy || '').toLowerCase();
+                    const ownerId = (task.ownerId || '').toLowerCase();
+                    const assignedTo = (task.assignedTo || '').toLowerCase();
+                    const createdBy = (task.createdBy || '').toLowerCase();
                     if (ownerId !== userEmail && assignedTo !== userEmail && createdBy !== userEmail) {
                         return;
                     }
                 }
 
-                // Only include pending tasks
-                if (taskData.status === 'completed') {
+                if (task.status === 'completed') {
                     return;
                 }
-
-                // Convert Firestore data to task format
-                const task = {
-                    id: taskData.id || doc.id,
-                    title: taskData.title || '',
-                    contact: taskData.contact || '',
-                    account: taskData.account || '',
-                    type: taskData.type || 'linkedin',
-                    priority: taskData.priority || 'sequence',
-                    dueDate: taskData.dueDate || '',
-                    dueTime: taskData.dueTime || '',
-                    status: taskData.status || 'pending',
-                    sequenceId: taskData.sequenceId || '',
-                    contactId: taskData.contactId || '',
-                    accountId: taskData.accountId || '',
-                    stepId: taskData.stepId || '',
-                    stepIndex: taskData.stepIndex !== undefined ? taskData.stepIndex : -1,
-                    isLinkedInTask: true,
-                    isSequenceTask: taskData.isSequenceTask || true,
-                    ownerId: taskData.ownerId || '',
-                    assignedTo: taskData.assignedTo || '',
-                    createdBy: taskData.createdBy || '',
-                    createdAt: taskData.createdAt || (taskData.timestamp && taskData.timestamp.toDate ? taskData.timestamp.toDate().getTime() : taskData.timestamp) || Date.now(),
-                    timestamp: taskData.timestamp && taskData.timestamp.toDate ? taskData.timestamp.toDate().getTime() : (taskData.timestamp || Date.now())
-                };
 
                 linkedInTasks.push(task);
             });
         } catch (error) {
-            console.error('[CRM] Error loading LinkedIn sequence tasks:', error);
+            console.error('[Tasks] Error filtering LinkedIn sequence tasks:', error);
         }
 
         return linkedInTasks;
@@ -5218,8 +5183,6 @@ class PowerChoosersCRM {
     }
 
     async loadTodaysTasks(skipFirebase = false) {
-        const startTime = performance.now();
-
         // Prevent multiple calls within 2 seconds AND while actively loading
         const currentTime = Date.now();
         if (this._lastTasksLoad && (currentTime - this._lastTasksLoad) < 2000) {
@@ -5378,82 +5341,91 @@ class PowerChoosersCRM {
         // If not skipping Firebase, fetch Firebase data in background and update
         if (!skipFirebase) {
             try {
-                if (window.firebaseDB) {
-                    let query = window.firebaseDB.collection('tasks');
+                const getCachedTasksNoFetch = async () => {
+                    try {
+                        if (!window.CacheManager || typeof window.CacheManager.getFromCache !== 'function') return [];
+                        if (typeof window.CacheManager.init === 'function') {
+                            await window.CacheManager.init();
+                        }
+                        const cached = await window.CacheManager.getFromCache('tasks');
+                        return Array.isArray(cached) ? cached : [];
+                    } catch (_) {
+                        return [];
+                    }
+                };
+
+                const waitForBackgroundTasks = async (timeoutMs = 2000) => {
+                    try {
+                        return await new Promise(resolve => {
+                            let done = false;
+                            const onLoaded = () => {
+                                if (done) return;
+                                done = true;
+                                try { clearTimeout(t); } catch (_) { }
+                                resolve(true);
+                            };
+                            const t = setTimeout(() => {
+                                if (done) return;
+                                done = true;
+                                try { document.removeEventListener('pc:tasks-loaded', onLoaded); } catch (_) { }
+                                resolve(false);
+                            }, timeoutMs);
+                            document.addEventListener('pc:tasks-loaded', onLoaded, { once: true });
+                        });
+                    } catch (_) {
+                        return false;
+                    }
+                };
+
+                {
+                    // NOTE: To keep Firestore reads low, Today's Tasks does not query Firestore directly.
+                    // It relies on BackgroundTasksLoader + IndexedDB cache, plus event-driven updates.
 
                     // CRITICAL: Add ownership filters for non-admin users
                     if (!isAdmin()) {
                         const email = getUserEmail();
 
 
-                        if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
-                            // Use DataManager helper if available
-                            const firebaseTasks = await window.DataManager.queryWithOwnership('tasks');
+                        if (email) {
+                            let firebaseTasks = [];
+                            let usedBackgroundLoader = false;
+                            let usedCache = false;
 
-
-                            // CRITICAL: Firebase is the source of truth once available.
-                            // Do NOT re-introduce stale local tasks that are missing from Firebase results.
-                            const mergedTasksMap = new Map();
-                            firebaseTasks.forEach(t => {
-                                const status = String(t?.status || 'pending').toLowerCase();
-                                const isCompleted = status === 'completed' || status === 'done' || t?.completed === true || t?.isCompleted === true || t?.completedAt || t?.completed_at;
-                                if (t && t.id && !isCompleted) mergedTasksMap.set(t.id, t);
-                            });
-
-                            // CRITICAL FIX: Add LinkedIn sequence tasks (only pending ones)
-                            const linkedInTasks = await this.getLinkedInTasksFromSequences();
-                            linkedInTasks.forEach(t => {
-                                const status = String(t?.status || 'pending').toLowerCase();
-                                const isCompleted = status === 'completed' || status === 'done' || t?.completed === true || t?.isCompleted === true || t?.completedAt || t?.completed_at;
-                                if (t && t.id && !isCompleted && !mergedTasksMap.has(t.id)) mergedTasksMap.set(t.id, t);
-                            });
-
-                            const mergedTasks = Array.from(mergedTasksMap.values());
-
-                            // Final safety check - ensure no completed tasks are saved to localStorage
-                            const finalMergedTasks = mergedTasks.filter(t => {
-                                if (!t || !t.id) return false;
-                                const status = String(t.status || 'pending').toLowerCase();
-                                if (status === 'completed' || status === 'done') return false;
-                                if (t.completed === true || t.isCompleted === true) return false;
-                                if (t.completedAt || t.completed_at) return false;
-                                return true;
-                            });
-
-                            // CRITICAL FIX: Save to both namespaced and legacy keys for compatibility
-                            try {
-                                const email = getUserEmail();
-                                const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
-                                localStorage.setItem(namespacedKey, JSON.stringify(finalMergedTasks));
-                                localStorage.setItem('userTasks', JSON.stringify(finalMergedTasks)); // Legacy key for compatibility
-                            } catch (e) {
-                                console.warn('Could not save merged tasks to localStorage cache:', e);
-                            }
-                            this.renderTodaysTasks(finalMergedTasks, parseDateStrict, parseTimeToMinutes, today);
-                            this._tasksLoading = false;
-                            return;
-                        } else if (email) {
-                            // Fallback: two separate queries and merge client-side
-                            const [ownedSnap, assignedSnap] = await Promise.all([
-                                window.firebaseDB.collection('tasks').where('ownerId', '==', email).orderBy('timestamp', 'desc').limit(200).get(),
-                                window.firebaseDB.collection('tasks').where('assignedTo', '==', email).orderBy('timestamp', 'desc').limit(200).get()
-                            ]);
-                            const tasksMap = new Map();
-                            ownedSnap.docs.forEach(doc => {
-                                const data = doc.data() || {};
-                                const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
-                                tasksMap.set(doc.id, { ...data, id: doc.id, createdAt, status: data.status || 'pending' });
-                            });
-                            assignedSnap.docs.forEach(doc => {
-                                if (!tasksMap.has(doc.id)) {
-                                    const data = doc.data() || {};
-                                    const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
-                                    tasksMap.set(doc.id, { ...data, id: doc.id, createdAt, status: data.status || 'pending' });
+                            if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.getTasksData === 'function') {
+                                const bgTasks = window.BackgroundTasksLoader.getTasksData();
+                                if (bgTasks && bgTasks.length > 0) {
+                                    firebaseTasks = bgTasks;
+                                    usedBackgroundLoader = true;
                                 }
-                            });
-                            const firebaseTasks = Array.from(tasksMap.values());
+                            }
 
-                            // CRITICAL: Firebase is the source of truth once available.
+                            if (!usedBackgroundLoader) {
+                                const cachedRaw = await getCachedTasksNoFetch();
+                                if (cachedRaw.length > 0) {
+                                    const em = email.toLowerCase();
+                                    firebaseTasks = cachedRaw.filter(t => {
+                                        if (!t) return false;
+                                        const ownerId = (t.ownerId || '').toLowerCase();
+                                        const assignedTo = (t.assignedTo || '').toLowerCase();
+                                        const createdBy = (t.createdBy || '').toLowerCase();
+                                        return ownerId === em || assignedTo === em || createdBy === em;
+                                    });
+                                    usedCache = true;
+                                }
+                            }
+
+                            if (!usedBackgroundLoader && !usedCache) {
+                                await waitForBackgroundTasks(2000);
+                                if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.getTasksData === 'function') {
+                                    const bgTasks = window.BackgroundTasksLoader.getTasksData();
+                                    if (bgTasks && bgTasks.length > 0) {
+                                        firebaseTasks = bgTasks;
+                                        usedBackgroundLoader = true;
+                                    }
+                                }
+                            }
+
+                            // CRITICAL: Firebase/BackgroundLoader is the source of truth once available.
                             // Do NOT re-introduce stale local tasks that are missing from Firebase results.
                             const mergedTasksMap = new Map();
                             firebaseTasks.forEach(t => {
@@ -5497,64 +5469,54 @@ class PowerChoosersCRM {
                         }
                     }
 
-                    // OPTIMIZATION: Try to use cached data from BackgroundLoaderCoordinator first
-                    // This avoids expensive Firebase queries when data is already cached
-                    const coordinatorExists = !!window.BackgroundLoaderCoordinator;
-                    const tasksLoaded = coordinatorExists ? window.BackgroundLoaderCoordinator.isLoaded('tasks') : false;
-                    const coordinatorStatus = coordinatorExists ? window.BackgroundLoaderCoordinator.getStatus() : null;
-                    if (tasksLoaded) {
-                        try {
-                            const cachedTasks = await window.CacheManager.get('tasks');
-                            // IMPORTANT: Do NOT pre-filter cached tasks with custom logic here.
-                            // That "early filtering" was producing a smaller list (e.g. 123) and then
-                            // the later Firebase/loader path produced a different list (e.g. 236),
-                            // which looks like the widget is battling/flipping.
-                            // Instead, only remove completed tasks here and let renderTodaysTasks()
-                            // apply the exact same due-date filtering every time.
-                            const processedTasks = (cachedTasks || []).filter(task => {
-                                if (!task) return false;
-                                const status = String(task.status || 'pending').toLowerCase();
-                                if (status === 'completed' || status === 'done') return false;
-                                if (task.completed === true || task.isCompleted === true) return false;
-                                if (task.completedAt || task.completed_at) return false;
-                                return true;
-                            }).map(task => ({
-                                ...task,
-                                time: task.time || '',
-                                priority: task.priority || 'medium',
-                                type: task.type || 'task'
-                            }));
-                            // Render cached tasks quickly if available.
-                            // IMPORTANT: For admins, cached tasks can be stale across browsers (2h expiry),
-                            // so we still revalidate against Firebase when skipFirebase === false.
-                            if (processedTasks.length > 0) {
-                                this.renderTodaysTasks(processedTasks, parseDateStrict, parseTimeToMinutes, today);
-                                if (!skipFirebase && String(window.currentUserRole || '') !== 'admin') {
-                                    // Non-admin users: keep current behavior to avoid extra reads; cached is typically fine + ownership filtered.
-                                    this._tasksLoading = false;
+                    const cachedTasksRaw = await getCachedTasksNoFetch();
+                    const processedTasks = (cachedTasksRaw || []).filter(task => {
+                        if (!task) return false;
+                        const status = String(task.status || 'pending').toLowerCase();
+                        if (status === 'completed' || status === 'done') return false;
+                        if (task.completed === true || task.isCompleted === true) return false;
+                        if (task.completedAt || task.completed_at) return false;
+                        return true;
+                    }).map(task => ({
+                        ...task,
+                        time: task.time || '',
+                        priority: task.priority || 'medium',
+                        type: task.type || 'task'
+                    }));
 
-                                    const endTime = performance.now();
-                                    return;
-                                }
-                                // Admin users: continue to Firebase path to revalidate.
-                            }
-                            // If cached returned 0 tasks, fall through to Firebase path
-                        } catch (error) {
-                            console.warn('[CRM] Failed to load cached tasks, falling back to Firebase:', error);
-                            // Continue to Firebase fallback
+                    if (processedTasks.length > 0) {
+                        this.renderTodaysTasks(processedTasks, parseDateStrict, parseTimeToMinutes, today);
+                        if (!isAdmin()) {
+                            this._tasksLoading = false;
+                            return;
                         }
                     }
 
-                    // Admin path: unrestricted query
-                    // CRITICAL FIX: Admin query must not rely on `timestamp` ordering.
-                    // Many tasks do not have timestamp set, which silently drops them and causes
-                    // the widget to render a partial list (often ~123).
-                    const snapshot = await window.firebaseDB.collection('tasks').get();
-                    const firebaseTasks = snapshot.docs.map(doc => {
-                        const data = doc.data() || {};
-                        const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
-                        return { ...data, id: (data.id || doc.id), createdAt, status: data.status || 'pending' };
-                    });
+                    let firebaseTasks = [];
+                    let usedBackgroundLoader = false;
+                    if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.getTasksData === 'function') {
+                        const bgTasks = window.BackgroundTasksLoader.getTasksData();
+                        if (bgTasks && bgTasks.length > 0) {
+                            firebaseTasks = bgTasks;
+                            usedBackgroundLoader = true;
+                        }
+                    }
+
+                    if (!usedBackgroundLoader) {
+                        await waitForBackgroundTasks(2000);
+                        if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.getTasksData === 'function') {
+                            const bgTasks = window.BackgroundTasksLoader.getTasksData();
+                            if (bgTasks && bgTasks.length > 0) {
+                                firebaseTasks = bgTasks;
+                                usedBackgroundLoader = true;
+                            }
+                        }
+                    }
+
+                    if (!firebaseTasks || firebaseTasks.length === 0) {
+                        this._tasksLoading = false;
+                        return;
+                    }
 
                     // CRITICAL: Admin path still treats Firebase as source of truth.
                     // Do NOT merge in stale localTasks after Firebase load.
@@ -5598,7 +5560,7 @@ class PowerChoosersCRM {
                     this.renderTodaysTasks(finalMergedTasks, parseDateStrict, parseTimeToMinutes, today);
                 }
             } catch (e) {
-                console.warn("Could not load tasks from Firebase for Today's Tasks widget:", e);
+                console.warn("Could not load tasks for Today's Tasks widget:", e);
             } finally {
                 // CRITICAL FIX: Always reset loading flag and render flag, even if there was an error
                 this._tasksLoading = false;
@@ -5609,8 +5571,6 @@ class PowerChoosersCRM {
             this._tasksLoading = false;
             this._hasRenderedForCurrentLoad = false;
         }
-
-        const endTime = performance.now();
 
         // CRITICAL FIX: Handle queued requests after loading completes
         if (this._queuedTasksLoad) {
@@ -5690,9 +5650,29 @@ class PowerChoosersCRM {
         // Smart Render Check: Avoid re-rendering if data hasn't changed (prevents flicker/scroll jumps)
         // This replaces the old "block all updates" logic which broke pagination and live updates.
         const currentFingerprint = todaysTasks.map(t => t.id + ':' + (t.status || '') + ':' + (t.dueDate || '')).join('|');
-        if (!isPaginationNav && this._lastRenderedFingerprint === currentFingerprint && this._hasRenderedForCurrentLoad) {
+        const hasSkeleton = !!tasksList.querySelector('.skeleton-task, .skeleton-text, .skeleton-shimmer');
+        if (!isPaginationNav && !hasSkeleton && this._lastRenderedFingerprint === currentFingerprint) {
             return;
         }
+
+        const nowMs = Date.now();
+        const animLockUntil = this._todaysTasksAnimLockUntil || 0;
+        if (!isPaginationNav && !hasSkeleton && animLockUntil && nowMs < animLockUntil) {
+            this._todaysTasksPendingRender = { allTasks, parseDateStrict, parseTimeToMinutes, today };
+            if (!this._todaysTasksPendingRenderTimer) {
+                const waitMs = Math.max(0, animLockUntil - nowMs);
+                this._todaysTasksPendingRenderTimer = setTimeout(() => {
+                    this._todaysTasksPendingRenderTimer = null;
+                    const pending = this._todaysTasksPendingRender;
+                    this._todaysTasksPendingRender = null;
+                    if (pending) {
+                        this.renderTodaysTasks(pending.allTasks, pending.parseDateStrict, pending.parseTimeToMinutes, pending.today);
+                    }
+                }, waitMs);
+            }
+            return;
+        }
+
         this._lastRenderedFingerprint = currentFingerprint;
         this._hasRenderedForCurrentLoad = true;
 
@@ -5735,8 +5715,9 @@ class PowerChoosersCRM {
 
                 // Add staggered delay for modern reveal (skip on pagination clicks for "clean" page turns)
                 const delay = (index * 0.05).toFixed(2);
-                const revealStyle = isPaginationNav ? '' : `style="animation-delay: ${delay}s;"`;
-                const revealClass = isPaginationNav ? '' : 'modern-reveal premium-borderline';
+                const disableReveal = !!(this._todaysTasksAnimLockUntil && Date.now() < this._todaysTasksAnimLockUntil);
+                const revealStyle = (isPaginationNav || disableReveal) ? '' : `style="animation-delay: ${delay}s;"`;
+                const revealClass = (isPaginationNav || disableReveal) ? '' : 'modern-reveal premium-borderline';
 
                 return `
                     <div class="task-item ${revealClass}" data-task-id="${task.id}" style="cursor: pointer;" ${revealStyle}>
@@ -5753,8 +5734,9 @@ class PowerChoosersCRM {
         // Add pagination if needed
         const totalPages = Math.ceil(todaysTasks.length / this.todaysTasksPagination.pageSize);
         if (totalPages > 1) {
-            const paginationRevealStyle = isPaginationNav ? '' : `style="animation-delay: ${(pageTasks.length * 0.05).toFixed(2)}s;"`;
-            const paginationRevealClass = isPaginationNav ? '' : 'modern-reveal';
+            const disableReveal = !!(this._todaysTasksAnimLockUntil && Date.now() < this._todaysTasksAnimLockUntil);
+            const paginationRevealStyle = (isPaginationNav || disableReveal) ? '' : `style="animation-delay: ${(pageTasks.length * 0.05).toFixed(2)}s;"`;
+            const paginationRevealClass = (isPaginationNav || disableReveal) ? '' : 'modern-reveal';
             tasksHtml += `
                 <div class="tasks-pagination ${paginationRevealClass}" ${paginationRevealStyle}>
                     <button class="pagination-btn prev-btn" ${this.todaysTasksPagination.currentPage === 1 ? 'disabled' : ''} data-action="prev">
@@ -5787,6 +5769,10 @@ class PowerChoosersCRM {
                 setTimeout(() => { list.style.height = ''; }, 450);
             });
         });
+
+        if (!isPaginationNav) {
+            this._todaysTasksAnimLockUntil = Date.now() + 650;
+        }
 
         // Attach task click event listeners
         document.querySelectorAll('.tasks-list').forEach(list => {

@@ -7279,7 +7279,7 @@
       await loadTaskData(restoreData.taskId);
 
       // Restore scroll position if available
-      if (restoreData.scroll) {
+      if (restoreData.scroll !== undefined && restoreData.scroll !== null) {
         setTimeout(() => {
           window.scrollTo(0, restoreData.scroll);
         }, 50);
