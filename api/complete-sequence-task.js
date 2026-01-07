@@ -117,15 +117,52 @@ export default async function handler(req, res) {
         }
 
         const sequence = sequenceDoc.data();
-        const currentStepIndex = task.stepIndex;
+        const steps = Array.isArray(sequence.steps) ? sequence.steps : [];
+
+        let currentStepIndex = Number.isInteger(task.stepIndex) ? task.stepIndex : Number.parseInt(task.stepIndex, 10);
+        let currentStepIndexResolvedFrom = 'task.stepIndex';
+
+        try {
+            const stepId = task.stepId || task.sequenceStepId || task.sequenceStepTemplateId;
+            if (stepId && steps.length) {
+                const byIdIndex = steps.findIndex(s => s && (s.id === stepId || s.stepId === stepId));
+                if (byIdIndex >= 0) {
+                    currentStepIndex = byIdIndex;
+                    currentStepIndexResolvedFrom = 'task.stepId';
+                }
+            }
+        } catch (_) { }
+
+        if (!Number.isInteger(currentStepIndex)) {
+            try {
+                const parsedFromId = Number.parseInt(String(taskId).split('-').slice(-1)[0], 10);
+                if (Number.isInteger(parsedFromId)) {
+                    currentStepIndex = parsedFromId;
+                    currentStepIndexResolvedFrom = 'taskId';
+                }
+            } catch (_) { }
+        }
+
+        if (!Number.isInteger(currentStepIndex) || currentStepIndex < 0 || currentStepIndex >= steps.length) {
+            logAlways(`Could not resolve current step index for task ${taskId} (stepIndex=${task.stepIndex}, stepId=${task.stepId || ''}), skipping next step creation`);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                success: true,
+                message: 'Could not resolve current step index - no next step created'
+            }));
+            return;
+        }
+
+        const currentStep = steps[currentStepIndex];
+        logAlways(`Task is part of sequence ${task.sequenceId}, step ${currentStepIndex} (resolvedFrom=${currentStepIndexResolvedFrom}, type=${currentStep?.type || 'unknown'})`);
 
         // Find the next non-paused step after current step
         let nextStep = null;
         let nextStepIndex = -1;
         let cumulativeDelayMs = 0;
 
-        for (let i = currentStepIndex + 1; i < (sequence.steps?.length || 0); i++) {
-            const step = sequence.steps[i];
+        for (let i = currentStepIndex + 1; i < steps.length; i++) {
+            const step = steps[i];
 
             // Skip paused steps
             if (step.paused) continue;
