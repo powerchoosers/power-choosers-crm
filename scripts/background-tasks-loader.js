@@ -22,6 +22,12 @@
     try { if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') return window.DataManager.getCurrentUserEmail(); return (window.currentUserEmail || '').toLowerCase(); } catch (_) { return (window.currentUserEmail || '').toLowerCase(); }
   };
 
+  const tasksCacheVersion = 2;
+  const getTasksCacheVersionKey = () => {
+    const email = getUserEmail();
+    return email ? `pc:tasks-cache-version:${email}` : 'pc:tasks-cache-version';
+  };
+
   async function loadFromFirestore(preserveExisting = false) {
 
     if (!window.firebaseDB && !(window.DataManager && typeof window.DataManager.queryWithOwnership === 'function')) {
@@ -46,15 +52,17 @@
 
 
         } else {
-          const email = window.currentUserEmail || '';
+          const email = getUserEmail();
           const db = window.firebaseDB;
-          const [ownedSnap, assignedSnap] = await Promise.all([
+          const [ownedSnap, assignedSnap, createdSnap] = await Promise.all([
             db.collection('tasks').where('ownerId', '==', email).get(),
-            db.collection('tasks').where('assignedTo', '==', email).get()
+            db.collection('tasks').where('assignedTo', '==', email).get(),
+            db.collection('tasks').where('createdBy', '==', email).get()
           ]);
           const map = new Map();
           ownedSnap.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
           assignedSnap.forEach(d => { if (!map.has(d.id)) map.set(d.id, { id: d.id, ...d.data() }); });
+          createdSnap.forEach(d => { if (!map.has(d.id)) map.set(d.id, { id: d.id, ...d.data() }); });
           newTasks = Array.from(map.values());
 
 
@@ -140,11 +148,19 @@
   (async function () {
     if (window.CacheManager && typeof window.CacheManager.get === 'function') {
       try {
+        try {
+          const key = getTasksCacheVersionKey();
+          const current = parseInt(localStorage.getItem(key) || '0', 10);
+          if (current !== tasksCacheVersion && typeof window.CacheManager.invalidate === 'function') {
+            await window.CacheManager.invalidate('tasks');
+            localStorage.setItem(key, String(tasksCacheVersion));
+          }
+        } catch (_) { }
+
         const cached = await window.CacheManager.get('tasks');
         if (cached && Array.isArray(cached) && cached.length > 0) {
           if (window.currentUserRole !== 'admin') {
-            const email = (window.currentUserEmail || '').toLowerCase();
-            const cachedCount = (cached || []).length;
+            const email = getUserEmail();
             // CRITICAL FIX: Include createdBy field in ownership check to match filterTasksByOwnership()
             tasksData = (cached || []).filter(t => {
               if (!t) return false;
@@ -178,10 +194,19 @@
       // Retry after a short delay if CacheManager isn't ready yet
       setTimeout(async () => {
         if (window.CacheManager) {
+          try {
+            const key = getTasksCacheVersionKey();
+            const current = parseInt(localStorage.getItem(key) || '0', 10);
+            if (current !== tasksCacheVersion && typeof window.CacheManager.invalidate === 'function') {
+              await window.CacheManager.invalidate('tasks');
+              localStorage.setItem(key, String(tasksCacheVersion));
+            }
+          } catch (_) { }
+
           const cached = await window.CacheManager.get('tasks');
           if (cached && Array.isArray(cached) && cached.length > 0) {
             if (window.currentUserRole !== 'admin') {
-              const email = (window.currentUserEmail || '').toLowerCase();
+              const email = getUserEmail();
               // CRITICAL FIX: Include createdBy field in ownership check to match filterTasksByOwnership()
               tasksData = (cached || []).filter(t => {
                 if (!t) return false;
@@ -260,7 +285,7 @@
     if (!window.firebaseDB) return tasksData.length;
 
     try {
-      const email = window.currentUserEmail || '';
+      const email = (window.currentUserEmail || '').toLowerCase();
       if (window.currentUserRole !== 'admin' && email) {
         // Non-admin: use aggregation count for owned/assigned tasks
         try {

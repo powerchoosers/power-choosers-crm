@@ -1643,17 +1643,21 @@
   }
 
   function updateTodaysTasksWidget(newTask) {
-    // Update the Today's Tasks widget
-    if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
-      window.crm.loadTodaysTasks();
-    }
-
     // Also trigger a custom event for other components that might need to know about task updates
     // CRITICAL FIX: Include task data so BackgroundTasksLoader can update cache in place
+    // Must dispatch BEFORE calling loadTodaysTasks so BackgroundLoader has time to update
     if (newTask) {
       window.dispatchEvent(new CustomEvent('tasksUpdated', {
-        detail: { source: 'taskCreation', taskData: newTask }
+        detail: { source: 'taskCreation', taskData: newTask, newTaskCreated: true }
       }));
+    }
+
+    // Update the Today's Tasks widget
+    // We defer this slightly to allow BackgroundTasksLoader to process the event
+    if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
+      setTimeout(() => {
+        window.crm.loadTodaysTasks();
+      }, 50);
     }
   }
 

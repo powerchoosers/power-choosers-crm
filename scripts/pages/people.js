@@ -469,7 +469,7 @@
         if (n) nMap.set(n, a);
       });
       window._accountLookupCache = { hash: listHash, domainMap: dMap, nameMap: nMap };
-      console.log(`[People] Rebuilt account lookup cache for ${list.length} accounts`);
+      
     }
 
     const normDomain = normalizeDomain(domain);
@@ -2158,7 +2158,7 @@
           }
           
           applyFilters(); // Re-apply filters with new data
-          console.log('[People] Loaded', result.loaded, 'more contacts. Total:', state.data.length);
+          
         } else {
           state.hasMore = false;
         }
@@ -3284,7 +3284,7 @@
         getCurrentState, 
         getState: function() { return state; },
         cleanup: function() {
-          console.log('[People] Cleaning up UI state...');
+          
           
           // 1. Unsubscribe from Firestore (CRITICAL)
           if (typeof _unsubscribePeople === 'function') {
@@ -3303,7 +3303,7 @@
           state.data = [];      // Clear paginated view
           state.filtered = [];  // Clear filtered view
           // Keep allContactsCache - it's needed for navigation back
-          console.log('[People] UI state cleaned');
+          
         }
       };
       // Export contacts data for contact-detail module
@@ -3399,7 +3399,6 @@
       // 1. Add call to in-memory cache if available
       if (call && window.callsModule && window.callsModule.state && Array.isArray(window.callsModule.state.data)) {
         window.callsModule.state.data.push(call);
-        console.log('[People] Added call to cache, total calls now:', window.callsModule.state.data.length);
       }
       
       // 2. Normalize the target phone for matching
@@ -3459,7 +3458,7 @@
         }
       });
       
-      console.log('[People] Total badges removed:', badgesRemoved);
+      
     });
   }
 
@@ -3763,7 +3762,6 @@
     const id = btn.getAttribute('data-id');
     switch (action) {
       case 'task': {
-        console.log('People: Create task', { id });
         break;
       }
       case 'linkedin': {
@@ -3783,7 +3781,6 @@
           // No LinkedIn info available
           try { window.crm?.showToast && window.crm.showToast('No LinkedIn profile available'); } catch (_) { /* noop */ }
         }
-        console.log('People: Open LinkedIn', { id, url });
         break;
       }
       case 'website': {
@@ -4630,18 +4627,13 @@
   }
 
   function updateBulkActionsBar(forceShow = false) {
-    console.log('updateBulkActionsBar called, forceShow:', forceShow, 'selected count:', state.selected.size);
     if (!els.tableContainer) {
-      console.log('No table container found');
       return;
     }
     const count = state.selected.size;
     const shouldShow = forceShow || count > 0;
-    console.log('shouldShow:', shouldShow);
     const existing = els.page.querySelector('#people-bulk-actions');
-    console.log('existing bar:', existing);
     if (!shouldShow) {
-      console.log('Not showing bar, removing if exists');
       if (existing) existing.remove();
       return;
     }
@@ -4835,4 +4827,3 @@
     // console.log('[People] UI state cleaned (preserving data for back navigation)');
   };
 })();
-

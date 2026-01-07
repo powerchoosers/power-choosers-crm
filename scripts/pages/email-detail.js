@@ -272,6 +272,7 @@
       });
     }
     if (!initDomRefs()) return;
+    setBackButtonLabel();
 
     // CRITICAL: Prevent race conditions
     if (state.loadingEmail) {
@@ -1313,30 +1314,64 @@
     } else if (navSource === 'task-detail' && window._emailNavigationTaskId) {
       // Return to task detail page
       const taskId = window._emailNavigationTaskId;
+      const restoreScroll = window._emailNavigationTaskScroll;
 
       // Clear navigation variables
       window._emailNavigationSource = null;
       window._emailNavigationTaskId = null;
+      window._emailNavigationTaskScroll = null;
 
       // Navigate to task detail
       if (window.crm && typeof window.crm.navigateToPage === 'function') {
-        window.crm.navigateToPage('tasks');
-        // Use retry pattern to ensure TaskDetail module is ready
+        window.crm.navigateToPage('task-detail');
+
         requestAnimationFrame(() => {
           let attempts = 0;
-          const maxAttempts = 25;
+          const maxAttempts = 40;
           const retryInterval = 80;
 
-          const retry = () => {
+          const tryRestore = () => {
             attempts++;
-            if (window.TaskDetail && typeof window.TaskDetail.show === 'function') {
-              window.TaskDetail.show(taskId);
-            } else if (attempts < maxAttempts) {
-              setTimeout(retry, retryInterval);
+            const page = document.getElementById('task-detail-page');
+            const isActive = page && !page.hidden && page.classList.contains('active');
+
+            if (isActive && window.TaskDetail) {
+              try {
+                document.dispatchEvent(new CustomEvent('pc:task-detail-restore', {
+                  detail: {
+                    taskId,
+                    scroll: restoreScroll
+                  }
+                }));
+              } catch (_) { }
+              return;
+            }
+
+            if (attempts < maxAttempts) {
+              setTimeout(tryRestore, retryInterval);
             }
           };
-          retry();
+
+          tryRestore();
         });
+      }
+    } else if (navSource === 'account-detail' && window._emailNavigationAccountId) {
+      const accountId = window._emailNavigationAccountId;
+
+      window._emailNavigationSource = null;
+      window._emailNavigationAccountId = null;
+      window._emailNavigationAccountScroll = null;
+
+      if (typeof window.showAccountDetail === 'function') {
+        window.showAccountDetail(accountId);
+        return;
+      }
+      if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+        window.AccountDetail.show(accountId);
+        return;
+      }
+      if (window.crm && typeof window.crm.navigateToPage === 'function') {
+        window.crm.navigateToPage('accounts');
       }
     } else if (navSource === 'home' || navSource === 'dashboard') {
       // Return to home/dashboard page
@@ -1344,6 +1379,11 @@
 
       if (window.crm && typeof window.crm.navigateToPage === 'function') {
         window.crm.navigateToPage('dashboard');
+      }
+    } else if (navSource === 'people') {
+      window._emailNavigationSource = null;
+      if (window.crm && typeof window.crm.navigateToPage === 'function') {
+        window.crm.navigateToPage('people');
       }
     } else {
       // Default: return to emails page (preserve existing behavior)
@@ -1361,6 +1401,23 @@
         window.crm.navigateToPage('emails');
       }
     }
+  }
+
+  function setBackButtonLabel() {
+    if (!els.backBtn) return;
+
+    const navSource = window._emailNavigationSource;
+    let label = 'Back to Emails';
+    if (navSource === 'contact-detail') label = 'Back to Contact';
+    else if (navSource === 'account-detail') label = 'Back to Account';
+    else if (navSource === 'task-detail') label = 'Back to Task';
+    else if (navSource === 'home' || navSource === 'dashboard') label = 'Back to Dashboard';
+    else if (navSource === 'people') label = 'Back to People';
+
+    const labelEl = document.getElementById('email-back-label');
+    if (labelEl) labelEl.textContent = label;
+    els.backBtn.setAttribute('aria-label', label);
+    els.backBtn.title = label;
   }
 
   // Toggle star status

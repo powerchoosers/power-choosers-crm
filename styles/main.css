@@ -7105,11 +7105,9 @@ body {
     /* Don't grow, stay next to button */
 }
 
-#email-detail-page .back-btn--icon {
+#email-detail-page #email-back-btn {
     margin: 0;
-    /* Ensure no margin on back button */
     flex-shrink: 0;
-    /* Don't shrink */
 }
 
 #email-detail-page .page-actions {
