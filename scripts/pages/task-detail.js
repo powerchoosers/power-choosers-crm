@@ -288,6 +288,21 @@
     return '';
   }
 
+  function isPcDebugEnabled() {
+    try {
+      return window.PC_DEBUG === true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function seqDebug(event, payload) {
+    if (!isPcDebugEnabled()) return;
+    try {
+      console.log(`[Hypothesis: Seq-Dedupe] ${event}`, payload || {});
+    } catch (_) { }
+  }
+
   // Helper functions for ownership filtering and localStorage key management
   function getUserTasksKey() {
     try {
@@ -1887,14 +1902,40 @@
     // Trigger sequence next step BEFORE deleting the current task so the API can read it
     if (state.currentTask && (state.currentTask.isSequenceTask || state.currentTask.sequenceId)) {
       try {
-        // console.log('[TaskDetail] Completed sequence task, creating next step...', state.currentTask.id);
+        seqDebug('task_detail_complete_sequence_request', {
+          taskId: state.currentTask.id,
+          isSequenceTask: !!state.currentTask.isSequenceTask,
+          sequenceId: state.currentTask.sequenceId || null
+        });
         const baseUrl = getApiBaseUrl();
         const response = await fetch(`${baseUrl}/api/complete-sequence-task`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ taskId: state.currentTask.id })
         });
-        const result = await response.json();
+
+        let result;
+        try {
+          result = await response.json();
+        } catch (parseError) {
+          seqDebug('task_detail_complete_sequence_response_parse_failed', {
+            taskId: state.currentTask.id,
+            status: response.status,
+            ok: response.ok,
+            error: parseError && parseError.message ? parseError.message : String(parseError)
+          });
+          throw parseError;
+        }
+
+        seqDebug('task_detail_complete_sequence_response', {
+          taskId: state.currentTask.id,
+          status: response.status,
+          ok: response.ok,
+          success: !!result?.success,
+          nextStepType: result?.nextStepType || null,
+          nextTaskId: result?.taskId || null,
+          message: result?.message || result?.error || null
+        });
 
         if (result.success) {
           // console.log('[TaskDetail] Next step created:', result.nextStepType, result);
@@ -1945,6 +1986,10 @@
           console.warn('[TaskDetail] Failed to create next step:', result.message || result.error);
         }
       } catch (error) {
+        seqDebug('task_detail_complete_sequence_error', {
+          taskId: state.currentTask && state.currentTask.id,
+          error: error && error.message ? error.message : String(error)
+        });
         console.error('[TaskDetail] Error creating next sequence step:', error);
       }
     }
