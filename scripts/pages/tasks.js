@@ -78,7 +78,12 @@
           const n = parseInt(d.currentPage, 10); if (!isNaN(n) && n > 0) state.currentPage = n;
         }
         if (Array.isArray(d.selectedItems)) state.selected = new Set(d.selectedItems);
-        render();
+        
+        // Only re-render if we actually have data to show
+        if (state.data && state.data.length > 0) {
+          render();
+        }
+        
         if (typeof d.scroll === 'number') {
           setTimeout(() => { try { window.scrollTo(0, d.scroll); } catch (_) { } }, 80);
         }
@@ -669,13 +674,25 @@
     });
 
     els.tbody.querySelectorAll('button.btn-success').forEach(btn => btn.addEventListener('click', async () => {
-      const id = btn.getAttribute('data-id'); const recIdx = state.data.findIndex(x => x.id === id); if (recIdx !== -1) {
+      const id = btn.getAttribute('data-id'); 
+      const recIdx = state.data.findIndex(x => x.id === id);
+
+      // CRITICAL FIX: Handle ghost tasks (visible in UI but not in state)
+      if (recIdx === -1) {
+        console.warn('[Tasks] Ghost task detected, syncing UI...', id);
+        applyFilters();
+        return;
+      }
+
+      if (recIdx !== -1) {
         // Get the task before removing it (for sequence processing)
         const task = state.data[recIdx];
 
         // Remove from state immediately
         const [removed] = state.data.splice(recIdx, 1);
-        state.filtered = state.data.slice();
+        
+        // CRITICAL FIX: Use applyFilters to respect current filter mode and update UI
+        applyFilters();
         // Remove from localStorage immediately (namespaced)
         try {
           const key = getUserTasksKey();

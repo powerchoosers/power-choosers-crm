@@ -1340,7 +1340,7 @@ class PowerChoosersCRM {
         };
 
         // Check if View Transitions API is supported
-        if (document.startViewTransition) {
+        if (document.startViewTransition && !params.skipTransition) {
             // Determine transition scope based on page type
             const isSettingsPage = pageName === 'settings';
             const isFromSettingsPage = fromPage === 'settings';

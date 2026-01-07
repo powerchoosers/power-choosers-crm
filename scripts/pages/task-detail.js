@@ -27,7 +27,7 @@
       el.classList.remove('task-fading-out');
       el.classList.add('task-loading');
       el.classList.remove('task-loaded');
-    }, 300);
+    }, 10);
   }
 
   function markTaskLoaded() {
@@ -38,7 +38,7 @@
     // Keep skeleton visible until content has fully faded in, then remove it
     window.setTimeout(() => {
       el.classList.remove('task-loading');
-    }, 600); // Wait for content fade-in (400ms) + buffer
+    }, 50); // Wait for content fade-in (400ms) + buffer
   }
 
   // Helper functions
@@ -3122,6 +3122,8 @@
   }
 
   async function loadTaskData(taskId) {
+    const t0 = performance.now();
+    
     markTaskLoading();
     // CRITICAL FIX: Prevent race conditions - if already loading, wait or skip
     if (state.loadingTask) {
