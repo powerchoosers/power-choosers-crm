@@ -692,17 +692,19 @@ export default async function handler(req, res) {
     // Parse response
     const generatedPost = parseAIResponse(responseText);
 
-    // Return generated post
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(generatedPost));
+    res.end(JSON.stringify({
+      success: true,
+      post: generatedPost
+    }));
 
   } catch (error) {
     logger.error('[AI Post Generation] Error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
+      success: false,
       error: 'Failed to generate post',
       details: error.message
     }));
   }
 }
-
