@@ -75,6 +75,13 @@
         box-sizing: border-box;
         max-height: 820px;
         overflow-y: auto;
+        scrollbar-gutter: stable both-edges;
+        overscroll-behavior: contain;
+        overflow-anchor: none;
+        will-change: transform;
+        transform: translateZ(0);
+        backface-visibility: hidden;
+        contain: paint layout;
         scrollbar-width: thin;
         scrollbar-color: var(--border-medium) transparent;
       }
