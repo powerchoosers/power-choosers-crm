@@ -112,6 +112,16 @@
       /* Ensure positioning context */
       #tasks-page .table-container { position: relative; overflow: visible; }
 
+      #tasks-page .table-scroll {
+        scrollbar-gutter: stable both-edges;
+        overscroll-behavior: contain;
+        overflow-anchor: none;
+        will-change: transform;
+        transform: translateZ(0);
+        backface-visibility: hidden;
+        contain: paint layout;
+      }
+
       /* Bulk selection backdrop (shared class name) */
       .bulk-select-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 800; }
 
