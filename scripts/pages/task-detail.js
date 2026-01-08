@@ -288,21 +288,6 @@
     return '';
   }
 
-  function isPcDebugEnabled() {
-    try {
-      return window.PC_DEBUG === true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  function seqDebug(event, payload) {
-    if (!isPcDebugEnabled()) return;
-    try {
-      console.log(`[Hypothesis: Seq-Dedupe] ${event}`, payload || {});
-    } catch (_) { }
-  }
-
   // Helper functions for ownership filtering and localStorage key management
   function getUserTasksKey() {
     try {
@@ -1902,11 +1887,6 @@
     // Trigger sequence next step BEFORE deleting the current task so the API can read it
     if (state.currentTask && (state.currentTask.isSequenceTask || state.currentTask.sequenceId)) {
       try {
-        seqDebug('task_detail_complete_sequence_request', {
-          taskId: state.currentTask.id,
-          isSequenceTask: !!state.currentTask.isSequenceTask,
-          sequenceId: state.currentTask.sequenceId || null
-        });
         const baseUrl = getApiBaseUrl();
         const response = await fetch(`${baseUrl}/api/complete-sequence-task`, {
           method: 'POST',
@@ -1918,24 +1898,8 @@
         try {
           result = await response.json();
         } catch (parseError) {
-          seqDebug('task_detail_complete_sequence_response_parse_failed', {
-            taskId: state.currentTask.id,
-            status: response.status,
-            ok: response.ok,
-            error: parseError && parseError.message ? parseError.message : String(parseError)
-          });
           throw parseError;
         }
-
-        seqDebug('task_detail_complete_sequence_response', {
-          taskId: state.currentTask.id,
-          status: response.status,
-          ok: response.ok,
-          success: !!result?.success,
-          nextStepType: result?.nextStepType || null,
-          nextTaskId: result?.taskId || null,
-          message: result?.message || result?.error || null
-        });
 
         if (result.success) {
           // console.log('[TaskDetail] Next step created:', result.nextStepType, result);
@@ -1986,10 +1950,6 @@
           console.warn('[TaskDetail] Failed to create next step:', result.message || result.error);
         }
       } catch (error) {
-        seqDebug('task_detail_complete_sequence_error', {
-          taskId: state.currentTask && state.currentTask.id,
-          error: error && error.message ? error.message : String(error)
-        });
         console.error('[TaskDetail] Error creating next sequence step:', error);
       }
     }
@@ -3168,13 +3128,15 @@
 
   async function loadTaskData(taskId) {
     const t0 = performance.now();
-    
-    markTaskLoading();
-    // CRITICAL FIX: Prevent race conditions - if already loading, wait or skip
+
+    // CRITICAL FIX: Prevent race conditions - if already loading, queue latest request
     if (state.loadingTask) {
-      console.warn('[TaskDetail] Task load already in progress, skipping duplicate call');
+      state._pendingTaskId = taskId;
+      console.warn('[TaskDetail] Task load already in progress, queuing latest taskId');
       return;
     }
+
+    markTaskLoading();
 
     if (!taskId) {
       console.error('[TaskDetail] No taskId provided to loadTaskData');
@@ -3598,6 +3560,20 @@
       // CRITICAL FIX: Always reset loading flag, even on error
       state.loadingTask = false;
       markTaskLoaded();
+
+      try {
+        const pendingTaskId = state._pendingTaskId;
+        if (pendingTaskId && String(pendingTaskId) !== String(taskId)) {
+          state._pendingTaskId = null;
+          setTimeout(() => {
+            try { loadTaskData(pendingTaskId); } catch (_) { }
+          }, 0);
+        } else {
+          state._pendingTaskId = null;
+        }
+      } catch (_) {
+        state._pendingTaskId = null;
+      }
     }
   }
 

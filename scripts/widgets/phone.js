@@ -223,7 +223,8 @@
 
       try {
         // Get Twilio access token
-        const resp = await fetch(`${base}/api/twilio/token?identity=agent`);
+        const tokenUrl = `${base}/api/twilio/token?identity=agent`;
+        const resp = await fetch(tokenUrl);
         try { console.debug('[TwilioRTC] Token fetch status =', resp.status); } catch (_) { }
 
         const j = await resp.json().catch(() => ({}));
