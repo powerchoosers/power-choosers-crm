@@ -5550,19 +5550,25 @@ body {
 
 /* === SIDEBAR === */
 .sidebar {
-    width: var(--sidebar-width);
+    width: var(--sidebar-expanded);
     background: var(--grey-700);
-    /* Removed glass blur for cohesiveness experiment */
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     border-right: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow);
-    transition: width var(--transition-smooth), background var(--transition-fast);
-    will-change: width, transform;
+    /* Custom butter-smooth transition for sidebar movement */
+    transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), 
+                background-color var(--transition-fast), 
+                backdrop-filter var(--transition-fast), 
+                -webkit-backdrop-filter var(--transition-fast);
+    will-change: transform;
     /* Force GPU layer but keep z-index manageable */
     z-index: 100 !important;
-    position: relative;
-    transform: translateZ(0);
+    position: fixed;
+    top: var(--topbar-height);
+    left: 0;
+    height: calc(100vh - var(--topbar-height));
+    transform: translateX(calc(var(--sidebar-width) - var(--sidebar-expanded)));
     /* Hardware acceleration */
     backface-visibility: hidden;
     /* Prevent flickering while allowing external shadows */
@@ -5571,13 +5577,16 @@ body {
 }
 
 .sidebar.expanded {
-    width: var(--sidebar-expanded);
+    transform: translateX(0);
+    background: rgba(42, 47, 55, 0.45);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
 }
 
 .sidebar-content {
     padding: var(--spacing-base) 0;
     height: 100%;
-    width: 100%;
+    width: var(--sidebar-expanded);
     /* Ensure content stays within strict container */
     overflow-y: hidden;
     overflow-x: visible;
@@ -5589,11 +5598,12 @@ body {
 }
 
 .sidebar:hover {
-    background: var(--grey-700);
+    background: rgba(42, 47, 55, 0.45);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
     /* Stay below top bar even on hover */
     z-index: 101 !important;
     box-shadow: 10px 0 40px rgba(0, 0, 0, 0.4);
-    transform: translateZ(1px);
 }
 
 /* Nav item refinements for glass look */
@@ -5603,7 +5613,7 @@ body {
     padding: var(--spacing-md) var(--spacing-base);
     color: var(--grey-400);
     text-decoration: none;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), background var(--transition-smooth), color var(--transition-smooth), border-left var(--transition-smooth), box-shadow var(--transition-smooth);
     white-space: nowrap;
     border-left: 3px solid transparent;
     font-size: 0.875rem;
@@ -5640,13 +5650,16 @@ body {
     height: 20px;
     flex-shrink: 0;
     margin-right: var(--spacing-md);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all var(--transition-smooth);
 }
 
 .sidebar:not(.expanded) .nav-item {
-    justify-content: center;
-    padding: var(--spacing-md) 0;
-    margin: 4px 10px;
+    /* Unify margin/padding with expanded state to prevent layout jumps */
+    transform: translateX(163px); /* 180px - 17px offset diff (margin 12 vs 0, padding 25 vs 20) */
+}
+
+.sidebar:not(.expanded) .nav-item:hover {
+    transform: translateX(163px); /* Match non-hover state to prevent jump before expansion */
 }
 
 .sidebar:not(.expanded) .nav-item svg {
@@ -5662,7 +5675,7 @@ body {
     white-space: nowrap;
     transform: translateX(-10px);
     /* Performance: Slide-in text for better feel */
-    transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.25s ease, transform var(--transition-smooth);
     will-change: opacity, transform;
 }
 
@@ -5676,23 +5689,24 @@ body {
     transition-delay: 0.05s;
 }
 
-/* FIX: Hide labels immediately if the sidebar is click-locked or not expanded */
-.sidebar.click-locked .nav-text,
+/* FIX: Hide labels immediately if the sidebar is not expanded */
 .sidebar:not(.expanded) .nav-text {
-    opacity: 0 !important;
-    visibility: hidden !important;
-    width: 0 !important;
-    max-width: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
+    opacity: 0;
+    visibility: hidden;
+    width: 0;
+    max-width: 0;
+    margin: 0;
+    padding: 0;
     pointer-events: none;
+    transition: opacity 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), max-width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .nav-divider {
     height: 1px;
-    background: var(--grey-700);
+    background: #ffffff; /* White as requested */
     margin: var(--spacing-base) var(--spacing-md);
     transition: opacity 0.3s ease;
+    opacity: 0.5; /* Slight transparency for elegance, but clearly white */
 }
 
 .sidebar:not(.expanded) .nav-divider {
@@ -5713,6 +5727,7 @@ body {
     display: flex;
     overflow: hidden;
     position: relative;
+    margin-left: var(--sidebar-width);
     z-index: 1;
 }
 
@@ -20365,6 +20380,16 @@ input.row-select[type="checkbox"]:focus-visible {
     }
 }
 
+@keyframes sidebarFadeIn {
+    0% {
+        opacity: 0;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
 /* Top bar entrance animation - Only when authenticated */
 .top-bar.visible {
     animation: slideDownFadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
@@ -20373,7 +20398,7 @@ input.row-select[type="checkbox"]:focus-visible {
 
 /* Sidebar entrance animation */
 .sidebar {
-    animation: slideLeftFadeIn 0.7s cubic-bezier(0.4, 0, 0.2, 1) 0.1s forwards;
+    animation: sidebarFadeIn 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.1s forwards;
     opacity: 0;
 }
 

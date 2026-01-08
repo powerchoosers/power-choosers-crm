@@ -68,21 +68,6 @@
     return '';
   }
 
-  function isPcDebugEnabled() {
-    try {
-      return window.PC_DEBUG === true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  function seqDebug(event, payload) {
-    if (!isPcDebugEnabled()) return;
-    try {
-      console.log(`[Hypothesis: Seq-Dedupe] ${event}`, payload || {});
-    } catch (_) { }
-  }
-
   // Restore handler for back navigation from Task Detail
   if (!document._tasksRestoreBound) {
     document.addEventListener('pc:tasks-restore', (ev) => {
@@ -719,32 +704,12 @@
         if (task && task.isSequenceTask) {
           try {
             const baseUrl = getApiBaseUrl();
-            const attemptId = `seqtask-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-            seqDebug('complete_sequence_task_request', {
-              attemptId,
-              taskId: task.id,
-              sequenceId: task.sequenceId,
-              stepIndex: task.stepIndex,
-              taskType: task.type,
-              contactId: task.contactId
-            });
             const response = await fetch(`${baseUrl}/api/complete-sequence-task`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ taskId: task.id })
             });
             const result = await response.json();
-
-            seqDebug('complete_sequence_task_response', {
-              attemptId,
-              ok: response.ok,
-              status: response.status,
-              success: result && result.success,
-              nextStepType: result && result.nextStepType,
-              nextTaskId: result && result.taskId,
-              nextEmailId: result && result.emailId,
-              message: result && (result.message || result.error)
-            });
 
             if (result.success) {
               // console.log('[Tasks] Next step created:', result.nextStepType);
@@ -765,11 +730,6 @@
               console.warn('[Tasks] Failed to create next step:', result.message || result.error);
             }
           } catch (error) {
-            seqDebug('complete_sequence_task_error', {
-              taskId: task.id,
-              message: error && error.message,
-              stack: error && error.stack
-            });
             // Don't block - task was already completed
           }
         }
@@ -1264,34 +1224,12 @@
           if (task.isSequenceTask) {
             try {
               const baseUrl = getApiBaseUrl();
-              const attemptId = `seqtask-bulk-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-              seqDebug('complete_sequence_task_request', {
-                attemptId,
-                taskId: task.id,
-                sequenceId: task.sequenceId,
-                stepIndex: task.stepIndex,
-                taskType: task.type,
-                contactId: task.contactId,
-                bulk: true
-              });
               const response = await fetch(`${baseUrl}/api/complete-sequence-task`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ taskId: task.id })
               });
               const result = await response.json();
-
-              seqDebug('complete_sequence_task_response', {
-                attemptId,
-                ok: response.ok,
-                status: response.status,
-                success: result && result.success,
-                nextStepType: result && result.nextStepType,
-                nextTaskId: result && result.taskId,
-                nextEmailId: result && result.emailId,
-                message: result && (result.message || result.error),
-                bulk: true
-              });
 
               if (result.success) {
                 if (result.nextStepType === 'task') {
@@ -1308,12 +1246,6 @@
                 console.warn('[Tasks] (Bulk) Failed to create next step:', result.message || result.error);
               }
             } catch (error) {
-              seqDebug('complete_sequence_task_error', {
-                taskId: task.id,
-                message: error && error.message,
-                stack: error && error.stack,
-                bulk: true
-              });
             }
           }
 

@@ -1264,12 +1264,21 @@ class PowerChoosersCRM {
                     e.preventDefault();
                     const targetPage = item.getAttribute('data-page');
 
-                    // Collapse sidebar and lock to prevent immediate reopening
-                    this.collapseSidebarAndLock();
+                    const sidebarWasExpanded = !!(this.sidebar && this.sidebar.classList.contains('expanded'));
+
+                    this.collapseSidebarAndLock(650);
 
                     // No special handling needed for Client Management - it has its own page now
 
-                    this.navigateToPage(targetPage);
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            if (sidebarWasExpanded) {
+                                setTimeout(() => this.navigateToPage(targetPage), 80);
+                            } else {
+                                this.navigateToPage(targetPage);
+                            }
+                        });
+                    });
                 });
                 item._navBound = true;
             }
@@ -1732,7 +1741,7 @@ class PowerChoosersCRM {
             }, { passive: true });
 
             window.addEventListener('hashchange', () => {
-                this.collapseSidebarAndLock(1200);
+                this.collapseSidebarAndLock(650);
             });
 
             sidebar._hoverBound = true;
@@ -1740,17 +1749,13 @@ class PowerChoosersCRM {
     }
 
     // Collapse sidebar and lock it to prevent immediate reopening
-    collapseSidebarAndLock(duration = 1200) {
+    collapseSidebarAndLock(duration = 650) {
         if (!this.sidebar) return;
 
-        // Use requestAnimationFrame for smoother collapse animation
-        requestAnimationFrame(() => {
-            this.sidebar.classList.add('click-locked');
-            this.sidebarLockCollapse = true;
-            this.sidebarMouseMoved = false; // Reset movement flag
-            this.clearSidebarTimers();
-            this.sidebar.classList.remove('expanded');
-        });
+        this.sidebarLockCollapse = true;
+        this.sidebarMouseMoved = false;
+        this.clearSidebarTimers();
+        this.sidebar.classList.remove('expanded');
 
         // Capture current mouse position for movement detection
         const captureCurrentPosition = (e) => {
@@ -1762,11 +1767,7 @@ class PowerChoosersCRM {
 
         // Unlock after duration
         setTimeout(() => {
-            requestAnimationFrame(() => {
-                this.sidebar.classList.remove('click-locked');
-                this.sidebarLockCollapse = false;
-                // Don't clear pointerInside - let natural pointerleave event handle it
-            });
+            this.sidebarLockCollapse = false;
         }, duration);
     }
 
