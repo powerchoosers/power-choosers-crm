@@ -412,23 +412,24 @@
     firebaseTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
 
 
-    // CRITICAL FIX: For admins, include all localStorage tasks since they should see everything
-    // For non-admins, only include recent tasks (< 1 hour) to avoid resurrecting deleted tasks
+    const includeLocalTasks = !isAdmin();
     const nowMs = Date.now();
-    const cutoffMs = isAdmin() ? 0 : 3600000; // 0ms for admins (no cutoff), 1 hour for non-admins
+    const cutoffMs = 3600000;
     let localTasksAdded = 0;
     let localTasksSkipped = 0;
-    userTasks.forEach(t => {
-      if (t && t.id && !allTasksMap.has(t.id)) {
-        const created = t.createdAt || (t.timestamp && typeof t.timestamp.toMillis === 'function' ? t.timestamp.toMillis() : t.timestamp) || 0;
-        if (cutoffMs === 0 || nowMs - created < cutoffMs) {
-          allTasksMap.set(t.id, t);
-          localTasksAdded++;
-        } else {
-          localTasksSkipped++;
+    if (includeLocalTasks) {
+      userTasks.forEach(t => {
+        if (t && t.id && !allTasksMap.has(t.id)) {
+          const created = t.createdAt || (t.timestamp && typeof t.timestamp.toMillis === 'function' ? t.timestamp.toMillis() : t.timestamp) || 0;
+          if (nowMs - created < cutoffMs) {
+            allTasksMap.set(t.id, t);
+            localTasksAdded++;
+          } else {
+            localTasksSkipped++;
+          }
         }
-      }
-    });
+      });
+    }
 
     const allTasks = Array.from(allTasksMap.values());
 
