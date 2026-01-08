@@ -5648,6 +5648,27 @@ class PowerChoosersCRM {
             return (a.createdAt || 0) - (b.createdAt || 0);
         });
 
+        {
+            const seen = new Set();
+            const deduped = [];
+            for (const task of todaysTasks) {
+                const isSequenceTask = !!task?.isSequenceTask || !!task?.isLinkedInTask || !!task?.sequenceId || String(task?.priority || '').toLowerCase() === 'sequence';
+                if (!isSequenceTask) {
+                    deduped.push(task);
+                    continue;
+                }
+                const key = String(task?.contactId || task?.targetId || task?.contact || task?.contactName || '').trim().toLowerCase();
+                if (!key) {
+                    deduped.push(task);
+                    continue;
+                }
+                if (seen.has(key)) continue;
+                seen.add(key);
+                deduped.push(task);
+            }
+            todaysTasks = deduped;
+        }
+
         // Smart Render Check: Avoid re-rendering if data hasn't changed (prevents flicker/scroll jumps)
         // This replaces the old "block all updates" logic which broke pagination and live updates.
         const currentFingerprint = todaysTasks.map(t => t.id + ':' + (t.status || '') + ':' + (t.dueDate || '')).join('|');
