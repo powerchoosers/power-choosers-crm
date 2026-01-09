@@ -34,6 +34,15 @@
     ? window.console
     : ((typeof globalThis !== 'undefined' && globalThis.console) ? globalThis.console : null);
 
+  function isTaskDetailActive() {
+    try {
+      const el = document.getElementById('task-detail-page');
+      return !!(el && el.classList && el.classList.contains('active'));
+    } catch (_) {
+      return false;
+    }
+  }
+
   function lushaLog() {
     return;
   }
@@ -127,7 +136,7 @@
     
     // Priority 1: Check task-detail state (for widgets opened from task pages)
     try {
-      if (window.TaskDetail && window.TaskDetail.state) {
+      if (isTaskDetailActive() && window.TaskDetail && window.TaskDetail.state) {
         const taskState = window.TaskDetail.state;
         if (taskState.account) {
           accountName = taskState.account.name || taskState.account.accountName || taskState.account.companyName || '';
@@ -2717,7 +2726,7 @@
       lushaLog('Getting context defaults for entity type:', entityType);
       
       // Check if we're on task-detail page first (priority for task context)
-      const taskState = window.TaskDetail?.state;
+      const taskState = isTaskDetailActive() ? window.TaskDetail?.state : null;
       if (taskState && (taskState.account || taskState.contact)) {
         lushaLog('TaskDetail state found:', { hasAccount: !!taskState.account, hasContact: !!taskState.contact });
         

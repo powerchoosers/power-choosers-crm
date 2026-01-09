@@ -283,6 +283,67 @@
     } catch (_) { return 'userTasks'; }
   }
 
+  function getDeletedTasksKey() {
+    try {
+      const email = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
+        ? window.DataManager.getCurrentUserEmail()
+        : (window.currentUserEmail || '').toLowerCase();
+      return email ? `pc:deleted-tasks:${email}` : 'pc:deleted-tasks';
+    } catch (_) {
+      return 'pc:deleted-tasks';
+    }
+  }
+
+  function getDeletedTaskIdsSet() {
+    try {
+      const key = getDeletedTasksKey();
+      const raw = localStorage.getItem(key);
+      const parsed = raw ? JSON.parse(raw) : {};
+      const now = Date.now();
+      const ttlMs = 7 * 24 * 60 * 60 * 1000;
+      const map = (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+
+      let changed = false;
+      for (const [id, ts] of Object.entries(map)) {
+        const t = typeof ts === 'number' ? ts : parseInt(String(ts || '0'), 10);
+        if (!id || !t || (now - t) > ttlMs) {
+          delete map[id];
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        try { localStorage.setItem(key, JSON.stringify(map)); } catch (_) { }
+      }
+
+      return new Set(Object.keys(map));
+    } catch (_) {
+      return new Set();
+    }
+  }
+
+  function tombstoneTaskId(taskId, source) {
+    if (!taskId) return;
+    try {
+      const key = getDeletedTasksKey();
+      const raw = localStorage.getItem(key);
+      const parsed = raw ? JSON.parse(raw) : {};
+      const map = (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+      map[String(taskId)] = Date.now();
+      localStorage.setItem(key, JSON.stringify(map));
+    } catch (_) { }
+  }
+
+  function filterOutDeletedTasks(tasks, source) {
+    const deleted = getDeletedTaskIdsSet();
+    if (!deleted || deleted.size === 0) return Array.isArray(tasks) ? tasks : [];
+    const arr = Array.isArray(tasks) ? tasks : [];
+    const before = arr.length;
+    const filtered = arr.filter(t => t && t.id && !deleted.has(String(t.id)));
+    const removed = before - filtered.length;
+    return filtered;
+  }
+
   async function loadData() {
 
     // Build from real sources: BackgroundTasksLoader + localStorage tasks + LinkedIn sequence tasks
@@ -339,6 +400,8 @@
         });
       }
     } catch (_) { userTasks = []; }
+
+    userTasks = filterOutDeletedTasks(userTasks, 'tasks.js.loadData(localStorage)');
 
     // Load from BackgroundTasksLoader (cache-first)
     try {
@@ -414,6 +477,8 @@
       console.warn('Could not load tasks from BackgroundTasksLoader:', error);
     }
 
+    firebaseTasks = filterOutDeletedTasks(firebaseTasks, 'tasks.js.loadData(backgroundLoader)');
+
     // // console.log(`[Tasks] Loaded ${userTasks.length} tasks from localStorage, ${firebaseTasks.length} tasks from Firebase`);
 
     // Merge all tasks - CRITICAL FIX: Always prefer Firebase as the source of truth
@@ -446,7 +511,7 @@
     // Add LinkedIn tasks that aren't duplicates
     const nonDupLinkedIn = linkedInTasks.filter(li => !allTasks.some(t => t.id === li.id));
 
-    const rows = [...allTasks, ...nonDupLinkedIn];
+    const rows = filterOutDeletedTasks([...allTasks, ...nonDupLinkedIn], 'tasks.js.loadData(merged)');
 
     state.data = rows;
     state.filtered = sortTasksChronologically(rows);
@@ -699,6 +764,8 @@
         // Get the task before removing it (for sequence processing)
         const task = state.data[recIdx];
 
+        tombstoneTaskId(id, 'tasks.js.complete');
+
         // Remove from state immediately
         const [removed] = state.data.splice(recIdx, 1);
         
@@ -786,7 +853,7 @@
         // CRITICAL FIX: Notify global loader and cache about deletion
         try {
           document.dispatchEvent(new CustomEvent('pc:task-deleted', {
-            detail: { taskId: id }
+            detail: { taskId: id, source: 'tasks' }
           }));
         } catch (_) { }
 
@@ -1076,6 +1143,8 @@
       // Process deletions sequentially to show progress
       for (const id of ids) {
         try {
+          tombstoneTaskId(id, 'tasks.js.bulkDelete');
+
           // Remove from localStorage
           try {
             const key = getUserTasksKey();
@@ -1100,7 +1169,7 @@
           // CRITICAL FIX: Notify global loader and cache about deletion
           try {
             document.dispatchEvent(new CustomEvent('pc:task-deleted', {
-              detail: { taskId: id }
+              detail: { taskId: id, source: 'tasks' }
             }));
           } catch (_) { }
 
@@ -1260,6 +1329,8 @@
             }
           }
 
+          tombstoneTaskId(id, 'tasks.js.bulkComplete');
+
           task.status = 'completed';
           // Save to localStorage
           try {
@@ -1281,6 +1352,12 @@
               if (!snap.empty) await batch.commit();
             }
           } catch (e) { console.warn('Could not update task in Firebase:', e); }
+
+          try {
+            document.dispatchEvent(new CustomEvent('pc:task-deleted', {
+              detail: { taskId: id, source: 'tasks' }
+            }));
+          } catch (_) { }
         }
       }
 

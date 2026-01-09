@@ -9,6 +9,11 @@
     account: null,
     navigating: false,
     loadingTask: false, // CRITICAL FIX: Guard against concurrent loadTaskData calls
+    _openTaskId: null,
+    _openTaskAt: 0,
+    _loadToken: 0,
+    _activeLoadToken: 0,
+    _activeTaskId: null,
     widgets: {
       maps: null,
       energy: null,
@@ -18,27 +23,287 @@
 
   const els = {};
 
+  function queueClassWhenVisible(targetEl, className, delayMs = 0) {
+    try {
+      const start = performance.now();
+      const tick = () => {
+        try {
+          const page = els.page || document.getElementById('task-detail-page');
+          if (!page || !targetEl || !targetEl.isConnected) return;
+          const display = window.getComputedStyle(page).display;
+          if (display !== 'none') {
+            const apply = () => {
+              try { void targetEl.offsetHeight; } catch (_) { }
+              try { targetEl.classList.add(className); } catch (_) { }
+            };
+            if (delayMs > 0) setTimeout(apply, delayMs);
+            else {
+              // Double RAF to ensure initial state (opacity: 0) is painted before transition starts
+              requestAnimationFrame(() => requestAnimationFrame(apply));
+            }
+            return;
+          }
+        } catch (_) { }
+
+        if (performance.now() - start < 1200) requestAnimationFrame(tick);
+      };
+
+      requestAnimationFrame(tick);
+    } catch (_) { }
+  }
+
+  function runWhenTaskDetailVisible(fn, maxWaitMs = 1200) {
+    try {
+      const start = performance.now();
+      const tick = () => {
+        try {
+          const page = els.page || document.getElementById('task-detail-page');
+          if (!page) return;
+          const display = window.getComputedStyle(page).display;
+          if (display !== 'none') {
+            try { fn(); } catch (_) { }
+            return;
+          }
+        } catch (_) { }
+
+        if (performance.now() - start < maxWaitMs) requestAnimationFrame(tick);
+      };
+
+      requestAnimationFrame(tick);
+    } catch (_) { }
+  }
+
   function markTaskLoading() {
     const el = els.page;
     if (!el) return;
-    // Fade out old content first
-    el.classList.add('task-fading-out');
-    setTimeout(() => {
-      el.classList.remove('task-fading-out');
-      el.classList.add('task-loading');
-      el.classList.remove('task-loaded');
-    }, 10);
+    el.classList.add('task-loading');
+    el.classList.remove('task-loaded');
+    el.classList.remove('task-fading-out');
+
+    try {
+      injectTaskDetailStyles();
+    } catch (_) { }
+
+    try {
+      const profileContainer = el.querySelector('.contact-header-profile');
+      if (profileContainer) {
+        // CRITICAL FIX: Clean up any existing icons/avatars BEFORE adding skeleton
+        // This prevents the old task's icon from persisting next to the skeleton
+        cleanupExistingAvatarsAndIcons();
+
+        const existingSkel = profileContainer.querySelector('.td-header-skel-icon');
+        if (!existingSkel) {
+          const skel = document.createElement('div');
+          skel.className = 'td-header-skel-icon skeleton-shimmer-modern';
+          skel.innerHTML = '<div class="skeleton-shape td-header-icon-shape"></div>';
+          profileContainer.prepend(skel);
+        }
+      }
+
+      if (els.title) {
+        // Ensure the title element itself doesn't have the shimmer class
+        els.title.classList.remove('skeleton-shimmer-modern');
+        els.title.innerHTML = '<div class="task-detail-title-skeleton skeleton-shimmer-modern"><div class="skeleton-shape td-title-shape"></div></div>';
+      }
+      if (els.subtitle) {
+        const existingInfo = el.querySelector('#task-contact-info');
+        if (existingInfo) existingInfo.remove();
+
+        const titleSection = el.querySelector('.contact-header-text');
+        if (titleSection) {
+          const info = document.createElement('div');
+          info.id = 'task-contact-info';
+          info.className = 'task-contact-info skeleton-shimmer-modern';
+          info.innerHTML = '<div class="skeleton-shape td-contactinfo-shape"></div>';
+          titleSection.insertBefore(info, els.subtitle);
+        }
+
+        els.subtitle.innerHTML = '<div class="task-detail-subtitle-skeleton skeleton-shimmer-modern"><div class="skeleton-shape td-subtitle-shape"></div></div>';
+      }
+      if (els.content) {
+        els.content.innerHTML = `
+          <div class="td-layout-grid td-skeleton-layer">
+            <div class="main-content">
+              <div class="task-card td-loading-card" id="task-action-card-skeleton">
+                <h3 class="section-title"><span class="td-skel td-skel-title"></span></h3>
+                <div class="linkedin-task-info">
+                  <div class="info-item">
+                    <label>Contact</label>
+                    <div class="info-value"><span class="td-skel td-skel-value td-w-60"></span></div>
+                  </div>
+                  <div class="info-item">
+                    <label>Company</label>
+                    <div class="info-value"><span class="td-skel td-skel-value td-w-55"></span></div>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <label>Notes</label>
+                  <div class="td-skel td-skel-textarea"></div>
+                </div>
+                <div class="actions">
+                  <button class="btn-primary" disabled><span class="td-skel td-skel-btn"></span></button>
+                  <button class="btn-secondary" disabled><span class="td-skel td-skel-btn"></span></button>
+                </div>
+                <div class="linkedin-guidance">
+                  <p>
+                    <span class="td-skel td-skel-line"></span>
+                    <span class="td-skel td-skel-line"></span>
+                    <span class="td-skel td-skel-line td-short"></span>
+                  </p>
+                </div>
+              </div>
+
+              <div class="company-summary-card td-loading-card">
+                <div class="company-summary-header">
+                  <div class="company-logo"><span class="td-skel td-skel-logo"></span></div>
+                  <div class="company-name"><span class="td-skel td-skel-title td-w-70"></span></div>
+                </div>
+                <div class="company-details">
+                  <div class="company-detail-item">
+                    <span class="detail-label">Location:</span>
+                    <span class="detail-value"><span class="td-skel td-skel-value td-w-65"></span></span>
+                  </div>
+                  <div class="company-detail-item">
+                    <span class="detail-label">Industry:</span>
+                    <span class="detail-value"><span class="td-skel td-skel-value td-w-55"></span></span>
+                  </div>
+                </div>
+                <div class="company-description">
+                  <div class="td-skel td-skel-line"></div>
+                  <div class="td-skel td-skel-line td-short"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="sidebar-content">
+              <div class="contact-info-section td-loading-card">
+                <h3 class="section-title">Contact Information</h3>
+                <div class="info-grid">
+                  <div class="info-row"><div class="info-label">EMAIL</div><div class="info-value"><span class="td-skel td-skel-value td-w-85"></span></div></div>
+                  <div class="info-row"><div class="info-label">MOBILE</div><div class="info-value"><span class="td-skel td-skel-value td-w-75"></span></div></div>
+                  <div class="info-row"><div class="info-label">COMPANY PHONE</div><div class="info-value"><span class="td-skel td-skel-value td-w-70"></span></div></div>
+                  <div class="info-row"><div class="info-label">CITY</div><div class="info-value"><span class="td-skel td-skel-value td-w-55"></span></div></div>
+                  <div class="info-row"><div class="info-label">STATE</div><div class="info-value"><span class="td-skel td-skel-value td-w-45"></span></div></div>
+                  <div class="info-row"><div class="info-label">INDUSTRY</div><div class="info-value"><span class="td-skel td-skel-value td-w-60"></span></div></div>
+                </div>
+              </div>
+
+              <div class="contact-info-section td-loading-card">
+                <h3 class="section-title">Energy &amp; Contract</h3>
+                <div class="info-grid">
+                  <div class="info-row"><div class="info-label">ELECTRICITY SUPPLIER</div><div class="info-value"><span class="td-skel td-skel-value td-w-80"></span></div></div>
+                  <div class="info-row"><div class="info-label">ANNUAL USAGE</div><div class="info-value"><span class="td-skel td-skel-value td-w-60"></span></div></div>
+                  <div class="info-row"><div class="info-label">CURRENT RATE</div><div class="info-value"><span class="td-skel td-skel-value td-w-50"></span></div></div>
+                  <div class="info-row"><div class="info-label">CONTRACT END</div><div class="info-value"><span class="td-skel td-skel-value td-w-55"></span></div></div>
+                </div>
+              </div>
+
+              <div class="activity-section td-loading-card">
+                <h3 class="section-title">Recent Activity</h3>
+                <div class="activities-list">
+                  <div class="td-activity-skeleton">
+                    <div class="td-skel td-skel-activity"></div>
+                    <div class="td-skel td-skel-activity"></div>
+                    <div class="td-skel td-skel-activity td-short"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        const realLayer = document.createElement('div');
+        realLayer.className = 'td-layout-grid td-real-layer';
+        realLayer.setAttribute('aria-hidden', 'true');
+        els.content.appendChild(realLayer);
+
+        try {
+          const skelLayer = els.content.querySelector('.td-skeleton-layer');
+          if (skelLayer) {
+             void skelLayer.offsetWidth;
+             queueClassWhenVisible(skelLayer, 'td-enter');
+          }
+        } catch (_) { }
+      }
+    } catch (_) { }
   }
 
-  function markTaskLoaded() {
+  function markTaskLoaded(loadToken, taskId) {
     const el = els.page;
     if (!el) return;
-    // Add loaded class to trigger content fade-in
+
+    try {
+      if (loadToken && state._activeLoadToken && loadToken !== state._activeLoadToken) return;
+      if (taskId && state._activeTaskId && String(taskId) !== String(state._activeTaskId)) return;
+    } catch (_) { }
+
+    runWhenTaskDetailVisible(() => {
+      try {
+        if (loadToken && state._activeLoadToken && loadToken !== state._activeLoadToken) return;
+        if (taskId && state._activeTaskId && String(taskId) !== String(state._activeTaskId)) return;
+      } catch (_) { }
+
+      try {
+        const content = els.content;
+        if (content) {
+          const realLayer = content.querySelector('.td-real-layer');
+          if (realLayer) realLayer.setAttribute('aria-hidden', 'false');
+
+          const skelLayer = content.querySelector('.td-skeleton-layer');
+
+          if (realLayer) queueClassWhenVisible(realLayer, 'td-enter');
+          if (skelLayer) {
+            try { skelLayer.classList.add('td-exit'); } catch (_) { }
+            setTimeout(() => {
+              try {
+                if (loadToken && state._activeLoadToken && loadToken !== state._activeLoadToken) return;
+                if (taskId && state._activeTaskId && String(taskId) !== String(state._activeTaskId)) return;
+              } catch (_) { }
+              try { skelLayer.remove(); } catch (_) { }
+            }, 260);
+          }
+        }
+      } catch (_) { }
+    });
+    try {
+      const titleSkel = el.querySelector('.task-detail-title-skeleton');
+      if (titleSkel) titleSkel.classList.add('td-skeleton-exit');
+      const subtitleSkel = el.querySelector('.task-detail-subtitle-skeleton');
+      if (subtitleSkel) subtitleSkel.classList.add('td-skeleton-exit');
+
+      const headerSkelIcon = el.querySelector('.td-header-skel-icon');
+      if (headerSkelIcon) headerSkelIcon.classList.add('td-skeleton-exit');
+
+      const contactInfo = el.querySelector('#task-contact-info');
+      if (contactInfo) contactInfo.classList.remove('skeleton-shimmer-modern');
+    } catch (_) { }
+
     el.classList.add('task-loaded');
-    // Keep skeleton visible until content has fully faded in, then remove it
-    window.setTimeout(() => {
-      el.classList.remove('task-loading');
-    }, 50); // Wait for content fade-in (400ms) + buffer
+
+    runWhenTaskDetailVisible(() => {
+      window.setTimeout(() => {
+        try {
+          if (loadToken && state._activeLoadToken && loadToken !== state._activeLoadToken) return;
+          if (taskId && state._activeTaskId && String(taskId) !== String(state._activeTaskId)) return;
+        } catch (_) { }
+        try {
+          try {
+            const content = els.content;
+            const skelLayer = content ? content.querySelector('.td-skeleton-layer') : null;
+            if (skelLayer && skelLayer.parentNode) skelLayer.parentNode.removeChild(skelLayer);
+          } catch (_) { }
+
+          const headerSkelIcon = el.querySelector('.td-header-skel-icon');
+          if (headerSkelIcon) headerSkelIcon.remove();
+          const titleSkel = el.querySelector('.task-detail-title-skeleton');
+          if (titleSkel) titleSkel.remove();
+          const subtitleSkel = el.querySelector('.task-detail-subtitle-skeleton');
+          if (subtitleSkel) subtitleSkel.remove();
+        } catch (_) { }
+
+        el.classList.remove('task-loading');
+      }, 400);
+    });
   }
 
   // Helper functions
@@ -298,6 +563,27 @@
     } catch (_) {
       return 'userTasks';
     }
+  }
+
+  function getDeletedTasksKey() {
+    try {
+      const email = getUserEmail();
+      return email ? `pc:deleted-tasks:${email}` : 'pc:deleted-tasks';
+    } catch (_) {
+      return 'pc:deleted-tasks';
+    }
+  }
+
+  function tombstoneTaskId(taskId, source) {
+    if (!taskId) return;
+    try {
+      const key = getDeletedTasksKey();
+      const raw = localStorage.getItem(key);
+      const parsed = raw ? JSON.parse(raw) : {};
+      const map = (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+      map[String(taskId)] = Date.now();
+      localStorage.setItem(key, JSON.stringify(map));
+    } catch (_) { }
   }
 
   function getUserEmail() {
@@ -708,30 +994,16 @@
       \u003cpath d=\"M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11\"\u003e\u003c/path\u003e
     \u003c/svg\u003e`;
 
-    // Build action buttons HTML based on task type
-    let actionButtonsHTML = '';
-    if (isAcctTask) {
-      // Account task: only "Add to List" and "Add Task" buttons
-      actionButtonsHTML = `
+    const actionButtonsHTML = `
         <button class="quick-action-btn list-header-btn" id="task-add-to-list" title="Add to list" aria-label="Add to list" aria-haspopup="dialog">
           ${listSvg}
         </button>
-        <button class="quick-action-btn task-header-btn" id="task-add-task" title="Add task" aria-label="Add task" aria-haspopup="dialog">
-          ${taskSvg}
-        </button>`;
-    } else {
-      // Contact task: "Add to List", "Add to Sequence", and "Add Task" buttons
-      actionButtonsHTML = `
-        <button class="quick-action-btn list-header-btn" id="task-add-to-list" title="Add to list" aria-label="Add to list" aria-haspopup="dialog">
-          ${listSvg}
-        </button>
-        <button class="quick-action-btn sequence-header-btn" id="task-add-to-sequence" title="Add to sequence" aria-label="Add to sequence" aria-haspopup="dialog">
+        <button class="quick-action-btn sequence-header-btn" id="task-add-to-sequence" title="Add to sequence" aria-label="Add to sequence" aria-haspopup="dialog" ${isAcctTask ? 'hidden' : ''}>
           ${sequenceSvg}
         </button>
         <button class="quick-action-btn task-header-btn" id="task-add-task" title="Add task" aria-label="Add task" aria-haspopup="dialog">
           ${taskSvg}
         </button>`;
-    }
 
     // Complete header buttons HTML
     return `
@@ -749,11 +1021,7 @@
 
   function injectTaskDetailStyles() {
     const id = 'task-detail-inline-styles';
-    if (document.getElementById(id)) return;
-    const style = document.createElement('style');
-    style.id = id;
-    style.type = 'text/css';
-    style.textContent = `
+    const css = `
       /* Task Detail Page Layout */
       #task-detail-page .page-header {
         display: flex;
@@ -915,18 +1183,70 @@
         flex-shrink: 0;
       }
       #task-detail-page .page-content { 
-        display: grid; 
-        grid-template-columns: 450px 1fr; /* Log Call side (left) narrow, Contact Info side (right) flexible */
-        grid-template-rows: 1fr; /* Make the row fill the available height */
-        column-gap: 0px; /* Remove column gap to eliminate visual space */
+        position: relative;
+        padding: 0;
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+        width: 100%;
+      }
+
+      #task-detail-page .td-skeleton-layer,
+      #task-detail-page .td-real-layer {
+        position: absolute;
+        inset: 0;
+      }
+
+      #task-detail-page .td-skeleton-layer {
+        pointer-events: none;
+        opacity: 0;
+        transform: scale(0.94);
+        transition: opacity 300ms ease, transform 350ms cubic-bezier(0.2, 0.9, 0.2, 1);
+      }
+
+      #task-detail-page.task-loading .td-skeleton-layer {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      #task-detail-page .td-skeleton-layer.td-enter {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      #task-detail-page .td-skeleton-layer.td-exit {
+        opacity: 0;
+        transform: scale(1.01);
+        transition: opacity 220ms ease, transform 220ms ease;
+      }
+
+      #task-detail-page .td-real-layer {
+        pointer-events: none;
+        opacity: 0;
+        transform: none;
+        transition: opacity 260ms ease;
+      }
+
+      #task-detail-page.task-loading .td-real-layer {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      #task-detail-page .td-real-layer.td-enter {
+        pointer-events: auto;
+        opacity: 1;
+      }
+
+      #task-detail-page .td-layout-grid {
+        display: grid;
+        grid-template-columns: 450px 1fr;
+        grid-template-rows: 1fr;
+        column-gap: 0px;
         row-gap: 25px;
-        padding: 0; /* No padding on parent - let children handle their own spacing */
-        flex: 1; /* Grow to fill available space in page-container */
-        min-height: 0; /* Allow the grid to shrink and enable internal scrolling */
-        overflow: hidden; /* Restore hidden overflow for proper scrolling */
-        justify-items: stretch; /* ensure items fill their grid tracks */
-        align-items: start;     /* align items to the top */
-        width: 100%; /* Ensure full width */
+        width: 100%;
+        height: 100%;
+        justify-items: stretch;
+        align-items: start;
       }
       /* Ensure container has glassmorphism while the page background matches dashboard */
       #task-detail-page .page-container {
@@ -937,10 +1257,10 @@
         margin-bottom: 0;
       }
       /* Override any global styles that might affect grid gap */
-      #task-detail-page .page-content > .main-content {
+      #task-detail-page .td-layout-grid > .main-content {
         margin: 0 !important;
       }
-      #task-detail-page .page-content > .sidebar-content {
+      #task-detail-page .td-layout-grid > .sidebar-content {
         margin: 0 !important;
       }
       #task-detail-page .main-content { 
@@ -958,6 +1278,9 @@
         background: rgba(0, 0, 0, 0.12); /* Subtle darkening for 2-tone effect */
         border-right: 1px solid var(--border-light); /* Vertical divider */
       }
+      #task-detail-page .main-content > * {
+        flex: 0 0 auto;
+      }
       #task-detail-page .sidebar-content { 
         display: flex; 
         flex-direction: column; 
@@ -970,6 +1293,9 @@
         margin: 0;
         align-items: stretch; /* Align to top */
         width: 100%; /* Ensure full width */
+      }
+      #task-detail-page .sidebar-content > * {
+        flex: 0 0 auto;
       }
       /* Ensure first child in sidebar has no extra top margin */
       #task-detail-page .sidebar-content > *:first-child {
@@ -1484,6 +1810,17 @@
         #task-detail-page .info-grid { grid-template-columns: 1fr; }
       }
     `;
+
+    const existing = document.getElementById(id);
+    if (existing) {
+      existing.textContent = css;
+      return;
+    }
+
+    const style = document.createElement('style');
+    style.id = id;
+    style.type = 'text/css';
+    style.textContent = css;
     document.head.appendChild(style);
   }
 
@@ -1609,13 +1946,9 @@
     const contactId = task.contactId || state.contact?.id || state.contact?._id;
 
     // Get account ID - prioritize state.account, then contact's linked account
-    let accountId = state.account?.id || state.account?.accountId || state.account?._id;
+    let accountId = task.accountId || state.account?.id || state.account?.accountId || state.account?._id;
     if (!accountId && state.contact) {
       accountId = state.contact.accountId || state.contact.account_id;
-    }
-    // Fallback: try to get from ContactDetail state (like health.js does)
-    if (!accountId && window.ContactDetail && window.ContactDetail.state) {
-      accountId = window.ContactDetail.state._linkedAccountId;
     }
 
     switch (which) {
@@ -1819,6 +2152,8 @@
 
   async function handleTaskComplete() {
     if (!state.currentTask) return;
+
+    tombstoneTaskId(state.currentTask.id, 'task-detail.js.complete');
 
     // CRITICAL FIX: Identify the next task in the global queue BEFORE deleting the current one
     // This must be done before any deletion logic runs
@@ -3129,6 +3464,15 @@
   async function loadTaskData(taskId) {
     const t0 = performance.now();
 
+    let loadToken = 0;
+
+    try {
+      const page = els.page || document.getElementById('task-detail-page');
+      if (page && page.classList.contains('task-loaded') && state.currentTask && String(state.currentTask.id) === String(taskId)) {
+        return;
+      }
+    } catch (_) { }
+
     // CRITICAL FIX: Prevent race conditions - if already loading, queue latest request
     if (state.loadingTask) {
       state._pendingTaskId = taskId;
@@ -3136,13 +3480,18 @@
       return;
     }
 
-    markTaskLoading();
+    state.loadingTask = true;
 
     if (!taskId) {
       console.error('[TaskDetail] No taskId provided to loadTaskData');
       showTaskError('No task ID provided');
+      state.loadingTask = false;
       return;
     }
+
+    loadToken = ++state._loadToken;
+    state._activeLoadToken = loadToken;
+    state._activeTaskId = taskId;
 
     // CRITICAL FIX: Clear previous state to prevent stale data from persisting
     state.contact = null;
@@ -3154,17 +3503,9 @@
     if (state.currentTask && state.currentTask.id !== taskId) {
        state.currentTask = null;
     }
-    state.loadingTask = true;
+    
 
     try {
-      // CRITICAL FIX: Show loading state immediately
-      if (els.content) {
-        els.content.innerHTML = '<div class="empty" style="padding: 2rem; text-align: center; color: var(--text-secondary);">Loading task...</div>';
-      }
-      // CRITICAL FIX: Also ensure subtitle shows loading state
-      if (els.subtitle) {
-        els.subtitle.textContent = 'Loading task...';
-      }
       // CRITICAL: Re-initialize DOM refs to ensure els.content exists
       if (!initDomRefs()) {
         console.warn('[TaskDetail] DOM not ready, retrying...');
@@ -3194,6 +3535,8 @@
         retry();
         return;
       }
+
+      markTaskLoading();
 
       // Load task from localStorage and Firebase with ownership filtering
       let task = null;
@@ -3559,7 +3902,12 @@
     } finally {
       // CRITICAL FIX: Always reset loading flag, even on error
       state.loadingTask = false;
-      markTaskLoaded();
+
+      try {
+        if (loadToken && loadToken === state._activeLoadToken && String(taskId) === String(state._activeTaskId)) {
+          markTaskLoaded(loadToken, taskId);
+        }
+      } catch (_) { }
 
       try {
         const pendingTaskId = state._pendingTaskId;
@@ -3880,7 +4228,7 @@
       const profileContainer = document.querySelector('#task-detail-page .contact-header-profile');
       if (profileContainer) {
         // Cleanup existing avatar/icon elements in the profile container
-        const existingElements = profileContainer.querySelectorAll('.avatar-initials, .company-favicon-header, .avatar-circle-small, .company-logo-header');
+        const existingElements = profileContainer.querySelectorAll('.avatar-initials, .company-favicon-header, .avatar-circle-small, .company-logo-header, .td-header-skel-icon');
         existingElements.forEach(el => el.remove());
 
         // Create the wrapper - no absolute positioning, let flex handle it
@@ -3934,6 +4282,7 @@
       '.avatar-circle-small',
       '.company-favicon-header',
       '.company-logo-header',
+      '.td-header-skel-icon',
       '.avatar-absolute'
     ];
 
@@ -3954,15 +4303,17 @@
       return;
     }
 
-    // Remove existing action buttons if any
-    const existingButtons = header.querySelectorAll('.reschedule-header-btn, .website-header-btn, .linkedin-header-btn, .header-action-divider, .list-seq-group');
-    existingButtons.forEach(el => el.remove());
+    const isAcctTask = isAccountTask(state.currentTask);
+    const alreadyInjected = !!header.querySelector('.website-header-btn, .linkedin-header-btn, .list-seq-group');
+    if (!alreadyInjected) {
+      const buttonsHTML = renderTaskHeaderButtons();
+      if (buttonsHTML) header.insertAdjacentHTML('beforeend', buttonsHTML);
+    }
 
-    // Generate and inject the header buttons HTML
-    const buttonsHTML = renderTaskHeaderButtons();
-    if (buttonsHTML) {
-      header.insertAdjacentHTML('beforeend', buttonsHTML);
-      // console.log('[TaskDetail] Header action buttons injected successfully');
+    const seqBtn = header.querySelector('#task-add-to-sequence');
+    if (seqBtn) {
+      if (isAcctTask) seqBtn.setAttribute('hidden', '');
+      else seqBtn.removeAttribute('hidden');
     }
   }
 
@@ -4874,7 +5225,30 @@
       }
     }
 
-    els.content.innerHTML = contentHtml;
+    const realLayer = els.content.querySelector('.td-real-layer');
+    if (realLayer) {
+      const isLoading = !!(els.page && els.page.classList.contains('task-loading'));
+      if (isLoading) {
+        try { realLayer.classList.remove('td-enter'); } catch (_) { }
+        try { realLayer.setAttribute('aria-hidden', 'true'); } catch (_) { }
+      }
+      realLayer.innerHTML = contentHtml;
+    } else {
+      // [Fix] Create real layer wrapper if it doesn't exist
+      // This preserves the skeleton layer if it exists, allowing for cross-fade
+      const newRealLayer = document.createElement('div');
+      newRealLayer.className = 'td-real-layer td-layout-grid';
+      const hasSkeleton = !!els.content.querySelector('.td-skeleton-layer');
+      const isLoading = !!(els.page && els.page.classList.contains('task-loading'));
+      newRealLayer.setAttribute('aria-hidden', hasSkeleton || isLoading ? 'true' : 'false');
+      if (!hasSkeleton && !isLoading) newRealLayer.classList.add('td-enter');
+      newRealLayer.innerHTML = contentHtml;
+
+      // If we have a skeleton, append the real layer (overlay it)
+      // If no skeleton (shouldn't happen usually), this just adds it
+      els.content.appendChild(newRealLayer);
+      
+    }
 
     // CRITICAL FIX: Setup inline editing after every DOM replacement
     // This must be called after each render since DOM elements are replaced
@@ -4884,10 +5258,7 @@
       setupInlineEditing();
     });
 
-    // Attach event handlers for task-specific buttons after rendering
-    setTimeout(() => {
-      attachTaskSpecificHandlers();
-    }, 50);
+    try { attachTaskSpecificHandlers(); } catch (_) { }
   }
 
   function attachTaskSpecificHandlers() {
@@ -4896,17 +5267,16 @@
     const markCompleteLinkedInBtn = document.getElementById('mark-complete-linkedin-btn');
 
     if (accessLinkedInBtn) {
-      // Remove existing listener if any
-      accessLinkedInBtn.replaceWith(accessLinkedInBtn.cloneNode(true));
-      const newBtn = document.getElementById('access-linkedin-btn');
-      newBtn.addEventListener('click', handleAccessLinkedIn);
+      if (!accessLinkedInBtn.dataset.pcBoundClick) {
+        accessLinkedInBtn.dataset.pcBoundClick = '1';
+        accessLinkedInBtn.addEventListener('click', handleAccessLinkedIn);
+      }
     }
 
     if (markCompleteLinkedInBtn) {
-      // Remove existing listener if any
-      markCompleteLinkedInBtn.replaceWith(markCompleteLinkedInBtn.cloneNode(true));
-      const newBtn = document.getElementById('mark-complete-linkedin-btn');
-      newBtn.addEventListener('click', async () => {
+      if (!markCompleteLinkedInBtn.dataset.pcBoundClick) {
+        markCompleteLinkedInBtn.dataset.pcBoundClick = '1';
+        markCompleteLinkedInBtn.addEventListener('click', async () => {
         // Get notes from textarea
         const notesEl = document.getElementById('linkedin-notes');
         const notes = notesEl ? notesEl.value.trim() : '';
@@ -4922,7 +5292,8 @@
 
         // Complete the task
         await handleTaskComplete();
-      });
+        });
+      }
     }
   }
 
@@ -6514,7 +6885,6 @@
 
       // If no contactId but we have a name, try to find it
       if (!finalContactId && contactName) {
-        console.log('[TaskDetail] No contactId, searching by name:', contactName);
         try {
           // Try getPeopleData first
           if (typeof window.getPeopleData === 'function') {
@@ -6745,7 +7115,6 @@
                   const contactIndex = contacts.findIndex(c => c && c.id === id);
                   if (contactIndex !== -1) {
                     contacts[contactIndex] = updatedContact;
-                    console.log('[TaskDetail] Updated contact in BackgroundContactsLoader cache');
                   }
                 }
               } catch (e) {
@@ -7113,8 +7482,6 @@
 
       // Only refresh if the updated account matches the task's account (any source)
       if (id === taskAccountId || id === contactAccountId || id === stateAccountId) {
-        console.log('[TaskDetail] Account updated, reloading account data:', id);
-
         try {
           // Reload account data from Firestore to get latest changes
           if (window.firebaseDB && id) {
@@ -7139,7 +7506,6 @@
                   const accountIndex = accounts.findIndex(a => a && a.id === id);
                   if (accountIndex !== -1) {
                     accounts[accountIndex] = updatedAccount;
-                    console.log('[TaskDetail] Updated account in BackgroundAccountsLoader cache');
                   }
                 }
               } catch (e) {
@@ -7170,8 +7536,6 @@
 
       // Only refresh if the updated account matches the task's account (any source)
       if (id === taskAccountId || id === contactAccountId || id === stateAccountId) {
-        console.log('[TaskDetail] Energy field updated:', field, 'for account:', id);
-
         try {
           // Reload account data from Firestore to get latest energy fields
           if (window.firebaseDB && id) {
@@ -7203,6 +7567,9 @@
   window.TaskDetail = {
     state: state, // Expose state so widgets can access account/contact data
     open: async function (taskId, navigationSource = 'tasks') {
+      if (!taskId) return;
+      state._openTaskId = taskId;
+      state._openTaskAt = Date.now();
       try {
         // CRITICAL: Capture navigation source BEFORE calling navigateToPage
         // Standardize navigation source detection to match account detail pattern
@@ -7291,10 +7658,22 @@
 
   // Listen for task detail restore event
   document.addEventListener('pc:task-detail-restore', async (e) => {
-    console.log('[TaskDetail] Restore event received:', e.detail);
     const restoreData = e.detail || {};
 
     if (restoreData.taskId) {
+      try {
+        if (state._openTaskId && String(state._openTaskId) === String(restoreData.taskId) && (Date.now() - (state._openTaskAt || 0) < 2000)) {
+          return;
+        }
+      } catch (_) { }
+
+      try {
+        const page = els.page || document.getElementById('task-detail-page');
+        if (page && page.classList.contains('task-loaded') && state.currentTask && String(state.currentTask.id) === String(restoreData.taskId)) {
+          return;
+        }
+      } catch (_) { }
+
       // Don't call TaskDetail.open() - just reload the task data directly
       // This preserves the navigation source that was already set
       await loadTaskData(restoreData.taskId);
@@ -7315,8 +7694,6 @@
       // Only refresh if we're currently viewing a task with an account
       if (state.currentTask && state.account?.id) {
         const accountId = state.account.id;
-        console.log('[TaskDetail] Returning from account-detail, refreshing account data:', accountId);
-
         try {
           // Force reload account data from Firestore (bypass cache to get latest changes)
           if (window.firebaseDB && accountId) {
@@ -7367,7 +7744,6 @@
           // Pass the current account state to the modal
           const accountData = state.account || (state.currentTask && state.currentTask.account ? { id: state.currentTask.accountId, name: state.currentTask.account } : null);
           window.AccountDetail.openEditModal(accountData);
-          console.log('[TaskDetail] Edit account clicked', id);
         } else {
           console.warn('[TaskDetail] AccountDetail.openEditModal not available');
         }
@@ -7379,7 +7755,6 @@
           // Pass the current contact state to the modal
           const contactData = state.contact || (state.currentTask && state.currentTask.contact ? { id: state.currentTask.contactId, name: state.currentTask.contact } : null);
           window.ContactDetail.openEditModal(contactData);
-          console.log('[TaskDetail] Edit contact clicked', id);
         } else {
           console.warn('[TaskDetail] ContactDetail.openEditModal not available');
         }
@@ -7402,7 +7777,6 @@
     }, true);
 
     document._taskHeaderActionsBound = true;
-    console.log('[TaskDetail] Header actions bound');
   }
 
 })();
