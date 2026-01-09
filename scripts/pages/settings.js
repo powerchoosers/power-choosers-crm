@@ -158,6 +158,18 @@ class SettingsPage {
         this.init();
     }
 
+    normalizeExternalUrl(value) {
+        const v = String(value || '').trim();
+        if (!v) return '';
+        if (/^https?:\/\//i.test(v)) return v;
+        if (/^mailto:/i.test(v) || /^tel:/i.test(v)) return v;
+        if (v.startsWith('//')) return `https:${v}`;
+        if (/^[a-z][a-z0-9+.-]*:/i.test(v)) return '';
+        if (v.startsWith('/') || v.startsWith('#')) return '';
+        if (/[.][a-z]{2,}([/?#]|$)/i.test(v)) return `https://${v}`;
+        return '';
+    }
+
     async init() {
         // IMMEDIATE: Set up UI first (styles, collapse buttons, save button) - don't wait for settings
         injectModernStyles();
@@ -590,6 +602,17 @@ class SettingsPage {
                     this.state.settings.general[key] = e.target.value.trim();
                     this.markDirty();
                 });
+
+                if (key === 'linkedIn') {
+                    input.addEventListener('blur', () => {
+                        const normalized = this.normalizeExternalUrl(input.value);
+                        if (normalized && input.value !== normalized) {
+                            input.value = normalized;
+                        }
+                        this.state.settings.general[key] = normalized || input.value.trim();
+                        this.markDirty();
+                    });
+                }
             }
         });
 
@@ -1205,6 +1228,13 @@ class SettingsPage {
             }
 
             const docId = isAdmin ? 'user-settings' : `user-settings-${userEmail}`;
+
+            if (this.state.settings?.general) {
+                const normalizedLinkedIn = this.normalizeExternalUrl(this.state.settings.general.linkedIn);
+                if (normalizedLinkedIn) {
+                    this.state.settings.general.linkedIn = normalizedLinkedIn;
+                }
+            }
 
             // Save to Firebase first
             if (window.firebaseDB) {
@@ -2709,7 +2739,7 @@ class SettingsPage {
         const phone = g.phone || '+1 (817) 809-3367';
         const email = g.email || '';
         const location = g.location || 'Fort Worth, TX';
-        const linkedIn = g.linkedIn || 'https://www.linkedin.com/company/power-choosers';
+        const linkedIn = this.normalizeExternalUrl(g.linkedIn) || 'https://www.linkedin.com/company/power-choosers';
         const avatar = g.hostedPhotoURL || g.photoURL || '';
 
         // Build email-compatible HTML signature (table-based for maximum compatibility)
