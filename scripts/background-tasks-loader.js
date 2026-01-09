@@ -28,6 +28,68 @@
     return email ? `pc:tasks-cache-version:${email}` : 'pc:tasks-cache-version';
   };
 
+  const getDeletedTasksKey = () => {
+    const email = getUserEmail();
+    return email ? `pc:deleted-tasks:${email}` : 'pc:deleted-tasks';
+  };
+
+  function getDeletedTaskIdsSet() {
+    try {
+      const key = getDeletedTasksKey();
+      const raw = localStorage.getItem(key);
+      const parsed = raw ? JSON.parse(raw) : {};
+      const now = Date.now();
+      const ttlMs = 7 * 24 * 60 * 60 * 1000;
+      const map = Array.isArray(parsed)
+        ? parsed.reduce((acc, v) => {
+          if (v && typeof v === 'object' && v.id) acc[String(v.id)] = v.ts || v.timestamp || now;
+          return acc;
+        }, {})
+        : (parsed && typeof parsed === 'object' ? parsed : {});
+
+      let changed = false;
+      for (const [id, ts] of Object.entries(map)) {
+        const t = typeof ts === 'number' ? ts : parseInt(String(ts || '0'), 10);
+        if (!id || !t || (now - t) > ttlMs) {
+          delete map[id];
+          changed = true;
+        }
+      }
+
+      const ids = new Set(Object.keys(map));
+
+      if (changed) {
+        try { localStorage.setItem(key, JSON.stringify(map)); } catch (_) { }
+      }
+
+      return ids;
+    } catch (_) {
+      return new Set();
+    }
+  }
+
+  function tombstoneTaskId(taskId, source) {
+    if (!taskId) return;
+    try {
+      const key = getDeletedTasksKey();
+      const raw = localStorage.getItem(key);
+      const parsed = raw ? JSON.parse(raw) : {};
+      const now = Date.now();
+      const map = (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+      map[String(taskId)] = now;
+      localStorage.setItem(key, JSON.stringify(map));
+    } catch (_) { }
+  }
+
+  function filterOutDeletedTasks(tasks, source) {
+    const deleted = getDeletedTaskIdsSet();
+    if (!deleted || deleted.size === 0) return tasks;
+    const before = Array.isArray(tasks) ? tasks.length : 0;
+    const filtered = (tasks || []).filter(t => t && t.id && !deleted.has(String(t.id)));
+    const removed = before - filtered.length;
+    return filtered;
+  }
+
   async function loadFromFirestore(preserveExisting = false) {
 
     if (!window.firebaseDB && !(window.DataManager && typeof window.DataManager.queryWithOwnership === 'function')) {
@@ -91,6 +153,7 @@
 
 
         }
+        tasksData = filterOutDeletedTasks(tasksData, 'BackgroundTasksLoader.loadFromFirestore(non-admin)');
         lastLoadedDoc = null;
         hasMoreData = false;
       } else {
@@ -121,6 +184,7 @@
 
 
         }
+        tasksData = filterOutDeletedTasks(tasksData, 'BackgroundTasksLoader.loadFromFirestore(admin)');
 
         // Admin pagination disabled (we load all tasks in one go)
         lastLoadedDoc = null;
@@ -177,6 +241,8 @@
 
           }
 
+          tasksData = filterOutDeletedTasks(tasksData, 'BackgroundTasksLoader.cacheInit');
+
           // Notify that cached data is available
           document.dispatchEvent(new CustomEvent('pc:tasks-loaded', {
             detail: { count: cached.length, cached: true }
@@ -218,6 +284,8 @@
             } else {
               tasksData = cached;
             }
+
+            tasksData = filterOutDeletedTasks(tasksData, 'BackgroundTasksLoader.cacheRetry');
             document.dispatchEvent(new CustomEvent('pc:tasks-loaded', {
               detail: { count: cached.length, cached: true }
             }));
@@ -398,6 +466,7 @@
     const { taskId, source } = event.detail || {};
     if (taskId) {
       try {
+        tombstoneTaskId(taskId, source || 'pc:task-deleted');
         // Remove from local cache
         tasksData = tasksData.filter(t => t && t.id !== taskId);
 
@@ -493,6 +562,7 @@
   function removeTask(taskId) {
     if (!taskId) return false;
     try {
+      tombstoneTaskId(taskId, 'BackgroundTasksLoader.removeTask');
       const beforeCount = tasksData.length;
       tasksData = tasksData.filter(t => t && t.id !== taskId);
       const removed = tasksData.length < beforeCount;

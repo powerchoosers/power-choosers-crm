@@ -1095,6 +1095,7 @@ textarea[data-skeleton-id] {
 
 .skeleton-bar {
     height: 16px;
+    display: block;
     background: linear-gradient(90deg,
             rgba(255, 255, 255, 0.1) 25%,
             rgba(255, 255, 255, 0.2) 50%,
@@ -21227,24 +21228,97 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     background: var(--bg-dashboard); /* Match lighter background of other pages */
 }
 
+#task-detail-page .task-detail-title-skeleton,
+#task-detail-page .task-detail-subtitle-skeleton {
+    display: block;
+    width: 100%;
+    max-width: 520px;
+}
+
+#task-detail-page .task-detail-title-skeleton .td-title-line {
+    height: 16px;
+    width: 55%;
+}
+
+#task-detail-page .task-detail-subtitle-skeleton .td-subtitle-line {
+    height: 12px;
+    width: 35%;
+}
+
+
+
 #task-detail-page .page-header,
 #task-detail-page .page-content {
-    transition: opacity 0.4s ease, transform 0.4s ease;
+    transition: opacity 0.24s ease, transform 0.24s ease;
+    will-change: opacity, transform;
+    transform-origin: top center;
 }
 
 #task-detail-page.task-loading .page-header,
 #task-detail-page.task-loading .page-content {
-    opacity: 0;
-    transform: translateY(10px);
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+    transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+#task-detail-page.task-loading .page-actions,
+#task-detail-page.task-loading .task-navigation,
+#task-detail-page.task-loading #task-complete-btn,
+#task-detail-page.task-loading #task-reschedule-btn,
+#task-detail-page.task-loading #task-open-widgets {
     pointer-events: none;
-    transition: opacity 0.3s ease, transform 0.3s ease;
+    opacity: 0.6;
+}
+
+#task-detail-page .contact-header-profile > .website-header-btn {
+    margin-left: auto;
 }
 
 #task-detail-page.task-loaded .page-header,
 #task-detail-page.task-loaded .page-content {
     opacity: 1;
     transform: translateY(0);
-    transition: opacity 0.4s ease 0.1s, transform 0.4s ease 0.1s;
+    animation: tdFadeZoomIn 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    transition: opacity 0.24s ease, transform 0.24s ease;
+}
+
+#task-detail-page.task-loaded .main-content > *,
+#task-detail-page.task-loaded .sidebar-content > * {
+    animation: tdCardReveal 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+#task-detail-page.task-loaded .main-content > *:nth-child(1) { animation-delay: 0.02s; }
+#task-detail-page.task-loaded .main-content > *:nth-child(2) { animation-delay: 0.05s; }
+#task-detail-page.task-loaded .main-content > *:nth-child(3) { animation-delay: 0.08s; }
+
+#task-detail-page.task-loaded .sidebar-content > *:nth-child(1) { animation-delay: 0.03s; }
+#task-detail-page.task-loaded .sidebar-content > *:nth-child(2) { animation-delay: 0.06s; }
+#task-detail-page.task-loaded .sidebar-content > *:nth-child(3) { animation-delay: 0.09s; }
+
+#task-detail-page .page-actions,
+#task-detail-page .task-navigation,
+#task-detail-page .header-action-divider,
+#task-detail-page .list-seq-group,
+#task-detail-page .quick-action-btn,
+#task-detail-page .contact-header-profile,
+#task-detail-page .contact-header-text {
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    will-change: opacity, transform;
+}
+
+#task-detail-page.task-loading .page-actions,
+#task-detail-page.task-loading .task-navigation,
+#task-detail-page.task-loading .header-action-divider,
+#task-detail-page.task-loading .list-seq-group,
+#task-detail-page.task-loading .quick-action-btn {
+    transform: translateY(2px) scale(0.985);
+}
+
+#task-detail-page .td-skeleton-exit {
+    opacity: 0;
+    transform: translateY(-2px) scale(0.985);
+    transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 /* Fade out old content when switching tasks */
@@ -21255,62 +21329,6 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
-#task-detail-page.task-loading::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: var(--bg-card);
-    border-radius: var(--border-radius-lg);
-    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
-    pointer-events: none;
-    z-index: 1;
-    opacity: 1;
-    transition: opacity 0.5s ease;
-}
-
-#task-detail-page.task-loading::after {
-    content: "";
-    position: absolute;
-    inset: 12px;
-    border-radius: calc(var(--border-radius-lg) - 2px);
-    background: linear-gradient(120deg,
-            rgba(255, 255, 255, 0) 0%,
-            rgba(255, 255, 255, 0.25) 50%,
-            rgba(255, 255, 255, 0));
-    animation: skeleton-shimmer 1.5s linear infinite;
-    pointer-events: none;
-    z-index: 2;
-    opacity: 1;
-    transition: opacity 0.5s ease;
-}
-
-#task-detail-page.task-loaded::before,
-#task-detail-page.task-loaded::after {
-    content: "";
-    position: absolute;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.5s ease;
-}
-
-#task-detail-page.task-loaded::before {
-    inset: 0;
-    background: var(--bg-card);
-    border-radius: var(--border-radius-lg);
-    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
-    z-index: 1;
-}
-
-#task-detail-page.task-loaded::after {
-    inset: 12px;
-    border-radius: calc(var(--border-radius-lg) - 2px);
-    background: linear-gradient(120deg,
-            rgba(255, 255, 255, 0) 0%,
-            rgba(255, 255, 255, 0.25) 50%,
-            rgba(255, 255, 255, 0));
-    z-index: 2;
-}
-
 @keyframes skeleton-shimmer {
     0% {
         transform: translateX(-100%);
@@ -21319,6 +21337,16 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     100% {
         transform: translateX(100%);
     }
+}
+
+@keyframes tdFadeZoomIn {
+    from { opacity: 0; transform: translateY(8px) scale(0.985); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes tdCardReveal {
+    from { opacity: 0; transform: translateY(10px) scale(0.985); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 /* Email detail skeleton + fade-in */
@@ -21334,10 +21362,20 @@ div[id="account-contacts-list"] .contact-item .contact-name {
 
 #email-detail-page.email-loading .page-header,
 #email-detail-page.email-loading .email-detail-container {
-    opacity: 0;
-    transform: translateY(10px);
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+    transition: none;
+}
+
+#email-detail-page.email-loading .page-actions,
+#email-detail-page.email-loading #star-email-btn,
+#email-detail-page.email-loading #reply-btn,
+#email-detail-page.email-loading #forward-btn,
+#email-detail-page.email-loading #delete-email-btn,
+#email-detail-page.email-loading #regenerate-email-btn {
     pointer-events: none;
-    transition: opacity 0.3s ease, transform 0.3s ease;
+    opacity: 0.6;
 }
 
 #email-detail-page.email-loaded .page-header,
@@ -21364,8 +21402,8 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
     pointer-events: none;
     z-index: 1;
-    opacity: 1;
-    transition: opacity 0.5s ease;
+    opacity: 0;
+    transition: opacity 0.2s ease;
 }
 
 #email-detail-page.email-loading::after {
@@ -21377,11 +21415,11 @@ div[id="account-contacts-list"] .contact-item .contact-name {
             rgba(255, 255, 255, 0) 0%,
             rgba(255, 255, 255, 0.25) 50%,
             rgba(255, 255, 255, 0));
-    animation: skeleton-shimmer 1.5s linear infinite;
+    animation: none;
     pointer-events: none;
     z-index: 2;
-    opacity: 1;
-    transition: opacity 0.5s ease;
+    opacity: 0;
+    transition: opacity 0.2s ease;
 }
 
 #email-detail-page.email-loaded::before,
@@ -24556,3 +24594,143 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     color: var(--text-primary);
     opacity: 1;
 }
+
+/* === Task Detail Field Skeletons (Real Containers) === */
+
+#task-detail-page .td-loading-card {
+    position: relative;
+    overflow: hidden;
+    min-height: 0;
+}
+
+#task-detail-page.task-loading .main-content > .td-loading-card {
+    flex: 0 0 auto;
+}
+
+#task-detail-page.task-loading .sidebar-content > .td-loading-card {
+    flex: 0 0 auto;
+}
+
+#task-detail-page .skeleton-shimmer-modern {
+    position: relative;
+    overflow: hidden;
+}
+
+#task-detail-page .td-loading-card::after,
+#task-detail-page .skeleton-shimmer-modern::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.04) 40%,
+        rgba(255, 255, 255, 0.07) 50%,
+        rgba(255, 255, 255, 0.04) 60%,
+        transparent 100%
+    );
+    transform: translateX(-100%);
+    animation: skeletonShimmerModern 2s infinite linear;
+    pointer-events: none;
+    z-index: 2;
+}
+
+#task-detail-page .skeleton-shape {
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 4px;
+}
+
+@keyframes skeletonShimmerModern {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+#task-detail-page .td-skel {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+#task-detail-page .td-skel-title {
+    height: 18px;
+    width: 45%;
+}
+
+#task-detail-page .td-header-skel-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+#task-detail-page .td-header-icon-shape {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+}
+
+#task-detail-page .td-contactinfo-shape {
+    height: 12px;
+    width: 160px;
+}
+
+#task-detail-page .td-skel-value {
+    height: 14px;
+    width: 70%;
+}
+
+#task-detail-page .td-skel-line {
+    height: 12px;
+    width: 100%;
+    display: block;
+    margin-top: 8px;
+}
+
+#task-detail-page .td-skel-textarea {
+    height: 86px;
+    width: 100%;
+    display: block;
+    margin-top: 8px;
+    border-radius: 6px;
+}
+
+#task-detail-page .td-skel-btn {
+    height: 12px;
+    width: 108px;
+    border-radius: 999px;
+}
+
+#task-detail-page .td-skel-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    display: block;
+}
+
+#task-detail-page .td-skel-activity {
+    height: 12px;
+    width: 100%;
+    display: block;
+    margin-top: 10px;
+}
+
+#task-detail-page .td-short { width: 70%; }
+#task-detail-page .td-w-45 { width: 45%; }
+#task-detail-page .td-w-50 { width: 50%; }
+#task-detail-page .td-w-55 { width: 55%; }
+#task-detail-page .td-w-60 { width: 60%; }
+#task-detail-page .td-w-65 { width: 65%; }
+#task-detail-page .td-w-70 { width: 70%; }
+#task-detail-page .td-w-75 { width: 75%; }
+#task-detail-page .td-w-80 { width: 80%; }
+#task-detail-page .td-w-85 { width: 85%; }
+
+/* Title/Subtitle header specific */
+.task-detail-title-skeleton { position: relative; overflow: hidden; display: inline-block; width: 200px; height: 24px; }
+.td-title-shape { width: 100%; height: 100%; }
+
+.task-detail-subtitle-skeleton { position: relative; overflow: hidden; display: inline-block; width: 300px; height: 16px; }
+.td-subtitle-shape { width: 100%; height: 100%; }

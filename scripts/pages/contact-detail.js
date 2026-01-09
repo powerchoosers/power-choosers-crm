@@ -2736,7 +2736,13 @@
             </div>
           </div>
           <div class="rc-list" id="contact-recent-calls-list">
-            <div class="rc-empty">Loading recent calls…</div>
+            <div class="rc-empty" style="padding: 12px 0;">
+              <div class="field-skeleton-container" style="padding: 0 12px;">
+                <div class="skeleton-bar skeleton-body-2 skeleton-animate"></div>
+                <div class="skeleton-bar skeleton-body-3 skeleton-animate"></div>
+                <div class="skeleton-bar skeleton-body-4 skeleton-animate"></div>
+              </div>
+            </div>
           </div>
         </div>
 

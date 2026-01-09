@@ -5287,6 +5287,53 @@ class PowerChoosersCRM {
         // Load localStorage tasks for immediate rendering after skeletons (non-admin only)
         // NOTE: localStorage is per-browser and can be stale across browsers; Firebase/CacheManager are source-of-truth.
         let localTasks = [];
+
+        const getDeletedTasksKey = () => {
+            try {
+                const email = getUserEmail();
+                return email ? `pc:deleted-tasks:${email}` : 'pc:deleted-tasks';
+            } catch (_) {
+                return 'pc:deleted-tasks';
+            }
+        };
+
+        const getDeletedTaskIdsSet = () => {
+            try {
+                const key = getDeletedTasksKey();
+                const raw = localStorage.getItem(key);
+                const parsed = raw ? JSON.parse(raw) : {};
+                const now = Date.now();
+                const ttlMs = 7 * 24 * 60 * 60 * 1000;
+                const map = (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+
+                let changed = false;
+                for (const [id, ts] of Object.entries(map)) {
+                    const t = typeof ts === 'number' ? ts : parseInt(String(ts || '0'), 10);
+                    if (!id || !t || (now - t) > ttlMs) {
+                        delete map[id];
+                        changed = true;
+                    }
+                }
+
+                if (changed) {
+                    try { localStorage.setItem(key, JSON.stringify(map)); } catch (_) { }
+                }
+
+                return new Set(Object.keys(map));
+            } catch (_) {
+                return new Set();
+            }
+        };
+
+        const filterOutDeletedTasks = (tasks, source) => {
+            const deleted = getDeletedTaskIdsSet();
+            const arr = Array.isArray(tasks) ? tasks : [];
+            if (!deleted || deleted.size === 0) return arr;
+            const before = arr.length;
+            const filtered = arr.filter(t => t && t.id && !deleted.has(String(t.id)));
+            const removed = before - filtered.length;
+            return filtered;
+        };
         try {
             // Admin users should NOT use localStorage as a source (it causes stale cross-browser confusion and flicker)
             if (isAdmin()) {
@@ -5324,6 +5371,8 @@ class PowerChoosersCRM {
                     if (t.completedAt || t.completed_at) return false;
                     return true;
                 });
+
+                localTasks = filterOutDeletedTasks(localTasks, "main.js.loadTodaysTasks(localStorage)");
 
 
             }
@@ -5455,16 +5504,18 @@ class PowerChoosersCRM {
                                 return true;
                             });
 
+                            const tombstonedFiltered = filterOutDeletedTasks(finalMergedTasks, "main.js.loadTodaysTasks(merged)");
+
                             // CRITICAL FIX: Save to both namespaced and legacy keys for compatibility
                             try {
                                 const email = getUserEmail();
                                 const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
-                                localStorage.setItem(namespacedKey, JSON.stringify(finalMergedTasks));
-                                localStorage.setItem('userTasks', JSON.stringify(finalMergedTasks)); // Legacy key for compatibility
+                                localStorage.setItem(namespacedKey, JSON.stringify(tombstonedFiltered));
+                                localStorage.setItem('userTasks', JSON.stringify(tombstonedFiltered)); // Legacy key for compatibility
                             } catch (e) {
                                 console.warn('Could not save merged tasks to localStorage cache:', e);
                             }
-                            this.renderTodaysTasks(finalMergedTasks, parseDateStrict, parseTimeToMinutes, today);
+                            this.renderTodaysTasks(tombstonedFiltered, parseDateStrict, parseTimeToMinutes, today);
                             this._tasksLoading = false;
                             return;
                         }
@@ -5485,8 +5536,10 @@ class PowerChoosersCRM {
                         type: task.type || 'task'
                     }));
 
-                    if (processedTasks.length > 0) {
-                        this.renderTodaysTasks(processedTasks, parseDateStrict, parseTimeToMinutes, today);
+                    const processedTasksFiltered = filterOutDeletedTasks(processedTasks, "main.js.loadTodaysTasks(cache)");
+
+                    if (processedTasksFiltered.length > 0) {
+                        this.renderTodaysTasks(processedTasksFiltered, parseDateStrict, parseTimeToMinutes, today);
                         if (!isAdmin()) {
                             this._tasksLoading = false;
                             return;
@@ -5548,17 +5601,19 @@ class PowerChoosersCRM {
                         return true;
                     });
 
+                    const tombstonedFiltered = filterOutDeletedTasks(finalMergedTasks, "main.js.loadTodaysTasks(adminMerged)");
+
                     // Save only to namespaced key (avoid cross-user/browser mixing)
                     try {
                         const email = getUserEmail();
                         const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
-                        localStorage.setItem(namespacedKey, JSON.stringify(finalMergedTasks));
+                        localStorage.setItem(namespacedKey, JSON.stringify(tombstonedFiltered));
                     } catch (e) {
                         console.warn('Could not save merged tasks to localStorage cache:', e);
                     }
 
                     // FINAL RENDER: Re-render with complete merged data (this will be the stable final render)
-                    this.renderTodaysTasks(finalMergedTasks, parseDateStrict, parseTimeToMinutes, today);
+                    this.renderTodaysTasks(tombstonedFiltered, parseDateStrict, parseTimeToMinutes, today);
                 }
             } catch (e) {
                 console.warn("Could not load tasks for Today's Tasks widget:", e);
@@ -6047,6 +6102,7 @@ class PowerChoosersCRM {
         if (this._cachedNews && this._cachedNews.timestamp && (now - this._cachedNews.timestamp) < (10 * 60 * 1000)) {
             // Render cached news immediately
             if (newsList && this._cachedNews.items) {
+                const newsTitleStyle = 'display: -webkit-box !important; line-height: 1.4 !important; max-height: 51px !important; overflow: hidden !important; -webkit-line-clamp: 3 !important; line-clamp: 3 !important; -webkit-box-orient: vertical !important; white-space: normal !important; text-overflow: ellipsis !important; word-wrap: break-word !important; overflow-wrap: break-word !important;';
                 const newsHtml = this._cachedNews.items.map((it, index) => {
                     const title = this.escapeHtml(it.title || '');
                     const url = (it.url || '').trim();
@@ -6058,7 +6114,7 @@ class PowerChoosersCRM {
 
                     return `
                         <a class="news-item modern-reveal" href="${safeHref}" target="_blank" rel="noopener noreferrer" ${revealStyle}>
-                            <div class="news-title">${title}</div>
+                            <div class="news-title" style="${newsTitleStyle}">${title}</div>
                             <div class="news-time">${this.escapeHtml(time)}</div>
                         </a>
                     `;
@@ -6130,6 +6186,8 @@ class PowerChoosersCRM {
                 const currentHeight = newsList.offsetHeight;
                 newsList.style.height = currentHeight + 'px';
 
+                const newsTitleStyle = 'display: -webkit-box !important; line-height: 1.4 !important; max-height: 51px !important; overflow: hidden !important; -webkit-line-clamp: 3 !important; line-clamp: 3 !important; -webkit-box-orient: vertical !important; white-space: normal !important; text-overflow: ellipsis !important; word-wrap: break-word !important; overflow-wrap: break-word !important;';
+
                 const newsHtml = items.map((it, index) => {
                     const title = escapeHtml(it.title || '');
                     const url = (it.url || '').trim();
@@ -6143,7 +6201,7 @@ class PowerChoosersCRM {
 
                     return `
                         <a class="news-item modern-reveal premium-borderline" href="${safeHref}" target="_blank" rel="noopener noreferrer" ${revealStyle}>
-                            <div class="news-title">${title}</div>
+                            <div class="news-title" style="${newsTitleStyle}">${title}</div>
                             <div class="news-time">${escapeHtml(time)}</div>
                         </a>
                     `;

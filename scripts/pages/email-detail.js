@@ -16,6 +16,33 @@
     // Go straight to loading state without the 300ms fade-out delay
     el.classList.add('email-loading');
     el.classList.remove('email-loaded');
+
+    try {
+      if (els.title) {
+        els.title.innerHTML = '<span class="skeleton-bar skeleton-subject-1 skeleton-animate"></span><span class="skeleton-bar skeleton-subject-2 skeleton-animate" style="margin-top:6px"></span>';
+      }
+      if (els.senderAvatar) {
+        els.senderAvatar.innerHTML = '<div class="skeleton-shimmer" style="width:40px;height:40px;border-radius:50%;background:var(--grey-700);"></div>';
+      }
+      if (els.senderName) {
+        els.senderName.innerHTML = '<span class="skeleton-bar skeleton-subject-2 skeleton-animate" style="height:14px"></span>';
+      }
+      if (els.senderEmail) {
+        els.senderEmail.innerHTML = '<span class="skeleton-bar skeleton-subject-1 skeleton-animate" style="height:12px"></span>';
+      }
+      if (els.emailDate) {
+        els.emailDate.innerHTML = '<span class="skeleton-bar skeleton-subject-2 skeleton-animate" style="height:12px; width:110px"></span>';
+      }
+      if (els.emailContent) {
+        els.emailContent.innerHTML = '<div class="field-skeleton-container" style="padding: 6px 0;">' +
+          '<div class="skeleton-bar skeleton-body-1 skeleton-animate"></div>' +
+          '<div class="skeleton-bar skeleton-body-2 skeleton-animate"></div>' +
+          '<div class="skeleton-bar skeleton-body-3 skeleton-animate"></div>' +
+          '<div class="skeleton-bar skeleton-body-4 skeleton-animate"></div>' +
+          '<div class="skeleton-bar skeleton-body-5 skeleton-animate"></div>' +
+        '</div>';
+      }
+    } catch (_) { }
   }
 
   function markEmailLoaded() {
