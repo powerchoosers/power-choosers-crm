@@ -124,9 +124,9 @@
 
       // Check if click is on website header button (only on account detail page)
       const websiteBtn = e.target.closest('.website-header-btn');
-      if (websiteBtn && document.getElementById('account-details-page')) {
+      if (websiteBtn && websiteBtn.closest('#account-detail-header')) {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         // console.log('[AccountDetail] Website button clicked via delegation');
         handleQuickAction('website');
         return;
@@ -134,9 +134,9 @@
 
       // Check if click is on LinkedIn header button (only on account detail page)
       const linkedInBtn = e.target.closest('.linkedin-header-btn');
-      if (linkedInBtn && document.getElementById('account-details-page')) {
+      if (linkedInBtn && linkedInBtn.closest('#account-detail-header')) {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         // console.log('[AccountDetail] LinkedIn button clicked via delegation');
         handleQuickAction('linkedin');
         return;
@@ -820,6 +820,8 @@
       #account-detail-header .contact-header-profile { display: inline-flex; align-items: center; gap: 8px; }
       /* Reset margin added globally so spacing is controlled here */
       #account-detail-header .linkedin-header-btn { margin-left: 0; margin-right: 0; }
+      #account-detail-header .header-quick-actions { display: inline-flex; align-items: center; gap: 8px; }
+      #account-detail-header .page-actions-separator { width: 1px; height: 24px; background: var(--border-light); margin: 0; flex-shrink: 0; }
       /* Vertical divider between LinkedIn and the List/Sequence group */
       #account-detail-header .header-action-divider {
         width: 1px;
@@ -1231,6 +1233,10 @@
                 </div>
                 <div class="contact-subtitle">${industry ? escapeHtml(industry) : ''}</div>
               </div>
+            </div>
+          </div>
+          <div class="page-actions">
+            <div class="header-quick-actions">
               <button class="quick-action-btn website-header-btn" data-action="website" title="Visit website" aria-label="Visit website">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="10"/>
@@ -1245,7 +1251,7 @@
                   <circle cx="4" cy="4" r="2"/>
                 </svg>
               </button>
-              <span class="header-action-divider" aria-hidden="true"></span>
+              <div class="page-actions-separator"></div>
               <div class="list-seq-group">
                 <button class="quick-action-btn list-header-btn" id="add-account-to-list" title="Add to list" aria-label="Add to list" aria-haspopup="dialog">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -1261,12 +1267,11 @@
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <polyline points="9,11 12,14 22,4"></polyline>
                     <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-                </svg>
-              </button>
+                  </svg>
+                </button>
               </div>
             </div>
-          </div>
-          <div class="page-actions">
+            <div class="page-actions-separator"></div>
             <div class="widgets-wrap">
               <button class="btn-primary" id="open-widgets" title="Widgets" aria-label="Widgets" aria-haspopup="menu" aria-expanded="false" aria-controls="widgets-drawer">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
