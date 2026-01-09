@@ -14,7 +14,7 @@ export default async function handler(req, res) {
 
     const { id } = req.query || {};
     const trackingId = String(id || '').trim();
-    const originalUrl = req.query?.url ? decodeURIComponent(req.query.url) : null;
+    let originalUrl = req.query?.url ? decodeURIComponent(req.query.url) : null;
     const linkIndex = parseInt(req.query?.idx || '0', 10);
 
     // Extract request metadata
@@ -22,7 +22,12 @@ export default async function handler(req, res) {
     const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.connection?.remoteAddress || 'unknown';
     const referer = req.headers.referer || '';
 
-    // Validate we have a URL to redirect to
+    if (!originalUrl) {
+      originalUrl = inferUrlFromPath(req?.url);
+    }
+
+    originalUrl = normalizeRedirectUrl(originalUrl);
+
     if (!originalUrl) {
       logger.warn('[Email Click] Missing redirect URL:', { trackingId });
       res.writeHead(400, { 'Content-Type': 'text/plain' });
@@ -87,15 +92,54 @@ export default async function handler(req, res) {
     logger.error('[Email Click] Unexpected error:', error.message || error);
 
     // Try to redirect to original URL even on error
-    const originalUrl = req.query?.url ? decodeURIComponent(req.query.url) : null;
-    if (originalUrl) {
-      res.writeHead(302, { 'Location': originalUrl });
+    const fallbackOriginalUrl = req.query?.url ? decodeURIComponent(req.query.url) : inferUrlFromPath(req?.url);
+    const safeUrl = normalizeRedirectUrl(fallbackOriginalUrl);
+    if (safeUrl) {
+      res.writeHead(302, { 'Location': safeUrl });
       res.end();
     } else {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end('Internal server error');
     }
   }
+}
+
+function inferUrlFromPath(requestUrl) {
+  const raw = String(requestUrl || '');
+  const marker = '/api/email/click/';
+  const markerIndex = raw.indexOf(marker);
+  if (markerIndex === -1) return null;
+
+  const after = raw.slice(markerIndex + marker.length);
+  const pathOnly = after.split('?')[0] || '';
+  if (!pathOnly) return null;
+
+  let decoded;
+  try {
+    decoded = decodeURIComponent(pathOnly);
+  } catch (_) {
+    decoded = pathOnly;
+  }
+
+  if (!/[.][a-z]{2,}([/?#]|$)/i.test(decoded)) return null;
+  if (/^https?:\/\//i.test(decoded) || /^mailto:/i.test(decoded) || /^tel:/i.test(decoded)) return decoded;
+
+  return decoded;
+}
+
+function normalizeRedirectUrl(url) {
+  const u = String(url || '').trim();
+  if (!u) return null;
+
+  if (/^mailto:/i.test(u) || /^tel:/i.test(u)) return u;
+  if (/^https?:\/\//i.test(u)) return u;
+  if (/^\/\//.test(u)) return `https:${u}`;
+
+  if (/^[a-z][a-z0-9+.-]*:/i.test(u)) return null;
+  if (u.startsWith('/') || u.startsWith('#')) return null;
+
+  if (/[.][a-z]{2,}([/?#]|$)/i.test(u)) return `https://${u}`;
+  return null;
 }
 
 /**

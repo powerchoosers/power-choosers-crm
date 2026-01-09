@@ -49,9 +49,26 @@ export function generateTrackedLink(originalUrl, trackingId, linkIndex = 0) {
     return originalUrl;
   }
 
+  const normalizedUrl = normalizeTrackableUrl(originalUrl);
+  if (!normalizedUrl) {
+    return originalUrl;
+  }
+
   const baseUrl = getBaseUrl();
-  const encodedUrl = encodeURIComponent(originalUrl);
+  const encodedUrl = encodeURIComponent(normalizedUrl);
   return `${baseUrl}/api/email/click/${trackingId}?url=${encodedUrl}&idx=${linkIndex}`;
+}
+
+function normalizeTrackableUrl(url) {
+  const u = String(url || '').trim();
+  if (!u) return null;
+  if (u.startsWith('mailto:') || u.startsWith('tel:')) return u;
+  if (u.startsWith('http://') || u.startsWith('https://')) return u;
+  if (u.startsWith('//')) return `https:${u}`;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(u)) return null;
+  if (u.startsWith('/') || u.startsWith('#')) return null;
+  if (/[.][a-z]{2,}([/?#]|$)/i.test(u)) return `https://${u}`;
+  return null;
 }
 
 /**
