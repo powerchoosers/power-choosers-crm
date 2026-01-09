@@ -988,21 +988,12 @@
       \u003cpolygon points=\"7 4 20 12 7 20 7 4\"\u003e\u003c/polygon\u003e
     \u003c/svg\u003e`;
 
-    // Task button SVG
-    const taskSvg = `\u003csvg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\" focusable=\"false\"\u003e
-      \u003cpolyline points=\"9,11 12,14 22,4\"\u003e\u003c/polyline\u003e
-      \u003cpath d=\"M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11\"\u003e\u003c/path\u003e
-    \u003c/svg\u003e`;
-
     const actionButtonsHTML = `
         <button class="quick-action-btn list-header-btn" id="task-add-to-list" title="Add to list" aria-label="Add to list" aria-haspopup="dialog">
           ${listSvg}
         </button>
         <button class="quick-action-btn sequence-header-btn" id="task-add-to-sequence" title="Add to sequence" aria-label="Add to sequence" aria-haspopup="dialog" ${isAcctTask ? 'hidden' : ''}>
           ${sequenceSvg}
-        </button>
-        <button class="quick-action-btn task-header-btn" id="task-add-task" title="Add task" aria-label="Add task" aria-haspopup="dialog">
-          ${taskSvg}
         </button>`;
 
     // Complete header buttons HTML
@@ -4977,7 +4968,7 @@
       const websiteBtn = e.target.closest('.website-header-btn');
       if (websiteBtn) {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         handleTaskDetailQuickAction('website');
         return;
       }
@@ -4986,7 +4977,7 @@
       const linkedinBtn = e.target.closest('.linkedin-header-btn');
       if (linkedinBtn) {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         handleTaskDetailQuickAction('linkedin');
         return;
       }
@@ -4995,7 +4986,7 @@
       const addToListBtn = e.target.closest('#task-add-to-list');
       if (addToListBtn) {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
 
         // Determine if account task or contact task, then open appropriate panel
         const isAcctTask = isAccountTask(state.currentTask);
@@ -5043,7 +5034,7 @@
       const addToSequenceBtn = e.target.closest('#task-add-to-sequence');
       if (addToSequenceBtn) {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
 
         // Only for contact tasks
         if (state.contact) {
@@ -5071,7 +5062,7 @@
       const addTaskBtn = e.target.closest('#task-add-task');
       if (addTaskBtn) {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
 
         // Determine if account task or contact task, then open appropriate popover
         const isAcctTask = isAccountTask(state.currentTask);
@@ -7182,7 +7173,7 @@
         });
         infoGrid._bound = '1';
       }
-    });
+    }, true);
   }
 
   function beginEditField(wrap, field) {

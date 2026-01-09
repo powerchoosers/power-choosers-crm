@@ -88,18 +88,18 @@
 
       // Website button click delegation (contact detail specific)
       const websiteBtn = e.target.closest('.website-header-btn');
-      if (websiteBtn && document.getElementById('contact-detail-header')) {
+      if (websiteBtn && websiteBtn.closest('#contact-detail-header')) {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         handleQuickAction('website');
         return;
       }
 
       // LinkedIn button click delegation (contact detail specific)
       const linkedInBtn = e.target.closest('.linkedin-header-btn');
-      if (linkedInBtn && document.getElementById('contact-detail-header')) {
+      if (linkedInBtn && linkedInBtn.closest('#contact-detail-header')) {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         handleQuickAction('linkedin');
         return;
       }
@@ -2584,6 +2584,10 @@
                 </div>
                 <div class="contact-subtitle">${title ? escapeHtml(title) : ''}${title && company ? ' at ' : ''}${company ? `<a href="#account-details" class="company-link" id="contact-company-link" title="View account details" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(company)}">${escapeHtml(company)}</a>` : ''}</div>
               </div>
+            </div>
+          </div>
+          <div class="page-actions">
+            <div class="header-quick-actions">
               <button class="quick-action-btn website-header-btn" data-action="website" title="Visit website" aria-label="Visit website">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="10"/>
@@ -2598,7 +2602,7 @@
                   <circle cx="4" cy="4" r="2"/>
                 </svg>
               </button>
-              <span class="header-action-divider" aria-hidden="true"></span>
+              <div class="page-actions-separator"></div>
               <div class="list-seq-group">
                 <button class="quick-action-btn list-header-btn" id="add-contact-to-list" title="Loading contact..." aria-label="Add to list" aria-haspopup="dialog" disabled style="opacity: 0.6;">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -2616,7 +2620,6 @@
                   </svg>
                 </button>
                 <button class="quick-action-btn list-header-btn" id="open-contact-task-popover" title="Tasks" aria-label="Tasks" aria-haspopup="dialog">
-                  <!-- Tasks icon (same as left nav) -->
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <polyline points="9,11 12,14 22,4"></polyline>
                     <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
@@ -2624,8 +2627,7 @@
                 </button>
               </div>
             </div>
-          </div>
-          <div class="page-actions">
+            <div class="page-actions-separator"></div>
             <div class="widgets-wrap">
               <button class="btn-primary" id="open-widgets" title="Widgets" aria-label="Widgets" aria-haspopup="menu" aria-expanded="false" aria-controls="widgets-drawer">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -6299,6 +6301,8 @@
       #contact-detail-header .contact-header-profile { display: inline-flex; align-items: center; gap: 8px; }
       /* Reset margin added globally so spacing is controlled here */
       #contact-detail-header .linkedin-header-btn { margin-left: 0; margin-right: 0; }
+      #contact-detail-header .header-quick-actions { display: inline-flex; align-items: center; gap: 8px; }
+      #contact-detail-header .page-actions-separator { width: 1px; height: 24px; background: var(--border-light); margin: 0; flex-shrink: 0; }
       /* Vertical divider between LinkedIn and the List/Sequence group */
       #contact-detail-header .header-action-divider {
         width: 1px;
