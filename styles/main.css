@@ -10309,6 +10309,110 @@ body {
     box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
 }
 
+/* AI Script Styles */
+#call-scripts-page .ai-toggle-btn {
+    background: var(--bg-secondary);
+    border: 1px dashed var(--orange-primary);
+    color: var(--orange-primary);
+    font-weight: 600;
+    min-width: 120px;
+}
+
+#call-scripts-page .ai-toggle-btn.active {
+    background: linear-gradient(135deg, var(--orange-primary), #f59e0b);
+    color: white;
+    border-style: solid;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+}
+
+.ai-script-container {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-lg);
+    position: relative;
+    overflow: hidden;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.ai-script-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--orange-primary);
+}
+
+.ai-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: var(--orange-muted);
+    color: var(--orange-primary);
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+}
+
+.ai-content {
+    color: var(--text-primary);
+    line-height: 1.7;
+    font-size: 1.05rem;
+}
+
+.ai-header {
+    color: var(--orange-primary);
+    font-size: 1.1rem;
+    margin: 20px 0 10px 0;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.ai-header:first-child {
+    margin-top: 0;
+}
+
+/* AI Skeleton Loader */
+.ai-skeleton-loader {
+    padding: var(--spacing-lg);
+}
+
+.skeleton-line {
+    background: var(--bg-item);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+}
+
+.skeleton-line.shimmer::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0,
+        rgba(255, 255, 255, 0.05) 20%,
+        rgba(255, 255, 255, 0.1) 60%,
+        rgba(255, 255, 255, 0)
+    );
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    100% {
+        transform: translateX(100%);
+    }
+}
+
 /* Remove completed state - don't orange out previous phases */
 
 /* Opener selector container */

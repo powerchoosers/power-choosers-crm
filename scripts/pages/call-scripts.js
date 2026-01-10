@@ -2573,7 +2573,10 @@
     history: [],
     overrideContactId: null,
     problemPath: null,  // Track which problem path was taken for dynamic consequence routing
-    monthlySpend: null  // Store entered monthly spend value
+    monthlySpend: null,  // Store entered monthly spend value
+    aiScript: null,      // Store AI-generated script
+    isAIActive: false,   // Whether AI script view is active
+    isAILoading: false   // Whether AI script is being generated
   };
 
   // Phase definitions with entry points (PEACE Framework aligned)
@@ -2873,12 +2876,34 @@
     nav.id = 'call-scripts-phase-nav';
     nav.className = 'phase-navigation';
     nav.innerHTML = PHASES.map(phase => {
-      const isActive = currentPhaseName === phase.name;
+      const isActive = !state.isAIActive && currentPhaseName === phase.name;
       let classes = 'action-btn'; // Use existing .action-btn class
       if (isActive) classes += ' active';
       // Removed completed state - don't mark previous phases as completed
       return `<button class="${classes}" data-phase="${phase.name}" data-entry="${phase.entryPoint}">${phase.name}</button>`;
     }).join('');
+
+    // Add AI Button
+    const aiBtn = document.createElement('button');
+    aiBtn.className = `action-btn ai-toggle-btn ${state.isAIActive ? 'active' : ''}`;
+    aiBtn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+      AI Script
+    `;
+    aiBtn.addEventListener('click', () => {
+      if (state.isAIActive) {
+        state.isAIActive = false;
+        render();
+      } else {
+        if (state.aiScript) {
+          state.isAIActive = true;
+          render();
+        } else {
+          fetchAIScript();
+        }
+      }
+    });
+    nav.appendChild(aiBtn);
 
     // Insert before script display
     const display = document.getElementById('call-scripts-display');
@@ -2891,6 +2916,7 @@
       btn.addEventListener('click', () => {
         const entryPoint = btn.getAttribute('data-entry');
         if (entryPoint && FLOW[entryPoint]) {
+          state.isAIActive = false; // Deactivate AI view when switching phases
           go(entryPoint);
         }
       });
@@ -3002,6 +3028,46 @@
     selector.style.display = showSelector ? 'block' : 'none';
   }
 
+  // AI Script Generation
+  async function fetchAIScript() {
+    if (state.isAILoading) return;
+    
+    const { contact, account } = getLiveData();
+    if (!contact && !account) {
+      alert('Please select a contact or account first to generate a personalized script.');
+      return;
+    }
+
+    state.isAILoading = true;
+    state.isAIActive = true;
+    render();
+
+    try {
+      const response = await fetch('/api/ai/generate-call-script', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contact,
+          account,
+          context: {
+            company: account?.name || contact?.company || ''
+          }
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to generate script');
+      
+      const data = await response.json();
+      state.aiScript = data.script;
+    } catch (err) {
+      console.error('[Call Scripts] AI Error:', err);
+      state.aiScript = `<div class="error-msg">Failed to generate AI script. Please try again.</div>`;
+    } finally {
+      state.isAILoading = false;
+      render();
+    }
+  }
+
   function render() {
     const { display, responses, backBtn } = els();
     const node = FLOW[state.current] || FLOW.start;
@@ -3016,7 +3082,39 @@
     buildOpenerSelector();
 
     if (display) {
-      const html = renderTemplate(node.text || '', 'text');
+      let html = '';
+      
+      if (state.isAIActive) {
+        if (state.isAILoading) {
+          html = `
+            <div class="ai-skeleton-loader">
+              <div class="skeleton-line shimmer" style="width: 40%; height: 24px; margin-bottom: 20px;"></div>
+              <div class="skeleton-line shimmer" style="width: 90%; height: 16px; margin-bottom: 12px;"></div>
+              <div class="skeleton-line shimmer" style="width: 85%; height: 16px; margin-bottom: 12px;"></div>
+              <div class="skeleton-line shimmer" style="width: 95%; height: 16px; margin-bottom: 24px;"></div>
+              <div class="skeleton-line shimmer" style="width: 30%; height: 20px; margin-bottom: 16px;"></div>
+              <div class="skeleton-line shimmer" style="width: 80%; height: 16px; margin-bottom: 12px;"></div>
+              <div class="skeleton-line shimmer" style="width: 88%; height: 16px;"></div>
+            </div>
+          `;
+        } else if (state.aiScript) {
+          // Convert markdown-style headers if present, or just wrap in div
+          const formatted = state.aiScript
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\n\n/g, '<br><br>')
+            .replace(/### (.*)/g, '<h3 class="ai-header">$1</h3>')
+            .replace(/## (.*)/g, '<h2 class="ai-header">$1</h2>');
+          
+          html = `
+            <div class="ai-script-container">
+              <div class="ai-badge">AI PERSONALIZED SCRIPT</div>
+              <div class="ai-content">${formatted}</div>
+            </div>
+          `;
+        }
+      } else {
+        html = renderTemplate(node.text || '', 'text');
+      }
 
       // Animate script display height change after initial render
       if (state._didInitialRender) {
