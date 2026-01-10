@@ -59,7 +59,14 @@ export default async function handler(req, res) {
         }
 
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const preferredModel = (process.env.GEMINI_MODEL || '').trim();
+        const modelCandidates = [
+            preferredModel,
+            'gemini-2.0-flash',
+            'gemini-2.0-flash-exp',
+            'gemini-flash-latest',
+            'gemini-pro-latest'
+        ].filter(Boolean);
 
         const prompt = `
 You are Lewis Patterson, Lead Energy Strategist at Power Choosers. You are preparing for a cold call to a potential commercial energy client.
@@ -90,9 +97,25 @@ FORMATTING:
 Generate the script now:
 `;
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const script = response.text();
+        let script = '';
+        let lastErr = null;
+        for (const modelName of modelCandidates) {
+            try {
+                const model = genAI.getGenerativeModel({ model: modelName });
+                const result = await model.generateContent(prompt);
+                const response = await result.response;
+                script = response.text();
+                lastErr = null;
+                break;
+            } catch (e) {
+                lastErr = e;
+                const msg = (e && (e.message || String(e))) || '';
+                const modelNotFound = msg.includes('not found for API version') || msg.includes('models/') || msg.includes('404');
+                if (!modelNotFound) break;
+            }
+        }
+
+        if (lastErr) throw lastErr;
 
         // Cache the result
         if (db) {
