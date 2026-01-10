@@ -2728,6 +2728,95 @@
           color: #6b7280;
           border-color: #6b7280;
         }
+
+        /* AI Script Styles */
+        .mini-scripts .ai-script-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 12px;
+          padding-bottom: 8px;
+          border-bottom: 1px solid var(--border-light);
+        }
+        .mini-scripts .ai-badge {
+          background: linear-gradient(135deg, var(--orange-primary), #ff8c42);
+          color: white;
+          padding: 4px 10px;
+          border-radius: 20px;
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          box-shadow: 0 2px 6px rgba(255, 107, 53, 0.3);
+        }
+        .mini-scripts .ai-generate-btn {
+          background: var(--bg-secondary);
+          color: var(--text-primary);
+          border: 1px solid var(--border-light);
+          padding: 8px 14px;
+          border-radius: 8px;
+          font-size: 0.85rem;
+          font-weight: 600;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          transition: all 0.2s ease;
+          width: 100%;
+          justify-content: center;
+          margin-bottom: 12px;
+        }
+        .mini-scripts .ai-generate-btn:hover {
+          background: var(--grey-600);
+          border-color: var(--orange-primary);
+          transform: translateY(-1px);
+        }
+        .mini-scripts .ai-generate-btn svg {
+          color: var(--orange-primary);
+        }
+        .mini-scripts .ai-content {
+          font-size: 0.95rem;
+          line-height: 1.5;
+          color: var(--text-primary);
+        }
+        .mini-scripts .ai-content h3 {
+          font-size: 1rem;
+          color: var(--orange-primary);
+          margin: 16px 0 8px 0;
+          font-weight: 700;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .mini-scripts .ai-content h3:first-child {
+          margin-top: 0;
+        }
+        .mini-scripts .ai-content p {
+          margin-bottom: 12px;
+        }
+
+        /* Shimmer Skeleton for AI Loading */
+        .mini-scripts .ai-skeleton {
+          background: var(--bg-main);
+          border-radius: 8px;
+          padding: 15px;
+        }
+        .mini-scripts .skeleton-line {
+          height: 12px;
+          background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--grey-600) 50%, var(--bg-secondary) 75%);
+          background-size: 200% 100%;
+          animation: pc-shimmer 1.5s infinite linear;
+          border-radius: 4px;
+          margin-bottom: 12px;
+        }
+        .mini-scripts .skeleton-line.short { width: 40%; }
+        .mini-scripts .skeleton-line.medium { width: 70%; }
+        .mini-scripts .skeleton-line.long { width: 100%; }
+        
+        @keyframes pc-shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
         
         .mini-scripts .tone-marker.friendly {
           background: rgba(249, 115, 22, 0.15);
@@ -2784,21 +2873,51 @@
             <div class="ms-suggest" role="listbox" aria-label="Contact suggestions" hidden></div>
           </div>
           <div class="ms-actions">
-            <button type="button" class="icon-btn ms-back" title="Back" aria-label="Back" data-action="back">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            </button>
-            <button type="button" class="icon-btn ms-reset" title="Reset" aria-label="Reset" data-action="reset">
+            <button type="button" class="icon-btn ms-reset" title="Reset/Standard Scripts" aria-label="Reset" data-action="reset">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
             </button>
           </div>
         </div>
-        <div class="ms-stage-nav"></div>
+        <div class="ai-script-area">
+          <button type="button" class="ai-generate-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+            Generate Personalized AI Script
+          </button>
+        </div>
+        <div class="ms-stage-nav" hidden></div>
         <div class="ms-display" aria-live="polite"></div>
         <div class="ms-responses"></div>
       `;
       wrap.appendChild(el);
 
-      const state = { current: '', history: [], overrideContactId: null, monthlySpend: null };
+      const state = { current: '', history: [], overrideContactId: null, monthlySpend: null, isAiMode: false };
+
+      // Setup AI Generation Event
+      const aiBtn = el.querySelector('.ai-generate-btn');
+      if (aiBtn) {
+         aiBtn.addEventListener('click', () => generateAIScript(card));
+       }
+
+       // Auto-trigger AI script if in call and opening for the first time
+        const inCall = (function () { 
+          try { 
+            // Look for active call in various places
+            if (typeof isCallInProgress !== 'undefined' && isCallInProgress) return true;
+            if (window.currentCall) return true;
+            if (window.TwilioRTC?.state?.connection) {
+              const st = (typeof window.TwilioRTC.state.connection.status === 'function') ? window.TwilioRTC.state.connection.status() : 'open';
+              return st && st !== 'closed';
+            }
+            // Check currentCallContext
+            if (typeof currentCallContext !== 'undefined' && currentCallContext && currentCallContext.isActive) return true;
+          } catch (_) { }
+          return false; 
+        })();
+        if (inCall) {
+          generateAIScript();
+        } else {
+          renderNode();
+        }
 
       // Data helpers (subset from scripts page)
       function escapeHtml(str) { if (str == null) return ''; return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
@@ -3376,6 +3495,8 @@
       }
 
       function renderNode() {
+        if (state.isAiMode) return; // Don't render standard nodes in AI mode
+
         // Ensure FLOW is available - get fresh reference each time
         let FLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
         if (!FLOW) {
@@ -3582,10 +3703,16 @@
       function goBack() { if (!state.history.length) return; state.current = state.history.pop(); renderNode(); }
       function resetAll() {
         // Smooth animation when resetting
-        state.current = '';
+        state.current = 'opener';
         state.history = [];
         state.overrideContactId = null;
         state.monthlySpend = null;
+        state.isAiMode = false;
+        
+        // Restore visibility of standard elements
+        el.querySelector('.ms-stage-nav').removeAttribute('hidden');
+        el.querySelector('.ai-script-area').removeAttribute('hidden');
+        
         inputEl.value = '';
         closeSuggest();
 
@@ -3601,6 +3728,9 @@
           // Clear content
           display.innerHTML = '';
           responses.innerHTML = '';
+
+          // Re-render standard node
+          renderNode();
 
           // Animate height collapse
           requestAnimationFrame(() => {
@@ -3627,6 +3757,84 @@
             });
           });
         }, 80);
+      }
+
+      async function generateAIScript() {
+        if (!display) return;
+
+        state.isAiMode = true;
+        const stageNav = el.querySelector('.ms-stage-nav');
+        const aiArea = el.querySelector('.ai-script-area');
+
+        stageNav.setAttribute('hidden', '');
+        aiArea.setAttribute('hidden', '');
+        responses.innerHTML = '';
+        display.classList.add('--visible');
+
+        // Show loading state
+        display.innerHTML = `
+          <div class="ai-skeleton">
+            <div class="ai-script-header">
+              <span class="ai-badge">AI Personalizing...</span>
+            </div>
+            <div class="skeleton-line long"></div>
+            <div class="skeleton-line medium"></div>
+            <div class="skeleton-line long"></div>
+            <div class="skeleton-line short"></div>
+          </div>
+        `;
+
+        try {
+          const data = getLiveData();
+          const response = await fetch('/api/ai/generate-call-script', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contact: data.contact,
+              account: data.account,
+              source: 'phone-widget'
+            })
+          });
+
+          if (!response.ok) throw new Error('AI Generation failed');
+
+          const result = await response.json();
+          if (!result.success) throw new Error(result.error || 'AI Generation failed');
+
+          // Render the AI script
+          display.innerHTML = `
+            <div class="ai-content">
+              <div class="ai-script-header">
+                <span class="ai-badge">AI Personalized Script</span>
+              </div>
+              ${result.script}
+            </div>
+          `;
+
+          // Add a "Back to Standard" button in responses
+          const backBtn = document.createElement('button');
+          backBtn.className = 'btn-secondary --visible';
+          backBtn.style.marginTop = '12px';
+          backBtn.textContent = 'Back to Standard PEACE Flow';
+          backBtn.onclick = resetAll;
+          responses.appendChild(backBtn);
+
+        } catch (err) {
+          console.error('[Phone] AI Script Error:', err);
+          display.innerHTML = `<p style="color: var(--text-error); padding: 10px;">Error generating AI script: ${err.message}</p>`;
+          
+          const retryBtn = document.createElement('button');
+          retryBtn.className = 'btn-secondary --visible';
+          retryBtn.textContent = 'Retry AI Generation';
+          retryBtn.onclick = generateAIScript;
+          responses.appendChild(retryBtn);
+
+          const backBtn = document.createElement('button');
+          backBtn.className = 'btn-secondary --visible';
+          backBtn.textContent = 'Back to Standard Scripts';
+          backBtn.onclick = resetAll;
+          responses.appendChild(backBtn);
+        }
       }
 
       // Phase definitions (same as call-scripts.js)
