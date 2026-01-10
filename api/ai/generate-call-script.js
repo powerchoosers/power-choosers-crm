@@ -8,7 +8,7 @@ export default async function handler(req, res) {
 
     if (req.method !== 'POST') {
         res.writeHead(405, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        res.end(JSON.stringify({ success: false, error: 'Method not allowed' }));
         return;
     }
 
@@ -17,7 +17,7 @@ export default async function handler(req, res) {
 
         if (!contact && !account) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Contact or Account context is required' }));
+            res.end(JSON.stringify({ success: false, error: 'Contact or Account context is required' }));
             return;
         }
 
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
                     if (Date.now() - (cacheData.cachedAt || 0) < CACHE_DURATION_MS) {
                         logger.log('[AI Script] Using cached script');
                         res.writeHead(200, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({ script: cacheData.script }));
+                        res.end(JSON.stringify({ success: true, script: cacheData.script, cached: true }));
                         return;
                     }
                 }
@@ -59,7 +59,7 @@ export default async function handler(req, res) {
         }
 
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' }); // Use the latest model mentioned in plan.md
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
         const prompt = `
 You are Lewis Patterson, Lead Energy Strategist at Power Choosers. You are preparing for a cold call to a potential commercial energy client.
@@ -108,11 +108,11 @@ Generate the script now:
         }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ script }));
+        res.end(JSON.stringify({ success: true, script, cached: false }));
 
     } catch (error) {
         logger.error('[AI Script] Generation error:', error);
         res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Failed to generate AI script', details: error.message }));
+        res.end(JSON.stringify({ success: false, error: 'Failed to generate AI script', details: error.message }));
     }
 }
