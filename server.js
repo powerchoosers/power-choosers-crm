@@ -123,6 +123,7 @@ import uploadHostGoogleAvatarHandler from './api/upload/host-google-avatar.js';
 import uploadSignatureImageHandler from './api/upload/signature-image.js';
 import generateStaticPostHandler from './api/posts/generate-static.js';
 import generateAiPostHandler from './api/posts/generate-ai.js';
+import generateCallScriptHandler from './api/ai/generate-call-script.js';
 import postsListHandler from './api/posts/list.js';
 import sitemapHandler from './api/sitemap.js';
 import algoliaReindexHandler from './api/algolia/reindex.js';
@@ -950,6 +951,9 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/upload/signature-image') {
     return handleApiUploadSignatureImage(req, res);
   }
+  if (pathname === '/api/ai/generate-call-script') {
+    return handleApiGenerateCallScript(req, res);
+  }
   if (pathname === '/api/posts/generate-static') {
     return handleApiGenerateStaticPost(req, res);
   }
@@ -1472,6 +1476,21 @@ async function handleApiUploadSignatureImage(req, res) {
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Server error', message: error.message }));
+    }
+  }
+}
+
+async function handleApiGenerateCallScript(req, res) {
+  try {
+    if (req.method === 'POST') {
+      req.body = await parseRequestBody(req);
+    }
+    return await generateCallScriptHandler(req, res);
+  } catch (error) {
+    console.error('[Server] Error in generate call script handler wrapper:', error);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'Server error', details: error.message }));
     }
   }
 }
