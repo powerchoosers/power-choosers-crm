@@ -173,6 +173,8 @@ if (process.env.NODE_ENV !== 'production') {
     hasTwilioAccountSid: !!process.env.TWILIO_ACCOUNT_SID,
     hasTwilioAuthToken: !!process.env.TWILIO_AUTH_TOKEN,
     hasPerplexityApiKey: !!process.env.PERPLEXITY_API_KEY,
+    hasGeminiApiKey: !!process.env.GEMINI_API_KEY,
+    hasFreeGeminiKey: !!process.env.FREE_GEMINI_KEY,
     nodeEnv: process.env.NODE_ENV || 'development',
     port: process.env.PORT || 3000
   });
@@ -2044,9 +2046,12 @@ async function handleApiEnergyNews(req, res) {
     const items = [];
     try {
       const { GoogleGenerativeAI } = await import('@google/generative-ai');
-      const apiKey = process.env.GEMINI_API_KEY;
+      const apiKey = process.env.GEMINI_API_KEY || process.env.FREE_GEMINI_KEY;
 
       if (apiKey) {
+        if (!process.env.GEMINI_API_KEY && process.env.FREE_GEMINI_KEY) {
+          console.log('[Energy News] Using FREE_GEMINI_KEY fallback');
+        }
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 

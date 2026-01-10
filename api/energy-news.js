@@ -71,9 +71,12 @@ return;
     const items = [];
     try {
       const { GoogleGenerativeAI } = await import('@google/generative-ai');
-      const apiKey = process.env.GEMINI_API_KEY;
+      const apiKey = process.env.GEMINI_API_KEY || process.env.FREE_GEMINI_KEY;
       
       if (apiKey) {
+        if (!process.env.GEMINI_API_KEY && process.env.FREE_GEMINI_KEY) {
+          logger.info('[Energy News] Using FREE_GEMINI_KEY fallback', 'Gemini');
+        }
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
         
