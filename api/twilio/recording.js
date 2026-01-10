@@ -1061,8 +1061,13 @@ async function generateGeminiAIInsights(transcript) {
     
     // Cache miss - call Gemini API
     const { GoogleGenerativeAI } = await import('@google/generative-ai');
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error('Missing GEMINI_API_KEY');
+    const apiKey = process.env.GEMINI_API_KEY || process.env.FREE_GEMINI_KEY;
+    if (!apiKey) throw new Error('Missing GEMINI_API_KEY or FREE_GEMINI_KEY');
+    
+    if (!process.env.GEMINI_API_KEY && process.env.FREE_GEMINI_KEY) {
+        logger.log('[Gemini AI] Using FREE_GEMINI_KEY fallback');
+    }
+    
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
     const prompt = `
