@@ -189,23 +189,33 @@ WEB RESEARCH (only use if present; do not invent facts):
 ${researchSummary || '- (no external research found)'}
 
 PEACE FRAMEWORK INSTRUCTIONS:
-1. **P**re-call: Briefly state the specific angle/leverage for this call (e.g., industry-specific trend, local TDU rate hike, or upcoming contract expiry).
-2. **O**pening: A strong hook. Mention their company and a specific reason for calling today. Avoid generic "how are you" openings.
-3. **S**ituation: Acknowledge their current situation (e.g., "I see you're with ${currentSupplier} and might be coming up on a renewal").
-4. **P**roblem: Highlight a specific risk or missed opportunity (e.g., "Most companies in ${industry} are seeing 20% spikes in demand charges right now").
-5. **C**onsequence: Explain what happens if they ignore this (e.g., "Missing this window could lock you into a 24-month peak-rate contract").
-6. **S**olution: Provide the low-friction next step (The "Broker Audit").
+1. **Pre-call**: Briefly state the specific angle/leverage for this call (e.g., industry-specific trend, local TDU rate hike, or upcoming contract expiry).
+2. **Opener**: A strong hook. Mention their company and a specific reason for calling today. Avoid generic "how are you" openings.
+3. **Situation**: 
+   - **IF TEXAS (ERCOT)**: Assume they shop for their own rate (deregulation is mandatory). If supplier/contract info is missing, ask how they manage their renewal cycles or who they're currently trusting with their procurement.
+   - **IF OTHER DEREGULATED STATES (e.g., PA, OH, IL, NY, NJ, MD, MA, CT, DE, NH, RI)**: Acknowledge they have the choice between the utility's "default rate" (Price to Compare) and shopping. If info is missing, ask if they are currently riding the utility default or if they've explored the market recently.
+   - **IF DATA IS MISSING**: NEVER use words like "unknown," "unaware," or "visibility." Instead, use a **Discovery Hook**:
+     - *Industry Pivot*: "Usually, companies in ${industry} are either locked into a long-term fixed rate to handle high demand, or they're just riding the utility's default. Where do you guys currently stand?"
+     - *Market Volatility*: "With the recent volatility in ${location}, many facilities are trying to figure out if their current setup is actually protecting them from peak-hour spikes. How have you been handling those delivery charge increases lately?"
+4. **Problem**: Highlight a specific risk or missed opportunity (e.g., "Most companies in ${industry} are seeing 20% spikes in demand charges right now"). CRITICAL: Immediately follow the problem with a fluid, open-ended question that flows naturally from the statement to invite the client to share their experience (e.g., "How has that been impacting your operational budget over the last few months?").
+5. **Solution**: Provide the low-friction next step (The "Broker Audit") and how it solves the problem.
+6. **Close**: A clear call to action to move to the next step.
+7. **Settle**: A brief wrap-up line to confirm the next action and end the call on a high note.
 
 FORMATTING:
 - Use <span class="tone-marker">tags</span> to indicate the recommended tone for specific lines.
 - Use <span class="pause-indicator"></span> for natural pauses.
 - Keep it concise, conversational, and direct.
-- Return ONLY the script text, organized by the PEACE phases.
+- Return ONLY the script text, organized by the labels: Pre-call, Opener, Situation, Problem, Solution, Close, Settle.
 
 RULES:
 - If WEB RESEARCH is empty, do not reference news/people/hires.
-- If WEB RESEARCH has items, weave 1–2 highly relevant specifics into the Opening and Situation.
+- If WEB RESEARCH has items, weave 1–2 highly relevant specifics into the Opener and Situation.
 - When referencing research, cite it softly as "I saw" / "I noticed" and mention the source type in parentheses if provided.
+- **NEVER** state that you don't know something. Frame lack of data as a diagnostic question.
+- In Texas, assume they are under contract with a 3rd party provider.
+- In other states, assume they might be on the utility's default "Price to Compare" rate unless a supplier is listed.
+- Ensure the Problem section always ends with a conversation-opening question.
 
 Generate the script now:
 `;
