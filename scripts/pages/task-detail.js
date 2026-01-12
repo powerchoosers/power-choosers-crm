@@ -925,7 +925,7 @@
         border-radius: 1px;
       }
       #task-detail-page .list-header-btn svg { display: block; }
-      #task-detail-page .list-seq-group { display: inline-flex; align-items: center; gap: 8px; }
+      #task-detail-page .list-seq-group { display: inline-flex; align-items: center; gap: 6px; }
     /* Ensure all quick action buttons are same size and clickable */
     #task-detail-page .quick-action-btn {
       display: inline-flex;
@@ -959,8 +959,6 @@
     const task = state.currentTask;
     if (!task) return '';
 
-    const isAcctTask = isAccountTask(task);
-
     // Website button SVG
     const websiteSvg = `\u003csvg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"\u003e
       \u003ccircle cx=\"12\" cy=\"12\" r=\"10\"/\u003e
@@ -975,7 +973,22 @@
       \u003ccircle cx=\"4\" cy=\"4\" r=\"2\"/\u003e
     \u003c/svg\u003e`;
 
-    //  List button SVG
+    // Complete header buttons HTML
+    return `
+      <button class="quick-action-btn website-header-btn" data-action="website" title="Visit website" aria-label="Visit website">
+        ${websiteSvg}
+      </button>
+      <button class="quick-action-btn linkedin-header-btn" data-action="linkedin" title="View on LinkedIn" aria-label="View on LinkedIn">
+        ${linkedInSvg}
+      </button>`;
+  }
+
+  function renderTaskListSequenceButtons() {
+    const task = state.currentTask;
+    if (!task) return '';
+
+    const isAcctTask = isAccountTask(task);
+
     const listSvg = `\u003csvg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\" focusable=\"false\"\u003e
       \u003ccircle cx=\"4\" cy=\"6\" r=\"1\"\u003e\u003c/circle\u003e
       \u003ccircle cx=\"4\" cy=\"12\" r=\"1\"\u003e\u003c/circle\u003e
@@ -985,31 +998,17 @@
       \u003cline x1=\"8\" y1=\"18\" x2=\"20\" y2=\"18\"\u003e\u003c/line\u003e
     \u003c/svg\u003e`;
 
-    // Sequence button SVG
     const sequenceSvg = `\u003csvg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"\u003e
       \u003cpolygon points=\"7 4 20 12 7 20 7 4\"\u003e\u003c/polygon\u003e
     \u003c/svg\u003e`;
 
-    const actionButtonsHTML = `
+    return `
         <button class="quick-action-btn list-header-btn" id="task-add-to-list" title="Add to list" aria-label="Add to list" aria-haspopup="dialog">
           ${listSvg}
         </button>
         <button class="quick-action-btn sequence-header-btn" id="task-add-to-sequence" title="Add to sequence" aria-label="Add to sequence" aria-haspopup="dialog" ${isAcctTask ? 'hidden' : ''}>
           ${sequenceSvg}
         </button>`;
-
-    // Complete header buttons HTML
-    return `
-      <button class="quick-action-btn website-header-btn" data-action="website" title="Visit website" aria-label="Visit website">
-        ${websiteSvg}
-      </button>
-      <button class="quick-action-btn linkedin-header-btn" data-action="linkedin" title="View on LinkedIn" aria-label="View on LinkedIn">
-        ${linkedInSvg}
-      </button>
-      <span class="header-action-divider" aria-hidden="true"></span>
-      <div class="list-seq-group">
-        ${actionButtonsHTML}
-      </div>`;
   }
 
   function injectTaskDetailStyles() {
@@ -4328,32 +4327,106 @@
 
   // Inject header buttons into the task detail page header
   function injectTaskHeaderButtonsIntoDOM() {
-    // Find the header container (should be .contact-header-profile or .page-title-section)
-    const header = document.querySelector('#task-detail-page .contact-header-profile') ||
-      document.querySelector('#task-detail-page .page-title-section');
-
-    if (!header) {
+    const profileHeader = document.querySelector('#task-detail-page .contact-header-profile');
+    if (!profileHeader) {
       console.warn('[TaskDetail] Header container not found for button injection');
       return;
     }
 
     const isAcctTask = isAccountTask(state.currentTask);
-    const alreadyInjected = !!header.querySelector('.website-header-btn, .linkedin-header-btn, .list-seq-group');
+
+    const alreadyInjected = !!document.querySelector('#task-detail-page .website-header-btn, #task-detail-page .linkedin-header-btn');
     if (!alreadyInjected) {
       const buttonsHTML = renderTaskHeaderButtons();
-      if (buttonsHTML) header.insertAdjacentHTML('beforeend', buttonsHTML);
+      if (buttonsHTML) profileHeader.insertAdjacentHTML('beforeend', buttonsHTML);
     }
 
-    const seqBtn = header.querySelector('#task-add-to-sequence');
+    const pageActions = document.querySelector('#task-detail-page .page-actions');
+    if (!pageActions) return;
+
+    const websiteBtn = profileHeader.querySelector('.website-header-btn') || pageActions.querySelector('.website-header-btn');
+    const linkedinBtn = profileHeader.querySelector('.linkedin-header-btn') || pageActions.querySelector('.linkedin-header-btn');
+
+    if (websiteBtn && websiteBtn.parentElement !== pageActions) {
+      pageActions.insertBefore(websiteBtn, pageActions.firstChild);
+    }
+    if (linkedinBtn && linkedinBtn.parentElement !== pageActions) {
+      const insertBefore = (websiteBtn && websiteBtn.parentElement === pageActions)
+        ? websiteBtn.nextElementSibling
+        : pageActions.firstChild;
+      pageActions.insertBefore(linkedinBtn, insertBefore);
+    }
+
+    profileHeader.querySelectorAll('.header-action-divider, .list-seq-group').forEach(el => el.remove());
+
+    let listSeqGroup = pageActions.querySelector('.list-seq-group');
+    const addTaskBtn = document.getElementById('task-add-task');
+    const addTaskSeparator = addTaskBtn?.nextElementSibling && addTaskBtn.nextElementSibling.classList.contains('page-actions-separator')
+      ? addTaskBtn.nextElementSibling
+      : null;
+
+    if (!listSeqGroup) {
+      listSeqGroup = document.createElement('div');
+      listSeqGroup.className = 'list-seq-group';
+      if (addTaskBtn) pageActions.insertBefore(listSeqGroup, addTaskBtn);
+      else pageActions.insertBefore(listSeqGroup, pageActions.firstChild);
+    }
+
+    if (linkedinBtn) {
+      const firstChild = pageActions.firstElementChild;
+      if (firstChild && firstChild !== websiteBtn && firstChild !== linkedinBtn) {
+        pageActions.insertBefore(linkedinBtn, firstChild);
+      }
+
+      if (listSeqGroup.parentElement === pageActions) {
+        const prev = listSeqGroup.previousElementSibling;
+        if (!prev || !prev.classList.contains('page-actions-separator')) {
+          const sep = document.createElement('div');
+          sep.className = 'page-actions-separator';
+          pageActions.insertBefore(sep, listSeqGroup);
+        }
+
+        const refAfterIcons = (listSeqGroup.previousElementSibling && listSeqGroup.previousElementSibling.classList.contains('page-actions-separator'))
+          ? listSeqGroup.previousElementSibling
+          : null;
+        if (refAfterIcons && refAfterIcons.previousElementSibling !== linkedinBtn) {
+          pageActions.insertBefore(listSeqGroup, linkedinBtn.nextElementSibling);
+          pageActions.insertBefore(refAfterIcons, listSeqGroup);
+        }
+      }
+    }
+
+    const hasList = !!listSeqGroup.querySelector('#task-add-to-list');
+    const hasSeq = !!listSeqGroup.querySelector('#task-add-to-sequence');
+    if (!hasList && !hasSeq) {
+      const html = renderTaskListSequenceButtons();
+      if (html) listSeqGroup.insertAdjacentHTML('afterbegin', html);
+    }
+
+    const seqBtn = listSeqGroup.querySelector('#task-add-to-sequence');
     if (seqBtn) {
       if (isAcctTask) seqBtn.setAttribute('hidden', '');
       else seqBtn.removeAttribute('hidden');
     }
 
-    const listSeqGroup = header.querySelector('.list-seq-group');
-    const addTaskBtn = document.getElementById('task-add-task');
-    if (listSeqGroup && addTaskBtn && addTaskBtn.parentElement !== listSeqGroup) {
+    if (addTaskBtn && addTaskBtn.parentElement !== listSeqGroup) {
       listSeqGroup.appendChild(addTaskBtn);
+    }
+
+    if (addTaskSeparator && addTaskSeparator.parentElement === pageActions) {
+      pageActions.insertBefore(addTaskSeparator, listSeqGroup.nextSibling);
+    }
+
+    const nav = pageActions.querySelector('.task-navigation');
+    const completeBtn = document.getElementById('task-complete-btn');
+    if (nav && completeBtn) {
+      const next = nav.nextElementSibling;
+      const hasSep = next && next.classList && next.classList.contains('page-actions-separator');
+      if (!hasSep) {
+        const sep = document.createElement('div');
+        sep.className = 'page-actions-separator';
+        pageActions.insertBefore(sep, completeBtn);
+      }
     }
   }
 

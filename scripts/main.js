@@ -6381,11 +6381,7 @@ window.__pcFaviconHelper = {
             // Create a hidden image to trigger browser cache
             const img = new Image();
             const requestSize = 128;
-            img.src = `https://logo.clearbit.com/${encodeURIComponent(clean)}`;
-
-            // Also pre-warm Google as the most reliable secondary
-            const img2 = new Image();
-            img2.src = `https://www.google.com/s2/favicons?sz=${requestSize}&domain=${encodeURIComponent(clean)}`;
+            img.src = `/api/logo?domain=${encodeURIComponent(clean)}&size=${requestSize}`;
         } catch (_) { }
     },
 
@@ -6501,15 +6497,20 @@ window.__pcFaviconHelper = {
                 const safeDomain = String(cleanDomain || '').replace(/'/g, "\\'");
                 const safeSuffix = String(idSuffix || '').replace(/'/g, "\\'");
 
-                // Immediate Visibility: If we have a direct logo URL and it hasn't failed yet, 
-                // don't hide it with 'favicon-loading'. This reduces the perceived delay.
-                const isLikelyGood = !this.failedLogos.has(normalizedLogo);
-                const containerClass = isLikelyGood ? 'company-favicon-container favicon-loaded' : 'company-favicon-container favicon-loading';
-                const imgVisibility = isLikelyGood ? 'visibility:visible;' : 'visibility:hidden;';
+            // Immediate Visibility: If we have a direct logo URL and it hasn't failed yet, 
+            // don't hide it with 'favicon-loading'. This reduces the perceived delay.
+            const isLikelyGood = !this.failedLogos.has(normalizedLogo);
+            const containerClass = isLikelyGood ? 'company-favicon-container favicon-loaded' : 'company-favicon-container favicon-loading';
+            const imgVisibility = isLikelyGood ? 'visibility:visible;' : 'visibility:hidden;';
 
-                return `<span class="${containerClass}" style="width:${size}px;height:${size}px;">
+            const requestSize = Math.max((parseInt(size, 10) || 0) * 2, 64);
+            const renderLogoSrc = (/^https?:\/\//i.test(logoUrl) && !/^data:/i.test(logoUrl) && !/^blob:/i.test(logoUrl))
+                ? `/api/logo?size=${encodeURIComponent(requestSize)}&domain=${encodeURIComponent(cleanDomain || '')}&url=${encodeURIComponent(logoUrl)}`
+                : logoUrl;
+
+            return `<span class="${containerClass}" style="width:${size}px;height:${size}px;">
                             <img class="company-favicon ${isLikelyGood ? 'icon-loaded' : ''}" 
-                                 src="${logoUrl}" 
+                                 src="${renderLogoSrc}" 
                                  alt="" 
                                  referrerpolicy="no-referrer" 
                                  loading="lazy"
@@ -6581,25 +6582,9 @@ window.__pcFaviconHelper = {
                 return;
             }
 
-            const faviconSources = [
-                `https://www.google.com/s2/favicons?sz=${requestSize}&domain=${encodeURIComponent(cleanDomain)}`,
-                `https://logo.clearbit.com/${encodeURIComponent(cleanDomain)}`,
-                `https://favicons.githubusercontent.com/${encodeURIComponent(cleanDomain)}`,
-                `https://api.faviconkit.com/${encodeURIComponent(cleanDomain)}/${requestSize}`,
-                `https://favicon.yandex.net/favicon/${encodeURIComponent(cleanDomain)}`,
-                `https://icons.duckduckgo.com/ip3/${encodeURIComponent(cleanDomain)}.ico`,
-                `https://${cleanDomain}/favicon.ico`
-            ];
-
-            // PERSISTENCE FIX: Check if we are already trying a specific index for this domain
-            const startingIndex = this.tryingDomains.get(cleanDomain) || 0;
-            const useIndex = startingIndex < faviconSources.length ? startingIndex : 0;
-
-            // Ensure we mark this domain as "trying favicons" so next render skips the broken logo
-            this.tryingDomains.set(cleanDomain, useIndex);
-
+            this.tryingDomains.set(cleanDomain, 0);
             try { img.classList.remove('icon-loaded'); } catch (_) { }
-            img.dataset.sourceIndex = String(useIndex);
+            img.dataset.sourceIndex = '0';
             img.dataset.displaySize = String(size);
             img.dataset.domain = cleanDomain;
             try { img.setAttribute('onload', 'window.__pcFaviconHelper.onFaviconLoadEl(this)'); } catch (_) { }
@@ -6608,7 +6593,7 @@ window.__pcFaviconHelper = {
                 img.style.display = '';
                 img.style.visibility = 'hidden';
             } catch (_) { }
-            img.src = faviconSources[useIndex];
+            img.src = `/api/logo?domain=${encodeURIComponent(cleanDomain)}&size=${encodeURIComponent(requestSize)}`;
         } catch (_) { }
     },
     // Generate favicon HTML with multiple fallback sources
@@ -6621,37 +6606,21 @@ window.__pcFaviconHelper = {
         }
 
         const requestSize = Math.max((parseInt(size, 10) || 0) * 2, 64);
-
-        // PERSISTENCE FIX: Check if we are already trying a specific index for this domain
-        const startingIndex = this.tryingDomains.get(cleanDomain) || 0;
-
-        // Multiple favicon sources to try - ordered by quality and reliability
-        const faviconSources = [
-            `https://logo.clearbit.com/${encodeURIComponent(cleanDomain)}`, // Best for company logos
-            `https://www.google.com/s2/favicons?sz=${requestSize}&domain=${encodeURIComponent(cleanDomain)}`, // Google's service
-            `https://favicons.githubusercontent.com/${encodeURIComponent(cleanDomain)}`, // GitHub's service  
-            `https://api.faviconkit.com/${encodeURIComponent(cleanDomain)}/${requestSize}`, // FaviconKit API
-            `https://favicon.yandex.net/favicon/${encodeURIComponent(cleanDomain)}`, // Yandex service
-            `https://icons.duckduckgo.com/ip3/${encodeURIComponent(cleanDomain)}.ico`, // DuckDuckGo
-            `https://${cleanDomain}/favicon.ico` // Direct favicon
-        ];
-
         const safeDomain = String(cleanDomain || '').replace(/'/g, "\\'");
-        const useIndex = startingIndex < faviconSources.length ? startingIndex : 0;
 
-        // Warm Start: If we already have a persistent index, don't hide the icon with 'favicon-loading'
-        // This prevents the "flip-back" flicker during rapid re-renders
         const isWarmStart = this.tryingDomains.has(cleanDomain);
         const containerClass = isWarmStart ? 'company-favicon-container favicon-loaded' : 'company-favicon-container favicon-loading';
         const imgVisibility = isWarmStart ? 'visibility:visible;' : 'visibility:hidden;';
 
+        const proxySrc = `/api/logo?domain=${encodeURIComponent(cleanDomain)}&size=${encodeURIComponent(requestSize)}`;
+
         return `<span class="${containerClass}" style="width:${size}px;height:${size}px;">
                     <img class="company-favicon ${isWarmStart ? 'icon-loaded' : ''}" 
-                         src="${faviconSources[useIndex]}" 
+                         src="${proxySrc}" 
                          alt="" 
                          referrerpolicy="no-referrer" 
                          loading="lazy"
-                         data-source-index="${useIndex}"
+                         data-source-index="0"
                          data-display-size="${size}"
                          data-domain="${cleanDomain}"
                          style="width:${size}px;height:${size}px;object-fit:cover;border-radius:6px;flex-shrink:0;pointer-events:none;background-color:rgba(255,255,255,0.05);${imgVisibility}"
@@ -6738,62 +6707,23 @@ window.__pcFaviconHelper = {
             return;
         }
 
-        // Get current source index from data attribute
-        let currentIndex = parseInt(img.dataset.sourceIndex || '0');
-        if (isNaN(currentIndex)) currentIndex = 0;
-        currentIndex++;
-
-        const requestSize = Math.max((parseInt(size, 10) || 0) * 2, 64);
-
-        // Try next favicon source - same order as generateFaviconHTML
-        const faviconSources = [
-            `https://logo.clearbit.com/${encodeURIComponent(cleanDomain)}`,
-            `https://www.google.com/s2/favicons?sz=${requestSize}&domain=${encodeURIComponent(cleanDomain)}`,
-            `https://favicons.githubusercontent.com/${encodeURIComponent(cleanDomain)}`,
-            `https://api.faviconkit.com/${encodeURIComponent(cleanDomain)}/${requestSize}`,
-            `https://favicon.yandex.net/favicon/${encodeURIComponent(cleanDomain)}`,
-            `https://icons.duckduckgo.com/ip3/${encodeURIComponent(cleanDomain)}.ico`,
-            `https://${cleanDomain}/favicon.ico`
-        ];
-
-        if (currentIndex < faviconSources.length) {
-            // Update the tryingDomains map to persist across re-renders
-            if (cleanDomain) {
-                this.tryingDomains.set(cleanDomain, currentIndex);
-            }
-
-            // Fade out then try next source for smoother transition
-            try { img.classList.add('icon-unloading'); } catch (_) { }
-            setTimeout(() => {
-                img.dataset.sourceIndex = currentIndex.toString();
-                try {
-                    img.style.display = '';
-                    img.style.visibility = 'hidden';
-                } catch (_) { }
-                img.src = faviconSources[currentIndex];
-                try { img.classList.remove('icon-unloading'); } catch (_) { }
-            }, 120);
-        } else {
-            if (cleanDomain) {
-                try {
-                    this.failedDomains.add(cleanDomain);
-                    this.tryingDomains.delete(cleanDomain);
-                    this._saveCache();
-                } catch (_) { }
-            }
-            if (container) {
-                container.classList.remove('favicon-loading');
-                container.classList.add('favicon-failed');
-                try { img.style.display = 'none'; } catch (_) { }
-                return;
-            }
-
-            try { img.classList.add('icon-unloading'); } catch (_) { }
-            setTimeout(() => {
-                img.classList.add('favicon-failed');
-                img.style.display = 'none';
-            }, 120);
+        if (cleanDomain) {
+            try {
+                this.failedDomains.add(cleanDomain);
+                this.tryingDomains.delete(cleanDomain);
+                this._saveCache();
+            } catch (_) { }
         }
+
+        if (container) {
+            container.classList.remove('favicon-loading');
+            container.classList.add('favicon-failed');
+            try { img.style.display = 'none'; } catch (_) { }
+            return;
+        }
+
+        try { img.classList.add('favicon-failed'); } catch (_) { }
+        try { img.style.display = 'none'; } catch (_) { }
     }
 };
 

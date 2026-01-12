@@ -1926,6 +1926,23 @@
       contact = await findContactById(contactId);
     }
 
+    try {
+      if (contact && (contact.company || contact.account) && !contact.companyName) {
+        const inferred = contact.company || contact.account;
+        if (inferred) contact.companyName = inferred;
+      }
+    } catch (_) { }
+    try {
+      if (contact && contact.companyName && !contact.accountName) {
+        contact.accountName = contact.companyName;
+      }
+    } catch (_) { }
+    try {
+      if (contact && contact.account_id && !contact.accountId) {
+        contact.accountId = contact.account_id;
+      }
+    } catch (_) { }
+
     // Ensure contact has an ID
     if (contact && !contact.id && contactId) {
       contact.id = contactId;
@@ -2145,7 +2162,7 @@
 
     // Use prefetched contact if provided by navigation source (avoids extra hops)
     try {
-      if (window._prefetchedContactForDetail && window._prefetchedContactForDetail.id === contactId) {
+      if (window._prefetchedContactForDetail && String(window._prefetchedContactForDetail.id || '') === String(contactId || '')) {
         const c = window._prefetchedContactForDetail;
         window._prefetchedContactForDetail = null; // consume
         return c;
@@ -2309,14 +2326,14 @@
       }
 
       // Check cache first
-      const cacheKey = contact.accountId || contact.companyName;
+      const cacheKey = contact.accountId || contact.account_id || contact.companyName || contact.accountName || contact.company || contact.account;
       if (cacheKey && state._accountCache && state._accountCache[cacheKey]) {
         return state._accountCache[cacheKey];
       }
 
       // OPTIMIZED: Check BackgroundAccountsLoader first, then Firestore fallback
       const accountId = contact.accountId || contact.account_id || '';
-      const companyName = contact.companyName || contact.accountName || '';
+      const companyName = contact.companyName || contact.accountName || contact.company || contact.account || '';
 
       // Check BackgroundAccountsLoader first (cache-first)
       if (window.BackgroundAccountsLoader && accountId) {
