@@ -73,6 +73,18 @@
     }
   }
 
+  // Scroll directly to the widget if it's already open
+  function scrollToWidget(widgetId) {
+    const widget = document.getElementById(widgetId);
+    const panel = document.getElementById('widget-panel');
+    if (widget && panel) {
+      const panelRect = panel.getBoundingClientRect();
+      const widgetRect = widget.getBoundingClientRect();
+      const scrollTop = panel.scrollTop + (widgetRect.top - panelRect.top);
+      panel.scrollTo({ top: scrollTop, behavior: 'smooth' });
+    }
+  }
+
   // Update existing widget content when entity changes
   async function updateWidgetContent() {
     const companyName = getCompanyName();
@@ -871,9 +883,9 @@
     const isSameContact = currentEntityType === 'contact' && String(currentContactId) === String(contactId);
     const existingWidget = document.getElementById(WIDGET_ID);
 
-    // If it's the same contact and widget is already open, toggle it closed
+    // If it's the same contact and widget is already open, scroll to it instead of toggling
     if (isSameContact && existingWidget) {
-      closeMapsWidget();
+      scrollToWidget(WIDGET_ID);
       return;
     }
 
@@ -881,7 +893,7 @@
     currentAccountId = null;
     currentEntityType = 'contact';
     
-    // If widget is already open for a different entity, just update it
+    // If widget is already open for a different entity, update it and scroll to top
     if (existingWidget) {
       updateWidgetContent();
       scrollToWidgetPanelTop();
@@ -964,9 +976,9 @@
     const isSameAccount = currentEntityType === 'account' && String(currentAccountId) === String(accountId);
     const existingWidget = document.getElementById(WIDGET_ID);
 
-    // If it's the same account and widget is already open, toggle it closed
+    // If it's the same account and widget is already open, scroll to it instead of toggling
     if (isSameAccount && existingWidget) {
-      closeMapsWidget();
+      scrollToWidget(WIDGET_ID);
       return;
     }
 
@@ -974,7 +986,7 @@
     currentContactId = null;
     currentEntityType = 'account';
     
-    // If widget is already open for a different entity, just update it
+    // If widget is already open for a different entity, update it and scroll to top
     if (existingWidget) {
       updateWidgetContent();
       scrollToWidgetPanelTop();
