@@ -6300,8 +6300,10 @@
       #contact-detail-header .contact-header-profile { display: inline-flex; align-items: center; gap: 8px; }
       /* Reset margin added globally so spacing is controlled here */
       #contact-detail-header .linkedin-header-btn { margin-left: 0; margin-right: 0; }
+      #contact-detail-header .page-actions { align-items: center; gap: 8px; }
       #contact-detail-header .header-quick-actions { display: inline-flex; align-items: center; gap: 8px; }
-      #contact-detail-header .page-actions-separator { width: 1px; height: 24px; background: var(--border-light); margin: 0; flex-shrink: 0; }
+      #contact-detail-header .header-quick-actions > .page-actions-separator { width: 0; height: 24px; background: transparent; border-left: 1px solid var(--border-light); margin: 0; flex-shrink: 0; align-self: center; opacity: 0.9; }
+      #contact-detail-header .page-actions > .page-actions-separator { width: 0; height: 24px; background: transparent; border-left: 1px solid var(--border-light); margin: 0; flex-shrink: 0; align-self: center; opacity: 0.9; }
       /* Vertical divider between LinkedIn and the List/Sequence group */
       #contact-detail-header .header-action-divider {
         width: 1px;

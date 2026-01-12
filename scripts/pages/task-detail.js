@@ -915,9 +915,10 @@
       #task-detail-page .linkedin-header-btn { margin-left: 0; margin-right: 0; }
       /* Vertical divider between LinkedIn and the List/Sequence group */
       #task-detail-page .header-action-divider {
-        width: 1px;
+        width: 0;
         height: 24px;
-        background: var(--border-light);
+        background: transparent;
+        border-left: 1px solid var(--border-light);
         opacity: 0.9;
         display: inline-block;
         margin: 0;
@@ -1131,7 +1132,7 @@
       #task-detail-page .page-actions {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 6px;
         margin-left: 20px;
         flex-shrink: 0;
       }
@@ -1168,9 +1169,10 @@
 
       /* Page actions separator - vertical line between button groups */
       #task-detail-page .page-actions-separator {
-        width: 1px;
+        width: 0;
         height: 24px;
-        background: var(--border-light);
+        background: transparent;
+        border-left: 1px solid var(--border-light);
         margin: 0;
         flex-shrink: 0;
       }
@@ -1428,7 +1430,7 @@
       #task-detail-page .page-actions {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         margin-left: auto;
       }
       
@@ -4346,6 +4348,12 @@
     if (seqBtn) {
       if (isAcctTask) seqBtn.setAttribute('hidden', '');
       else seqBtn.removeAttribute('hidden');
+    }
+
+    const listSeqGroup = header.querySelector('.list-seq-group');
+    const addTaskBtn = document.getElementById('task-add-task');
+    if (listSeqGroup && addTaskBtn && addTaskBtn.parentElement !== listSeqGroup) {
+      listSeqGroup.appendChild(addTaskBtn);
     }
   }
 
