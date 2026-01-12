@@ -140,6 +140,7 @@ import twilioTranscribeHandler from './api/twilio/transcribe.js';
 import twilioDialCompleteHandler from './api/twilio/dial-complete.js';
 import twilioProcessExistingTranscriptsHandler from './api/twilio/process-existing-transcripts.js';
 import energyNewsHandler from './api/energy-news.js';
+import logoHandler from './api/logo.js';
 import twilioBridgeHandler from './api/twilio/bridge.js';
 import twilioOperatorWebhookHandler from './api/twilio/operator-webhook.js';
 import twilio from 'twilio';
@@ -839,6 +840,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/search') {
     return handleApiSearch(req, res, parsedUrl);
+  }
+  if (pathname === '/api/logo') {
+    return handleApiLogo(req, res, parsedUrl);
   }
   // Aliases for phone metadata lookups used by the softphone widget
   if (pathname === '/api/contacts/search' || pathname === '/api/v1/search' || pathname === '/api/lookup/phone' || pathname === '/api/contacts/lookup') {
@@ -2017,6 +2021,11 @@ async function handleApiSearch(req, res, parsedUrl) {
 
   // Call handler directly (no proxy)
   return await searchHandler(req, res);
+}
+
+async function handleApiLogo(req, res, parsedUrl) {
+  req.query = { ...parsedUrl.query };
+  return await logoHandler(req, res);
 }
 
 // Twilio Caller ID lookup: accepts POST { phoneNumber }
