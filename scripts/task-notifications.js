@@ -336,7 +336,7 @@ class TaskNotificationManager {
             return window.__pcFaviconHelper.generateFaviconHTML(d, 64);
         }
         // Fallback to old system
-        return `https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent('https://' + d)}`;
+        return `/api/logo?domain=${encodeURIComponent(d)}&size=64`;
     }
 
     rescheduleNotifications() {

@@ -5031,7 +5031,7 @@
                   img.src = newImg.src;
                 }
               } else {
-                img.src = `https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(nextDomain)}&ts=${ts}`;
+                img.src = `/api/logo?domain=${encodeURIComponent(nextDomain)}&size=64&ts=${ts}`;
               }
               img.style.display = '';
               const initials = header.querySelector('.avatar-circle-small');
