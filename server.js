@@ -2072,7 +2072,7 @@ async function handleApiEnergyNews(req, res) {
           console.log('[Energy News] Using FREE_GEMINI_KEY fallback');
         }
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
         // Process headlines in parallel for better performance
         const reformattedItems = await Promise.all(rawItems.map(async (item) => {
