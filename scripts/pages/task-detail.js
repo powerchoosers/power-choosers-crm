@@ -14,6 +14,7 @@
     _loadToken: 0,
     _activeLoadToken: 0,
     _activeTaskId: null,
+    _contactListMemberships: {}, // NEW: Map of contactId -> list names
     widgets: {
       maps: null,
       energy: null,
@@ -1421,101 +1422,7 @@
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       }
       
-      /* Widgets Drawer */
-      #task-detail-page .widgets-drawer {
-        position: absolute;
-        top: 50%;
-        right: calc(100% + 8px);
-        /* appear to the left of the button */
-        /* Start slightly to the right and fade in so it slides left into place */
-        transform: translate(10px, -50%);
-        opacity: 0;
-        visibility: hidden;
-        pointer-events: none;
-        background: var(--bg-card);
-        color: var(--text-primary);
-        border: 1px solid var(--border-light);
-        border-radius: var(--border-radius);
-        box-shadow: var(--elevation-card);
-        padding: 8px;
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-        z-index: 20;
-        transition: transform 160ms ease, opacity 160ms ease, visibility 0s linear 160ms;
-        /* delay visibility off so it doesn't flicker */
-        --arrow-size: 8px;
-        /* square size before rotation */
-      }
-      
-      /* Pointed triangle pointing right */
-      #task-detail-page .widgets-drawer::before,
-      #task-detail-page .widgets-drawer::after {
-        content: "";
-        position: absolute;
-        width: var(--arrow-size);
-        height: var(--arrow-size);
-        transform: rotate(45deg);
-        pointer-events: none;
-        right: calc(-1 * var(--arrow-size) / 2 + 1px);
-        top: 50%;
-        transform: translateY(-50%) rotate(45deg);
-      }
-      
-      /* Border layer */
-      #task-detail-page .widgets-drawer::before {
-        background: var(--border-light);
-      }
-      
-      /* Fill layer */
-      #task-detail-page .widgets-drawer::after {
-        background: var(--bg-card);
-        right: calc(-1 * var(--arrow-size) / 2 + 2px);
-      }
-      
-      /* Drawer Open State */
-      #task-detail-page .widgets-wrap.open .widgets-drawer {
-        transform: translate(0, -50%);
-        opacity: 1;
-        visibility: visible;
-        pointer-events: auto;
-        transition: transform 180ms ease, opacity 180ms ease;
-      }
-      
-      /* Widget icon buttons inside drawer */
-      #task-detail-page .widgets-drawer .widget-item {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 36px;
-        height: 36px;
-        border-radius: var(--border-radius);
-        background: var(--bg-item);
-        border: 1px solid var(--border-light);
-        color: var(--text-secondary);
-        cursor: pointer;
-        transition: all 0.2s ease;
-      }
-      
-      #task-detail-page .widgets-drawer .widget-item:hover {
-        background: var(--bg-secondary);
-        border-color: var(--accent-color) !important;
-        color: var(--text-primary);
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-      }
-      
-      #task-detail-page .widgets-drawer .widget-item:focus-visible {
-        outline: 2px solid var(--orange-muted);
-        outline-offset: 2px;
-      }
-      
-      #task-detail-page .widgets-drawer .widget-item svg {
-        width: 18px;
-        height: 18px;
-        display: block;
-        pointer-events: none;
-      }
+
       
       /* Ensure page-actions uses flexbox for proper alignment */
       #task-detail-page .page-actions {
@@ -1856,52 +1763,137 @@
       nextBtn.addEventListener('click', (e) => { e.preventDefault(); navigateToAdjacentTask('next'); });
     }
 
-    // Widget button hover functionality
     const widgetsBtn = document.getElementById('task-open-widgets');
     const widgetsWrap = document.querySelector('#task-detail-page .widgets-wrap');
-    if (widgetsBtn && widgetsWrap) {
-      // Click toggles open state (also support keyboard)
-      widgetsBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const isOpen = widgetsWrap.classList.toggle('open');
-        widgetsBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-      });
+    const widgetsDrawer = document.getElementById('task-widgets-drawer') || document.querySelector('#task-detail-page .widgets-drawer');
 
-      // Hover/focus intent: open immediately, close with slight delay
-      const openNow = () => {
-        clearTimeout(widgetsWrap._closeTimer);
-        if (!widgetsWrap.classList.contains('open')) {
-          widgetsWrap.classList.add('open');
-          widgetsBtn.setAttribute('aria-expanded', 'true');
-        }
+    if (widgetsBtn && widgetsWrap && widgetsDrawer && !widgetsDrawer._pcBound) {
+      const portalize = (el) => {
+        try {
+          if (!el || el.__pcPortalized) return;
+          const parent = el.parentNode;
+          const next = el.nextSibling;
+          el.__pcPortalized = true;
+          el.__pcPortalParent = parent;
+          el.__pcPortalNext = next;
+          document.body.appendChild(el);
+        } catch (_) { }
       };
+
+      const positionDrawer = (force = false) => {
+        try {
+          const rect = widgetsBtn.getBoundingClientRect();
+          widgetsDrawer.style.position = 'fixed';
+          widgetsDrawer.style.left = '0px';
+          widgetsDrawer.style.top = '0px';
+          widgetsDrawer.style.right = 'auto';
+
+          const drawerRect = widgetsDrawer.getBoundingClientRect();
+          const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+          const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+
+          let left = rect.left - drawerRect.width - 8;
+          let top = rect.top + (rect.height / 2) - (drawerRect.height / 2);
+
+          if (left < 8) {
+            left = rect.right + 8;
+          }
+
+          left = Math.max(8, Math.min(left, viewportWidth - drawerRect.width - 8));
+          top = Math.max(8, Math.min(top, viewportHeight - drawerRect.height - 8));
+
+          widgetsDrawer.style.left = `${left}px`;
+          widgetsDrawer.style.top = `${top}px`;
+        } catch (_) { }
+      };
+
+      const setOpen = (open) => {
+        try {
+          clearTimeout(widgetsWrap._closeTimer);
+          if (open) {
+            portalize(widgetsDrawer);
+            positionDrawer(true);
+            widgetsWrap.classList.add('open');
+            widgetsDrawer.classList.add('--open');
+            widgetsBtn.setAttribute('aria-expanded', 'true');
+            positionDrawer(true);
+            requestAnimationFrame(() => {
+              try { positionDrawer(true); } catch (_) { }
+            });
+          } else {
+            widgetsWrap.classList.remove('open');
+            widgetsDrawer.classList.remove('--open');
+            widgetsBtn.setAttribute('aria-expanded', 'false');
+          }
+        } catch (_) { }
+      };
+
+      const openNow = () => setOpen(true);
       const closeSoon = () => {
         clearTimeout(widgetsWrap._closeTimer);
-        widgetsWrap._closeTimer = setTimeout(() => {
-          widgetsWrap.classList.remove('open');
-          widgetsBtn.setAttribute('aria-expanded', 'false');
-        }, 320); // slightly longer grace period to move into the drawer
+        widgetsWrap._closeTimer = setTimeout(() => setOpen(false), 320);
       };
+
+      widgetsBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const isOpen = widgetsDrawer.classList.contains('--open');
+        setOpen(!isOpen);
+      });
 
       widgetsWrap.addEventListener('mouseenter', openNow);
       widgetsWrap.addEventListener('mouseleave', closeSoon);
       widgetsWrap.addEventListener('focusin', openNow);
       widgetsWrap.addEventListener('focusout', (e) => {
-        // If focus moves outside the wrap, start close timer
-        if (!widgetsWrap.contains(e.relatedTarget)) closeSoon();
+        try {
+          const rt = e.relatedTarget;
+          if (rt && (widgetsWrap.contains(rt) || widgetsDrawer.contains(rt))) return;
+        } catch (_) { }
+        closeSoon();
       });
+
+      widgetsDrawer.addEventListener('mouseenter', openNow);
+      widgetsDrawer.addEventListener('mouseleave', closeSoon);
+      widgetsDrawer.addEventListener('focusin', openNow);
+      widgetsDrawer.addEventListener('focusout', (e) => {
+        try {
+          const rt = e.relatedTarget;
+          if (rt && (widgetsWrap.contains(rt) || widgetsDrawer.contains(rt))) return;
+        } catch (_) { }
+        closeSoon();
+      });
+
+      document.addEventListener('mousedown', (e) => {
+        try {
+          if (!widgetsDrawer.classList.contains('--open')) return;
+          if (widgetsWrap.contains(e.target) || widgetsDrawer.contains(e.target)) return;
+          setOpen(false);
+        } catch (_) { }
+      }, true);
+
+      document.addEventListener('keydown', (e) => {
+        try {
+          if (e.key !== 'Escape') return;
+          if (!widgetsDrawer.classList.contains('--open')) return;
+          setOpen(false);
+        } catch (_) { }
+      }, true);
+
+      window.addEventListener('resize', positionDrawer, true);
+      window.addEventListener('scroll', positionDrawer, true);
+
+      widgetsDrawer._pcBound = '1';
     }
 
     // Widget drawer item clicks
-    const widgetsDrawer = document.getElementById('task-widgets-drawer') || document.querySelector('#task-detail-page .widgets-drawer');
-    if (widgetsDrawer && !widgetsDrawer._bound) {
-      widgetsDrawer.addEventListener('click', (e) => {
+    const widgetsDrawerClick = document.getElementById('task-widgets-drawer') || document.querySelector('#task-detail-page .widgets-drawer');
+    if (widgetsDrawerClick && !widgetsDrawerClick._bound) {
+      widgetsDrawerClick.addEventListener('click', (e) => {
         const item = e.target.closest?.('.widget-item');
         if (!item) return;
         const which = item.getAttribute('data-widget');
         handleWidgetAction(which);
       });
-      widgetsDrawer._bound = '1';
+      widgetsDrawerClick._bound = '1';
     }
 
     // CRITICAL: Listen for task deletion events (e.g. sequence removal) to auto-navigate
@@ -1948,7 +1940,9 @@
         if (window.Widgets) {
           try {
             const api = window.Widgets;
-            if (typeof api.isLushaOpen === 'function' && api.isLushaOpen()) {
+            const isOpenForCurrent = accountId ? api.isLushaOpen('account', accountId) : api.isLushaOpen('contact', contactId);
+
+            if (typeof api.isLushaOpen === 'function' && isOpenForCurrent) {
               if (typeof api.closeLusha === 'function') { api.closeLusha(); return; }
             } else if (accountId && typeof api.openLushaForAccount === 'function') {
               api.openLushaForAccount(accountId); return;
@@ -1966,7 +1960,9 @@
         if (window.Widgets) {
           try {
             const api = window.Widgets;
-            if (typeof api.isMapsOpen === 'function' && api.isMapsOpen()) {
+            const isOpenForCurrent = accountId ? api.isMapsOpen('account', accountId) : api.isMapsOpen('contact', contactId);
+            
+            if (typeof api.isMapsOpen === 'function' && isOpenForCurrent) {
               if (typeof api.closeMaps === 'function') { api.closeMaps(); return; }
             } else if (accountId && typeof api.openMapsForAccount === 'function') {
               api.openMapsForAccount(accountId); return;
@@ -3452,6 +3448,51 @@
     }
   }
 
+  /**
+   * Fetch list memberships for a set of contacts and store in state
+   */
+  async function fetchContactMemberships(contacts) {
+    if (!contacts || !Array.isArray(contacts) || contacts.length === 0) return;
+    if (!window.firebaseDB) return;
+
+    try {
+      const contactIds = contacts.map(c => c.id || c.contactId).filter(Boolean);
+      if (contactIds.length === 0) return;
+
+      // Reset memberships for these contacts to avoid stale data
+      contactIds.forEach(id => { state._contactListMemberships[id] = []; });
+
+      const db = window.firebaseDB;
+      const listsData = (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.getListsData === 'function')
+        ? window.BackgroundListsLoader.getListsData()
+        : [];
+
+      // Fetch in chunks of 30 (Firestore IN limit)
+      for (let i = 0; i < contactIds.length; i += 30) {
+        const chunk = contactIds.slice(i, i + 30);
+        const snapshot = await db.collection('listMembers')
+          .where('targetType', 'in', ['people', 'contact', 'contacts'])
+          .where('targetId', 'in', chunk)
+          .get();
+
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const contactId = data.targetId;
+          const listId = data.listId;
+          const list = listsData.find(l => l.id === listId);
+          if (list && list.name) {
+            if (!state._contactListMemberships[contactId]) state._contactListMemberships[contactId] = [];
+            if (!state._contactListMemberships[contactId].includes(list.name)) {
+              state._contactListMemberships[contactId].push(list.name);
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.warn('[TaskDetail] Failed to fetch contact memberships:', error);
+    }
+  }
+
   async function loadTaskData(taskId) {
     const t0 = performance.now();
 
@@ -3515,9 +3556,9 @@
           }
           retryCount++;
           const delay = Math.min(100 * retryCount, 500); // Exponential backoff, max 500ms
-          setTimeout(() => {
+          setTimeout(async () => {
             if (initDomRefs()) {
-              loadTaskData(taskId);
+              await loadTaskData(taskId);
             } else {
               retry();
             }
@@ -3874,7 +3915,7 @@
 
       // Render the task page
       try {
-        renderTaskPage();
+        await renderTaskPage();
       } catch (renderError) {
         console.error('[TaskDetail] Error rendering task page:', renderError);
         showTaskError('Failed to render task. Please refresh the page.');
@@ -3904,8 +3945,8 @@
         const pendingTaskId = state._pendingTaskId;
         if (pendingTaskId && String(pendingTaskId) !== String(taskId)) {
           state._pendingTaskId = null;
-          setTimeout(() => {
-            try { loadTaskData(pendingTaskId); } catch (_) { }
+          setTimeout(async () => {
+            try { await loadTaskData(pendingTaskId); } catch (_) { }
           }, 0);
         } else {
           state._pendingTaskId = null;
@@ -4309,7 +4350,7 @@
   }
 
 
-  function renderTaskPage() {
+  async function renderTaskPage() {
     if (!state.currentTask) {
       console.error('[TaskDetail] Cannot render: no current task in state');
       showTaskError('No task data available. Please refresh the page.');
@@ -4326,7 +4367,7 @@
     if (!els.content) {
       if (!initDomRefs()) {
         console.warn('[TaskDetail] DOM not ready for rendering, retrying...');
-        setTimeout(() => renderTaskPage(), 100);
+        setTimeout(async () => await renderTaskPage(), 100);
         return;
       }
     }
@@ -4876,7 +4917,7 @@
     }
 
     // Render task-specific content (split layout similar to Apollo screenshot)
-    renderTaskContent();
+    await renderTaskContent();
 
     // CRITICAL FIX: Event handlers are now set up once using event delegation
     // No need to re-attach - they work automatically for dynamically added elements
@@ -5184,7 +5225,7 @@
     // to ensure it runs after every DOM replacement, not just once
   }
 
-  function renderTaskContent() {
+  async function renderTaskContent() {
     if (!els.content) return;
 
     const task = state.currentTask;
@@ -5194,7 +5235,7 @@
 
     // Check if this is an account task
     if (isAccountTask(task)) {
-      contentHtml = renderAccountTaskContent(task);
+      contentHtml = await renderAccountTaskContent(task);
     } else {
       // Contact task - use existing logic
       switch (taskType) {
@@ -5338,7 +5379,7 @@
     }
   }
 
-  function renderAccountTaskContent(task) {
+  async function renderAccountTaskContent(task) {
     // Get account information
     const accountName = task.account || '';
     const accountId = task.accountId || '';
@@ -5389,7 +5430,7 @@
     }
 
     // Render contacts list
-    const contactsListHTML = renderAccountContacts(account);
+    const contactsListHTML = await renderAccountContacts(account);
 
     return `
       <div class="main-content">
@@ -6640,7 +6681,7 @@
   }
 
   // Render contacts list for account tasks
-  function renderAccountContacts(account) {
+  async function renderAccountContacts(account) {
     if (!account || !window.getPeopleData) {
       return '<div class="contacts-placeholder">No contacts found</div>';
     }
@@ -6663,6 +6704,9 @@
         return '<div class="contacts-placeholder">No contacts found for this account</div>';
       }
 
+      // NEW: Fetch list memberships for all associated contacts
+      await fetchContactMemberships(associatedContacts);
+
       return associatedContacts.map(contact => {
         const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.name || 'Unknown Contact';
         const title = contact.title || '';
@@ -6675,14 +6719,21 @@
           ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
           : (parts[0] ? parts[0][0].toUpperCase() : '?');
 
+        // Get list name badges
+        const memberships = state._contactListMemberships[contact.id] || [];
+        const badgeHtml = memberships.map(name => `<span class="contact-list-badge">${escapeHtml(name)}</span>`).join('');
+
         return `
           <div class="contact-item contact-link" data-contact-id="${escapeHtml(contact.id)}" data-contact-name="${escapeHtml(fullName)}" style="cursor: pointer;">
             <div class="contact-avatar">
               <div class="avatar-circle-small" aria-hidden="true">${initials}</div>
             </div>
             <div class="contact-info">
-              <div class="contact-name">
-                <span class="contact-name-text">${escapeHtml(fullName)}</span>
+              <div class="contact-name-container">
+                <div class="contact-name">
+                  <span class="contact-name-text">${escapeHtml(fullName)}</span>
+                </div>
+                ${badgeHtml}
               </div>
               <div class="contact-details">
                 ${title ? `<span class="contact-title">${escapeHtml(title)}</span>` : ''}
@@ -7051,7 +7102,7 @@
       console.warn('[TaskDetail] Contact creation guard set but listeners missing. Rebinding.');
     }
 
-    const onContactCreated = (e) => {
+    const onContactCreated = async (e) => {
       if (state.currentTask && isAccountTask(state.currentTask)) {
         // Refresh the contacts list for account tasks
         const contactsList = document.getElementById('account-contacts-list');
@@ -7062,7 +7113,7 @@
           const account = findAccountByIdOrName(accountId, accountName);
 
           if (account) {
-            contactsList.innerHTML = renderAccountContacts(account);
+            contactsList.innerHTML = await renderAccountContacts(account);
           }
         }
       }
@@ -7092,7 +7143,7 @@
               // console.log('[TaskDetail] ✓ Reloaded contact data:', updatedContact.firstName, updatedContact.lastName);
 
               // Re-render the task page to show updated contact information
-              renderTaskPage();
+              await renderTaskPage();
 
               // Update cache if available
               if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
@@ -7483,7 +7534,7 @@
               // console.log('[TaskDetail] ✓ Reloaded account data:', updatedAccount.accountName || updatedAccount.name);
 
               // Re-render the task page to show updated account information
-              renderTaskPage();
+              await renderTaskPage();
 
               // Update cache if available
               if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
@@ -7536,7 +7587,7 @@
               state.account = updatedAccount;
 
               // Re-render the task page to show updated energy information
-              renderTaskPage();
+              await renderTaskPage();
 
               // Update cache if available
               if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
@@ -7695,7 +7746,7 @@
               // console.log('[TaskDetail] ✓ Reloaded account data after returning from account-detail');
 
               // Re-render the task page to show updated account information
-              renderTaskPage();
+              await renderTaskPage();
 
               // Update cache with fresh data
               if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {

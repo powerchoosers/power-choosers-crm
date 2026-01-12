@@ -107,5 +107,3 @@ self.onmessage = async function(e) {
     });
   }
 };
-
-console.log('[CallWorker] Call processing worker initialized');

@@ -203,22 +203,17 @@
         newItem.id = ref.id;
       }
     } catch (err) {
-      console.warn('Create list failed:', err);
-      // keep local item without id if offline
+      // Create list failed
     }
 
     // COST-EFFECTIVE: Update BackgroundListsLoader cache locally (zero Firestore reads)
     if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.addListLocally === 'function') {
       window.BackgroundListsLoader.addListLocally(newItem);
-      // console.log('[ListsOverview] ✓ Updated BackgroundListsLoader cache locally');
     }
 
     // COST-EFFECTIVE: Update CacheManager locally (IndexedDB write only, no Firestore read)
     if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function' && newItem.id) {
-      window.CacheManager.updateRecord('lists', newItem.id, newItem).catch(err => 
-        console.warn('[ListsOverview] Cache update failed:', err)
-      );
-      // console.log('[ListsOverview] ✓ Updated CacheManager cache locally');
+      window.CacheManager.updateRecord('lists', newItem.id, newItem).catch(err => {});
     }
 
     // COST-EFFECTIVE: Dispatch event for cross-component sync (free, no cost)
@@ -226,9 +221,7 @@
       document.dispatchEvent(new CustomEvent('pc:list-created', {
         detail: { id: newItem.id, list: newItem, kind }
       }));
-      // console.log('[ListsOverview] ✓ Dispatched pc:list-created event');
     } catch (e) {
-      console.warn('[ListsOverview] Failed to dispatch event:', e);
     }
 
     // Update local state and render
@@ -263,11 +256,9 @@
         if (!btn) return;
         const newView = btn.getAttribute('data-view');
         if (!newView || newView === state.kind) {
-          console.log('[ListsOverview] Toggle clicked but view unchanged:', { current: state.kind, newView });
           return;
         }
         
-        console.log('[ListsOverview] Toggle clicked:', { from: state.kind, to: newView });
         
         // Update active styles
         viewToggle.querySelectorAll('.toggle-btn').forEach(b => {
@@ -283,11 +274,9 @@
         // COST-EFFECTIVE: If both kinds are already loaded, just re-render (zero cost)
         // Otherwise, ensure data is loaded
         if (state.loadedPeople && state.loadedAccounts) {
-          console.log('[ListsOverview] Both kinds loaded, applying filters for:', state.kind);
           applyFilters();
           updateToggleState();
         } else {
-          console.log('[ListsOverview] Not all kinds loaded, calling ensureLoadedThenRender');
           ensureLoadedThenRender();
         }
       });
@@ -409,7 +398,6 @@
         state.accountLists = mergeListsById(state.accountLists, accountLists);
         state.loadedAccounts = true;
         
-        // console.log('[ListsOverview] ✓ Loaded', peopleLists.length, 'people lists and', accountLists.length, 'account lists from BackgroundListsLoader cache (zero cost)');
         
         // Preload members for both kinds if needed (uses cache if available)
         if (typeof window.__preloadListMembers === 'function') {
@@ -432,7 +420,7 @@
       updateToggleState();
       // Lazy-load accounts in background (non-blocking)
       if (!state.loadedAccounts) {
-        loadLists('accounts').catch(err => console.warn('[ListsOverview] Background load of accounts failed:', err));
+        loadLists('accounts').catch(err => {});
       }
     } else if (state.kind === 'accounts' && !state.loadedAccounts) {
       await loadLists('accounts');
@@ -440,7 +428,7 @@
       updateToggleState();
       // Lazy-load people in background (non-blocking)
       if (!state.loadedPeople) {
-        loadLists('people').catch(err => console.warn('[ListsOverview] Background load of people failed:', err));
+        loadLists('people').catch(err => {});
       }
     } else {
       // Both already loaded or current kind already loaded
@@ -452,7 +440,6 @@
   async function loadLists(kind) {
     // COST-EFFECTIVE: Always try BackgroundListsLoader first (zero Firestore reads if cache available)
     try {
-      if (console.time) console.time(`[ListsOverview] loadLists ${kind}`);
       
       // Use BackgroundListsLoader (cache-first)
       if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.getListsData === 'function') {
@@ -460,13 +447,11 @@
         
         // If background loader hasn't loaded data yet, wait for it (cost-effective: avoids Firestore query)
         if (listsData.length === 0) {
-          console.log('[ListsOverview] BackgroundListsLoader not ready yet, waiting...');
           // Wait up to 3 seconds for background loader
           for (let attempt = 0; attempt < 30; attempt++) {
             await new Promise(resolve => setTimeout(resolve, 100));
             listsData = window.BackgroundListsLoader.getListsData() || [];
             if (listsData.length > 0) {
-              // console.log('[ListsOverview] ✓ BackgroundListsLoader ready after', (attempt + 1) * 100, 'ms with', listsData.length, 'lists (zero cost)');
               break;
             }
           }
@@ -483,7 +468,6 @@
             }
           });
           
-          // console.log('[ListsOverview] ✓ Loaded', filteredLists.length, 'lists from BackgroundListsLoader for kind:', kind, '(zero cost)');
           
           // Ensure global cache exists
           try { window.listMembersCache = window.listMembersCache || {}; } catch (_) {}
@@ -494,7 +478,6 @@
             await window.__preloadListMembers(filteredLists);
           } else {
             // Fallback: set default counts
-            console.log('[ListsOverview] Preloader not available, setting default counts');
             for (const list of filteredLists) {
               list.count = 0;
             }
@@ -508,7 +491,6 @@
             state.loadedAccounts = true;
           }
           
-          if (console.timeEnd) console.timeEnd(`[ListsOverview] loadLists ${kind}`);
           renderFilteredItems(kind === 'people' ? state.peopleLists : state.accountLists);
           return; // Skip Firestore query - cache has data
         }
@@ -560,9 +542,7 @@
               return (kind === 'people') ? (k === 'people' || k === 'person' || k === 'contacts' || k === 'contact')
                                          : (k === 'accounts' || k === 'account' || k === 'companies' || k === 'company');
             });
-            console.debug('[ListsOverview] fallback fetched without where', { total: all.length, matched: items.length, forKind: kind });
           } catch (e) {
-            console.debug('[ListsOverview] fallback fetch failed', e);
           }
         }
 
@@ -573,9 +553,7 @@
         if (typeof window.__preloadListMembers === 'function') {
           await window.__preloadListMembers(items);
         } else {
-          console.warn('[ListsOverview] Preloader not available, skipping member count loading');
         }
-        console.debug('[ListsOverview] lists loaded', { kind, count: items.length });
 
         // After preloading, set count per item based on its declared kind
         for (const item of items) {
@@ -598,9 +576,7 @@
         // No Firestore: remain empty but mark as loaded
         if (kind === 'people') state.loadedPeople = true; else state.loadedAccounts = true;
       }
-      if (console.timeEnd) console.timeEnd(`[ListsOverview] loadLists ${kind}`);
     } catch (err) {
-      console.error('[ListsOverview] Failed to load lists for kind', kind, err);
       
       // COST-EFFECTIVE: Preserve cache on error (don't clear existing data)
       // Try to use BackgroundListsLoader cache as fallback
@@ -628,10 +604,8 @@
               }
               state.loadedAccounts = true;
             }
-            // console.log('[ListsOverview] ✓ Preserved cache data on error (zero cost)');
           }
         } catch (cacheErr) {
-          console.warn('[ListsOverview] Cache fallback failed:', cacheErr);
         }
       }
       
@@ -677,41 +651,29 @@
         try {
           // CRITICAL FIX: Skip live listener updates during restore operation
           if (window._listsOverviewRestoring) {
-            console.log('[ListsOverview] ⏭️ Skipping live listener update during restore');
             return;
           }
           
           // CRITICAL FIX: Protect against incomplete listener data
           const existingCount = state.peopleLists.length;
           
-          console.log(`[ListsOverview] Live listener update - people lists:`, {
-            existingCount,
-            newCount: items.length,
-            currentView: state.kind,
-            itemIds: items.map(i => i.id).slice(0, 5), // Show first 5 IDs
-            existingIds: state.peopleLists.map(i => i.id).slice(0, 5)
-          });
           
           // CRITICAL: Only protect against complete data loss or massive drops
           // Don't protect against normal updates (user deleted lists, etc.)
           // If listener returns 50% or less of existing items, it's likely incomplete
           if (existingCount > 5 && items.length > 0 && items.length < existingCount * 0.5) {
-            console.warn(`[ListsOverview] ⚠️ Live listener returned ${items.length} items but we have ${existingCount} (${Math.round(items.length/existingCount*100)}%) - likely incomplete data, preserving existing`);
             return;
           }
           
           // If listener returns empty and we have existing data, preserve existing
           if (items.length === 0 && existingCount > 0) {
-            console.warn('[ListsOverview] ⚠️ Live listener returned empty, preserving existing lists');
             return;
           }
           
           // Update with listener data
-          const previousCount = state.peopleLists.length;
           state.peopleLists = items;
           state.loadedPeople = true;
           
-          // console.log(`[ListsOverview] ✓ Updated people lists from listener: ${previousCount} → ${items.length}`);
           
           // Re-render if we're viewing people lists
           if (state.kind === 'people') {
@@ -720,7 +682,6 @@
           
           _peopleListenerRetries = 0; // Reset retry counter on success
         } catch (e) {
-          console.error('[ListsOverview] People lists debounced update error:', e);
         }
       }, 500); // 500ms debounce
       
@@ -751,17 +712,14 @@
                 // Use debounced update to prevent flickering
                 debouncedPeopleUpdate(items);
               } catch (e) {
-                console.error('[ListsOverview] People lists snapshot error:', e);
               }
             },
             (error) => {
               // Error handler - try fallback instead of unsubscribing
-              console.error('[ListsOverview] People lists live listener error:', error);
               
               // If filtered query failed and we haven't tried fallback yet, retry with unfiltered
               if (useFilter && _peopleListenerRetries < 2) {
                 _peopleListenerRetries++;
-                console.log('[ListsOverview] Retrying people lists listener with fallback query...');
                 setTimeout(() => {
                   if (_unsubListsPeople) {
                     try { _unsubListsPeople(); } catch(_) {}
@@ -771,13 +729,11 @@
                 }, 1000);
               } else {
                 // After retries, don't unsubscribe - keep existing data visible
-                console.warn('[ListsOverview] People lists listener failed, keeping existing data');
                 // Don't clear state or unsubscribe - preserve what we have
               }
             }
           );
         } catch (e) {
-          console.error('[ListsOverview] Failed to setup people listener:', e);
         }
       };
       
@@ -791,40 +747,28 @@
         try {
           // CRITICAL FIX: Skip live listener updates during restore operation
           if (window._listsOverviewRestoring) {
-            console.log('[ListsOverview] ⏭️ Skipping live listener update during restore');
             return;
           }
           
           // CRITICAL FIX: Protect against incomplete listener data
           const existingCount = state.accountLists.length;
           
-          console.log(`[ListsOverview] Live listener update - account lists:`, {
-            existingCount,
-            newCount: items.length,
-            currentView: state.kind,
-            itemIds: items.map(i => i.id).slice(0, 5),
-            existingIds: state.accountLists.map(i => i.id).slice(0, 5)
-          });
           
           // CRITICAL: Only protect against complete data loss or massive drops
           // If listener returns 50% or less of existing items, it's likely incomplete
           if (existingCount > 5 && items.length > 0 && items.length < existingCount * 0.5) {
-            console.warn(`[ListsOverview] ⚠️ Live listener returned ${items.length} items but we have ${existingCount} (${Math.round(items.length/existingCount*100)}%) - likely incomplete data, preserving existing`);
             return;
           }
           
           // If listener returns empty and we have existing data, preserve existing
           if (items.length === 0 && existingCount > 0) {
-            console.warn('[ListsOverview] ⚠️ Live listener returned empty, preserving existing lists');
             return;
           }
           
           // Update with listener data
-          const previousCount = state.accountLists.length;
           state.accountLists = items;
           state.loadedAccounts = true;
           
-          // console.log(`[ListsOverview] ✓ Updated account lists from listener: ${previousCount} → ${items.length}`);
           
           // Re-render if we're viewing account lists
           if (state.kind === 'accounts') {
@@ -833,7 +777,6 @@
           
           _accountsListenerRetries = 0; // Reset retry counter on success
         } catch (e) {
-          console.error('[ListsOverview] Account lists debounced update error:', e);
         }
       }, 500); // 500ms debounce
       
@@ -864,17 +807,14 @@
                 // Use debounced update to prevent flickering
                 debouncedAccountsUpdate(items);
               } catch (e) {
-                console.error('[ListsOverview] Account lists snapshot error:', e);
               }
             },
             (error) => {
               // Error handler - try fallback instead of unsubscribing
-              console.error('[ListsOverview] Account lists live listener error:', error);
               
               // If filtered query failed and we haven't tried fallback yet, retry with unfiltered
               if (useFilter && _accountsListenerRetries < 2) {
                 _accountsListenerRetries++;
-                console.log('[ListsOverview] Retrying account lists listener with fallback query...');
                 setTimeout(() => {
                   if (_unsubListsAccounts) {
                     try { _unsubListsAccounts(); } catch(_) {}
@@ -884,20 +824,17 @@
                 }, 1000);
               } else {
                 // After retries, don't unsubscribe - keep existing data visible
-                console.warn('[ListsOverview] Account lists listener failed, keeping existing data');
                 // Don't clear state or unsubscribe - preserve what we have
               }
             }
           );
         } catch (e) {
-          console.error('[ListsOverview] Failed to setup account listener:', e);
         }
       };
       
       setupAccountsListener(true); // Start with filtered query
       
     } catch (e) {
-      console.warn('[ListsOverview] Failed to start live listeners', e);
     }
   }
 
@@ -953,7 +890,6 @@
       }
     }
     
-    console.log('[ListsOverview] applyFilters:', { kind: state.kind, itemsCount: items.length, peopleListsCount: state.peopleLists.length, accountListsCount: state.accountLists.length });
     renderFilteredItems(items);
   }
 
@@ -1107,7 +1043,6 @@
         const action = newBtn.getAttribute('data-action');
         const id = newBtn.getAttribute('data-id');
         const kind = newBtn.getAttribute('data-kind');
-        console.log('[Lists] action', action, { id, kind });
         if (action === 'Open') {
           handleOpenList(id, kind);
           return;
@@ -1216,12 +1151,10 @@
         const listDoc = await window.firebaseDB.collection('lists').doc(id).get();
         if (listDoc.exists) {
           name = listDoc.data().name || 'List';
-          console.log('[ListsOverview] Loaded list name from Firestore:', name);
         } else {
           name = 'List';
         }
       } catch (e) {
-        console.warn('[ListsOverview] Failed to load list name:', e);
         name = 'List';
       }
     } else if (!name) {
@@ -1230,12 +1163,6 @@
     
     try {
       const cache = window.listMembersCache?.[id];
-      console.debug('[ListsOverview] Open clicked cache status', {
-        id,
-        loaded: !!cache?.loaded,
-        people: cache?.people instanceof Set ? cache.people.size : (Array.isArray(cache?.people) ? cache.people.length : 0),
-        accounts: cache?.accounts instanceof Set ? cache.accounts.size : (Array.isArray(cache?.accounts) ? cache.accounts.length : 0)
-      });
     } catch (_) {}
     
     // RETRY MECHANISM: Ensure both contacts and accounts are loaded
@@ -1259,10 +1186,6 @@
     // If either is empty, wait for background loaders
     if ((contactsData.length === 0 || accountsData.length === 0) && 
         (window.BackgroundContactsLoader || window.BackgroundAccountsLoader)) {
-      console.log('[ListsOverview] Waiting for background loaders...', {
-        contacts: contactsData.length,
-        accounts: accountsData.length
-      });
       
       // Wait up to 3 seconds (30 attempts x 100ms)
       for (let attempt = 0; attempt < 30; attempt++) {
@@ -1278,21 +1201,11 @@
         
         // Break if both are loaded
         if (contactsData.length > 0 && accountsData.length > 0) {
-          /*
-          // console.log('[ListsOverview] ✓ Background loaders ready after', (attempt + 1) * 100, 'ms', {
-            contacts: contactsData.length,
-            accounts: accountsData.length
-          });
-          */
           break;
         }
       }
       
       if (contactsData.length === 0 || accountsData.length === 0) {
-        console.warn('[ListsOverview] ⚠ Timeout waiting for data after 3 seconds', {
-          contacts: contactsData.length,
-          accounts: accountsData.length
-        });
       }
     }
     
@@ -1300,7 +1213,6 @@
     try {
       window._listDetailNavigationSource = 'lists';
       window._listDetailReturn = getCurrentState();
-      console.log('[ListsOverview] Stored navigation state for back button:', window._listDetailReturn);
     } catch (_) {}
     
     // Store context for the list detail page
@@ -1314,7 +1226,7 @@
     if (window.crm && typeof window.crm.navigateToPage === 'function') {
       window.crm.navigateToPage('list-detail');
     } else {
-      console.warn('Navigation not available');
+      // Navigation not available
     }
   }
 
@@ -1392,7 +1304,7 @@
         
         closeModal();
       } catch (error) {
-        console.error('Failed to rename list:', error);
+        // Failed to rename list
         if (window.crm && window.crm.showToast) {
           window.crm.showToast('Failed to rename list', 'error');
         }
@@ -1485,7 +1397,7 @@
         await window.firebaseDB.collection('lists').doc(id).delete();
       }
     } catch (err) {
-      console.warn('Delete from Firestore failed:', err);
+      // Delete from Firestore failed
       // Continue with local deletion even if remote fails
     }
 
@@ -1496,9 +1408,7 @@
 
     // Remove from CacheManager cache
     if (window.CacheManager && typeof window.CacheManager.deleteRecord === 'function') {
-      window.CacheManager.deleteRecord('lists', id).catch(err => 
-        console.warn('[ListsOverview] Failed to delete from cache:', err)
-      );
+      window.CacheManager.deleteRecord('lists', id).catch(err => {});
     }
 
     // Remove from local state
@@ -1510,9 +1420,7 @@
 
     // Also invalidate list members cache if it exists
     if (window.CacheManager && typeof window.CacheManager.invalidateListCache === 'function') {
-      window.CacheManager.invalidateListCache(id).catch(err => 
-        console.warn('[ListsOverview] Failed to invalidate list members cache:', err)
-      );
+      window.CacheManager.invalidateListCache(id).catch(err => {});
     }
 
     closeDeleteModal();
@@ -1532,11 +1440,9 @@
 
   async function refreshCounts() {
     // Reload list data and refresh counts
-    if (console.time) console.time('[ListsOverview] refreshCounts');
     state.loadedPeople = false;
     state.loadedAccounts = false;
     await ensureLoadedThenRender();
-    if (console.timeEnd) console.timeEnd('[ListsOverview] refreshCounts');
   }
 
   // Navigation state tracking for back button functionality
@@ -1563,7 +1469,7 @@
     document.addEventListener('pc:lists-restore', (ev) => {
       try {
         const detail = ev && ev.detail ? ev.detail : {};
-        console.log('[ListsOverview] Restoring state from back button:', detail);
+        // Restoring state from back button
         
         // CRITICAL FIX: Set flag to prevent live listener from overwriting during restore
         window._listsOverviewRestoring = true;
@@ -1595,15 +1501,11 @@
           try { window.scrollTo(0, y); } catch (_) {}
         }, 100);
         
-        console.log('[ListsOverview] State restored successfully');
-        
         // Clear restore flag after a delay to allow live listener to settle
         setTimeout(() => {
           window._listsOverviewRestoring = false;
-          console.log('[ListsOverview] Restore flag cleared');
         }, 1500); // 1.5 seconds should be enough for debounced listener
       } catch (e) { 
-        console.error('[ListsOverview] Error restoring state:', e);
         window._listsOverviewRestoring = false;
       }
     });
@@ -1845,7 +1747,6 @@
   async function preloadListMembersGlobal(lists) {
     if (!lists || !Array.isArray(lists) || lists.length === 0) return;
     
-    console.log('[ListsOverview] Preloading members for', lists.length, 'lists...');
     try { window.listMembersCache = window.listMembersCache || {}; } catch (_) {}
     
     const tasks = [];
@@ -1927,12 +1828,12 @@
       try {
         window.listMembersCache = window.listMembersCache || {};
         window.listMembersCache[listId] = out;
-        // console.log(`[ListsOverview] ✓ Updated in-memory cache for ${listId}`, { people: out.people.size, accounts: out.accounts.size });
+        // Updated in-memory cache
       } catch (cacheErr) {
-        console.warn('[ListsOverview] In-memory cache update failed:', cacheErr);
+        // In-memory cache update failed
       }
     } catch (error) {
-      console.warn('[ListsOverview] Failed to fetch members for list', listId, error);
+      // Failed to fetch members for list
     }
     
     return out;
@@ -1943,10 +1844,10 @@
   
   // Debug helper to check list ownership fields
   window.debugListOwnership = async () => {
-    if (!window.firebaseDB) return console.log('Firebase not available');
+    if (!window.firebaseDB) return; // Firebase not available
     
     const email = getUserEmail();
-    console.log('Debugging list ownership for email:', email);
+    // Debugging list ownership
     
     try {
       const [ownedSnap, assignedSnap, createdSnap, allSnap] = await Promise.all([
@@ -1956,26 +1857,18 @@
         window.firebaseDB.collection('lists').limit(10).get()
       ]);
       
-      console.log('Ownership Debug Results:');
-      console.log('- ownerId matches:', ownedSnap.docs.length);
-      console.log('- assignedTo matches:', assignedSnap.docs.length);
-      console.log('- createdBy matches:', createdSnap.docs.length);
-      console.log('- total lists (sample):', allSnap.docs.length);
-      
-      if (allSnap.docs.length > 0) {
-        console.log('Sample list fields:', allSnap.docs[0].data());
-      }
+      // Ownership Debug Results
     } catch (error) {
-      console.error('Debug failed:', error);
+      // Debug failed
     }
   };
   
   // Debug helper to check a specific list's member count
   window.debugListMembers = async (listId) => {
-    if (!window.firebaseDB) return console.log('Firebase not available');
-    if (!listId) return console.log('Please provide a listId');
+    if (!window.firebaseDB) return; // Firebase not available
+    if (!listId) return; // Please provide a listId
     
-    console.log(`🔍 Debugging members for list: ${listId}`);
+    // Debugging members for list
     
     try {
       // Check subcollection
@@ -1983,12 +1876,9 @@
       try {
         const subSnap = await window.firebaseDB.collection('lists').doc(listId).collection('members').get();
         subCount = subSnap.docs.length;
-        console.log(`📁 Subcollection (lists/${listId}/members):`, subCount, 'documents');
-        if (subCount > 0) {
-          console.log('   Sample member:', subSnap.docs[0].data());
-        }
+        // Subcollection results
       } catch (e) {
-        console.log('   Subcollection error:', e.message);
+        // Subcollection error
       }
       
       // Check top-level listMembers
@@ -1996,47 +1886,31 @@
       try {
         const topSnap = await window.firebaseDB.collection('listMembers').where('listId', '==', listId).get();
         topCount = topSnap.docs.length;
-        console.log(`📋 Top-level (listMembers where listId==${listId}):`, topCount, 'documents');
-        if (topCount > 0) {
-          const sample = topSnap.docs[0].data();
-          console.log('   Sample member:', sample);
-          console.log('   Has ownerId?', !!sample.ownerId);
-          console.log('   Has userId?', !!sample.userId);
-        }
+        // Top-level results
       } catch (e) {
-        console.log('   Top-level query error:', e.message);
-        console.log('   This is expected for non-admins if listMembers lack ownership fields');
+        // Top-level query error
       }
       
       // Check cache
       const cached = window.listMembersCache?.[listId];
-      console.log(`💾 In-memory cache:`, cached ? {
-        loaded: cached.loaded,
-        people: cached.people?.size || 0,
-        accounts: cached.accounts?.size || 0
-      } : 'not cached');
+      // In-memory cache status
       
-      console.log('\n📊 Summary:');
-      console.log(`   Subcollection: ${subCount} members`);
-      console.log(`   Top-level: ${topCount} members`);
-      console.log(`   Cache: ${cached ? (cached.people?.size || 0) + (cached.accounts?.size || 0) : 0} members`);
-      console.log('\n💡 Recommendation:', subCount > 0 ? 'Using subcollections ✅' : 'Should migrate to subcollections');
+      // Summary
       
     } catch (error) {
-      console.error('Debug failed:', error);
+      // Debug failed
     }
   };
   
   // ONE-TIME FIX: Add missing ownership fields to all lists
   window.fixListOwnership = async () => {
-    if (!window.firebaseDB) return console.log('Firebase not available');
+    if (!window.firebaseDB) return; // Firebase not available
     
     const email = getUserEmail();
-    console.log('🔧 Fixing list ownership fields for:', email);
-    console.log('This will add ownerId, assignedTo, and createdBy to all your lists');
+    // Fixing list ownership fields
     
     if (!confirm('This will update all lists that are missing ownership fields. Continue?')) {
-      return console.log('Cancelled by user');
+      return; // Cancelled by user
     }
     
     try {
@@ -2054,7 +1928,7 @@
       createdSnap.docs.forEach(doc => { if (!listsMap.has(doc.id)) listsMap.set(doc.id, doc); });
       
       const allLists = Array.from(listsMap.values());
-      console.log(`📋 Found ${allLists.length} total lists accessible to you`);
+      // Found lists to update
       
       let updated = 0;
       let skipped = 0;
@@ -2091,42 +1965,38 @@
         if (needsUpdate) {
           try {
             await listDoc.ref.update(updates);
-            console.log(`✅ Updated "${listData.name}" with fields:`, Object.keys(updates));
+            // Updated list
             updated++;
           } catch (error) {
-            console.error(`❌ Failed to update "${listData.name}":`, error);
+            // Failed to update list
             errors++;
           }
         } else {
-          console.log(`⏭️ Skipped "${listData.name}" (already has all ownership fields)`);
+          // Skipped list (already correct)
           skipped++;
         }
       }
       
-      console.log(`\n🎉 Migration complete!`);
-      console.log(`  ✅ Updated: ${updated}`);
-      console.log(`  ⏭️ Skipped: ${skipped} (already correct)`);
-      console.log(`  ❌ Errors: ${errors}`);
+      // Migration complete
       
       if (updated > 0) {
-        console.log('\n🔄 Refreshing lists page...');
-        // Force reload
+        // Refreshing lists page
         state.loadedPeople = false;
         state.loadedAccounts = false;
         await ensureLoadedThenRender();
-        console.log('✅ Lists page refreshed');
+        // Lists page refreshed
       }
       
     } catch (error) {
-      console.error('❌ Migration failed:', error);
+      // Migration failed
     }
   };
   
   // CRITICAL FIX: Sync count field with recordCount (one-time fix for data inconsistency)
   window.syncCountFields = async () => {
-    if (!window.firebaseDB) return console.log('Firebase not available');
+    if (!window.firebaseDB) return; // Firebase not available
     
-    console.log('🔄 Syncing count and recordCount fields...');
+    // Syncing count and recordCount fields
     
     try {
       const email = getUserEmail();
@@ -2142,7 +2012,7 @@
       createdSnap.docs.forEach(d=>{ if(!map.has(d.id)) map.set(d.id, d); });
       
       const allLists = Array.from(map.values());
-      console.log(`📋 Found ${allLists.length} lists to sync`);
+      // Found lists to sync
       
       let updated = 0;
       let skipped = 0;
@@ -2158,37 +2028,35 @@
               count: recordCount,
               updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || new Date()
             });
-            console.log(`✅ "${listData.name}": count ${count} → ${recordCount}`);
+            // Updated list count
             updated++;
           } catch (error) {
-            console.error(`❌ Failed to update "${listData.name}":`, error);
+            // Failed to update list
           }
         } else {
-          console.log(`⏭️ "${listData.name}": already in sync (${count})`);
+          // Already in sync
           skipped++;
         }
       }
       
-      console.log(`\n🎉 Sync complete!`);
-      console.log(`  ✅ Updated: ${updated}`);
-      console.log(`  ⏭️ Skipped: ${skipped}`);
+      // Sync complete
       
       if (updated > 0) {
         state.loadedPeople = false;
         state.loadedAccounts = false;
         await ensureLoadedThenRender();
-        console.log('✅ Lists page refreshed');
+        // Lists page refreshed
       }
     } catch (error) {
-      console.error('❌ Sync failed:', error);
+      // Sync failed
     }
   };
   
   // ONE-TIME FIX: Sync recordCount with actual member counts
   window.syncListCounts = async () => {
-    if (!window.firebaseDB) return console.log('Firebase not available');
+    if (!window.firebaseDB) return; // Firebase not available
     
-    console.log('🔄 Starting list count sync...');
+    // Starting list count sync
     
     try {
       // Get all lists for current user
@@ -2213,7 +2081,7 @@
         listsSnap = await window.firebaseDB.collection('lists').get();
       }
       
-      console.log(`📋 Found ${listsSnap.docs.length} lists to sync`);
+      // Found lists to sync
       
       let updated = 0;
       let errors = 0;
@@ -2257,7 +2125,7 @@
           const currentRecordCount = listData.recordCount || 0;
           
           if (totalCount !== currentRecordCount) {
-            console.log(`📊 ${listData.name}: ${currentRecordCount} → ${totalCount} (${peopleCount} people, ${accountsCount} accounts)`);
+            // Syncing count
             
             await window.firebaseDB.collection('lists').doc(listId).update({
               recordCount: totalCount,
@@ -2266,16 +2134,16 @@
             
             updated++;
           } else {
-            console.log(`✅ ${listData.name}: ${totalCount} (already correct)`);
+            // Already correct
           }
           
         } catch (error) {
-          console.error(`❌ Failed to sync ${listData.name}:`, error);
+          // Failed to sync
           errors++;
         }
       }
       
-      console.log(`🎉 Sync complete! Updated: ${updated}, Errors: ${errors}`);
+      // Sync complete
       
       // Refresh the lists overview
       if (window.ListsOverview && window.ListsOverview.refreshCounts) {
@@ -2283,13 +2151,13 @@
       }
       
     } catch (error) {
-      console.error('❌ Sync failed:', error);
+      // Sync failed
     }
   };
 
   // Listen for background lists loader events
   document.addEventListener('pc:lists-loaded', async () => {
-    console.log('[ListsOverview] Background lists loaded, refreshing data...');
+    // Background lists loaded, refreshing data
     // Reload both kinds
     state.loadedPeople = false;
     state.loadedAccounts = false;
@@ -2303,13 +2171,13 @@
       const listId = detail.listId || detail.targetListId || null;
       if (listId && window.listMembersCache) {
         delete window.listMembersCache[listId];
-        // console.log('[ListsOverview] ✓ Cleared in-memory cache for list (account-created):', listId);
+        // Cleared in-memory cache for list (account-created)
       }
       // Force a lightweight reload of lists
       state.loadedAccounts = false;
       await ensureLoadedThenRender();
     } catch (e) {
-      console.warn('[ListsOverview] account-created handler failed:', e);
+      // account-created handler failed
     }
   });
   
@@ -2319,7 +2187,7 @@
       const listId = detail.listId || detail.targetListId || null;
       if (listId && window.listMembersCache) {
         delete window.listMembersCache[listId];
-        // console.log('[ListsOverview] ✓ Cleared in-memory cache for list (account-updated):', listId);
+        // Cleared in-memory cache for list (account-updated)
       }
       // Refresh account lists view if currently showing accounts
       if (state.kind === 'accounts') {
@@ -2327,7 +2195,7 @@
         await ensureLoadedThenRender();
       }
     } catch (e) {
-      console.warn('[ListsOverview] account-updated handler failed:', e);
+      // account-updated handler failed
     }
   });
   
@@ -2336,21 +2204,21 @@
     try {
       if (listId && window.listMembersCache) {
         delete window.listMembersCache[listId];
-        console.log('[ListsOverview] Cleared in-memory members cache for list:', listId);
+        // Cleared in-memory members cache for list
       } else {
         window.listMembersCache = {};
-        console.log('[ListsOverview] Cleared all in-memory members cache');
+        // Cleared all in-memory members cache
       }
       if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
         await window.CacheManager.invalidate('lists');
-        console.log('[ListsOverview] Invalidated IndexedDB lists cache');
+        // Invalidated IndexedDB lists cache
       }
       state.loadedPeople = false;
       state.loadedAccounts = false;
       await ensureLoadedThenRender();
-      console.log('[ListsOverview] Reload complete after cache clear');
+      // Reload complete after cache clear
     } catch (e) {
-      console.error('[ListsOverview] Failed to clear caches:', e);
+      // Failed to clear caches
     }
   };
   
@@ -2358,12 +2226,12 @@
   document.addEventListener('pc:bulk-import-complete', async (event) => {
     try {
       const { listId, type } = event.detail || {};
-      console.log('[ListsOverview] Bulk import complete, invalidating caches for:', { listId, type });
+      // Bulk import complete, invalidating caches
       
       // Clear in-memory cache for this list
       if (listId && window.listMembersCache) {
         delete window.listMembersCache[listId];
-        // console.log('[ListsOverview] ✓ Cleared in-memory cache for', listId);
+        // Cleared in-memory cache
       }
       
       // Force reload of list data
@@ -2371,9 +2239,9 @@
       state.loadedAccounts = false;
       await ensureLoadedThenRender();
       
-      // console.log('[ListsOverview] ✓ Reloaded lists after bulk import');
+      // Reloaded lists after bulk import
     } catch (e) {
-      console.error('[ListsOverview] Error handling bulk import complete:', e);
+      // Error handling bulk import complete
     }
   });
 
@@ -2383,7 +2251,7 @@
       const { id, list, kind } = event.detail || {};
       if (!id || !list || !kind) return;
       
-      console.log('[ListsOverview] New list created:', { id, name: list.name, kind });
+      // New list created
       
       // Add to appropriate state array
       if (kind === 'people') {
@@ -2399,9 +2267,9 @@
         applyFilters();
       }
       
-      console.log('[ListsOverview] List added to UI immediately');
+      // List added to UI immediately
     } catch (error) {
-      console.error('[ListsOverview] Error handling new list creation:', error);
+      // Error handling new list creation
     }
   });
   
@@ -2411,7 +2279,7 @@
       const { listId, deletedCount } = event.detail || {};
       if (!listId) return;
       
-      console.log('[ListsOverview] List count updated:', { listId, deletedCount });
+      // List count updated
       
       // COST-EFFECTIVE: Update local state and BackgroundListsLoader cache (no Firestore reads)
       const updateListCount = (list) => {
@@ -2449,10 +2317,10 @@
       if (updated) {
         // Re-render to show updated count
         applyFilters();
-        console.log('[ListsOverview] Updated list count immediately (no Firestore reads)');
+        // Updated list count immediately
       }
     } catch (error) {
-      console.error('[ListsOverview] Error handling list count update:', error);
+      // Error handling list count update
     }
   });
   
@@ -2462,7 +2330,7 @@
       const { listId, deletedCount, newCount, kind } = event.detail || {};
       if (!listId) return;
       
-      console.log('[ListsOverview] List count updated (alt):', { listId, deletedCount, newCount, kind });
+      // List count updated (alt)
       
       // Calculate final count first (before updating lists)
       let finalCount = null;
@@ -2498,7 +2366,7 @@
               recordCount: count,
               count: count,
               updatedAt: new Date()
-            }).catch(err => console.warn('[ListsOverview] CacheManager update failed:', err));
+            }).catch(err => { /* Cache update failed */ });
           }
           
           return true;
@@ -2530,9 +2398,9 @@
       if (updated) {
         // Re-render to show updated count
         applyFilters();
-        // console.log('[ListsOverview] ✓ Updated list count immediately from event (no Firestore reads):', finalCount || newCount || 'unknown');
+        // Updated list count immediately from event
       } else {
-        console.warn('[ListsOverview] List not found in current state:', listId);
+        // List not found in current state
         // List not in current view - refresh from BackgroundListsLoader
         if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.getListsData === 'function') {
           const listsData = window.BackgroundListsLoader.getListsData() || [];
@@ -2544,12 +2412,12 @@
               window.BackgroundListsLoader.updateListCountLocally(listId, finalCount);
             }
             // Reload lists for current kind
-            loadLists(state.kind).catch(err => console.warn('[ListsOverview] Failed to reload lists:', err));
+            loadLists(state.kind).catch(err => { /* Failed to reload lists */ });
           }
         }
       }
     } catch (error) {
-      console.error('[ListsOverview] Error handling list count update (alt):', error);
+      // Error handling list count update (alt)
     }
   });
 
@@ -2580,7 +2448,7 @@
         const { id, recordCount, targetType, isActualCount } = e.detail || {};
         if (!id || recordCount === undefined || recordCount === null) return;
         
-        console.log('[ListsOverview] Received pc:list-updated event:', { id, recordCount, targetType, isActualCount });
+        // Received pc:list-updated event
         
         // Find the list in current state
         const allLists = [...state.peopleLists, ...state.accountLists];
@@ -2607,16 +2475,16 @@
               recordCount: newCount,
               count: newCount,
               updatedAt: new Date()
-            }).catch(err => console.warn('[ListsOverview] CacheManager update failed:', err));
+            }).catch(err => { /* Cache update failed */ });
           }
           
-          // console.log('[ListsOverview] ✓ Updated list count locally:', { id, oldCount: currentCount, newCount, isActualCount });
+          // Updated list count locally
           
           // Re-render the affected list card
           renderFilteredItems(state.kind === 'people' ? state.peopleLists : state.accountLists);
         } else {
           // List not in current view - reload from BackgroundListsLoader
-          console.log('[ListsOverview] List not in current view, refreshing from BackgroundListsLoader...');
+          // refreshing from BackgroundListsLoader
           const listsData = window.BackgroundListsLoader?.getListsData() || [];
           const updatedList = listsData.find(l => l.id === id);
           
@@ -2629,15 +2497,15 @@
             }
             
             // Reload lists for current kind to pick up the update
-            loadLists(state.kind).catch(err => console.warn('[ListsOverview] Failed to reload lists:', err));
+            loadLists(state.kind).catch(err => { /* Failed to reload lists */ });
           }
         }
       } catch (err) {
-        console.warn('[ListsOverview] Error handling pc:list-updated:', err);
+        // Error handling pc:list-updated
       }
     });
     document._listsUpdateListenerBound = true;
-    // console.log('[ListsOverview] ✓ Bound pc:list-updated event listener');
+    // Bound pc:list-updated event listener
   }
 })();
 
@@ -2647,7 +2515,7 @@
 
   async function fetchMembersForList(listId) {
     const out = { people: new Set(), accounts: new Set(), loaded: false };
-    if (console.time) console.time(`[ListsOverview] preload fetch ${listId}`);
+    // preload fetch
     if (!listId) return out;
     
     // CRITICAL FIX: Check in-memory cache ONLY (skip IndexedDB - it can be stale)
@@ -2658,15 +2526,14 @@
         out.people = cached.people instanceof Set ? cached.people : new Set(cached.people || []);
         out.accounts = cached.accounts instanceof Set ? cached.accounts : new Set(cached.accounts || []);
         out.loaded = true;
-        if (console.timeEnd) console.timeEnd(`[ListsOverview] preload fetch ${listId}`);
-        // console.log(`[ListsOverview] ✓ Loaded members for ${listId} from in-memory cache`, { people: out.people.size, accounts: out.accounts.size });
+        // preload fetch done
         return out;
       }
     }
     
     // Always fetch from Firestore for accurate data
     if (!window.firebaseDB || typeof window.firebaseDB.collection !== 'function') {
-      if (console.timeEnd) console.timeEnd(`[ListsOverview] preload fetch ${listId}`);
+      // preload fetch done
       return out;
     }
     
@@ -2683,7 +2550,7 @@
           if (t === 'people' || t === 'contact' || t === 'contacts') out.people.add(id);
           else if (t === 'accounts' || t === 'account' || t === 'companies' || t === 'company') out.accounts.add(id);
         });
-        console.debug('[ListsOverview] preload subcollection', { listId, docs: subSnap.docs.length, people: out.people.size, accounts: out.accounts.size });
+        // preload subcollection done
       }
     } catch (_) {}
     // Fallback top-level listMembers
@@ -2697,7 +2564,7 @@
           if (t === 'people' || t === 'contact' || t === 'contacts') out.people.add(id);
           else if (t === 'accounts' || t === 'account' || t === 'companies' || t === 'company') out.accounts.add(id);
         });
-        console.debug('[ListsOverview] preload top-level', { listId, docs: lmSnap?.docs?.length || 0, people: out.people.size, accounts: out.accounts.size });
+        // preload top-level done
       } catch (_) {}
     }
     out.loaded = true;
@@ -2706,17 +2573,17 @@
     try {
       window.listMembersCache = window.listMembersCache || {};
       window.listMembersCache[listId] = out;
-      // console.log(`[ListsOverview] ✓ Updated in-memory cache for ${listId}`, { people: out.people.size, accounts: out.accounts.size });
+      // Updated in-memory cache
     } catch (cacheErr) {
-      console.warn('[ListsOverview] In-memory cache update failed:', cacheErr);
+      // In-memory cache update failed
     }
     
-    if (console.timeEnd) console.timeEnd(`[ListsOverview] preload fetch ${listId}`);
+    // preload fetch done
     return out;
   }
 
   async function preloadMembersForLists(items) {
-    if (console.time) console.time('[ListsOverview] preloadMembersForLists');
+    // preloadMembersForLists starting
     try { window.listMembersCache = window.listMembersCache || {}; } catch (_) {}
     const tasks = [];
     for (const it of (items || [])) {
@@ -2730,11 +2597,11 @@
       );
     }
     if (tasks.length) {
-      console.debug('[ListsOverview] preload starting', { lists: tasks.length });
+      // preload starting
       try { await Promise.all(tasks); } catch (_) {}
-      console.debug('[ListsOverview] preload done', { cached: Object.keys(window.listMembersCache || {}).length });
+      // preload done
     }
-    if (console.timeEnd) console.timeEnd('[ListsOverview] preloadMembersForLists');
+    // preloadMembersForLists done
   }
 
   // Expose for debugging/tests

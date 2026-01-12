@@ -865,7 +865,7 @@
         if (window.Widgets) {
           try {
             const api = window.Widgets;
-            if (typeof api.isLushaOpen === 'function' && api.isLushaOpen()) {
+            if (typeof api.isLushaOpen === 'function' && api.isLushaOpen('contact', contactId)) {
               if (typeof api.closeLusha === 'function') { api.closeLusha(); return; }
             } else if (typeof api.openLusha === 'function') {
               api.openLusha(contactId); return;
@@ -877,11 +877,11 @@
         break;
       }
       case 'maps': {
-        // Toggle Google Maps: if open, close; else open for this contact
+        // Toggle Google Maps: if open for this contact, close; else open/update for this contact
         if (window.Widgets) {
           try {
             const api = window.Widgets;
-            if (typeof api.isMapsOpen === 'function' && api.isMapsOpen()) {
+            if (typeof api.isMapsOpen === 'function' && api.isMapsOpen('contact', contactId)) {
               if (typeof api.closeMaps === 'function') { api.closeMaps(); return; }
             } else if (typeof api.openMaps === 'function') {
               api.openMaps(contactId); return;
@@ -5228,23 +5228,23 @@
     if (!list || !state.currentContact) return;
 
     // CRITICAL: Check if page is still visible before doing heavy work
-    const contactPage = document.getElementById('contact-detail-page');
-    const isVisible = contactPage && contactPage.classList.contains('active') && !contactPage.hidden;
+    // In contact-detail.js, we reuse the people-page but add a contact-detail-mode class
+    const contactPage = document.getElementById('people-page');
+    const isVisible = contactPage && contactPage.classList.contains('active') && contactPage.classList.contains('contact-detail-mode') && !contactPage.hidden;
+
     if (!isVisible) {
-      // console.log('[ContactDetail] Skipping calls load - page not visible');
       return;
     }
+
+    // Set loading state
+    if (list) rcSetLoading(list);
 
     const contactId = state.currentContact.id;
     const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
 
-    // Loading recent calls for contact
-
     try {
-      // FIX: Add timeout to prevent hanging on slow API calls
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
-        console.warn('[ContactDetail] Recent calls API timeout - aborting after 5 seconds');
         controller.abort();
       }, 5000); // 5 second timeout
 
@@ -5270,8 +5270,6 @@
       clearTimeout(timeoutId);
       const j = await r.json().catch(() => ({}));
       const calls = (j && j.ok && Array.isArray(j.calls)) ? j.calls : [];
-
-      // console.log(`[Contact Detail] Loaded ${calls.length} targeted calls for contact ${contactId}`);
 
       // Calls are already filtered and sorted by the API
       const filtered = calls;
@@ -5340,6 +5338,7 @@
     const list = document.getElementById('contact-recent-calls-list');
     if (!list) return;
     const total = Array.isArray(state._rcCalls) ? state._rcCalls.length : 0;
+    
     if (!total) { rcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>'); updateRecentCallsPager(0, 0); return; }
     const slice = getRecentCallsPageSlice();
     const tryApplySingleNewCallPatch = () => {

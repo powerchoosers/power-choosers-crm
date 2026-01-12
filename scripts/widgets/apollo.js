@@ -56,6 +56,46 @@
     return content || panel;
   }
 
+  // Scroll the widget panel to the top to bring the Apollo widget into view
+  function scrollToWidgetPanelTop() {
+    const panel = document.getElementById('widget-panel');
+    if (panel) {
+      panel.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  // Update existing widget content when entity changes
+  async function updateWidgetContent(entityId, entityType) {
+    // Clear state for new entity
+    currentEntityType = entityType;
+    if (entityType === 'contact') {
+      currentContactId = entityId;
+      currentAccountId = null;
+    } else {
+      currentAccountId = entityId;
+      currentContactId = null;
+    }
+
+    // Reset results and cache
+    lastCompanyResult = null;
+    window.__lushaLastRequestId = null;
+    window.__lushaOpenedFromCache = false;
+    window.__lushaLastEntityId = entityId;
+    window.__lushaLastEntityType = entityType;
+
+    // Clear company panel
+    const companyPanel = document.getElementById('lusha-panel-company');
+    if (companyPanel) {
+      companyPanel.innerHTML = '';
+      companyPanel.removeAttribute('data-content-hash');
+    }
+
+    // Prefill and search
+    try { prefillInputs(entityType); } catch (_) { }
+    try { performLushaSearch({ openLiveIfUncached: true }); } catch (_) { }
+    try { renderUsageBar(); } catch (_) { }
+  }
+
   function removeExistingWidget() {
     const existing = document.getElementById(WIDGET_ID);
     if (existing && existing.parentElement) existing.parentElement.removeChild(existing);
@@ -3630,18 +3670,51 @@
 
   // Public API
   function openLusha(contactId) {
+    const isSameContact = currentEntityType === 'contact' && String(currentContactId) === String(contactId);
+    const existingWidget = document.getElementById(WIDGET_ID);
+
+    // If it's the same contact and widget is already open, toggle it closed
+    if (isSameContact && existingWidget) {
+      closeLushaWidget();
+      return;
+    }
+
     currentContactId = contactId;
     currentEntityType = 'contact';
-    removeExistingWidget();
+    
+    // If widget is already open for a different entity, just update it
+    if (existingWidget) {
+      updateWidgetContent(contactId, 'contact');
+      scrollToWidgetPanelTop();
+      return;
+    }
+
     makeCard(contactId, 'contact');
     // Removed toast notification
+    scrollToWidgetPanelTop();
   }
 
   function openLushaForAccount(accountId) {
     lushaLog('openLushaForAccount called with:', accountId);
+    const isSameAccount = currentEntityType === 'account' && String(currentAccountId) === String(accountId);
+    const existingWidget = document.getElementById(WIDGET_ID);
+
+    // If it's the same account and widget is already open, toggle it closed
+    if (isSameAccount && existingWidget) {
+      closeLushaWidget();
+      return;
+    }
+
     currentAccountId = accountId;
     currentEntityType = 'account';
-    removeExistingWidget();
+    
+    // If widget is already open for a different entity, just update it
+    if (existingWidget) {
+      updateWidgetContent(accountId, 'account');
+      scrollToWidgetPanelTop();
+      return;
+    }
+
     makeCard(accountId, 'account');
     // Ensure prefill runs after widget is created
     setTimeout(() => {
@@ -3651,14 +3724,28 @@
       }
     }, 100);
     // Removed toast notification
+    scrollToWidgetPanelTop();
   }
 
   function closeLusha() {
     closeLushaWidget();
   }
 
-  function isLushaOpen() {
-    return !!document.getElementById(WIDGET_ID);
+  function isLushaOpen(entityType, entityId) {
+    const card = document.getElementById(WIDGET_ID);
+    if (!card) return false;
+    
+    // If no type/id provided, just check if open at all
+    if (!entityType || !entityId) return true;
+    
+    // Check if open for specific entity
+    if (entityType === 'contact') {
+      return currentEntityType === 'contact' && String(currentContactId) === String(entityId);
+    } else if (entityType === 'account') {
+      return currentEntityType === 'account' && String(currentAccountId) === String(entityId);
+    }
+    
+    return true;
   }
 
   // Expose public API

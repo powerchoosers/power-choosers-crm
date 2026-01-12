@@ -212,7 +212,5 @@
     pickRecentContactForAccount,
     clearPhoneToContactCache
   };
-
-  console.log('[CallsEnrichmentHelpers] Module initialized');
 })();
 

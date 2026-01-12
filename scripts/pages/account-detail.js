@@ -9,7 +9,8 @@
 
   const state = {
     currentAccount: null,
-    loaded: false
+    loaded: false,
+    _contactListMemberships: {} // NEW: Map of contactId -> list names
   };
 
   // CRITICAL: Debounce and mutex to prevent multiple rapid showAccountDetail calls
@@ -245,6 +246,51 @@
     els.pageContainer = els.page ? els.page.querySelector('.page-container') : null;
     els.mainContent = els.page ? els.page.querySelector('.page-content') : null;
     return !!els.page && !!els.mainContent;
+  }
+
+  /**
+   * Fetch list memberships for a set of contacts and store in state
+   */
+  async function fetchContactMemberships(contacts) {
+    if (!contacts || !Array.isArray(contacts) || contacts.length === 0) return;
+    if (!window.firebaseDB) return;
+
+    try {
+      const contactIds = contacts.map(c => c.id).filter(Boolean);
+      if (contactIds.length === 0) return;
+
+      // Reset memberships for these contacts to avoid stale data
+      contactIds.forEach(id => { state._contactListMemberships[id] = []; });
+
+      const db = window.firebaseDB;
+      const listsData = (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.getListsData === 'function')
+        ? window.BackgroundListsLoader.getListsData()
+        : [];
+
+      // Fetch in chunks of 30 (Firestore IN limit)
+      for (let i = 0; i < contactIds.length; i += 30) {
+        const chunk = contactIds.slice(i, i + 30);
+        const snapshot = await db.collection('listMembers')
+          .where('targetType', 'in', ['people', 'contact', 'contacts'])
+          .where('targetId', 'in', chunk)
+          .get();
+
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const contactId = data.targetId;
+          const listId = data.listId;
+          const list = listsData.find(l => l.id === listId);
+          if (list && list.name) {
+            if (!state._contactListMemberships[contactId]) state._contactListMemberships[contactId] = [];
+            if (!state._contactListMemberships[contactId].includes(list.name)) {
+              state._contactListMemberships[contactId].push(list.name);
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.warn('[AccountDetail] Failed to fetch contact memberships:', error);
+    }
   }
 
   async function showAccountDetail(accountId) {
@@ -993,6 +1039,11 @@
       state._contactsPage = page;
       state._contactsPageSize = pageSize;
 
+      // NEW: Fetch list memberships for all associated contacts
+      // We don't await here to avoid blocking rendering, but we'll try to get them
+      // Actually, since we want them in the first render, we should await if they're not loaded
+      await fetchContactMemberships(associatedContacts);
+
       // Calculate pagination
       const totalPages = Math.ceil(associatedContacts.length / pageSize);
       const startIndex = (page - 1) * pageSize;
@@ -1009,13 +1060,21 @@
         const phone = contact.workDirectPhone || contact.mobile || contact.otherPhone || '';
 
         const delay = (index * 0.05).toFixed(2);
+        
+        // Get list name badges
+        const memberships = state._contactListMemberships[contact.id] || [];
+        const badgeHtml = memberships.map(name => `<span class="contact-list-badge">${escapeHtml(name)}</span>`).join('');
+
         return `
           <div class="contact-item modern-reveal premium-borderline" data-contact-id="${contact.id}" style="animation-delay: ${delay}s;">
             <div class="contact-avatar">
               <div class="avatar-circle-small">${getInitials(fullName)}</div>
             </div>
             <div class="contact-info">
-              <div class="contact-name">${escapeHtml(fullName)}</div>
+              <div class="contact-name-container">
+                <div class="contact-name">${escapeHtml(fullName)}</div>
+                ${badgeHtml}
+              </div>
               <div class="contact-details">
                 ${title ? `<div class="contact-title">${escapeHtml(title)}</div>` : ''}
                 ${email && phone ?
@@ -4349,7 +4408,7 @@
         if (window.Widgets) {
           try {
             const api = window.Widgets;
-            if (typeof api.isLushaOpen === 'function' && api.isLushaOpen()) {
+            if (typeof api.isLushaOpen === 'function' && api.isLushaOpen('account', accountId)) {
               if (typeof api.closeLusha === 'function') { api.closeLusha(); return; }
             } else if (typeof api.openLushaForAccount === 'function') {
               api.openLushaForAccount(accountId); return;
@@ -4363,11 +4422,11 @@
         break;
       }
       case 'maps': {
-        // Toggle Google Maps: if open, close; else open for this account
+        // Toggle Google Maps: if open for this account, close; else open/update for this account
         if (window.Widgets) {
           try {
             const api = window.Widgets;
-            if (typeof api.isMapsOpen === 'function' && api.isMapsOpen()) {
+            if (typeof api.isMapsOpen === 'function' && api.isMapsOpen('account', accountId)) {
               if (typeof api.closeMaps === 'function') { api.closeMaps(); return; }
             } else if (typeof api.openMapsForAccount === 'function') {
               api.openMapsForAccount(accountId); return;

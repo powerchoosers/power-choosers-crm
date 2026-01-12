@@ -140,7 +140,11 @@ class ToastManager {
 
             actions.forEach(action => {
                 const button = document.createElement('button');
-                button.className = `toast-btn ${action.class || ''}`;
+                if (type === 'call') {
+                    button.className = `call-btn ${action.class || ''}`;
+                } else {
+                    button.className = `toast-btn ${action.class || ''}`;
+                }
                 button.textContent = action.text;
                 button.onclick = action.handler;
                 actionsElement.appendChild(button);

@@ -164,6 +164,4 @@
     invalidateCache,
     clearCache
   };
-
-  console.log('[CallDetailsHelper] Module initialized');
 })();

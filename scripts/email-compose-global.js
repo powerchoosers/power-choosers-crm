@@ -22,8 +22,6 @@
       return;
     }
 
-    console.log('[EmailCompose] Opening compose for:', toEmail, name || '');
-
     // Always try to open compose window directly on current page
     // No navigation - stay on whatever page user is currently on
     openComposeWindowDirect(toEmail, name);
@@ -40,10 +38,8 @@
 
     // Try emails-redesigned.js first, but fallback to direct DOM manipulation
     if (window.emailManager && typeof window.emailManager.openComposeWindow === 'function') {
-      console.log('[EmailCompose] Using emails-redesigned.js compose function...');
       openComposeWithManager(toEmail, name);
     } else {
-      console.log('[EmailCompose] emailManager not available, using direct DOM approach...');
       openComposeDirectly(toEmail, name);
     }
   }
@@ -52,7 +48,6 @@
     const emailManager = window.emailManager;
 
     if (emailManager && typeof emailManager.openComposeWindow === 'function') {
-      console.log('[EmailCompose] Opening compose with emails-redesigned.js...');
       // Call openComposeWindow with null to ensure it's treated as a new email
       emailManager.openComposeWindow(null);
 
@@ -92,8 +87,6 @@
         const subjectInput = document.getElementById('compose-subject');
         const bodyInput = document.querySelector('.body-input');
 
-        console.log('[EmailCompose] Subject field value after opening:', subjectInput?.value);
-
         if (toInput) {
           toInput.value = toEmail;
         }
@@ -106,7 +99,6 @@
 
         // Ensure HTML mode is OFF when opening (show rendered view, not source)
         if (emailManager._isHtmlMode) {
-          console.log('[EmailCompose] Resetting HTML mode on open');
           emailManager._isHtmlMode = false;
           const composeWindow = document.getElementById('compose-window');
           const codeBtn = composeWindow?.querySelector('.editor-toolbar [data-action="code"]');
@@ -119,7 +111,6 @@
 
         // If body has HTML email content, ensure it's rendered (not shown as source)
         if (bodyInput && bodyInput.getAttribute('data-html-email') === 'true') {
-          console.log('[EmailCompose] HTML email detected, ensuring rendered view');
           bodyInput.removeAttribute('data-mode');
         }
 
@@ -135,7 +126,6 @@
 
           if (isHtml && !bodyInput.getAttribute('data-html-email')) {
             bodyInput.setAttribute('data-html-email', 'true');
-            console.log('[EmailCompose] Detected HTML email, setting attribute for persistence');
           }
         }
 
@@ -152,7 +142,6 @@
       //   }
       // }, 300);
     } else {
-      console.warn('[EmailCompose] emailManager.openComposeWindow not available');
       window.crm?.showToast && window.crm.showToast('Email compose not available');
     }
   }
@@ -257,8 +246,6 @@
         e.preventDefault();
         e.stopPropagation();
 
-        console.log('[EmailCompose] Closing and fully resetting compose window...');
-
         // FULL RESET: Clear all fields and state for clean slate on next open
         try {
           // 1. Clear all input fields
@@ -350,7 +337,6 @@
 
           // 7. Reset HTML mode state
           if (window.emailManager && window.emailManager._isHtmlMode) {
-            console.log('[EmailCompose] Resetting HTML mode state');
             window.emailManager._isHtmlMode = false;
             const codeBtn = composeWindow?.querySelector('.editor-toolbar [data-action="code"]');
             if (codeBtn) {
@@ -364,8 +350,6 @@
           if (window._lastGeneratedMetadata) {
             window._lastGeneratedMetadata = null;
           }
-
-          console.log('[EmailCompose] Full reset complete - clean slate ready');
         } catch (err) {
           console.error('[EmailCompose] Error during reset:', err);
         }
@@ -377,8 +361,6 @@
             composeWindow.style.display = 'none';
           }, 300);
         }
-
-        console.log('[EmailCompose] Compose window closed');
       });
 
       closeBtn.dataset.listenerAdded = 'true';
@@ -393,7 +375,6 @@
       const composeWindow = editor?.closest?.('#compose-window') || document.getElementById('compose-window');
       const variablesBar = composeWindow?.querySelector('.variables-bar');
       const aiBar = composeWindow?.querySelector('.ai-bar');
-      console.log('[Toolbar] handleToolbarAction:', action, { editor, formattingBar, linkBar, variablesBar });
 
       // Helper function to close all toolbars
       const closeAllToolbars = () => {
@@ -467,7 +448,7 @@
           break;
         }
         default: {
-          console.log('[Toolbar] Unknown action:', action);
+          // Unknown action
         }
       }
     } catch (e) {
@@ -1355,13 +1336,10 @@
 
     // Add click handler for remove buttons - use more specific targeting
     badge.addEventListener('click', (e) => {
-      console.log('[File Attachment] Badge clicked, target:', e.target);
-
       // Check if the clicked element or its parent is a remove button
       const removeBtn = e.target.closest('.attachment-remove');
       if (removeBtn) {
         const attachmentId = removeBtn.dataset.id; // Don't use parseInt for string IDs
-        console.log('[File Attachment] Remove button clicked for ID:', attachmentId);
         e.preventDefault();
         e.stopPropagation();
         removeAttachment(attachmentId);
@@ -1372,7 +1350,6 @@
     const composeActions = composeFooter.querySelector('.compose-actions');
     if (composeActions) {
       composeActions.insertAdjacentElement('afterend', badge);
-      console.log('[File Attachment] Badge inserted successfully');
     } else {
       console.error('[File Attachment] Could not find compose-actions element');
     }
@@ -1453,7 +1430,6 @@
 
         // Wait for editor fade out before showing preview
         setTimeout(() => {
-          editor.style.display = 'none';
           editor.classList.remove('preview-hiding');
         }, 250);
       }
@@ -1481,7 +1457,10 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background: #f1f5fa;
+        background: var(--glass-bg);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        border: 1px solid var(--glass-border);
         overflow-y: auto;
         padding: 0;
         z-index: 10;
@@ -1495,9 +1474,11 @@
         top: 0;
         left: 0;
         right: 0;
-        background: #fff;
+        background: var(--glass-bg);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
         padding: 16px 20px;
-        border-bottom: 1px solid #e5e7eb;
+        border-bottom: 1px solid var(--glass-border);
         z-index: 100;
         border-radius: 12px 12px 0 0;
       `;
@@ -2139,7 +2120,10 @@
         height: 100%;
         min-height: 500px;
         position: relative;
-        background: #f1f5fa;
+        background: var(--glass-bg);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        border: 1px solid var(--glass-border);
         border-radius: 8px;
         overflow: hidden;
       `;
@@ -2262,9 +2246,6 @@
           <div style="position: relative; width: 100%;">
           <textarea class="ai-prompt input-dark" rows="3" 
                       placeholder="Describe your email... For cold emails: use a tone opener (e.g., 'Question for you—'), ask a problem-awareness question tied to their situation, explain why it matters, then end with a low-friction yes/no CTA. For follow-ups: reference the previous email, add new context, ask a simple qualifying question. You can also write freely—the system will guide the output."></textarea>
-            <div class="nepq-tip" style="margin-top: 6px; font-size: 12px; color: var(--text-secondary, #666); line-height: 1.4;">
-              <strong>NEPQ Tip:</strong> Instead of "Mention their new product launch," try "Ask what new operational challenges the product launch has created." Focus on the problem, not just the event!
-            </div>
           </div>
         </div>
         <div class="ai-row suggestions" role="list">
@@ -4667,11 +4648,9 @@
           handleToolbarAction(action, btn, editor, formattingBar, linkBar, composeWindow);
         }
       }
-      console.log('[Toolbar] Global listener handled:', action);
     });
 
     document._mainToolbarHandlerBound = true;
-    console.log('[EmailCompose] Main toolbar document listener registered');
   }
 
   // ========== AI BUTTON HANDLER ==========
@@ -4694,8 +4673,6 @@
           // Toggle AI bar
           const isOpen = aiBar.classList.toggle('open');
           aiBar.setAttribute('aria-hidden', String(!isOpen));
-
-          console.log('[AI] AI bar toggled:', isOpen ? 'open' : 'closed');
         }
       }
     });
@@ -4714,13 +4691,11 @@
     if (aiBar) {
       // Ensure AI bar is rendered before toggling
       if (!aiBar.dataset.rendered) {
-        console.log('[EmailCompose] Rendering AI bar before toggle...');
         renderAIBar(aiBar);
       }
 
       const isOpen = aiBar.classList.toggle('open');
       aiBar.setAttribute('aria-hidden', String(!isOpen));
-      console.log('[EmailCompose] Toggled AI bar directly. Open:', isOpen);
     } else {
       console.error('[EmailCompose] AI panel not found.');
     }
@@ -5354,7 +5329,6 @@
       if (variablesBar?.contains(e.target)) {
         // Close button
         if (e.target.matches('[data-vars-close]')) {
-          console.log('[SecondaryBars] Variables close button clicked');
           variablesBar.classList.remove('open');
           variablesBar.setAttribute('aria-hidden', 'true');
           return;
@@ -5366,7 +5340,6 @@
           const scope = varItem.getAttribute('data-scope');
           const key = varItem.getAttribute('data-key');
           const label = varItem.querySelector('.var-item-label')?.textContent;
-          console.log('[SecondaryBars] Variable item clicked:', scope, key);
           insertVariableChip(editor, scope, key, label);
           return;
         }
@@ -5374,7 +5347,6 @@
         // Tab switching
         if (e.target.matches('.vars-tab')) {
           const tab = e.target.getAttribute('data-tab');
-          console.log('[SecondaryBars] Variables tab clicked:', tab);
 
           variablesBar.querySelectorAll('.vars-tab').forEach(t => {
             t.classList.remove('active');
@@ -5397,7 +5369,6 @@
     });
 
     document._secondaryBarsHandlerBound = true;
-    console.log('[EmailCompose] Secondary bars document listener registered');
   }
 
   // ========== INITIALIZATION ==========
@@ -5409,6 +5380,4 @@
 
   // Setup send button functionality
   setupSendButtonHandler();
-
-  console.log('[EmailCompose] Global module with AI and send functionality initialized');
 })();

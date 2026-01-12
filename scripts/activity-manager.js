@@ -1022,6 +1022,8 @@ class ActivityManager {
             type: 'email',
             title: email.subject || `${direction} Email`,
             description: this.truncateText(previewText, 100),
+            fullDescription: previewText, // Store full text for expansion
+            truncatedDescription: this.truncateText(previewText, 100), // Store truncated text for collapse
             timestamp: emailTimestamp,
             icon: 'email',
             data: {
@@ -2501,6 +2503,31 @@ class ActivityManager {
   }
 
   /**
+   * Generate HTML for email tracking badges (opened/clicked)
+   * @param {Object} activity - The activity object
+   * @returns {string} - HTML string for badges
+   */
+  getTrackingBadgesHtml(activity) {
+    if (activity.type !== 'email' || !activity.data) return '';
+    
+    const isSent = activity.data.type === 'sent' || activity.data.emailType === 'sent' || activity.data.isSentEmail;
+    if (!isSent) return '';
+
+    let badgesHtml = '';
+    const opened = activity.data.openCount || 0;
+    const clicked = activity.data.clickCount || 0;
+
+    if (opened > 0) {
+      badgesHtml += `<span class="badge badge-opened" style="margin-left: 8px;">Opened <span class="count-circle">${opened}</span></span>`;
+    }
+    if (clicked > 0) {
+      badgesHtml += `<span class="badge badge-clicked" style="margin-left: 4px;">Clicked <span class="count-circle">${clicked}</span></span>`;
+    }
+
+    return badgesHtml;
+  }
+
+  /**
    * Render activity list HTML
    */
   renderActivityList(activities) {
@@ -2580,9 +2607,14 @@ class ActivityManager {
               ${entityAvatar}
             </div>
             <div class="activity-content">
-                <div class="activity-title">${this.escapeHtml(activity.title)}</div>
+                <div class="activity-title">
+                  ${this.escapeHtml(activity.title)}
+                  ${this.getTrackingBadgesHtml(activity)}
+                </div>
                 <div class="activity-entity">${this.escapeHtml(entityName || '')}</div>
-              <div class="activity-description">${this.escapeHtml(activity.description || '')}</div>
+              <div class="activity-description" data-full-text="${this.escapeHtml(activity.fullDescription || '')}" data-truncated-text="${this.escapeHtml(activity.truncatedDescription || '')}">
+                ${this.escapeHtml(activity.description || '')}${activity.fullDescription && activity.fullDescription.length > 100 ? `<span class="expand-link" onclick="window.ActivityManager.expandDescription(this); event.stopPropagation();">EXPAND</span>` : ''}
+              </div>
               <div class="activity-time">${this.formatTimestamp(activity.timestamp)}</div>
             </div>
             <div class="activity-icon activity-icon--${activity.type}">
@@ -2601,8 +2633,13 @@ class ActivityManager {
               ${this.getActivityIcon(activity.type || 'note')}
             </div>
             <div class="activity-content">
-                <div class="activity-title">${this.escapeHtml(activity.title || 'Activity')}</div>
-              <div class="activity-description">${this.escapeHtml(activity.description || '')}</div>
+                <div class="activity-title">
+                  ${this.escapeHtml(activity.title || 'Activity')}
+                  ${this.getTrackingBadgesHtml(activity)}
+                </div>
+              <div class="activity-description" data-full-text="${this.escapeHtml(activity.fullDescription || '')}" data-truncated-text="${this.escapeHtml(activity.truncatedDescription || '')}">
+                ${this.escapeHtml(activity.description || '')}${activity.fullDescription && activity.fullDescription.length > 100 ? `<span class="expand-link" onclick="window.ActivityManager.expandDescription(this); event.stopPropagation();">EXPAND</span>` : ''}
+              </div>
               <div class="activity-time">${this.formatTimestamp(activity.timestamp)}</div>
             </div>
           </div>
@@ -3448,6 +3485,59 @@ class ActivityManager {
       return `${diffDays}d ago`;
     } else {
       return date.toLocaleDateString();
+    }
+  }
+
+  /**
+   * Toggle between expanded and truncated activity description
+   */
+  expandDescription(toggleBtn) {
+    const descriptionDiv = toggleBtn.parentElement;
+    const fullText = descriptionDiv.getAttribute('data-full-text');
+    const truncatedText = descriptionDiv.getAttribute('data-truncated-text');
+    
+    if (!fullText) return;
+
+    const isExpanded = descriptionDiv.classList.contains('expanded');
+
+    if (isExpanded) {
+      // Collapse
+      
+      // 1. Set explicit height to current scroll height so transition has a starting point
+      descriptionDiv.style.maxHeight = descriptionDiv.scrollHeight + 'px';
+      
+      // 2. Force reflow to ensure the browser registers the fixed height
+      descriptionDiv.offsetHeight;
+      
+      // 3. Remove expanded class (this handles margin-bottom transition via CSS)
+      descriptionDiv.classList.remove('expanded');
+      
+      // 4. Animate to collapsed height
+      descriptionDiv.style.maxHeight = '4em';
+      
+      // Delay innerHTML swap until transition is done (matches CSS 0.8s)
+      setTimeout(() => {
+        if (!descriptionDiv.classList.contains('expanded')) {
+          descriptionDiv.innerHTML = `${this.escapeHtml(truncatedText)}<span class="expand-link" onclick="window.ActivityManager.expandDescription(this); event.stopPropagation();">EXPAND</span>`;
+          // Reset style after swap
+          descriptionDiv.style.maxHeight = '';
+        }
+      }, 800);
+    } else {
+      // Expand
+      descriptionDiv.classList.add('expanded');
+      descriptionDiv.innerHTML = `${this.escapeHtml(fullText)}<span class="collapse-link" onclick="window.ActivityManager.expandDescription(this); event.stopPropagation();">COLLAPSE</span>`;
+      
+      // Measure and set specific height for smooth transition
+      const scrollHeight = descriptionDiv.scrollHeight;
+      descriptionDiv.style.maxHeight = scrollHeight + 'px';
+      
+      // Optional: Reset to large value after transition to handle potential content changes
+      setTimeout(() => {
+        if (descriptionDiv.classList.contains('expanded')) {
+          descriptionDiv.style.maxHeight = '2000px';
+        }
+      }, 800);
     }
   }
 

@@ -1,6 +1,6 @@
 'use strict';
 (function() {
-  console.log('[EmailDetail] Script loaded and executing...');
+  // Script loaded
   const state = {
     currentEmail: null,
     loadingEmail: false
@@ -48,14 +48,11 @@
   function markEmailLoaded() {
     const el = els.page;
     if (!el) return;
-    const startTime = performance.now();
-    console.log('[Performance] markEmailLoaded() triggered - starting 600ms fade-in buffer');
     // Add loaded class to trigger content fade-in
     el.classList.add('email-loaded');
     // Keep skeleton visible until content has fully faded in, then remove it
     window.setTimeout(() => {
       el.classList.remove('email-loading');
-      console.log(`[Performance] markEmailLoaded() animation buffer finished in ${Math.round(performance.now() - startTime)}ms`);
     }, 50); // Optimized: reduced to 50ms for near-instant transition
   }
 
@@ -189,7 +186,7 @@
               }
             }
           } catch (error) {
-            console.warn('[EmailDetail] Firestore name-based lookup failed for', nameSlug, error);
+            // Firestore name-based lookup failed
           }
         }
 
@@ -287,26 +284,13 @@
 
   // Show email detail
   async function show(emailId) {
-    console.log(`[Performance] window.EmailDetail.show called with: ${emailId}`);
-    const startTime = performance.now();
-    console.log(`[Performance] show() started for emailId: ${emailId}`);
-    if (window.PC_DEBUG === true && window.PCDebug && typeof window.PCDebug.log === 'function') {
-      const t0 = window.__pcEmailDetailOpen && window.__pcEmailDetailOpen.emailId === emailId ? window.__pcEmailDetailOpen.t0 : null;
-      const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-      window.PCDebug.log('[Perf: EmailDetail] show() start', {
-        emailId,
-        msSinceNavigate: (typeof t0 === 'number') ? Math.round(now - t0) : null
-      });
-    }
+    // show() start
     if (!initDomRefs()) return;
     setBackButtonLabel();
 
     // CRITICAL: Prevent race conditions
     if (state.loadingEmail) {
-      console.log('[Performance] show() aborted - already loading');
-      if (window.PC_DEBUG === true && window.PCDebug && typeof window.PCDebug.warn === 'function') {
-        window.PCDebug.warn('[Perf: EmailDetail] show() aborted - already loading', { emailId });
-      }
+      // show() aborted - already loading
       return;
     }
     state.loadingEmail = true;
@@ -324,25 +308,14 @@
     try {
       let emailData;
       if (window.emailCache && window.emailCache.has(emailId)) {
-        console.log('[Performance] Using cached email data for:', emailId);
         emailData = window.emailCache.get(emailId);
       } else {
         // Load email data from Firebase
-        const fetchStart = performance.now();
         const emailDoc = await firebase.firestore().collection('emails').doc(emailId).get();
-        console.log(`[Performance] Firestore get() completed in ${Math.round(performance.now() - fetchStart)}ms`);
-        if (window.PC_DEBUG === true && window.PCDebug && typeof window.PCDebug.log === 'function') {
-          window.PCDebug.log('[Perf: EmailDetail] Firestore get() completed', {
-            emailId,
-            ms: Math.round(performance.now() - fetchStart)
-          });
-        }
+        // Firestore get() completed
 
         if (!emailDoc.exists) {
-          console.error('Email not found:', emailId);
-          if (window.PC_DEBUG === true && window.PCDebug && typeof window.PCDebug.error === 'function') {
-            window.PCDebug.error('[Perf: EmailDetail] Email not found', { emailId });
-          }
+          // Email not found
           state.loadingEmail = false;
           goBack();
           return;
@@ -391,7 +364,6 @@
       }
 
       // Populate email details immediately
-      console.log('[Performance] Triggering populateEmailDetails');
       populateEmailDetails(state.currentEmail);
 
       // Add tracking icons for sent emails (before scheduled email actions)
@@ -410,26 +382,11 @@
       // Trigger loaded animation
       markEmailLoaded();
       state.loadingEmail = false;
-      console.log(`[Performance] show() total time: ${Math.round(performance.now() - startTime)}ms`);
 
-      if (window.PC_DEBUG === true && window.PCDebug && typeof window.PCDebug.log === 'function') {
-        const t0 = window.__pcEmailDetailOpen && window.__pcEmailDetailOpen.emailId === emailId ? window.__pcEmailDetailOpen.t0 : null;
-        const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-        window.PCDebug.log('[Perf: EmailDetail] show() done', {
-          emailId,
-          totalMs: Math.round(performance.now() - startTime),
-          msSinceNavigate: (typeof t0 === 'number') ? Math.round(now - t0) : null
-        });
-      }
+      // show() done
 
     } catch (error) {
-      console.error('Failed to load email:', error);
-      if (window.PC_DEBUG === true && window.PCDebug && typeof window.PCDebug.error === 'function') {
-        window.PCDebug.error('[Perf: EmailDetail] show() failed', {
-          emailId,
-          error: (error && error.message) ? error.message : String(error)
-        });
-      }
+      // Failed to load email
       state.loadingEmail = false;
       goBack();
     }
@@ -498,9 +455,7 @@
 
   function actuallyPopulateEmailDetails(email) {
     if (!email) return;
-    const startTime = performance.now();
-    console.log(`[Performance] actuallyPopulateEmailDetails started for email: ${email.id}`);
-
+    
     // Avoid redundant populates if the email hasn't changed AND the logo state hasn't changed
     const emailTimestamp = email.updatedAt || email.timestamp || '';
     
@@ -521,7 +476,6 @@
     
     // Only skip if the detail view already has content and the state is identical
     if (stateKey === lastPopulatedEmailId && els.emailContent?.innerHTML?.trim()) {
-      console.log('[Performance] actuallyPopulateEmailDetails skipped - redundant');
       return;
     }
     lastPopulatedEmailId = stateKey;
@@ -736,8 +690,9 @@
         signatureMarker.test(email.html || '') ||
         signatureMarker.test(email.content || '');
 
-      // Debug logging for signature detection issues
-      console.log('[EmailDetail] Render decision:', {
+      // Render decision info
+      /*
+      {
         emailId: email.id,
         isOurEmail,
         isHtmlEmailFlag,
@@ -748,7 +703,8 @@
         looksLikeHtml,
         emailType: email.type,
         emailStatus: email.status
-      });
+      }
+      */
 
       // For RECEIVED emails: prefer HTML to preserve styling (LinkedIn, newsletters, etc.)
       // For SENT emails: prefer HTML when marked as HTML email OR when signature marker detected
@@ -770,54 +726,39 @@
         const hasBlocks = /<\s*(p|br|div|table|tr|td|ul|ol|li|blockquote|hr)/i.test(bodyPart);
         if (hasBlocks || bodyPart.length === 0) return html;
         const wrappedBody = `<p style="margin: 0 0 12px 0; color: var(--text-primary, #ffffff);">${escapeHtml(bodyPart)}</p><br><br>`;
-        console.log('[EmailDetail] Wrapped inline HTML body before signature');
+        // Wrapped inline HTML body before signature
         return wrappedBody + sigPart;
       };
 
       if (isOurEmail && hasSignatureMarker && htmlSource) {
         // Our sent emails with custom HTML signature: preserve the full HTML structure
-        console.log('[EmailDetail] Using HTML path: hasSignatureMarker');
+        // Using HTML path: hasSignatureMarker
         contentHtml = renderOurHtmlEmail(wrapInlineBody(htmlSource));
       } else if (isOurEmail && isHtmlEmailFlag && rawHtml && rawHtml.trim()) {
         // Our sent HTML template emails (AI/templated with isHtmlEmail flag): keep original HTML
-        console.log('[EmailDetail] Using HTML path: isHtmlEmailFlag');
+        // Using HTML path: isHtmlEmailFlag
         contentHtml = renderOurHtmlEmail(rawHtml);
       } else if (isOurEmail && htmlHasStructure && rawHtml && rawHtml.trim()) {
         // FALLBACK: Our sent email has HTML structure (tables, divs, images) - use HTML rendering
         // This catches emails where marker detection failed but HTML is clearly structured
-        console.log('[EmailDetail] Using HTML path: htmlHasStructure fallback');
+        // Using HTML path: htmlHasStructure fallback
         contentHtml = renderOurHtmlEmail(rawHtml);
       } else if (isOurEmail && rawText) {
         // Manual/plain emails: always build paragraphs from text to preserve single/new line breaks
-        console.log('[EmailDetail] Using TEXT paragraph path for manual/plain email', {
-          rawTextLength: rawText.length,
-          sample: rawText.slice(0, 200),
-          hasNewlines: /\r|\n/.test(rawText),
-          looksLikeHtml,
-          isHtmlEmailFlag
-        });
+        // Using TEXT paragraph path for manual/plain email
         const decoded = decodeQuotedPrintable(rawText);
         const lines = decoded.split(/\r\n|\r|\n/);
-        console.log('[EmailDetail] Decoded lines count:', lines.length, 'First lines:', lines.slice(0, 5));
+        // Decoded lines count: lines.length
         const paras = lines.map(line => line.trim() === ''
           ? '<p style="margin: 0 0 12px 0; color: var(--text-primary, #ffffff);">&nbsp;</p>'
           : `<p style="margin: 0 0 12px 0; color: var(--text-primary, #ffffff);">${escapeHtml(line)}</p>`);
         contentHtml = paras.join('');
       } else if (!isOurEmail && rawHtml && rawHtml.trim() && looksLikeHtml) {
         // Received email with proper HTML - use it
-        console.log('[EmailDetail] Using HTML path: received email');
-        const sanitizeStart = performance.now();
         contentHtml = sanitizeEmailHtml(rawHtml);
-        if (window.PC_DEBUG === true) {
-          console.log('[Performance] sanitizeEmailHtml completed', {
-            timeMs: Math.round(performance.now() - sanitizeStart),
-            emailId: email.id,
-            rawHtmlLength: (rawHtml || '').length
-          });
-        }
       } else if (isOurEmail && rawText && rawText.trim()) {
         // Sent email with text but NO signature marker in HTML - use text to preserve line breaks
-        console.log('[EmailDetail] Using TEXT path: rawText with signature extraction');
+        // Using TEXT path: rawText with signature extraction
         const decoded = decodeQuotedPrintable(rawText);
         let signatureHtml = '';
 
@@ -869,7 +810,7 @@
               }
             }
           } catch (e) {
-            console.warn('[EmailDetail] Error extracting signature:', e);
+            // Error extracting signature
           }
         }
 
@@ -936,7 +877,7 @@
             const br2 = document.createElement('br');
             sig.parentNode.insertBefore(br, sig);
             sig.parentNode.insertBefore(br2, sig);
-            console.log('[EmailDetail] Inserted break before signature (text node)');
+            // Inserted break before signature (text node)
           }
         } else if (prev && prev.nodeType === Node.ELEMENT_NODE) {
           const prevTag = prev.tagName.toLowerCase();
@@ -946,7 +887,7 @@
             const br2 = document.createElement('br');
             sig.parentNode.insertBefore(br, sig);
             sig.parentNode.insertBefore(br2, sig);
-            console.log('[EmailDetail] Inserted break before signature (inline elem)', prevTag);
+            // Inserted break before signature (inline elem)
           }
         }
         return temp.innerHTML;
@@ -1084,7 +1025,7 @@
             contentHtml += signatureHtml;
           }
         } catch (error) {
-          console.warn('[EmailDetail] Error adding signature:', error);
+          // Error adding signature
         }
       }
 
@@ -1095,37 +1036,24 @@
       if (isSentEmail || email.type === 'sent' || email.status === 'sent') {
         els.emailContent.classList.add('sent-email-preview');
         
-        console.log('[Performance] Starting optimized DOM cleanup');
-        const cleanupStart = performance.now();
-        
         // Optimized single-pass cleanup
         cleanupEmailDom(els.emailContent);
         
         // Preserve signature inline colors
         preserveSignatureColors(els.emailContent);
         
-        console.log(`[Performance] DOM cleanup finished in ${Math.round(performance.now() - cleanupStart)}ms`);
       } else {
         els.emailContent.classList.remove('sent-email-preview');
       }
     }
-    console.log(`[Performance] actuallyPopulateEmailDetails finished in ${Math.round(performance.now() - startTime)}ms`);
   }
 
   // Optimized single-pass DOM cleanup to prevent layout thrashing
   function cleanupEmailDom(container) {
     if (!container) return;
     
-    const cleanupStart = performance.now();
     const elements = Array.from(container.querySelectorAll('*'));
-    if (window.PC_DEBUG === true) {
-      console.log('[Performance] cleanupEmailDom querySelectorAll', {
-        elementCount: elements.length,
-        timeMs: Math.round(performance.now() - cleanupStart)
-      });
-    }
     
-    const loopStart = performance.now();
     const toRemove = new Set();
     
     // 1. Identify signatures once
@@ -1207,14 +1135,6 @@
     
     // 4. Batch removals
     toRemove.forEach(el => el.remove());
-    if (window.PC_DEBUG === true) {
-      console.log('[Performance] cleanupEmailDom finished', {
-        loopTimeMs: Math.round(performance.now() - loopStart),
-        totalTimeMs: Math.round(performance.now() - cleanupStart),
-        elementCount: elements.length,
-        emptyBlockPass: shouldRunEmptyBlockPass
-      });
-    }
   }
 
   // Force preserve inline colors on signature elements using JavaScript
@@ -1225,8 +1145,7 @@
     const signature = container.querySelector('[data-signature="true"]');
     if (!signature) return;
 
-    const debugEnabled = window.PC_DEBUG === true;
-    if (debugEnabled) console.log('[EmailDetail] Preserving signature colors...');
+    // Preserving signature colors...
     
     // Get all elements inside signature
     const elements = signature.querySelectorAll('*');
@@ -1241,7 +1160,7 @@
         const adjusted = adjustColorForDarkTheme(colorValue);
         // Force this color with !important using JavaScript
         el.style.setProperty('color', adjusted, 'important');
-        if (debugEnabled) console.log('[EmailDetail] Preserved color:', adjusted, 'on', el.tagName);
+        // Preserved color: adjusted on el.tagName
       }
     });
     
@@ -1472,7 +1391,7 @@
       }
 
     } catch (error) {
-      console.error('Failed to toggle star:', error);
+      // Failed to toggle star
     }
   }
 
@@ -1588,7 +1507,7 @@
           els.replyBodyInput.appendChild(divider);
         }
       } catch (error) {
-        console.warn('[EmailDetail] Error adding original email thread:', error);
+        // Error adding original email thread
       }
 
       // Add signature if available
@@ -1603,7 +1522,7 @@
           }
         }
       } catch (error) {
-        console.warn('[EmailDetail] Error adding signature:', error);
+        // Error adding signature
       }
     }
 
@@ -1669,7 +1588,7 @@
             sel.removeAllRanges();
             sel.addRange(range);
           } catch (error) {
-            console.warn('[EmailDetail] Error setting cursor position:', error);
+            // Error setting cursor position
             // Fallback: just focus
             els.replyBodyInput.focus();
           }
@@ -1731,7 +1650,7 @@
           els.replyBodyInput.innerHTML += signature;
         }
       } catch (error) {
-        console.warn('[EmailDetail] Error adding signature:', error);
+        // Error adding signature
       }
     }
 
@@ -1814,7 +1733,7 @@
         avatarEl.innerHTML = `<div style="width: 32px; height: 32px; border-radius: 50%; background: var(--orange-subtle); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: 14px; letter-spacing: 0.5px; border: 1px solid var(--border-light);" aria-hidden="true">${escapeHtml(initials)}</div>`;
       }
     } catch (error) {
-      console.warn('[EmailDetail] Error updating reply avatar:', error);
+      // Error updating reply avatar
     }
   }
 
@@ -1939,7 +1858,7 @@
             for (const quoted of quotedElements) {
               try {
                 if (range.intersectsNode(quoted)) {
-                  console.log('[EmailDetail] Backspace/Delete would affect quoted content - preventing');
+                  // Backspace/Delete would affect quoted content - preventing
                   e.preventDefault();
                   e.stopPropagation();
 
@@ -1963,7 +1882,7 @@
                   return;
                 }
               } catch (err) {
-                console.warn('[EmailDetail] Error checking quoted content:', err);
+                // Error checking quoted content
               }
             }
 
@@ -1974,7 +1893,7 @@
               // Check if the range would delete or affect the signature
               try {
                 if (range.intersectsNode(signature)) {
-                  console.log('[EmailDetail] Backspace/Delete would affect signature - preventing');
+                  // Backspace/Delete would affect signature - preventing
                   e.preventDefault();
                   e.stopPropagation();
 
@@ -1999,7 +1918,6 @@
                 }
               } catch (err) {
                 // intersectsNode might not be available in all browsers, use alternative check
-                console.warn('[EmailDetail] intersectsNode not available, using alternative check');
               }
 
               // Check if cursor is right before signature and backspace would delete it
@@ -2015,7 +1933,7 @@
                     : node.childNodes.length);
 
                   if (isAtEnd) {
-                    console.log('[EmailDetail] Backspace at end before signature - preventing');
+                    // Backspace at end before signature - preventing
                     e.preventDefault();
                     e.stopPropagation();
                     return;
@@ -2026,7 +1944,7 @@
                 let walker = node;
                 while (walker && walker !== els.replyBodyInput) {
                   if (walker === signature) {
-                    console.log('[EmailDetail] Backspace inside signature - preventing');
+                    // Backspace inside signature - preventing
                     e.preventDefault();
                     e.stopPropagation();
                     return;
@@ -2037,7 +1955,7 @@
                 // Check if we're at the very beginning and signature is the first child
                 // This handles the case where user backspaces all the way to the beginning
                 if (els.replyBodyInput.firstChild === signature) {
-                  console.log('[EmailDetail] Backspace at beginning would delete signature - preventing');
+                  // Backspace at beginning would delete signature - preventing
                   e.preventDefault();
                   e.stopPropagation();
                   return;
@@ -2060,7 +1978,7 @@
                   const isAtStart = range.startOffset === 0;
 
                   if ((isEmpty || isAtStart) && e.key === 'Backspace') {
-                    console.log('[EmailDetail] Backspace in empty element before signature - preventing');
+                    // Backspace in empty element before signature - preventing
                     e.preventDefault();
                     e.stopPropagation();
                     return;
@@ -2078,7 +1996,7 @@
                 let walker = startParent;
                 while (walker && walker !== els.replyBodyInput) {
                   if (walker === signature) {
-                    console.log('[EmailDetail] Selection includes signature - preventing delete');
+                    // Selection includes signature - preventing delete
                     e.preventDefault();
                     e.stopPropagation();
                     return;
@@ -2089,7 +2007,7 @@
                 walker = endParent;
                 while (walker && walker !== els.replyBodyInput) {
                   if (walker === signature) {
-                    console.log('[EmailDetail] Selection includes signature - preventing delete');
+                    // Selection includes signature - preventing delete
                     e.preventDefault();
                     e.stopPropagation();
                     return;
@@ -2103,7 +2021,7 @@
 
         // Handle Enter key for single spacing (like email-compose-global.js)
         if (e.key === 'Enter') {
-          console.log('[EmailDetail] Enter key pressed in reply body input');
+          // Enter key pressed in reply body input
           e.preventDefault();
 
           // Check if cursor is INSIDE signature (not just near it)
@@ -2112,7 +2030,7 @@
             const range = selection.getRangeAt(0);
             const isInsideSignature = isCursorInsideSignature(els.replyBodyInput, range);
             if (isInsideSignature) {
-              console.log('[EmailDetail] Cursor inside signature - preventing edit');
+              // Cursor inside signature - preventing edit
               return;
             }
           }
@@ -2142,15 +2060,15 @@
             selection.removeAllRanges();
             selection.addRange(range);
 
-            console.log('[EmailDetail] Single line break inserted with proper spacing');
+            // Single line break inserted with proper spacing
           } catch (error) {
-            console.error('[EmailDetail] Failed to insert line break:', error);
+            // Failed to insert line break
             // Fallback: try execCommand but it may have spacing issues
             try {
               document.execCommand('insertHTML', false, '<br>');
-              console.log('[EmailDetail] Fallback: Single line break inserted via execCommand');
+              // Fallback: Single line break inserted via execCommand
             } catch (fallbackError) {
-              console.error('[EmailDetail] All methods failed:', fallbackError);
+              // All methods failed
             }
           }
           return; // Don't process other keydown logic for Enter
@@ -2453,7 +2371,7 @@
         addReplyAttachment(file);
       });
 
-      console.log('[EmailDetail] Added', files.length, 'files');
+      // Added files
       window.crm?.showToast(`Added ${files.length} file${files.length > 1 ? 's' : ''}`);
     });
 
@@ -2479,19 +2397,14 @@
       icon: getFileIcon(file.type, file.name)
     };
 
-    console.log('[EmailDetail] Adding attachment with ID:', attachment.id, 'Type:', typeof attachment.id);
-
+    // Adding attachment
     window.emailAttachments.push(attachment);
     updateReplyAttachmentBadge();
   }
 
   // Remove attachment (matching global compose pattern)
   function removeReplyAttachment(attachmentId) {
-    console.log('[EmailDetail] removeAttachment called with ID:', attachmentId, 'Type:', typeof attachmentId);
-    console.log('[EmailDetail] Current attachments:', window.emailAttachments);
-
     if (!window.emailAttachments) {
-      console.log('[EmailDetail] No attachments array found');
       return;
     }
 
@@ -2499,22 +2412,13 @@
 
     // Convert to string for consistent comparison
     const stringId = String(attachmentId);
-    console.log('[EmailDetail] Converting ID to string:', stringId);
-
-    // Log each attachment ID and type for debugging
-    window.emailAttachments.forEach((att, index) => {
-      console.log(`[EmailDetail] Attachment ${index}: ID=${att.id}, Type=${typeof att.id}, Match=${att.id === stringId}`);
-    });
 
     window.emailAttachments = window.emailAttachments.filter(att => {
       const matches = att.id !== stringId;
-      console.log(`[EmailDetail] Filtering attachment ${att.id}: ${matches ? 'KEEP' : 'REMOVE'}`);
       return matches;
     });
 
     const finalLength = window.emailAttachments.length;
-
-    console.log('[EmailDetail] Removed attachment. Before:', initialLength, 'After:', finalLength);
 
     updateReplyAttachmentBadge();
   }
@@ -2613,24 +2517,19 @@
   function updateReplyAttachmentBadge() {
     const replyFooter = els.replyContainer ? els.replyContainer.querySelector('.email-reply-footer') : null;
     if (!replyFooter) {
-      console.log('[EmailDetail] No reply footer found');
       return;
     }
 
     // Remove existing badge
     const existingBadge = replyFooter.querySelector('.attachment-badge');
     if (existingBadge) {
-      console.log('[EmailDetail] Removing existing badge');
       existingBadge.remove();
     }
 
     // Don't show badge if no attachments
     if (!window.emailAttachments || window.emailAttachments.length === 0) {
-      console.log('[EmailDetail] No attachments to display');
       return;
     }
-
-    console.log('[EmailDetail] Creating badge for', window.emailAttachments.length, 'attachments');
 
     // Create attachment badge
     const badge = document.createElement('div');
@@ -2657,13 +2556,10 @@
 
     // Add click handler for remove buttons - use more specific targeting (matching global compose)
     badge.addEventListener('click', (e) => {
-      console.log('[EmailDetail] Badge clicked, target:', e.target);
-
       // Check if the clicked element or its parent is a remove button
       const removeBtn = e.target.closest('.attachment-remove');
       if (removeBtn) {
         const attachmentId = removeBtn.dataset.id; // Don't use parseInt for string IDs
-        console.log('[EmailDetail] Remove button clicked for ID:', attachmentId);
         e.preventDefault();
         e.stopPropagation();
         removeReplyAttachment(attachmentId);
@@ -2674,9 +2570,8 @@
     const replyActions = replyFooter.querySelector('.reply-actions');
     if (replyActions) {
       replyActions.insertAdjacentElement('afterend', badge);
-      console.log('[EmailDetail] Badge inserted successfully');
     } else {
-      console.error('[EmailDetail] Could not find reply-actions element');
+      // Could not find reply-actions element
     }
   }
 
@@ -2850,8 +2745,7 @@
       const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
       const genUrl = `${base}/api/perplexity-email`;
 
-      console.log('[EmailDetail] Generating reply with AI, mode:', mode);
-
+      // Generating reply with AI
       // Extract recipient email
       const recipientEmail = els.replyToInput?.value?.trim() || extractEmail(email.from);
 
@@ -2885,7 +2779,7 @@
           }
         }
       } catch (error) {
-        console.warn('[EmailDetail] Failed to lookup recipient:', error);
+        // Failed to lookup recipient
       }
 
       // Build email thread context for intelligent reply generation
@@ -2984,7 +2878,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       }
 
       const result = await response.json();
-      console.log('[EmailDetail] AI response received:', result);
+      // AI response received
 
       // Handle response based on mode
       const templateType = result.templateType || null;
@@ -3061,7 +2955,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
               }
             }
           } catch (error) {
-            console.warn('[EmailDetail] Error adding signature:', error);
+            // Error adding signature
           }
         }
 
@@ -3123,7 +3017,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
           return { subject, html };
         }
       } catch (e) {
-        console.warn('[EmailDetail] JSON parse failed, treating as plain text:', e);
+        // JSON parse failed, treating as plain text
       }
 
       // Fallback: treat as plain text with signature
@@ -3519,7 +3413,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
               createdAt: firebase.firestore.FieldValue.serverTimestamp ? firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString()
             });
 
-            console.log(`[EmailDetail] Created next step email (step ${nextStepIndex}) for contact ${contactId}`);
+            // Created next step email
           }
         }
       }
@@ -3532,7 +3426,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       // Go back to emails page
       goBack();
     } catch (error) {
-      console.error('[EmailDetail] Failed to reject and advance email:', error);
+      // Failed to reject and advance email
       if (window.crm && window.crm.showToast) {
         window.crm.showToast('Failed to reject email: ' + error.message);
       }
@@ -3702,7 +3596,6 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
   // Add tracking icons (eye and click) for sent emails
   function addTrackingIconsForSentEmail(email) {
     if (!els.actionBar || !email) {
-      console.log('[EmailDetail] addTrackingIconsForSentEmail: Missing actionBar or email', { hasActionBar: !!els.actionBar, hasEmail: !!email });
       return;
     }
 
@@ -3721,20 +3614,8 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
                         email.status === 'sent' ||
                         (email.type === 'scheduled' && email.status === 'sent');
 
-    console.log('[EmailDetail] addTrackingIconsForSentEmail: Checking email', {
-      emailId: email.id,
-      isSentEmail: email.isSentEmail,
-      type: email.type,
-      emailType: email.emailType,
-      status: email.status,
-      detectedAsSent: isSentEmail,
-      openCount: email.openCount,
-      clickCount: email.clickCount
-    });
-
     // Only show for sent emails (not received/inbox emails)
     if (!isSentEmail) {
-      console.log('[EmailDetail] addTrackingIconsForSentEmail: Not a sent email, skipping');
       return;
     }
 
@@ -4483,16 +4364,6 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
           .replace(/<img[^>]*src=["'][^"']*vercel\.app\/api\/email\/track\/[^"']+["'][^>]*>/gi, '');
       }
 
-      const regexTime = Math.round(performance.now() - regexStart);
-      if (debugEnabled) {
-        console.log('[Performance] sanitizeEmailHtml', {
-          decodeTimeMs: decodeTime,
-          regexTimeMs: regexTime,
-          inputLength: input.length,
-          needsDecode
-        });
-      }
-
       // If no content after sanitization, show fallback
       if (!decodedHtml.trim() || decodedHtml.trim() === '') {
         return '<p>No content available</p>';
@@ -4965,9 +4836,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
 
   // Initialize
   function init() {
-    console.log('[EmailDetail] init() called');
     if (!initDomRefs()) {
-      console.warn('[EmailDetail] init() failed - DOM refs not found');
       return;
     }
     attachEvents();
