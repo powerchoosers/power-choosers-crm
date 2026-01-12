@@ -3746,7 +3746,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     els.senderName.removeAttribute('tabindex');
   }
 
-  function openContactDetailFromEmail(contactId) {
+  async function openContactDetailFromEmail(contactId) {
     if (!contactId) return;
 
     // Store navigation context for back button
@@ -3758,13 +3758,40 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     try {
       // First try to get full contact from people data cache
       let fullContact = null;
+      let fullContactSource = '';
       if (window.getPeopleData && typeof window.getPeopleData === 'function') {
         const peopleData = window.getPeopleData();
         fullContact = peopleData.find(p => p.id === contactId);
+        if (fullContact) fullContactSource = 'people-cache';
+      }
+
+      if (!fullContact && window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+        const contactsData = window.BackgroundContactsLoader.getContactsData() || [];
+        fullContact = contactsData.find(p => p.id === contactId);
+        if (fullContact) fullContactSource = 'background-contacts-loader';
+      }
+
+      if (!fullContact && window.firebaseDB) {
+        try {
+          const doc = await window.firebaseDB.collection('contacts').doc(contactId).get();
+          if (doc && doc.exists) {
+            fullContact = { id: doc.id, ...doc.data() };
+            fullContactSource = 'firestore-contacts-doc';
+          }
+        } catch (_) { }
       }
 
       // If we found the full contact in cache, use it
       if (fullContact) {
+        try {
+          if (fullContact.company && !fullContact.companyName) fullContact.companyName = fullContact.company;
+        } catch (_) { }
+        try {
+          if (fullContact.account && !fullContact.companyName) fullContact.companyName = fullContact.account;
+        } catch (_) { }
+        try {
+          if (fullContact.account_id && !fullContact.accountId) fullContact.accountId = fullContact.account_id;
+        } catch (_) { }
         window._prefetchedContactForDetail = fullContact;
       } else {
         // Fallback: Build contact object from email data with company context
@@ -3790,8 +3817,16 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         let linkedAccountId = null;
         let linkedAccountName = state.currentEmail.companyName || state.currentEmail.company || '';
 
-        if (emailDomain && window.getAccountsData && typeof window.getAccountsData === 'function') {
-          const accounts = window.getAccountsData();
+        if (emailDomain) {
+          let accounts = [];
+          try {
+            if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
+              accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+            } else if (window.getAccountsData && typeof window.getAccountsData === 'function') {
+              accounts = window.getAccountsData() || [];
+            }
+          } catch (_) { accounts = []; }
+
           const linkedAccount = accounts.find(a => {
             const accountDomain = (a.domain || '').toLowerCase().replace(/^www\./, '');
             const accountWebsite = (a.website || '').toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
@@ -3811,6 +3846,8 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
           name: state.currentEmail.contactName || extractName(contactEmail) || 'Unknown',
           email: contactEmail,
           company: linkedAccountName,
+          companyName: linkedAccountName,
+          accountName: linkedAccountName,
           accountId: linkedAccountId,
           account_id: linkedAccountId // Also set legacy field
         };
