@@ -3664,17 +3664,45 @@
                                                 </div>
                                             </div>
                                             <div class="page-actions">
-                                                <button class="quick-action-btn task-header-btn" id="task-add-task"
-                                                    title="Add task" aria-label="Add task" aria-haspopup="dialog">
+                                                <button class="quick-action-btn website-header-btn" data-action="website"
+                                                    title="Visit website" aria-label="Visit website">
                                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                                                         stroke="currentColor" stroke-width="2" aria-hidden="true"
                                                         focusable="false">
-                                                        <polyline points="9,11 12,14 22,4"></polyline>
+                                                        <circle cx="12" cy="12" r="10"></circle>
+                                                        <line x1="2" y1="12" x2="22" y2="12"></line>
                                                         <path
-                                                            d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11">
+                                                            d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z">
                                                         </path>
                                                     </svg>
                                                 </button>
+                                                <button class="quick-action-btn linkedin-header-btn" data-action="linkedin"
+                                                    title="View on LinkedIn" aria-label="View on LinkedIn">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                        stroke="currentColor" stroke-width="2" aria-hidden="true"
+                                                        focusable="false">
+                                                        <path
+                                                            d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z">
+                                                        </path>
+                                                        <rect x="2" y="9" width="4" height="12"></rect>
+                                                        <circle cx="4" cy="4" r="2"></circle>
+                                                    </svg>
+                                                </button>
+                                                <div class="page-actions-separator"></div>
+
+                                                <div class="list-seq-group">
+                                                    <button class="quick-action-btn task-header-btn" id="task-add-task"
+                                                        title="Add task" aria-label="Add task" aria-haspopup="dialog">
+                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                            stroke="currentColor" stroke-width="2" aria-hidden="true"
+                                                            focusable="false">
+                                                            <polyline points="9,11 12,14 22,4"></polyline>
+                                                            <path
+                                                                d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11">
+                                                            </path>
+                                                        </svg>
+                                                    </button>
+                                                </div>
                                                 <div class="page-actions-separator"></div>
                                                 <button class="quick-action-btn reschedule-header-btn"
                                                     id="task-reschedule-btn" title="Reschedule"
@@ -3707,6 +3735,7 @@
                                                         </svg>
                                                     </button>
                                                 </div>
+                                                <div class="page-actions-separator"></div>
                                                 <button class="btn-primary" id="task-complete-btn">Complete
                                                     Task</button>
                                                 <div class="page-actions-separator"></div>
