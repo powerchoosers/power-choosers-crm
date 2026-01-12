@@ -134,7 +134,7 @@
       localStorage.setItem(PEOPLE_COL_STORAGE_KEY, JSON.stringify(peopleColumnOrder));
       localStorage.setItem(ACCOUNTS_COL_STORAGE_KEY, JSON.stringify(accountsColumnOrder));
     } catch (e) {
-      console.warn('Failed to persist column order:', e);
+      // Failed to persist column order
     }
   }
 
@@ -242,7 +242,6 @@
     // Scope to the detail page
     els.page = document.getElementById('list-detail-page');
     if (!els.page) {
-      console.log('[ListDetail] #list-detail-page not found');
       return false;
     }
 
@@ -329,13 +328,6 @@
     els.pHasEmail = qs('list-detail-filter-has-email');
     els.pHasPhone = qs('list-detail-filter-has-phone');
 
-    console.log('[ListDetail] DOM refs initialized:', {
-      page: !!els.page,
-      table: !!els.table,
-      theadRow: !!els.theadRow,
-      tbody: !!els.tbody
-    });
-
     return true;
   }
 
@@ -347,7 +339,6 @@
         if (window._listDetailNavigationSource === 'lists') {
           try {
             const restore = window._listDetailReturn || {};
-            console.log('[ListDetail] Back button: Returning to lists page with restore data:', restore);
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
               window.crm.navigateToPage('lists');
 
@@ -365,7 +356,6 @@
                     }
                   });
                   document.dispatchEvent(ev);
-                  console.log('[ListDetail] Back button: Dispatched pc:lists-restore event');
                 } catch (_) { }
               }, 60);
             }
@@ -444,7 +434,6 @@
                 listName: state.listName,
                 view: state.view
               };
-              console.log('[ListDetail] Captured state for back navigation (contact):', window._listDetailReturn);
             } catch (_) { /* noop */ }
 
             // Navigate via existing people route to ensure modules are bound, then open detail with retry mechanism
@@ -455,14 +444,12 @@
               requestAnimationFrame(() => {
                 setTimeout(() => {
                   if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
-                    console.log('[List Detail] Showing contact detail:', contactId);
                     try {
                       window.ContactDetail.show(contactId);
                     } catch (error) {
-                      console.error('[List Detail] Error showing contact detail:', error);
+                      // Error showing contact detail
                     }
                   } else {
-                    console.log('[List Detail] ContactDetail not available, using retry mechanism');
                     // Retry mechanism to ensure ContactDetail module is ready
                     let attempts = 0;
                     const maxAttempts = 15;
@@ -470,12 +457,11 @@
                     const retry = () => {
                       attempts++;
                       if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
-                        console.log('[List Detail] ContactDetail ready after', attempts, 'attempts');
                         window.ContactDetail.show(contactId);
                       } else if (attempts < maxAttempts) {
                         setTimeout(retry, retryInterval);
                       } else {
-                        console.error('[List Detail] ContactDetail not available after', maxAttempts, 'attempts');
+                        // ContactDetail not available
                       }
                     };
                     retry();
@@ -1195,11 +1181,8 @@
     state.membersAccounts = new Set();
 
     if (!listId) {
-      console.log('[ListDetail] No listId provided, skipping member fetch');
       return;
     }
-
-    if (console.time) console.time(`[ListDetail] fetchMembers ${listId}`);
 
     // 0) FAST PATH: in-memory listMembersCache (updated by other pages; zero cost)
     try {
@@ -1207,7 +1190,6 @@
       if (mem && mem.loaded && (mem.people instanceof Set || Array.isArray(mem.people))) {
         state.membersPeople = mem.people instanceof Set ? new Set(mem.people) : new Set(mem.people || []);
         state.membersAccounts = mem.accounts instanceof Set ? new Set(mem.accounts) : new Set(mem.accounts || []);
-        if (console.timeEnd) console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
         return;
       }
     } catch (_) { }
@@ -1218,7 +1200,6 @@
       if (cached && (cached.people instanceof Set || Array.isArray(cached.people))) {
         state.membersPeople = cached.people instanceof Set ? cached.people : new Set(cached.people || []);
         state.membersAccounts = cached.accounts instanceof Set ? cached.accounts : new Set(cached.accounts || []);
-        // console.log(`[ListDetail] ✓ Loaded ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts from cache (zero cost)`);
 
         // Update legacy in-memory cache for backward compatibility
         window.listMembersCache = window.listMembersCache || {};
@@ -1228,20 +1209,16 @@
           loaded: true
         };
 
-        if (console.timeEnd) console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
         return;
       }
     } catch (e) {
-      console.warn('[ListDetail] Cache read failed (preserving empty Sets):', e);
+      // Cache read failed (preserving empty Sets)
       // COST-EFFECTIVE: Preserve empty Sets instead of clearing - allows filtering to work
     }
 
     // 2) Cache miss - fetch from Firebase (only if cache empty/expired)
-    console.log('[ListDetail] Cache miss, fetching from Firebase...');
     try {
       if (!window.firebaseDB || typeof window.firebaseDB.collection !== 'function') {
-        console.warn('[ListDetail] Firestore not available, preserving empty Sets');
-        if (console.timeEnd) console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
         return;
       }
 
@@ -1251,7 +1228,6 @@
 
       // Priority 1: Top-level listMembers collection (where all new additions go)
       try {
-        const __q0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
         const lmSnap = await window.firebaseDB.collection('listMembers').where('listId', '==', listId).limit(5000).get();
         if (lmSnap && lmSnap.docs && lmSnap.docs.length > 0) {
           lmSnap.docs.forEach(d => {
@@ -1261,10 +1237,9 @@
             if (t === 'people' || t === 'contact' || t === 'contacts') state.membersPeople.add(id);
             else if (t === 'accounts' || t === 'account') state.membersAccounts.add(id);
           });
-          // console.log(`[ListDetail] ✓ Loaded ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts from top-level collection`);
         }
       } catch (lmErr) {
-        console.warn('[ListDetail] Top-level query failed:', lmErr);
+        // Top-level query failed
       }
 
       // Priority 2: Also check subcollection for any legacy data (merge with top-level results)
@@ -1275,7 +1250,6 @@
         const legacyCheck = window._listDetailLegacyMemberCheck[listId];
         if (legacyCheck && legacyCheck.checked && legacyCheck.hasDocs === false) {
         } else {
-        const __s0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
         const subSnap = await window.firebaseDB.collection('lists').doc(listId).collection('members').get();
         try {
           window._listDetailLegacyMemberCheck[listId] = {
@@ -1284,8 +1258,6 @@
           };
         } catch (_) { }
         if (subSnap && subSnap.docs && subSnap.docs.length > 0) {
-          const beforePeople = state.membersPeople.size;
-          const beforeAccounts = state.membersAccounts.size;
           subSnap.docs.forEach(d => {
             const m = d.data() || {};
             const t = (m.targetType || m.type || '').toLowerCase();
@@ -1293,28 +1265,20 @@
             if (t === 'people' || t === 'contact' || t === 'contacts') state.membersPeople.add(id);
             else if (t === 'accounts' || t === 'account') state.membersAccounts.add(id);
           });
-          const addedPeople = state.membersPeople.size - beforePeople;
-          const addedAccounts = state.membersAccounts.size - beforeAccounts;
-          if (addedPeople > 0 || addedAccounts > 0) {
-            // console.log(`[ListDetail] ✓ Merged ${addedPeople} people, ${addedAccounts} accounts from subcollection (legacy data)`);
-          }
         }
         }
       } catch (subErr) {
-        console.warn('[ListDetail] Subcollection query failed (non-critical):', subErr);
+        // Subcollection query failed (non-critical)
       }
 
       // 3) Cache the results for next time (COST-EFFECTIVE: IndexedDB write only)
       if (state.membersPeople.size > 0 || state.membersAccounts.size > 0) {
         try {
           await window.CacheManager.cacheListMembers(listId, state.membersPeople, state.membersAccounts);
-          // console.log(`[ListDetail] ✓ Cached members for future use (zero cost on next load)`);
         } catch (cacheErr) {
-          console.warn('[ListDetail] Cache write failed (non-critical):', cacheErr);
+          // Cache write failed (non-critical)
         }
       }
-
-      // console.log(`[ListDetail] ✓ Fetched from Firebase: ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts`);
 
       // 4) Update legacy in-memory cache for backward compatibility
       window.listMembersCache = window.listMembersCache || {};
@@ -1325,11 +1289,9 @@
       };
 
     } catch (err) {
-      console.error('[ListDetail] Failed to fetch list members (preserving empty Sets):', err);
+      // Failed to fetch list members (preserving empty Sets)
       // COST-EFFECTIVE: Preserve empty Sets on error - allows filtering to work without crashing
     }
-
-    if (console.timeEnd) console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
   }
 
   function applyFilters() {
@@ -1384,14 +1346,7 @@
 
       // Filter by list membership
       if (state.listId) {
-        console.log('[ListDetail] Filtering people by list membership:', {
-          listId: state.listId,
-          totalPeople: state.dataPeople.length,
-          membersCount: state.membersPeople.size,
-          beforeFilter: base.length
-        });
         base = base.filter(c => state.membersPeople.has(c.id));
-        console.log('[ListDetail] After filtering:', { afterFilter: base.length });
       }
       state.filtered = base;
     } else {
@@ -1402,14 +1357,7 @@
       });
 
       if (state.listId) {
-        console.log('[ListDetail] Filtering accounts by list membership:', {
-          listId: state.listId,
-          totalAccounts: state.dataAccounts.length,
-          membersCount: state.membersAccounts.size,
-          beforeFilter: base.length
-        });
         base = base.filter(a => state.membersAccounts.has(a.id));
-        console.log('[ListDetail] After filtering accounts:', { afterFilter: base.length });
       }
       state.filtered = base;
     }
@@ -1419,28 +1367,6 @@
       state.currentPage = 1;
     }
     render();
-
-    const t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-    console.debug('[ListDetail] applyFilters', {
-      view: state.view,
-      listId: state.listId,
-      qLength: (els.quickSearch ? (els.quickSearch.value || '').length : 0),
-      chips: {
-        title: state.chips.title.length,
-        company: state.chips.company.length,
-        city: state.chips.city.length,
-        state: state.chips.state.length,
-        employees: state.chips.employees.length,
-        industry: state.chips.industry.length,
-        visitorDomain: state.chips.visitorDomain.length,
-        hasEmail: !!state.flags.hasEmail,
-        hasPhone: !!state.flags.hasPhone
-      },
-      dataSizes: { people: state.dataPeople.length, accounts: state.dataAccounts.length },
-      memberSizes: { people: state.membersPeople.size, accounts: state.membersAccounts.size },
-      filtered: state.filtered.length,
-      tookMs: Math.round(t1 - t0)
-    });
   }
 
   function normalize(s) { return (s || '').toString().trim().toLowerCase(); }

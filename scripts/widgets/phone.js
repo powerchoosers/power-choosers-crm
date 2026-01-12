@@ -766,7 +766,17 @@
                   incomingCallSid = pp.CallSid || pp.callSid || null;
                 } catch (_) { }
                 try {
-                  document.dispatchEvent(new CustomEvent('callStarted', { detail: { callSid: incomingCallSid } }));
+                  document.dispatchEvent(new CustomEvent('callStarted', {
+                    detail: {
+                      callSid: incomingCallSid,
+                      contactName: currentCallContext.name || currentCallContext.contactName || currentCallContext.company || currentCallContext.number,
+                      contactId: currentCallContext.contactId,
+                      accountId: currentCallContext.accountId,
+                      logoUrl: currentCallContext.logoUrl,
+                      domain: currentCallContext.domain,
+                      isCompanyPhone: currentCallContext.isCompanyPhone
+                    }
+                  }));
                   const el = document.getElementById(WIDGET_ID);
                   if (el) el.dispatchEvent(new CustomEvent('callStateChanged', { detail: { state: 'in-call', callSid: incomingCallSid } }));
                 } catch (_) { }
@@ -1696,7 +1706,7 @@
       .phone-contact .contact-name { font-weight: 700; color: var(--text-primary, #fff); }
       .phone-contact .contact-sub { color: var(--text-secondary, #b5b5b5); font-size: 12px; }
       .phone-contact .company-favicon { width: 28px; height: 28px; object-fit: cover; border-radius: 4px; }
-      .phone-contact .avatar-initials { width: 28px; height: 28px; border-radius: 50%; background: var(--primary-700, #ff6b35); color: #fff; display:flex; align-items:center; justify-content:center; font-size: 12px; font-weight: 700; }
+      .phone-contact .avatar-initials { width: 28px; height: 28px; border-radius: 50%; background: var(--orange-primary, #f18335); color: #fff; display:flex; align-items:center; justify-content:center; font-size: 12px; font-weight: 700; }
     `;
     document.head.appendChild(style);
   }
@@ -1779,7 +1789,7 @@
 
         if (contactId || accountId) {
           nameEl.style.cursor = 'pointer';
-          nameEl.style.textDecoration = 'underline';
+          nameEl.style.textDecoration = 'none';
           nameEl.title = 'Click to view details';
           nameEl.onclick = (e) => {
             e.preventDefault();
@@ -1858,8 +1868,6 @@
             }
           } else if (!newSrc && existingImg && existingSrc) {
             // New logoUrl is empty but we have an existing logo - preserve it to prevent flickering
-            // Don't update the DOM, just skip the logo rendering logic
-            // Continue with the rest of the function (name/sub updates, animations, etc.)
           } else if (!newSrc && !existingImg) {
             // No logo and no existing image - try fallbacks
             if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
@@ -1867,9 +1875,13 @@
               avatarWrap.innerHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: '', domain, size: 28 });
             } else if (typeof window.__pcAccountsIcon === 'function') {
               avatarWrap.innerHTML = window.__pcAccountsIcon(28);
+            } else {
+              // Final fallback to a building SVG if nothing else works
+              avatarWrap.innerHTML = `<div class="company-favicon-placeholder" style="width:28px;height:28px;border-radius:4px;background:var(--grey-700,#2f343a);display:flex;align-items:center;justify-content:center;color:#fff;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1"></path></svg>
+              </div>`;
             }
           }
-          // If logoUrl is empty but we have an existing image, don't clear it (prevents flickering)
         } else {
           // Individual contact: render initials avatar (letter glyphs)
           const initials = (function () {
@@ -2205,7 +2217,12 @@
                 duration: Math.floor(elapsed / 1000),
                 durationFormatted: formatDurationForRecentCalls(elapsed),
                 contactName: currentCallContext.name || currentCallContext.contactName || currentCallContext.company || currentCallContext.number,
-                number: currentCallContext.number
+                number: currentCallContext.number,
+                contactId: currentCallContext.contactId,
+                accountId: currentCallContext.accountId,
+                logoUrl: currentCallContext.logoUrl,
+                domain: currentCallContext.domain,
+                isCompanyPhone: currentCallContext.isCompanyPhone
               }
             }));
           } catch (_) { }
@@ -2557,6 +2574,45 @@
     return phone;
   }
 
+  // Helper: detect active call connection
+  const hasActiveCall = () => {
+    try {
+      if (isCallInProgress) return true;
+      if (TwilioRTC.state?.connection) {
+        const st = (typeof TwilioRTC.state.connection.status === 'function') ? TwilioRTC.state.connection.status() : 'open';
+        return st && st !== 'closed';
+      }
+      if (currentCall) {
+        const st2 = (typeof currentCall.status === 'function') ? currentCall.status() : 'open';
+        return st2 && st2 !== 'closed';
+      }
+    } catch (_) { }
+    return false;
+  };
+
+  const sendDTMF = (digit) => {
+    try {
+      const conn = currentCall || TwilioRTC.state?.connection;
+      if (conn && typeof conn.sendDigits === 'function') {
+        conn.sendDigits(String(digit));
+        console.debug('[Phone] Sent DTMF:', digit);
+      }
+      // Briefly flash the corresponding dial key for visual feedback
+      try {
+        const card = document.getElementById(WIDGET_ID);
+        if (card) {
+          const keyBtn = card.querySelector(`.dial-key[data-key="${CSS.escape(String(digit))}"]`);
+          if (keyBtn) {
+            keyBtn.classList.add('dtmf-flash');
+            setTimeout(() => { try { keyBtn.classList.remove('dtmf-flash'); } catch (_) { } }, 180);
+          }
+        }
+      } catch (_) { }
+    } catch (e) {
+      console.warn('[Phone] Failed to send DTMF:', e);
+    }
+  };
+
   function makeCard() {
     const card = document.createElement('div');
     card.className = 'widget-card phone-card';
@@ -2634,7 +2690,7 @@
       const style = document.createElement('style');
       style.id = 'phone-mini-scripts-styles';
       style.textContent = `
-        .mini-scripts { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 10px; padding: 10px; margin-top: 10px; max-height: 600px; overflow-y: auto; overflow-x: hidden; opacity: 0; transform: translateY(-4px); transition: opacity 250ms ease, transform 250ms ease; }
+        .mini-scripts { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 10px; padding: 6px; margin-top: 10px; max-height: 600px; overflow-y: auto; overflow-x: hidden; opacity: 0; transform: translateY(-4px); transition: opacity 250ms ease, transform 250ms ease; }
         .mini-scripts.--show { opacity: 1; transform: translateY(0); }
         .mini-scripts .ms-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
         .mini-scripts .ms-search { position: relative; display: flex; align-items: center; gap: 8px; flex: 1; }
@@ -2650,7 +2706,7 @@
         .mini-scripts .ms-stage-btn:hover { background: var(--grey-600); transform: translateY(-1px); }
         .mini-scripts .ms-stage-btn:active { transform: translateY(0); filter: brightness(0.98); }
         .mini-scripts .ms-stage-btn.active { background: var(--orange-primary); color: var(--text-inverse); border-color: var(--orange-primary); box-shadow: 0 2px 8px rgba(255, 107, 53, 0.25); }
-        .mini-scripts .ms-display { color: var(--text-primary); line-height: 1.4; background: var(--bg-main); border: 1px solid var(--border-light); border-radius: 8px; padding: 10px; margin: 8px 0; min-height: 60px; max-height: 300px; overflow-y: auto; overflow-x: hidden; word-wrap: break-word; opacity: 0; transition: opacity 200ms ease; scrollbar-width: thin; scrollbar-color: var(--grey-600) var(--bg-main); }
+        .mini-scripts .ms-display { color: var(--text-primary); line-height: 1.4; background: var(--bg-main); border: 1px solid var(--border-light); border-radius: 8px; padding: 6px; margin: 8px 0; min-height: 60px; max-height: 300px; overflow-y: auto; overflow-x: hidden; word-wrap: break-word; opacity: 0; transition: opacity 200ms ease; scrollbar-width: thin; scrollbar-color: var(--grey-600) var(--bg-main); }
         .mini-scripts .ms-display::-webkit-scrollbar { width: 6px; }
         .mini-scripts .ms-display::-webkit-scrollbar-track { background: var(--bg-main); border-radius: 4px; }
         .mini-scripts .ms-display::-webkit-scrollbar-thumb { background: var(--grey-600); border-radius: 4px; }
@@ -2772,7 +2828,7 @@
           transform: translateY(-1px);
         }
         .mini-scripts .ai-generate-btn svg {
-          color: var(--orange-primary);
+          color: white;
         }
         .mini-scripts .ai-content {
           font-size: 0.95rem;
@@ -2858,9 +2914,8 @@
 
     function buildMiniScriptsUI(card) {
       ensureMiniScriptsStyles();
-      const body = card.querySelector('.phone-body');
       const wrap = card.querySelector('.mini-scripts-wrap');
-      if (!body || !wrap) return;
+      if (!wrap) return;
 
       // Clear and build shell
       wrap.innerHTML = '';
@@ -2872,52 +2927,432 @@
             <input type="text" class="input-dark ms-input" placeholder="Search contact for this call…" aria-label="Search contact" autocomplete="off" />
             <div class="ms-suggest" role="listbox" aria-label="Contact suggestions" hidden></div>
           </div>
-          <div class="ms-actions">
-            <button type="button" class="icon-btn ms-reset" title="Reset/Standard Scripts" aria-label="Reset" data-action="reset">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-            </button>
-          </div>
         </div>
         <div class="ai-script-area">
           <button type="button" class="ai-generate-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-            Generate Personalized AI Script
+            <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="0"><path fill="currentColor" d="M23.426,31.911l-1.719,3.936c-0.661,1.513-2.754,1.513-3.415,0l-1.719-3.936	c-1.529-3.503-4.282-6.291-7.716-7.815l-4.73-2.1c-1.504-0.668-1.504-2.855,0-3.523l4.583-2.034	c3.522-1.563,6.324-4.455,7.827-8.077l1.741-4.195c0.646-1.557,2.797-1.557,3.443,0l1.741,4.195	c1.503,3.622,4.305,6.514,7.827,8.077l4.583,2.034c1.504,0.668,1.504,2.855,0,3.523l-4.73,2.1	C27.708,25.62,24.955,28.409,23.426,31.911z"></path><path fill="currentColor" d="M38.423,43.248l-0.493,1.131c-0.361,0.828-1.507,0.828-1.868,0l-0.493-1.131	c-0.879-2.016-2.464-3.621-4.44-4.5l-1.52-0.675c-0.822-0.365-0.822-1.56,0-1.925l1.435-0.638c2.027-0.901,3.64-2.565,4.504-4.65	l0.507-1.222c0.353-0.852,1.531-0.852,1.884,0l0.507,1.222c0.864,2.085,2.477,3.749,4.504,4.65l1.435,0.638	c0.822,0.365,0.822,1.56,0,1.925l-1.52,0.675C40.887,39.627,39.303,41.232,38.423,43.248z"></path></svg>
+            Generate AI Script
           </button>
         </div>
-        <div class="ms-stage-nav" hidden></div>
         <div class="ms-display" aria-live="polite"></div>
         <div class="ms-responses"></div>
       `;
       wrap.appendChild(el);
 
-      const state = { current: '', history: [], overrideContactId: null, monthlySpend: null, isAiMode: false };
+      const state = { overrideContactId: null };
 
-      // Setup AI Generation Event
-      const aiBtn = el.querySelector('.ai-generate-btn');
-      if (aiBtn) {
-         aiBtn.addEventListener('click', () => generateAIScript(card));
-       }
+      const display = el.querySelector('.ms-display');
+      const responses = el.querySelector('.ms-responses');
+      const inputEl = el.querySelector('.ms-input');
+      const panelEl = el.querySelector('.ms-suggest');
 
-       // Auto-trigger AI script if in call and opening for the first time
-        const inCall = (function () { 
-          try { 
-            // Look for active call in various places
-            if (typeof isCallInProgress !== 'undefined' && isCallInProgress) return true;
-            if (window.currentCall) return true;
-            if (window.TwilioRTC?.state?.connection) {
-              const st = (typeof window.TwilioRTC.state.connection.status === 'function') ? window.TwilioRTC.state.connection.status() : 'open';
-              return st && st !== 'closed';
-            }
-            // Check currentCallContext
-            if (typeof currentCallContext !== 'undefined' && currentCallContext && currentCallContext.isActive) return true;
-          } catch (_) { }
-          return false; 
-        })();
-        if (inCall) {
-          generateAIScript();
-        } else {
-          renderNode();
+      function escapeHtml(str) { if (str == null) return ''; return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
+      function splitName(s) { const parts = String(s || '').trim().split(/\s+/); return { first: parts[0] || '', last: parts.slice(1).join(' ') || '', full: String(s || '').trim() }; }
+      function normPhone(p) { return String(p || '').replace(/\D/g, '').slice(-10); }
+      function normDomain(email) { return String(email || '').split('@')[1]?.toLowerCase() || ''; }
+      function normName(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim(); }
+      function getPeopleCache() { try { return (typeof window.getPeopleData === 'function' ? (window.getPeopleData() || []) : []); } catch (_) { return []; } }
+      function getAccountsCache() { try { return (typeof window.getAccountsData === 'function' ? (window.getAccountsData() || []) : []); } catch (_) { return []; } }
+
+      function normalizeAccount(a) {
+        const obj = a ? { ...a } : {};
+        obj.name = obj.name || obj.accountName || obj.companyName || '';
+        obj.industry = obj.industry || '';
+        obj.city = obj.city || obj.locationCity || obj.billingCity || '';
+        obj.state = obj.state || obj.region || obj.billingState || '';
+        obj.website = obj.website || obj.domain || '';
+        obj.accountId = obj.accountId || obj.account_id || obj.account || obj.companyId || obj.id || '';
+        obj.supplier = obj.supplier || obj.currentSupplier || obj.current_supplier || obj.energySupplier || obj.supplierName || '';
+        obj.contract_end = obj.contract_end || obj.contractEnd || obj.contractEndDate || obj.contract_end_date || obj.renewalDate || obj.renewal_date || '';
+        obj.contractEnd = obj.contractEnd || obj.contract_end || obj.contract_end_date || obj.contractEndDate || '';
+        return obj;
+      }
+
+      function normalizeContact(c) {
+        const obj = c ? { ...c } : {};
+        const nameGuess = obj.name || ((obj.firstName || obj.first_name || '') + ' ' + (obj.lastName || obj.last_name || '')).trim();
+        const sp = splitName(nameGuess);
+        obj.firstName = obj.firstName || obj.first_name || sp.first;
+        obj.lastName = obj.lastName || obj.last_name || sp.last;
+        obj.fullName = obj.fullName || obj.full_name || nameGuess;
+        obj.name = obj.name || obj.fullName || nameGuess;
+        obj.company = obj.company || obj.companyName || obj.accountName || obj.account_name || '';
+        obj.phone = obj.phone || obj.workDirectPhone || obj.mobile || obj.otherPhone || obj.mobile_phone || '';
+        obj.mobile = obj.mobile || obj.mobile_phone || '';
+        obj.email = obj.email || obj.work_email || obj.personal_email || '';
+        obj.title = obj.title || obj.jobTitle || obj.job_title || '';
+        obj.accountId = obj.accountId || obj.account_id || obj.account || obj.companyId || '';
+        obj.id = obj.id || obj.contactId || obj._id || '';
+        return obj;
+      }
+
+      function findAccountForContact(contact) {
+        if (!contact) return {};
+        const accounts = getAccountsCache();
+        try {
+          if (contact.accountId) {
+            const hitById = accounts.find(a => String(a.id || a.accountId || a._id || '') === String(contact.accountId));
+            if (hitById) return hitById;
+          }
+        } catch (_) { }
+        const clean = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\b(llc|inc|inc\.|co|co\.|corp|corp\.|ltd|ltd\.)\b/g, ' ').replace(/\s+/g, ' ').trim();
+        const comp = clean(contact.company || contact.companyName || '');
+        if (comp) {
+          const hit = accounts.find(a => {
+            const nm = clean(a.accountName || a.name || a.companyName || '');
+            return nm && nm === comp;
+          });
+          if (hit) return hit;
         }
+        const domain = normDomain(contact.email || '');
+        if (domain) {
+          const match = accounts.find(a => {
+            const d = String(a.domain || a.website || '').toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+            return d && (domain.endsWith(d) || d.endsWith(domain));
+          });
+          if (match) return match;
+        }
+        return {};
+      }
+
+      function getAccountKey(a) { return String((a && (a.accountName || a.name || a.companyName || '')) || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim(); }
+
+      function getLiveData() {
+        const ctx = (typeof currentCallContext !== 'undefined' && currentCallContext) ? currentCallContext : {};
+        let contact = null;
+        let account = null;
+
+        if (state.overrideContactId) {
+          try {
+            const people = getPeopleCache();
+            const found = people.find(p => String(p.id || p.contactId || p._id || '') === String(state.overrideContactId));
+            if (found) contact = found;
+          } catch (_) { }
+        }
+
+        if (!contact && ctx.contactId) {
+          try {
+            const people = getPeopleCache();
+            const found = people.find(p => String(p.id || p.contactId || p._id || '') === String(ctx.contactId));
+            if (found) contact = found;
+          } catch (_) { }
+        }
+
+        if (!contact && ctx.number) {
+          try {
+            const n10 = normPhone(ctx.number);
+            const people = getPeopleCache();
+            contact = people.find(p => {
+              const candidates = [p.workDirectPhone, p.mobile, p.otherPhone, p.phone];
+              return candidates.some(ph => normPhone(ph) === n10);
+            }) || null;
+          } catch (_) { }
+        }
+
+        if (ctx.accountId) {
+          try {
+            const accounts = getAccountsCache();
+            const found = accounts.find(a => String(a.id || a.accountId || a._id || '') === String(ctx.accountId));
+            if (found) account = found;
+          } catch (_) { }
+        }
+
+        if (!account) {
+          try { account = findAccountForContact(contact) || {}; } catch (_) { account = {}; }
+        }
+
+        if ((!account || !account.name) && ctx.company) {
+          try {
+            const accounts = getAccountsCache();
+            const nm = String(ctx.company || '').trim();
+            if (nm) {
+              const hit = accounts.find(a => getAccountKey(a) === getAccountKey({ name: nm }));
+              if (hit) account = hit;
+            }
+          } catch (_) { }
+        }
+
+        contact = normalizeContact(contact);
+        account = normalizeAccount(account);
+
+        if (!account.name && (contact.company || contact.companyName)) account.name = contact.company || contact.companyName;
+        if (!account.name && ctx.company) account.name = ctx.company;
+
+        return { contact, account, ctx };
+      }
+
+      function closeSuggest() { if (panelEl) panelEl.hidden = true; }
+      function openSuggest() { if (panelEl) panelEl.hidden = false; }
+
+      function setSelectedContact(id) {
+        state.overrideContactId = id ? String(id) : null;
+        try {
+          const people = getPeopleCache();
+          const sel = people.find(p => String(p.id || p.contactId || p._id || '') === String(id));
+          if (sel && inputEl) {
+            const name = sel.name || ((sel.firstName || '') + ' ' + (sel.lastName || ''));
+            inputEl.value = String(name || '').trim();
+          }
+        } catch (_) { }
+        closeSuggest();
+      }
+
+      function buildSuggestions(q) {
+        if (!panelEl) return;
+        const people = getPeopleCache();
+        const live = getLiveData();
+        const accKey = getAccountKey(live.account);
+        const qn = String(q || '').trim().toLowerCase();
+        const filtered = people.filter(p => {
+          const nm = (p.name || ((p.firstName || '') + ' ' + (p.lastName || ''))).toLowerCase();
+          const acct = getAccountKey({ name: p.company || p.companyName || '' });
+          const matchAccount = !accKey || (acct === accKey);
+          const matchName = !qn || nm.includes(qn);
+          return matchAccount && matchName;
+        }).slice(0, 8);
+        if (!filtered.length) {
+          panelEl.innerHTML = '<div class="item" aria-disabled="true">No matches</div>';
+          openSuggest();
+          return;
+        }
+        panelEl.innerHTML = filtered.map(p => {
+          const nm = (p.name || ((p.firstName || '') + ' ' + (p.lastName || ''))) || '';
+          const first = (nm || '?').charAt(0).toUpperCase();
+          return `<div class="item" role="option" data-id="${escapeHtml(p.id || p.contactId || p._id || '')}"><div class="glyph">${escapeHtml(first)}</div><div class="label">${escapeHtml(nm)}</div></div>`;
+        }).join('');
+        openSuggest();
+      }
+
+      async function generateAIScript() {
+        if (!display) return;
+
+        const setAiButtonState = (opts = {}) => {
+          if (!aiBtn) return;
+          const isLoading = !!opts.loading;
+          aiBtn.disabled = isLoading;
+          aiBtn.classList.toggle('--loading', isLoading);
+        };
+
+        if (responses) responses.innerHTML = '';
+        display.classList.add('--visible');
+        display.innerHTML = `
+          <div class="ai-skeleton">
+            <div class="skeleton-line long"></div>
+            <div class="skeleton-line medium"></div>
+            <div class="skeleton-line long"></div>
+            <div class="skeleton-line short"></div>
+          </div>
+        `;
+
+        setAiButtonState({ loading: true });
+
+        try {
+          const live = getLiveData();
+          const ctx = live.ctx || {};
+          const inferredCompanyPhone = !!(ctx.isCompanyPhone || ((ctx.accountId || ctx.company || ctx.accountName) && !ctx.contactId && !state.overrideContactId));
+          const callFlow = inferredCompanyPhone ? 'gatekeeper' : 'decision-maker';
+          const response = await fetch('/api/ai/generate-call-script', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contact: live.contact,
+              account: live.account,
+              source: 'phone-widget',
+              callFlow,
+              dialedNumber: String(ctx.number || '')
+            })
+          });
+
+          const result = await response.json().catch(() => null);
+          if (!response.ok) throw new Error(result?.error || `HTTP ${response.status}`);
+          if (!result || !result.success) throw new Error(result?.error || 'AI Generation failed');
+
+          let scriptHtml = String(result.script || '');
+
+          // --- 1. KEY FACTS HIGHLIGHTING ---
+          const highlightPatterns = [
+            // Dates: April 2026, 10/12/2025, Jan 15th, 2025-12-31
+            /\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?\b/gi,
+            /\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/g,
+            /\b\d{4}-\d{2}-\d{2}\b/g,
+            
+            // Suppliers: SCE, PG&E, SDG&E, ConEd, etc.
+            /\b(?:SCE|PG&E|SDG&E|ConEd|National Grid|Direct Energy|Reliant|TXU|Green Mountain|Ambit|Constellation|Vistra|NextEra)\b/gi,
+            
+            // Industry terms: Broker, Capacity, Demand Charge, Renewal, kWh, Therms
+            /\b(?:Broker|Capacity Charges?|Demand Charges?|Renewal Date|LOA|Utility Bill|Electricity|Natural Gas|Kilowatt hour|kWh|Therm|Supply rate|Delivery rate|Deregulated|Energy Market|Grid)\b/gi,
+            
+            // Locations: City names and states
+            /\b(?:Buena Park|California|Texas|Dallas|Houston|New York|Chicago|Los Angeles|San Francisco|Miami|Florida|Illinois|New Jersey|Pennsylvania|Ohio)\b/gi,
+            
+            // Money & Percentages
+            /\$\d+(?:,\d+)*(?:\.\d+)?/g,
+            /\d+(?:\.\d+)?%/g
+          ];
+
+          // To avoid double-highlighting, we'll use a more careful replacement strategy
+          // We wrap all matches in a unique marker first, then replace the marker with the actual span
+          let matches = [];
+          highlightPatterns.forEach(pattern => {
+            let match;
+            while ((match = pattern.exec(scriptHtml)) !== null) {
+              matches.push({
+                start: match.index,
+                end: match.index + match[0].length,
+                text: match[0]
+              });
+            }
+          });
+
+          // Sort matches by start position, then by length (descending)
+          matches.sort((a, b) => (a.start - b.start) || (b.end - a.end));
+
+          // Filter out overlapping matches
+          let filteredMatches = [];
+          let lastEnd = -1;
+          for (const m of matches) {
+            if (m.start >= lastEnd) {
+              filteredMatches.push(m);
+              lastEnd = m.end;
+            }
+          }
+
+          // Apply matches in reverse order to keep indices valid
+          for (let i = filteredMatches.length - 1; i >= 0; i--) {
+            const m = filteredMatches[i];
+            scriptHtml = scriptHtml.substring(0, m.start) + 
+                         `<span class="ai-highlight">${m.text}</span>` + 
+                         scriptHtml.substring(m.end);
+          }
+
+          // 1. CLEANUP: Strip markdown bolding and common headers before sectioning
+          // This ensures that **Opening:** becomes Opening: so our regex can catch it
+          scriptHtml = scriptHtml.replace(/\*\*/g, '');
+          scriptHtml = scriptHtml.replace(/#{1,6}\s?/g, '');
+          scriptHtml = scriptHtml.replace(/[*_~`]/g, ''); // Strip all markdown symbols
+          scriptHtml = scriptHtml.trim();
+
+          // --- 2. VISUAL SECTIONING (P-O-S-P-C-S) ---
+          const sections = [
+            { id: 'Pre-call', regex: /^Pre\s*-?\s*call\s*[:\-]*\s*/gim },
+            { id: 'Opener', regex: /^(?:Opener|Opening|Introduction)\s*[:\-]*\s*/gim },
+            { id: 'Situation', regex: /^(?:Situation|Background)\s*[:\-]*\s*/gim },
+            { id: 'Problem', regex: /^(?:Problem|Pain Point|Challenge)\s*[:\-]*\s*/gim },
+            { id: 'Solution', regex: /^(?:Solution|Value Prop|Offer)\s*[:\-]*\s*/gim },
+            { id: 'Close', regex: /^(?:Close|Call to Action|Next Steps)\s*[:\-]*\s*/gim },
+            { id: 'Settle', regex: /^(?:Settle|Wrap-up|Follow-up)\s*[:\-]*\s*/gim }
+          ];
+
+          // We'll split the text by these markers. We use ^ marker and m flag for line-start matching
+          sections.forEach(s => {
+            scriptHtml = scriptHtml.replace(s.regex, `\n__SECTION_SPLIT__${s.id}:`);
+          });
+
+          const parts = scriptHtml.split('__SECTION_SPLIT__').filter(p => p.trim());
+          let finalHtml = '';
+
+          parts.forEach(part => {
+            const colonIndex = part.indexOf(':');
+            if (colonIndex !== -1) {
+              const label = part.substring(0, colonIndex);
+              const content = part.substring(colonIndex + 1).trim();
+              finalHtml += `
+                <div class="ai-section" data-type="${label}">
+                  <div class="ai-section-header">
+                    <div class="ai-section-label">${label}</div>
+                  </div>
+                  <div class="ai-section-body">${content.replace(/\n/g, '<br>')}</div>
+                </div>
+              `;
+            } else {
+              // Fallback for text before the first section or if format is weird
+              finalHtml += `<div class="ai-section-fallback">${part.replace(/\n/g, '<br>')}</div>`;
+            }
+          });
+
+          display.innerHTML = `
+            <div class="ai-content">
+              ${finalHtml}
+            </div>
+          `;
+
+          // Auto-scroll to show the newly generated script
+          setTimeout(() => {
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+          }, 100);
+        } catch (err) {
+          try { console.error('[Phone] AI Script Error:', err); } catch (_) { }
+          display.innerHTML = `<p style="color: var(--text-error); padding: 10px;">Error generating AI script: ${escapeHtml(err?.message || 'Unknown error')}</p>`;
+          if (responses) responses.innerHTML = '';
+        } finally {
+          setAiButtonState({ loading: false });
+        }
+      }
+
+      const aiBtn = el.querySelector('.ai-generate-btn');
+      if (aiBtn) aiBtn.addEventListener('click', generateAIScript);
+
+      if (inputEl) {
+        inputEl.addEventListener('input', () => {
+          const v = inputEl.value || '';
+          if (!v.trim()) {
+            state.overrideContactId = null;
+            closeSuggest();
+            return;
+          }
+          buildSuggestions(v);
+        });
+
+        inputEl.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') { closeSuggest(); return; }
+          if (e.key === 'Enter') {
+            const first = panelEl && panelEl.querySelector ? panelEl.querySelector('.item') : null;
+            if (first) {
+              const id = first.getAttribute('data-id');
+              if (id) {
+                setSelectedContact(id);
+                generateAIScript();
+              }
+              closeSuggest();
+              e.preventDefault();
+            }
+          }
+        });
+      }
+
+      if (panelEl) {
+        panelEl.addEventListener('click', (e) => {
+          const it = e.target && e.target.closest ? e.target.closest('.item') : null;
+          if (!it) return;
+          const id = it.getAttribute('data-id');
+          if (!id) return;
+          setSelectedContact(id);
+          generateAIScript();
+        });
+      }
+
+      document.addEventListener('click', (e) => { try { if (!el.contains(e.target)) closeSuggest(); } catch (_) { } });
+
+      const inCall = (function () {
+        try {
+          if (typeof isCallInProgress !== 'undefined' && isCallInProgress) return true;
+          if (window.currentCall) return true;
+          if (window.TwilioRTC?.state?.connection) {
+            const st = (typeof window.TwilioRTC.state.connection.status === 'function') ? window.TwilioRTC.state.connection.status() : 'open';
+            return st && st !== 'closed';
+          }
+          if (typeof currentCallContext !== 'undefined' && currentCallContext && currentCallContext.isActive) return true;
+        } catch (_) { }
+        return false;
+      })();
+
+      if (inCall) setTimeout(() => { try { generateAIScript(); } catch (_) { } }, 0);
+
+      return;
+
+      if (false) {
 
       // Data helpers (subset from scripts page)
       function escapeHtml(str) { if (str == null) return ''; return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
@@ -3288,655 +3723,6 @@
         return result;
       }
 
-      // Opener management - same as call-scripts.js
-      const OPENER_CONFIGS = {
-        default: {
-          key: 'pattern_interrupt_opening',
-          label: 'Bold Direct (Default)',
-          state: 'pattern_interrupt_opening'
-        },
-        direct_question: {
-          key: 'opener_direct_question',
-          label: 'Direct Question',
-          state: 'opener_direct_question'
-        },
-        transparent: {
-          key: 'opener_transparent',
-          label: 'Transparent',
-          state: 'opener_transparent'
-        },
-        social_proof: {
-          key: 'opener_social_proof',
-          label: 'Social Proof',
-          state: 'opener_social_proof'
-        },
-        quick_check: {
-          key: 'opener_quick_check',
-          label: 'Quick Check',
-          state: 'opener_quick_check'
-        }
-      };
-
-      let currentOpener = OPENER_CONFIGS.default;
-      let availableOpeners = [
-        OPENER_CONFIGS.direct_question,
-        OPENER_CONFIGS.transparent,
-        OPENER_CONFIGS.social_proof,
-        OPENER_CONFIGS.quick_check
-      ];
-
-      // Firebase persistence for opener selection
-      async function loadSavedOpener() {
-        try {
-          if (!window.firebaseDB) return;
-          const getUserEmail = () => {
-            try {
-              if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
-                return window.DataManager.getCurrentUserEmail();
-              }
-              return (window.currentUserEmail || '').toLowerCase();
-            } catch (_) {
-              return (window.currentUserEmail || '').toLowerCase();
-            }
-          };
-          const email = getUserEmail();
-          if (!email) return;
-
-          // Use per-user document like settings.js
-          const docId = `call-scripts-${email}`;
-          const doc = await window.firebaseDB.collection('settings').doc(docId).get();
-
-          if (doc.exists) {
-            const data = doc.data();
-            if (data && data.openerKey) {
-              const savedOpener = Object.values(OPENER_CONFIGS).find(o => o.key === data.openerKey);
-              if (savedOpener) {
-                // Update currentOpener
-                const oldDefault = currentOpener;
-                currentOpener = savedOpener;
-
-                // Update availableOpeners - remove saved opener, add old default back
-                availableOpeners = availableOpeners.filter(o => o.key !== savedOpener.key);
-                if (oldDefault && oldDefault.key !== savedOpener.key) {
-                  // Only add old default if it's different
-                  availableOpeners.push(oldDefault);
-                }
-
-                // Sync with call-scripts module if available
-                if (window.callScriptsModule) {
-                  try {
-                    window.callScriptsModule.currentOpener = currentOpener;
-                    window.callScriptsModule.availableOpeners = availableOpeners;
-                  } catch (_) { }
-                }
-
-                updateHookOpener();
-              }
-            }
-          }
-        } catch (err) {
-          console.warn('[Phone Widget] Could not load saved opener:', err);
-        }
-      }
-
-      async function saveOpenerSelection(openerKey) {
-        try {
-          if (!window.firebaseDB) return;
-          const getUserEmail = () => {
-            try {
-              if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
-                return window.DataManager.getCurrentUserEmail();
-              }
-              return (window.currentUserEmail || '').toLowerCase();
-            } catch (_) {
-              return (window.currentUserEmail || '').toLowerCase();
-            }
-          };
-          const getCurrentUserId = () => {
-            try {
-              if (window.firebase && window.firebase.auth && window.firebase.auth().currentUser) {
-                return window.firebase.auth().currentUser.uid;
-              }
-            } catch (_) { }
-            return null;
-          };
-
-          const email = getUserEmail();
-          const userId = getCurrentUserId();
-          if (!email) return;
-
-          // Use per-user document pattern from settings.js
-          const docId = `call-scripts-${email}`;
-          const docRef = window.firebaseDB.collection('settings').doc(docId);
-
-          const updateData = {
-            openerKey: openerKey,
-            ownerId: email,
-            updatedAt: window.firebase.firestore.FieldValue.serverTimestamp()
-          };
-          if (userId) updateData.userId = userId;
-
-          // Check if document exists
-          const doc = await docRef.get();
-          if (doc.exists) {
-            await docRef.update(updateData);
-          } else {
-            // Create new document with proper ownerId
-            await docRef.set({
-              ...updateData,
-              createdAt: window.firebase.firestore.FieldValue.serverTimestamp()
-            });
-          }
-        } catch (err) {
-          console.warn('[Phone Widget] Could not save opener selection:', err);
-        }
-      }
-
-      // Update hook responses to use current opener
-      function updateHookOpener() {
-        const FLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
-        if (FLOW && FLOW.hook && FLOW.hook.responses) {
-          FLOW.hook.responses.forEach(response => {
-            if (response.label === 'Yes, speaking' || response.label === "Who's calling?") {
-              response.next = currentOpener.state;
-            }
-          });
-        }
-        // Also update gatekeeper transfer to point to current opener
-        if (FLOW && FLOW.gatekeeper_transferred && FLOW.gatekeeper_transferred.responses) {
-          FLOW.gatekeeper_transferred.responses.forEach(response => {
-            if (response.label === 'Connected to decision maker') {
-              response.next = currentOpener.state;
-            }
-          });
-        }
-      }
-
-      // Flow: ALWAYS use scripts page FLOW (must be exported from call-scripts.js)
-      // Note: call-scripts.js loads before phone.js, so FLOW should be available
-      // But we'll handle the case where it's not ready yet gracefully
-      const FLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
-      if (!FLOW) {
-        // call-scripts.js may still be loading - this is OK, FLOW will be available when scripts button is clicked
-        console.warn('[Phone Widget] FLOW not available yet (call-scripts.js may still be loading) - will retry when scripts button is clicked');
-        // Don't return - continue building the UI structure, just scripts won't work until FLOW loads
-      }
-
-      const display = el.querySelector('.ms-display');
-      const responses = el.querySelector('.ms-responses');
-
-      // Load saved opener FIRST - phone widget loads independently so it works immediately
-      // This ensures the saved opener is ready when user clicks scripts button
-      let openerLoadPromise = loadSavedOpener().then(() => {
-        // After loading, sync with call-scripts module if it exists
-        if (window.callScriptsModule) {
-          try {
-            window.callScriptsModule.currentOpener = currentOpener;
-            window.callScriptsModule.availableOpeners = availableOpeners;
-          } catch (_) { }
-        }
-        // Wait a bit for FLOW to be available from call-scripts.js
-        setTimeout(() => {
-          updateHookOpener();
-        }, 300);
-      }).catch(() => {
-        // If load fails, just use default
-        updateHookOpener();
-      });
-
-      // Also sync with call-scripts module if it's already loaded (eager load)
-      if (window.callScriptsModule && window.callScriptsModule.currentOpener) {
-        const csOpener = window.callScriptsModule.currentOpener;
-        if (csOpener && csOpener.key !== OPENER_CONFIGS.default.key) {
-          // call-scripts module has the saved opener already loaded, use it
-          currentOpener = csOpener;
-          availableOpeners = window.callScriptsModule.availableOpeners || availableOpeners;
-        }
-      }
-
-      function renderNode() {
-        if (state.isAiMode) return; // Don't render standard nodes in AI mode
-
-        // Ensure FLOW is available - get fresh reference each time
-        let FLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
-        if (!FLOW) {
-          console.warn('[Phone Widget] FLOW not available yet, waiting for call-scripts.js...');
-          if (display) {
-            display.innerHTML = '<p style="color: var(--text-muted); padding: var(--spacing-md);">Loading scripts...</p>';
-          }
-          if (responses) responses.innerHTML = '';
-          // Retry after a short delay
-          setTimeout(() => {
-            FLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
-            if (FLOW) {
-              renderNode();
-            } else {
-              if (display) {
-                display.innerHTML = '<p style="color: var(--text-error); padding: var(--spacing-md);">Scripts not available. Please refresh the page.</p>';
-              }
-            }
-          }, 500);
-          return;
-        }
-
-        const key = state.current;
-        // Ensure hook is updated before rendering
-        if (key === 'hook' || (FLOW && FLOW[key] && (FLOW[key].stage === 'Opening' || FLOW[key].stage.includes('Gatekeeper')))) {
-          updateHookOpener();
-        }
-        const node = FLOW[key];
-        if (!node) { display.innerHTML = ''; responses.innerHTML = ''; buildStageNavigation(); return; }
-
-        // Update stage navigation
-        buildStageNavigation();
-
-        // Measure current height before changes
-        const currentHeight = card.getBoundingClientRect().height;
-
-        // Fade out current content
-        display.classList.remove('--visible');
-        const oldButtons = responses.querySelectorAll('.btn-secondary');
-        oldButtons.forEach(b => b.classList.remove('--visible'));
-
-        // Update DOM after brief fade
-        setTimeout(() => {
-          const live = (function () { try { return hasActiveCall() || (currentCallContext && currentCallContext.isActive); } catch (_) { return false; } })();
-          // Always render with values when contact is selected, even if not in live call
-          const hasSelectedContact = !!(state.overrideContactId);
-          const shouldRenderValues = live || hasSelectedContact;
-          display.innerHTML = shouldRenderValues ? renderTemplateValues(node.text || '') : renderTemplateChips(node.text || '');
-          responses.innerHTML = '';
-
-          // Special handling for situation_discovery and all acknowledgment states that ask about monthly spending - show input field
-          if (key === 'situation_discovery' ||
-            key === 'ack_confident_handle' ||
-            key === 'ack_struggling' ||
-            key === 'ack_no_idea' ||
-            key === 'ack_dq_confident' ||
-            key === 'ack_dq_struggling' ||
-            key === 'ack_vendor_handling') {
-            const inputWrap = document.createElement('div');
-            inputWrap.className = 'monthly-spend-input-wrap';
-            inputWrap.style.cssText = 'width: 100%; margin-bottom: 12px;';
-
-            const label = document.createElement('label');
-            label.textContent = 'Monthly Spend:';
-            label.style.cssText = 'display: block; margin-bottom: 6px; color: var(--text-primary); font-size: 14px;';
-            inputWrap.appendChild(label);
-
-            const inputContainer = document.createElement('div');
-            inputContainer.style.cssText = 'display: flex; gap: 8px; align-items: center;';
-
-            const dollarSign = document.createElement('span');
-            dollarSign.textContent = '$';
-            dollarSign.style.cssText = 'color: var(--text-primary); font-size: 16px; font-weight: 500;';
-            inputContainer.appendChild(dollarSign);
-
-            const input = document.createElement('input');
-            input.type = 'number';
-            input.placeholder = 'Enter amount (e.g., 5000)';
-            input.min = '0';
-            input.step = '100';
-            input.className = 'monthly-spend-input';
-            input.style.cssText = 'flex: 1; padding: 10px 12px; border: 1px solid var(--border-light); border-radius: 6px; background: var(--bg-main); color: var(--text-primary); font-size: 16px;';
-            if (state.monthlySpend) {
-              input.value = state.monthlySpend;
-            }
-            // Prevent dialpad clicks from interfering with input - stop propagation
-            input.addEventListener('click', (e) => {
-              e.stopPropagation();
-              e.stopImmediatePropagation();
-              input.focus();
-            });
-            input.addEventListener('focus', (e) => {
-              e.stopPropagation();
-              e.stopImmediatePropagation();
-            });
-            input.addEventListener('mousedown', (e) => {
-              e.stopPropagation();
-              e.stopImmediatePropagation();
-            });
-            input.addEventListener('keydown', (e) => {
-              e.stopPropagation();
-            });
-            // Also stop propagation on the container and wrap
-            inputContainer.addEventListener('click', (e) => {
-              e.stopPropagation();
-            });
-            inputWrap.addEventListener('click', (e) => {
-              e.stopPropagation();
-            });
-            inputContainer.appendChild(input);
-            inputWrap.appendChild(inputContainer);
-            responses.appendChild(inputWrap);
-
-            const nextBtn = document.createElement('button');
-            nextBtn.type = 'button';
-            nextBtn.className = 'btn-secondary';
-            nextBtn.textContent = 'Continue';
-            nextBtn.style.cssText = 'width: 100%; margin-bottom: 8px;';
-            const handleContinue = () => {
-              const value = parseFloat(input.value);
-              if (value && value > 0) {
-                state.monthlySpend = value;
-                if (FLOW['situation_monthly_spend']) {
-                  state.history.push(state.current);
-                  state.current = 'situation_monthly_spend';
-                  renderNode();
-                }
-              } else {
-                alert('Please enter a valid monthly spend amount.');
-              }
-            };
-            nextBtn.addEventListener('click', handleContinue);
-            input.addEventListener('keypress', (e) => {
-              if (e.key === 'Enter') {
-                handleContinue();
-              }
-            });
-            responses.appendChild(nextBtn);
-
-            // Add "Don't know offhand" button (different labels based on state)
-            const dontKnowLabel = key === 'ack_no_idea' ? "Honestly don't have a guess" :
-              key === 'ack_confident_handle' || key === 'ack_dq_confident' || key === 'ack_dq_struggling' ? "Don't know exact amount" :
-                "Don't know offhand";
-            const dontKnowBtn = document.createElement('button');
-            dontKnowBtn.type = 'button';
-            dontKnowBtn.className = 'btn-secondary';
-            dontKnowBtn.textContent = dontKnowLabel;
-            dontKnowBtn.style.cssText = 'width: 100%;';
-            dontKnowBtn.addEventListener('click', () => {
-              state.monthlySpend = null;
-              if (FLOW['situation_monthly_spend']) {
-                state.history.push(state.current);
-                state.current = 'situation_monthly_spend';
-                renderNode();
-              }
-            });
-            responses.appendChild(dontKnowBtn);
-          } else {
-            (node.responses || []).forEach(r => {
-              const b = document.createElement('button');
-              b.type = 'button';
-              b.className = 'btn-secondary';
-              b.textContent = r.label || '';
-              b.addEventListener('click', () => { if (r.next && FLOW[r.next]) { state.history.push(state.current); state.current = r.next; renderNode(); } });
-              responses.appendChild(b);
-            });
-          }
-
-          // Let CSS transition handle height smoothly
-          requestAnimationFrame(() => {
-            // Set explicit start height
-            card.style.height = currentHeight + 'px';
-            card.style.overflow = 'hidden';
-
-            requestAnimationFrame(() => {
-              // Get target height with new content
-              const tempHeight = card.style.height;
-              card.style.height = 'auto';
-              const targetHeight = card.scrollHeight;
-              card.style.height = tempHeight;
-
-              // Trigger CSS transition to target
-              requestAnimationFrame(() => {
-                card.style.height = targetHeight + 'px';
-
-                // Fade in new content
-                display.classList.add('--visible');
-                const newButtons = responses.querySelectorAll('.btn-secondary');
-                newButtons.forEach(b => b.classList.add('--visible'));
-
-                // Clean up after transition
-                const cleanup = () => {
-                  card.style.height = '';
-                  card.style.overflow = '';
-                };
-                setTimeout(cleanup, 300);
-              });
-            });
-          });
-        }, 80);
-      }
-
-      function startAt(key) { state.current = key; state.history = []; renderNode(); }
-      function goBack() { if (!state.history.length) return; state.current = state.history.pop(); renderNode(); }
-      function resetAll() {
-        // Smooth animation when resetting
-        state.current = 'opener';
-        state.history = [];
-        state.overrideContactId = null;
-        state.monthlySpend = null;
-        state.isAiMode = false;
-        
-        // Restore visibility of standard elements
-        el.querySelector('.ms-stage-nav').removeAttribute('hidden');
-        el.querySelector('.ai-script-area').removeAttribute('hidden');
-        
-        inputEl.value = '';
-        closeSuggest();
-
-        // Animate collapse smoothly
-        const currentHeight = card.getBoundingClientRect().height;
-
-        // Fade out content
-        display.classList.remove('--visible');
-        const oldButtons = responses.querySelectorAll('.btn-secondary');
-        oldButtons.forEach(b => b.classList.remove('--visible'));
-
-        setTimeout(() => {
-          // Clear content
-          display.innerHTML = '';
-          responses.innerHTML = '';
-
-          // Re-render standard node
-          renderNode();
-
-          // Animate height collapse
-          requestAnimationFrame(() => {
-            card.style.height = currentHeight + 'px';
-            card.style.overflow = 'hidden';
-
-            requestAnimationFrame(() => {
-              // Measure collapsed height
-              const tempHeight = card.style.height;
-              card.style.height = 'auto';
-              const targetHeight = card.scrollHeight;
-              card.style.height = tempHeight;
-
-              requestAnimationFrame(() => {
-                // Trigger CSS transition
-                card.style.height = targetHeight + 'px';
-
-                // Clean up after transition
-                setTimeout(() => {
-                  card.style.height = '';
-                  card.style.overflow = '';
-                }, 300);
-              });
-            });
-          });
-        }, 80);
-      }
-
-      async function generateAIScript() {
-        if (!display) return;
-
-        state.isAiMode = true;
-        const stageNav = el.querySelector('.ms-stage-nav');
-        const aiArea = el.querySelector('.ai-script-area');
-
-        stageNav.setAttribute('hidden', '');
-        aiArea.setAttribute('hidden', '');
-        responses.innerHTML = '';
-        display.classList.add('--visible');
-
-        // Show loading state
-        display.innerHTML = `
-          <div class="ai-skeleton">
-            <div class="ai-script-header">
-              <span class="ai-badge">AI Personalizing...</span>
-            </div>
-            <div class="skeleton-line long"></div>
-            <div class="skeleton-line medium"></div>
-            <div class="skeleton-line long"></div>
-            <div class="skeleton-line short"></div>
-          </div>
-        `;
-
-        try {
-          const data = getLiveData();
-          const response = await fetch('/api/ai/generate-call-script', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contact: data.contact,
-              account: data.account,
-              source: 'phone-widget'
-            })
-          });
-
-          if (!response.ok) throw new Error('AI Generation failed');
-
-          const result = await response.json();
-          if (!result.success) throw new Error(result.error || 'AI Generation failed');
-
-          // Render the AI script
-          display.innerHTML = `
-            <div class="ai-content">
-              <div class="ai-script-header">
-                <span class="ai-badge">AI Personalized Script</span>
-              </div>
-              ${result.script}
-            </div>
-          `;
-
-          // Add a "Back to Standard" button in responses
-          const backBtn = document.createElement('button');
-          backBtn.className = 'btn-secondary --visible';
-          backBtn.style.marginTop = '12px';
-          backBtn.textContent = 'Back to Standard PEACE Flow';
-          backBtn.onclick = resetAll;
-          responses.appendChild(backBtn);
-
-        } catch (err) {
-          console.error('[Phone] AI Script Error:', err);
-          display.innerHTML = `<p style="color: var(--text-error); padding: 10px;">Error generating AI script: ${err.message}</p>`;
-          
-          const retryBtn = document.createElement('button');
-          retryBtn.className = 'btn-secondary --visible';
-          retryBtn.textContent = 'Retry AI Generation';
-          retryBtn.onclick = generateAIScript;
-          responses.appendChild(retryBtn);
-
-          const backBtn = document.createElement('button');
-          backBtn.className = 'btn-secondary --visible';
-          backBtn.textContent = 'Back to Standard Scripts';
-          backBtn.onclick = resetAll;
-          responses.appendChild(backBtn);
-        }
-      }
-
-      // Phase definitions (same as call-scripts.js)
-      const PHASES = [
-        { name: 'Pre-Call', stagePattern: 'Pre-Call Prep', entryPoint: 'pre_call_qualification' },
-        { name: 'Opening', stagePattern: 'Opening', entryPoint: 'hook' },
-        { name: 'Situation', stagePattern: 'Discovery - Situation', entryPoint: 'situation_discovery' },
-        { name: 'Problem', stagePattern: 'Discovery - Problem', entryPoint: 'problem_discovery' },
-        { name: 'Consequence', stagePattern: 'Discovery - Consequence', entryPoint: 'consequence_discovery' },
-        { name: 'Solution', stagePattern: 'Discovery - Solution', entryPoint: 'solution_discovery' },
-        { name: 'Closing', stagePattern: 'Closing', entryPoint: 'trial_close_1' },
-        { name: 'Objections', stagePattern: 'Objection Handling', entryPoint: 'objection_not_interested' },
-        { name: 'Success', stagePattern: 'Success', entryPoint: 'meeting_scheduled' }
-      ];
-
-      // Build stage navigation
-      function buildStageNavigation() {
-        const stageNav = el.querySelector('.ms-stage-nav');
-        if (!stageNav) return;
-
-        // Get fresh FLOW reference each time
-        const FLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
-        if (!FLOW) {
-          console.warn('[Phone Widget] buildStageNavigation: FLOW not available yet');
-          return;
-        }
-
-        const node = FLOW[state.current] || FLOW.start;
-        const currentStage = node.stage || '';
-        // Handle gatekeeper states as part of Opening phase
-        let currentPhaseName = '';
-        if (state.current && state.current.startsWith('gatekeeper_')) {
-          currentPhaseName = 'Opening';
-        } else {
-          currentPhaseName = PHASES.find(p => currentStage.includes(p.stagePattern))?.name || '';
-          // Also check for Opening or Gatekeeper stages
-          if (!currentPhaseName && (currentStage === 'Opening' || currentStage.includes('Gatekeeper'))) {
-            currentPhaseName = 'Opening';
-          }
-        }
-
-        stageNav.innerHTML = PHASES.map(phase => {
-          const isActive = currentPhaseName === phase.name;
-          let classes = 'btn-secondary ms-stage-btn';
-          if (isActive) classes += ' active';
-          return `<button type="button" class="${classes}" data-phase="${phase.name}" data-entry="${phase.entryPoint}">${phase.name}</button>`;
-        }).join('');
-
-        // Attach click handlers
-        stageNav.querySelectorAll('.ms-stage-btn').forEach(btn => {
-          btn.addEventListener('click', () => {
-            const entryPoint = btn.getAttribute('data-entry');
-            if (entryPoint && FLOW[entryPoint]) {
-              startAt(entryPoint);
-            }
-          });
-        });
-      }
-
-      // Buttons
-      el.querySelector('.ms-back').addEventListener('click', goBack);
-      el.querySelector('.ms-reset').addEventListener('click', resetAll);
-
-      // Search suggestions (account-scoped)
-      const inputEl = el.querySelector('.ms-input');
-      const panelEl = el.querySelector('.ms-suggest');
-      function closeSuggest() { panelEl.hidden = true; }
-      function openSuggest() { panelEl.hidden = false; }
-      function setSelectedContact(id) { state.overrideContactId = id ? String(id) : null; try { const people = getPeopleCache(); const sel = people.find(p => String(p.id || p.contactId || p._id || '') === String(id)); if (sel) { const name = sel.name || ((sel.firstName || '') + ' ' + (sel.lastName || '')); inputEl.value = name; } } catch (_) { } closeSuggest(); renderNode(); }
-      function buildSuggestions(q) {
-        const people = getPeopleCache();
-        const ctxData = getLiveData();
-        const accKey = getAccountKey(ctxData.account);
-        const qn = String(q || '').trim().toLowerCase();
-        const filtered = people.filter(p => {
-          const nm = (p.name || ((p.firstName || '') + ' ' + (p.lastName || ''))).toLowerCase();
-          const acct = getAccountKey({ name: p.company || p.companyName || '' });
-          const matchAccount = !accKey || (acct === accKey);
-          const matchName = !qn || nm.includes(qn);
-          return matchAccount && matchName;
-        }).slice(0, 8);
-        if (!filtered.length) { panelEl.innerHTML = '<div class="item" aria-disabled="true">No matches</div>'; openSuggest(); return; }
-        panelEl.innerHTML = filtered.map(p => {
-          const nm = (p.name || ((p.firstName || '') + ' ' + (p.lastName || ''))) || '';
-          const first = (nm || '?').charAt(0).toUpperCase();
-          return `<div class="item" role="option" data-id="${escapeHtml(p.id || p.contactId || p._id || '')}"><div class="glyph">${first}</div><div class="label">${escapeHtml(nm)}</div></div>`;
-        }).join('');
-        openSuggest();
-      }
-      inputEl.addEventListener('input', () => { const v = inputEl.value || ''; if (!v.trim()) { state.overrideContactId = null; closeSuggest(); renderNode(); return; } buildSuggestions(v); });
-      inputEl.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSuggest(); return; } if (e.key === 'Enter') { const first = panelEl.querySelector('.item'); if (first) { const id = first.getAttribute('data-id'); if (id) setSelectedContact(id); closeSuggest(); e.preventDefault(); } } });
-      panelEl.addEventListener('click', (e) => { const it = e.target.closest && e.target.closest('.item'); if (!it) return; const id = it.getAttribute('data-id'); if (id) setSelectedContact(id); });
-      document.addEventListener('click', (e) => { if (!el.contains(e.target)) closeSuggest(); });
-
-      // Energy updates
-      let lastEnergyAt = 0; const TH = 3000;
-      const onEnergy = (ev) => { try { const now = Date.now(); if (now - lastEnergyAt < TH) return; lastEnergyAt = now; const d = ev.detail || {}; const live = getLiveData(); const contactId = live.contact?.id || live.contact?.contactId || live.contact?._id; const accountId = live.account?.id || live.account?.accountId || live.account?._id; const relevant = (d.entity === 'contact' && String(d.id) === String(contactId)) || (d.entity === 'account' && String(d.id) === String(accountId)); if (relevant) renderNode(); } catch (_) { } };
-      document.addEventListener('pc:energy-updated', onEnergy);
-
-      // Re-render on call state changes (e.g., connected -> substitute values)
-      try { card.addEventListener('callStateChanged', () => renderNode()); } catch (_) { }
-
       // --- Global Export for External Control ---
       window.Widgets = window.Widgets || {};
       window.Widgets.hangup = function () {
@@ -3964,32 +3750,7 @@
       // Initialize (if not already done by script tag position)
       openPhone();
 
-      // Initialize empty and build stage navigation
-      state.current = '';
-      // Ensure opener is loaded and FLOW is available before first render
-      openerLoadPromise.then(() => {
-        // Check FLOW is available before building navigation
-        const FLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
-        if (FLOW) {
-          buildStageNavigation();
-        } else {
-          // FLOW not ready yet, wait a bit and retry
-          setTimeout(() => {
-            const retryFLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
-            if (retryFLOW) {
-              buildStageNavigation();
-            } else {
-              console.warn('[Phone Widget] FLOW not available during initialization, will build navigation when scripts button is clicked');
-            }
-          }, 500);
-        }
-      }).catch(() => {
-        // On error, still try to build navigation if FLOW is available
-        const FLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
-        if (FLOW) {
-          buildStageNavigation();
-        }
-      });
+      }
     }
 
     function toggleMiniScripts(card) {
@@ -3997,39 +3758,9 @@
       const wrap = card.querySelector('.mini-scripts-wrap');
       if (!wrap) return;
 
-      // If scripts UI hasn't been built yet, build it now
-      // This ensures FLOW is available when scripts button is clicked
       const miniScripts = wrap.querySelector('.mini-scripts');
       if (!miniScripts) {
-        // Wait a moment to ensure call-scripts.js has finished loading
-        setTimeout(() => {
-          buildMiniScriptsUI(card);
-        }, 100);
-        return;
-      }
-
-      // Ensure FLOW is available before showing scripts
-      const displaySelector = '.ms-display';
-      let display = card.querySelector(displaySelector);
-      const FLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
-      if (!FLOW) {
-        console.warn('[Phone Widget] FLOW not available yet, waiting...');
-        // Wait a bit and retry
-        setTimeout(() => {
-          const retryFLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
-          if (retryFLOW) {
-            toggleMiniScripts(card); // Retry toggle
-          } else {
-            console.error('[Phone Widget] FLOW still not available after wait');
-            if (!display && card) {
-              display = card.querySelector(displaySelector);
-            }
-            if (display) {
-              display.innerHTML = '<p style="color: var(--text-error); padding: var(--spacing-md);">Scripts not available. Please refresh the page.</p>';
-            }
-          }
-        }, 500);
-        return;
+        buildMiniScriptsUI(card);
       }
 
       const isHidden = wrap.hasAttribute('hidden');
@@ -4140,43 +3871,6 @@
     };
 
     // Dialpad clicks
-    // Helper: detect active call connection
-    const hasActiveCall = () => {
-      try {
-        if (isCallInProgress) return true;
-        if (TwilioRTC.state?.connection) {
-          const st = (typeof TwilioRTC.state.connection.status === 'function') ? TwilioRTC.state.connection.status() : 'open';
-          return st && st !== 'closed';
-        }
-        if (currentCall) {
-          const st2 = (typeof currentCall.status === 'function') ? currentCall.status() : 'open';
-          return st2 && st2 !== 'closed';
-        }
-      } catch (_) { }
-      return false;
-    };
-    const sendDTMF = (digit) => {
-      try {
-        const conn = currentCall || TwilioRTC.state?.connection;
-        if (conn && typeof conn.sendDigits === 'function') {
-          conn.sendDigits(String(digit));
-          console.debug('[Phone] Sent DTMF:', digit);
-        }
-        // Briefly flash the corresponding dial key for visual feedback
-        try {
-          const card = document.getElementById(WIDGET_ID);
-          if (card) {
-            const keyBtn = card.querySelector(`.dial-key[data-key="${CSS.escape(String(digit))}"]`);
-            if (keyBtn) {
-              keyBtn.classList.add('dtmf-flash');
-              setTimeout(() => { try { keyBtn.classList.remove('dtmf-flash'); } catch (_) { } }, 180);
-            }
-          }
-        } catch (_) { }
-      } catch (e) {
-        console.warn('[Phone] Failed to send DTMF:', e);
-      }
-    };
     card.querySelectorAll('.dial-key').forEach(btn => {
       btn.addEventListener('click', () => {
         const k = btn.getAttribute('data-key') || '';
@@ -4462,7 +4156,16 @@
           } catch (_) { }
           // Notify widgets that a call started
           try {
-            document.dispatchEvent(new CustomEvent('callStarted', { detail: { callSid: twilioCallSid || callId } }));
+            document.dispatchEvent(new CustomEvent('callStarted', {
+              detail: {
+                callSid: twilioCallSid || callId,
+                contactName: currentCallContext.name || currentCallContext.contactName || currentCallContext.company || currentCallContext.number,
+                contactId: currentCallContext.contactId,
+                accountId: currentCallContext.accountId,
+                logoUrl: currentCallContext.logoUrl,
+                domain: currentCallContext.domain
+              }
+            }));
             const el = document.getElementById(WIDGET_ID);
             if (el) el.dispatchEvent(new CustomEvent('callStateChanged', { detail: { state: 'in-call', callSid: twilioCallSid || callId } }));
           } catch (_) { }
@@ -5716,6 +5419,32 @@
   // Track user typing activity in phone widget
   let lastUserTypingTime = 0;
   const USER_TYPING_COOLDOWN = 2000; // 2 seconds after user stops typing
+
+  // Global listeners for CRM-wide events
+  // Listen for global DTMF events (e.g. from Active Call Manager)
+  document.addEventListener('pc:send-dtmf', (e) => {
+    if (e.detail && e.detail.key) {
+      if (hasActiveCall()) {
+        sendDTMF(e.detail.key);
+      } else {
+        console.debug('[Phone] Ignoring global DTMF - no active call');
+      }
+    }
+  });
+
+  // Listen for global End Call events
+  document.addEventListener('pc:end-call', () => {
+    console.debug('[Phone] End call requested via event');
+    if (isCallInProgress) {
+      const card = document.getElementById(WIDGET_ID);
+      const hangupBtn = card ? card.querySelector('.call-btn-start') : null;
+      if (hangupBtn) {
+        hangupBtn.click();
+      } else if (currentCall) {
+        try { currentCall.disconnect(); } catch (_) { }
+      }
+    }
+  });
 
   // Global call function for CRM integration
   window.Widgets.callNumber = function (number, contactName = '', autoTrigger = false, source = 'unknown') {

@@ -65,6 +65,28 @@
     }
   }
 
+  // Scroll the widget panel to the top to bring the Maps widget into view
+  function scrollToWidgetPanelTop() {
+    const panel = document.getElementById('widget-panel');
+    if (panel) {
+      panel.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  // Update existing widget content when entity changes
+  async function updateWidgetContent() {
+    const companyName = getCompanyName();
+    const searchInput = document.getElementById('maps-search-input');
+    if (searchInput) {
+      searchInput.value = companyName;
+    }
+    
+    // If map is initialized, trigger search
+    if (map && companyName) {
+      await searchPlaces(companyName);
+    }
+  }
+
   // Get the widget panel content element
   function getPanelContentEl() {
     const panel = document.getElementById('widget-panel');
@@ -846,11 +868,25 @@
 
   // Open maps widget for contact
   function openMaps(contactId) {
+    const isSameContact = currentEntityType === 'contact' && String(currentContactId) === String(contactId);
+    const existingWidget = document.getElementById(WIDGET_ID);
+
+    // If it's the same contact and widget is already open, toggle it closed
+    if (isSameContact && existingWidget) {
+      closeMapsWidget();
+      return;
+    }
+
     currentContactId = contactId;
     currentAccountId = null;
     currentEntityType = 'contact';
     
-    removeExistingWidget();
+    // If widget is already open for a different entity, just update it
+    if (existingWidget) {
+      updateWidgetContent();
+      scrollToWidgetPanelTop();
+      return;
+    }
     
     const panelContent = getPanelContentEl();
     if (!panelContent) {
@@ -919,16 +955,31 @@
     // Initialize map after a short delay to ensure DOM is ready
     setTimeout(() => {
       initializeMap();
+      scrollToWidgetPanelTop();
     }, 100);
   }
 
   // Open maps widget for account
   function openMapsForAccount(accountId) {
+    const isSameAccount = currentEntityType === 'account' && String(currentAccountId) === String(accountId);
+    const existingWidget = document.getElementById(WIDGET_ID);
+
+    // If it's the same account and widget is already open, toggle it closed
+    if (isSameAccount && existingWidget) {
+      closeMapsWidget();
+      return;
+    }
+
     currentAccountId = accountId;
     currentContactId = null;
     currentEntityType = 'account';
     
-    removeExistingWidget();
+    // If widget is already open for a different entity, just update it
+    if (existingWidget) {
+      updateWidgetContent();
+      scrollToWidgetPanelTop();
+      return;
+    }
     
     const panelContent = getPanelContentEl();
     if (!panelContent) {
@@ -997,12 +1048,26 @@
     // Initialize map after a short delay to ensure DOM is ready
     setTimeout(() => {
       initializeMap();
+      scrollToWidgetPanelTop();
     }, 100);
   }
 
   // Check if maps widget is open
-  function isMapsOpen() {
-    return document.getElementById(WIDGET_ID) !== null;
+  function isMapsOpen(entityType, entityId) {
+    const card = document.getElementById(WIDGET_ID);
+    if (!card) return false;
+    
+    // If no type/id provided, just check if open at all
+    if (!entityType || !entityId) return true;
+    
+    // Check if open for specific entity
+    if (entityType === 'contact') {
+      return currentEntityType === 'contact' && String(currentContactId) === String(entityId);
+    } else if (entityType === 'account') {
+      return currentEntityType === 'account' && String(currentAccountId) === String(entityId);
+    }
+    
+    return true;
   }
 
   // Close maps widget

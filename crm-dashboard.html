@@ -103,17 +103,87 @@
                 <div id="active-call-display" class="active-call-display" style="display: none;">
                     <div class="active-call-info">
                         <span class="active-call-status-dot"></span>
+                        <div class="active-call-avatar" id="active-call-avatar"></div>
                         <span class="active-call-contact" id="active-call-contact-text"></span>
                         <span class="active-call-timer" id="active-call-timer">00:00</span>
                     </div>
-                    <button class="active-call-end-btn" id="active-call-end-btn" title="End Call">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path
-                                d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z">
-                            </path>
-                        </svg>
-                    </button>
+                    <div class="active-call-actions">
+                        <button class="active-call-dialpad-btn" id="active-call-dialpad-btn" title="Dial Pad">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <circle cx="7" cy="7" r="1.55"></circle>
+                                <circle cx="12" cy="7" r="1.55"></circle>
+                                <circle cx="17" cy="7" r="1.55"></circle>
+                                <circle cx="7" cy="12" r="1.55"></circle>
+                                <circle cx="12" cy="12" r="1.55"></circle>
+                                <circle cx="17" cy="12" r="1.55"></circle>
+                                <circle cx="7" cy="17" r="1.55"></circle>
+                                <circle cx="12" cy="17" r="1.55"></circle>
+                                <circle cx="17" cy="17" r="1.55"></circle>
+                            </svg>
+                        </button>
+                        <button class="active-call-end-btn" id="active-call-end-btn" title="End Call">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path
+                                    d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z">
+                                </path>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Dial Pad Popover -->
+                    <div class="active-call-dialpad-popover" id="active-call-dialpad-popover" hidden>
+                        <div class="dialpad">
+                            <button type="button" class="dial-key" data-key="1">
+                                <div class="dial-digit">1</div>
+                                <div class="dial-letters"></div>
+                            </button>
+                            <button type="button" class="dial-key" data-key="2">
+                                <div class="dial-digit">2</div>
+                                <div class="dial-letters">ABC</div>
+                            </button>
+                            <button type="button" class="dial-key" data-key="3">
+                                <div class="dial-digit">3</div>
+                                <div class="dial-letters">DEF</div>
+                            </button>
+                            <button type="button" class="dial-key" data-key="4">
+                                <div class="dial-digit">4</div>
+                                <div class="dial-letters">GHI</div>
+                            </button>
+                            <button type="button" class="dial-key" data-key="5">
+                                <div class="dial-digit">5</div>
+                                <div class="dial-letters">JKL</div>
+                            </button>
+                            <button type="button" class="dial-key" data-key="6">
+                                <div class="dial-digit">6</div>
+                                <div class="dial-letters">MNO</div>
+                            </button>
+                            <button type="button" class="dial-key" data-key="7">
+                                <div class="dial-digit">7</div>
+                                <div class="dial-letters">PQRS</div>
+                            </button>
+                            <button type="button" class="dial-key" data-key="8">
+                                <div class="dial-digit">8</div>
+                                <div class="dial-letters">TUV</div>
+                            </button>
+                            <button type="button" class="dial-key" data-key="9">
+                                <div class="dial-digit">9</div>
+                                <div class="dial-letters">WXYZ</div>
+                            </button>
+                            <button type="button" class="dial-key" data-key="*">
+                                <div class="dial-digit">*</div>
+                                <div class="dial-letters"></div>
+                            </button>
+                            <button type="button" class="dial-key" data-key="0">
+                                <div class="dial-digit">0</div>
+                                <div class="dial-letters">+</div>
+                            </button>
+                            <button type="button" class="dial-key" data-key="#">
+                                <div class="dial-digit">#</div>
+                                <div class="dial-letters"></div>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="top-bar-right">
@@ -1738,7 +1808,8 @@
                                             data...</p>
                                     </div>
                                     <div class="error-message"
-                                        style="display: none; background: var(--bg-error); border: 1px solid var(--border-error); color: var(--text-error); padding: 16px; border-radius: 8px; margin: 16px 0;"></div>
+                                        style="display: none; background: var(--bg-error); border: 1px solid var(--border-error); color: var(--text-error); padding: 16px; border-radius: 8px; margin: 16px 0;">
+                                    </div>
 
                                     <div class="client-dashboard">
                                         <!-- Overview Stats -->
@@ -3585,21 +3656,32 @@
                                                 </button>
                                                 <div class="contact-header-profile">
                                                     <div class="contact-header-text">
-                                                        <h2 class="page-title contact-page-title" id="task-detail-title">Task Details</h2>
-                                                        <div class="contact-subtitle" id="task-detail-subtitle">Loading task...</div>
+                                                        <h2 class="page-title contact-page-title"
+                                                            id="task-detail-title">Task Details</h2>
+                                                        <div class="contact-subtitle" id="task-detail-subtitle">Loading
+                                                            task...</div>
                                                     </div>
                                                 </div>
                                             </div>
                                             <div class="page-actions">
-                                                <button class="quick-action-btn task-header-btn" id="task-add-task" title="Add task" aria-label="Add task" aria-haspopup="dialog">
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+                                                <button class="quick-action-btn task-header-btn" id="task-add-task"
+                                                    title="Add task" aria-label="Add task" aria-haspopup="dialog">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                        stroke="currentColor" stroke-width="2" aria-hidden="true"
+                                                        focusable="false">
                                                         <polyline points="9,11 12,14 22,4"></polyline>
-                                                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                                                        <path
+                                                            d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11">
+                                                        </path>
                                                     </svg>
                                                 </button>
                                                 <div class="page-actions-separator"></div>
-                                                <button class="quick-action-btn reschedule-header-btn" id="task-reschedule-btn" title="Reschedule" aria-label="Reschedule task">
-                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <button class="quick-action-btn reschedule-header-btn"
+                                                    id="task-reschedule-btn" title="Reschedule"
+                                                    aria-label="Reschedule task">
+                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                        stroke-linejoin="round" aria-hidden="true">
                                                         <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                                                         <line x1="16" y1="2" x2="16" y2="6"></line>
                                                         <line x1="8" y1="2" x2="8" y2="6"></line>
@@ -3610,8 +3692,8 @@
                                                 </button>
                                                 <div class="page-actions-separator"></div>
                                                 <div class="task-navigation">
-                                                    <button class="btn-icon" id="task-prev-btn" aria-label="Previous Task"
-                                                        title="Previous Task">
+                                                    <button class="btn-icon" id="task-prev-btn"
+                                                        aria-label="Previous Task" title="Previous Task">
                                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                                                             stroke="currentColor" stroke-width="2">
                                                             <path d="M15 18l-6-6 6-6" />
@@ -3625,7 +3707,8 @@
                                                         </svg>
                                                     </button>
                                                 </div>
-                                                <button class="btn-primary" id="task-complete-btn">Complete Task</button>
+                                                <button class="btn-primary" id="task-complete-btn">Complete
+                                                    Task</button>
                                                 <div class="page-actions-separator"></div>
                                                 <div class="widgets-wrap">
                                                     <button class="btn-primary" id="task-open-widgets" title="Widgets"
@@ -3644,7 +3727,8 @@
                                                         <button type="button" class="widget-item" data-widget="lusha"
                                                             title="Prospect" aria-label="Prospect">
                                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                                                stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                                stroke="currentColor" stroke-width="2"
+                                                                aria-hidden="true">
                                                                 <circle cx="11" cy="11" r="8"></circle>
                                                                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                                                             </svg>
@@ -3652,31 +3736,39 @@
                                                         <button type="button" class="widget-item" data-widget="maps"
                                                             title="Google Maps" aria-label="Google Maps">
                                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                                                stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                                                                stroke="currentColor" stroke-width="2"
+                                                                aria-hidden="true">
+                                                                <path
+                                                                    d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                                                                 <circle cx="12" cy="10" r="3" />
                                                             </svg>
                                                         </button>
                                                         <button type="button" class="widget-item" data-widget="health"
-                                                            title="Energy Health Check" aria-label="Energy Health Check">
+                                                            title="Energy Health Check"
+                                                            aria-label="Energy Health Check">
                                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                                                stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                                                                stroke="currentColor" stroke-width="2"
+                                                                aria-hidden="true">
+                                                                <polygon
+                                                                    points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                                                             </svg>
                                                         </button>
                                                         <button type="button" class="widget-item" data-widget="deal"
                                                             title="Deal Calculator" aria-label="Deal Calculator">
                                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                                                stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                                stroke="currentColor" stroke-width="2"
+                                                                aria-hidden="true">
                                                                 <line x1="12" y1="1" x2="12" y2="23"></line>
-                                                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6">
+                                                                <path
+                                                                    d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6">
                                                                 </path>
                                                             </svg>
                                                         </button>
                                                         <button type="button" class="widget-item" data-widget="notes"
                                                             title="Notes" aria-label="Notes">
                                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                                                stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                                stroke="currentColor" stroke-width="2"
+                                                                aria-hidden="true">
                                                                 <path
                                                                     d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z">
                                                                 </path>

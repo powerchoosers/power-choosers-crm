@@ -3055,10 +3055,12 @@
         })
       });
 
-      if (!response.ok) throw new Error('Failed to generate script');
-      
-      const data = await response.json();
-      state.aiScript = data.script;
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.details || data?.error || 'Failed to generate script');
+      }
+
+      state.aiScript = data?.script || '';
     } catch (err) {
       console.error('[Call Scripts] AI Error:', err);
       state.aiScript = `<div class="error-msg">Failed to generate AI script. Please try again.</div>`;

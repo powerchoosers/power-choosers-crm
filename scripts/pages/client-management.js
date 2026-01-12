@@ -493,8 +493,6 @@
         renderClientList(); // Refresh primary contact display
       }
     });
-    
-    console.log('[ClientManagement] Real-time event listeners initialized');
   }
 
   // Calculate dashboard metrics from real data

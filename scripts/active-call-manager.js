@@ -8,9 +8,13 @@
     const contactId = 'active-call-contact-text';
     const timerId = 'active-call-timer';
     const endBtnId = 'active-call-end-btn';
+    const dialpadBtnId = 'active-call-dialpad-btn';
+    const dialpadPopoverId = 'active-call-dialpad-popover';
+    const avatarId = 'active-call-avatar';
 
     let isVisible = false;
     let currentLinkTarget = { contactId: null, accountId: null };
+    let portalizedPopover = null;
 
     function init() {
         const display = document.getElementById(displayId);
@@ -28,6 +32,36 @@
             endBtn.addEventListener('click', handleEndCall);
         }
 
+        // Dial Pad Button
+        const dialpadBtn = document.getElementById(dialpadBtnId);
+        if (dialpadBtn) {
+            dialpadBtn.addEventListener('click', toggleDialpad);
+        }
+
+        // Dial Pad Keys
+        const popover = document.getElementById(dialpadPopoverId);
+        if (popover) {
+            portalizedPopover = portalizeDialpadPopover(popover);
+
+            popover.querySelectorAll('.dial-key').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const key = btn.getAttribute('data-key');
+                    if (key) sendDTMF(key);
+                });
+            });
+
+            // Close popover when clicking outside
+            document.addEventListener('click', (e) => {
+                const btn = document.getElementById(dialpadBtnId);
+                if (!popover.classList.contains('visible')) return;
+                if (popover.contains(e.target)) return;
+                if (btn && btn.contains(e.target)) return;
+                closeDialpadPopover(popover);
+            });
+        }
+
         // Contact Click (Navigation)
         const contactEl = document.getElementById(contactId);
         if (contactEl) {
@@ -38,13 +72,21 @@
         checkInitialState();
     }
 
+    function portalizeDialpadPopover(popover) {
+        try {
+            if (!popover || popover.__pcPortalized) return popover;
+            document.body.appendChild(popover);
+            popover.__pcPortalized = true;
+        } catch (_) { }
+        return popover;
+    }
+
     function handleContactClick(e) {
         // Prevent default if it's a link (it's a span, but good practice)
         e.preventDefault();
         e.stopPropagation();
 
         if (currentLinkTarget.contactId) {
-            console.log('[ActiveCallManager] Navigating to contact:', currentLinkTarget.contactId);
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
                 window.crm.navigateToPage('contact-detail');
                 // Allow a brief moment for page to init before showing data
@@ -55,7 +97,6 @@
                 }, 100);
             }
         } else if (currentLinkTarget.accountId) {
-            console.log('[ActiveCallManager] Navigating to account:', currentLinkTarget.accountId);
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
                 window.crm.navigateToPage('account-details'); // Try account-details first
                 // Helper for account showing usually isn't as standardized as ContactDetail.show(id)
@@ -77,15 +118,16 @@
 
     function handleCallStart(e) {
         showDisplay();
-        // Try to get contact info from global context if available
-        updateContactInfo();
+        // Use enriched data from event if available
+        if (e.detail && e.detail.contactName) {
+            updateUIFromEvent(e.detail);
+        } else {
+            updateContactInfo();
+        }
     }
 
     function handleCallDuration(e) {
         if (!isVisible) showDisplay();
-
-        // Debug logging
-        // console.log('[ActiveCallManager] Duration event:', e.detail);
 
         const durationFormatted = e.detail.durationFormatted;
         const timerEl = document.getElementById(timerId);
@@ -93,29 +135,87 @@
             timerEl.textContent = durationFormatted;
         }
 
+        // Update name and navigation targets from duration event
+        updateUIFromEvent(e.detail);
+    }
+
+    function updateUIFromEvent(data) {
+        if (!data) return;
+
         // Save IDs for navigation
-        if (e.detail.contactId || e.detail.accountId) {
-            currentLinkTarget.contactId = e.detail.contactId;
-            currentLinkTarget.accountId = e.detail.accountId;
+        if (data.contactId || data.accountId) {
+            currentLinkTarget.contactId = data.contactId;
+            currentLinkTarget.accountId = data.accountId;
 
             // Update cursor style
             const contactEl = document.getElementById(contactId);
             if (contactEl) {
                 contactEl.style.cursor = 'pointer';
-                contactEl.style.textDecoration = 'underline';
+                contactEl.style.textDecoration = 'none';
             }
         }
 
-        // Use contact name from event if available, otherwise fallback to DOM scraping
-        if (e.detail.contactName) {
+        // Update contact name
+        if (data.contactName) {
             const contactEl = document.getElementById(contactId);
-            if (contactEl && contactEl.textContent !== e.detail.contactName) {
-                contactEl.textContent = e.detail.contactName;
-                contactEl.title = e.detail.contactName;
+            if (contactEl && contactEl.textContent !== data.contactName) {
+                contactEl.textContent = data.contactName;
+                contactEl.title = data.contactName;
             }
-        } else {
-            // Continuously ensure contact info is up to date (fallback)
-            updateContactInfo();
+        }
+
+        // Update Avatar/Icon
+        const avatarEl = document.getElementById(avatarId);
+        if (avatarEl) {
+            const isCompanyPhone = !!(data.isCompanyPhone || (data.accountId && !data.contactId));
+            const nameLine = data.contactName || '';
+            const logoUrl = data.logoUrl || '';
+            const domain = data.domain || '';
+            const d = domain.replace(/^https?:\/\//, '').replace(/^www\./i, '');
+
+            if (isCompanyPhone) {
+                // CRITICAL: Prevent flickering by checking if logo URL hasn't changed
+                const existingImg = avatarEl.querySelector('.company-favicon');
+                const existingSrc = existingImg ? existingImg.src : '';
+                const newSrc = logoUrl || '';
+
+                // Only update if the logo URL has actually changed
+                // If newSrc is empty but we have an existing logo, preserve it (prevents flickering on call connect)
+                if (newSrc && existingSrc !== newSrc) {
+                    // Absolute priority: explicit logoUrl provided by the page/widget
+                    if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
+                        avatarEl.innerHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: newSrc, domain: d, size: 24 });
+                    } else {
+                        avatarEl.innerHTML = `<img class="company-favicon" src="${newSrc}" alt="" style="width:24px;height:24px;border-radius:4px;object-fit:cover;">`;
+                    }
+                } else if (!newSrc && existingImg && existingSrc) {
+                    // New logoUrl is empty but we have an existing logo - preserve it to prevent flickering
+                } else if (!newSrc && !existingImg) {
+                    // No logo and no existing image - try fallbacks
+                    if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
+                        // Helper will try multiple favicon sources; fallback to accounts icon if it fails
+                        avatarEl.innerHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: '', domain: d, size: 24 });
+                    } else if (typeof window.__pcAccountsIcon === 'function') {
+                        avatarEl.innerHTML = window.__pcAccountsIcon(24);
+                    } else {
+                        // Final fallback to a building SVG if nothing else works
+                        avatarEl.innerHTML = `<div class="company-favicon-placeholder" style="width:24px;height:24px;border-radius:4px;background:var(--grey-700,#2f343a);display:flex;align-items:center;justify-content:center;color:#fff;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1"></path></svg>
+                        </div>`;
+                    }
+                }
+            } else {
+                // Individual contact: render initials avatar (letter glyphs)
+                const initials = (function () {
+                    const n = (nameLine || '').trim();
+                    if (!n) return '?';
+                    const parts = n.split(/\s+/).filter(Boolean);
+                    const a = parts[0] ? parts[0].charAt(0) : '';
+                    const b = parts.length > 1 ? parts[parts.length - 1].charAt(0) : '';
+                    return (a + b).toUpperCase();
+                })();
+                avatarEl.innerHTML = `<div class="avatar-initials" style="width:24px;height:24px;border-radius:50%;background:var(--orange-primary, #f18335);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;">${initials}</div>`;
+            }
         }
     }
 
@@ -137,27 +237,69 @@
             contactEl.style.cursor = 'default';
             contactEl.style.textDecoration = 'none';
         }
+        const avatarEl = document.getElementById(avatarId);
+        if (avatarEl) {
+            avatarEl.innerHTML = '';
+        }
+        // Hide dial pad popover if open
+        const popover = document.getElementById(dialpadPopoverId);
+        if (popover) closeDialpadPopover(popover, true);
+    }
+
+    function toggleDialpad(e) {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        const popover = document.getElementById(dialpadPopoverId);
+        if (!popover) return;
+        if (popover.classList.contains('visible')) {
+            closeDialpadPopover(popover);
+        } else {
+            openDialpadPopover(popover);
+        }
+    }
+
+    function openDialpadPopover(popover) {
+        try { popover.hidden = false; } catch (_) { }
+
+        try {
+            popover = portalizedPopover || popover;
+            const btn = document.getElementById(dialpadBtnId);
+            if (btn) {
+                const rect = btn.getBoundingClientRect();
+                const width = popover.offsetWidth || 240;
+                const leftRaw = rect.left + rect.width / 2 - width / 2;
+                const left = Math.max(8, Math.min(leftRaw, window.innerWidth - width - 8));
+                const top = rect.bottom + 12;
+                popover.style.left = `${Math.round(left)}px`;
+                popover.style.top = `${Math.round(top)}px`;
+            }
+        } catch (_) { }
+
+        requestAnimationFrame(() => {
+            try { popover.classList.add('visible'); } catch (_) { }
+        });
+    }
+
+    function closeDialpadPopover(popover, immediate) {
+        try { popover.classList.remove('visible'); } catch (_) { }
+        const delay = immediate ? 0 : 160;
+        setTimeout(() => {
+            try {
+                if (!popover.classList.contains('visible')) {
+                    popover.hidden = true;
+                }
+            } catch (_) { }
+        }, delay);
+    }
+
+    function sendDTMF(key) {
+        document.dispatchEvent(new CustomEvent('pc:send-dtmf', { detail: { key } }));
     }
 
     function handleEndCall() {
-        console.log('[ActiveCallManager] End call requested');
-
-        // 1. Try global method
-        if (window.Widgets && typeof window.Widgets.hangup === 'function') {
-            console.log('[ActiveCallManager] Using window.Widgets.hangup()');
-            window.Widgets.hangup();
-            return;
-        }
-
-        // 2. Fallback: Simulate click on the main widget's hangup button
-        const widgetStartBtn = document.querySelector('#phone-widget .call-btn-start');
-        if (widgetStartBtn) {
-            console.log('[ActiveCallManager] Clicking widget button fallback');
-            widgetStartBtn.click();
-            return;
-        }
-
-        console.warn('[ActiveCallManager] Could not find a way to end the call');
+        document.dispatchEvent(new CustomEvent('pc:end-call'));
     }
 
     function showDisplay() {
@@ -178,6 +320,8 @@
         const display = document.getElementById(displayId);
         if (display) {
             display.classList.remove('visible');
+            const popover = document.getElementById(dialpadPopoverId);
+            if (popover) closeDialpadPopover(popover, true);
             // Wait for transition to finish before setting display:none
             setTimeout(() => {
                 if (!display.classList.contains('visible')) {

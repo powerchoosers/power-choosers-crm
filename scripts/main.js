@@ -2245,14 +2245,18 @@ class PowerChoosersCRM {
                 }
             }
 
+            const inTopBar = !!(el.closest && el.closest('.top-bar'));
             let left = Math.round(rect.left + (rect.width / 2) - (ttRect.width / 2));
             let top = Math.round(rect.top - ttRect.height - gap);
-            // Keep in viewport
             left = Math.max(8, Math.min(left, window.innerWidth - ttRect.width - 8));
             if (top < 4) {
-                // Flip below if no space above
-                top = Math.round(rect.bottom + gap);
-                tooltipEl.dataset.placement = 'bottom';
+                if (inTopBar) {
+                    top = 4;
+                    tooltipEl.dataset.placement = 'top';
+                } else {
+                    top = Math.round(rect.bottom + gap);
+                    tooltipEl.dataset.placement = 'bottom';
+                }
             } else {
                 tooltipEl.dataset.placement = 'top';
             }

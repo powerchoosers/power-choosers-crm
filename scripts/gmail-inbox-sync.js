@@ -29,14 +29,12 @@
   async function getGmailAccessToken() {
     const user = firebase.auth().currentUser;
     if (!user) {
-      console.warn('[GmailSync] No user logged in');
       return null;
     }
 
     // Check if user signed in with Google
     const googleProvider = user.providerData.find(p => p.providerId === 'google.com');
     if (!googleProvider) {
-      console.warn('[GmailSync] User did not sign in with Google');
       return null;
     }
 
@@ -54,7 +52,7 @@
           return persistedToken;
         }
       } catch (storageErr) {
-        console.warn('[GmailSync] Could not read token from localStorage:', storageErr);
+        // Ignore storage errors
       }
       
       // Priority 3: Try to get from user object (usually not available)
@@ -66,7 +64,6 @@
       // Priority 4: Re-authenticate with Gmail scope (only if token is missing or expired)
       return await reauthenticateWithGmailScope();
     } catch (error) {
-      console.error('[GmailSync] Failed to get access token:', error);
       return null;
     }
   }
@@ -99,14 +96,9 @@
       
       const result = await firebase.auth().signInWithPopup(provider);
       
-      console.log('[GmailSync] Re-auth result received:', { 
-        hasResult: !!result, 
-        hasCredential: !!(result && result.credential),
-        hasUser: !!(result && result.user)
-      });
+
       
       if (!result || !result.credential) {
-        console.warn('[GmailSync] Re-auth result or credential is null');
         _isReauthenticating = false;
         return null;
       }
@@ -128,15 +120,6 @@
       return null;
     } catch (error) {
       _isReauthenticating = false;
-      console.error('[GmailSync] Popup reauthentication failed:', error);
-      
-      // Provide user-friendly error messages
-      if (error.code === 'auth/popup-closed-by-user') {
-        console.warn('[GmailSync] User closed popup - Gmail sync will not work until authenticated');
-      } else if (error.code === 'auth/popup-blocked') {
-        console.warn('[GmailSync] Popup blocked - please allow popups for this site to enable Gmail sync');
-      }
-      
       return null;
     }
   }
@@ -160,13 +143,12 @@
 
       if (!response.ok) {
         if (response.status === 401) {
-          console.warn('[GmailSync] Token expired, need to re-authenticate');
           // Clear expired token from storage
           try {
             localStorage.removeItem('pc:googleAccessToken');
             window._googleAccessToken = null;
           } catch (storageErr) {
-            console.warn('[GmailSync] Could not clear expired token:', storageErr);
+            // Ignore storage errors
           }
           return { messages: [], needsReauth: true, nextPageToken: null, resultSizeEstimate: null };
         }
@@ -181,7 +163,6 @@
         resultSizeEstimate: typeof data.resultSizeEstimate === 'number' ? data.resultSizeEstimate : null
       };
     } catch (error) {
-      console.error('[GmailSync] Failed to fetch messages:', error);
       return { messages: [], error, nextPageToken: null, resultSizeEstimate: null };
     }
   }
@@ -219,7 +200,6 @@
 
       return await response.json();
     } catch (error) {
-      console.error('[GmailSync] Failed to fetch message:', messageId, error);
       return null;
     }
   }
@@ -241,7 +221,6 @@
       }
       return new TextDecoder('utf-8').decode(bytes);
     } catch (e) {
-      console.warn('[GmailSync] Base64 decode error:', e);
       return '';
     }
   }
@@ -470,7 +449,6 @@
         .get();
       return !snap.empty;
     } catch (error) {
-      console.error('[GmailSync] Error checking email existence:', error);
       return false;
     }
   }
@@ -497,7 +475,6 @@
       const data = await response.json();
       return data.data; // base64url encoded
     } catch (error) {
-      console.error('[GmailSync] Failed to fetch attachment:', attachmentId, error);
       return null;
     }
   }
@@ -511,7 +488,6 @@
       const docRef = await db.collection('emails').add(emailData);
       return docRef.id;
     } catch (error) {
-      console.error('[GmailSync] Failed to save email:', error);
       return null;
     }
   }
@@ -536,7 +512,6 @@
     const userEmail = (window.currentUserEmail || '').toLowerCase();
 
     if (!userEmail) {
-      console.warn('[GmailSync] No user email available');
       _isSyncing = false;
       return { synced: 0, skipped: 0, status: 'no_user' };
     }
@@ -546,7 +521,6 @@
       let accessToken = await getGmailAccessToken();
       
       if (!accessToken) {
-        console.warn('[GmailSync] No access token available');
         _isSyncing = false;
         return { synced: 0, skipped: 0, status: 'no_token' };
       }
@@ -616,7 +590,6 @@
           // Fetch full message
           const fullMessage = await fetchGmailMessage(accessToken, msg.id);
           if (!fullMessage) {
-            console.warn('[GmailSync] Could not fetch message:', msg.id);
             continue;
           }
 
@@ -636,7 +609,6 @@
 
           await new Promise(resolve => setTimeout(resolve, 25));
         } catch (msgError) {
-          console.error('[GmailSync] Error processing message:', msg.id, msgError);
         }
       }
 
@@ -675,7 +647,6 @@
       return { synced, skipped, status: 'success', query, resultSizeEstimate: lastEstimate };
 
     } catch (error) {
-      console.error('[GmailSync] Sync failed:', error);
       return { synced: 0, skipped: 0, status: 'error', error };
     } finally {
       _isSyncing = false;
@@ -707,8 +678,6 @@
 
   // Auto-sync: Trigger sync when user opens the emails page
   function initAutoSync() {
-    console.log('[GmailSync] Initializing auto-sync check...');
-    
     // Check if we're on a page that should trigger sync
     const path = window.location.pathname.toLowerCase();
     const isEmailsPage = path.includes('crm-dashboard') || 
@@ -716,37 +685,22 @@
                          path === '/' ||
                          path === '/index.html';
     
-    console.log('[GmailSync] Path check:', { path, isEmailsPage });
-    
     if (isEmailsPage) {
       // Delay initial sync to let other modules load
-      console.log('[GmailSync] Scheduling auto-sync in 5s...');
       setTimeout(async () => {
         const available = isGmailSyncAvailable();
         const user = firebase.auth().currentUser;
         
-        console.log('[GmailSync] Auto-sync check:', { 
-          available, 
-          hasUser: !!user,
-          userEmail: user?.email,
-          providerData: user?.providerData?.map(p => p.providerId)
-        });
-
         if (available) {
-          console.log('[GmailSync] Auto-sync triggered on page load');
           const result = await syncGmailInbox({ maxMessages: 20 });
-          console.log('[GmailSync] Auto-sync result:', result);
         } else {
-          console.warn('[GmailSync] Auto-sync skipped: Gmail sync not available for this user session');
           
           // If user is logged in but doesn't have Google provider, maybe they need to link?
           if (user && !user.providerData.find(p => p.providerId === 'google.com')) {
-            console.log('[GmailSync] User is logged in but not via Google provider. Provider data:', user.providerData);
           }
         }
       }, 5000);
     } else {
-      console.log('[GmailSync] Not on a sync-triggering page');
     }
   }
 
@@ -770,7 +724,6 @@
       const emailDoc = await db.collection('emails').doc(emailId).get();
       
       if (!emailDoc.exists) {
-        console.error('[GmailSync] Email not found:', emailId);
         return null;
       }
       
@@ -778,14 +731,12 @@
       const gmailMessageId = email.gmailMessageId;
       
       if (!gmailMessageId) {
-        console.error('[GmailSync] No Gmail message ID for email:', emailId);
         return null;
       }
       
       // Get access token
       const accessToken = await getGmailAccessToken();
       if (!accessToken) {
-        console.error('[GmailSync] No access token available');
         return null;
       }
       
@@ -808,7 +759,6 @@
         filename: attachmentMeta?.filename || 'attachment'
       };
     } catch (error) {
-      console.error('[GmailSync] Failed to get attachment:', error);
       return null;
     }
   }
