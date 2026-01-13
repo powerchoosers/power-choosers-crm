@@ -1992,13 +1992,7 @@ var console = {
                 }
                 
                 /*
-                console.log('[Accounts][DEBUG] Setting call context:', {
-                  accountId: aid,
-                  accountName: name,
-                  contactId: contactId,
-                  contactName: contactName,
-                  phone: phone
-                });
+                // Call context set
                 */
                 
                 // Always force company-mode when calling from Accounts list

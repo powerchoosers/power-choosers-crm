@@ -14,7 +14,6 @@ class FreeSequenceAutomation {
    */
   async startSequence(sequence, contactData) {
     try {
-      console.log('[FreeSequence] Starting sequence:', sequence.name);
 
       // Get current user email for ownership
       const getUserEmail = () => {
@@ -38,7 +37,6 @@ class FreeSequenceAutomation {
       // Skip if contact has no email
       const hasEmail = contactData.email && contactData.email.trim() !== '';
       if (!hasEmail) {
-        console.log(`[FreeSequenceAutomation] Skipping sequence for ${contactData.name} - no email address`);
         throw new Error('Contact must have an email address to start sequence');
       }
 
@@ -59,7 +57,6 @@ class FreeSequenceAutomation {
       };
 
       await activationRef.set(sequenceActivationData);
-      console.log('[FreeSequence] Created sequenceActivation:', activationId);
 
       // Call server endpoint to process immediately
       try {
@@ -77,7 +74,6 @@ class FreeSequenceAutomation {
 
         if (response.ok) {
           const result = await response.json();
-          console.log('[FreeSequence] Activation processing triggered:', result);
 
           // Dispatch event to refresh emails page
           window.dispatchEvent(new CustomEvent('pc:emails-updated'));
@@ -177,8 +173,6 @@ class FreeSequenceAutomation {
         return;
       }
 
-      console.log(`[FreeSequence] Email due: ${email.id}`);
-
       // Check if email has been generated and approved
       if (email.status === 'not_generated') {
         // Generate email content (this would call your AI service)
@@ -205,7 +199,6 @@ class FreeSequenceAutomation {
    */
   async generateEmailContent(email) {
     try {
-      console.log(`[FreeSequence] Generating content for ${email.id}`);
 
       // Update status to generating (in memory and Firebase)
       email.status = 'generating';
@@ -252,7 +245,6 @@ class FreeSequenceAutomation {
               generatedAt: email.generatedAt,
               updatedAt: new Date().toISOString()
             });
-            console.log(`[FreeSequence] Updated email in Firebase with generated content: ${email.id}`);
 
             // Dispatch event to refresh emails page
             window.dispatchEvent(new CustomEvent('pc:emails-updated'));
@@ -261,7 +253,6 @@ class FreeSequenceAutomation {
           }
         }
 
-        console.log(`[FreeSequence] Generated content for ${email.id}`);
       } else {
         email.status = 'error';
         email.errorMessage = 'Failed to generate content';
@@ -370,7 +361,6 @@ class FreeSequenceAutomation {
 
       // Note: Email will be sent by server-side cron job (/api/send-scheduled-emails)
       // No need to call sendEmail() here anymore
-      console.log(`[FreeSequence] Email ${emailId} approved. Will be sent by server at scheduled time.`);
     } catch (error) {
       console.error('[FreeSequence] Failed to approve email:', error);
       throw error;
@@ -410,8 +400,6 @@ class FreeSequenceAutomation {
       // Remove notification
       const notification = document.querySelector('.email-approval-notification');
       if (notification) notification.remove();
-
-      console.log(`[FreeSequence] Email ${emailId} rejected`);
     } catch (error) {
       console.error('[FreeSequence] Failed to reject email:', error);
       throw error;
@@ -439,7 +427,6 @@ class FreeSequenceAutomation {
       const email = { id: emailId, ...emailDoc.data() };
 
       // Open email editor (you would implement this)
-      console.log(`[FreeSequence] Edit email ${emailId}`);
       // This would open your email editor modal
       // For now, just navigate to email detail page
       if (window.crm && typeof window.crm.navigateToPage === 'function') {
@@ -461,7 +448,6 @@ class FreeSequenceAutomation {
    */
   async sendEmail(email) {
     try {
-      console.log(`[FreeSequence] Sending email ${email.id}`);
 
       // Get email settings from step or use defaults
       const step = email.step || {};
@@ -495,7 +481,6 @@ class FreeSequenceAutomation {
           const user = window.firebase?.auth?.().currentUser;
           if (user?.displayName) {
             senderName = user.displayName.trim();
-            console.log('[FreeSequence] Using Firebase auth displayName as sender name:', senderName);
           }
         } catch (_) { }
 
@@ -506,13 +491,6 @@ class FreeSequenceAutomation {
       }
 
       const senderEmail = general.email || 'l.patterson@powerchoosers.com';
-
-      // Debug logging to verify sender name
-      console.log('[FreeSequence] Sender details:', {
-        email: senderEmail,
-        name: senderName,
-        source: 'settings + Firebase auth fallback'
-      });
 
       // Prepare email data for SendGrid
       const emailData = {
@@ -526,7 +504,6 @@ class FreeSequenceAutomation {
       };
 
       // Send via SendGrid
-      console.log('[FreeSequence] Sending email with fromName:', senderName);
       const result = await sendEmailViaSendGrid(emailData);
 
       if (result.success) {
@@ -534,7 +511,6 @@ class FreeSequenceAutomation {
         email.sentAt = Date.now();
         email.trackingId = result.trackingId;
         email.messageId = result.messageId;
-        console.log(`[FreeSequence] Email ${email.id} sent successfully via SendGrid`);
       } else {
         email.status = 'error';
         email.errorMessage = result.error || 'Failed to send email';
@@ -554,7 +530,6 @@ class FreeSequenceAutomation {
     if (this.isRunning) return;
 
     this.isRunning = true;
-    console.log('[FreeSequence] Free automation started');
 
     // Check every 5 minutes for any missed emails
     this.checkInterval = setInterval(() => {
@@ -584,7 +559,6 @@ class FreeSequenceAutomation {
       this.checkInterval = null;
     }
     this.isRunning = false;
-    console.log('[FreeSequence] Free automation stopped');
   }
 }
 // Sequence Builder page module (placeholder)
@@ -1050,7 +1024,6 @@ class FreeSequenceAutomation {
         // If sequence is active, automatically create sequenceActivation for this new contact
         if (hasActiveMembers || hasExistingActivations) {
           if (contact.email && !contact._skipEmailSteps) {
-            console.log('[SequenceBuilder] Sequence is active, auto-starting for new contact:', contact.name);
 
             // Create sequenceActivation for this single contact
             const activationRef = db.collection('sequenceActivations').doc();
@@ -1093,7 +1066,6 @@ class FreeSequenceAutomation {
             };
 
             await activationRef.set(sequenceActivationData);
-            console.log('[SequenceBuilder] Created auto-sequenceActivation:', activationId);
 
             // Trigger immediate processing
             try {
@@ -1109,7 +1081,6 @@ class FreeSequenceAutomation {
 
               if (response.ok) {
                 const result = await response.json();
-                console.log('[SequenceBuilder] Auto-started sequence for new contact:', result);
                 if (window.crm && typeof window.crm.showToast === 'function') {
                   window.crm.showToast(`✓ ${contact.name} added and sequence started automatically!`, 'success');
                 }
@@ -1121,7 +1092,6 @@ class FreeSequenceAutomation {
               // Contact is still added, cron will pick it up
             }
           } else {
-            console.log('[SequenceBuilder] Contact has no email, skipping auto-start');
           }
         }
       } catch (autoStartError) {
@@ -1164,8 +1134,6 @@ class FreeSequenceAutomation {
     const previousView = shouldPreserveState ? state.currentView : 'builder';
     const previousCache = shouldPreserveState ? state.sequenceMembersCache : null;
     
-    console.log(`[SequenceBuilder] show() called, isSameSequence=${isSameSequence}, preserveState=${shouldPreserveState}, previousPage=${previousStepsPage}`);
-    
     state.currentSequence = sequence;
 
     // Ensure all steps have position fields (backward compatibility)
@@ -1197,7 +1165,6 @@ class FreeSequenceAutomation {
       state.stepsTotalCount = previousTotalCount;
       state.currentView = previousView;
       state.sequenceMembersCache = previousCache;
-      console.log(`[SequenceBuilder] Restored state: page=${state.stepsPage}, loaded=${state.stepsLoadedMembers.length}, view=${state.currentView}`);
     } else {
       // Reset pagination state for new sequence
       state.stepsPage = 1;
@@ -1383,7 +1350,6 @@ class FreeSequenceAutomation {
 
             // Optionally clean up orphaned sequenceMembers records
             if (notFound.length > 0) {
-              console.log(`[SequenceBuilder] To clean up orphaned records, run: await cleanupOrphanedSequenceMembers('${sequenceId}')`);
             }
           }
 
@@ -1516,7 +1482,6 @@ class FreeSequenceAutomation {
       // If we already have enough members loaded for this page, skip fetching
       const membersNeededForPage = page * state.stepsPageSize;
       if (!reset && state.stepsLoadedMembers.length >= membersNeededForPage) {
-        console.log(`[StepsView] Already have ${state.stepsLoadedMembers.length} members, need ${membersNeededForPage} for page ${page} - skipping fetch`);
         state.stepsHasMore = state.stepsLoadedMembers.length < state.stepsTotalCount;
         return {
           members: state.stepsLoadedMembers,
@@ -1525,7 +1490,6 @@ class FreeSequenceAutomation {
         };
       }
       
-      console.log(`[StepsView] Loading page ${page}: have ${state.stepsLoadedMembers.length}, need ${membersNeededForPage}`);
 
       // Load next batch ordered by targetId (deterministic pagination w/out custom index)
       let query = db.collection('sequenceMembers')
@@ -1568,8 +1532,6 @@ class FreeSequenceAutomation {
         timestamp: Date.now()
       };
 
-      console.log(`[StepsView] Loaded page ${page}: ${newMembers.length} members (total loaded: ${state.stepsLoadedMembers.length}, hasMore: ${state.stepsHasMore})`);
-
       return {
         members: state.stepsLoadedMembers,
         hasMore: state.stepsHasMore,
@@ -1595,7 +1557,6 @@ class FreeSequenceAutomation {
 
     if (needsReset) {
       // Reset and load first page for new sequence
-      console.log('[StepsView] New sequence detected, resetting and loading first page');
       await loadSequenceMembersPage(sequenceId, 1, true);
       state.sequenceMembersCache = {
         sequenceId: sequenceId,
@@ -1604,7 +1565,6 @@ class FreeSequenceAutomation {
       };
     } else if (state.stepsLoadedMembers.length === 0) {
       // Load first page if we don't have any loaded
-      console.log('[StepsView] No members loaded, loading first page');
       await loadSequenceMembersPage(sequenceId, 1, false);
     } else {
       // Check if we need to load more for the current page
@@ -1613,7 +1573,6 @@ class FreeSequenceAutomation {
       
       if (currentPageStart >= state.stepsLoadedMembers.length && state.stepsHasMore) {
         // Need to load more pages to display current page
-        console.log(`[StepsView] Need more data for page ${state.stepsPage}: have ${state.stepsLoadedMembers.length}, need at least ${currentPageEnd}`);
         while (state.stepsLoadedMembers.length < currentPageEnd && state.stepsHasMore) {
           const pageToLoad = Math.floor(state.stepsLoadedMembers.length / state.stepsPageSize) + 1;
           await loadSequenceMembersPage(sequenceId, pageToLoad, false);
@@ -1631,7 +1590,6 @@ class FreeSequenceAutomation {
         .get();
 
       emails = emailsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      console.log(`[StepsView] Loaded ${emails.length} emails for sequence`);
     } catch (err) {
       console.error('Error loading emails:', err);
       // Continue without emails - will show "Not started" for everyone
@@ -1645,7 +1603,6 @@ class FreeSequenceAutomation {
         .get();
 
       tasks = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      console.log(`[StepsView] Loaded ${tasks.length} tasks for sequence`);
     } catch (err) {
       console.error('Error loading tasks:', err);
     }
@@ -1680,7 +1637,6 @@ class FreeSequenceAutomation {
 
     if (missingContactIds.length > 0 && db) {
       try {
-        console.log(`[StepsView] Fetching ${missingContactIds.length} missing contacts from Firestore`);
         // Fetch in batches to avoid query limits
         const batchSize = 10;
         for (let i = 0; i < missingContactIds.length; i += batchSize) {
@@ -1712,7 +1668,6 @@ class FreeSequenceAutomation {
             }
           });
         }
-        console.log(`[StepsView] Fetched ${contactsMap.size} total contacts (${missingContactIds.length} from Firestore)`);
       } catch (e) {
         console.error('[StepsView] Error fetching missing contacts:', e);
       }
@@ -1786,8 +1741,6 @@ class FreeSequenceAutomation {
         }
       }
     });
-
-    console.log('[StepsView] Contact progress mapping:', contactProgressMap.size, 'contacts with progress');
 
     // Pagination - use total count for accurate pagination
     const derivedTotal = state.currentSequence?.recordCount || state.contacts.length || 0;
@@ -2332,7 +2285,6 @@ class FreeSequenceAutomation {
       if (paginationEl && window.crm && window.crm.createPagination) {
         const totalPages = Math.max(1, Math.ceil((state.stepsTotalCount || state.stepsLoadedMembers.length || 0) / state.stepsPageSize));
         window.crm.createPagination(state.stepsPage, totalPages, async (page) => {
-          console.log(`[StepsView] Pagination: navigating to page ${page}, current loaded: ${state.stepsLoadedMembers.length}, total: ${state.stepsTotalCount}`);
           
           // Set the page BEFORE loading/rendering
           state.stepsPage = page;
@@ -2343,11 +2295,9 @@ class FreeSequenceAutomation {
           
           // Load more if we don't have enough data for this page
           if (pageStartIdx >= state.stepsLoadedMembers.length && state.stepsHasMore && state.currentSequence) {
-            console.log(`[StepsView] Need to load more data for page ${page}, pageStartIdx=${pageStartIdx}, loaded=${state.stepsLoadedMembers.length}`);
             // Load pages until we have enough
             while (state.stepsLoadedMembers.length < pageEndIdx && state.stepsHasMore) {
               const nextPageToLoad = Math.floor(state.stepsLoadedMembers.length / state.stepsPageSize) + 1;
-              console.log(`[StepsView] Loading page ${nextPageToLoad}...`);
               await loadSequenceMembersPage(state.currentSequence.id, nextPageToLoad, false);
             }
           }
@@ -2723,8 +2673,6 @@ class FreeSequenceAutomation {
                     });
                     await taskBatch.commit();
                   }
-                  
-                  console.log(`[SequenceBuilder] Deleted ${taskIds.length} sequence task(s) for contact ${id} in sequence ${state.currentSequence.id}`);
                   
                   // Clean up caches
                   taskIds.forEach(taskId => {
@@ -3207,17 +3155,6 @@ class FreeSequenceAutomation {
     // Drag-and-drop and initial normalization (in show()) already keep this array ordered,
     // so we should not resort here – otherwise steps can appear to "jump" when re-rendering.
     const sortedSteps = Array.isArray(steps) ? steps.slice() : [];
-
-    try {
-      console.log('[SequenceBuilder] renderSteps order:', sortedSteps.map((s, idx) => ({
-        idx,
-        id: s.id,
-        label: s.label,
-        position: s.position
-      })));
-    } catch (_) {
-      // Logging is best-effort only
-    }
 
     const out = [];
     sortedSteps.forEach((step, idx) => {
@@ -5994,7 +5931,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     const step = state.currentSequence?.steps?.find(s => s.id === stepId);
     if (step) {
       step.emailSettings = settings;
-      console.log('[EmailSettings] Settings saved for step:', stepId, settings);
 
       // Persist to Firestore
       try {
@@ -7013,7 +6949,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           state.stepsHasMore = true;
           state.stepsTotalCount = 0;
           state.stepsPage = 1;
-          console.log('[SequenceBuilder] Switching to Steps view, cache and pagination reset');
         }
 
         // Re-render
@@ -7025,7 +6960,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     const refreshBtn = document.getElementById('refresh-steps-btn');
     if (refreshBtn) {
       refreshBtn.addEventListener('click', async () => {
-        console.log('[SequenceBuilder] Manual refresh triggered');
         // Invalidate cache to force fresh data load
         state.sequenceMembersCache = null;
         // Reset pagination state for fresh load
@@ -7247,8 +7181,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           return;
         }
 
-        console.log('[SequenceBuilder] Contact name clicked:', contactId);
-
         // Store navigation source for back button - include full sequence for instant restore
         // Capture scroll positions before navigating away
         const tableScroller = document.querySelector('#sequence-builder-page .table-scroll');
@@ -7272,7 +7204,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           scrollY: pageScroll,
           tableScrollTop: tableScroll
         };
-        console.log(`[SequenceBuilder] Stored return state: page=${state.stepsPage}, loaded=${state.stepsLoadedMembers.length}, scrollY=${pageScroll}, tableScroll=${tableScroll}`);
 
         // Prefetch from already loaded sequence contacts first (instant)
         if (Array.isArray(state.contacts) && state.contacts.length > 0) {
@@ -7294,7 +7225,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
             const tryShowContact = () => {
               if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
                 try {
-                  console.log('[SequenceBuilder] Opening contact detail for ID:', contactId);
                   window.ContactDetail.show(contactId);
                 } catch (error) {
                   console.error('[SequenceBuilder] Error showing contact:', error);
@@ -8585,7 +8515,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           // If we extracted from DOM, store it in aiOutput for future reference
           if (aiSubject || aiBody) {
             step.data.aiOutput = { subject: aiSubject, html: aiBody };
-            console.log('[SequenceBuilder] Extracted AI output from DOM preview');
           }
         }
         
@@ -8609,14 +8538,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         step.data.body = aiBody || step.data.body || '';
         step.data.aiStatus = 'saved';
         step.data.savedAt = Date.now(); // Store timestamp
-        
-        console.log('[SequenceBuilder] Saving AI output to step:', {
-          stepId: step.id,
-          hasSubject: !!step.data.subject,
-          hasBody: !!step.data.body,
-          subjectLength: step.data.subject?.length || 0,
-          bodyLength: step.data.body?.length || 0
-        });
         
         try { 
           scheduleStepSave(step.id, true); 
@@ -9657,8 +9578,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
   // Function to start a sequence for a contact using FREE automation
   async function startSequenceForContact(sequence, contactData) {
     try {
-      console.log('[SequenceBuilder] Starting sequence for single contact via server-side processing:', contactData);
-
       // Get user email for ownership
       const getUserEmail = () => {
         try {
@@ -9713,7 +9632,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       };
 
       await activationRef.set(sequenceActivationData);
-      console.log('[SequenceBuilder] Created sequenceActivation:', activationId);
 
       // Show progress toast
       if (window.crm && typeof window.crm.showToast === 'function') {
@@ -9736,7 +9654,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
 
         if (response.ok) {
           const result = await response.json();
-          console.log('[SequenceBuilder] Sequence activation triggered:', result);
 
           if (window.crm && typeof window.crm.showToast === 'function') {
             window.crm.showToast(`✓ Sequence started for ${contactData.name || contactData.email}!`, 'success');
@@ -10110,13 +10027,11 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       if (!sequenceId) return console.error('Could not detect sequenceId. Please provide it: fixStuckMembers("seq-...")');
 
       const db = window.firebaseDB;
-      console.log(`[Fix] Checking sequence ${sequenceId}...`);
 
       // 1. Get all members
       const membersSnap = await db.collection('sequenceMembers').where('sequenceId', '==', sequenceId).get();
       const memberContactIds = new Set();
       membersSnap.forEach(doc => memberContactIds.add(doc.data().targetId));
-      console.log(`[Fix] Found ${memberContactIds.size} members.`);
 
       // 2. Get all activations
       const activationsSnap = await db.collection('sequenceActivations').where('sequenceId', '==', sequenceId).get();
@@ -10125,11 +10040,9 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         const d = doc.data();
         if (d.contactIds) d.contactIds.forEach(id => activatedContactIds.add(id));
       });
-      console.log(`[Fix] Found ${activatedContactIds.size} contacts already activated.`);
 
       // 3. Find missing
       const missingIds = [...memberContactIds].filter(id => !activatedContactIds.has(id));
-      console.log(`[Fix] Found ${missingIds.length} stuck contacts.`);
 
       if (missingIds.length === 0) return 'All good! No stuck contacts.';
 

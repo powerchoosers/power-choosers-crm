@@ -511,7 +511,6 @@
         } catch(_) {}
       }
       
-      if (DEBUG_CLICK_TO_CALL) console.log('[ClickToCall] Contact Detail phone context:', context);
       window.Widgets.setCallContext(context);
       
       // Also trigger the phone widget to show the contact display immediately
@@ -1132,10 +1131,6 @@
     processSpecificPhoneElements: processSpecificPhoneElements,
     // Debug function to test phone number validation
     testPhoneNumber: function(text) {
-      console.log('Testing phone number:', text);
-      console.log('isValidPhoneNumber result:', isValidPhoneNumber(text));
-      console.log('parsePhoneWithExtension result:', parsePhoneWithExtension(text));
-      console.log('formatPhoneForDisplay result:', formatPhoneForDisplay(text));
     }
   };
 

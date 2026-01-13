@@ -30,7 +30,6 @@ class BackgroundLoaderCoordinator {
    * Coordinate all background loading with proper sequencing
    */
   async coordinateLoading() {
-    console.log('[Hypothesis: Page Load Delay] coordinateLoading started');
     if (this.loading) {
       // Wait for existing loading to complete
       await Promise.all(Array.from(this.loadingPromises.values()));
@@ -60,7 +59,6 @@ class BackgroundLoaderCoordinator {
    * Load a specific collection with deduplication
    */
   async loadCollection(collection) {
-    console.log('[Hypothesis: Page Load Delay] loadCollection requested:', collection);
     // Skip if already loaded or loading
     if (this.loadedCollections.has(collection) || this.loadingPromises.has(collection)) {
       return this.loadingPromises.get(collection);

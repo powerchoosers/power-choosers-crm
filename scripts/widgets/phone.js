@@ -8,7 +8,6 @@
 
   // Debug wrapper for this module (disabled by default)
   function phoneLog() {
-    try { if (window.CRM_DEBUG_PHONE) console.debug.apply(console, arguments); } catch (_) { }
   }
 
   // Business phone number for fallback calls
@@ -218,14 +217,14 @@
         throw new Error('Missing API_BASE_URL');
       }
 
-      try { console.debug('[TwilioRTC] ensureDevice: API base =', base); } catch (_) { }
+      try { } catch (_) { }
       state.connecting = true;
 
       try {
         // Get Twilio access token
         const tokenUrl = `${base}/api/twilio/token?identity=agent`;
         const resp = await fetch(tokenUrl);
-        try { console.debug('[TwilioRTC] Token fetch status =', resp.status); } catch (_) { }
+        try { } catch (_) { }
 
         const j = await resp.json().catch(() => ({}));
         if (!resp.ok || !j?.token) {
@@ -270,19 +269,15 @@
 
           if (inputDevices && inputDevices.size > 0) {
             const deviceIds = Array.from(inputDevices.keys());
-            console.debug('[TwilioRTC] Available input devices during init:', deviceIds);
 
             if (!deviceIds.includes('default') && deviceIds.length > 0) {
               inputDeviceId = deviceIds[0];
-              console.debug('[TwilioRTC] Using first available input device:', inputDeviceId);
             }
           }
 
           await state.device.audio.setInputDevice(inputDeviceId);
-          console.debug('[TwilioRTC] Input device set to:', inputDeviceId);
         } catch (e) {
           // Changed from console.warn to console.debug as this is often expected noise when 'default' device isn't available
-          console.debug('[TwilioRTC] Failed to set input device (expected if default not found):', e);
           // Try without any specific device
           try {
             await state.device.audio.unsetInputDevice();
@@ -291,7 +286,6 @@
 
         // Set up device event handlers
         state.device.on('registered', () => {
-          console.debug('[TwilioRTC] Device registered and ready');
           // Browser calling ready
         });
 
@@ -314,7 +308,6 @@
               } catch (_) { }
             }
 
-            console.debug('[TwilioRTC] Token error detected, attempting immediate refresh...');
             setTimeout(async () => {
               try {
                 const refreshResp = await fetch(`${base}/api/twilio/token?identity=agent`);
@@ -324,7 +317,6 @@
                   // Validate new token before updating
                   if (refreshData.token.split('.').length === 3) {
                     state.device.updateToken(refreshData.token);
-                    console.debug('[TwilioRTC] Emergency token refresh successful');
                   } else {
                     console.error('[TwilioRTC] Emergency token refresh failed - invalid token format');
                   }
@@ -346,7 +338,6 @@
         // Handle device changes (e.g., headset plugged in/out)
         // According to Twilio best practices
         state.device.audio.on('deviceChange', () => {
-          console.debug('[TwilioRTC] Audio devices changed');
           // Update UI with new device list if needed
         });
 
@@ -358,16 +349,13 @@
 
             if (outputDevices && outputDevices.size > 0) {
               const deviceIds = Array.from(outputDevices.keys());
-              console.debug('[TwilioRTC] Available output devices during init:', deviceIds);
 
               if (!deviceIds.includes('default') && deviceIds.length > 0) {
                 outputDeviceId = deviceIds[0];
-                console.debug('[TwilioRTC] Using first available output device during init:', outputDeviceId);
               }
             }
 
             state.device.audio.speakerDevices.set(outputDeviceId);
-            console.debug('[TwilioRTC] Output device set during init:', outputDeviceId);
           } catch (e) {
             console.warn('[TwilioRTC] Failed to set output device during init:', e);
           }
@@ -381,8 +369,7 @@
         } catch (_) { }
 
         state.device.on('incoming', async (conn) => {
-          console.debug('[TwilioRTC] Incoming call event fired:', conn);
-          console.log('[TwilioRTC] DEBUG: Incoming call detected. Device ready:', state.ready);
+          // console.log('[TwilioRTC] DEBUG: Incoming call detected. Device ready:', state.ready);
 
           // Do NOT open widget yet - only show toast notification
           // Widget will open when user clicks "Answer" on the toast
@@ -430,7 +417,6 @@
             // Do NOT auto-accept. Show a distinct incoming-call notification first.
             // Use originalCaller parameter if available, otherwise fall back to From
             const number = conn.customParameters?.originalCaller || conn.parameters?.From || '';
-            console.debug('[TwilioRTC] Incoming call from number:', number, 'Original caller:', conn.customParameters?.originalCaller, 'Full parameters:', conn.parameters);
 
             // [AGENT FIX] CRITICAL: Clear stale call context BEFORE resolving incoming caller.
             // Without this, resolvePhoneMeta() would return the LAST OUTBOUND call's data instead
@@ -455,7 +441,6 @@
             let initialToastId = null;
             try {
                 if (window.ToastManager) {
-                    console.log('[TwilioRTC] DEBUG: ToastManager found, attempting to show initial toast');
                     const initialCallData = {
                         callerName: '', // Unknown initially
                         callerNumber: number,
@@ -474,7 +459,6 @@
                         connection: conn
                     };
                     initialToastId = window.ToastManager.showCallNotification(initialCallData);
-                    console.log('[TwilioRTC] DEBUG: Initial toast shown with ID:', initialToastId);
                     
                     // Store in pending state immediately so cancellation handles it
                     TwilioRTC.state.pendingIncoming = conn;
@@ -482,15 +466,13 @@
                         TwilioRTC.state.pendingIncoming.toastId = initialToastId;
                     }
                 } else {
-                    console.error('[TwilioRTC] DEBUG: Window.ToastManager is missing!');
+                    // Window.ToastManager is missing
                 }
             } catch (err) {
-                console.error('[TwilioRTC] DEBUG: Error showing initial toast:', err);
+                // Error showing initial toast
             }
 
-            console.log('[TwilioRTC] DEBUG: Starting resolvePhoneMeta...');
             const meta = await resolvePhoneMeta(number);
-            console.log('[TwilioRTC] DEBUG: resolvePhoneMeta completed:', meta);
 
             // Pre-warm the icon cache as soon as we have meta (before toast shows)
             if (meta && meta.domain && window.__pcFaviconHelper) {
@@ -507,7 +489,6 @@
 
             // Listen for connection events immediately
             conn.on('accept', () => {
-              console.debug('[TwilioRTC] Incoming call connection accepted');
               isCallInProgress = true;
               state.connection = conn;
               currentCall = conn; // Set global connection reference
@@ -551,7 +532,6 @@
 
               // Cleanup on disconnect - Handle cleanup regardless of who hangs up
               const cleanup = () => {
-                console.debug('[TwilioRTC] Incoming call connection cleanup (disconnect/cancel/error)');
                 isCallInProgress = false;
                 state.connection = null;
 
@@ -599,17 +579,6 @@
 
             // Update enhanced toast notification with resolved metadata
             if (window.ToastManager && initialToastId) {
-              console.log('[TwilioRTC] DEBUG: Updating toast notification with resolved data');
-              console.debug('[TwilioRTC] Updating toast notification with data:', {
-                name: meta.name,
-                account: meta.account,
-                title: meta.title,
-                city: meta.city,
-                state: meta.state,
-                domain: meta.domain,
-                logoUrl: meta.logoUrl
-              });
-
               const callData = {
                 callerName: meta.name || '',
                 callerNumber: number,
@@ -634,10 +603,9 @@
                   window.ToastManager.updateCallNotification(initialToastId, callData);
                   callData.toastId = initialToastId;
               } catch (e) {
-                  console.error('[TwilioRTC] DEBUG: Failed to update toast:', e);
+                  // Failed to update toast
               }
             } else if (window.ToastManager) {
-                console.log('[TwilioRTC] DEBUG: No initial toast found, creating new one after resolve');
                 // Fallback if no initial toast (shouldn't happen with new flow)
                  const callData = {
                     callerName: meta.name || '',
@@ -686,7 +654,6 @@
             // If the caller hangs up (cancels) before we accept, immediately clean up UI/state
             try {
               conn.on('cancel', () => {
-                console.debug('[TwilioRTC] Incoming call canceled by remote - cleaning up UI');
 
                 // Add missed call notification to badge
                 if (window.Notifications && typeof window.Notifications.addMissedCall === 'function') {
@@ -756,7 +723,6 @@
                     window.Notifications.addMissedCall(from, null);
                   }
                 } catch (_) { }
-                console.debug('[TwilioRTC] Incoming cancel cleanup complete');
               });
             } catch (_) { }
 
@@ -765,12 +731,10 @@
 
             const accept = async () => {
               try {
-                console.debug('[TwilioRTC] Accepting incoming call after user click');
                 // Guard: if call already canceled/closed, ignore accept
                 try {
                   const status = (typeof conn.status === 'function') ? conn.status() : 'unknown';
                   if (conn._canceled || (status && status !== 'pending')) {
-                    console.warn('[TwilioRTC] Incoming call no longer available, status:', status, '- ignoring accept');
                     TwilioRTC.state.pendingIncoming = null;
                     TwilioRTC.state.connection = null;
                     isCallInProgress = false;
@@ -814,7 +778,6 @@
                       const deviceIds = Array.from(inputDevices.keys());
                       if (!deviceIds.includes('default') && deviceIds.length > 0) {
                         inputDeviceId = deviceIds[0];
-                        console.debug('[TwilioRTC] Using first available input device for call:', inputDeviceId);
                       }
                     }
                     await state.device.audio.setInputDevice(inputDeviceId);
@@ -869,7 +832,6 @@
                   isCompanyPhone: !!(meta?.account && !meta?.contactId),
                   isActive: true
                 };
-                console.debug('[Phone] Incoming call context set on accept:', currentCallContext);
 
                 // Start live timer banner
                 startLiveCallTimer(document.getElementById(WIDGET_ID), incomingCallSid);
@@ -880,7 +842,6 @@
 
                   const input = card.querySelector('.phone-display');
                   if (input) {
-                    console.debug('[Phone] Setting input to caller number:', number);
                     input.value = number;
                   }
                   // Show rich contact display and keep header title clean
@@ -898,7 +859,6 @@
                 }
 
                 conn.on('disconnect', () => {
-                  console.debug('[Phone] Call disconnected');
 
                   // Record call in notification system
                   if (window.Notifications && typeof window.Notifications.addCallCompleted === 'function') {
@@ -954,7 +914,6 @@
                   if (widget) {
                     const btn = widget.querySelector('.call-btn-start');
                     if (btn) {
-                      console.debug('[Phone] DISCONNECT: Setting button to "Call" state');
                       btn.textContent = 'Call';
                       btn.classList.remove('btn-danger');
                       btn.classList.add('btn-primary');
@@ -981,7 +940,6 @@
 
                   // Force UI update to ensure button state is visible
                   setInCallUI(false);
-                  console.debug('[Phone] DISCONNECT: UI cleanup complete, call should show as ended');
 
                   // Fire-and-forget termination of all related call legs
                   const callSidsToTerminate = [];
@@ -1007,7 +965,6 @@
                   if (callSidsToTerminate.length > 0) {
                     try {
                       const base = (window.API_BASE_URL || '').replace(/\/$/, '');
-                      console.debug('[Phone] DISCONNECT: Terminating all call legs:', callSidsToTerminate);
                       fetch(`${base}/api/twilio/hangup`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ callSids: callSidsToTerminate })
@@ -1078,7 +1035,6 @@
 
             // Define reject handler for user-initiated decline
             const reject = () => {
-              console.debug('[TwilioRTC] Rejecting incoming call (user action)');
               try {
                 // Use original reject if wrapped
                 if (typeof conn._reject === 'function') {
@@ -1139,7 +1095,6 @@
         // Belt-and-suspenders: device-level disconnect handler to ensure cleanup
         try {
           state.device.on('disconnect', (conn) => {
-            try { console.debug('[TwilioRTC] Device-level disconnect observed', conn?.parameters || {}); } catch (_) { }
             // Clear connection state
             TwilioRTC.state.connection = null;
             TwilioRTC.state.pendingIncoming = null;
@@ -1166,7 +1121,6 @@
             setInCallUI(false); // Ensure consistent UI reset
             lastCallCompleted = Date.now();
             autoTriggerBlockUntil = Date.now() + 10000;
-            console.debug('[TwilioRTC] Device-level disconnect cleanup complete');
           });
         } catch (_) { }
 
@@ -1180,13 +1134,11 @@
 
         state.tokenRefreshTimer = setInterval(async () => {
           try {
-            console.debug('[TwilioRTC] Refreshing access token...');
             const refreshResp = await fetch(`${base}/api/twilio/token?identity=agent`);
             const refreshData = await refreshResp.json().catch(() => ({}));
 
             if (refreshResp.ok && refreshData?.token && state.device) {
               state.device.updateToken(refreshData.token);
-              console.debug('[TwilioRTC] Token refreshed successfully');
             } else {
               console.warn('[TwilioRTC] Token refresh failed:', refreshData?.error || 'No token received');
             }
@@ -1195,7 +1147,6 @@
           }
         }, 50 * 60 * 1000); // 50 minutes
 
-        try { console.debug('[TwilioRTC] Device ready with token refresh enabled'); } catch (_) { }
         state.ready = true;
 
         // Request browser notification permission for incoming calls
@@ -1228,8 +1179,6 @@
     // Accept incoming call
     function acceptCall() {
       if (state.pendingIncoming) {
-        console.debug('[TwilioRTC] Accepting incoming call via public API');
-
         const conn = state.pendingIncoming;
         const toastId = conn.toastId;
 
@@ -1259,8 +1208,6 @@
     // Decline incoming call
     function declineCall() {
       if (state.pendingIncoming) {
-        console.debug('[TwilioRTC] Declining incoming call');
-
         // Store toast ID before clearing pending state
         const toastId = state.pendingIncoming.toastId;
 
@@ -1524,7 +1471,6 @@
           storedProgrammaticContext = input._programmaticContext;
           // If we found stored context and currentCallContext is empty, restore it immediately
           if (storedProgrammaticContext && (!currentCallContext || !currentCallContext.accountId) && !currentCallContext?.contactId && !currentCallContext?.name && !currentCallContext?.company) {
-            console.debug('[Phone] resolvePhoneMeta: Restoring context from stored programmatic context');
             currentCallContext = {
               number: storedProgrammaticContext.number || '',
               name: storedProgrammaticContext.name || '',
@@ -1609,7 +1555,6 @@
               if (j) {
                 // Skip disabled endpoints
                 if (j.success === false && j.disabled) {
-                  console.debug('[Phone] Memoized route is disabled, invalidating memo');
                   window.__pcPhoneSearchRoute = null;
                 } else {
                   let c = j.contact || (Array.isArray(j.contacts) && j.contacts[0]) || j.person || ((j.name || j.title || j.email) ? j : null);
@@ -1629,7 +1574,6 @@
                       contactId: meta.contactId || (c && (c.id || c.contactId || c._id)) || null,
                       accountId: meta.accountId || (a && (a.id || a.accountId || a._id)) || null
                     };
-                    console.debug('[Phone] Resolved metadata (memoized route):', { url, resolved });
                     return resolved;
                   }
                 }
@@ -1662,17 +1606,14 @@
             try {
               const resp = await fetch(r.url, r.method === 'POST' ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(r.body) } : undefined);
               if (!resp || !resp.ok) {
-                console.debug('[Phone] Search route failed:', r.url, resp.status);
                 continue;
               }
               const j = await resp.json().catch(() => ({}));
               if (!j) {
-                console.debug('[Phone] Search route returned no JSON:', r.url);
                 continue;
               }
               // Skip disabled endpoints (they return success: false with message)
               if (j.success === false && j.disabled) {
-                console.debug('[Phone] Search route is disabled:', r.url);
                 continue;
               }
               // Accept several shapes
@@ -1703,7 +1644,6 @@
                   contactId: meta.contactId || (c && (c.id || c.contactId || c._id)) || null,
                   accountId: meta.accountId || (a && (a.id || a.accountId || a._id)) || null
                 };
-                console.debug('[Phone] Resolved metadata from CRM (flex routes):', { route: r.url, resolved });
                 // Remember a winning route to reduce future attempts
                 try {
                   if (r.method === 'GET') {
@@ -2483,7 +2423,6 @@
   function resetMicrophonePermission() {
     TwilioRTC.state.micPermissionGranted = false;
     TwilioRTC.state.micPermissionChecked = false;
-    console.debug('[Phone] Microphone permission state reset');
   }
 
   function getPanelContentEl() {
@@ -2667,7 +2606,6 @@
       const conn = currentCall || TwilioRTC.state?.connection;
       if (conn && typeof conn.sendDigits === 'function') {
         conn.sendDigits(String(digit));
-        console.debug('[Phone] Sent DTMF:', digit);
       }
       // Briefly flash the corresponding dial key for visual feedback
       try {
@@ -3798,7 +3736,6 @@
       // --- Global Export for External Control ---
       window.Widgets = window.Widgets || {};
       window.Widgets.hangup = function () {
-        console.log('[Phone] Global hangup requested');
         // 1. Try clicking the visual button first (triggers UI flow)
         const btn = document.querySelector('#phone-widget .call-btn-start');
         if (btn && btn.classList.contains('btn-danger')) {
@@ -3995,7 +3932,6 @@
           console.debug('[Phone] Input event from programmatic set - preserving context');
           // If we have stored context but currentCallContext was cleared, restore it
           if (hasStoredContextData && !hasContextData && storedContext) {
-            console.debug('[Phone] Restoring context from stored programmatic context');
             currentCallContext = {
               number: storedContext.number || '',
               name: storedContext.name || '',
@@ -4051,7 +3987,6 @@
         // Reuse hasContextData already declared above
 
         if (value.trim() && currentCallContext.isActive === false && !isCallInProgress && !valueMatchesContext && !hasContextData) {
-          console.debug('[Phone] User typing new number - clearing stale context');
           currentCallContext = {
             number: '',
             name: '',
@@ -4073,7 +4008,6 @@
         // BUT: Don't clear context if a call is currently in progress
         if (value.trim() && currentCallContext.isActive && currentCallContext.number &&
           currentCallContext.number !== value.trim() && !isCallInProgress) {
-          console.debug('[Phone] User typing different number - clearing existing context');
           currentCallContext = {
             number: '',
             name: '',
@@ -4099,8 +4033,6 @@
     if (scriptsToggle && !scriptsToggle._bound) { scriptsToggle.addEventListener('click', () => toggleMiniScripts(card)); scriptsToggle._bound = true; }
 
     async function placeBrowserCall(number, extension = '') {
-      console.debug('[Phone] Attempting browser call to:', number, extension ? `ext. ${extension}` : '');
-
       try {
         const device = await TwilioRTC.ensureDevice();
 
@@ -4163,13 +4095,10 @@
 
         // Get selected phone number from settings for caller ID
         const selectedCallerId = getSelectedPhoneNumber();
-        console.debug('[Phone] Using caller ID:', selectedCallerId);
 
         // Verify TwiML App configuration before making call
         const base = (window.API_BASE_URL || '').replace(/\/$/, '');
         const expectedVoiceUrl = `${base}/api/twilio/voice`;
-        console.debug('[Phone] Expected TwiML App Voice URL:', expectedVoiceUrl);
-        console.debug('[Phone] Make sure your TwiML App (configured in TWILIO_TWIML_APP_SID) has Voice URL set to:', expectedVoiceUrl);
 
         // Make the call with recording enabled via TwiML app
         // Pass From parameter so TwiML webhook can use it as callerId
@@ -4180,7 +4109,6 @@
               From: selectedCallerId  // Pass selected Twilio number as caller ID
             }
           });
-          console.debug('[Phone] Browser call initiated successfully via TwiML App');
         } catch (connectError) {
           console.error('[Phone] device.connect() failed:', connectError);
           console.error('[Phone] Error details:', {
@@ -4200,8 +4128,6 @@
         // Store outbound connection globally for unified cleanup paths
         try { TwilioRTC.state.connection = currentCall; } catch (_) { }
 
-        console.debug('[Phone] Call initiated');
-
         // Set UI immediately for responsiveness
         setInCallUI(true);
 
@@ -4216,7 +4142,6 @@
 
         // Handle call events
         currentCall.on('accept', async () => {
-          console.debug('[Phone] Call connected');
           isCallInProgress = true;
           currentCallContext.isActive = true;
           currentCallContext.number = number;
@@ -4224,7 +4149,6 @@
             // Capture the Twilio CallSid if exposed by the SDK
             const p = (currentCall && (currentCall.parameters || currentCall._parameters)) || {};
             twilioCallSid = p.CallSid || p.callSid || null;
-            if (twilioCallSid) console.debug('[Phone] Captured Twilio CallSid:', twilioCallSid);
           } catch (_) { }
           // Notify widgets that a call started
           try {
@@ -4259,8 +4183,6 @@
               currentCallContext.accountName
             ));
 
-            console.debug('[Phone] Call accept - hasExistingContext:', hasExistingContext, 'currentCallContext:', currentCallContext);
-
             let meta = {};
             // CRITICAL: Capture context snapshot BEFORE async operations to prevent it from being cleared
             const contextSnapshot = hasExistingContext ? {
@@ -4280,14 +4202,12 @@
 
             if (!hasExistingContext) {
               // Only resolve if we don't have context - prevents DOM lookup after navigation
-              console.debug('[Phone] No existing context, resolving phone meta for:', number);
               // Pass contextSnapshot (or currentCallContext if snapshot is null) to preserve any context that might exist
               meta = await resolvePhoneMeta(number, contextSnapshot || currentCallContext).catch((err) => {
                 console.warn('[Phone] Failed to resolve phone meta:', err);
                 return {};
               });
             } else {
-              console.debug('[Phone] Using existing context, skipping phone meta resolution');
               // Use the context snapshot to build meta for display
               if (contextSnapshot) {
                 meta = {
@@ -4363,8 +4283,6 @@
         });
 
         currentCall.on('disconnect', () => {
-          console.debug('[Phone] Call disconnected');
-
           // Only set critical flags immediately - everything else goes to worker
           const disconnectTime = Date.now();
           lastCallCompleted = disconnectTime;
@@ -4418,7 +4336,6 @@
           if (widget) {
             const btn = widget.querySelector('.call-btn-start');
             if (btn) {
-              console.debug('[Phone] DISCONNECT: Setting button to "Call" state');
               btn.textContent = 'Call';
               btn.classList.remove('btn-danger');
               btn.classList.add('btn-primary');
@@ -4426,7 +4343,6 @@
               btn.disabled = true;
               setTimeout(() => {
                 btn.disabled = false;
-                console.debug('[Phone] DISCONNECT: Button re-enabled after 2s cooldown');
               }, 2000);
             }
             const input = widget.querySelector('.phone-display');
@@ -4439,7 +4355,6 @@
 
           // Force UI update to ensure button state is visible
           setInCallUI(false);
-          console.debug('[Phone] DISCONNECT: UI cleanup complete, call should show as ended');
 
           // Notify that call has ended
           try {
@@ -4487,7 +4402,6 @@
           if (callSidsToTerminate.length > 0) {
             try {
               const base = (window.API_BASE_URL || '').replace(/\/$/, '');
-              console.debug('[Phone] DISCONNECT: Terminating all call legs before browser disconnect:', callSidsToTerminate);
               // Fire-and-forget; do not await
               fetch(`${base}/api/twilio/hangup`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -4504,10 +4418,6 @@
 
           // Don't clear call context yet - keep it for proper attribution
           // Context will be cleared when call actually ends
-          console.debug('[Phone] Call context preserved for attribution');
-
-          console.debug('[Phone] Call cleanup complete - aggressive anti-redial protection active');
-          console.debug('[Phone] Cooldown set:', { lastCallCompleted: disconnectTime, lastCalledNumber: number });
 
           // Final state clear
           currentCall = null;
@@ -4597,8 +4507,6 @@
 
       if (isMainWebsite) {
         // On main website - actually initiate the call
-        console.debug('[Phone] Main website call - initiating call to:', number);
-
         try {
           // Create a tel: link and simulate clicking it to trigger the phone system
           const telLink = document.createElement('a');
@@ -4638,8 +4546,6 @@
           agent_phone: '+19728342317' // Your personal phone that will ring first
         };
 
-        console.debug('[Phone] Making CRM API call with caller ID:', selectedCallerId, callData);
-
         const r = await fetch(`${base}/api/twilio/call`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -4651,7 +4557,6 @@
         // Store the server call SID for potential termination
         if (data?.callSid) {
           window.currentServerCallSid = data.callSid;
-          console.debug('[Phone] Server call initiated with SID:', data.callSid);
         }
 
         // Show appropriate message based on call context
@@ -4862,7 +4767,6 @@
       // If there is a pending incoming call (ringing) and not yet connected, treat this button as Decline/Hang Up
       if (TwilioRTC.state && TwilioRTC.state.pendingIncoming && !isCallInProgress) {
         try {
-          console.debug('[Phone] Declining pending incoming call');
           TwilioRTC.state.pendingIncoming.reject();
         } catch (_) { }
         TwilioRTC.state.pendingIncoming = null;
@@ -4881,8 +4785,6 @@
 
       // If already in a call (currentCall exists OR isCallInProgress OR device connection), hangup
       if (currentCall || isCallInProgress || TwilioRTC.state?.connection) {
-        console.debug('[Phone] Hanging up active call - currentCall:', !!currentCall, 'isCallInProgress:', isCallInProgress, 'deviceConnection:', !!TwilioRTC.state?.connection);
-
         // IMMEDIATE state clearing to prevent double-clicks and ensure proper hangup
         const wasInCall = isCallInProgress;
         isCallInProgress = false;
@@ -4897,7 +4799,6 @@
               new Promise((resolve) => {
                 try {
                   currentCall.disconnect();
-                  console.debug('[Phone] Manual hangup - disconnected outbound call');
                   resolve();
                 } catch (e) {
                   console.warn('[Phone] Error disconnecting outbound call:', e);
@@ -4913,7 +4814,6 @@
               new Promise((resolve) => {
                 try {
                   TwilioRTC.state.connection.disconnect();
-                  console.debug('[Phone] Manual hangup - disconnected inbound call');
                   resolve();
                 } catch (e) {
                   console.warn('[Phone] Error disconnecting inbound call:', e);
@@ -4929,7 +4829,6 @@
               new Promise((resolve) => {
                 try {
                   TwilioRTC.state.pendingIncoming.reject();
-                  console.debug('[Phone] Manual hangup - rejected pending incoming');
                   resolve();
                 } catch (e) {
                   console.warn('[Phone] Error rejecting pending incoming:', e);
@@ -5037,7 +4936,6 @@
         if (TwilioRTC.state.device && TwilioRTC.state.device.audio) {
           try {
             await TwilioRTC.state.device.audio.unsetInputDevice();
-            console.debug('[Phone] Audio input device released after manual hangup');
           } catch (e) {
             console.warn('[Phone] Failed to release audio input device:', e);
           }
@@ -5090,7 +4988,7 @@
 
       // If context exists but is for a different number, clear it first
       if (currentCallContext && currentCallContext.isActive && currentCallContext.number !== normalized.value) {
-        console.debug('[Phone] Clearing context for different number - old:', currentCallContext.number, 'new:', normalized.value);
+        // console.debug('[Phone] Clearing context for different number - old:', currentCallContext.number, 'new:', normalized.value);
         currentCallContext = {
           number: '',
           name: '',
@@ -5111,7 +5009,7 @@
       // Only resolve metadata if this is truly a manual entry (no active context from click-to-call)
       if (!hasExistingContext) {
         try {
-          console.debug('[Phone] Manual call - resolving phone metadata for:', normalized.value);
+          // console.debug('[Phone] Manual call - resolving phone metadata for:', normalized.value);
           // Pass currentCallContext to preserve any context that might exist
           const freshMeta = await resolvePhoneMeta(normalized.value, currentCallContext).catch(() => ({}));
 
@@ -5132,7 +5030,7 @@
             isActive: true
           };
 
-          console.debug('[Phone] Manual call context resolved:', currentCallContext);
+          // console.debug('[Phone] Manual call context resolved:', currentCallContext);
 
           // Build meta object for setContactDisplay (expects meta.account, not meta.company)
           const displayMeta = {
@@ -5184,7 +5082,6 @@
 
         if (isMainWebsite) {
           // On main website - skip browser calling and go straight to fallback
-          console.debug('[Phone] On main website, using fallback call directly');
           try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value}...`); } catch (_) { }
           try {
             await fallbackServerCall(normalized.value);
@@ -5202,7 +5099,7 @@
           updateMicrophoneStatusUI(card, 'checking');
           hasMicPermission = await checkMicrophonePermission(card);
           updateMicrophoneStatusUI(card, hasMicPermission ? 'granted' : 'denied');
-          console.debug('[Phone] Microphone permission check result:', hasMicPermission);
+          // console.debug('[Phone] Microphone permission check result:', hasMicPermission);
         } catch (permError) {
           console.warn('[Phone] Permission check failed, using fallback:', permError?.message || permError);
           updateMicrophoneStatusUI(card, 'error');
@@ -5211,7 +5108,6 @@
 
         // If user already canceled during permission prompt, abort
         if (!isCallInProgress) {
-          console.debug('[Phone] Aborting dial: user canceled before placement');
           return;
         }
         // Try browser calling first if microphone permission is available
@@ -5220,14 +5116,12 @@
           try {
             // If user canceled right before placing call, abort gracefully
             if (!isCallInProgress) {
-              console.debug('[Phone] Aborting: user canceled after permission but before placing call');
               return;
             }
 
             // Check if bridge to mobile is enabled - if so, skip browser call and go straight to server call
             const bridgeToMobile = isBridgeToMobileEnabled();
             if (bridgeToMobile) {
-              console.debug('[Phone] Bridge to mobile enabled - using server call (mobile phone)');
               try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} - your phone will ring first...`); } catch (_) { }
               try {
                 await fallbackServerCall(normalized.value);
@@ -5240,7 +5134,6 @@
 
             // Bridge to mobile is OFF - try browser call first
             const call = await placeBrowserCall(normalized.value, normalized.extension);
-            console.debug('[Phone] Browser call successful, no fallback needed');
             // Note: initial call logging is already done in placeBrowserCall()
             return; // Exit early - browser call succeeded
           } catch (e) {
@@ -5259,15 +5152,12 @@
           // Check if bridge to mobile is enabled (even without mic permission, we can still bridge)
           const bridgeToMobile = isBridgeToMobileEnabled();
           if (!isCallInProgress) {
-            console.debug('[Phone] Aborting: user canceled before server call');
             return;
           }
 
           if (bridgeToMobile) {
-            console.debug('[Phone] Using server-based calling (bridge to mobile enabled)');
             try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} - your phone will ring first...`); } catch (_) { }
           } else {
-            console.debug('[Phone] Using server-based calling (no mic permission)');
             try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} - your phone will ring first...`); } catch (_) { }
           }
 
@@ -5542,7 +5432,6 @@
     // Enforce: only click-to-call with a fresh user gesture may auto-trigger
     if (autoTrigger && !isClickToCall) {
       console.warn('[Phone] FORCING autoTrigger=false for non click-to-call source', { source });
-      console.debug('[Phone] Non-click autoTrigger attempt stack:', stack?.split('\n').slice(0, 8).join('\n'));
       autoTrigger = false;
     }
 
@@ -5735,7 +5624,6 @@
               console.error('[Phone] Time since last call:', finalCheck, 'ms, required:', CALLBACK_COOLDOWN, 'ms');
               return false;
             }
-            console.debug('[Phone] Auto-triggering call');
             // Important: Do NOT pre-set isCallInProgress here. Doing so causes the
             // call button's click handler to interpret this as an active call and
             // immediately execute the hangup path. We only set isCallInProgress
@@ -5760,7 +5648,7 @@
           findAndClickButton();
         }
       } else {
-        console.debug('[Phone] Not auto-triggering call - user must click Call button');
+        // No auto-trigger
       }
     }
 
@@ -5861,8 +5749,6 @@
       currentCallContext.suggestedContactName = (ctx.suggestedContactName !== undefined) ? ctx.suggestedContactName : '';
       // Preserve phoneType if provided
       if (ctx.phoneType !== undefined) currentCallContext.phoneType = ctx.phoneType;
-
-      console.debug('[Phone Widget] Call context updated:', currentCallContext);
 
       // Force UI update immediately if widget is visible
       if (isPhoneOpen()) {

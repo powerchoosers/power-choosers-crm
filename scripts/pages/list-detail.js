@@ -508,7 +508,6 @@
           }
 
           if (account && account.id) {
-            console.log('[ListDetail] Navigating to account:', account.id, account.accountName || account.name);
 
             try {
               const bd = document.querySelector('.bulk-select-backdrop');
@@ -539,7 +538,6 @@
                 listName: state.listName,
                 view: state.view
               };
-              console.log('[ListDetail] Captured state for back navigation:', window._listDetailReturn);
             } catch (_) { /* noop */ }
 
             // Prefetch account object and open detail immediately
@@ -590,7 +588,6 @@
                 listName: state.listName,
                 view: state.view
               };
-              console.log('[ListDetail] Captured state for back navigation:', window._listDetailReturn);
             } catch (_) { /* noop */ }
 
             // Prefetch account object if available and open detail immediately
@@ -990,11 +987,9 @@
         if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
           state.dataPeople = window.BackgroundContactsLoader.getContactsData() || [];
           state.loadedPeople = true;
-          console.debug('[ListDetail] loadDataOnce: people loaded from BackgroundContactsLoader', { count: state.dataPeople.length });
         } else if (typeof window.getPeopleData === 'function') {
           state.dataPeople = window.getPeopleData() || [];
           state.loadedPeople = true;
-          console.debug('[ListDetail] loadDataOnce: people loaded from getPeopleData', { count: state.dataPeople.length });
         }
       }
 
@@ -1002,11 +997,9 @@
         if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
           state.dataAccounts = window.BackgroundAccountsLoader.getAccountsData() || [];
           state.loadedAccounts = true;
-          console.debug('[ListDetail] loadDataOnce: accounts loaded from BackgroundAccountsLoader', { count: state.dataAccounts.length });
         } else if (typeof window.getAccountsData === 'function') {
           state.dataAccounts = window.getAccountsData() || [];
           state.loadedAccounts = true;
-          console.debug('[ListDetail] loadDataOnce: accounts loaded from getAccountsData', { count: state.dataAccounts.length });
         }
       }
 
@@ -1014,7 +1007,6 @@
       // COST OPTIMIZATION: Only wait for the loader we actually need
       if ((needsPeople && !state.loadedPeople && window.BackgroundContactsLoader) ||
         (needsAccounts && !state.loadedAccounts && window.BackgroundAccountsLoader)) {
-        console.log('[ListDetail] Background loaders not ready yet, waiting...');
 
         // Wait up to 3 seconds (30 attempts x 100ms)
         for (let attempt = 0; attempt < 30; attempt++) {
@@ -1061,13 +1053,11 @@
           if (needsPeople && !state.loadedPeople) {
             state.dataPeople = await window.CacheManager.get('contacts') || [];
             state.loadedPeople = true;
-            console.debug('[ListDetail] loadDataOnce: people loaded from CacheManager', { count: state.dataPeople.length });
           }
 
           if (needsAccounts && !state.loadedAccounts) {
             state.dataAccounts = await window.CacheManager.get('accounts') || [];
             state.loadedAccounts = true;
-            console.debug('[ListDetail] loadDataOnce: accounts loaded from CacheManager', { count: state.dataAccounts.length });
           }
         } else if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
           // Firestore fallback - SCOPED queries for security compliance
@@ -1091,7 +1081,6 @@
             }
             state.dataPeople = peopleSnap ? peopleSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
             state.loadedPeople = true;
-            console.debug('[ListDetail] loadDataOnce: people loaded from Firestore (scoped)', { count: state.dataPeople.length });
           }
 
           if (needsAccounts && !state.loadedAccounts) {
@@ -1112,7 +1101,6 @@
             }
             state.dataAccounts = accountsSnap ? accountsSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
             state.loadedAccounts = true;
-            console.debug('[ListDetail] loadDataOnce: accounts loaded from Firestore (scoped)', { count: state.dataAccounts.length });
           }
         }
       }
@@ -1432,7 +1420,6 @@
     }
 
     if (account) {
-      console.debug('[ListDetail] Found account in state.dataAccounts:', decodedName, '→', account.id);
       return account;
     }
 
@@ -1465,9 +1452,6 @@
           }
         }
 
-        if (account) {
-          console.debug('[ListDetail] Found account in BackgroundAccountsLoader:', decodedName, '→', account.id);
-        }
       } catch (_) { /* noop */ }
     }
 
@@ -1500,9 +1484,6 @@
           }
         }
 
-        if (account) {
-          console.debug('[ListDetail] Found account in getAccountsData:', decodedName, '→', account.id);
-        }
       } catch (_) { /* noop */ }
     }
 
@@ -1555,13 +1536,10 @@
         if (e.target && e.target.classList && e.target.classList.contains('row-select')) {
           const id = e.target.getAttribute('data-id');
           const checked = !!e.target.checked;
-          console.log('[ListDetail] Checkbox changed:', { id, checked, view: state.view });
           if (state.view === 'people') {
             if (checked) state.selectedPeople.add(id); else state.selectedPeople.delete(id);
-            console.log('[ListDetail] Selected people count:', state.selectedPeople.size);
           } else {
             if (checked) state.selectedAccounts.add(id); else state.selectedAccounts.delete(id);
-            console.log('[ListDetail] Selected accounts count:', state.selectedAccounts.size);
           }
           updateHeaderSelectAll();
           renderRowSelectionHighlights();
@@ -2182,7 +2160,6 @@
   }
 
   async function init(context) {
-    console.log('[ListDetail] Initializing with context:', context);
     if (console.time) console.time('[ListDetail] init');
 
     if (!initDomRefs()) {
@@ -2232,7 +2209,6 @@
       const targetPage = Math.max(1, parseInt(restore.page || 1, 10));
       state.currentPage = targetPage;
       state.hasAnimated = true; // Prevent animations on restore
-      console.log('[ListDetail] Pre-setting page for restoration:', targetPage);
     }
 
     // Update title
@@ -2275,7 +2251,6 @@
       document.addEventListener('pc:bulk-import-complete', async (event) => {
         try {
           const { listId, type } = event.detail || {};
-          console.log('[ListDetail] Bulk import complete, refreshing data for:', { listId, type });
 
           // If we're viewing the affected list, clear cache and reload
           if (listId && state.listId === listId) {
@@ -2316,7 +2291,6 @@
         if (!e.detail) return;
         const { page, scroll, filters, view, listId, listName } = e.detail;
 
-        console.log('[ListDetail] Restore event received:', e.detail);
 
         // Mark as animated to prevent row animations
         state.hasAnimated = true;
@@ -2324,7 +2298,6 @@
         // Restore list context (view, listId, listName)
         if (view) {
           state.view = view;
-          console.log('[ListDetail] Restored view:', view);
         }
         if (listId) {
           state.listId = listId;
@@ -2380,7 +2353,6 @@
         // Re-initialize drag and drop after restoration
         setTimeout(() => {
           try {
-            console.log('[ListDetail] Re-initializing drag and drop after restore');
             initHeaderDragAndDrop();
             attachListDetailHeaderDnDHooks();
           } catch (e) {
@@ -2429,7 +2401,6 @@
       try {
         window.__restoringListDetail = false;
         window.__restoringListDetailUntil = 0;
-        console.log('[ListDetail] Cleared stale restoration flag');
       } catch (_) { }
     }
 
@@ -2491,7 +2462,6 @@
       const missingIds = Array.from(state.membersPeople).filter(id => !loadedIds.has(id));
 
       if (missingIds.length > 0) {
-        console.log(`[ListDetail] Found ${missingIds.length} members missing from local data, fetching...`);
         await fetchMissingContacts(missingIds);
       }
     } else if (state.view === 'accounts' && state.membersAccounts.size > 0) {
@@ -2499,7 +2469,6 @@
       const missingIds = Array.from(state.membersAccounts).filter(id => !loadedIds.has(id));
 
       if (missingIds.length > 0) {
-        console.log(`[ListDetail] Found ${missingIds.length} accounts missing from local data, fetching...`);
         await fetchMissingAccounts(missingIds);
       }
     }
@@ -2573,14 +2542,12 @@
 
     // Initialize drag and drop after everything is rendered
     setTimeout(() => {
-      console.log('[ListDetail] Initializing drag and drop after data load');
       initHeaderDragAndDrop();
       attachListDetailHeaderDnDHooks();
     }, 100);
 
     // Initialize click-to-call and click-to-email after table is rendered
     setTimeout(() => {
-      console.log('[ListDetail] Initializing click-to-call and click-to-email');
       if (window.ClickToCall && typeof window.ClickToCall.init === 'function') {
         window.ClickToCall.init();
       }
@@ -2596,7 +2563,6 @@
   // Function to refresh list membership
   async function refreshListMembership() {
     if (state.listId) {
-      console.log('[ListDetail] Refreshing list membership for:', state.listId);
       // Clear the in-memory cache for this list
       if (window.listMembersCache && window.listMembersCache[state.listId]) {
         delete window.listMembersCache[state.listId];
@@ -3535,7 +3501,6 @@ function openBulkSelectPopover() {
       } else if (mode === 'all') {
         // CRITICAL FIX: Use fresh filtered state to ensure we get ALL items, not just current page
         const allIds = freshFiltered.map((it) => it.id).filter(Boolean);
-        console.log('[ListDetail] Selecting all filtered items:', { totalFiltered: freshFiltered.length, allIds: allIds.length });
         selectIds(allIds);
       }
 
@@ -3891,7 +3856,6 @@ async function populateListDetailSequences(container, view) {
     // Cache-first loading using BackgroundSequencesLoader
     if (window.BackgroundSequencesLoader && typeof window.BackgroundSequencesLoader.getSequencesData === 'function') {
       sequences = window.BackgroundSequencesLoader.getSequencesData() || [];
-      console.log('[ListDetail] Loaded', sequences.length, 'sequences from BackgroundSequencesLoader');
     }
 
     // Fallback to CacheManager
@@ -3900,7 +3864,6 @@ async function populateListDetailSequences(container, view) {
         const cached = await window.CacheManager.get('sequences');
         if (cached && Array.isArray(cached) && cached.length > 0) {
           sequences = cached;
-          console.log('[ListDetail] Loaded', sequences.length, 'sequences from CacheManager');
         }
       } catch (e) {
         console.warn('[ListDetail] CacheManager get failed:', e);
@@ -3921,7 +3884,6 @@ async function populateListDetailSequences(container, view) {
 
         const snap = await q.get();
         sequences = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        console.log('[ListDetail] Loaded', sequences.length, 'sequences from Firestore');
       } catch (e) {
         console.warn('[ListDetail] Firestore query failed:', e);
       }
@@ -4209,7 +4171,6 @@ async function handleListDetailSequenceChoose(el, view) {
 
           if (activationCount > 0) {
             await activationBatch.commit();
-            console.log(`[ListDetail] Created ${activationCount} activation batches`);
 
             // Trigger processing
             // We can use fetch to call the API
@@ -4618,7 +4579,6 @@ async function handleDeleteConfirm(ids, view) {
         // Process deletions sequentially to show progress
         for (const id of ids) {
           try {
-            console.log(`[Bulk Delete] Deleting ${view}: ${id}`);
             await window.firebaseDB.collection(collectionName).doc(id).delete();
             // Drop from background caches so deleted rows do not reappear
             try {
@@ -4640,7 +4600,6 @@ async function handleDeleteConfirm(ids, view) {
               }
             } catch (_) { /* ignore cache errors */ }
             completed++;
-            console.log(`[Bulk Delete] Successfully deleted ${view} ${id}`);
             // Update progress toast after each successful delete
             if (progressToast && typeof progressToast.update === 'function') {
               progressToast.update(completed, ids.length);
@@ -4691,7 +4650,6 @@ async function handleDeleteConfirm(ids, view) {
                   const batch = window.firebaseDB.batch();
                   snap.forEach(doc => batch.delete(doc.ref));
                   await batch.commit();
-                  console.log(`[Bulk Delete] Removed ${snap.size} listMembers rows for ${listId || 'all lists'}`);
                 }
               } catch (e) { console.warn('[Bulk Delete] listMembers cleanup failed:', e); }
 
@@ -4702,7 +4660,6 @@ async function handleDeleteConfirm(ids, view) {
                     const batch = window.firebaseDB.batch();
                     subSnap.forEach(doc => batch.delete(doc.ref));
                     await batch.commit();
-                    console.log(`[Bulk Delete] Removed ${subSnap.size} legacy members for list ${listId}`);
                   }
                 } catch (e) { console.warn('[Bulk Delete] Subcollection cleanup failed:', e); }
               }
@@ -4722,8 +4679,6 @@ async function handleDeleteConfirm(ids, view) {
               count: actualCount,
               updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date()
             });
-
-            console.log(`[Bulk Delete] Updated list ${listId} with actual count: ${actualCount} ${targetType}`);
 
             // Update BackgroundListsLoader cache (cost-effective: no Firestore read)
             if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
@@ -4856,8 +4811,7 @@ async function handleDeleteConfirm(ids, view) {
           window.crm?.showToast ? window.crm.showToast(`Deleted ${completed} ${view === 'people' ? 'contact' : 'account'}${completed === 1 ? '' : 's'}, ${failed} failed`, 'warning') :
             console.warn(`Deleted ${completed} ${view}, ${failed} failed`);
         } else {
-          window.crm?.showToast ? window.crm.showToast(`Successfully deleted ${completed} ${view === 'people' ? 'contact' : 'account'}${completed === 1 ? '' : 's'}`, 'success') :
-            console.log(`Successfully deleted ${completed} ${view}`);
+          if (window.crm?.showToast) window.crm.showToast(`Successfully deleted ${completed} ${view === 'people' ? 'contact' : 'account'}${completed === 1 ? '' : 's'}`, 'success');
         }
       }
     } catch (error) {

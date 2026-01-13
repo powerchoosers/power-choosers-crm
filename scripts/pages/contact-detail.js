@@ -2300,13 +2300,10 @@
   // Helper to safely get accounts data even if accounts.js hasn't loaded yet
   // Helper to safely get accounts data - now simplified with background loader
   async function getAccountsDataSafe() {
-    const log = window.console.log.bind(window.console); // Bypass log silencing
-
     // Priority 1: Background loader (most reliable data)
     if (window.BackgroundAccountsLoader) {
       const data = window.BackgroundAccountsLoader.getAccountsData();
       if (data && data.length > 0) {
-        log('[ContactDetail] Got', data.length, 'accounts from BackgroundAccountsLoader');
         return data;
       }
     }
@@ -2315,7 +2312,6 @@
     if (typeof window.getAccountsData === 'function') {
       const data = window.getAccountsData() || [];
       if (data.length > 0) {
-        log('[ContactDetail] Got', data.length, 'accounts from window.getAccountsData');
         return data;
       }
     }
@@ -2325,7 +2321,6 @@
       try {
         const cached = await window.CacheManager.get('accounts');
         if (cached && Array.isArray(cached) && cached.length > 0) {
-          log('[ContactDetail] Got', cached.length, 'accounts from CacheManager');
           return cached;
         }
       } catch (err) {
@@ -5798,7 +5793,6 @@
     // Guard against duplicate listeners
     const guardKey = `_contactDetailInsights_${callSid}_Bound`;
     if (document[guardKey]) {
-      console.log('[ContactDetail] Insights listener already active for call:', callSid);
       return;
     }
     document[guardKey] = true;
@@ -5856,7 +5850,6 @@
             finalizeReady(call);
             unsubscribe(); // Stop listening - saves Firebase costs
             delete document[guardKey]; // Clear guard
-            console.log('[ContactDetail] Insights ready for call:', callSid);
           }
         }
       }, (error) => {
@@ -5868,7 +5861,6 @@
     setTimeout(() => {
       unsubscribe();
       delete document[guardKey];
-      console.log('[ContactDetail] Auto-cleanup: Insights listener stopped for call:', callSid);
     }, 5 * 60 * 1000);
   }
 
@@ -6524,7 +6516,6 @@
     panel._sequenceClickHandler = (e) => {
       const item = e.target.closest?.('.list-item');
       if (!item || item.getAttribute('aria-disabled') === 'true') return;
-      console.log('[ContactDetail] Sequence item clicked:', item.getAttribute('data-name'));
       handleSequenceChoose(item);
     };
     panel.addEventListener('click', panel._sequenceClickHandler);

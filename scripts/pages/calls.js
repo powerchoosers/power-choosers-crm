@@ -836,7 +836,6 @@ if (!document._callsRestoreBound) {
     // Guard against duplicate listeners
     const guardKey = `_callsInsights_${callSid}_Bound`;
     if (document[guardKey]) {
-      console.log('[Calls] Insights listener already active for call:', callSid);
       return false;
     }
     document[guardKey] = true;
@@ -865,7 +864,6 @@ if (!document._callsRestoreBound) {
               }
               unsubscribe(); // Stop listening - saves Firebase costs
               delete document[guardKey]; // Clear guard
-              console.log('[Calls] Insights ready for call:', callSid);
               resolve(true);
             }
           }
@@ -879,7 +877,6 @@ if (!document._callsRestoreBound) {
       setTimeout(() => {
         unsubscribe();
         delete document[guardKey];
-        console.log('[Calls] Auto-cleanup: Insights listener stopped for call:', callSid);
         resolve(false);
       }, 5 * 60 * 1000);
     });
@@ -1551,11 +1548,7 @@ if (!document._callsRestoreBound) {
               
               // Debug logging for contact name vs company name
               if (isCompanyName) {
-                console.log('[Calls][contactId] DETECTED: Contact name same as company name:', {
-                  contactName: c.contactName,
-                  company: c.company,
-                  callId: id
-                });
+                // Contact name same as company name
               }
               
               if (!isCompanyName) {
@@ -1585,7 +1578,6 @@ if (!document._callsRestoreBound) {
                 }
                 // Keep the contact name as the company name for company phone calls
                 contactName = c.contactName;
-                console.log('[Calls][contactId] Keeping company name as contact name for company phone call');
               }
             }
             else if (c.contactId) {
@@ -1646,35 +1638,9 @@ if (!document._callsRestoreBound) {
                       resolvedContactId = p.id;
                       debug.contactIdSource = 'account.mostActiveContact';
                     }
-                    console.log('[Calls] Selected most active contact for account:', {
-                      accountId: acct.id,
-                      accountName: acct.accountName || acct.name,
-                      selectedContact: {
-                        id: p.id,
-                        name: full,
-                        title: p.title
-                      },
-                      contactName,
-                      resolvedContactId,
-                      callId: id
-                    });
                   }
                 } else {
-                  if (window.CRM_DEBUG_CALLS) {
-                    console.log('[Calls][DEBUG] No most active contact found for account:', {
-                      accountId: acct.id,
-                      accountName: acct.accountName || acct.name,
-                      callId: id,
-                      phone: party
-                    });
-                  }
-                }
               } else {
-                if (window.CRM_DEBUG_CALLS) {
-                  console.log('[Calls][DEBUG] No account found for phone:', {
-                    phone: party,
-                    callId: id
-                  });
                 }
               }
             }
@@ -1715,16 +1681,6 @@ if (!document._callsRestoreBound) {
                   debug.titleSource = 'account.mostActiveContact'; 
                 }
               }
-            }
-            
-            // Debug logging for title resolution issues
-            if (window.CRM_DEBUG_CALLS && !contactTitle && (c.contactId || party)) {
-              console.debug('[Calls][title] No title found for:', {
-                callId: id,
-                contactId: c.contactId,
-                party,
-                phoneMapSize: phoneToContact.size
-              });
             }
 
             // Company resolution (using fast pre-built maps) - ROBUST with multiple fallbacks
@@ -1906,12 +1862,6 @@ if (!document._callsRestoreBound) {
             if (contactName && company && contactName !== company && resolvedContactId) {
               // Only save if we resolved a different contact name than the original
               if (c.contactName !== contactName) {
-                console.log('[Calls][DEBUG] Saving resolved contact name to backend:', {
-                  callId: id,
-                  originalContactName: c.contactName,
-                  resolvedContactName: contactName,
-                  resolvedContactId
-                });
                 // Save to backend asynchronously
                 saveResolvedContactName(id, contactName, resolvedContactId).catch(err => {
                   console.warn('[Calls] Failed to save resolved contact name:', err);
@@ -2597,28 +2547,6 @@ if (!document._callsRestoreBound) {
     
     const name = escapeHtml(displayNameRaw || '');
     
-    // Debug contact name display logic
-    if (window.CRM_DEBUG_CALLS && r.company && r.contactName) {
-      console.log('[Calls] Contact name display logic:', {
-        callId: r.id,
-        contactName: r.contactName,
-        company: r.company,
-        hasContact,
-        displayNameRaw,
-        finalName: name
-      });
-    }
-    
-    // Debug when contact name equals company name
-    if (window.CRM_DEBUG_CALLS && r.contactName && r.company && r.contactName === r.company) {
-      console.log('[Calls][DEBUG] DISPLAY ISSUE: Contact name equals company name in display:', {
-        callId: r.id,
-        contactName: r.contactName,
-        company: r.company,
-        displayNameRaw,
-        finalName: name
-      });
-    }
     const title = escapeHtml(r.contactTitle || '');
     const company = escapeHtml(r.company || '');
     const callTimeStr = new Date(r.callTime).toLocaleString();
@@ -3339,19 +3267,12 @@ if (!document._callsRestoreBound) {
 
   function openInsightsModal(id){
     injectInsightsModalStyles();
-    console.log('[Call Insights] Opening modal for ID:', id);
-    console.log('[Call Insights] State data length:', state.data?.length || 0);
-    console.log('[Call Insights] State filtered length:', state.filtered?.length || 0);
     const r = (state.filtered||[]).find(x=>x.id===id) || (state.data||[]).find(x=>x.id===id);
     if(!r) {
       console.error('[Call Insights] No call data found for ID:', id);
       return;
     }
-    console.log('[Call Insights] Found call data:', r);
-    console.log('[Call Insights] AI Summary:', r.aiSummary);
-    console.log('[Call Insights] Transcript:', r.transcript);
-    console.log('[Call Insights] AI Insights:', r.aiInsights);
-    // DEBUG: verify all insight sections present
+    // verify all insight sections present
     try {
       const A = r.aiInsights || {};
       const completeness = {
@@ -3364,7 +3285,6 @@ if (!document._callsRestoreBound) {
         entities: Array.isArray(A.entities) && A.entities.length>0,
         flags: !!A.flags
       };
-      console.log('[Call Insights][completeness]', completeness);
       if (window.CRM_DEBUG_TRANSCRIPTS) {
         const turns = Array.isArray(A.speakerTurns) ? A.speakerTurns : [];
         const sample = turns.slice(0, 6).map(t=>({ role:t.role, t:t.t, text:(t.text||'').slice(0,80) }));

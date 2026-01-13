@@ -774,7 +774,6 @@ class ActivityManager {
           sequences = await this.fetchSequences(limit);
         }
       }
-      console.log(`[Hypothesis: Page Load Delay] getSequenceActivities fetch took ${Math.round(performance.now() - seqStart)}ms`);
 
       if (Array.isArray(sequences) && sequences.length > 1) {
         sequences = sequences.slice().sort((a, b) => {
@@ -1139,7 +1138,6 @@ class ActivityManager {
           ? this.fetchTasks(limit)
           : (window.CacheManager ? window.CacheManager.get('tasks', forceRefresh) : this.fetchTasks(limit))
       );
-      console.log(`[Hypothesis: Page Load Delay] getTaskActivities fetch took ${Math.round(performance.now() - taskStart)}ms`);
 
       // OPTIMIZATION: Pre-calculate contact IDs for account view to avoid O(N^2) loops
       let accountContactIds = new Set();
@@ -1346,7 +1344,6 @@ class ActivityManager {
         // If we have any contacts at all, trust this data set and don't hit Firestore
         if (cachedContacts.length > 0) {
           const contactsWithNotes = cachedContacts.filter(c => c && c.notes && c.notes.trim());
-          console.log(`[Hypothesis: Page Load Delay] fetchContactsWithNotes using BG Loader (${cachedContacts.length} contacts, ${contactsWithNotes.length} with notes)`);
           
           // Sort by notesUpdatedAt desc and limit
           contactsWithNotes.sort((a, b) => {
@@ -1490,7 +1487,6 @@ class ActivityManager {
         // If we have any accounts at all, trust this data set and don't hit Firestore
         if (cachedAccounts.length > 0) {
           const accountsWithNotes = cachedAccounts.filter(a => a && a.notes && a.notes.trim());
-          console.log(`[Hypothesis: Page Load Delay] fetchAccountsWithNotes using BG Loader (${cachedAccounts.length} accounts, ${accountsWithNotes.length} with notes)`);
 
           // Sort by notesUpdatedAt desc and limit
           accountsWithNotes.sort((a, b) => {
@@ -2358,8 +2354,7 @@ class ActivityManager {
   /**
    * Render activities for a specific container
    */
-  async renderActivities(containerId, entityType = 'global', entityId = null, forceRefresh = false, opts = {}) {
-    console.log('[Hypothesis: Page Load Delay] renderActivities called:', { containerId, entityType, entityId, forceRefresh, opts });
+  async renderActivities(containerId, entityType = null, entityId = null, forceRefresh = false, opts = {}) {
     const container = document.getElementById(containerId);
     if (!container) {
       return;

@@ -276,10 +276,8 @@ class ToastManager {
     }
 
     updateToast(id, options) {
-        console.log('[ToastManager] DEBUG: updateToast called', { id, options });
         const toast = this.toasts.get(id);
         if (!toast) {
-            console.warn('[ToastManager] DEBUG: Toast not found for update:', id);
             return false;
         }
 
@@ -419,7 +417,6 @@ class ToastManager {
     }
 
     updateCallNotification(id, callData) {
-        console.log('[ToastManager] DEBUG: updateCallNotification called', { id, callData });
         const { callerName, callerNumber, company, title, city, state, callerIdImage, carrierName, carrierType, nationalFormat } = callData;
 
         let hasCallerName = Boolean(callerName);
