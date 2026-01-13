@@ -553,9 +553,9 @@
               conn.on('error', cleanup);
             });
 
-            // Show enhanced toast notification for incoming call
-            if (window.ToastManager) {
-              console.debug('[TwilioRTC] Toast notification data:', {
+            // Update enhanced toast notification with resolved metadata
+            if (window.ToastManager && initialToastId) {
+              console.debug('[TwilioRTC] Updating toast notification with data:', {
                 name: meta.name,
                 account: meta.account,
                 title: meta.title,
@@ -584,9 +584,31 @@
                 connection: conn
               };
 
-              const toastId = window.ToastManager.showCallNotification(callData);
-              callData.toastId = toastId;
-              TwilioRTC.state.pendingIncoming.toastId = toastId;
+              // UPDATE existing toast instead of creating new one
+              window.ToastManager.updateCallNotification(initialToastId, callData);
+              callData.toastId = initialToastId;
+            } else if (window.ToastManager) {
+                // Fallback if no initial toast (shouldn't happen with new flow)
+                 const callData = {
+                    callerName: meta.name || '',
+                    callerNumber: number,
+                    company: meta.account || '',
+                    title: meta.title || '',
+                    city: meta.city || '',
+                    state: meta.state || '',
+                    accountId: meta.accountId || null,
+                    contactId: meta.contactId || null,
+                    domain: meta.domain || '',
+                    callerIdImage: meta.logoUrl || (meta.domain ? makeFavicon(meta.domain) : null),
+                    isCompanyPhone: !!(meta.account && !meta.contactId),
+                    carrierName: meta.carrierName || '',
+                    carrierType: meta.carrierType || '',
+                    nationalFormat: meta.nationalFormat || number,
+                    connection: conn
+                  };
+                  const toastId = window.ToastManager.showCallNotification(callData);
+                  callData.toastId = toastId;
+                  TwilioRTC.state.pendingIncoming.toastId = toastId;
             }
 
             // Show browser notification for incoming call (so user sees it on other tabs)
