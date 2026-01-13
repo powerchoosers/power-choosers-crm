@@ -275,6 +275,59 @@ class ToastManager {
         });
     }
 
+    updateToast(id, options) {
+        console.log('[ToastManager] DEBUG: updateToast called', { id, options });
+        const toast = this.toasts.get(id);
+        if (!toast) {
+            console.warn('[ToastManager] DEBUG: Toast not found for update:', id);
+            return false;
+        }
+
+        const { title, message, details, icon, type } = options;
+
+        // Update content
+        if (title) {
+            const titleEl = toast.querySelector('.toast-title');
+            if (titleEl) titleEl.textContent = title;
+        }
+        if (message) {
+            const messageEl = toast.querySelector('.toast-message');
+            if (messageEl) messageEl.textContent = message;
+        }
+        if (details) {
+            const detailsEl = toast.querySelector('.toast-details');
+            if (detailsEl) detailsEl.textContent = details;
+        }
+
+        // Update icon
+        if (icon) {
+            const iconContainer = toast.querySelector('.toast-icon');
+            if (iconContainer) {
+                // Check if icon is HTML string or URL
+                if (icon.trim().startsWith('<')) {
+                    iconContainer.innerHTML = icon;
+                } else if (icon.length <= 3) {
+                     // Initials
+                    iconContainer.innerHTML = `<div class="initials-avatar">${icon}</div>`;
+                } else {
+                    // Image URL
+                    iconContainer.innerHTML = `<img src="${icon}" alt="Icon">`;
+                }
+            }
+        }
+        
+        // Update type class if changed
+        if (type) {
+            toast.className = `toast toast-${type} show`;
+        }
+        
+        // Recalculate widths in case content changed size
+        // Use timeout to allow DOM to update
+        setTimeout(() => this.recalculateWidths(), 0);
+
+        return true;
+    }
+
     // Convenience methods for different notification types
     showCallNotification(callData) {
         const { callerName, callerNumber, company, title, city, state, callerIdImage, carrierName, carrierType, nationalFormat } = callData;
@@ -366,6 +419,7 @@ class ToastManager {
     }
 
     updateCallNotification(id, callData) {
+        console.log('[ToastManager] DEBUG: updateCallNotification called', { id, callData });
         const { callerName, callerNumber, company, title, city, state, callerIdImage, carrierName, carrierType, nationalFormat } = callData;
 
         let hasCallerName = Boolean(callerName);

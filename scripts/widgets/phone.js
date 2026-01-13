@@ -381,7 +381,8 @@
         } catch (_) { }
 
         state.device.on('incoming', async (conn) => {
-          console.debug('[TwilioRTC] Incoming call:', conn);
+          console.debug('[TwilioRTC] Incoming call event fired:', conn);
+          console.log('[TwilioRTC] DEBUG: Incoming call detected. Device ready:', state.ready);
 
           // Do NOT open widget yet - only show toast notification
           // Widget will open when user clicks "Answer" on the toast
@@ -450,7 +451,46 @@
               isActive: false
             };
 
+            // SHOW TOAST IMMEDIATELY
+            let initialToastId = null;
+            try {
+                if (window.ToastManager) {
+                    console.log('[TwilioRTC] DEBUG: ToastManager found, attempting to show initial toast');
+                    const initialCallData = {
+                        callerName: '', // Unknown initially
+                        callerNumber: number,
+                        company: '',
+                        title: '',
+                        city: '',
+                        state: '',
+                        accountId: null,
+                        contactId: null,
+                        domain: '',
+                        callerIdImage: null,
+                        isCompanyPhone: false,
+                        carrierName: '',
+                        carrierType: '',
+                        nationalFormat: number, // Use raw number initially
+                        connection: conn
+                    };
+                    initialToastId = window.ToastManager.showCallNotification(initialCallData);
+                    console.log('[TwilioRTC] DEBUG: Initial toast shown with ID:', initialToastId);
+                    
+                    // Store in pending state immediately so cancellation handles it
+                    TwilioRTC.state.pendingIncoming = conn;
+                    if (TwilioRTC.state.pendingIncoming) {
+                        TwilioRTC.state.pendingIncoming.toastId = initialToastId;
+                    }
+                } else {
+                    console.error('[TwilioRTC] DEBUG: Window.ToastManager is missing!');
+                }
+            } catch (err) {
+                console.error('[TwilioRTC] DEBUG: Error showing initial toast:', err);
+            }
+
+            console.log('[TwilioRTC] DEBUG: Starting resolvePhoneMeta...');
             const meta = await resolvePhoneMeta(number);
+            console.log('[TwilioRTC] DEBUG: resolvePhoneMeta completed:', meta);
 
             // Pre-warm the icon cache as soon as we have meta (before toast shows)
             if (meta && meta.domain && window.__pcFaviconHelper) {
@@ -460,6 +500,10 @@
             TwilioRTC.state.pendingIncoming = conn;
             TwilioRTC.state.pendingIncomingMeta = meta;
             TwilioRTC.state.pendingIncomingNumber = number;
+            // Ensure toastId is preserved/updated
+            if (initialToastId && TwilioRTC.state.pendingIncoming) {
+                TwilioRTC.state.pendingIncoming.toastId = initialToastId;
+            }
 
             // Listen for connection events immediately
             conn.on('accept', () => {
@@ -555,6 +599,7 @@
 
             // Update enhanced toast notification with resolved metadata
             if (window.ToastManager && initialToastId) {
+              console.log('[TwilioRTC] DEBUG: Updating toast notification with resolved data');
               console.debug('[TwilioRTC] Updating toast notification with data:', {
                 name: meta.name,
                 account: meta.account,
@@ -585,9 +630,14 @@
               };
 
               // UPDATE existing toast instead of creating new one
-              window.ToastManager.updateCallNotification(initialToastId, callData);
-              callData.toastId = initialToastId;
+              try {
+                  window.ToastManager.updateCallNotification(initialToastId, callData);
+                  callData.toastId = initialToastId;
+              } catch (e) {
+                  console.error('[TwilioRTC] DEBUG: Failed to update toast:', e);
+              }
             } else if (window.ToastManager) {
+                console.log('[TwilioRTC] DEBUG: No initial toast found, creating new one after resolve');
                 // Fallback if no initial toast (shouldn't happen with new flow)
                  const callData = {
                     callerName: meta.name || '',
