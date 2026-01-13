@@ -580,6 +580,14 @@ class PowerChoosersCRM {
             if (searchInput && dropdown && hiddenId && window.AccountDetail && typeof window.AccountDetail.setupParentCompanyAutocomplete === 'function') {
                 window.AccountDetail.setupParentCompanyAutocomplete(searchInput, dropdown, hiddenId);
             }
+
+            // Setup subsidiary autocomplete
+            const subSearchInput = modal.querySelector('#subsidiary-search');
+            const subDropdown = modal.querySelector('#subsidiary-dropdown');
+            const subHiddenId = modal.querySelector('#subsidiary-id');
+            if (subSearchInput && subDropdown && subHiddenId && window.AccountDetail && typeof window.AccountDetail.setupSubsidiaryAutocomplete === 'function') {
+                window.AccountDetail.setupSubsidiaryAutocomplete(subSearchInput, subDropdown, subHiddenId);
+            }
         }, 0);
 
         // Focus trap within dialog
@@ -788,6 +796,44 @@ class PowerChoosersCRM {
                         }
 
                         const ref = await db.collection('accounts').add(finalDoc);
+
+                        // Handle subsidiary linkage if a subsidiary was selected
+                        const subsidiaryId = data.subsidiaryId;
+                        if (subsidiaryId) {
+                            try {
+                                await db.collection('accounts').doc(subsidiaryId).update({
+                                    parentCompanyId: ref.id,
+                                    parentCompanyName: finalDoc.accountName,
+                                    updatedAt: now
+                                });
+
+                                // Update local data for immediate feedback if possible
+                                if (window.getAccountsData) {
+                                    const allAccounts = window.getAccountsData();
+                                    const subAcc = allAccounts.find(acc => acc.id === subsidiaryId);
+                                    if (subAcc) {
+                                        subAcc.parentCompanyId = ref.id;
+                                        subAcc.parentCompanyName = finalDoc.accountName;
+                                    }
+                                }
+
+                                // Notify system that the subsidiary was updated
+                                try {
+                                    document.dispatchEvent(new CustomEvent('pc:account-updated', {
+                                        detail: {
+                                          id: subsidiaryId,
+                                          changes: {
+                                            parentCompanyId: ref.id,
+                                            parentCompanyName: finalDoc.accountName,
+                                            updatedAt: new Date()
+                                          }
+                                        }
+                                    }));
+                                } catch (_) { }
+                            } catch (err) {
+                                console.warn('[Add Account] Failed to link subsidiary:', err);
+                            }
+                        }
 
                         // Create UI document for notifications and navigation
                         // Use finalDoc instead of doc to include serviceAddresses and all other fields

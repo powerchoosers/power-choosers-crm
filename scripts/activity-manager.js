@@ -322,6 +322,14 @@ class ActivityManager {
       }
     });
 
+    // Listen for real-time email tracking updates (opens/clicks)
+    document.addEventListener('pc:email-tracking-updated', (e) => {
+      const { emailId, openCount, clickCount } = e.detail || {};
+      if (emailId) {
+        this.updateEmailTrackingUI(emailId, openCount, clickCount);
+      }
+    });
+
     // Invalidate call cache when calls are logged
     document.addEventListener('pc:call-logged', () => {
       if (window.CacheManager) window.CacheManager.invalidate('calls');
@@ -447,6 +455,7 @@ class ActivityManager {
    * Get activities with caching to prevent re-fetching underlying data
    */
   async getActivities(entityType = 'global', entityId = null, forceRefresh = false, page = null) {
+    const start = performance.now();
     const cacheKey = `${entityType}-${entityId || 'global'}`;
     const isGlobalHome = entityType === 'global' && !entityId;
     const perTypeLimit = isGlobalHome ? this.homeFetchLimitPerType : this.fetchLimitPerType;
@@ -614,6 +623,7 @@ class ActivityManager {
    * Get note activities
    */
   async getNoteActivities(entityType, entityId, limit, forceRefresh = false) {
+    const noteStart = performance.now();
     const activities = [];
     const startTime = performance.now();
 
@@ -671,8 +681,18 @@ class ActivityManager {
         }
       } else if (entityType === 'contact' && entityId) {
         // For specific contact, find the contact and check if it has notes
-        const contacts = await (window.CacheManager ? window.CacheManager.get('contacts', forceRefresh) : []);
-        const contact = contacts.find(c => c && String(c.id) === String(entityId));
+        // OPTIMIZATION: Use BackgroundContactsLoader if available to avoid heavy CacheManager/Firestore fetch (~35s save for admins)
+        let contact = null;
+        if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+          const allContacts = window.BackgroundContactsLoader.getContactsData() || [];
+          contact = allContacts.find(c => c && String(c.id) === String(entityId));
+        }
+
+        if (!contact) {
+          const contacts = await (window.CacheManager ? window.CacheManager.get('contacts', forceRefresh) : []);
+          contact = contacts.find(c => c && String(c.id) === String(entityId));
+        }
+
         if (contact && contact.notes && contact.notes.trim()) {
           // Use proper timestamp priority: notesUpdatedAt > updatedAt > createdAt
           const timestamp = contact.notesUpdatedAt || contact.updatedAt || contact.createdAt;
@@ -738,6 +758,7 @@ class ActivityManager {
    * Get sequence activities
    */
   async getSequenceActivities(entityType, entityId, limit, forceRefresh = false) {
+    const seqStart = performance.now();
     const activities = [];
     const startTime = performance.now();
 
@@ -753,6 +774,7 @@ class ActivityManager {
           sequences = await this.fetchSequences(limit);
         }
       }
+      console.log(`[Hypothesis: Page Load Delay] getSequenceActivities fetch took ${Math.round(performance.now() - seqStart)}ms`);
 
       if (Array.isArray(sequences) && sequences.length > 1) {
         sequences = sequences.slice().sort((a, b) => {
@@ -813,6 +835,7 @@ class ActivityManager {
    * Get email activities
    */
   async getEmailActivities(entityType, entityId, limit, forceRefresh = false) {
+    const emailStart = performance.now();
     const startTime = performance.now();
     const activities = [];
 
@@ -1106,6 +1129,7 @@ class ActivityManager {
    * Get task activities
    */
   async getTaskActivities(entityType, entityId, limit, forceRefresh = false) {
+    const taskStart = performance.now();
     const activities = [];
     const startTime = performance.now();
 
@@ -1115,6 +1139,7 @@ class ActivityManager {
           ? this.fetchTasks(limit)
           : (window.CacheManager ? window.CacheManager.get('tasks', forceRefresh) : this.fetchTasks(limit))
       );
+      console.log(`[Hypothesis: Page Load Delay] getTaskActivities fetch took ${Math.round(performance.now() - taskStart)}ms`);
 
       // OPTIMIZATION: Pre-calculate contact IDs for account view to avoid O(N^2) loops
       let accountContactIds = new Set();
@@ -1318,8 +1343,11 @@ class ActivityManager {
       // OPTIMIZATION: Try BackgroundContactsLoader cached data first (zero Firestore reads, instant)
       if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
         const cachedContacts = window.BackgroundContactsLoader.getContactsData() || [];
-        const contactsWithNotes = cachedContacts.filter(c => c && c.notes && c.notes.trim());
-        if (contactsWithNotes.length > 0) {
+        // If we have any contacts at all, trust this data set and don't hit Firestore
+        if (cachedContacts.length > 0) {
+          const contactsWithNotes = cachedContacts.filter(c => c && c.notes && c.notes.trim());
+          console.log(`[Hypothesis: Page Load Delay] fetchContactsWithNotes using BG Loader (${cachedContacts.length} contacts, ${contactsWithNotes.length} with notes)`);
+          
           // Sort by notesUpdatedAt desc and limit
           contactsWithNotes.sort((a, b) => {
             const timeA = this.getTimestampMs(a.notesUpdatedAt || a.updatedAt || a.createdAt);
@@ -1459,8 +1487,11 @@ class ActivityManager {
       // OPTIMIZATION: Try BackgroundAccountsLoader cached data first (zero Firestore reads, instant)
       if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
         const cachedAccounts = window.BackgroundAccountsLoader.getAccountsData() || [];
-        const accountsWithNotes = cachedAccounts.filter(a => a && a.notes && a.notes.trim());
-        if (accountsWithNotes.length > 0) {
+        // If we have any accounts at all, trust this data set and don't hit Firestore
+        if (cachedAccounts.length > 0) {
+          const accountsWithNotes = cachedAccounts.filter(a => a && a.notes && a.notes.trim());
+          console.log(`[Hypothesis: Page Load Delay] fetchAccountsWithNotes using BG Loader (${cachedAccounts.length} accounts, ${accountsWithNotes.length} with notes)`);
+
           // Sort by notesUpdatedAt desc and limit
           accountsWithNotes.sort((a, b) => {
             const timeA = this.getTimestampMs(a.notesUpdatedAt || a.updatedAt || a.createdAt);
@@ -2328,6 +2359,7 @@ class ActivityManager {
    * Render activities for a specific container
    */
   async renderActivities(containerId, entityType = 'global', entityId = null, forceRefresh = false, opts = {}) {
+    console.log('[Hypothesis: Page Load Delay] renderActivities called:', { containerId, entityType, entityId, forceRefresh, opts });
     const container = document.getElementById(containerId);
     if (!container) {
       return;
@@ -2335,8 +2367,8 @@ class ActivityManager {
 
 
     // OPTIMIZATION: Don't render if container is not visible (saves heavy processing for hidden dashboard widgets)
-    const page = container.closest('.page');
-    const isVisible = page && page.classList.contains('active') && !page.hidden;
+    const pageEl = container.closest('.page');
+    const isVisible = pageEl && pageEl.classList.contains('active') && !pageEl.hidden;
     if (!isVisible && !forceRefresh) {
       return;
     }
@@ -2503,6 +2535,42 @@ class ActivityManager {
   }
 
   /**
+   * Update email tracking badges in the UI for a specific email
+   */
+  updateEmailTrackingUI(emailId, openCount, clickCount) {
+    // Find all activity items with this email ID
+    // We look for both the activity-id (which might be prefixed with email-) and the data-email-id
+    const selector = `.activity-item[data-activity-id="email-${emailId}"], .activity-item[data-email-id="${emailId}"]`;
+    const activityItems = document.querySelectorAll(selector);
+
+    if (activityItems.length === 0) return;
+
+    activityItems.forEach(item => {
+      const titleDiv = item.querySelector('.activity-title');
+      if (!titleDiv) return;
+
+      // Update the badge HTML
+      const badgesHtml = this.getTrackingBadgesHtml({
+        type: 'email',
+        data: { 
+          openCount, 
+          clickCount,
+          type: 'sent' // Ensure getTrackingBadgesHtml treats it as a sent email
+        }
+      });
+
+      // Find existing badges container or create a new one
+      let badgesContainer = titleDiv.querySelector('.activity-tracking-badges');
+      if (badgesContainer) {
+        badgesContainer.outerHTML = badgesHtml;
+      } else {
+        // If no badges existed before, append them to the title
+        titleDiv.insertAdjacentHTML('beforeend', badgesHtml);
+      }
+    });
+  }
+
+  /**
    * Generate HTML for email tracking badges (opened/clicked)
    * @param {Object} activity - The activity object
    * @returns {string} - HTML string for badges
@@ -2524,7 +2592,7 @@ class ActivityManager {
       badgesHtml += `<span class="badge badge-clicked" style="margin-left: 4px;">Clicked <span class="count-circle">${clicked}</span></span>`;
     }
 
-    return badgesHtml;
+    return `<span class="activity-tracking-badges">${badgesHtml}</span>`;
   }
 
   /**

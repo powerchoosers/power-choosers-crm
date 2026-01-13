@@ -893,10 +893,10 @@
     currentAccountId = null;
     currentEntityType = 'contact';
     
-    // If widget is already open for a different entity, update it and scroll to top
+    // If widget is already open for a different entity, update it and scroll to it
     if (existingWidget) {
       updateWidgetContent();
-      scrollToWidgetPanelTop();
+      scrollToWidget(WIDGET_ID);
       return;
     }
     
@@ -986,10 +986,10 @@
     currentContactId = null;
     currentEntityType = 'account';
     
-    // If widget is already open for a different entity, update it and scroll to top
+    // If widget is already open for a different entity, update it and scroll to it
     if (existingWidget) {
       updateWidgetContent();
-      scrollToWidgetPanelTop();
+      scrollToWidget(WIDGET_ID);
       return;
     }
     

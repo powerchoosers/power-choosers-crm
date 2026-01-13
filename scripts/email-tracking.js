@@ -92,6 +92,18 @@ class EmailTrackingManager {
                                 openCount: currentOpenCount,
                                 clickCount: currentClickCount
                             });
+
+                            // Dispatch event for real-time UI updates (e.g. ActivityManager)
+                            document.dispatchEvent(new CustomEvent('pc:email-tracking-updated', {
+                                detail: {
+                                    emailId: emailId,
+                                    openCount: currentOpenCount,
+                                    clickCount: currentClickCount,
+                                    contactId: emailData.contactId,
+                                    accountId: emailData.accountId,
+                                    subject: emailData.subject
+                                }
+                            }));
                         } else if (change.type === 'added') {
                             // Initialize counts for new emails
                             const emailData = change.doc.data();

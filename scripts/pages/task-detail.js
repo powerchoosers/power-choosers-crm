@@ -15,6 +15,7 @@
     _activeLoadToken: 0,
     _activeTaskId: null,
     _contactListMemberships: {}, // NEW: Map of contactId -> list names
+    _contactSequenceMemberships: {}, // NEW: Map of contactId -> sequence names
     widgets: {
       maps: null,
       energy: null,
@@ -1941,11 +1942,7 @@
         if (window.Widgets) {
           try {
             const api = window.Widgets;
-            const isOpenForCurrent = accountId ? api.isLushaOpen('account', accountId) : api.isLushaOpen('contact', contactId);
-
-            if (typeof api.isLushaOpen === 'function' && isOpenForCurrent) {
-              if (typeof api.closeLusha === 'function') { api.closeLusha(); return; }
-            } else if (accountId && typeof api.openLushaForAccount === 'function') {
+            if (accountId && typeof api.openLushaForAccount === 'function') {
               api.openLushaForAccount(accountId); return;
             } else if (contactId && typeof api.openLusha === 'function') {
               api.openLusha(contactId); return;
@@ -1961,11 +1958,7 @@
         if (window.Widgets) {
           try {
             const api = window.Widgets;
-            const isOpenForCurrent = accountId ? api.isMapsOpen('account', accountId) : api.isMapsOpen('contact', contactId);
-            
-            if (typeof api.isMapsOpen === 'function' && isOpenForCurrent) {
-              if (typeof api.closeMaps === 'function') { api.closeMaps(); return; }
-            } else if (accountId && typeof api.openMapsForAccount === 'function') {
+            if (accountId && typeof api.openMapsForAccount === 'function') {
               api.openMapsForAccount(accountId); return;
             } else if (contactId && typeof api.openMaps === 'function') {
               api.openMaps(contactId); return;
@@ -3450,7 +3443,7 @@
   }
 
   /**
-   * Fetch list memberships for a set of contacts and store in state
+   * Fetch list and sequence memberships for a set of contacts and store in state
    */
   async function fetchContactMemberships(contacts) {
     if (!contacts || !Array.isArray(contacts) || contacts.length === 0) return;
@@ -3461,22 +3454,31 @@
       if (contactIds.length === 0) return;
 
       // Reset memberships for these contacts to avoid stale data
-      contactIds.forEach(id => { state._contactListMemberships[id] = []; });
+      contactIds.forEach(id => { 
+        state._contactListMemberships[id] = []; 
+        state._contactSequenceMemberships[id] = [];
+      });
 
       const db = window.firebaseDB;
       const listsData = (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.getListsData === 'function')
         ? window.BackgroundListsLoader.getListsData()
         : [];
+      
+      const sequencesData = (window.BackgroundSequencesLoader && typeof window.BackgroundSequencesLoader.getSequencesData === 'function')
+        ? window.BackgroundSequencesLoader.getSequencesData()
+        : [];
 
       // Fetch in chunks of 30 (Firestore IN limit)
       for (let i = 0; i < contactIds.length; i += 30) {
         const chunk = contactIds.slice(i, i + 30);
-        const snapshot = await db.collection('listMembers')
+        
+        // Fetch List Memberships
+        const listSnapshot = await db.collection('listMembers')
           .where('targetType', 'in', ['people', 'contact', 'contacts'])
           .where('targetId', 'in', chunk)
           .get();
 
-        snapshot.forEach(doc => {
+        listSnapshot.forEach(doc => {
           const data = doc.data();
           const contactId = data.targetId;
           const listId = data.listId;
@@ -3485,6 +3487,25 @@
             if (!state._contactListMemberships[contactId]) state._contactListMemberships[contactId] = [];
             if (!state._contactListMemberships[contactId].includes(list.name)) {
               state._contactListMemberships[contactId].push(list.name);
+            }
+          }
+        });
+
+        // Fetch Sequence Memberships
+        const sequenceSnapshot = await db.collection('sequenceMembers')
+          .where('targetType', 'in', ['people', 'contact', 'contacts'])
+          .where('targetId', 'in', chunk)
+          .get();
+
+        sequenceSnapshot.forEach(doc => {
+          const data = doc.data();
+          const contactId = data.targetId;
+          const sequenceId = data.sequenceId;
+          const sequence = sequencesData.find(s => s.id === sequenceId);
+          if (sequence && sequence.name) {
+            if (!state._contactSequenceMemberships[contactId]) state._contactSequenceMemberships[contactId] = [];
+            if (!state._contactSequenceMemberships[contactId].includes(sequence.name)) {
+              state._contactSequenceMemberships[contactId].push(sequence.name);
             }
           }
         });
@@ -4880,6 +4901,9 @@
         // });
 
         const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(finalContactId || '')}" data-contact-name="${escapeHtml(contactName)}" style="cursor: pointer;">${escapeHtml(contactName)}</a>`;
+
+        const actionsHTML = `<div class="title-actions" aria-hidden="true"><button type="button" class="icon-btn-sm title-edit" title="Edit contact" data-action="edit-contact" data-id="${escapeHtml(finalContactId || '')}">${editIcon()}</button><button type="button" class="icon-btn-sm title-copy" title="Copy name" data-action="copy-name" data-text="${escapeHtml(contactName)}">${copyIcon()}</button><button type="button" class="icon-btn-sm title-clear" title="Delete" data-action="delete-contact" data-id="${escapeHtml(finalContactId || '')}">${trashIcon()}</button></div>`;
+
         // Determine action text based on task type (contact name goes in the middle)
         let actionPrefix = '';
         let actionSuffix = '';
@@ -4909,25 +4933,19 @@
             actionSuffix = '';
         }
 
-        // Format: "Add [contact name] on LinkedIn"
-        if (actionSuffix) {
-          els.title.innerHTML = `${escapeHtml(actionPrefix)} ${contactLinkHTML} ${escapeHtml(actionSuffix)}`;
-        } else {
-          els.title.innerHTML = `${escapeHtml(actionPrefix)} ${contactLinkHTML}`;
-        }
+        const suffixHTML = actionSuffix ? `<span>${escapeHtml(actionSuffix)}</span>` : '';
+        els.title.innerHTML = `<span class="contact-title-row" style="display:inline-flex; align-items:center; gap: 4px; vertical-align: middle;"><span>${escapeHtml(actionPrefix)}</span>${contactLinkHTML}${actionsHTML}${suffixHTML}</span>`;
 
-        // CRITICAL FIX: Ensure contact link handler is attached and verify it exists
         setTimeout(() => {
+          if (!document._taskHeaderActionsBound) {
+            setupHeaderActions();
+          }
+
           const contactLink = els.title.querySelector('.contact-link');
           if (contactLink) {
-            // console.log('[TaskDetail] LinkedIn contact link rendered and ready:', contactLink.getAttribute('data-contact-id'));
-            // Verify event handler is set up
             if (!document._taskDetailContactHandlersBound) {
-              console.warn('[TaskDetail] Contact handlers not bound, setting up now...');
               setupContactLinkHandlers();
             }
-          } else {
-            console.error('[TaskDetail] Contact link not found after rendering!');
           }
         }, 100);
       }
@@ -5540,7 +5558,7 @@
           </div>
         </div>
         ` : ''}
-        
+
         <!-- Contacts List Card -->
         <div class="task-card contacts-list-card">
           <div class="section-header-with-action">
@@ -5835,7 +5853,7 @@
             <button class="btn-secondary" id="schedule-meeting">Schedule a meeting</button>
           </div>
         </div>
-        
+
         <!-- Company Summary Card -->
         <div class="company-summary-card">
           <div class="company-summary-header">
@@ -5858,6 +5876,7 @@
             ${companyDescriptionHTML}
           </div>
         </div>
+        
       </div>
       
       <div class="sidebar-content">
@@ -5936,7 +5955,7 @@
         
         ${linkedAccount ? `
         <!-- Energy & Contract Details -->
-        <div class="contact-info-section">
+        <div class="contact-info-section" style="border-bottom: none; margin-bottom: 0;">
           <h3 class="section-title">Energy & Contract</h3>
           <div class="info-grid">
             <div class="info-row">
@@ -6232,27 +6251,69 @@
           <div class="info-grid">
             <div class="info-row">
               <div class="info-label">EMAIL</div>
-              <div class="info-value ${!email ? 'empty' : ''}">${email ? `<span class="email-text" data-email="${escapeHtml(email)}" data-contact-name="${escapeHtml(contactName)}" data-contact-id="${escapeHtml(contactId || '')}">${escapeHtml(email)}</span>` : '--'}</div>
+              <div class="info-value-wrap" data-field="email" data-entity="contact" data-entity-id="${escapeHtml(contactId || '')}">
+                <span class="info-value-text ${!email ? 'empty' : ''}">${email ? `<span class="email-text" data-email="${escapeHtml(email)}" data-contact-name="${escapeHtml(contactName)}" data-contact-id="${escapeHtml(contactId || '')}">${escapeHtml(email)}</span>` : '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">${phoneType.toUpperCase()}</div>
-              <div class="info-value ${!primaryPhone ? 'empty' : ''}">${primaryPhone ? `<span class="phone-text" data-phone="${escapeHtml(primaryPhone)}" data-contact-name="${escapeHtml(contactName)}" data-contact-id="${escapeHtml(contactId || '')}" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(companyName || '')}" data-company-name="${escapeHtml(companyName || '')}" data-logo-url="${escapeHtml(linkedAccount?.logoUrl || '')}" data-city="${escapeHtml(finalCity || '')}" data-state="${escapeHtml(finalState || '')}" data-domain="${escapeHtml(domain || '')}" data-phone-type="${phoneType}">${escapeHtml(primaryPhone)}</span>` : '--'}</div>
+              <div class="info-value-wrap" data-field="phone" data-entity="contact" data-entity-id="${escapeHtml(contactId || '')}" data-phone-type="${phoneType}">
+                <span class="info-value-text ${!primaryPhone ? 'empty' : ''}">${primaryPhone ? `<span class="phone-text" data-phone="${escapeHtml(primaryPhone)}" data-contact-name="${escapeHtml(contactName)}" data-contact-id="${escapeHtml(contactId || '')}" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(companyName || '')}" data-company-name="${escapeHtml(companyName || '')}" data-logo-url="${escapeHtml(linkedAccount?.logoUrl || '')}" data-city="${escapeHtml(finalCity || '')}" data-state="${escapeHtml(finalState || '')}" data-domain="${escapeHtml(domain || '')}" data-phone-type="${phoneType}">${escapeHtml(primaryPhone)}</span>` : '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">COMPANY PHONE</div>
-              <div class="info-value ${!companyPhone ? 'empty' : ''}">${companyPhone ? `<span class="phone-text" data-phone="${escapeHtml(companyPhone)}" data-contact-name="" data-contact-id="" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(companyName || '')}" data-company-name="${escapeHtml(companyName || '')}" data-logo-url="${escapeHtml(linkedAccount?.logoUrl || '')}" data-city="${escapeHtml(finalCity || '')}" data-state="${escapeHtml(finalState || '')}" data-domain="${escapeHtml(domain || '')}" data-is-company-phone="true">${escapeHtml(companyPhone)}</span>` : '--'}</div>
+              <div class="info-value-wrap" data-field="companyPhone" data-entity="account" data-entity-id="${escapeHtml(linkedAccount?.id || '')}">
+                <span class="info-value-text ${!companyPhone ? 'empty' : ''}">${companyPhone ? `<span class="phone-text" data-phone="${escapeHtml(companyPhone)}" data-contact-name="" data-contact-id="" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(companyName || '')}" data-company-name="${escapeHtml(companyName || '')}" data-logo-url="${escapeHtml(linkedAccount?.logoUrl || '')}" data-city="${escapeHtml(finalCity || '')}" data-state="${escapeHtml(finalState || '')}" data-domain="${escapeHtml(domain || '')}" data-is-company-phone="true">${escapeHtml(companyPhone)}</span>` : '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">CITY</div>
-              <div class="info-value ${!city ? 'empty' : ''}">${escapeHtml(city) || '--'}</div>
+              <div class="info-value-wrap" data-field="city" data-entity="contact" data-entity-id="${escapeHtml(contactId || '')}">
+                <span class="info-value-text ${!city ? 'empty' : ''}">${escapeHtml(city) || '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">STATE</div>
-              <div class="info-value ${!stateVal ? 'empty' : ''}">${escapeHtml(stateVal) || '--'}</div>
+              <div class="info-value-wrap" data-field="state" data-entity="contact" data-entity-id="${escapeHtml(contactId || '')}">
+                <span class="info-value-text ${!stateVal ? 'empty' : ''}">${escapeHtml(stateVal) || '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">INDUSTRY</div>
-              <div class="info-value ${!industry ? 'empty' : ''}">${escapeHtml(industry) || '--'}</div>
+              <div class="info-value-wrap" data-field="industry" data-entity="contact" data-entity-id="${escapeHtml(contactId || '')}">
+                <span class="info-value-text ${!industry ? 'empty' : ''}">${escapeHtml(industry) || '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -6264,32 +6325,52 @@
           <div class="info-grid">
             <div class="info-row">
               <div class="info-label">ELECTRICITY SUPPLIER</div>
-              <div class="info-value ${!electricitySupplier ? 'empty' : ''}">${escapeHtml(electricitySupplier) || '--'}</div>
+              <div class="info-value-wrap" data-field="electricitySupplier" data-entity="account" data-entity-id="${escapeHtml(linkedAccount?.id || '')}">
+                <span class="info-value-text ${!electricitySupplier ? 'empty' : ''}">${escapeHtml(electricitySupplier) || '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">ANNUAL USAGE</div>
-              <div class="info-value ${!annualUsage ? 'empty' : ''}">${escapeHtml(annualUsage) || '--'}</div>
+              <div class="info-value-wrap" data-field="annualUsage" data-entity="account" data-entity-id="${escapeHtml(linkedAccount?.id || '')}">
+                <span class="info-value-text ${!annualUsage ? 'empty' : ''}">${annualUsage ? escapeHtml(String(annualUsage).replace(/[^0-9]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',')) : '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">CURRENT RATE</div>
-              <div class="info-value ${!currentRate ? 'empty' : ''}">${escapeHtml(currentRate) || '--'}</div>
+              <div class="info-value-wrap" data-field="currentRate" data-entity="account" data-entity-id="${escapeHtml(linkedAccount?.id || '')}">
+                <span class="info-value-text ${!currentRate ? 'empty' : ''}">${escapeHtml(currentRate) || '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">CONTRACT END</div>
-              <div class="info-value ${!contractEndDate ? 'empty' : ''}">${escapeHtml(contractEndDate) || '--'}</div>
+              <div class="info-value-wrap" data-field="contractEndDate" data-entity="account" data-entity-id="${escapeHtml(linkedAccount?.id || '')}">
+                <span class="info-value-text ${!contractEndDate ? 'empty' : ''}">${contractEndDate ? escapeHtml(toMDY(contractEndDate)) : '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
         ` : ''}
-        
-        ${shortDescription ? `
-        <!-- Company Summary -->
-        <div class="company-summary-section">
-          <div class="info-label">COMPANY SUMMARY</div>
-          <div class="company-summary-text">${escapeHtml(shortDescription)}</div>
-        </div>
-        ` : ''}
-        
+                
         <!-- Recent Activity -->
         <div class="activity-section">
           <h3 class="section-title">Recent Activity</h3>
@@ -6800,9 +6881,16 @@
           ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
           : (parts[0] ? parts[0][0].toUpperCase() : '?');
 
-        // Get list name badges
-        const memberships = state._contactListMemberships[contact.id] || [];
-        const badgeHtml = memberships.map(name => `<span class="contact-list-badge">${escapeHtml(name)}</span>`).join('');
+        // Get list and sequence name badges
+        const listMemberships = state._contactListMemberships[contact.id] || [];
+        const sequenceMemberships = state._contactSequenceMemberships[contact.id] || [];
+        
+        const listIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 4px; opacity: 0.8;"><circle cx="4" cy="6" r="1"></circle><circle cx="4" cy="12" r="1"></circle><circle cx="4" cy="18" r="1"></circle><line x1="8" y1="6" x2="20" y2="6"></line><line x1="8" y1="12" x2="20" y2="12"></line><line x1="8" y1="18" x2="20" y2="18"></line></svg>`;
+        const sequenceIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; opacity: 0.8;"><polygon points="7 4 20 12 7 20 7 4"></polygon></svg>`;
+
+        const listBadges = listMemberships.map(name => `<span class="contact-list-badge">${listIcon}${escapeHtml(name)}</span>`).join('');
+        const sequenceBadges = sequenceMemberships.map(name => `<span class="contact-sequence-badge">${sequenceIcon}${escapeHtml(name)}</span>`).join('');
+        const badgeHtml = listBadges + sequenceBadges;
 
         return `
           <div class="contact-item contact-link" data-contact-id="${escapeHtml(contact.id)}" data-contact-name="${escapeHtml(fullName)}" style="cursor: pointer;">
@@ -7207,24 +7295,41 @@
       if (!id || !state.currentTask) return;
 
       // Check if this contact update is relevant to the current task
-      // Contact can be linked via: task.contactId or state.contact.id
       const taskContactId = state.currentTask?.contactId || '';
       const stateContactId = state.contact?.id || '';
 
-      // Only refresh if the updated contact matches the task's contact
       if (id === taskContactId || id === stateContactId) {
+        // OPTIMISTIC UPDATE: Apply changes to state immediately
+        if (state.contact && changes) {
+          state.contact = {
+            ...state.contact,
+            ...changes
+          };
+          // Re-render immediately with optimistic data
+          await renderTaskPage();
+          
+          // Re-process click-to-call to ensure context is updated
+          setTimeout(() => {
+            processClickToCallAndEmail();
+          }, 50);
+        }
 
         try {
-          // Reload contact data from Firestore to get latest changes
+          // STILL fetch from Firestore to ensure we have the absolute latest/full data
           if (window.firebaseDB && id) {
             const contactDoc = await window.firebaseDB.collection('contacts').doc(id).get();
             if (contactDoc.exists) {
               const updatedContact = { id: contactDoc.id, ...contactDoc.data() };
+              
+              // Only re-render if the fetched data is different from our optimistic state
+              // (e.g. server-side timestamps or other fields we didn't have)
+              const hasChanges = JSON.stringify(updatedContact) !== JSON.stringify(state.contact);
+              
               state.contact = updatedContact;
-              // console.log('[TaskDetail] ✓ Reloaded contact data:', updatedContact.firstName, updatedContact.lastName);
 
-              // Re-render the task page to show updated contact information
-              await renderTaskPage();
+              if (hasChanges) {
+                await renderTaskPage();
+              }
 
               // Update cache if available
               if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
@@ -7241,13 +7346,7 @@
                   }
                 }
               } catch (e) {
-                console.warn('[TaskDetail] Could not update BackgroundContactsLoader cache:', e);
               }
-
-              // Re-process click-to-call to ensure context is updated
-              setTimeout(() => {
-                processClickToCallAndEmail();
-              }, 100);
             }
           }
         } catch (error) {
@@ -7413,6 +7512,8 @@
   }
 
   async function commitEdit(wrap, field, value) {
+    const entity = wrap.dataset.entity || 'account';
+    const entityId = wrap.dataset.entityId || null;
     let toSave = value;
 
     // Convert contractEndDate to MM/DD/YYYY for storage
@@ -7421,7 +7522,7 @@
     }
 
     // Normalize phone numbers
-    if (field === 'companyPhone') {
+    if (field === 'companyPhone' || field === 'phone') {
       toSave = normalizePhone(value);
     }
 
@@ -7439,16 +7540,16 @@
           }
         }
         if (nextDomain) {
-          await saveField('domain', nextDomain);
+          await saveField('domain', nextDomain, entity, entityId);
         }
       } catch (_) { /* noop */ }
     }
 
-    await saveField(field, toSave);
+    await saveField(field, toSave, entity, entityId);
     updateFieldText(wrap, toSave);
 
     // If phone field was updated, refresh click-to-call bindings
-    if (field === 'companyPhone') {
+    if (field === 'companyPhone' || field === 'phone') {
       try {
         setTimeout(() => {
           if (window.ClickToCall && typeof window.ClickToCall.processSpecificPhoneElements === 'function') {

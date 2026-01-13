@@ -16,6 +16,13 @@
     let currentLinkTarget = { contactId: null, accountId: null };
     let portalizedPopover = null;
 
+    let durationSyncSeconds = null;
+    let durationSyncAt = 0;
+    let durationTicker = null;
+    let lastRenderedDuration = '';
+
+    let hideTransitionToken = 0;
+
     function init() {
         const display = document.getElementById(displayId);
         if (!display) return;
@@ -118,6 +125,11 @@
 
     function handleCallStart(e) {
         showDisplay();
+        try {
+            syncDurationSeconds(0);
+            ensureDurationTicker();
+            tickDuration();
+        } catch (_) { }
         // Use enriched data from event if available
         if (e.detail && e.detail.contactName) {
             updateUIFromEvent(e.detail);
@@ -129,14 +141,108 @@
     function handleCallDuration(e) {
         if (!isVisible) showDisplay();
 
-        const durationFormatted = e.detail.durationFormatted;
-        const timerEl = document.getElementById(timerId);
-        if (timerEl && durationFormatted) {
-            timerEl.textContent = durationFormatted;
-        }
+        syncDurationFromDetail(e && e.detail ? e.detail : null);
+        ensureDurationTicker();
+        tickDuration();
 
-        // Update name and navigation targets from duration event
         updateUIFromEvent(e.detail);
+    }
+
+    function parseDurationToSeconds(v) {
+        try {
+            const s = String(v || '').trim();
+            if (!s) return null;
+            const parts = s.split(':').map(x => parseInt(x, 10));
+            if (parts.some(n => isNaN(n))) return null;
+            if (parts.length === 2) return (parts[0] * 60) + parts[1];
+            if (parts.length === 3) return (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+            return null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function formatSecondsAsDuration(totalSeconds) {
+        try {
+            const s = Math.max(0, Math.floor(totalSeconds || 0));
+            const h = Math.floor(s / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            const sec = s % 60;
+            if (h > 0) {
+                return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+            }
+            return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+        } catch (_) {
+            return '00:00';
+        }
+    }
+
+    function syncDurationSeconds(seconds) {
+        const n = (typeof seconds === 'number' && isFinite(seconds)) ? Math.max(0, Math.floor(seconds)) : null;
+        if (n === null) return;
+        durationSyncSeconds = n;
+        durationSyncAt = Date.now();
+    }
+
+    function syncDurationFromDetail(detail) {
+        try {
+            if (!detail) return;
+
+            if (typeof detail.duration === 'number') {
+                syncDurationSeconds(detail.duration);
+                return;
+            }
+            if (typeof detail.durationSeconds === 'number') {
+                syncDurationSeconds(detail.durationSeconds);
+                return;
+            }
+            if (typeof detail.seconds === 'number') {
+                syncDurationSeconds(detail.seconds);
+                return;
+            }
+
+            const durationFormatted = detail.durationFormatted || detail.formattedDuration || detail.durationText;
+            const seconds = parseDurationToSeconds(durationFormatted);
+            if (seconds !== null) syncDurationSeconds(seconds);
+        } catch (_) { }
+    }
+
+    function getInterpolatedDuration() {
+        if (durationSyncSeconds === null) return null;
+        const elapsed = Math.floor((Date.now() - durationSyncAt) / 1000);
+        return durationSyncSeconds + Math.max(0, elapsed);
+    }
+
+    function tickDuration() {
+        try {
+            const timerEl = document.getElementById(timerId);
+            if (!timerEl) return;
+            const seconds = getInterpolatedDuration();
+            if (seconds === null) return;
+            const next = formatSecondsAsDuration(seconds);
+            if (next && next !== lastRenderedDuration) {
+                timerEl.textContent = next;
+                lastRenderedDuration = next;
+            }
+        } catch (_) { }
+    }
+
+    function ensureDurationTicker() {
+        if (durationTicker) return;
+        durationTicker = setInterval(() => {
+            if (!isVisible) return;
+            tickDuration();
+        }, 1000);
+    }
+
+    function stopDurationTicker() {
+        if (durationTicker) {
+            clearInterval(durationTicker);
+            durationTicker = null;
+        }
+        durationSyncSeconds = null;
+        durationSyncAt = 0;
+        lastRenderedDuration = '';
     }
 
     function updateUIFromEvent(data) {
@@ -174,31 +280,16 @@
             const d = domain.replace(/^https?:\/\//, '').replace(/^www\./i, '');
 
             if (isCompanyPhone) {
-                // CRITICAL: Prevent flickering by checking if logo URL hasn't changed
-                const existingImg = avatarEl.querySelector('.company-favicon');
-                const existingSrc = existingImg ? existingImg.src : '';
-                const newSrc = logoUrl || '';
-
-                // Only update if the logo URL has actually changed
-                // If newSrc is empty but we have an existing logo, preserve it (prevents flickering on call connect)
-                if (newSrc && existingSrc !== newSrc) {
-                    // Absolute priority: explicit logoUrl provided by the page/widget
+                const key = `company|${logoUrl || ''}|${d || ''}`;
+                if (avatarEl.dataset.pcAvatarKey !== key || !avatarEl.innerHTML) {
+                    avatarEl.dataset.pcAvatarKey = key;
                     if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
-                        avatarEl.innerHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: newSrc, domain: d, size: 24 });
-                    } else {
-                        avatarEl.innerHTML = `<img class="company-favicon" src="${newSrc}" alt="" style="width:24px;height:24px;border-radius:4px;object-fit:cover;">`;
-                    }
-                } else if (!newSrc && existingImg && existingSrc) {
-                    // New logoUrl is empty but we have an existing logo - preserve it to prevent flickering
-                } else if (!newSrc && !existingImg) {
-                    // No logo and no existing image - try fallbacks
-                    if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
-                        // Helper will try multiple favicon sources; fallback to accounts icon if it fails
-                        avatarEl.innerHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: '', domain: d, size: 24 });
+                        avatarEl.innerHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: logoUrl || '', domain: d, size: 24 });
+                    } else if (logoUrl) {
+                        avatarEl.innerHTML = `<img class="company-favicon" src="${logoUrl}" alt="" style="width:24px;height:24px;border-radius:4px;object-fit:cover;">`;
                     } else if (typeof window.__pcAccountsIcon === 'function') {
                         avatarEl.innerHTML = window.__pcAccountsIcon(24);
                     } else {
-                        // Final fallback to a building SVG if nothing else works
                         avatarEl.innerHTML = `<div class="company-favicon-placeholder" style="width:24px;height:24px;border-radius:4px;background:var(--grey-700,#2f343a);display:flex;align-items:center;justify-content:center;color:#fff;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1"></path></svg>
                         </div>`;
@@ -214,7 +305,11 @@
                     const b = parts.length > 1 ? parts[parts.length - 1].charAt(0) : '';
                     return (a + b).toUpperCase();
                 })();
-                avatarEl.innerHTML = `<div class="avatar-initials" style="width:24px;height:24px;border-radius:50%;background:var(--orange-primary, #f18335);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;">${initials}</div>`;
+                const key = `person|${initials}`;
+                if (avatarEl.dataset.pcAvatarKey !== key || !avatarEl.innerHTML) {
+                    avatarEl.dataset.pcAvatarKey = key;
+                    avatarEl.innerHTML = `<div class="avatar-initials" style="width:24px;height:24px;border-radius:50%;background:var(--orange-primary, #f18335);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;">${initials}</div>`;
+                }
             }
         }
     }
@@ -229,6 +324,7 @@
     }
 
     function handleCallEnd(e) {
+        stopDurationTicker();
         hideDisplay();
         // Reset target
         currentLinkTarget = { contactId: null, accountId: null };
@@ -240,6 +336,7 @@
         const avatarEl = document.getElementById(avatarId);
         if (avatarEl) {
             avatarEl.innerHTML = '';
+            try { delete avatarEl.dataset.pcAvatarKey; } catch (_) { }
         }
         // Hide dial pad popover if open
         const popover = document.getElementById(dialpadPopoverId);
@@ -265,11 +362,14 @@
 
         try {
             popover = portalizedPopover || popover;
+            const display = document.getElementById(displayId);
             const btn = document.getElementById(dialpadBtnId);
-            if (btn) {
-                const rect = btn.getBoundingClientRect();
+            const anchor = display || btn;
+            if (anchor) {
+                const rect = anchor.getBoundingClientRect();
                 const width = popover.offsetWidth || 240;
-                const leftRaw = rect.left + rect.width / 2 - width / 2;
+                const centerX = rect.left + (rect.width / 2);
+                const leftRaw = centerX - (width / 2);
                 const left = Math.max(8, Math.min(leftRaw, window.innerWidth - width - 8));
                 const top = rect.bottom + 12;
                 popover.style.left = `${Math.round(left)}px`;
@@ -306,6 +406,7 @@
         if (isVisible) return;
         const display = document.getElementById(displayId);
         if (display) {
+            try { display.classList.remove('hiding'); } catch (_) { }
             display.style.display = 'flex'; // Ensure it's in the layout
             // slight delay to allow display:flex to apply before transition
             requestAnimationFrame(() => {
@@ -319,18 +420,41 @@
         if (!isVisible) return;
         const display = document.getElementById(displayId);
         if (display) {
+            hideTransitionToken++;
+            const token = hideTransitionToken;
+
+            try { display.classList.add('hiding'); } catch (_) { }
             display.classList.remove('visible');
             const popover = document.getElementById(dialpadPopoverId);
             if (popover) closeDialpadPopover(popover, true);
-            // Wait for transition to finish before setting display:none
-            setTimeout(() => {
+            stopDurationTicker();
+
+            const finalizeHide = () => {
+                if (token !== hideTransitionToken) return;
                 if (!display.classList.contains('visible')) {
+                    try { display.classList.remove('hiding'); } catch (_) { }
                     display.style.display = 'none';
-                    // Reset timer
                     const timerEl = document.getElementById(timerId);
                     if (timerEl) timerEl.textContent = '00:00';
                 }
-            }, 400); // Match transition duration
+            };
+
+            const onEnd = (ev) => {
+                if (token !== hideTransitionToken) {
+                    try { display.removeEventListener('transitionend', onEnd); } catch (_) { }
+                    return;
+                }
+                if (ev && ev.target !== display) return;
+                if (ev && ev.propertyName && ev.propertyName !== 'max-width') return;
+                try { display.removeEventListener('transitionend', onEnd); } catch (_) { }
+                finalizeHide();
+            };
+
+            try { display.addEventListener('transitionend', onEnd); } catch (_) { }
+            setTimeout(() => {
+                try { display.removeEventListener('transitionend', onEnd); } catch (_) { }
+                finalizeHide();
+            }, 900);
             isVisible = false;
         }
     }

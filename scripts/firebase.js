@@ -145,9 +145,10 @@
             }
           } catch (_) {}
           
-          // Persist to Firestore
+          // Persist to Firestore (Async - don't await to keep UI snappy)
           if (db && collection && id) {
-            try { await db.collection(collection).doc(id).set(payload, { merge: true }); } catch (e) { console.warn('[PCSaves] update failed', { collection, id }, e); }
+            db.collection(collection).doc(id).set(payload, { merge: true })
+              .catch(e => console.warn('[PCSaves] update failed', { collection, id }, e));
           }
           return true;
         },

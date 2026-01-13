@@ -635,11 +635,11 @@
             <div class="form-row">
               <label>LinkedIn URL<input type="url" class="input-dark" name="linkedin" value="${escapeHtml(c.linkedin || '')}" /></label>
             </div>
-            <div class="form-row" style="justify-content:flex-end; gap: var(--spacing-sm);">
-              <button type="button" class="btn-text" data-close="edit-contact">Cancel</button>
-              <button type="submit" class="btn-primary">Save</button>
-            </div>
-        </div>
+          </div>
+          <div class="pc-modal__footer">
+            <button type="button" class="btn-text" data-close="edit-contact">Cancel</button>
+            <button type="submit" class="btn-primary">Save changes</button>
+          </div>
         </form>
       </div>`;
 
@@ -659,6 +659,13 @@
 
     // Open (append to DOM)
     document.body.appendChild(overlay);
+
+    // Trigger animation with double rAF for ultra-smooth entry
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        overlay.classList.add('show');
+      });
+    });
 
     // Focus management
     setTimeout(() => {
@@ -865,9 +872,7 @@
         if (window.Widgets) {
           try {
             const api = window.Widgets;
-            if (typeof api.isLushaOpen === 'function' && api.isLushaOpen('contact', contactId)) {
-              if (typeof api.closeLusha === 'function') { api.closeLusha(); return; }
-            } else if (typeof api.openLusha === 'function') {
+            if (typeof api.openLusha === 'function') {
               api.openLusha(contactId); return;
             }
           } catch (_) { /* noop */ }
@@ -881,9 +886,7 @@
         if (window.Widgets) {
           try {
             const api = window.Widgets;
-            if (typeof api.isMapsOpen === 'function' && api.isMapsOpen('contact', contactId)) {
-              if (typeof api.closeMaps === 'function') { api.closeMaps(); return; }
-            } else if (typeof api.openMaps === 'function') {
+            if (typeof api.openMaps === 'function') {
               api.openMaps(contactId); return;
             }
           } catch (_) { /* noop */ }
@@ -2078,6 +2081,24 @@
       document._contactDetailUpdatedBound = true;
       try {
         document.addEventListener('pc:contact-updated', (e) => {
+          const { id, contactId, changes } = e.detail || {};
+          const currentId = state.currentContact?.id || state.currentContact?._id;
+          const targetId = id || contactId;
+
+          if (targetId && currentId && String(targetId) === String(currentId)) {
+            // Update state with changes
+            if (changes) {
+              state.currentContact = {
+                ...state.currentContact,
+                ...changes
+              };
+            }
+            // Re-render immediately
+            if (typeof window.ContactDetail?.renderContactDetail === 'function') {
+              window.ContactDetail.renderContactDetail();
+            }
+          }
+
           // Re-attach event handlers after contact is updated
           setTimeout(() => {
             if (!state._contactDetailEventsAttached) {
@@ -2924,15 +2945,25 @@
     const peoplePage = document.getElementById('people-page');
     const containerId = 'contact-activity-timeline';
 
+    if (!window.ActivityManager || !state.currentContact) return;
+    const contactId = state.currentContact.id;
+
+    // DEDUPE: Don't start a new render if one is already in flight for this contact
+    if (state._activitiesLoadingForContactId === contactId) {
+      return;
+    }
+    state._activitiesLoadingForContactId = contactId;
+
     // H1 Fix: Wait a moment for navigateToPage to finish adding .active class
     // Increased to 500ms to handle "Back" button navigation transitions
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    if (!window.ActivityManager || !state.currentContact) return;
-
-    const contactId = state.currentContact.id;
-    // Pass forceRefresh=true to bypass visibility checks during navigation
-    window.ActivityManager.renderActivities(containerId, 'contact', contactId, true);
+    try {
+      // Pass forceRefresh=true to bypass visibility checks during navigation
+      await window.ActivityManager.renderActivities(containerId, 'contact', contactId, true);
+    } finally {
+      state._activitiesLoadingForContactId = null;
+    }
 
     // Setup pagination
     setupContactActivityPagination(contactId);
@@ -5257,13 +5288,21 @@
     if (list) rcSetLoading(list);
 
     const contactId = state.currentContact.id;
+    
+    // DEDUPE: Don't start a new fetch if one is already in flight for this contact
+    if (state._rcLoadingForContactId === contactId) {
+      return;
+    }
+    state._rcLoadingForContactId = contactId;
+    const fetchStart = performance.now();
+
     const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
 
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         controller.abort();
-      }, 5000); // 5 second timeout
+      }, 15000); // Increased to 15 seconds (was 5s) for reliability
 
       // Use new targeted API endpoint for much better performance
       const token = (window.firebase && window.firebase.auth && window.firebase.auth().currentUser)
@@ -5337,7 +5376,9 @@
       try { window.ClickToCall?.processSpecificPhoneElements?.(); } catch (_) { }
       // Clear the reload flag after successful load
       try { state._rcReloadInFlight = false; } catch (_) { }
+      try { state._rcLoadingForContactId = null; } catch (_) { }
     } catch (e) {
+      try { state._rcLoadingForContactId = null; } catch (_) { }
       console.warn('[RecentCalls][Contact] load failed', e);
       list.innerHTML = '<div class="rc-empty">Failed to load recent calls</div>';
     }
@@ -6588,6 +6629,12 @@
         frag.appendChild(item);
       });
       container.appendChild(frag);
+
+      // Ensure last item is rounded to match modal corners
+      const lastItem = container.querySelector('.list-item:last-child');
+      if (lastItem) {
+        lastItem.style.borderRadius = '0 0 var(--border-radius) var(--border-radius)';
+      }
     } catch (err) {
       console.warn('Failed to load sequences', err);
     }
@@ -7025,42 +7072,53 @@
     }
     style.textContent = `
       /* Contact Detail: Add to List/Sequence panel */
-      #contact-lists-panel, #contact-sequences-panel { position: fixed; z-index: 1200; width: min(560px, 92vw);
-        background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-light);
-        border-radius: var(--border-radius); box-shadow: var(--elevation-card-hover, 0 16px 40px rgba(0,0,0,.28), 0 6px 18px rgba(0,0,0,.22));
+      #contact-lists-panel, #contact-sequences-panel { 
+        position: fixed; z-index: 1200; width: min(560px, 92vw);
+        background: var(--glass-bg); 
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        color: var(--text-primary); 
+        border: 1px solid var(--glass-border);
+        border-radius: var(--border-radius); 
+        box-shadow: var(--glass-shadow);
         transform: translateY(-8px); opacity: 0; transition: transform 400ms ease, opacity 400ms ease;
         /* Avoid clipping the pointer arrow */
         --arrow-size: 10px;
-        /* Don't use overflow: hidden - it clips the arrow pointer */ }
+      }
       #contact-lists-panel.--show, #contact-sequences-panel.--show { transform: translateY(0); opacity: 1; }
       #contact-lists-panel .list-header, #contact-sequences-panel .list-header { 
         display: flex; align-items: center; justify-content: space-between; 
         padding: 14px 16px; border-bottom: 1px solid var(--border-light); 
-        font-weight: 700; background: var(--bg-card);
+        font-weight: 700; 
+        background: transparent;
         border-radius: var(--border-radius) var(--border-radius) 0 0;
       }
       #contact-lists-panel .list-title, #contact-sequences-panel .list-title { 
         font-weight: 700; color: var(--text-primary); font-size: 1rem; 
       }
       #contact-lists-panel .close-btn, #contact-sequences-panel .close-btn {
-        display: inline-flex; align-items: center; justify-content: center;
-        width: 28px; height: 28px; min-width: 28px; min-height: 28px; padding: 0;
-        background: var(--bg-item) !important; color: var(--grey-300) !important;
-        border: 1px solid var(--border-light); border-radius: var(--border-radius-sm);
-        line-height: 1; font-size: 16px; font-weight: 600; cursor: pointer;
-        transition: var(--transition-fast); box-sizing: border-box;
-        -webkit-tap-highlight-color: transparent; margin-right: 0;
+        background: var(--bg-item); color: var(--text-primary);
+        transition: var(--transition-fast);
       }
       #contact-lists-panel .close-btn:hover, #contact-sequences-panel .close-btn:hover {
-        background: var(--grey-600) !important; color: var(--text-inverse) !important;
+        background: var(--grey-600); color: var(--text-inverse);
       }
-      #contact-lists-panel .close-btn:focus-visible, #contact-sequences-panel .close-btn:focus-visible {
-        outline: 2px solid var(--orange-muted); outline-offset: 2px;
+      #contact-lists-panel .list-body, #contact-sequences-panel .list-body { 
+        max-height: min(70vh, 720px); 
+        overflow-y: auto; 
+        overflow-x: hidden;
+        background: transparent; 
+        border-radius: 0 0 var(--border-radius) var(--border-radius);
       }
-      #contact-lists-panel .list-body, #contact-sequences-panel .list-body { max-height: min(70vh, 720px); overflow: auto; background: var(--bg-card); }
-      #contact-lists-panel .list-body::-webkit-scrollbar, #contact-sequences-panel .list-body::-webkit-scrollbar { width: 10px; }
+      #contact-lists-panel .list-body::-webkit-scrollbar, #contact-sequences-panel .list-body::-webkit-scrollbar { width: 8px; }
       #contact-lists-panel .list-body::-webkit-scrollbar-thumb, #contact-sequences-panel .list-body::-webkit-scrollbar-thumb { background: var(--grey-700); border-radius: 8px; }
-      #contact-lists-panel .list-item, #contact-sequences-panel .list-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; cursor:pointer; background: var(--bg-card); border-top: 1px solid var(--border-light); }
+      #contact-lists-panel .list-item, #contact-sequences-panel .list-item { 
+        display:flex; align-items:center; justify-content:space-between; gap:12px; 
+        padding:12px 16px; cursor:pointer; 
+        background: transparent; 
+        border-top: 1px solid var(--border-light);
+        transition: background 0.2s ease;
+      }
       #contact-lists-panel .list-item:first-child, #contact-sequences-panel .list-item:first-child { border-top: 0; }
       #contact-lists-panel .list-item:last-child, #contact-sequences-panel .list-item:last-child {
         border-radius: 0 0 var(--border-radius) var(--border-radius);
@@ -7072,9 +7130,7 @@
       #contact-lists-panel .list-meta, #contact-sequences-panel .list-meta { color: var(--text-muted); font-size: .85rem; }
 
       /* Pointer arrow (reuse delete-popover pattern) */
-      #contact-lists-panel::before,
       #contact-lists-panel::after,
-      #contact-sequences-panel::before,
       #contact-sequences-panel::after {
         content: "";
         position: absolute;
@@ -7082,32 +7138,47 @@
         height: var(--arrow-size);
         transform: rotate(45deg);
         pointer-events: none;
+        background: var(--glass-bg);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        z-index: -1;
+      }
+      #contact-lists-panel::before,
+      #contact-sequences-panel::before {
+        content: "";
+        position: absolute;
+        width: var(--arrow-size);
+        height: var(--arrow-size);
+        transform: rotate(45deg);
+        pointer-events: none;
+        background: var(--glass-border);
+        z-index: -2;
       }
       /* Bottom placement (arrow on top edge) */
       #contact-lists-panel[data-placement="bottom"]::before,
       #contact-sequences-panel[data-placement="bottom"]::before {
         left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
         top: calc(-1 * var(--arrow-size) / 2 + 1px);
-        background: var(--border-light);
+        clip-path: polygon(0% 0%, 100% 0%, 100% 50%, 0% 50%);
       }
       #contact-lists-panel[data-placement="bottom"]::after,
       #contact-sequences-panel[data-placement="bottom"]::after {
         left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
         top: calc(-1 * var(--arrow-size) / 2 + 2px);
-        background: var(--bg-card);
+        clip-path: polygon(0% 0%, 100% 0%, 100% 50%, 0% 50%);
       }
       /* Top placement (arrow on bottom edge) */
       #contact-lists-panel[data-placement="top"]::before,
       #contact-sequences-panel[data-placement="top"]::before {
         left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
         bottom: calc(-1 * var(--arrow-size) / 2 + 1px);
-        background: var(--border-light);
+        clip-path: polygon(0% 50%, 100% 50%, 100% 100%, 0% 100%);
       }
       #contact-lists-panel[data-placement="top"]::after,
       #contact-sequences-panel[data-placement="top"]::after {
         left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
         bottom: calc(-1 * var(--arrow-size) / 2 + 2px);
-        background: var(--bg-card);
+        clip-path: polygon(0% 50%, 100% 50%, 100% 100%, 0% 100%);
       }
     `;
     document.head.appendChild(style);
@@ -7500,6 +7571,12 @@
       container.innerHTML = '';
       if (createRow) container.appendChild(createRow);
       container.insertAdjacentHTML('beforeend', listHtml || `<div class="list-item" tabindex="-1" aria-disabled="true"><div><div class="list-name">No lists found</div><div class="list-meta">Create a new list</div></div></div>`);
+
+      // Ensure last item is rounded to match modal corners
+      const lastItem = container.querySelector('.list-item:last-child');
+      if (lastItem) {
+        lastItem.style.borderRadius = '0 0 var(--border-radius) var(--border-radius)';
+      }
 
       // Event delegation - ALWAYS re-attach to ensure it works after panel recreation
       // Remove any existing listener first to prevent duplicates

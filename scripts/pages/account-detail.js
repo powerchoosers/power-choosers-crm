@@ -10,7 +10,8 @@
   const state = {
     currentAccount: null,
     loaded: false,
-    _contactListMemberships: {} // NEW: Map of contactId -> list names
+    _contactListMemberships: {}, // NEW: Map of contactId -> list names
+    _contactSequenceMemberships: {} // NEW: Map of contactId -> sequence names
   };
 
   // CRITICAL: Debounce and mutex to prevent multiple rapid showAccountDetail calls
@@ -44,6 +45,7 @@
     renderAccountDetail: null, // Will be set when functions are defined
     setupEnergyUpdateListener: null,
     setupParentCompanyAutocomplete: null,
+    setupSubsidiaryAutocomplete: null,
     state: state  // Expose state for debugging and other modules
   };
 
@@ -249,7 +251,7 @@
   }
 
   /**
-   * Fetch list memberships for a set of contacts and store in state
+   * Fetch list and sequence memberships for a set of contacts and store in state
    */
   async function fetchContactMemberships(contacts) {
     if (!contacts || !Array.isArray(contacts) || contacts.length === 0) return;
@@ -260,22 +262,31 @@
       if (contactIds.length === 0) return;
 
       // Reset memberships for these contacts to avoid stale data
-      contactIds.forEach(id => { state._contactListMemberships[id] = []; });
+      contactIds.forEach(id => { 
+        state._contactListMemberships[id] = []; 
+        state._contactSequenceMemberships[id] = [];
+      });
 
       const db = window.firebaseDB;
       const listsData = (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.getListsData === 'function')
         ? window.BackgroundListsLoader.getListsData()
         : [];
+      
+      const sequencesData = (window.BackgroundSequencesLoader && typeof window.BackgroundSequencesLoader.getSequencesData === 'function')
+        ? window.BackgroundSequencesLoader.getSequencesData()
+        : [];
 
       // Fetch in chunks of 30 (Firestore IN limit)
       for (let i = 0; i < contactIds.length; i += 30) {
         const chunk = contactIds.slice(i, i + 30);
-        const snapshot = await db.collection('listMembers')
+        
+        // Fetch List Memberships
+        const listSnapshot = await db.collection('listMembers')
           .where('targetType', 'in', ['people', 'contact', 'contacts'])
           .where('targetId', 'in', chunk)
           .get();
 
-        snapshot.forEach(doc => {
+        listSnapshot.forEach(doc => {
           const data = doc.data();
           const contactId = data.targetId;
           const listId = data.listId;
@@ -284,6 +295,25 @@
             if (!state._contactListMemberships[contactId]) state._contactListMemberships[contactId] = [];
             if (!state._contactListMemberships[contactId].includes(list.name)) {
               state._contactListMemberships[contactId].push(list.name);
+            }
+          }
+        });
+
+        // Fetch Sequence Memberships
+        const sequenceSnapshot = await db.collection('sequenceMembers')
+          .where('targetType', 'in', ['people', 'contact', 'contacts'])
+          .where('targetId', 'in', chunk)
+          .get();
+
+        sequenceSnapshot.forEach(doc => {
+          const data = doc.data();
+          const contactId = data.targetId;
+          const sequenceId = data.sequenceId;
+          const sequence = sequencesData.find(s => s.id === sequenceId);
+          if (sequence && sequence.name) {
+            if (!state._contactSequenceMemberships[contactId]) state._contactSequenceMemberships[contactId] = [];
+            if (!state._contactSequenceMemberships[contactId].includes(sequence.name)) {
+              state._contactSequenceMemberships[contactId].push(sequence.name);
             }
           }
         });
@@ -716,24 +746,39 @@
         top: 100%;
         left: 0;
         right: 0;
-        margin-top: 4px;
-        background: var(--bg-card);
-        border: 1px solid var(--border-light);
+        margin-top: 8px;
+        background: var(--glass-bg); /* Use global glass token */
+        border: 1px solid var(--glass-border);
         border-radius: var(--border-radius-lg);
-        box-shadow: var(--elevation-card);
-        max-height: 300px;
+        box-shadow: var(--glass-shadow);
+        max-height: 320px;
         overflow-y: auto;
-        z-index: 1000;
+        z-index: 2000;
+        backdrop-filter: var(--glass-blur) !important;
+        -webkit-backdrop-filter: var(--glass-blur) !important;
+        opacity: 0;
+        transform: translateY(-8px) scale(0.98); /* Less drastic transform for smoother feel */
+        transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        pointer-events: none;
+        scrollbar-width: thin;
+        scrollbar-color: var(--grey-600) transparent;
+        will-change: transform, opacity;
+      }
+      
+      .parent-company-dropdown.--show {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        pointer-events: auto;
       }
       
       .parent-company-dropdown-item {
         display: flex;
         align-items: center;
         gap: 12px;
-        padding: 12px;
+        padding: 12px 16px;
         cursor: pointer;
-        transition: background 0.2s ease;
-        border-bottom: 1px solid var(--border-light);
+        transition: background 0.2s ease, transform 0.2s ease;
+        border-bottom: 1px solid var(--glass-border);
       }
       
       .parent-company-dropdown-item:last-child {
@@ -741,7 +786,8 @@
       }
       
       .parent-company-dropdown-item:hover {
-        background: var(--bg-hover);
+        background: var(--glass-highlight);
+        padding-left: 20px; /* Slight slide on hover instead of transform: translateX to avoid layout jitter */
       }
       
       .parent-company-dropdown-favicon {
@@ -766,20 +812,22 @@
       
       .parent-company-dropdown-name {
         font-weight: 600;
-        color: var(--text-primary);
-        margin-bottom: 4px;
+        color: var(--text-inverse);
+        margin-bottom: 2px;
+        font-size: 0.95rem;
       }
       
       .parent-company-dropdown-details {
         font-size: 12px;
-        color: var(--text-secondary);
+        color: var(--text-muted);
       }
       
       .parent-company-dropdown-empty {
-        padding: 12px;
+        padding: 20px;
         text-align: center;
-        color: var(--text-secondary);
+        color: var(--text-muted);
         font-size: 14px;
+        font-style: italic;
       }
     `;
     document.head.appendChild(style);
@@ -1064,8 +1112,15 @@
         const delay = (index * 0.05).toFixed(2);
         
         // Get list name badges
-        const memberships = state._contactListMemberships[contact.id] || [];
-        const badgeHtml = memberships.map(name => `<span class="contact-list-badge">${escapeHtml(name)}</span>`).join('');
+        const listMemberships = state._contactListMemberships[contact.id] || [];
+        const sequenceMemberships = state._contactSequenceMemberships[contact.id] || [];
+        
+        const listIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 4px; opacity: 0.8;"><circle cx="4" cy="6" r="1"></circle><circle cx="4" cy="12" r="1"></circle><circle cx="4" cy="18" r="1"></circle><line x1="8" y1="6" x2="20" y2="6"></line><line x1="8" y1="12" x2="20" y2="12"></line><line x1="8" y1="18" x2="20" y2="18"></line></svg>`;
+        const sequenceIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; opacity: 0.8;"><polygon points="7 4 20 12 7 20 7 4"></polygon></svg>`;
+
+        const listBadges = listMemberships.map(name => `<span class="contact-list-badge">${listIcon}${escapeHtml(name)}</span>`).join('');
+        const sequenceBadges = sequenceMemberships.map(name => `<span class="contact-sequence-badge">${sequenceIcon}${escapeHtml(name)}</span>`).join('');
+        const badgeHtml = listBadges + sequenceBadges;
 
         return `
           <div class="contact-item modern-reveal premium-borderline" data-contact-id="${contact.id}" style="animation-delay: ${delay}s;">
@@ -2884,9 +2939,14 @@
         clearTimeout(autocompleteDebounceTimer);
       }
 
-      // If empty, hide dropdown and clear hidden ID
+      // If empty, hide dropdown with animation
       if (!searchTerm) {
-        dropdownElement.style.display = 'none';
+        dropdownElement.classList.remove('--show');
+        setTimeout(() => {
+          if (!dropdownElement.classList.contains('--show')) {
+            dropdownElement.style.display = 'none';
+          }
+        }, 400);
         hiddenIdElement.value = '';
         return;
       }
@@ -2897,10 +2957,17 @@
       }, 300);
     });
 
-    // Close dropdown when clicking outside
+    // Close dropdown when clicking outside with animation
     document.addEventListener('click', (e) => {
-      if (!inputElement.contains(e.target) && !dropdownElement.contains(e.target)) {
-        dropdownElement.style.display = 'none';
+      if (dropdownElement.style.display === 'block' && 
+          !inputElement.contains(e.target) && 
+          !dropdownElement.contains(e.target)) {
+        dropdownElement.classList.remove('--show');
+        setTimeout(() => {
+          if (!dropdownElement.classList.contains('--show')) {
+            dropdownElement.style.display = 'none';
+          }
+        }, 400);
       }
     });
   }
@@ -2931,6 +2998,12 @@
     if (!results || results.length === 0) {
       dropdownElement.innerHTML = '<div class="parent-company-dropdown-empty">No companies found</div>';
       dropdownElement.style.display = 'block';
+      // Use double requestAnimationFrame for ultra-smooth transition
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          dropdownElement.classList.add('--show');
+        });
+      });
       return;
     }
 
@@ -2987,6 +3060,13 @@
 
     dropdownElement.innerHTML = html;
     dropdownElement.style.display = 'block';
+    // Use double requestAnimationFrame for ultra-smooth transition
+    // This ensures the display: block is fully processed by the browser before the animation class is added
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        dropdownElement.classList.add('--show');
+      });
+    });
 
     // Add click handlers to dropdown items
     dropdownElement.querySelectorAll('.parent-company-dropdown-item').forEach(item => {
@@ -3001,10 +3081,190 @@
   function selectParentCompany(accountId, accountName, inputElement, dropdownElement, hiddenIdElement) {
     inputElement.value = accountName;
     hiddenIdElement.value = accountId;
-    dropdownElement.style.display = 'none';
+    
+    // Smooth exit animation
+    dropdownElement.classList.remove('--show');
+    setTimeout(() => {
+      if (!dropdownElement.classList.contains('--show')) {
+        dropdownElement.style.display = 'none';
+      }
+    }, 400); // Match var(--transition-smooth)
   }
 
-  // Assign to variable declared at top for event delegation scope
+  // Subsidiary Autocomplete Functions
+  function setupSubsidiaryAutocomplete(inputElement, dropdownElement, hiddenIdElement) {
+    if (!inputElement || !dropdownElement || !hiddenIdElement) return;
+
+    // Inject styles (reusing same styles)
+    injectParentCompanyAutocompleteStyles();
+
+    // Handle input with debounce
+    inputElement.addEventListener('input', (e) => {
+      const searchTerm = e.target.value.trim();
+
+      // Clear debounce timer
+      if (autocompleteDebounceTimer) {
+        clearTimeout(autocompleteDebounceTimer);
+      }
+
+      // If empty, hide dropdown with animation
+      if (!searchTerm) {
+        dropdownElement.classList.remove('--show');
+        setTimeout(() => {
+          if (!dropdownElement.classList.contains('--show')) {
+            dropdownElement.style.display = 'none';
+          }
+        }, 400);
+        hiddenIdElement.value = '';
+        return;
+      }
+
+      // Debounce search
+      autocompleteDebounceTimer = setTimeout(() => {
+        performSubsidiarySearch(searchTerm, inputElement, dropdownElement, hiddenIdElement);
+      }, 300);
+    });
+
+    // Close dropdown when clicking outside with animation
+    document.addEventListener('click', (e) => {
+      if (dropdownElement.style.display === 'block' && 
+          !inputElement.contains(e.target) && 
+          !dropdownElement.contains(e.target)) {
+        dropdownElement.classList.remove('--show');
+        setTimeout(() => {
+          if (!dropdownElement.classList.contains('--show')) {
+            dropdownElement.style.display = 'none';
+          }
+        }, 400);
+      }
+    });
+  }
+
+  function performSubsidiarySearch(searchTerm, inputElement, dropdownElement, hiddenIdElement) {
+    const accounts = window.getAccountsData ? window.getAccountsData() : [];
+    const currentAccountId = state.currentAccount?.id || '';
+
+    // Filter accounts (exclude current account and its current parent/subsidiaries to prevent loops)
+    const lowerSearch = searchTerm.toLowerCase();
+    const results = accounts.filter(account => {
+      if (account.id === currentAccountId) return false;
+      // Also exclude if it's already a subsidiary or parent
+      if (account.parentCompanyId === currentAccountId) return false;
+      if (state.currentAccount && account.id === state.currentAccount.parentCompanyId) return false;
+
+      const name = (account.accountName || account.name || account.companyName || '').toLowerCase();
+      const city = (account.city || account.locationCity || '').toLowerCase();
+      const stateVal = (account.state || account.locationState || '').toLowerCase();
+      const industry = (account.industry || '').toLowerCase();
+
+      return name.includes(lowerSearch) ||
+        city.includes(lowerSearch) ||
+        stateVal.includes(lowerSearch) ||
+        industry.includes(lowerSearch);
+    }).slice(0, 10); // Limit to 10 results
+
+    renderSubsidiaryDropdown(results, inputElement, dropdownElement, hiddenIdElement);
+  }
+
+  function renderSubsidiaryDropdown(results, inputElement, dropdownElement, hiddenIdElement) {
+    if (!results || results.length === 0) {
+      dropdownElement.innerHTML = '<div class="parent-company-dropdown-empty">No companies found</div>';
+      dropdownElement.style.display = 'block';
+      // Use double requestAnimationFrame for ultra-smooth transition
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          dropdownElement.classList.add('--show');
+        });
+      });
+      return;
+    }
+
+    const html = results.map(account => {
+      const accountName = account.accountName || account.name || account.companyName || '';
+      const city = account.city || account.locationCity || '';
+      const stateVal = account.state || account.locationState || '';
+      const industry = account.industry || '';
+
+      // Build location/industry string
+      const locationParts = [];
+      if (city && stateVal) locationParts.push(`${city}, ${stateVal}`);
+      else if (city) locationParts.push(city);
+      else if (stateVal) locationParts.push(stateVal);
+
+      if (industry) locationParts.push(industry);
+      const details = locationParts.join(' • ');
+
+      // Get company icon/favicon
+      const deriveDomain = (input) => {
+        try {
+          if (!input) return '';
+          let s = String(input).trim();
+          if (/^https?:\/\//i.test(s)) { const u = new URL(s); return (u.hostname || '').replace(/^www\./i, ''); }
+          if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s)) { return s.replace(/^www\./i, ''); }
+          return '';
+        } catch (_) { return ''; }
+      };
+      const domain = account.domain ? String(account.domain).replace(/^https?:\/\//, '').replace(/\/$/, '').replace(/^www\./i, '') : deriveDomain(account.website || '');
+      const logoUrl = account.logoUrl || '';
+
+      let iconHTML = '';
+      try {
+        if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
+          iconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 32 });
+        }
+      } catch (_) { }
+
+      if (!iconHTML) {
+        const fallbackLetter = accountName ? accountName.charAt(0).toUpperCase() : 'C';
+        iconHTML = `<div style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: var(--bg-item); border-radius: 6px; font-weight: 600; font-size: 14px; color: var(--text-secondary);">${fallbackLetter}</div>`;
+      }
+
+      return `
+        <div class="parent-company-dropdown-item" data-account-id="${escapeHtml(account.id)}" data-account-name="${escapeHtml(accountName)}">
+          <div class="parent-company-dropdown-favicon">${iconHTML}</div>
+          <div class="parent-company-dropdown-info">
+            <div class="parent-company-dropdown-name">${escapeHtml(accountName)}</div>
+            ${details ? `<div class="parent-company-dropdown-details">${escapeHtml(details)}</div>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    dropdownElement.innerHTML = html;
+    dropdownElement.style.display = 'block';
+    // Use double requestAnimationFrame for ultra-smooth transition
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        dropdownElement.classList.add('--show');
+      });
+    });
+
+    // Add click handlers to dropdown items
+    dropdownElement.querySelectorAll('.parent-company-dropdown-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const accountId = item.getAttribute('data-account-id');
+        const accountName = item.getAttribute('data-account-name');
+        selectSubsidiary(accountId, accountName, inputElement, dropdownElement, hiddenIdElement);
+      });
+    });
+  }
+
+  function selectSubsidiary(accountId, accountName, inputElement, dropdownElement, hiddenIdElement) {
+    inputElement.value = accountName;
+    hiddenIdElement.value = accountId;
+    
+    // Smooth exit animation
+    dropdownElement.classList.remove('--show');
+    setTimeout(() => {
+      if (!dropdownElement.classList.contains('--show')) {
+        dropdownElement.style.display = 'none';
+      }
+    }, 400); // Match var(--transition-smooth)
+  }
+
+  // Assign functions to the exported object
+  window.AccountDetail.setupParentCompanyAutocomplete = setupParentCompanyAutocomplete;
+  window.AccountDetail.setupSubsidiaryAutocomplete = setupSubsidiaryAutocomplete;
   openEditAccountModal = function (accountOverride) {
     const a = accountOverride || state.currentAccount || {};
     // CRITICAL FIX: Update internal state if an override is provided
@@ -3069,6 +3329,13 @@
                 <input type="text" name="parentCompanyName" class="input-dark" id="parent-company-search-edit" placeholder="Search for parent company..." autocomplete="off" value="${escapeHtml(a.parentCompanyName || '')}" />
                 <input type="hidden" name="parentCompanyId" id="parent-company-id-edit" value="${escapeHtml(a.parentCompanyId || '')}" />
                 <div id="parent-company-dropdown-edit" class="parent-company-dropdown" style="display: none;"></div>
+              </label>
+            </div>
+            <div class="form-row">
+              <label style="position: relative;">Add Subsidiary
+                <input type="text" name="subsidiaryName" class="input-dark" id="subsidiary-search-edit" placeholder="Search for subsidiary to add..." autocomplete="off" />
+                <input type="hidden" name="subsidiaryId" id="subsidiary-id-edit" />
+                <div id="subsidiary-dropdown-edit" class="parent-company-dropdown" style="display: none;"></div>
               </label>
             </div>
             <div class="form-row">
@@ -3151,6 +3418,13 @@
       if (searchInput && dropdown && hiddenId) {
         setupParentCompanyAutocomplete(searchInput, dropdown, hiddenId);
       }
+
+      const subSearchInput = overlay.querySelector('#subsidiary-search-edit');
+      const subDropdown = overlay.querySelector('#subsidiary-dropdown-edit');
+      const subHiddenId = overlay.querySelector('#subsidiary-id-edit');
+      if (subSearchInput && subDropdown && subHiddenId) {
+        setupSubsidiaryAutocomplete(subSearchInput, subDropdown, subHiddenId);
+      }
     }, 0);
 
     // Service address plus and minus button handler (event delegation) for Edit Account modal
@@ -3228,9 +3502,49 @@
 
       const id = state.currentAccount?.id;
       const db = window.firebaseDB;
-      updates.updatedAt = window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date();
+      const now = window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date();
+      updates.updatedAt = now;
+
       if (db && id) {
-        try { await db.collection('accounts').doc(id).update(updates); } catch (err) { console.warn('Failed to save account', err); }
+        try {
+          await db.collection('accounts').doc(id).update(updates);
+
+          // Handle subsidiary linkage if a subsidiary was selected
+          const subsidiaryId = (fd.get('subsidiaryId') || '').toString().trim();
+          if (subsidiaryId) {
+            await db.collection('accounts').doc(subsidiaryId).update({
+              parentCompanyId: id,
+              parentCompanyName: updates.accountName,
+              updatedAt: now
+            });
+
+            // Update local data for immediate feedback if possible
+            if (window.getAccountsData) {
+              const allAccounts = window.getAccountsData();
+              const subAcc = allAccounts.find(acc => acc.id === subsidiaryId);
+              if (subAcc) {
+                subAcc.parentCompanyId = id;
+                subAcc.parentCompanyName = updates.accountName;
+              }
+            }
+
+            // Notify system that the subsidiary was updated
+            try {
+              document.dispatchEvent(new CustomEvent('pc:account-updated', {
+                detail: {
+                  id: subsidiaryId,
+                  changes: {
+                    parentCompanyId: id,
+                    parentCompanyName: updates.accountName,
+                    updatedAt: new Date()
+                  }
+                }
+              }));
+            } catch (_) { }
+          }
+        } catch (err) {
+          console.warn('Failed to save account', err);
+        }
       }
       try { Object.assign(state.currentAccount, updates); } catch (_) { }
       try { window.crm?.showToast && window.crm.showToast('Saved'); } catch (_) { }
@@ -3415,8 +3729,23 @@
                 ...window._accountDetailPeopleCache[idx],
                 ...changes
               };
-              // console.log('[AccountDetail] Updated contact in _accountDetailPeopleCache');
             }
+          }
+
+          // CRITICAL: Update window._accountContactsCache if it exists to ensure renderAccountContacts sees changes
+          if (window._accountContactsCache) {
+            Object.keys(window._accountContactsCache).forEach(accId => {
+              const contacts = window._accountContactsCache[accId];
+              if (Array.isArray(contacts)) {
+                const idx = contacts.findIndex(c => c.id === contactId);
+                if (idx >= 0) {
+                  contacts[idx] = {
+                    ...contacts[idx],
+                    ...changes
+                  };
+                }
+              }
+            });
           }
 
           // Update BackgroundContactsLoader if available
@@ -4410,9 +4739,7 @@
         if (window.Widgets) {
           try {
             const api = window.Widgets;
-            if (typeof api.isLushaOpen === 'function' && api.isLushaOpen('account', accountId)) {
-              if (typeof api.closeLusha === 'function') { api.closeLusha(); return; }
-            } else if (typeof api.openLushaForAccount === 'function') {
+            if (typeof api.openLushaForAccount === 'function') {
               api.openLushaForAccount(accountId); return;
             } else if (typeof api.openLusha === 'function') {
               api.openLusha('account-' + accountId); return;
@@ -4428,9 +4755,7 @@
         if (window.Widgets) {
           try {
             const api = window.Widgets;
-            if (typeof api.isMapsOpen === 'function' && api.isMapsOpen('account', accountId)) {
-              if (typeof api.closeMaps === 'function') { api.closeMaps(); return; }
-            } else if (typeof api.openMapsForAccount === 'function') {
+            if (typeof api.openMapsForAccount === 'function') {
               api.openMapsForAccount(accountId); return;
             } else if (typeof api.openMaps === 'function') {
               // Fallback to contact version with account prefix
@@ -5459,42 +5784,53 @@
     }
     style.textContent = `
       /* Account Detail: Add to List panel */
-      #account-lists-panel { position: fixed; z-index: 1200; width: min(560px, 92vw);
-        background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-light);
-        border-radius: var(--border-radius); box-shadow: var(--elevation-card-hover, 0 16px 40px rgba(0,0,0,.28), 0 6px 18px rgba(0,0,0,.22));
+      #account-lists-panel { 
+        position: fixed; z-index: 1200; width: min(560px, 92vw);
+        background: var(--glass-bg); 
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        color: var(--text-primary); 
+        border: 1px solid var(--glass-border);
+        border-radius: var(--border-radius); 
+        box-shadow: var(--glass-shadow);
         transform: translateY(-8px); opacity: 0; transition: transform 400ms ease, opacity 400ms ease;
         /* Avoid clipping the pointer arrow */
         --arrow-size: 10px;
-        /* Don't use overflow: hidden - it clips the arrow pointer */ }
+      }
       #account-lists-panel.--show { transform: translateY(0); opacity: 1; }
       #account-lists-panel .list-header { 
         display: flex; align-items: center; justify-content: space-between; 
         padding: 14px 16px; border-bottom: 1px solid var(--border-light); 
-        font-weight: 700; background: var(--bg-card);
+        font-weight: 700; 
+        background: transparent;
         border-radius: var(--border-radius) var(--border-radius) 0 0;
       }
       #account-lists-panel .list-title { 
         font-weight: 700; color: var(--text-primary); font-size: 1rem; 
       }
       #account-lists-panel .close-btn {
-        display: inline-flex; align-items: center; justify-content: center;
-        width: 28px; height: 28px; min-width: 28px; min-height: 28px; padding: 0;
-        background: var(--bg-item) !important; color: var(--grey-300) !important;
-        border: 1px solid var(--border-light); border-radius: var(--border-radius-sm);
-        line-height: 1; font-size: 16px; font-weight: 600; cursor: pointer;
-        transition: var(--transition-fast); box-sizing: border-box;
-        -webkit-tap-highlight-color: transparent; margin-right: 0;
+        background: var(--bg-item); color: var(--text-primary);
+        transition: var(--transition-fast);
       }
       #account-lists-panel .close-btn:hover {
-        background: var(--grey-600) !important; color: var(--text-inverse) !important;
+        background: var(--grey-600); color: var(--text-inverse);
       }
-      #account-lists-panel .close-btn:focus-visible {
-        outline: 2px solid var(--orange-muted); outline-offset: 2px;
+      #account-lists-panel .list-body { 
+        max-height: min(70vh, 720px); 
+        overflow-y: auto; 
+        overflow-x: hidden;
+        background: transparent; 
+        border-radius: 0 0 var(--border-radius) var(--border-radius);
       }
-      #account-lists-panel .list-body { max-height: min(70vh, 720px); overflow: auto; background: var(--bg-card); }
-      #account-lists-panel .list-body::-webkit-scrollbar { width: 10px; }
+      #account-lists-panel .list-body::-webkit-scrollbar { width: 8px; }
       #account-lists-panel .list-body::-webkit-scrollbar-thumb { background: var(--grey-700); border-radius: 8px; }
-      #account-lists-panel .list-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; cursor:pointer; background: var(--bg-card); border-top: 1px solid var(--border-light); }
+      #account-lists-panel .list-item { 
+        display:flex; align-items:center; justify-content:space-between; gap:12px; 
+        padding:12px 16px; cursor:pointer; 
+        background: transparent; 
+        border-top: 1px solid var(--border-light);
+        transition: background 0.2s ease;
+      }
       #account-lists-panel .list-item:first-child { border-top: 0; }
       #account-lists-panel .list-item:last-child {
         border-radius: 0 0 var(--border-radius) var(--border-radius);
@@ -5506,7 +5842,6 @@
       #account-lists-panel .list-meta { color: var(--text-muted); font-size: .85rem; }
 
       /* Pointer arrow (reuse delete-popover pattern) */
-      #account-lists-panel::before,
       #account-lists-panel::after {
         content: "";
         position: absolute;
@@ -5514,28 +5849,42 @@
         height: var(--arrow-size);
         transform: rotate(45deg);
         pointer-events: none;
+        background: var(--glass-bg);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        z-index: -1;
+      }
+      #account-lists-panel::before {
+        content: "";
+        position: absolute;
+        width: var(--arrow-size);
+        height: var(--arrow-size);
+        transform: rotate(45deg);
+        pointer-events: none;
+        background: var(--glass-border);
+        z-index: -2;
       }
       /* Bottom placement (arrow on top edge) */
       #account-lists-panel[data-placement="bottom"]::before {
-        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px));
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
         top: calc(-1 * var(--arrow-size) / 2 + 1px);
-        background: var(--border-light);
+        clip-path: polygon(0% 0%, 100% 0%, 100% 50%, 0% 50%);
       }
       #account-lists-panel[data-placement="bottom"]::after {
-        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px));
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
         top: calc(-1 * var(--arrow-size) / 2 + 2px);
-        background: var(--bg-card);
+        clip-path: polygon(0% 0%, 100% 0%, 100% 50%, 0% 50%);
       }
       /* Top placement (arrow on bottom edge) */
       #account-lists-panel[data-placement="top"]::before {
-        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px));
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
         bottom: calc(-1 * var(--arrow-size) / 2 + 1px);
-        background: var(--border-light);
+        clip-path: polygon(0% 50%, 100% 50%, 100% 100%, 0% 100%);
       }
       #account-lists-panel[data-placement="top"]::after {
-        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px));
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
         bottom: calc(-1 * var(--arrow-size) / 2 + 2px);
-        background: var(--bg-card);
+        clip-path: polygon(0% 50%, 100% 50%, 100% 100%, 0% 100%);
       }
     `;
     document.head.appendChild(style);
@@ -5608,10 +5957,7 @@
     panel.innerHTML = `
     <div class="list-header">
       <div class="list-title">Add ${escapeHtml(companyName)} to list</div>
-      <button type="button" class="list-close" id="account-lists-close" aria-label="Close panel">×</button>
-    </div>
-    <div class="list-search">
-      <input type="text" class="search-input" id="list-search-input" placeholder="Search lists..." aria-label="Search lists">
+      <button type="button" class="close-btn" id="account-lists-close" aria-label="Close panel">×</button>
     </div>
     <div class="list-body" id="account-lists-body">
       <!-- Lists dynamic content -->
@@ -5767,7 +6113,17 @@
           </div>`;
       }).join('');
 
-      body.innerHTML = items;
+      // Replace loading row but keep the create row first
+      const createRow = body.querySelector('.list-item[data-action="create"]');
+      body.innerHTML = '';
+      if (createRow) body.appendChild(createRow);
+      body.insertAdjacentHTML('beforeend', items || '<div class="list-item" aria-disabled="true"><div class="list-name">No lists found</div><div class="list-meta">Create a new list</div></div>');
+
+      // Ensure last item is rounded to match modal corners
+      const lastItem = body.querySelector('.list-item:last-child');
+      if (lastItem) {
+        lastItem.style.borderRadius = '0 0 var(--border-radius) var(--border-radius)';
+      }
 
       // Bind click handlers
       body.querySelectorAll('.list-item[data-action]').forEach(item => {
@@ -6654,6 +7010,7 @@
   window.AccountDetail.renderAccountDetail = renderAccountDetail;
   window.AccountDetail.setupEnergyUpdateListener = setupEnergyUpdateListener;
   window.AccountDetail.setupParentCompanyAutocomplete = setupParentCompanyAutocomplete;
+  window.AccountDetail.setupSubsidiaryAutocomplete = setupSubsidiaryAutocomplete;
   window.AccountDetail.openEditModal = openEditAccountModal;
   window.AccountDetail.openAccountListsPanel = openAccountListsPanel;
   window.AccountDetail.openAccountTaskPopover = openAccountTaskPopover;

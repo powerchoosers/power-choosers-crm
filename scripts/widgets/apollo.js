@@ -95,10 +95,15 @@
     window.__lushaLastEntityId = entityId;
     window.__lushaLastEntityType = entityType;
 
-    // Clear company panel
+    // Clear company panel and show skeleton
     const companyPanel = document.getElementById('lusha-panel-company');
     if (companyPanel) {
-      companyPanel.innerHTML = '';
+      try { 
+        renderCompanySkeleton(); 
+        renderContactSkeletons();
+      } catch (_) {
+        companyPanel.innerHTML = '';
+      }
       companyPanel.removeAttribute('data-content-hash');
     }
 
@@ -450,27 +455,11 @@
     allContacts = [];
     currentPage = 1;
 
-    const loadingEl = document.getElementById('lusha-loading');
-    const resultsWrap = document.getElementById('lusha-results');
-    // On refresh, keep results visible; otherwise use normal hide/show
-    if (loadingEl) {
-      loadingEl.style.display = 'none'; // no spinner content
-      try { if (!options.forceLive) { loadingEl.classList.remove('is-hidden'); loadingEl.classList.add('is-shown'); } } catch (_) { }
-    }
-    if (resultsWrap) {
-      try {
-        resultsWrap.style.display = 'flex';
-        if (!options.forceLive) {
-          resultsWrap.classList.remove('is-shown');
-          resultsWrap.classList.add('is-hidden');
-        } else {
-          // Ensure no transitions are applied during refresh
-          resultsWrap.style.transition = 'none';
-          resultsWrap.classList.add('is-shown');
-          resultsWrap.classList.remove('is-hidden');
-        }
-      } catch (_) { }
-    }
+    // Show skeletons immediately during search
+    try { 
+      renderCompanySkeleton();
+      renderContactSkeletons(); 
+    } catch (_) { }
 
     // derive company + domain from page context (no input fields)
     const ctx = getContextDefaults(currentEntityType);
@@ -1680,29 +1669,41 @@
       const db = window.firebaseDB;
       if (!db) throw new Error('Firestore not initialized');
 
-      // Check if contact exists (by email)
+      // Check if contact exists (by email or name, within the same company)
       const email = contact.email || (Array.isArray(contact.emails) && contact.emails[0] && contact.emails[0].address) || '';
       const companyName = contact.company || contact.companyName || '';
+      const firstName = (contact.firstName || '').toString().trim();
+      const lastName = (contact.lastName || '').toString().trim();
+      const fullName = (firstName && lastName) ? `${firstName} ${lastName}`.trim() : (contact.fullName || '').toString().trim();
+      const targetCompany = companyName.toLowerCase();
+      
       let existingId = null;
+
+      // Helper to check if a doc matches the target company
+      const docMatchesCompany = (doc) => {
+        if (!targetCompany) return true;
+        const data = doc.data();
+        const dbCompany = (data.companyName || data.accountName || '').toString().toLowerCase();
+        return dbCompany.includes(targetCompany) || targetCompany.includes(dbCompany);
+      };
+
+      // 1. Try email matching first (limited to company)
       if (email) {
         try {
-          const snap = await db.collection('contacts').where('email', '==', email).limit(1).get();
-          if (snap && snap.docs && snap.docs[0]) existingId = snap.docs[0].id;
+          const snap = await db.collection('contacts').where('email', '==', email).get();
+          if (snap && snap.docs && snap.docs.length > 0) {
+            const match = snap.docs.find(docMatchesCompany);
+            if (match) existingId = match.id;
+          }
         } catch (_) { }
       }
 
-      // If no email match, try name + company based matching (Deduplication)
-      if (!existingId && contact.firstName && contact.lastName && companyName) {
+      // 2. If no email match (or no email), try name + company matching
+      if (!existingId && fullName && targetCompany) {
          try {
-           const fullName = `${contact.firstName} ${contact.lastName}`.trim();
            const snap = await db.collection('contacts').where('name', '==', fullName).limit(5).get();
            if (snap && snap.docs && snap.docs.length > 0) {
-              const targetCompany = companyName.toLowerCase();
-              const match = snap.docs.find(doc => {
-                 const data = doc.data();
-                 const dbCompany = (data.companyName || data.accountName || '').toLowerCase();
-                 return dbCompany.includes(targetCompany) || targetCompany.includes(dbCompany);
-              });
+              const match = snap.docs.find(docMatchesCompany);
               if (match) existingId = match.id;
            }
          } catch (_) { }
@@ -1768,31 +1769,27 @@
 
       // Save to CRM contacts collection
       if (existingId) {
+        // PCSaves.updateContact handles optimistic cache + event emission + async Firestore save
         await window.PCSaves.updateContact(existingId, payload);
         saved = true;
-
-        try {
-          if (window.ContactDetail && window.ContactDetail.state && window.ContactDetail.state.currentContact) {
-            const currentId = window.ContactDetail.state.currentContact.id || window.ContactDetail.state.currentContact._id;
-            if (currentId && String(currentId) === String(existingId)) {
-              window.ContactDetail.state.currentContact = Object.assign({}, window.ContactDetail.state.currentContact, payload);
-              if (typeof window.ContactDetail.renderContactDetail === 'function') {
-                window.ContactDetail.renderContactDetail();
-              }
-            }
-          }
-        } catch (_) { }
       } else {
         const ref = await db.collection('contacts').add(payload);
         const created = Object.assign({ id: ref.id }, payload);
         saved = true;
+
+        // Emit create event for People page to prepend and other pages to react
+        try {
+          const createEvent = new CustomEvent('pc:contact-created', {
+            detail: { id: ref.id, doc: created, contact: created, source: 'lusha' }
+          });
+          document.dispatchEvent(createEvent);
+        } catch (_) { }
+
         try {
           if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
             window.CacheManager.updateRecord('contacts', ref.id, created);
           }
         } catch (_) { }
-        // Emit create event for People page to prepend
-        try { document.dispatchEvent(new CustomEvent('pc:contact-created', { detail: { id: ref.id, doc: created, contact: created } })); } catch (_) { }
       }
 
       try {
@@ -2261,57 +2258,9 @@
         updatePayload.department = enriched.department;
       }
 
-      // Update the contact
+      // Update the contact - PCSaves.updateContact handles optimistic cache + event emission + async Firestore save
       await window.PCSaves.updateContact(existingId, updatePayload);
       window.crm?.showToast && window.crm.showToast('Contact enriched successfully');
-
-      // Refresh the contact details page if we're viewing that contact
-      try {
-        if (window.ContactDetail && window.ContactDetail.state && window.ContactDetail.state.currentContact) {
-          const currentContactId = window.ContactDetail.state.currentContact.id || window.ContactDetail.state.currentContact._id;
-          if (currentContactId === existingId) {
-            // Update the current contact data immediately with enriched data
-            window.ContactDetail.state.currentContact = {
-              ...window.ContactDetail.state.currentContact,
-              ...updatePayload
-            };
-
-            // We're viewing the contact that was just enriched, refresh the page
-            window.ContactDetail.renderContactDetail();
-
-            // Also trigger a custom event to ensure all components refresh
-            const refreshEvent = new CustomEvent('pc:contact-enriched', {
-              detail: { contactId: existingId, enrichedData: enriched }
-            });
-            document.dispatchEvent(refreshEvent);
-          }
-        }
-
-        // Also check if we're on account details page and refresh that too
-        if (window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount) {
-          window.AccountDetail.renderAccountDetail();
-
-          // Trigger account refresh event
-          const accountRefreshEvent = new CustomEvent('pc:account-refresh', {
-            detail: { accountId: window.AccountDetail.state.currentAccount.id }
-          });
-          document.dispatchEvent(accountRefreshEvent);
-        }
-
-        // Also refresh any other pages that might be showing this contact
-        try {
-          // Trigger a general contact update event for other components
-          const generalUpdateEvent = new CustomEvent('pc:contact-updated', {
-            detail: {
-              contactId: existingId,
-              changes: updatePayload,
-              source: 'lusha-enrichment'
-            }
-          });
-          document.dispatchEvent(generalUpdateEvent);
-        } catch (_) { /* noop */ }
-      } catch (refreshError) {
-      }
 
     } catch (e) {
       window.crm?.showToast && window.crm.showToast('Failed to enrich contact: ' + (e.message || 'Unknown error'));
@@ -2709,40 +2658,59 @@
       const firstName = (contact.firstName || '').toString().trim();
       const lastName = (contact.lastName || '').toString().trim();
       const fullName = (firstName && lastName) ? `${firstName} ${lastName}`.trim() : (contact.fullName || '').toString().trim();
-      const targetCompany = (contact.companyName || contact.company || '').toString().trim().toLowerCase();
+      
+      // CRITICAL: Get target company from contact or the search context (lastCompanyResult)
+      // This ensures cached results (which might lack company info per contact) still find matches
+      let targetCompany = (contact.companyName || contact.company || '').toString().trim().toLowerCase();
+      if (!targetCompany && lastCompanyResult) {
+        targetCompany = (lastCompanyResult.name || lastCompanyResult.companyName || '').toString().trim().toLowerCase();
+      }
+      
       const phone = contact.phone || contact.phoneNumber || (Array.isArray(contact.phones) && contact.phones[0] && contact.phones[0].number) || '';
 
       const checks = [];
+      
+      // Helper to check if a doc matches the target company
+      const matchesCompany = (doc) => {
+        if (!targetCompany) return true; // If we don't know the target company, assume match (fallback to original behavior)
+        const data = doc.data();
+        const dbCompany = (data.companyName || data.accountName || '').toString().toLowerCase();
+        if (!dbCompany) return false;
+        return dbCompany.includes(targetCompany) || targetCompany.includes(dbCompany);
+      };
+
+      // 1. Check by Email AND Company
       if (email) {
         checks.push(
-          db.collection('contacts').where('email', '==', email).limit(1).get()
+          db.collection('contacts').where('email', '==', email).limit(5).get()
+            .then(s => {
+              if (!s || !s.docs || s.docs.length === 0) return false;
+              // User wants linking ONLY if company matches
+              return s.docs.some(matchesCompany);
+            })
+            .catch(() => false)
+        );
+      }
+
+      // 2. Check by Name AND Company
+      if (fullName && targetCompany) {
+        checks.push(
+          db.collection('contacts').where('name', '==', fullName).limit(5).get()
+            .then(s => {
+              if (!s || !s.docs || s.docs.length === 0) return false;
+              return s.docs.some(matchesCompany);
+            })
+            .catch(() => false)
+        );
+      }
+
+      // 3. Fallback: Check by Phone (global)
+      if (phone) {
+        checks.push(
+          db.collection('contacts').where('phone', '==', phone).limit(1).get()
             .then(s => !!(s && s.docs && s.docs[0]))
             .catch(() => false)
         );
-      } else {
-        if (fullName && targetCompany) {
-          checks.push(
-            db.collection('contacts').where('name', '==', fullName).limit(5).get()
-              .then(s => {
-                if (!s || !s.docs || s.docs.length === 0) return false;
-                const match = s.docs.find(doc => {
-                  const data = doc.data();
-                  const dbCompany = (data.companyName || data.accountName || '').toString().toLowerCase();
-                  if (!dbCompany) return false;
-                  return dbCompany.includes(targetCompany) || targetCompany.includes(dbCompany);
-                });
-                return !!match;
-              })
-              .catch(() => false)
-          );
-        }
-        if (phone) {
-          checks.push(
-            db.collection('contacts').where('phone', '==', phone).limit(1).get()
-              .then(s => !!(s && s.docs && s.docs[0]))
-              .catch(() => false)
-          );
-        }
       }
 
       let contactExists = false;
@@ -2752,7 +2720,9 @@
       }
 
       setActionButtonsState(containerEl, contactExists);
-    } catch (_) { }
+    } catch (err) {
+      lushaLog('updateActionButtons failed:', err);
+    }
   }
 
   function copyContactInfo(contact) {
@@ -2891,6 +2861,85 @@
     } catch (_) { }
 
     return out;
+  }
+
+  function renderCompanySkeleton() {
+    const compPanel = document.getElementById('lusha-panel-company');
+    if (!compPanel) return;
+
+    compPanel.innerHTML = `
+      <div class="lusha-company-skeleton skeleton-shimmer-modern">
+        <div class="lusha-skel-header">
+          <div class="lusha-skel-avatar skeleton-shape" style="width: 48px; height: 48px;"></div>
+          <div class="lusha-skel-info">
+            <div class="lusha-skel-name skeleton-shape" style="width: 70%; height: 18px;"></div>
+            <div class="lusha-skel-title skeleton-shape" style="width: 50%; height: 12px;"></div>
+          </div>
+        </div>
+      </div>
+    `;
+    compPanel.style.minHeight = '80px';
+  }
+
+  function renderContactSkeletons() {
+    const listEl = document.getElementById('lusha-contacts-list');
+    if (!listEl) return;
+
+    listEl.innerHTML = '';
+    for (let i = 0; i < 3; i++) {
+      const skel = document.createElement('div');
+      skel.className = 'lusha-contact-item skeleton-shimmer-modern';
+      skel.style.pointerEvents = 'none';
+      skel.innerHTML = `
+        <div class="lusha-contact-header">
+          <div class="lusha-contact-info">
+            <div class="lusha-contact-name skeleton-shape" style="width: 60%; height: 18px; margin-bottom: 4px;"></div>
+            <div class="lusha-contact-title skeleton-shape" style="width: 40%; height: 14px;"></div>
+          </div>
+        </div>
+        <div class="lusha-contact-details" style="margin-bottom: 12px;">
+          <div class="lusha-fields">
+            <div class="lusha-field">
+              <div class="lusha-field-header" style="margin-bottom: 4px;">
+                <div class="lusha-label skeleton-shape" style="width: 30px; height: 10px;"></div>
+              </div>
+              <div class="lusha-field-body">
+                <div class="skeleton-shape" style="width: 80%; height: 14px; margin: 4px 0;"></div>
+              </div>
+            </div>
+            <div class="lusha-field">
+              <div class="lusha-field-header" style="margin-bottom: 4px;">
+                <div class="lusha-label skeleton-shape" style="width: 30px; height: 10px;"></div>
+              </div>
+              <div class="lusha-field-body">
+                <div class="skeleton-shape" style="width: 70%; height: 14px; margin: 4px 0;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="lusha-contact-actions">
+          <div class="lusha-action-btn skeleton-shape" style="height: 34px;"></div>
+          <div class="lusha-action-btn skeleton-shape" style="height: 34px;"></div>
+          <div class="lusha-action-btn skeleton-shape" style="height: 34px;"></div>
+        </div>
+      `;
+      listEl.appendChild(skel);
+    }
+
+    // Ensure the results section is visible so skeletons can be seen
+    const resultsWrap = document.getElementById('lusha-results');
+    if (resultsWrap) {
+      resultsWrap.style.display = 'flex';
+      resultsWrap.classList.add('is-shown');
+      resultsWrap.classList.remove('is-hidden');
+
+      // Ensure the header is visible too
+      const headerEl = resultsWrap.querySelector('.lusha-results-header');
+      if (headerEl) {
+        headerEl.style.opacity = '1';
+        headerEl.style.transform = 'translateY(0)';
+      }
+    }
   }
 
   function updateResults(contacts, skipAnimations = false) {
@@ -3694,10 +3743,10 @@
     currentContactId = contactId;
     currentEntityType = 'contact';
     
-    // If widget is already open for a different entity, update it and scroll to top
+    // If widget is already open for a different entity, update it and scroll to it
     if (existingWidget) {
       updateWidgetContent(contactId, 'contact');
-      scrollToWidgetPanelTop();
+      scrollToWidget(WIDGET_ID);
       return;
     }
 
@@ -3720,10 +3769,10 @@
     currentAccountId = accountId;
     currentEntityType = 'account';
     
-    // If widget is already open for a different entity, update it and scroll to top
+    // If widget is already open for a different entity, update it and scroll to it
     if (existingWidget) {
       updateWidgetContent(accountId, 'account');
-      scrollToWidgetPanelTop();
+      scrollToWidget(WIDGET_ID);
       return;
     }
 
