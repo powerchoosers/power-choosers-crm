@@ -171,15 +171,17 @@ class ToastManager {
         iconElement.className = 'toast-icon';
 
         if (customIcon) {
-            if (typeof customIcon === 'string' && (customIcon.startsWith('http') || customIcon.startsWith('data:image'))) {
+            const trimmedIcon = typeof customIcon === 'string' ? customIcon.trim() : '';
+
+            if (trimmedIcon && (trimmedIcon.startsWith('http') || trimmedIcon.startsWith('data:image'))) {
                 // Image URL or Data URI
                 iconElement.classList.add('has-image');
                 const img = document.createElement('img');
-                img.src = customIcon;
+                img.src = trimmedIcon;
                 img.alt = 'Icon';
                 // Add error handling to fallback to initials if image fails
                 img.onerror = () => {
-                    console.warn('[ToastManager] Icon image failed to load:', customIcon);
+                    console.warn('[ToastManager] Icon image failed to load:', trimmedIcon);
                     img.style.display = 'none';
                     iconElement.classList.remove('has-image'); // Remove class so background returns
                     if (type === 'call') {
@@ -189,12 +191,12 @@ class ToastManager {
                     }
                 };
                 iconElement.appendChild(img);
-            } else if (typeof customIcon === 'string' && (customIcon.startsWith('<svg') || customIcon.startsWith('<span') || customIcon.startsWith('<div'))) {
+            } else if (trimmedIcon && (trimmedIcon.startsWith('<svg') || trimmedIcon.startsWith('<span') || trimmedIcon.startsWith('<div'))) {
                 // HTML string (SVG or complex container like __pcFaviconHelper)
-                if (customIcon.includes('company-favicon-container')) {
+                if (trimmedIcon.includes('company-favicon-container')) {
                     iconElement.classList.add('has-image');
                 }
-                iconElement.innerHTML = customIcon;
+                iconElement.innerHTML = trimmedIcon;
             } else if (typeof customIcon === 'string') {
                 // Text/initials
                 iconElement.textContent = customIcon;

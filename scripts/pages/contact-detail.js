@@ -110,7 +110,6 @@
       if (editBtn && editBtn.dataset.action === 'edit-contact' && document.getElementById('contact-detail-header') && !document.getElementById('account-details-page')) {
         e.preventDefault();
         e.stopPropagation();
-        // console.log('[ContactDetail] Edit contact button clicked via delegation');
         openEditContactModal();
         return;
       }
@@ -231,17 +230,13 @@
 
   // Save service addresses array to linked account from contact detail
   async function saveAccountServiceAddresses(addresses) {
-    // console.log('[Contact Detail] saveAccountServiceAddresses called:', { addresses });
     const db = window.firebaseDB;
     const accountId = state._linkedAccountId;
-    // console.log('[Contact Detail] Linked account ID:', accountId);
     if (!accountId) {
-      // console.log('[Contact Detail] No linked account ID found');
       return;
     }
 
     const payload = { serviceAddresses: addresses, updatedAt: Date.now() };
-    // console.log('[Contact Detail] Payload to save:', payload);
 
     // Update local cache if we have it
     try {
@@ -253,13 +248,11 @@
             accounts[idx].serviceAddresses = addresses;
             accounts[idx].updatedAt = new Date();
           } catch (_) { }
-          // console.log('[Contact Detail] Updated local cache for account service addresses:', accountId);
         }
       }
     } catch (_) { }
 
     if (!db) {
-      // console.log('[Contact Detail] No database, dispatching service-addresses-updated event');
       try { document.dispatchEvent(new CustomEvent('pc:service-addresses-updated', { detail: { entity: 'account', id: accountId, addresses } })); } catch (_) { }
       return;
     }
@@ -267,7 +260,6 @@
     try {
       await db.collection('accounts').doc(accountId).update(payload);
       window.crm?.showToast && window.crm.showToast('Saved');
-      // console.log('[Contact Detail] Dispatching service-addresses-updated event:', { entity: 'account', id: accountId, addresses });
       try {
         const event = new CustomEvent('pc:service-addresses-updated', { detail: { entity: 'account', id: accountId, addresses } });
         document.dispatchEvent(event);
@@ -286,7 +278,7 @@
     style.id = 'contact-recent-calls-styles';
     style.textContent = `
       /* Base list + rows */
-      #contact-recent-calls .rc-list { 
+      .rc-list { 
         position: relative; 
         display:flex; 
         flex-direction:column; 
@@ -295,7 +287,7 @@
         contain: layout; /* Prevent layout shifts during updates */
         min-height: 0; /* Prevent height jumping */
       }
-      #contact-recent-calls .rc-item { 
+      .rc-item { 
         display:flex; 
         align-items:center; 
         justify-content:space-between; 
@@ -307,12 +299,12 @@
         contain: layout; /* Prevent layout shifts during duration updates */
         min-height: 48px; /* Fixed height to prevent jumping */
       }
-      #contact-recent-calls .rc-item.rc-new { animation: rcNewIn 220ms ease-out both; }
+      .rc-item.rc-new { animation: rcNewIn 220ms ease-out both; }
       @keyframes rcNewIn { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-      #contact-recent-calls .rc-meta { display:flex; align-items:center; gap:10px; min-width:0; }
-      #contact-recent-calls .rc-title { font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      #contact-recent-calls .rc-sub { color:var(--text-secondary); font-size:12px; white-space:nowrap; }
-      #contact-recent-calls .rc-empty { color: var(--text-secondary); font-size: 12px; padding: 6px 0; }
+      .rc-meta { display:flex; align-items:center; gap:10px; min-width:0; }
+      .rc-title { font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .rc-sub { color:var(--text-secondary); font-size:12px; white-space:nowrap; }
+      .rc-empty { color: var(--text-secondary); font-size: 12px; padding: 6px 0; }
       /* Pager (shared with Account) */
       .rc-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom: var(--spacing-md); }
       .rc-pager { display:flex; align-items:center; gap:8px; }
@@ -320,17 +312,42 @@
       .rc-page-btn:hover { background: var(--bg-hover); border-color: var(--accent-color); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
       .rc-page-info { min-width: 44px; text-align:center; color: var(--text-secondary); font-size: 12px; }
       /* Actions */
-      #contact-recent-calls .rc-icon-btn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:8px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-light); }
-      #contact-recent-calls .rc-icon-btn:hover { background: var(--bg-hover); border-color: var(--accent-color); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-      #contact-recent-calls .rc-icon-btn.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
-      #contact-recent-calls .rc-icon-btn.disabled:hover { background: var(--bg-card); border-color: var(--border-light); transform: none; box-shadow: none; }
-      #contact-recent-calls .rc-actions { display:flex; align-items:center; gap:8px; }
-      #contact-recent-calls .rc-outcome { font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--border-light); background:var(--bg-card); color:var(--text-secondary); }
+      .rc-icon-btn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:8px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-light); }
+      .rc-icon-btn:hover { background: var(--bg-hover); border-color: var(--accent-color); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+      .rc-icon-btn.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+      .rc-icon-btn.disabled:hover { background: var(--bg-card); border-color: var(--border-light); transform: none; box-shadow: none; }
+      
+      /* Processing State - Orange Border (Added to match user request) */
+      .rc-icon-btn.processing {
+        border-color: var(--orange-primary);
+        cursor: default;
+        padding: 0; /* Ensure spinner centering */
+      }
+      .rc-icon-btn.processing:hover {
+        background: var(--bg-card);
+        transform: none;
+        box-shadow: none;
+      }
+
+      /* Not Processed State - Faint but visible */
+      .rc-icon-btn.not-processed {
+        color: var(--text-secondary);
+        opacity: 0.6;
+      }
+      .rc-icon-btn.not-processed:hover {
+        opacity: 1;
+        color: var(--text-primary);
+        background: var(--bg-hover);
+        border-color: var(--accent-color);
+      }
+
+      .rc-actions { display:flex; align-items:center; gap:8px; }
+      .rc-outcome { font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--border-light); background:var(--bg-card); color:var(--text-secondary); }
       /* Inline details under item */
-      #contact-recent-calls .rc-details { overflow:hidden; border:1px solid var(--border-light); border-radius: var(--border-radius); background: var(--bg-card); margin: 6px 2px 2px 2px; box-shadow: var(--elevation-card); }
-      #contact-recent-calls .rc-details-inner { padding: 12px; }
+      .rc-details { overflow:hidden; border:1px solid var(--border-light); border-radius: var(--border-radius); background: var(--bg-card); margin: 6px 2px 2px 2px; box-shadow: var(--elevation-card); }
+      .rc-details-inner { padding: 12px; }
       /* Live call duration indicator */
-      #contact-recent-calls .rc-item.live-call .rc-duration { color: var(--text-secondary); font-weight: 400; }
+      .rc-item.live-call .rc-duration { color: var(--text-secondary); font-weight: 400; }
       /* Shared insights styles (mirrors account/calls page so it always looks correct) */
       .insights-grid { display:grid; grid-template-columns: 2fr 1fr; gap:14px; }
       @media (max-width: 960px){ .insights-grid{ grid-template-columns:1fr; } }
@@ -831,7 +848,6 @@
             }
           } catch (_) { /* noop */ }
         }
-        // console.log('Widget: Notes for contact', contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Notes'); } catch (_) { }
         break;
       }
@@ -847,7 +863,6 @@
             }
           } catch (_) { /* noop */ }
         }
-        // console.log('Widget: Energy Health Check for contact', contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Energy Health Check'); } catch (_) { }
         break;
       }
@@ -863,7 +878,6 @@
             }
           } catch (_) { /* noop */ }
         }
-        // console.log('Widget: Deal Calculator for contact', contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Deal Calculator'); } catch (_) { }
         break;
       }
@@ -877,7 +891,6 @@
             }
           } catch (_) { /* noop */ }
         }
-        // console.log('Widget: Prospect for contact', contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Prospect'); } catch (_) { }
         break;
       }
@@ -891,12 +904,11 @@
             }
           } catch (_) { /* noop */ }
         }
-        // console.log('Widget: Google Maps for contact', contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Google Maps'); } catch (_) { }
         break;
       }
       default:
-      // console.log('Unknown widget action:', which, 'for contact', contactId);
+        break;
     }
   }
 
@@ -916,9 +928,7 @@
     const company = c.companyName || '';
 
     const nextBiz = getNextBusinessDayISO();
-    // console.log('nextBiz ISO string:', nextBiz);
     const nextBizDate = new Date(nextBiz + 'T00:00:00'); // Add time to avoid timezone issues
-    // console.log('nextBiz formatted for input:', `${(nextBizDate.getMonth() + 1).toString().padStart(2, '0')}/${nextBizDate.getDate().toString().padStart(2, '0')}/${nextBizDate.getFullYear()}`);
 
     const currentTasksHtml = renderExistingTasksForContact(c.id, fullName);
 
@@ -1106,7 +1116,6 @@
         // Always allow backspace, delete, navigation keys, and space
         const alwaysAllowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab', 'Enter', 'Escape', ' ', 'Space', 'Spacebar'];
         if (alwaysAllowed.includes(e.key) || e.ctrlKey || e.metaKey) {
-          // try { console.log('[TimeInput] keydown allow', { key: e.key, reason: 'alwaysAllowed' }); } catch (_) { }
           return; // Allow the event to proceed
         }
 
@@ -1116,11 +1125,9 @@
 
         // If the current value is a complete time format and user is trying to add characters at the end
         if (complete && cursorPos >= value.length) {
-          // try { console.log('[TimeInput] keydown block', { key: e.key, value, cursorPos, complete }); } catch (_) { }
           e.preventDefault();
           return false;
         }
-        // try { console.log('[TimeInput] keydown pass', { key: e.key, value, cursorPos, complete }); } catch (_) { }
       });
 
       // Helper function to check if time format is complete
@@ -1344,22 +1351,13 @@
 
       // Scroll to the time/date form row when calendar opens
       setTimeout(() => {
-        // console.log('Attempting to scroll to form row...');
         const tpBody = pop.querySelector('.tp-body');
 
         // Find the Time/Due date form row by looking for the Time label
         const timeLabel = pop.querySelector('label:has(input[name="dueTime"])');
         const formRow = timeLabel ? timeLabel.closest('.form-row') : null;
 
-        // console.log('tpBody found:', !!tpBody);
-        // console.log('timeLabel found:', !!timeLabel);
-        // console.log('formRow found:', !!formRow);
-
         if (tpBody && formRow) {
-          // console.log('Both elements found, attempting scroll...');
-          // console.log('tpBody scrollTop before:', tpBody.scrollTop);
-          // console.log('formRow offsetTop:', formRow.offsetTop);
-
           // Scroll to align the actual Time label top with the container top
           const anchorEl = timeLabel || formRow; // prefer the Time label; fallback to row
 
@@ -1369,20 +1367,11 @@
             const deltaTop = anchorRect.top - containerRect.top; // pixels from visible top
             const targetScrollTop = Math.max(0, tpBody.scrollTop + deltaTop - 0); // no padding
 
-            // console.log('containerRect.top:', containerRect.top);
-            // console.log('anchorRect.top:', anchorRect.top);
-            // console.log('deltaTop:', deltaTop);
-            // console.log('targetScrollTop:', targetScrollTop);
-
             tpBody.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
           } else {
-            // console.log('Anchor label not found, scrolling to top');
             tpBody.scrollTo({ top: 0, behavior: 'smooth' });
           }
 
-          // console.log('tpBody.scrollTo called');
-        } else {
-          // console.log('Missing elements - tpBody:', !!tpBody, 'formRow:', !!formRow);
         }
       }, 300); // Increased delay to ensure calendar is fully rendered
     }
@@ -1671,8 +1660,6 @@
     const d = new Date();
     const dayOfWeek = d.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
 
-    // console.log('Current date:', d.toDateString(), 'Day of week:', dayOfWeek);
-
     // If today is Friday (5), next business day is Monday (+3 days)
     if (dayOfWeek === 5) {
       d.setDate(d.getDate() + 3);
@@ -1690,7 +1677,6 @@
       d.setDate(d.getDate() + 1);
     }
 
-    // console.log('Next business day:', d.toDateString());
     return d.toISOString().split('T')[0];
   }
 
@@ -2094,9 +2080,7 @@
               };
             }
             // Re-render immediately
-            if (typeof window.ContactDetail?.renderContactDetail === 'function') {
-              window.ContactDetail.renderContactDetail();
-            }
+            renderContactDetail();
           }
 
           // Re-attach event handlers after contact is updated
@@ -2977,7 +2961,6 @@
       document.addEventListener('pc:call-logged', (event) => {
         const callData = event.detail;
         if (callData && callData.contactId === state.currentContact?.id) {
-          // console.log('[ContactDetail] Call logged for this contact, refreshing activities');
 
           // Immediately refresh recent calls section
           if (window.ActivityManager && typeof window.ActivityManager.renderActivities === 'function') {
@@ -2997,7 +2980,6 @@
       // Listen for call insights ready (after transcript processing completes)
       document.addEventListener('pc:call-insights-ready', (event) => {
         const { callSid, call } = event.detail || {};
-        // console.log('[ContactDetail] Call insights ready:', callSid);
 
         // Update the call in our local cache
         if (Array.isArray(state._rcCalls) && callSid) {
@@ -5283,7 +5265,7 @@
     if (list) rcSetLoading(list);
 
     const contactId = state.currentContact.id;
-    
+
     // DEDUPE: Don't start a new fetch if one is already in flight for this contact
     if (state._rcLoadingForContactId === contactId) {
       return;
@@ -5391,7 +5373,7 @@
     const list = document.getElementById('contact-recent-calls-list');
     if (!list) return;
     const total = Array.isArray(state._rcCalls) ? state._rcCalls.length : 0;
-    
+
     if (!total) { rcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>'); updateRecentCallsPager(0, 0); return; }
     const slice = getRecentCallsPageSlice();
     const tryApplySingleNewCallPatch = () => {
@@ -5644,11 +5626,15 @@
 
     // Use shared CI processor for consistent functionality
     if (window.SharedCIProcessor) {
+      const c = state.currentContact;
       const success = await window.SharedCIProcessor.processCall(callSid, recordingSid, btn, {
         context: 'contact-detail',
+        metadata: {
+          contactName: c?.name || 'Unknown Contact',
+          contactTitle: c?.title || 'Contact',
+          company: c?.companyName || ''
+        },
         onSuccess: (call) => {
-          // console.log('[ContactDetail] CI processing completed:', call);
-
           // Update state cache so future renders show full insights
           try {
             if (Array.isArray(state._rcCalls)) {
@@ -5666,8 +5652,30 @@
                 }
                 return x;
               });
+              // Explicitly update button UI and auto-expand without full re-render
+              try {
+                // 1. Update the button visuals immediately
+                btn.innerHTML = svgEye();
+                btn.classList.remove('processing', 'not-processed');
+                btn.classList.add('just-ready'); // Trigger the new pulse animation
+                btn.disabled = false;
+                btn.title = 'View AI insights';
+                
+                // 2. Remove pulse class after animation
+                setTimeout(() => btn.classList.remove('just-ready'), 3000);
+
+                // 3. Auto-expand the insight
+                toggleRcDetails(btn, call);
+                
+              } catch (e) {
+                console.error('[ContactDetail] Error during targeted update:', e);
+                // Fallback to full render if targeted update fails
+                renderRecentCallsPage();
+              }
             }
-          } catch (_) { }
+          } catch (e) {
+            console.error('[ContactDetail] Error updating state:', e);
+          }
         },
         onError: (error) => {
           console.error('[ContactDetail] CI processing failed:', error);
@@ -5738,7 +5746,6 @@
         return;
       }
       const result = await response.json().catch(() => ({}));
-      try { console.log('[ContactDetail] CI processing initiated:', result); } catch (_) { }
 
       // Keep spinner; backend/webhook will update UI when analysis completes
       try {
@@ -7574,19 +7581,15 @@
       if (container._listItemClickHandler) {
         try {
           container.removeEventListener('click', container._listItemClickHandler);
-          console.log('[ContactDetail] Removed old list item click handler');
         } catch (e) {
           console.warn('[ContactDetail] Error removing old handler:', e);
         }
       }
 
-      // Create and store the handler function with detailed logging
+      // Create and store the handler function
       container._listItemClickHandler = (e) => {
-        console.log('[ContactDetail] Click detected in list container', e.target);
         const listItem = e.target.closest('.list-item');
-        console.log('[ContactDetail] Closest list-item:', listItem);
         if (listItem && !listItem.hasAttribute('aria-disabled')) {
-          console.log('[ContactDetail] Calling handleListChoose for:', listItem.getAttribute('data-name'));
           try {
             handleListChoose(listItem);
           } catch (err) {
@@ -7595,17 +7598,11 @@
               window.crm.showToast('Error adding to list. Please try again.', 'error');
             }
           }
-        } else {
-          console.log('[ContactDetail] List item click ignored:', {
-            hasListItem: !!listItem,
-            isDisabled: listItem?.hasAttribute('aria-disabled')
-          });
         }
       };
 
       // Attach the listener with capture phase to ensure it fires
       container.addEventListener('click', container._listItemClickHandler, true);
-      console.log('[ContactDetail] List item click handler attached to container:', container.id);
     } catch (err) {
       console.warn('Failed to load lists', err);
     }
@@ -7818,28 +7815,13 @@
 
           // Get website from contact's company or account
           let website = contact.website || contact.companyWebsite || contact.accountWebsite;
-          console.log('[ContactDetail] Contact website fields:', {
-            website: contact.website,
-            companyWebsite: contact.companyWebsite,
-            accountWebsite: contact.accountWebsite,
-            found: website
-          });
 
           // If no website on contact, try to get from pre-loaded linked account
           if (!website) {
             try {
-              console.log('[ContactDetail] No website on contact, using pre-loaded linked account...');
               const linkedAccount = state._preloadedAccount;
               if (linkedAccount) {
                 website = linkedAccount.website || linkedAccount.domain;
-                console.log('[ContactDetail] Found linked account:', linkedAccount.accountName || linkedAccount.name);
-                console.log('[ContactDetail] Account website fields:', {
-                  website: linkedAccount.website,
-                  domain: linkedAccount.domain,
-                  found: website
-                });
-              } else {
-                console.log('[ContactDetail] No linked account found');
               }
             } catch (e) {
               console.warn('[ContactDetail] Failed to find linked account for website:', e);
@@ -7852,10 +7834,8 @@
             if (!url.startsWith('http://') && !url.startsWith('https://')) {
               url = 'https://' + url;
             }
-            console.log('[ContactDetail] Opening website:', url);
             try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ }
           } else {
-            console.log('[ContactDetail] No website available for contact');
             // Show message if no website available
             if (window.crm && typeof window.crm.showToast === 'function') {
               window.crm.showToast('No website available for this contact');
@@ -7866,20 +7846,14 @@
       case 'linkedin':
         const contactLinkedIn = state.currentContact;
         if (contactLinkedIn) {
-          console.log('[ContactDetail] LinkedIn button clicked for contact:', contactLinkedIn.name || contactLinkedIn.firstName + ' ' + contactLinkedIn.lastName);
-          console.log('[ContactDetail] Contact LinkedIn field:', contactLinkedIn.linkedin);
-
           // If contact has a LinkedIn URL, use it directly (PERSONAL LinkedIn, not company)
           if (contactLinkedIn.linkedin) {
-            console.log('[ContactDetail] Using contact personal LinkedIn:', contactLinkedIn.linkedin);
             try { window.open(contactLinkedIn.linkedin, '_blank', 'noopener'); } catch (e) { /* noop */ }
           } else {
             // Fallback to search for the PERSON (not company)
             const fullName = [contactLinkedIn.firstName, contactLinkedIn.lastName].filter(Boolean).join(' ') || contactLinkedIn.name;
             const query = encodeURIComponent(fullName);
             const url = `https://www.linkedin.com/search/results/people/?keywords=${query}`;
-            console.log('[ContactDetail] No personal LinkedIn, searching for person:', fullName);
-            console.log('[ContactDetail] LinkedIn search URL:', url);
             try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ }
           }
         }
@@ -8175,6 +8149,7 @@
   // Export functions for use by people.js
   window.ContactDetail = {
     show: showContactDetail,
+    renderContactDetail: renderContactDetail,
     setupEnergyUpdateListener: setupEnergyUpdateListener,
     setupContactCreatedListener: setupContactCreatedListener,
     // Expose internal state for widgets to read linked account id

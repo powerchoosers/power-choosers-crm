@@ -5182,7 +5182,7 @@ class PowerChoosersCRM {
                     if (ownerId !== userEmail && assignedTo !== userEmail && createdBy !== userEmail) {
                         return;
                     }
-                }
+a                }
 
                 if (task.status === 'completed') {
                     return;

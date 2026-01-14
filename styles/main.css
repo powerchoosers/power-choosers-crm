@@ -21041,6 +21041,23 @@ input.row-select[type="checkbox"]:focus-visible {
     }
 }
 
+@keyframes pulse-eye-subtle {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+@keyframes pulse-blue-glow-subtle {
+    0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+}
+
+.rc-insights.just-ready {
+    animation: pulse-eye-subtle 0.6s ease-out, pulse-blue-glow-subtle 1.5s ease-out;
+    color: #ffffff !important;
+}
+
 /* Improved Shimmer Animation: Base stays fixed, light ray moves */
 .skeleton-shimmer {
     position: relative;

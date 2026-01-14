@@ -673,8 +673,12 @@ if (!document._callsRestoreBound) {
             if (window.SharedCIProcessor) {
               const success = await window.SharedCIProcessor.processCall(row.id || row.callSid, row.recordingSid, btn, {
                 context: 'calls-page',
+                metadata: {
+                  company: row.company || '',
+                  contactName: row.contactName || '',
+                  contactTitle: row.contactTitle || 'Contact'
+                },
                 onSuccess: (call) => {
-                  console.log('[Calls] CI processing completed:', call);
                   
                   // Update local state row
                   try {
@@ -1639,8 +1643,6 @@ if (!document._callsRestoreBound) {
                       debug.contactIdSource = 'account.mostActiveContact';
                     }
                   }
-                } else {
-              } else {
                 }
               }
             }
@@ -3356,11 +3358,10 @@ if (!document._callsRestoreBound) {
   function insightsContentHtml(r){
     // Normalize AI payload (supports snake_case from Twilio Operator and camelCase)
     const A = r.aiInsights || {};
-    console.log('[Insights Debug] Full AI insights object:', A);
     const get = (obj, keys, d='') => { for (const k of keys) { if (obj && obj[k] != null && obj[k] !== '') return obj[k]; } return d; };
     const toArr = (v)=> Array.isArray(v)?v:(v? [v]:[]);
 
-    const contract = (()=>{ const mapped = extractContractFromAll(A, r.transcript); console.log('[Insights Debug] Mapped contract:', mapped); return mapped; })();
+    const contract = (()=>{ const mapped = extractContractFromAll(A, r.transcript); return mapped; })();
 
     const sentiment = get(A, ['sentiment'], 'Unknown');
     const disposition = get(A, ['disposition'], '');
@@ -4566,7 +4567,6 @@ if (!document._callsRestoreBound) {
     document.addEventListener('pc:call-insights-ready', async (e) => {
       try {
         const { callSid, call } = e.detail || {};
-        console.log('[Calls] Call insights ready event received:', callSid);
         
         if (!callSid || !call) return;
         

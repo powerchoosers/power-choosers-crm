@@ -106,15 +106,12 @@
     // Only set up once
     if (document._pcAccountDetailDelegated) return;
 
-    // console.log('[AccountDetail] Setting up event delegation on document');
-
     const delegatedClickHandler = (e) => {
       // Check if click is on "Add to list" button
       const addToListBtn = e.target.closest('#add-account-to-list');
       if (addToListBtn) {
         e.preventDefault();
         e.stopPropagation();
-        // console.log('[AccountDetail] Add to list clicked via delegation');
 
         // Toggle behavior: close if already open
         if (document.getElementById('account-lists-panel')) {
@@ -130,7 +127,6 @@
       if (websiteBtn && websiteBtn.closest('#account-detail-header')) {
         e.preventDefault();
         e.stopImmediatePropagation();
-        // console.log('[AccountDetail] Website button clicked via delegation');
         handleQuickAction('website');
         return;
       }
@@ -140,7 +136,6 @@
       if (linkedInBtn && linkedInBtn.closest('#account-detail-header')) {
         e.preventDefault();
         e.stopImmediatePropagation();
-        // console.log('[AccountDetail] LinkedIn button clicked via delegation');
         handleQuickAction('linkedin');
         return;
       }
@@ -151,7 +146,6 @@
       if (editBtn && editBtn.dataset.action === 'edit-account' && document.getElementById('account-details-page') && !document.getElementById('contact-detail-header')) {
         e.preventDefault();
         e.stopPropagation();
-        // console.log('[AccountDetail] Edit account button clicked via delegation');
         openEditAccountModal();
         return;
       }
@@ -162,7 +156,6 @@
     eventListeners.push({ type: 'click', handler: delegatedClickHandler, target: document });
 
     document._pcAccountDetailDelegated = true;
-    // console.log('[AccountDetail] Event delegation set up successfully');
   }
 
   // Initialize event delegation immediately
@@ -171,38 +164,29 @@
   // Listen for contacts data becoming available (ONCE)
   if (!document._accountDetailContactsListenerBound) {
     document.addEventListener('pc:contacts-loaded', async (e) => {
-      // console.log('[AccountDetail] Contacts loaded event received, count:', e.detail?.count);
-
       // Update the contacts cache - prioritize BackgroundContactsLoader
       if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
         window._accountDetailPeopleCache = window.BackgroundContactsLoader.getContactsData() || [];
-        // console.log('[AccountDetail] Updated people cache from BackgroundContactsLoader:', window._accountDetailPeopleCache.length);
       } else if (typeof window.getPeopleData === 'function') {
         window._accountDetailPeopleCache = window.getPeopleData() || [];
-        // console.log('[AccountDetail] Updated people cache from getPeopleData:', window._accountDetailPeopleCache.length);
       }
 
       // Re-render just the contacts section if we're showing an account
       if (state.currentAccount && window._accountDetailPeopleCache && window._accountDetailPeopleCache.length > 0) {
         const contactsList = document.getElementById('account-contacts-list');
         if (contactsList) {
-          // console.log('[AccountDetail] Re-rendering contacts section with', window._accountDetailPeopleCache.length, 'contacts');
           try {
             contactsList.innerHTML = await renderAccountContacts(state.currentAccount);
             bindContactItemEvents();
-            // console.log('[AccountDetail] Contacts section re-rendered successfully');
           } catch (error) {
             console.error('[AccountDetail] Error re-rendering contacts:', error);
           }
         } else {
           console.warn('[AccountDetail] Contact list element not found');
         }
-      } else {
-        // console.log('[AccountDetail] Not re-rendering: account=', !!state.currentAccount, 'cache length=', window._accountDetailPeopleCache?.length);
       }
     });
     document._accountDetailContactsListenerBound = true;
-    // console.log('[AccountDetail] Registered contacts-loaded listener');
   }
 
   // ==== Date helpers for Energy & Contract fields ====
@@ -262,8 +246,8 @@
       if (contactIds.length === 0) return;
 
       // Reset memberships for these contacts to avoid stale data
-      contactIds.forEach(id => { 
-        state._contactListMemberships[id] = []; 
+      contactIds.forEach(id => {
+        state._contactListMemberships[id] = [];
         state._contactSequenceMemberships[id] = [];
       });
 
@@ -271,7 +255,7 @@
       const listsData = (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.getListsData === 'function')
         ? window.BackgroundListsLoader.getListsData()
         : [];
-      
+
       const sequencesData = (window.BackgroundSequencesLoader && typeof window.BackgroundSequencesLoader.getSequencesData === 'function')
         ? window.BackgroundSequencesLoader.getSequencesData()
         : [];
@@ -279,7 +263,7 @@
       // Fetch in chunks of 30 (Firestore IN limit)
       for (let i = 0; i < contactIds.length; i += 30) {
         const chunk = contactIds.slice(i, i + 30);
-        
+
         // Fetch List Memberships
         const listSnapshot = await db.collection('listMembers')
           .where('targetType', 'in', ['people', 'contact', 'contacts'])
@@ -328,7 +312,6 @@
     // CRITICAL: Debounce rapid-fire calls (prevents event listener pile-up)
     const now = Date.now();
     if (_lastRequestedAccountId === accountId && (now - _lastShowAccountDetailTime) < 500) {
-      // console.log('[AccountDetail] Debouncing duplicate call for same account within 500ms:', accountId);
       return;
     }
     _lastShowAccountDetailTime = now;
@@ -337,11 +320,9 @@
     if (_showAccountDetailInProgress) {
       // If same account is already loading, skip this call entirely
       if (_lastRequestedAccountId === accountId) {
-        // console.log('[AccountDetail] Skipping duplicate call - already in progress:', accountId);
         return;
       }
       // If different account, wait for current to finish (but don't block forever)
-      // console.log('[AccountDetail] Waiting for previous load to complete...');
       let waitCount = 0;
       while (_showAccountDetailInProgress && waitCount < 50) {
         await new Promise(r => setTimeout(r, 100));
@@ -399,17 +380,13 @@
       try {
         if (typeof window.getPeopleData === 'function') {
           window._accountDetailPeopleCache = window.getPeopleData() || [];
-          // console.log('[AccountDetail] Cached people data from people.js:', window._accountDetailPeopleCache.length);
           contactsLoaded = window._accountDetailPeopleCache.length > 0;
         } else if (window.CacheManager && typeof window.CacheManager.get === 'function') {
-          // console.log('[AccountDetail] Loading people data from cache...');
           const contacts = await window.CacheManager.get('contacts');
           window._accountDetailPeopleCache = (contacts && Array.isArray(contacts)) ? contacts : [];
-          // console.log('[AccountDetail] Cached people data from CacheManager:', window._accountDetailPeopleCache.length);
           contactsLoaded = window._accountDetailPeopleCache.length > 0;
         } else {
           // If people.js hasn't loaded and no cache, contacts will load via event
-          // console.log('[AccountDetail] No people data available yet, will update when loaded');
           window._accountDetailPeopleCache = [];
           contactsLoaded = false;
         }
@@ -441,21 +418,17 @@
 
       // If no contacts loaded and account is rendering, set up retry
       if (!contactsLoaded && state.currentAccount) {
-        // console.log('[AccountDetail] No contacts available yet, will retry when event fires');
-
         // Add a one-time retry with timeout in case event doesn't fire
         setTimeout(async () => {
           if (window._accountDetailPeopleCache && window._accountDetailPeopleCache.length === 0) {
             // Try loading again
             if (typeof window.getPeopleData === 'function') {
               window._accountDetailPeopleCache = window.getPeopleData() || [];
-              // console.log('[AccountDetail] Retry: Got', window._accountDetailPeopleCache.length, 'contacts');
 
               // Update contacts section
               if (window._accountDetailPeopleCache.length > 0) {
                 const contactsList = document.getElementById('account-contacts-list');
                 if (contactsList && state.currentAccount) {
-                  // console.log('[AccountDetail] Retry: Re-rendering contacts section');
                   contactsList.innerHTML = await renderAccountContacts(state.currentAccount);
                   bindContactItemEvents();
                 }
@@ -522,13 +495,11 @@
     }
 
     // FALLBACK: If not in cache (e.g., after clearing cache), load from Firebase
-    // console.log('[AccountDetail] Account not in cache, loading from Firebase:', accountId);
     if (window.firebaseDB) {
       try {
         const doc = await window.firebaseDB.collection('accounts').doc(accountId).get();
         if (doc.exists) {
           const account = { id: doc.id, ...doc.data() };
-          // console.log('[AccountDetail] ✓ Loaded account from Firebase:', account.name || account.accountName);
           return account;
         }
       } catch (error) {
@@ -1019,25 +990,20 @@
     // This should almost never happen since BackgroundContactsLoader loads on app init
     if (allContacts.length === 0 && !window.BackgroundContactsLoader && window.firebaseDB) {
       try {
-        // window.console.log('[AccountDetail] Querying Firestore for contacts of account:', accountName);
-
         // Query by accountId first (most reliable)
         let snapshot = await window.firebaseDB.collection('contacts')
           .where('accountId', '==', accountId)
           .get();
 
         allContacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        // window.console.log('[AccountDetail] Found', allContacts.length, 'contacts by accountId');
 
         // If no results, try by company name (fallback)
         if (allContacts.length === 0 && accountName) {
-          // window.console.log('[AccountDetail] No contacts found by accountId, trying companyName:', accountName);
           snapshot = await window.firebaseDB.collection('contacts')
             .where('companyName', '==', accountName)
             .get();
 
           allContacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          // window.console.log('[AccountDetail] Found', allContacts.length, 'contacts by companyName');
         }
 
         // Cache the results for this account
@@ -1050,7 +1016,6 @@
         // FALLBACK: Try background loader if Firestore query fails
         if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
           const allCachedContacts = window.BackgroundContactsLoader.getContactsData() || [];
-          // window.console.log('[AccountDetail] Fallback: Got', allCachedContacts.length, 'contacts from BackgroundContactsLoader');
 
           // Filter client-side as fallback
           const norm = (s) => String(s || '').toLowerCase()
@@ -1066,23 +1031,17 @@
             const contactCompany = contact.companyName || contact.accountName || '';
             return norm(contactCompany) === normalizedAccountName;
           });
-          // window.console.log('[AccountDetail] Fallback: Filtered to', allContacts.length, 'contacts');
         }
       }
     }
 
-    // window.console.log('[AccountDetail] renderAccountContacts: account=', accountName, 'contacts found=', allContacts.length);
-
     if (allContacts.length === 0) {
-      // window.console.log('[AccountDetail] No contacts found for this account');
       return '<div class="contacts-placeholder">No contacts found for this account</div>';
     }
 
     try {
       // Contacts are already filtered by account, no need to filter again
       const associatedContacts = allContacts;
-
-      // window.console.log('[AccountDetail] Rendering', associatedContacts.length, 'contacts');
 
       // Store all contacts in state for pagination
       state._allContacts = associatedContacts;
@@ -1110,11 +1069,11 @@
         const phone = contact.workDirectPhone || contact.mobile || contact.otherPhone || '';
 
         const delay = (index * 0.05).toFixed(2);
-        
+
         // Get list name badges
         const listMemberships = state._contactListMemberships[contact.id] || [];
         const sequenceMemberships = state._contactSequenceMemberships[contact.id] || [];
-        
+
         const listIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 4px; opacity: 0.8;"><circle cx="4" cy="6" r="1"></circle><circle cx="4" cy="12" r="1"></circle><circle cx="4" cy="18" r="1"></circle><line x1="8" y1="6" x2="20" y2="6"></line><line x1="8" y1="12" x2="20" y2="12"></line><line x1="8" y1="18" x2="20" y2="18"></line></svg>`;
         const sequenceIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; opacity: 0.8;"><polygon points="7 4 20 12 7 20 7 4"></polygon></svg>`;
 
@@ -1765,6 +1724,30 @@
       }
       .rc-icon-btn.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
       .rc-icon-btn.disabled:hover { background: var(--bg-card); border-color: var(--border-light); transform: none; box-shadow: none; }
+
+      /* Processing State - Orange Border */
+      .rc-icon-btn.processing {
+        border-color: var(--orange-primary);
+        cursor: default;
+        padding: 0; /* Ensure spinner centering */
+      }
+      .rc-icon-btn.processing:hover {
+        background: var(--bg-card);
+        transform: none;
+        box-shadow: none;
+      }
+
+      /* Not Processed State - Faint but visible */
+      .rc-icon-btn.not-processed {
+        color: var(--text-secondary);
+        opacity: 0.6;
+      }
+      .rc-icon-btn.not-processed:hover {
+        opacity: 1;
+        color: var(--text-primary);
+        background: var(--bg-hover);
+        border-color: var(--accent-color);
+      }
       /* Live call duration indicator */
       .rc-item.live-call .rc-duration { color: var(--text-secondary); font-weight: 400; }
       /* Inline details under item */
@@ -1826,7 +1809,6 @@
         const callData = event.detail;
         if (callData && (callData.accountId === state.currentAccount?.id ||
           callData.call?.accountId === state.currentAccount?.id)) {
-          // console.log('[AccountDetail] Call logged for this account, refreshing activities');
 
           // Immediately refresh recent calls section
           if (window.ActivityManager && typeof window.ActivityManager.renderActivities === 'function') {
@@ -1846,7 +1828,6 @@
       // Listen for call insights ready (after transcript processing completes)
       document.addEventListener('pc:call-insights-ready', (event) => {
         const { callSid, call } = event.detail || {};
-        // console.log('[AccountDetail] Call insights ready:', callSid);
 
         // Update the call in our local cache
         if (Array.isArray(state._arcCalls) && callSid) {
@@ -2125,7 +2106,6 @@
             // Use the correct property names from the call object
             const callSid = call.id || call.twilioSid || call.callSid;
             const recordingSid = call.recordingSid || call.recording_id;
-            // console.log('[AccountDetail] Triggering CI processing for call:', callSid, 'recording:', recordingSid);
             triggerAccountCI(callSid, recordingSid, btn);
             return;
           }
@@ -2338,11 +2318,15 @@
 
     // Use shared CI processor for consistent functionality
     if (window.SharedCIProcessor) {
+      const a = state.currentAccount;
       const success = await window.SharedCIProcessor.processCall(callSid, recordingSid, btn, {
         context: 'account-detail',
+        metadata: {
+          company: a?.accountName || a?.name || a?.companyName || 'Unknown Account',
+          city: a?.city || a?.locationCity || '',
+          state: a?.state || a?.locationState || ''
+        },
         onSuccess: (call) => {
-          // console.log('[AccountDetail] CI processing completed:', call);
-
           // Update state cache so future renders show full insights
           try {
             if (Array.isArray(state._arcCalls)) {
@@ -2360,8 +2344,30 @@
                 }
                 return x;
               });
+              // Explicitly update button UI and auto-expand without full re-render
+              try {
+                // 1. Update the button visuals immediately
+                btn.innerHTML = svgEye();
+                btn.classList.remove('processing', 'not-processed');
+                btn.classList.add('just-ready'); // Trigger the new pulse animation
+                btn.disabled = false;
+                btn.title = 'View AI insights';
+                
+                // 2. Remove pulse class after animation
+                setTimeout(() => btn.classList.remove('just-ready'), 3000);
+
+                // 3. Auto-expand the insight
+                toggleRcDetails(btn, call);
+                
+              } catch (e) {
+                console.error('[AccountDetail] Error during targeted update:', e);
+                // Fallback to full render if targeted update fails
+                arcRenderPage();
+              }
             }
-          } catch (_) { }
+          } catch (e) {
+            console.error('[AccountDetail] Error updating state:', e);
+          }
         },
         onError: (error) => {
           console.error('[AccountDetail] CI processing failed:', error);
@@ -2381,7 +2387,6 @@
 
     // If no recordingSid provided, the API will look it up by callSid
     if (!recordingSid) {
-      // console.log('[AccountDetail] No recordingSid provided, API will look up recording for callSid:', callSid);
     }
 
     try {
@@ -2430,7 +2435,6 @@
       }
 
       const result = await response.json();
-      // console.log('[AccountDetail] CI processing initiated:', result);
 
       // Update the button to show processing state (consistent with contact-detail)
       btn.innerHTML = '<span class="ci-btn-spinner" aria-hidden="true"></span>';
@@ -2473,7 +2477,6 @@
     // Guard against duplicate listeners
     const guardKey = `_accountDetailInsights_${callSid}_Bound`;
     if (document[guardKey]) {
-      // console.log('[AccountDetail] Insights listener already active for call:', callSid);
       return;
     }
     document[guardKey] = true;
@@ -2507,19 +2510,48 @@
             state._arcCalls.unshift(call);
           }
         }
-      } catch (_) { }
-      try { btn.innerHTML = svgEye(); btn.classList.remove('processing', 'not-processed'); btn.disabled = false; btn.title = 'View AI insights'; } catch (_) { }
+      } catch (e) {
+        console.error('[AccountDetail] Error updating state via arcPollInsights:', e);
+      }
+      try {
+        btn.innerHTML = svgEye();
+        btn.classList.remove('processing', 'not-processed');
+        btn.disabled = false;
+        btn.title = 'View AI insights';
+      } catch (e) {
+        console.error('[AccountDetail] Error updating button UI:', e);
+      }
       try { if (window.ToastManager) { window.ToastManager.showToast({ type: 'success', title: 'Insights Ready', message: 'Click the eye icon to view call insights.' }); } } catch (_) { }
 
-      // Re-render the recent calls list to show updated insights
-      try { arcRenderPage(); } catch (_) { }
+      // Update button UI and auto-expand without full re-render
+      try {
+        // 1. Update visuals
+        btn.innerHTML = svgEye();
+        btn.classList.remove('processing', 'not-processed');
+        btn.classList.add('just-ready');
+        btn.disabled = false;
+        btn.title = 'View AI insights';
+        
+        // 2. Remove pulse
+        setTimeout(() => btn.classList.remove('just-ready'), 3000);
+
+        // 3. Auto-expand
+        toggleRcDetails(btn, call);
+        
+      } catch (e) {
+        console.error('[AccountDetail] Error during targeted update via arcPollInsights:', e);
+        // Fallback to full render
+        arcRenderPage();
+      }
 
       // Also dispatch an event to notify other components
       try {
         document.dispatchEvent(new CustomEvent('pc:call-insights-ready', {
           detail: { callSid, call }
         }));
-      } catch (_) { }
+      } catch (e) {
+        console.error('[AccountDetail] Error dispatching event:', e);
+      }
     };
 
     // Firebase real-time listener
@@ -2527,14 +2559,13 @@
       .doc(callSid)
       .onSnapshot((doc) => {
         if (doc.exists) {
-          const call = { id: doc.id, ...doc.data() };
-          if (isReady(call)) {
-            finalizeReady(call);
-            unsubscribe(); // Stop listening - saves Firebase costs
-            delete document[guardKey]; // Clear guard
-            // console.log('[AccountDetail] Insights ready for call:', callSid);
-          }
+        const call = { id: doc.id, ...doc.data() };
+        if (isReady(call)) {
+          finalizeReady(call);
+          unsubscribe(); // Stop listening - saves Firebase costs
+          delete document[guardKey]; // Clear guard
         }
+      }
       }, (error) => {
         console.error('[AccountDetail] Firebase listener error:', error);
         delete document[guardKey]; // Clear guard on error
@@ -2544,7 +2575,6 @@
     setTimeout(() => {
       unsubscribe();
       delete document[guardKey];
-      // console.log('[AccountDetail] Auto-cleanup: Insights listener stopped for call:', callSid);
     }, 5 * 60 * 1000);
   }
 
@@ -2959,9 +2989,9 @@
 
     // Close dropdown when clicking outside with animation
     document.addEventListener('click', (e) => {
-      if (dropdownElement.style.display === 'block' && 
-          !inputElement.contains(e.target) && 
-          !dropdownElement.contains(e.target)) {
+      if (dropdownElement.style.display === 'block' &&
+        !inputElement.contains(e.target) &&
+        !dropdownElement.contains(e.target)) {
         dropdownElement.classList.remove('--show');
         setTimeout(() => {
           if (!dropdownElement.classList.contains('--show')) {
@@ -3081,7 +3111,7 @@
   function selectParentCompany(accountId, accountName, inputElement, dropdownElement, hiddenIdElement) {
     inputElement.value = accountName;
     hiddenIdElement.value = accountId;
-    
+
     // Smooth exit animation
     dropdownElement.classList.remove('--show');
     setTimeout(() => {
@@ -3127,9 +3157,9 @@
 
     // Close dropdown when clicking outside with animation
     document.addEventListener('click', (e) => {
-      if (dropdownElement.style.display === 'block' && 
-          !inputElement.contains(e.target) && 
-          !dropdownElement.contains(e.target)) {
+      if (dropdownElement.style.display === 'block' &&
+        !inputElement.contains(e.target) &&
+        !dropdownElement.contains(e.target)) {
         dropdownElement.classList.remove('--show');
         setTimeout(() => {
           if (!dropdownElement.classList.contains('--show')) {
@@ -3252,7 +3282,7 @@
   function selectSubsidiary(accountId, accountName, inputElement, dropdownElement, hiddenIdElement) {
     inputElement.value = accountName;
     hiddenIdElement.value = accountId;
-    
+
     // Smooth exit animation
     dropdownElement.classList.remove('--show');
     setTimeout(() => {
@@ -4692,7 +4722,6 @@
             }
           } catch (_) { /* noop */ }
         }
-        // console.log('Widget: Notes for account', accountId);
         try { window.crm?.showToast && window.crm.showToast('Open Notes'); } catch (_) { }
         break;
       }
@@ -4711,7 +4740,6 @@
             }
           } catch (_) { /* noop */ }
         }
-        // console.log('Widget: Energy Health Check for account', accountId);
         try { window.crm?.showToast && window.crm.showToast('Open Energy Health Check'); } catch (_) { }
         break;
       }
@@ -4730,7 +4758,6 @@
             }
           } catch (_) { /* noop */ }
         }
-        // console.log('Widget: Deal Calculator for account', accountId);
         try { window.crm?.showToast && window.crm.showToast('Open Deal Calculator'); } catch (_) { }
         break;
       }
@@ -4746,7 +4773,6 @@
             }
           } catch (_) { /* noop */ }
         }
-        // console.log('Widget: Prospect for account', accountId);
         try { window.crm?.showToast && window.crm.showToast('Open Prospect'); } catch (_) { }
         break;
       }
@@ -4763,12 +4789,11 @@
             }
           } catch (_) { /* noop */ }
         }
-        // console.log('Widget: Google Maps for account', accountId);
         try { window.crm?.showToast && window.crm.showToast('Open Google Maps'); } catch (_) { }
         break;
       }
       default:
-      // console.log('Unknown widget action:', which, 'for account', accountId);
+        break;
     }
   }
 

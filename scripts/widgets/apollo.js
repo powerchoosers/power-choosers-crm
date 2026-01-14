@@ -1772,6 +1772,14 @@
         // PCSaves.updateContact handles optimistic cache + event emission + async Firestore save
         await window.PCSaves.updateContact(existingId, payload);
         saved = true;
+        
+        // Also emit pc:contact-updated explicitly for any page listening to just the event
+        try {
+          const updateEvent = new CustomEvent('pc:contact-updated', {
+            detail: { id: existingId, changes: payload, contact: Object.assign({ id: existingId }, payload), source: 'lusha' }
+          });
+          document.dispatchEvent(updateEvent);
+        } catch (_) { }
       } else {
         const ref = await db.collection('contacts').add(payload);
         const created = Object.assign({ id: ref.id }, payload);
@@ -1783,6 +1791,14 @@
             detail: { id: ref.id, doc: created, contact: created, source: 'lusha' }
           });
           document.dispatchEvent(createEvent);
+        } catch (_) { }
+        
+        // Also emit contact-updated for consistency (some pages only listen to updated)
+        try {
+          const updateEvent = new CustomEvent('pc:contact-updated', {
+            detail: { id: ref.id, changes: payload, contact: created, source: 'lusha' }
+          });
+          document.dispatchEvent(updateEvent);
         } catch (_) { }
 
         try {
