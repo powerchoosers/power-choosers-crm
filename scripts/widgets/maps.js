@@ -80,7 +80,8 @@
     if (widget && panel) {
       const panelRect = panel.getBoundingClientRect();
       const widgetRect = widget.getBoundingClientRect();
-      const scrollTop = panel.scrollTop + (widgetRect.top - panelRect.top);
+      // Add 25px cushion from top
+      const scrollTop = Math.max(0, panel.scrollTop + (widgetRect.top - panelRect.top) - 25);
       panel.scrollTo({ top: scrollTop, behavior: 'smooth' });
     }
   }

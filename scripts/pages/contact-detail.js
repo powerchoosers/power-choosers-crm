@@ -141,6 +141,34 @@
     document._contactDetailAccountsListenerBound = true;
   }
 
+  // Listen for contact updates from other sources (e.g. Apollo enrichment)
+  if (!document._contactDetailUpdatedListenerBound) {
+    document.addEventListener('pc:contact-updated', (e) => {
+      try {
+        const d = e.detail || {};
+        const targetId = d.id || d.contactId;
+        // Only re-render if we're currently showing this contact
+        if (state.currentContact && (state.currentContact.id === targetId || state.currentContact._id === targetId)) {
+          // console.log('[ContactDetail] Received update for current contact:', targetId);
+          
+          // Merge changes into current state
+          if (d.changes) {
+            state.currentContact = { ...state.currentContact, ...d.changes };
+          } else if (d.contact) {
+            // Full object update
+            state.currentContact = { ...state.currentContact, ...d.contact };
+          }
+          
+          // Re-render
+          renderContactDetail();
+        }
+      } catch (err) {
+        console.warn('[ContactDetail] Error handling contact update:', err);
+      }
+    });
+    document._contactDetailUpdatedListenerBound = true;
+  }
+
   // Save a Contact field from the contact detail page
   async function saveField(field, value) {
     const db = window.firebaseDB;
@@ -8012,6 +8040,41 @@
         });
       }
     } catch (_) { }
+  }
+
+  // Listen for contact updates (e.g. from Apollo enrichment)
+  function setupContactUpdatedListener() {
+    if (document._contactDetailUpdatedListenerBound) return;
+
+    const onContactUpdated = (e) => {
+      try {
+        const d = e.detail || {};
+        const { id, contactId, changes } = d;
+        const targetId = id || contactId;
+
+        // Only update if we are viewing this contact
+        if (state.currentContact && (state.currentContact.id === targetId || state.currentContact._id === targetId)) {
+          // Merge changes
+          if (changes) {
+            state.currentContact = { ...state.currentContact, ...changes };
+          }
+          
+          // Re-render the page to reflect changes (e.g. new phone/email)
+          renderContactDetail();
+        }
+      } catch (err) {
+        console.warn('[ContactDetail] Error handling contact update:', err);
+      }
+    };
+
+    document.addEventListener('pc:contact-updated', onContactUpdated);
+    document._contactDetailUpdatedListenerBound = true;
+
+    // Return cleanup function
+    return () => {
+      document.removeEventListener('pc:contact-updated', onContactUpdated);
+      document._contactDetailUpdatedListenerBound = false;
+    };
   }
 
   // Listen for new contact creation to update state when navigating from Account Details

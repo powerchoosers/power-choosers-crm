@@ -71,7 +71,8 @@
     if (widget && panel) {
       const panelRect = panel.getBoundingClientRect();
       const widgetRect = widget.getBoundingClientRect();
-      const scrollTop = panel.scrollTop + (widgetRect.top - panelRect.top);
+      // Add 25px cushion from top
+      const scrollTop = Math.max(0, panel.scrollTop + (widgetRect.top - panelRect.top) - 25);
       panel.scrollTo({ top: scrollTop, behavior: 'smooth' });
     }
   }
@@ -1671,12 +1672,18 @@
 
       // Check if contact exists (by email or name, within the same company)
       const email = contact.email || (Array.isArray(contact.emails) && contact.emails[0] && contact.emails[0].address) || '';
-      const companyName = contact.company || contact.companyName || '';
+      
+      // CRITICAL: Get target company from contact or the search context (lastCompanyResult)
+      let targetCompany = (contact.company || contact.companyName || '').toString().trim().toLowerCase();
+      if (!targetCompany && lastCompanyResult) {
+        targetCompany = (lastCompanyResult.name || lastCompanyResult.companyName || '').toString().trim().toLowerCase();
+      }
+
       const firstName = (contact.firstName || '').toString().trim();
       const lastName = (contact.lastName || '').toString().trim();
       const fullName = (firstName && lastName) ? `${firstName} ${lastName}`.trim() : (contact.fullName || '').toString().trim();
-      const targetCompany = companyName.toLowerCase();
-      
+      const phone = contact.phone || contact.phoneNumber || (Array.isArray(contact.phones) && contact.phones[0] && contact.phones[0].number) || '';
+
       let existingId = null;
 
       // Helper to check if a doc matches the target company
@@ -1684,29 +1691,50 @@
         if (!targetCompany) return true;
         const data = doc.data();
         const dbCompany = (data.companyName || data.accountName || '').toString().toLowerCase();
+        if (!dbCompany) return false;
         return dbCompany.includes(targetCompany) || targetCompany.includes(dbCompany);
       };
+      
+      const checks = [];
 
       // 1. Try email matching first (limited to company)
       if (email) {
-        try {
-          const snap = await db.collection('contacts').where('email', '==', email).get();
-          if (snap && snap.docs && snap.docs.length > 0) {
-            const match = snap.docs.find(docMatchesCompany);
-            if (match) existingId = match.id;
-          }
-        } catch (_) { }
+        checks.push(
+          db.collection('contacts').where('email', '==', email).limit(5).get()
+            .then(s => {
+               if (!s || !s.docs || s.docs.length === 0) return null;
+               const match = s.docs.find(docMatchesCompany);
+               return match ? match.id : null;
+            })
+            .catch(() => null)
+        );
       }
 
       // 2. If no email match (or no email), try name + company matching
-      if (!existingId && fullName && targetCompany) {
-         try {
-           const snap = await db.collection('contacts').where('name', '==', fullName).limit(5).get();
-           if (snap && snap.docs && snap.docs.length > 0) {
-              const match = snap.docs.find(docMatchesCompany);
-              if (match) existingId = match.id;
-           }
-         } catch (_) { }
+      if (fullName && targetCompany) {
+         checks.push(
+           db.collection('contacts').where('name', '==', fullName).limit(5).get()
+             .then(s => {
+                if (!s || !s.docs || s.docs.length === 0) return null;
+                const match = s.docs.find(docMatchesCompany);
+                return match ? match.id : null;
+             })
+             .catch(() => null)
+         );
+      }
+      
+      // 3. Fallback: Check by Phone (global)
+      if (phone) {
+        checks.push(
+          db.collection('contacts').where('phone', '==', phone).limit(1).get()
+            .then(s => (s && s.docs && s.docs[0]) ? s.docs[0].id : null)
+            .catch(() => null)
+        );
+      }
+
+      if (checks.length > 0) {
+        const results = await Promise.all(checks);
+        existingId = results.find(id => id !== null);
       }
 
       // Get current account information for linking
@@ -2624,12 +2652,54 @@
            allContacts[idx] = contactToCache;
         }
 
-        const email = enriched.emails && enriched.emails[0] && enriched.emails[0].address;
-        if (email && window.firebaseDB) {
+        // Update CRM if contact exists (using cached ID or searching)
+        let existingId = contact._crmId;
+        const enrichBtn = container.querySelector('[data-action="enrich-contact"]');
+        if (!existingId && enrichBtn) {
+           existingId = enrichBtn.getAttribute('data-crm-id');
+        }
+
+        if (window.firebaseDB) {
           try {
-            const snap = await window.firebaseDB.collection('contacts').where('email', '==', email).limit(1).get();
-            if (snap && snap.docs && snap.docs[0]) {
-              const existingId = snap.docs[0].id;
+            const db = window.firebaseDB;
+            const targetCompany = (contactToCache.companyName || contactToCache.company || '').toString().trim().toLowerCase();
+            
+            // Helper to check company match (same as in updateActionButtons)
+            const matchesCompany = (doc) => {
+               if (!targetCompany) return true;
+               const data = doc.data();
+               const dbCompany = (data.companyName || data.accountName || '').toString().toLowerCase();
+               if (!dbCompany) return false;
+               return dbCompany.includes(targetCompany) || targetCompany.includes(dbCompany);
+            };
+
+            if (!existingId) {
+               // Try to find the contact again if we don't have the ID
+               const email = enriched.emails && enriched.emails[0] && enriched.emails[0].address;
+               const firstName = (contactToCache.firstName || '').toString().trim();
+               const lastName = (contactToCache.lastName || '').toString().trim();
+               const fullName = (firstName && lastName) ? `${firstName} ${lastName}`.trim() : (contactToCache.fullName || '').toString().trim();
+
+               // 1. Check by Email
+               if (email) {
+                 const s = await db.collection('contacts').where('email', '==', email).limit(5).get();
+                 if (s && s.docs.length > 0) {
+                    const match = s.docs.find(matchesCompany);
+                    if (match) existingId = match.id;
+                 }
+               }
+               
+               // 2. Check by Name (if not found by email)
+               if (!existingId && fullName && targetCompany) {
+                 const s = await db.collection('contacts').where('name', '==', fullName).limit(5).get();
+                 if (s && s.docs.length > 0) {
+                    const match = s.docs.find(matchesCompany);
+                    if (match) existingId = match.id;
+                 }
+               }
+            }
+
+            if (existingId) {
               const updatePayload = {};
               if (which === 'phones' && enriched.phones && enriched.phones.length > 0) {
                 updatePayload.workDirectPhone = selectPhone(enriched, 'direct') || selectPhone(enriched, 'work') || '';
@@ -2642,10 +2712,13 @@
               }
               if (Object.keys(updatePayload).length > 0) {
                 updatePayload.updatedAt = new Date();
+                // window.PCSaves.updateContact emits pc:contact-updated automatically
                 await window.PCSaves.updateContact(existingId, updatePayload);
+                lushaLog('Updated CRM contact via PCSaves:', existingId);
               }
             }
           } catch (crmError) {
+             lushaLog('CRM update failed:', crmError);
           }
         }
       } catch (cacheError) {
@@ -2688,7 +2761,7 @@
       
       // Helper to check if a doc matches the target company
       const matchesCompany = (doc) => {
-        if (!targetCompany) return true; // If we don't know the target company, assume match (fallback to original behavior)
+        if (!targetCompany) return true; // If we don't know the target company, assume match
         const data = doc.data();
         const dbCompany = (data.companyName || data.accountName || '').toString().toLowerCase();
         if (!dbCompany) return false;
@@ -2700,11 +2773,12 @@
         checks.push(
           db.collection('contacts').where('email', '==', email).limit(5).get()
             .then(s => {
-              if (!s || !s.docs || s.docs.length === 0) return false;
-              // User wants linking ONLY if company matches
-              return s.docs.some(matchesCompany);
+              if (!s || !s.docs || s.docs.length === 0) return null;
+              // User requirement: Must work for same company
+              const match = s.docs.find(matchesCompany);
+              return match ? match.id : null;
             })
-            .catch(() => false)
+            .catch(() => null)
         );
       }
 
@@ -2713,10 +2787,11 @@
         checks.push(
           db.collection('contacts').where('name', '==', fullName).limit(5).get()
             .then(s => {
-              if (!s || !s.docs || s.docs.length === 0) return false;
-              return s.docs.some(matchesCompany);
+              if (!s || !s.docs || s.docs.length === 0) return null;
+              const match = s.docs.find(matchesCompany);
+              return match ? match.id : null;
             })
-            .catch(() => false)
+            .catch(() => null)
         );
       }
 
@@ -2724,18 +2799,24 @@
       if (phone) {
         checks.push(
           db.collection('contacts').where('phone', '==', phone).limit(1).get()
-            .then(s => !!(s && s.docs && s.docs[0]))
-            .catch(() => false)
+            .then(s => (s && s.docs && s.docs[0]) ? s.docs[0].id : null)
+            .catch(() => null)
         );
       }
 
-      let contactExists = false;
+      let existingId = null;
       if (checks.length > 0) {
         const results = await Promise.all(checks);
-        contactExists = results.some(Boolean);
+        existingId = results.find(id => id !== null);
       }
 
-      setActionButtonsState(containerEl, contactExists);
+      if (existingId) {
+        contact._crmId = existingId; // Store for revealForContact
+        const enrichBtn = containerEl.querySelector('[data-action="enrich-contact"]');
+        if (enrichBtn) enrichBtn.setAttribute('data-crm-id', existingId);
+      }
+
+      setActionButtonsState(containerEl, !!existingId);
     } catch (err) {
       lushaLog('updateActionButtons failed:', err);
     }
@@ -2884,22 +2965,28 @@
     if (!compPanel) return;
 
     compPanel.innerHTML = `
-      <div class="lusha-company-skeleton skeleton-shimmer-modern">
-        <div class="lusha-skel-header">
-          <div class="lusha-skel-avatar skeleton-shape" style="width: 48px; height: 48px;"></div>
-          <div class="lusha-skel-info">
-            <div class="lusha-skel-name skeleton-shape" style="width: 70%; height: 18px;"></div>
-            <div class="lusha-skel-title skeleton-shape" style="width: 50%; height: 12px;"></div>
-          </div>
+      <div class="skeleton-shimmer-modern" style="display:flex;align-items:flex-start;gap:12px;margin-bottom:6px;">
+        <div>
+           <div class="skeleton-shape" style="width:36px;height:36px;border-radius:6px;"></div>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div class="skeleton-shape" style="width: 140px; height: 16px; margin-bottom: 6px; border-radius: 4px;"></div>
+          <div class="skeleton-shape" style="width: 100px; height: 14px; border-radius: 4px;"></div>
         </div>
       </div>
     `;
-    compPanel.style.minHeight = '80px';
+    compPanel.style.minHeight = '60px';
   }
 
   function renderContactSkeletons() {
     const listEl = document.getElementById('lusha-contacts-list');
     if (!listEl) return;
+
+    // Add skeleton for results count
+    const countEl = document.getElementById('lusha-results-count');
+    if (countEl) {
+      countEl.innerHTML = '<div class="skeleton-shimmer-modern" style="display:inline-block;vertical-align:middle;"><div class="skeleton-shape" style="width: 80px; height: 14px; border-radius: 4px;"></div></div>';
+    }
 
     listEl.innerHTML = '';
     for (let i = 0; i < 3; i++) {

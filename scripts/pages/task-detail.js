@@ -5387,6 +5387,8 @@
     requestAnimationFrame(() => {
       // console.log('[TaskDetail] Setting up inline editing for new content...');
       setupInlineEditing();
+      // Load recent calls for the task
+      loadRecentCallsForTask();
     });
 
     try { attachTaskSpecificHandlers(); } catch (_) { }
@@ -5707,6 +5709,17 @@
           </div>
         </div>
         
+        <!-- Recent Calls Section -->
+        <div class="contact-info-section" style="border-bottom: none; margin-bottom: 0;">
+          <h3 class="section-title">Recent Calls</h3>
+          <div class="recent-calls-list" id="task-recent-calls-list">
+            <div class="rc-loading-overlay">
+              <div class="spinner"></div>
+            </div>
+          </div>
+          <div id="task-recent-calls-pagination" class="pagination-controls" style="display: none; margin-top: 10px;"></div>
+        </div>
+        
         <!-- Recent Activity -->
         <div class="activity-section">
           <h3 class="section-title">Recent Activity</h3>
@@ -6005,6 +6018,17 @@
           </div>
         </div>
         ` : ''}
+
+        <!-- Recent Calls Section -->
+        <div class="contact-info-section" style="border-bottom: none; margin-bottom: 0;">
+          <h3 class="section-title">Recent Calls</h3>
+          <div class="recent-calls-list" id="task-recent-calls-list">
+            <div class="rc-loading-overlay">
+              <div class="spinner"></div>
+            </div>
+          </div>
+          <div id="task-recent-calls-pagination" class="pagination-controls" style="display: none; margin-top: 10px;"></div>
+        </div>
         
         <!-- Recent Activity -->
         <div class="activity-section">
@@ -6026,29 +6050,268 @@
   }
 
   function renderEmailTaskContent(task) {
+    // Get contact information (same as call/linkedin tasks)
+    const contactName = task.contact || '';
+    const accountName = task.account || '';
+
+    // CRITICAL FIX: Use state.contact if available
+    let person = state.contact || null;
+
+    if (!person && typeof window.getPeopleData === 'function') {
+      const people = window.getPeopleData() || [];
+      person = people.find(p => {
+        const full = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
+        return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
+      });
+    }
+
+    // Also try BackgroundContactsLoader
+    if (!person && window.BackgroundContactsLoader) {
+      try {
+        const contacts = window.BackgroundContactsLoader.getContactsData() || [];
+        person = contacts.find(c => {
+          const full = [c.firstName, c.lastName].filter(Boolean).join(' ').trim() || c.name || '';
+          return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
+        });
+      } catch (_) { }
+    }
+
+    // Also try by contactId
+    if (!person && task.contactId) {
+      if (typeof window.getPeopleData === 'function') {
+        const people = window.getPeopleData() || [];
+        person = people.find(p => p.id === task.contactId);
+      }
+      if (!person && window.BackgroundContactsLoader) {
+        try {
+          const contacts = window.BackgroundContactsLoader.getContactsData() || [];
+          person = contacts.find(c => c.id === task.contactId);
+        } catch (_) { }
+      }
+    }
+
+    person = person || {};
+
+    // Get contact details for the sidebar
+    const contactId = person.id || person.contactId || task.contactId || '';
+    const email = person.email || '';
+    const city = person.city || person.locationCity || '';
+    const stateVal = person.state || person.locationState || '';
+    const industry = person.industry || person.companyIndustry || '';
+    const seniority = person.seniority || '';
+    const department = person.department || '';
+    const companyName = person.companyName || accountName;
+
+    // CRITICAL FIX: Use state.account if available
+    const linkedAccount = state.account || (state._taskAccountNotFound ? null : findAssociatedAccount(person)) || null;
+
+    // Get location data from both contact and account
+    const finalCity = city || linkedAccount?.city || linkedAccount?.locationCity || '';
+    const finalState = stateVal || linkedAccount?.state || linkedAccount?.locationState || '';
+    const finalIndustry = industry || linkedAccount?.industry || '';
+
+    const electricitySupplier = linkedAccount?.electricitySupplier || '';
+    const annualUsage = linkedAccount?.annualUsage || '';
+    const currentRate = linkedAccount?.currentRate || '';
+    const contractEndDate = linkedAccount?.contractEndDate || '';
+    const companyPhone = linkedAccount?.companyPhone || linkedAccount?.phone || linkedAccount?.primaryPhone || linkedAccount?.mainPhone || '';
+
+    // Get primary phone data with type information
+    const phoneData = getPrimaryPhoneData(person);
+    const { value: primaryPhone, type: phoneType } = phoneData;
+    
+    // Domain for phone data
+    const deriveDomain = (input) => {
+      try {
+        if (!input) return '';
+        let s = String(input).trim();
+        if (/^https?:\/\//i.test(s)) { const u = new URL(s); return (u.hostname || '').replace(/^www\./i, ''); }
+        if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s)) { return s.replace(/^www\./i, ''); }
+        return '';
+      } catch (_) { return ''; }
+    };
+    const domain = linkedAccount?.domain ? String(linkedAccount.domain).replace(/^https?:\/\//, '').replace(/\/$/, '').replace(/^www\./i, '') : deriveDomain(linkedAccount?.website || '');
+
     return `
-      <div class="task-content">
-        <div class="email-composer">
-          <h3>Email Composer</h3>
-          <div class="compose-header">
-            <div class="form-row">
-              <label>To</label>
-              <input type="email" class="input-dark" value="${task.contact || ''}" readonly />
+      <div class="main-content">
+        <div class="task-card email-composer-card">
+          <div class="email-composer">
+            <h3>Email Composer</h3>
+            <div class="compose-header">
+              <div class="form-row">
+                <label>To</label>
+                <input type="email" class="input-dark" value="${task.contact || ''}" readonly />
+              </div>
+              <div class="form-row">
+                <label>Subject</label>
+                <input type="text" class="input-dark" placeholder="Email subject" />
+              </div>
             </div>
-            <div class="form-row">
-              <label>Subject</label>
-              <input type="text" class="input-dark" placeholder="Email subject" />
+            
+            <div class="compose-body">
+              <div class="email-editor" contenteditable="true" placeholder="Compose your email..."></div>
+            </div>
+            
+            <div class="compose-actions">
+              <button class="btn-secondary" id="save-draft-btn">Save Draft</button>
+              <button class="btn-primary" id="send-email-btn">Send Email</button>
+              <button class="btn-secondary" id="schedule-email-btn">Schedule</button>
             </div>
           </div>
-          
-          <div class="compose-body">
-            <div class="email-editor" contenteditable="true" placeholder="Compose your email..."></div>
+        </div>
+      </div>
+      
+      <div class="sidebar-content">
+        <!-- Contact Information -->
+        <div class="contact-info-section">
+          <h3 class="section-title">Contact Information</h3>
+          <div class="info-grid">
+            <div class="info-row">
+              <div class="info-label">EMAIL</div>
+              <div class="info-value-wrap" data-field="email" data-entity="contact" data-entity-id="${escapeHtml(contactId || '')}">
+                <span class="info-value-text ${!email ? 'empty' : ''}">${email ? `<span class="email-text" data-email="${escapeHtml(email)}" data-contact-name="${escapeHtml(contactName)}" data-contact-id="${escapeHtml(contactId || '')}">${escapeHtml(email)}</span>` : '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">${phoneType.toUpperCase()}</div>
+              <div class="info-value-wrap" data-field="phone" data-entity="contact" data-entity-id="${escapeHtml(contactId || '')}" data-phone-type="${phoneType}">
+                <span class="info-value-text ${!primaryPhone ? 'empty' : ''}">${primaryPhone ? `<span class="phone-text" data-phone="${escapeHtml(primaryPhone)}" data-contact-name="${escapeHtml(contactName)}" data-contact-id="${escapeHtml(contactId || '')}" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(companyName || '')}" data-company-name="${escapeHtml(companyName || '')}" data-logo-url="${escapeHtml(linkedAccount?.logoUrl || '')}" data-city="${escapeHtml(finalCity || '')}" data-state="${escapeHtml(finalState || '')}" data-domain="${escapeHtml(domain || '')}" data-phone-type="${phoneType}">${escapeHtml(primaryPhone)}</span>` : '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">COMPANY PHONE</div>
+              <div class="info-value-wrap" data-field="companyPhone" data-entity="account" data-entity-id="${escapeHtml(linkedAccount?.id || '')}">
+                <span class="info-value-text ${!companyPhone ? 'empty' : ''}">${companyPhone ? `<span class="phone-text" data-phone="${escapeHtml(companyPhone)}" data-contact-name="" data-contact-id="" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(companyName || '')}" data-company-name="${escapeHtml(companyName || '')}" data-logo-url="${escapeHtml(linkedAccount?.logoUrl || '')}" data-city="${escapeHtml(finalCity || '')}" data-state="${escapeHtml(finalState || '')}" data-domain="${escapeHtml(domain || '')}" data-is-company-phone="true">${escapeHtml(companyPhone)}</span>` : '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">CITY</div>
+              <div class="info-value-wrap" data-field="city" data-entity="contact" data-entity-id="${escapeHtml(contactId || '')}">
+                <span class="info-value-text ${!city ? 'empty' : ''}">${escapeHtml(city) || '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">STATE</div>
+              <div class="info-value-wrap" data-field="state" data-entity="contact" data-entity-id="${escapeHtml(contactId || '')}">
+                <span class="info-value-text ${!stateVal ? 'empty' : ''}">${escapeHtml(stateVal) || '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">INDUSTRY</div>
+              <div class="info-value-wrap" data-field="industry" data-entity="contact" data-entity-id="${escapeHtml(contactId || '')}">
+                <span class="info-value-text ${!industry ? 'empty' : ''}">${escapeHtml(industry) || '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
+            </div>
           </div>
-          
-          <div class="compose-actions">
-            <button class="btn-secondary" id="save-draft-btn">Save Draft</button>
-            <button class="btn-primary" id="send-email-btn">Send Email</button>
-            <button class="btn-secondary" id="schedule-email-btn">Schedule</button>
+        </div>
+        
+        ${linkedAccount ? `
+        <!-- Energy & Contract Details -->
+        <div class="contact-info-section">
+          <h3 class="section-title">Energy & Contract</h3>
+          <div class="info-grid">
+            <div class="info-row">
+              <div class="info-label">ELECTRICITY SUPPLIER</div>
+              <div class="info-value-wrap" data-field="electricitySupplier" data-entity="account" data-entity-id="${escapeHtml(linkedAccount?.id || '')}">
+                <span class="info-value-text ${!electricitySupplier ? 'empty' : ''}">${escapeHtml(electricitySupplier) || '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">ANNUAL USAGE</div>
+              <div class="info-value-wrap" data-field="annualUsage" data-entity="account" data-entity-id="${escapeHtml(linkedAccount?.id || '')}">
+                <span class="info-value-text ${!annualUsage ? 'empty' : ''}">${annualUsage ? escapeHtml(String(annualUsage).replace(/[^0-9]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',')) : '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">CURRENT RATE</div>
+              <div class="info-value-wrap" data-field="currentRate" data-entity="account" data-entity-id="${escapeHtml(linkedAccount?.id || '')}">
+                <span class="info-value-text ${!currentRate ? 'empty' : ''}">${escapeHtml(currentRate) || '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">CONTRACT END</div>
+              <div class="info-value-wrap" data-field="contractEndDate" data-entity="account" data-entity-id="${escapeHtml(linkedAccount?.id || '')}">
+                <span class="info-value-text ${!contractEndDate ? 'empty' : ''}">${contractEndDate ? escapeHtml(toMDY(contractEndDate)) : '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- Recent Calls Section -->
+        <div class="contact-info-section" style="border-bottom: none; margin-bottom: 0;">
+          <h3 class="section-title">Recent Calls</h3>
+          <div class="recent-calls-list" id="task-recent-calls-list">
+            <div class="rc-loading-overlay">
+              <div class="spinner"></div>
+            </div>
+          </div>
+          <div id="task-recent-calls-pagination" class="pagination-controls" style="display: none; margin-top: 10px;"></div>
+        </div>
+        
+        <!-- Recent Activity -->
+        <div class="activity-section">
+          <h3 class="section-title">Recent Activity</h3>
+          <div class="activities-list" id="task-activity-timeline">
+            <div class="activity-placeholder">
+              <div class="placeholder-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M12 1v6m0 6v6"/>
+                </svg>
+              </div>
+              <div class="placeholder-text">No recent activity</div>
+            </div>
           </div>
         </div>
       </div>
@@ -6370,6 +6633,17 @@
           </div>
         </div>
         ` : ''}
+        
+        <!-- Recent Calls Section -->
+        <div class="contact-info-section" style="border-bottom: none; margin-bottom: 0;">
+          <h3 class="section-title">Recent Calls</h3>
+          <div class="recent-calls-list" id="task-recent-calls-list">
+            <div class="rc-loading-overlay">
+              <div class="spinner"></div>
+            </div>
+          </div>
+          <div id="task-recent-calls-pagination" class="pagination-controls" style="display: none; margin-top: 10px;"></div>
+        </div>
                 
         <!-- Recent Activity -->
         <div class="activity-section">
@@ -6665,6 +6939,297 @@
     } catch (error) {
       console.error('[Task Detail] Error setting company phone context:', error);
     }
+  }
+
+  // --- Recent Calls Logic (Ported from Contact/Account Detail) ---
+
+  function setupTaskRecentCallsHooks() {
+    if (window._taskRcHooksBound) return;
+    window._taskRcHooksBound = true;
+
+    const refresh = debounce(() => {
+      // Only refresh if task page is active
+      if (document.getElementById('task-detail-page')?.classList.contains('active')) {
+        loadRecentCallsForTask();
+      }
+    }, 1500);
+
+    document.addEventListener('callEnded', refresh);
+    document.addEventListener('pc:call-logged', refresh);
+  }
+
+  async function loadRecentCallsForTask(retryCount = 0) {
+    const list = document.getElementById('task-recent-calls-list');
+    if (!list) return;
+
+    // Check for DB availability
+    if (!window.db) {
+      if (retryCount < 10) {
+        setTimeout(() => loadRecentCallsForTask(retryCount + 1), 500);
+        return;
+      }
+      console.warn('[TaskDetail] DB not ready after retries, cannot load calls');
+      list.innerHTML = '<div class="rc-empty">System loading...</div>';
+      return;
+    }
+
+    // Identify context
+    const task = state.currentTask;
+    if (!task) return;
+
+    const isAcct = isAccountTask(task);
+    let entityId = '';
+    let collectionName = ''; // 'contacts' or 'accounts' logic
+
+    // We need to fetch calls. For contact, we use contactId. For account, we use accountId.
+    // We can reuse the queries from contact-detail/account-detail.
+
+    if (isAcct) {
+      // Account context
+      const account = state.account || (task.accountId ? { id: task.accountId } : null);
+      if (!account && task.account) {
+         const a = findAccountByIdOrName('', task.account);
+         if (a) entityId = a.id;
+      } else if (account) {
+         entityId = account.id;
+      }
+      
+      if (!entityId) {
+        list.innerHTML = '<div class="rc-empty">No account context</div>';
+        return;
+      }
+
+      taskRcSetLoading(list);
+
+      try {
+        // Query calls for this account
+        // Limit to 50 for client-side pagination
+        const snapshot = await window.db.collection('calls')
+          .where('accountId', '==', entityId)
+          .orderBy('timestamp', 'desc')
+          .limit(50)
+          .get();
+        
+        const calls = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        state._rcCalls = calls;
+        state._rcPage = 1;
+        renderTaskRecentCallsPage();
+        bindTaskRecentCallsPager();
+      } catch (err) {
+        console.error('[TaskDetail] Error loading account calls:', err);
+        list.innerHTML = '<div class="rc-empty">Error loading calls</div>';
+      }
+
+    } else {
+      // Contact context
+      const contact = state.contact || (task.contactId ? { id: task.contactId } : null);
+      if (!contact && task.contact) {
+         // Try to find by name if no ID
+         // ... (simplified for now, assume state.contact is populated or we have contactId)
+      }
+      entityId = contact ? contact.id : task.contactId;
+
+      if (!entityId) {
+         // Fallback: try to find by phone if we have it
+         // But usually we have contactId on the task
+         list.innerHTML = '<div class="rc-empty">No contact context</div>';
+         return;
+      }
+
+      taskRcSetLoading(list);
+
+      try {
+        // Query calls for this contact
+        const snapshot = await window.db.collection('calls')
+          .where('contactId', '==', entityId)
+          .orderBy('timestamp', 'desc')
+          .limit(50)
+          .get();
+        
+        const calls = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        state._rcCalls = calls;
+        state._rcPage = 1;
+        renderTaskRecentCallsPage();
+        bindTaskRecentCallsPager();
+      } catch (err) {
+        console.error('[TaskDetail] Error loading contact calls:', err);
+        list.innerHTML = '<div class="rc-empty">Error loading calls</div>';
+      }
+    }
+  }
+
+  function renderTaskRecentCallsPage() {
+    const list = document.getElementById('task-recent-calls-list');
+    if (!list) return;
+
+    const allCalls = state._rcCalls || [];
+    if (allCalls.length === 0) {
+      list.innerHTML = '<div class="rc-empty">No recent calls</div>';
+      const pager = document.getElementById('task-recent-calls-pagination');
+      if (pager) pager.style.display = 'none';
+      return;
+    }
+
+    const RC_PAGE_SIZE = 5;
+    const page = state._rcPage || 1;
+    const start = (page - 1) * RC_PAGE_SIZE;
+    const slice = allCalls.slice(start, start + RC_PAGE_SIZE);
+    const total = allCalls.length;
+
+    // Check signature to avoid unnecessary re-renders (perf optimization)
+    try {
+        const key = slice.map(c => `${c.id}|${c.status}|${c.durationSec}|${c.transcript?'1':'0'}|${c.aiInsights?'1':'0'}`).join('||');
+        const sig = `${state.currentTask?.id}::p${page}::${key}`;
+        if (list.dataset.pcRecentCallsSig === sig) return;
+        list.dataset.pcRecentCallsSig = sig;
+    } catch (_) {}
+
+    taskRcUpdateListAnimated(list, slice.map((call, index) => taskRcItemHtml(call, index)).join(''));
+    
+    const totalPages = Math.max(1, Math.ceil(total / RC_PAGE_SIZE));
+    updateTaskRecentCallsPager(page, totalPages);
+  }
+
+  function taskRcItemHtml(c, index = 0) {
+    // Prefer contact name; if absent (company call), show company once
+    const hasContact = !!(c.contactId && c.contactName);
+    const rawCompany = String(c.accountName || c.company || '');
+    const displayName = hasContact ? String(c.contactName) : rawCompany || 'Unknown';
+    const name = escapeHtml(displayName);
+    const company = escapeHtml(rawCompany);
+    const outcome = escapeHtml(c.outcome || c.status || '');
+    const ts = c.callTime || c.timestamp || new Date().toISOString();
+    const when = new Date(ts).toLocaleString();
+    const idAttr = escapeHtml(String(c.id || c.twilioSid || c.callSid || ''));
+
+    // Duration logic
+    let durStr = '';
+    const dur = Math.max(0, parseInt(c.durationSec || c.duration || 0, 10));
+    durStr = `${Math.floor(dur / 60)}m ${dur % 60}s`;
+
+    const phone = escapeHtml(String(c.targetPhone || c.to || c.from || c.contactPhone || c.counterpartyPretty || ''));
+    const direction = escapeHtml((c.direction || '').charAt(0).toUpperCase() + (c.direction || '').slice(1));
+    const title = `${name}${(hasContact && rawCompany && rawCompany !== displayName) ? ` • ${company}` : ''}`;
+
+    const delay = (index * 0.05).toFixed(2);
+    
+    // Check if CI is processed
+    const hasInsights = c.transcript && c.aiInsights && Object.keys(c.aiInsights).length > 0;
+
+    return `
+      <div class="rc-item modern-reveal premium-borderline" data-id="${idAttr}" style="animation-delay: ${delay}s;">
+        <div class="rc-meta">
+          <div class="rc-title">${title}</div>
+          <div class="rc-sub">${when} • <span class="rc-duration">${durStr}</span> • <span class="phone-number">${phone}</span>${direction ? ` • ${direction}` : ''}</div>
+        </div>
+        <div class="rc-actions">
+          <span class="rc-outcome">${outcome}</span>
+          <button type="button" class="rc-icon-btn rc-insights ${!hasInsights ? 'not-processed' : ''}" data-id="${idAttr}" aria-label="View insights" title="${!hasInsights ? 'Process Call' : 'View AI insights'}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>`;
+  }
+
+  function taskRcUpdateListAnimated(list, html) {
+      // Simplified animation update
+      list.innerHTML = html;
+      // Re-bind insights buttons
+      list.querySelectorAll('.rc-insights').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const callId = btn.getAttribute('data-id');
+              const call = (state._rcCalls || []).find(c => String(c.id) === String(callId));
+              if (call) toggleTaskRcDetails(btn, call);
+          });
+      });
+  }
+
+  function toggleTaskRcDetails(btn, call) {
+      // Reuse logic from contact-detail if possible, or reimplement
+      // For now, simple toggle or trigger CI
+      if (!call.transcript || !call.aiInsights) {
+          triggerTaskCI(call.id, call.recordingSid, btn);
+          return;
+      }
+      // Expand details (simplified for brevity, can be expanded later)
+      alert('Insights: ' + (call.aiInsights.summary || 'No summary available.'));
+  }
+
+  async function triggerTaskCI(callSid, recordingSid, btn) {
+      if (window.SharedCIProcessor) {
+        await window.SharedCIProcessor.processCall(callSid, recordingSid, btn, {
+            context: 'task-detail',
+            onSuccess: (updatedCall) => {
+                // Update local state
+                if (state._rcCalls) {
+                    const idx = state._rcCalls.findIndex(c => c.id === updatedCall.id);
+                    if (idx !== -1) state._rcCalls[idx] = { ...state._rcCalls[idx], ...updatedCall };
+                }
+                renderTaskRecentCallsPage();
+            }
+        });
+      }
+  }
+
+  function taskRcSetLoading(list) {
+      list.innerHTML = '<div class="rc-loading"><div class="spinner"></div></div>';
+  }
+
+  function bindTaskRecentCallsPager() {
+      const container = document.getElementById('task-recent-calls-pagination');
+      if (!container) return;
+      
+      // Clear existing content to avoid duplicates if re-binding
+      container.innerHTML = '';
+      
+      const prevBtn = document.createElement('button');
+      prevBtn.className = 'pagination-arrow';
+      prevBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"></polyline></svg>`;
+      prevBtn.addEventListener('click', () => {
+          if (state._rcPage > 1) {
+              state._rcPage--;
+              renderTaskRecentCallsPage();
+          }
+      });
+
+      const nextBtn = document.createElement('button');
+      nextBtn.className = 'pagination-arrow';
+      nextBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,18 15,12 9,6"></polyline></svg>`;
+      nextBtn.addEventListener('click', () => {
+          const total = (state._rcCalls || []).length;
+          const totalPages = Math.max(1, Math.ceil(total / 5));
+          if (state._rcPage < totalPages) {
+              state._rcPage++;
+              renderTaskRecentCallsPage();
+          }
+      });
+
+      const label = document.createElement('div');
+      label.className = 'pagination-current';
+      label.id = 'task-rc-page-label';
+
+      container.appendChild(prevBtn);
+      container.appendChild(label);
+      container.appendChild(nextBtn);
+      
+      // Store references for updates
+      container._prevBtn = prevBtn;
+      container._nextBtn = nextBtn;
+      container._label = label;
+  }
+
+  function updateTaskRecentCallsPager(page, totalPages) {
+      const container = document.getElementById('task-recent-calls-pagination');
+      if (!container) return;
+
+      // Ensure visible if we have pages
+      container.style.display = totalPages > 1 ? 'flex' : 'none';
+      if (totalPages <= 1) return;
+
+      if (container._label) container._label.textContent = `${page} / ${totalPages}`;
+      if (container._prevBtn) container._prevBtn.disabled = page <= 1;
+      if (container._nextBtn) container._nextBtn.disabled = page >= totalPages;
   }
 
   // Process click-to-call and click-to-email elements
@@ -7860,6 +8425,7 @@
       setupContactLinkHandlers();
       setupPhoneClickHandlers();
       setupContactCreationListener();
+      try { setupTaskRecentCallsHooks(); } catch (_) { }
     }
   };
 

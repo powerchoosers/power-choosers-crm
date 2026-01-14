@@ -21,6 +21,18 @@
     return content || panel;
   }
 
+  function scrollToWidget(widgetId) {
+    const widget = document.getElementById(widgetId);
+    const panel = document.getElementById('widget-panel');
+    if (widget && panel) {
+      const panelRect = panel.getBoundingClientRect();
+      const widgetRect = widget.getBoundingClientRect();
+      // Add 25px cushion from top
+      const scrollTop = Math.max(0, panel.scrollTop + (widgetRect.top - panelRect.top) - 25);
+      panel.scrollTo({ top: scrollTop, behavior: 'smooth' });
+    }
+  }
+
   function removeExistingWidget() {
     try { if (typeof unsub === 'function') { unsub(); } } catch (_) { /* noop */ }
     unsub = null;
@@ -470,8 +482,7 @@
 
     // Bring panel into view
     try {
-      const panel = document.getElementById('widget-panel');
-      if (panel) panel.scrollTop = 0;
+      setTimeout(() => scrollToWidget(WIDGET_ID), 50);
     } catch (_) { /* noop */ }
 
     try { window.crm?.showToast && window.crm.showToast('Notes opened'); } catch (_) {}
@@ -552,8 +563,7 @@
 
     // Bring panel into view
     try {
-      const panel = document.getElementById('widget-panel');
-      if (panel) panel.scrollTop = 0;
+      setTimeout(() => scrollToWidget(WIDGET_ID), 50);
     } catch (_) { /* noop */ }
 
     try { window.crm?.showToast && window.crm.showToast('Account notes opened'); } catch (_) {}
