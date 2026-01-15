@@ -147,10 +147,11 @@ export default async function handler(req, res) {
       
     }
 
-    const searchUrl = `${APOLLO_BASE_URL}/mixed_people/search`;
+    const searchUrl = `${APOLLO_BASE_URL}/mixed_people/api_search`;
     
     // Log outgoing request (for debugging)
-    // console.log('[Apollo Search] Body:', JSON.stringify(searchBody, null, 2));
+    logger.info('[Apollo Search] URL:', searchUrl);
+    logger.info('[Apollo Search] Body:', JSON.stringify(searchBody, null, 2));
 
     const searchResp = await fetchWithRetry(searchUrl, {
       method: 'POST',
@@ -188,8 +189,8 @@ export default async function handler(req, res) {
       pagination: {
         page: page,
         size: size,
-        total: searchData.pagination?.total_entries || mappedContacts.length,
-        totalPages: searchData.pagination?.total_pages || 1
+        total: searchData.total_entries || searchData.pagination?.total_entries || mappedContacts.length,
+        totalPages: searchData.pagination?.total_pages || Math.ceil((searchData.total_entries || mappedContacts.length) / size) || 1
       }
     };
 
