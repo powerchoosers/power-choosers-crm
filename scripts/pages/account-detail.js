@@ -2800,11 +2800,11 @@
       if (String(rec).includes('/api/recording?url=')) proxied = rec;
       else {
         const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
-        const playbackBase = /localhost|127\.0\.0\.1/.test(base) ? 'https://power-choosers-crm-792458658491.us-south1.run.app' : base;
+        const playbackBase = base; // Use local server for playback to support Range headers
         proxied = `${playbackBase}/api/recording?url=${encodeURIComponent(rec)}`;
       }
     }
-    const audio = proxied ? `<audio controls style=\"width:100%; margin-top:8px;\"><source src=\"${proxied}\" type=\"audio/mpeg\">Your browser does not support audio playback.</audio>` : '<div style=\"color:var(--text-muted); font-size:12px;\">No recording available</div>';
+    const audio = proxied ? `<audio controls preload="metadata" style="width:100%; margin-top:8px;"><source src="${proxied}" type="audio/mpeg">Your browser does not support audio playback.</audio>` : '<div style="color:var(--text-muted); font-size:12px;">No recording available</div>';
     const hasAI = AI && Object.keys(AI).length > 0;
 
     // Energy & Contract + Entities to mirror Calls modal

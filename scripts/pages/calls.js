@@ -1997,7 +1997,9 @@ if (!document._callsRestoreBound) {
               aiInsights: c.aiInsights || null,
               // Ensure CI metadata is available even when only nested under aiInsights
               conversationalIntelligence: c.conversationalIntelligence || (c.aiInsights && c.aiInsights.conversationalIntelligence) || null,
-              audioUrl: c.audioUrl ? `${playbackBase}/api/recording?url=${encodeURIComponent(c.audioUrl)}` : '',
+              // Use local server for playback to support Range headers
+      // audioUrl: c.audioUrl ? `${playbackBase}/api/recording?url=${encodeURIComponent(c.audioUrl)}` : '',
+      audioUrl: c.audioUrl ? `${base}/api/recording?url=${encodeURIComponent(c.audioUrl)}` : '',
               recordingChannels: c.recordingChannels || '1',
               recordingTrack: c.recordingTrack || 'inbound',
               recordingSource: c.recordingSource || 'unknown',
@@ -2357,7 +2359,9 @@ if (!document._callsRestoreBound) {
       aiSummary: c.aiSummary || '',
       aiInsights: c.aiInsights || null,
       conversationalIntelligence: c.conversationalIntelligence || null,
-      audioUrl: c.audioUrl ? `${playbackBase}/api/recording?url=${encodeURIComponent(c.audioUrl)}` : '',
+      // Use local server for playback to support Range headers
+      // audioUrl: c.audioUrl ? `${playbackBase}/api/recording?url=${encodeURIComponent(c.audioUrl)}` : '',
+      audioUrl: c.audioUrl ? `${base}/api/recording?url=${encodeURIComponent(c.audioUrl)}` : '',
       recordingChannels: c.recordingChannels || '1',
       recordingTrack: c.recordingTrack || 'inbound',
       recordingSource: c.recordingSource || 'unknown',
@@ -3653,7 +3657,7 @@ if (!document._callsRestoreBound) {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
               Call Recording
             </h4>
-            <div style="color:var(--text-secondary); font-style:italic;">${r.audioUrl ? `<audio controls style="width:100%; margin-top:8px;"><source src="${r.audioUrl}" type="audio/mpeg">Your browser does not support audio playback.</audio>` : 'No recording available'}</div>
+            <div style="color:var(--text-secondary); font-style:italic;">${r.audioUrl ? `<audio controls preload="metadata" style="width:100%; margin-top:8px;"><source src="${r.audioUrl}" type="audio/mpeg">Your browser does not support audio playback.</audio>` : 'No recording available'}</div>
             ${r.audioUrl ? '' : '<div style="color:var(--text-muted); font-size:12px; margin-top:4px;">Recording may take 1-2 minutes to process after call completion</div>'}
             ${r.audioUrl && r.recordingChannels ? `<div style="color:var(--text-secondary); font-size:12px; margin-top:4px;">Recording: ${r.recordingChannels === '2' ? 'Dual-Channel (2 Channels)' : 'Single Channel'} • Source: ${r.recordingSource || 'Unknown'}</div>` : ''}
             ${hasAIInsights ? '<div style="color:var(--orange-subtle); font-size:12px; margin-top:4px;">✓ AI analysis completed</div>' : '<div style="color:var(--text-muted); font-size:12px; margin-top:4px;">AI analysis in progress...</div>'}

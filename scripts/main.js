@@ -5905,9 +5905,9 @@ a                }
         document.querySelectorAll('.tasks-list').forEach(list => {
             list.querySelectorAll('.task-item[data-task-id]').forEach(taskItem => {
                 taskItem.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const taskId = taskItem.getAttribute('data-task-id');
-                    if (taskId && window.TaskDetail && typeof window.TaskDetail.open === 'function') {
+      e.preventDefault();
+      const taskId = taskItem.getAttribute('data-task-id');
+      if (taskId && window.TaskDetail && typeof window.TaskDetail.open === 'function') {
                         // Capture comprehensive dashboard state before opening task detail
                         const current = (window.crm && window.crm.currentPage) ? window.crm.currentPage : (document.querySelector('.page.active')?.getAttribute('data-page') || 'dashboard');
 

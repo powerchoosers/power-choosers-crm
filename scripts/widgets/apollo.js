@@ -477,7 +477,7 @@
     lushaLog('Context derived:', { companyName, domain, entityType: currentEntityType, currentAccountId, currentContactId });
 
     try {
-      if (!companyName && !domain) {
+      if (!companyName && !domain && !options.personName) {
         if (options.cachedOnly) {
           lushaLog('No company context found in cached-only mode; showing empty state');
           // Show empty results gracefully without hitting live endpoints
@@ -766,7 +766,8 @@
       if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
 
       // Only fetch company data if we don't have it or if we're forcing live WITHOUT a name search
-      if (!lastCompanyResult || (!options.personName && options.forceLive)) {
+      // AND we have at least a domain or company name to search for
+      if ((companyName || domain) && (!lastCompanyResult || (!options.personName && options.forceLive))) {
         const params = new URLSearchParams();
         if (domain) params.append('domain', domain);
         if (companyName) params.append('company', companyName);
@@ -801,10 +802,10 @@
         // Prioritize company ID for account-specific searches (most accurate)
         if (lastCompanyResult && lastCompanyResult.id) {
           requestBody.filters.companies.include.ids = [lastCompanyResult.id];
-        } else if (lastCompanyResult && lastCompanyResult.domain) {
-          requestBody.filters.companies.include.domains = [lastCompanyResult.domain];
-        } else if (lastCompanyResult && lastCompanyResult.name) {
-          requestBody.filters.companies.include.names = [lastCompanyResult.name];
+        } else if (lastCompanyResult && lastCompanyResult.domain && lastCompanyResult.domain.trim()) {
+          requestBody.filters.companies.include.domains = [lastCompanyResult.domain.trim()];
+        } else if (lastCompanyResult && lastCompanyResult.name && lastCompanyResult.name.trim()) {
+          requestBody.filters.companies.include.names = [lastCompanyResult.name.trim()];
         } else {
         }
 

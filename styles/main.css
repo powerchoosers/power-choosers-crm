@@ -25776,3 +25776,18 @@ div[id="account-contacts-list"] .contact-item .contact-name {
 .rc-details-inner { padding: 12px; }
 
 .rc-item.live-call .rc-duration { color: var(--text-secondary); font-weight: 400; }
+
+/* [Fix] Prevent re-animation of content inside Task Detail real layer during cross-fade */
+.td-real-layer .rc-item,
+.td-real-layer .task-card,
+.td-real-layer .activity-item,
+.td-real-layer .task-item,
+.td-real-layer .news-item,
+.td-real-layer .page-title-section,
+.td-real-layer .contact-header-info,
+.td-real-layer .page-actions,
+.td-real-layer .quick-action-btn,
+.td-real-layer .back-btn,
+.td-real-layer .btn-primary {
+    animation: none !important;
+}

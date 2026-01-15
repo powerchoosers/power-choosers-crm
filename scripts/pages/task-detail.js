@@ -135,6 +135,11 @@
         els.subtitle.innerHTML = '<div class="task-detail-subtitle-skeleton skeleton-shimmer-modern"><div class="skeleton-shape td-subtitle-shape"></div></div>';
       }
       if (els.content) {
+        // [Transition Fix] Prevent duplicate skeletons if already loading
+        if (els.content.querySelector('.td-skeleton-layer')) {
+          return;
+        }
+
         // [Transition Fix] Handle existing content for smooth cross-fade
         const oldRealLayer = els.content.querySelector('.td-real-layer');
         if (oldRealLayer) {
@@ -323,15 +328,15 @@
           </div>
         `;
 
-        const skelLayer = document.createElement('div');
-        skelLayer.className = 'td-layout-grid td-skeleton-layer';
-        skelLayer.innerHTML = skelHtml;
-        els.content.appendChild(skelLayer);
-
         const realLayer = document.createElement('div');
         realLayer.className = 'td-layout-grid td-real-layer';
         realLayer.setAttribute('aria-hidden', 'true');
         els.content.appendChild(realLayer);
+
+        const skelLayer = document.createElement('div');
+        skelLayer.className = 'td-layout-grid td-skeleton-layer';
+        skelLayer.innerHTML = skelHtml;
+        els.content.appendChild(skelLayer);
 
         try {
           void skelLayer.offsetWidth;
@@ -364,16 +369,26 @@
 
           const skelLayer = content.querySelector('.td-skeleton-layer');
 
-          if (realLayer) queueClassWhenVisible(realLayer, 'td-enter');
+          if (realLayer) {
+            // CRITICAL FIX: Ensure real layer enters BEFORE skeleton exits
+            requestAnimationFrame(() => {
+              try { realLayer.classList.add('td-enter'); } catch (_) { }
+            });
+          }
+
           if (skelLayer) {
-            try { skelLayer.classList.add('td-exit'); } catch (_) { }
+            // Delay skeleton exit for cross-fade overlap
+            setTimeout(() => {
+              try { skelLayer.classList.add('td-exit'); } catch (_) { }
+            }, 80);
+
             setTimeout(() => {
               try {
                 if (loadToken && state._activeLoadToken && loadToken !== state._activeLoadToken) return;
                 if (taskId && state._activeTaskId && String(taskId) !== String(state._activeTaskId)) return;
               } catch (_) { }
               try { skelLayer.remove(); } catch (_) { }
-            }, 260);
+            }, 600);
           }
         }
       } catch (_) { }
@@ -415,7 +430,7 @@
         } catch (_) { }
 
         el.classList.remove('task-loading');
-      }, 400);
+      }, 600);
     });
   }
 
@@ -1305,6 +1320,7 @@
       #task-detail-page .td-skeleton-layer {
         pointer-events: none;
         opacity: 0;
+        z-index: 2;
         transform: translateY(2px);
         transition: opacity 200ms ease, transform 200ms ease;
       }
@@ -1322,14 +1338,15 @@
       #task-detail-page .td-skeleton-layer.td-exit {
         opacity: 0;
         transform: translateY(-2px);
-        transition: opacity 150ms ease, transform 150ms ease;
+        transition: opacity 400ms ease, transform 400ms ease;
       }
 
       #task-detail-page .td-real-layer {
         pointer-events: none;
         opacity: 0;
+        z-index: 1;
         transform: none;
-        transition: opacity 260ms ease;
+        transition: opacity 150ms ease;
       }
 
       #task-detail-page.task-loading .td-real-layer {
@@ -5480,15 +5497,19 @@
       // This preserves the skeleton layer if it exists, allowing for cross-fade
       const newRealLayer = document.createElement('div');
       newRealLayer.className = 'td-real-layer td-layout-grid';
-      const hasSkeleton = !!els.content.querySelector('.td-skeleton-layer');
+      const skelLayer = els.content.querySelector('.td-skeleton-layer');
+      const hasSkeleton = !!skelLayer;
       const isLoading = !!(els.page && els.page.classList.contains('task-loading'));
       newRealLayer.setAttribute('aria-hidden', hasSkeleton || isLoading ? 'true' : 'false');
       if (!hasSkeleton && !isLoading) newRealLayer.classList.add('td-enter');
       newRealLayer.innerHTML = contentHtml;
 
-      // If we have a skeleton, append the real layer (overlay it)
-      // If no skeleton (shouldn't happen usually), this just adds it
-      els.content.appendChild(newRealLayer);
+      // Ensure real layer is BEHIND skeleton if skeleton exists
+      if (skelLayer) {
+        els.content.insertBefore(newRealLayer, skelLayer);
+      } else {
+        els.content.appendChild(newRealLayer);
+      }
 
     }
 
@@ -5503,14 +5524,6 @@
       if (rcList) taskRcSetLoading(rcList);
 
       // Load recent calls for the task
-      if (window.PC_DEBUG === true) {
-        try {
-          console.log('[Hypothesis: RC-Lifecycle] renderTaskContent:afterDomSwap -> loadRecentCallsForTask', {
-            taskId: state.currentTask?.id || '',
-            taskType: state.currentTask?.type || ''
-          });
-        } catch (_) { }
-      }
       loadRecentCallsForTask();
     });
 
@@ -7265,13 +7278,13 @@
     const direction = escapeHtml((c.direction || '').charAt(0).toUpperCase() + (c.direction || '').slice(1));
     const title = `${name}${(hasContact && rawCompany && rawCompany !== displayName) ? ` • ${company}` : ''}`;
 
-    const delay = (index * 0.05).toFixed(2);
+    // const delay = (index * 0.05).toFixed(2);
 
     // Check if CI is processed
     const hasInsights = c.transcript && c.aiInsights && Object.keys(c.aiInsights).length > 0;
 
     return `
-      <div class="rc-item premium-borderline" data-id="${idAttr}" style="animation-delay: ${delay}s;">
+      <div class="rc-item premium-borderline" data-id="${idAttr}">
         <div class="rc-meta">
           <div class="rc-title">${title}</div>
           <div class="rc-sub">${when} • <span class="rc-duration">${durStr}</span> • <span class="phone-number">${phone}</span>${direction ? ` • ${direction}` : ''}</div>
@@ -7286,8 +7299,30 @@
   }
 
   function taskRcUpdateListAnimated(list, html) {
-    // Simplified animation update
     list.innerHTML = html;
+    
+    // Restore open states
+    try {
+      if (state._rcOpenIds && state._rcOpenIds.size > 0) {
+        state._rcOpenIds.forEach(id => {
+          const btn = list.querySelector(`.rc-insights[data-id="${CSS.escape(id)}"]`);
+          const call = (state._rcCalls || []).find(c => String(c.id || c.twilioSid || c.callSid || '') === String(id));
+          if (btn && call) {
+            // Re-open without animation for restoration
+            const item = btn.closest('.rc-item');
+            if (item && !item.nextElementSibling?.classList.contains('rc-details')) {
+              const panel = document.createElement('div');
+              panel.className = 'rc-details';
+              panel.innerHTML = `<div class="rc-details-inner">${taskRc_insightsInlineHtml(call)}</div>`;
+              item.insertAdjacentElement('afterend', panel);
+              panel.style.height = 'auto';
+              panel.style.opacity = '1';
+            }
+          }
+        });
+      }
+    } catch (_) { }
+
     // Re-bind insights buttons
     list.querySelectorAll('.rc-insights').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -7300,14 +7335,342 @@
   }
 
   function toggleTaskRcDetails(btn, call) {
-    // Reuse logic from contact-detail if possible, or reimplement
-    // For now, simple toggle or trigger CI
+    // If no insights, trigger CI
     if (!call.transcript || !call.aiInsights) {
       triggerTaskCI(call.id, call.recordingSid, btn);
       return;
     }
-    // Expand details (simplified for brevity, can be expanded later)
-    alert('Insights: ' + (call.aiInsights.summary || 'No summary available.'));
+
+    const item = btn.closest('.rc-item');
+    if (!item) return;
+    const existing = item.nextElementSibling && item.nextElementSibling.classList && item.nextElementSibling.classList.contains('rc-details') ? item.nextElementSibling : null;
+    const idStr = String(call.id || call.twilioSid || call.callSid || '');
+    
+    if (existing) {
+      // Close
+      try { if (state._rcOpenIds && state._rcOpenIds instanceof Set) state._rcOpenIds.delete(idStr); } catch (_) { }
+      taskRc_animateCollapse(existing, () => existing.remove());
+      return;
+    }
+
+    // Open
+    try { if (!state._rcOpenIds || !(state._rcOpenIds instanceof Set)) state._rcOpenIds = new Set(); state._rcOpenIds.add(idStr); } catch (_) { }
+    const panel = document.createElement('div');
+    panel.className = 'rc-details';
+    panel.innerHTML = `<div class="rc-details-inner">${taskRc_insightsInlineHtml(call)}</div>`;
+    item.insertAdjacentElement('afterend', panel);
+    taskRc_animateExpand(panel);
+
+    // Background transcript fetch if missing
+    try {
+      const candidateSid = call.twilioSid || call.callSid || (typeof call.id === 'string' && /^CA[0-9a-zA-Z]+$/.test(call.id) ? call.id : '');
+      if ((!call.transcript || String(call.transcript).trim() === '') && candidateSid) {
+        const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+        const url = base ? `${base}/api/twilio/ai-insights` : '/api/twilio/ai-insights';
+        fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ callSid: candidateSid })
+        }).then(res => res.json()).then(data => {
+          if (data && data.transcript) {
+            call.transcript = data.transcript;
+            const tEl = panel.querySelector('.pc-transcript-container');
+            if (tEl) tEl.innerHTML = taskRc_renderTranscriptHtml(call.aiInsights, call.transcript, call);
+          }
+        }).catch(() => { });
+      }
+    } catch (_) { }
+  }
+
+  // --- Task RC Helpers (Ported from Contact/Account Detail) ---
+  
+  function taskRc_animateExpand(el) {
+    el.style.height = '0px'; el.style.opacity = '0';
+    const h = el.scrollHeight; 
+    requestAnimationFrame(() => {
+      el.classList.add('expanding');
+      el.style.transition = 'height 180ms ease, opacity 180ms ease';
+      el.style.height = h + 'px'; el.style.opacity = '1';
+      setTimeout(() => { el.style.height = ''; el.style.transition = ''; el.classList.remove('expanding'); }, 200);
+    });
+  }
+
+  function taskRc_animateCollapse(el, done) {
+    const h = el.scrollHeight;
+    el.style.height = h + 'px'; el.style.opacity = '1';
+    requestAnimationFrame(() => {
+      el.classList.add('collapsing');
+      el.style.transition = 'height 140ms ease, opacity 140ms ease';
+      el.style.height = '0px'; el.style.opacity = '0';
+      setTimeout(() => { el.classList.remove('collapsing'); done && done(); }, 160);
+    });
+  }
+
+  function taskRc_getAgentAvatar() { return `<div class="transcript-avatar-circle agent-avatar" aria-hidden="true">Y</div>`; }
+
+  function taskRc_getContactAvatar(contactName, call) {
+    try {
+      if (window.getPeopleData && call && call.contactId) {
+         const people = window.getPeopleData() || [];
+         const c = people.find(p => p.id === call.contactId);
+         if (c && c.firstName) {
+            const initials = (c.firstName.charAt(0) + (c.lastName ? c.lastName.charAt(0) : '')).toUpperCase();
+            return `<div class="transcript-avatar-circle contact-avatar" aria-hidden="true">${initials}</div>`;
+         }
+      }
+    } catch(_) {}
+
+    // Account fallback
+    const accountInfo = taskRc_getAccountInfoForAvatar(call && (call.accountName || ''));
+    const { logoUrl, domain } = accountInfo;
+    if (logoUrl || domain) {
+      if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
+        const iconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 28 });
+        return `<div class="transcript-avatar-circle company-avatar" aria-hidden="true">${iconHTML}</div>`;
+      } else if (domain && window.__pcFaviconHelper) {
+        return `<div class="transcript-avatar-circle company-avatar" aria-hidden="true">${window.__pcFaviconHelper.generateFaviconHTML(domain, 28)}</div>`;
+      }
+    }
+    const initial = (String(contactName || 'C').charAt(0) || 'C').toUpperCase();
+    return `<div class="transcript-avatar-circle contact-avatar" aria-hidden="true">${initial}</div>`;
+  }
+
+  function taskRc_getAccountInfoForAvatar(name) {
+    const result = { logoUrl: '', domain: '' };
+    if (!name) return result;
+    try {
+      const key = String(name).trim().toLowerCase();
+      if (typeof window.getAccountsData === 'function') {
+        const accounts = window.getAccountsData() || [];
+        const hit = accounts.find(a => String(a.name || a.accountName || '').trim().toLowerCase() === key);
+        if (hit) {
+          result.logoUrl = hit.logoUrl || hit.iconUrl || hit.logo || hit.companyLogo || '';
+          const dom = hit.domain || hit.website || '';
+          if (dom) result.domain = String(dom).replace(/^https?:\/\//, '').replace(/\/$/, '');
+        }
+      }
+    } catch (_) { }
+    return result;
+  }
+
+  function taskRc_normalizeSupplierTokens(s) { try { if (!s) return ''; let out = String(s); out = out.replace(/\bT\s*X\s*U\b/gi, 'TXU'); out = out.replace(/\bN\s*R\s*G\b/gi, 'NRG'); out = out.replace(/\breliant\b/gi, 'Reliant'); return out; } catch (_) { return s || ''; } }
+
+  function taskRc_toMMSS(s) { const m = Math.floor((s || 0) / 60), ss = (s || 0) % 60; return `${String(m)}:${String(ss).padStart(2, '0')}`; }
+
+  function taskRc_parseSpeakerTranscript(text) {
+      const out = []; if (!text) return out; const lines = String(text).split(/\r?\n/);
+      for (const raw of lines) {
+        const line = raw.trim(); if (!line) continue;
+        let m = line.match(/^([A-Za-z][A-Za-z0-9 ]{0,30})\s+(\d+):(\d{2}):\s*(.*)$/);
+        if (!m) { m = line.match(/^([A-Za-z][A-Za-z0-9 ]{0,30})\s+\d+\s+(\d+):(\d{2}):\s*(.*)$/); if (m) { m = [m[0], m[1], m[2], m[3], m[4]]; } }
+        if (m) { const label = m[1].trim(); const mm = parseInt(m[2], 10) || 0; const ss = parseInt(m[3], 10) || 0; const txt = m[4] || ''; out.push({ label, t: mm * 60 + ss, text: txt }); continue; }
+        out.push({ label: '', t: null, text: line });
+      }
+      return out;
+  }
+
+  function taskRc_renderTranscriptHtml(A, raw, call) {
+      let turns = Array.isArray(A?.speakerTurns) ? A.speakerTurns : [];
+      if (turns.length && !turns.some(t => t && (t.role === 'agent' || t.role === 'customer'))) {
+        let next = 'customer';
+        turns = turns.map(t => ({ t: Number(t.t) || 0, role: next = (next === 'agent' ? 'customer' : 'agent'), text: t.text || '' }));
+      }
+      if (turns.length) {
+        const contactFirst = (String(call.contactName || '').trim().split(/\s+/)[0]) || 'Customer';
+        const groups = [];
+        let current = null;
+        for (const t of turns) {
+          const roleKey = t.role === 'agent' ? 'agent' : (t.role === 'customer' ? 'customer' : 'other');
+          const text = taskRc_normalizeSupplierTokens(t.text || '');
+          const ts = Number(t.t) || 0;
+          if (current && current.role === roleKey) { current.texts.push(text); current.end = ts; }
+          else { if (current) groups.push(current); current = { role: roleKey, start: ts, texts: [text] }; }
+        }
+        if (current) groups.push(current);
+        return groups.map(g => {
+          const label = g.role === 'agent' ? 'You' : (g.role === 'customer' ? contactFirst : 'Speaker');
+          const avatar = g.role === 'agent' ? taskRc_getAgentAvatar() : taskRc_getContactAvatar(contactFirst, call);
+          return `<div class="transcript-message ${g.role}"><div class="transcript-avatar">${avatar}</div><div class="transcript-content"><div class="transcript-header"><span class="transcript-speaker">${label}</span><span class="transcript-time">${taskRc_toMMSS(g.start)}</span></div><div class="transcript-text">${escapeHtml(g.texts.join(' ').trim())}</div></div></div>`;
+        }).join('');
+      }
+      const parsed = taskRc_parseSpeakerTranscript(raw || '');
+      if (parsed.some(p => p.label && p.t != null)) {
+        const contactFirst = (String(call.contactName || '').trim().split(/\s+/)[0]) || 'Customer';
+        let toggle = 'customer';
+        return parsed.map(p => {
+          if (!p.label) return `<div class="transcript-message"><div class="transcript-content"><div class="transcript-text">${escapeHtml(p.text || '')}</div></div></div>`;
+          let roleLabel = p.label; let role = 'other';
+          if (/^speaker\b/i.test(roleLabel)) { roleLabel = (toggle === 'agent') ? 'You' : contactFirst; role = toggle; toggle = (toggle === 'agent') ? 'customer' : 'agent'; }
+          const avatar = role === 'agent' ? taskRc_getAgentAvatar() : taskRc_getContactAvatar(contactFirst, call);
+          return `<div class="transcript-message ${role}"><div class="transcript-avatar">${avatar}</div><div class="transcript-content"><div class="transcript-header"><span class="transcript-speaker">${escapeHtml(roleLabel)}</span><span class="transcript-time">${taskRc_toMMSS(p.t)}</span></div><div class="transcript-text">${escapeHtml(p.text || '')}</div></div></div>`;
+        }).join('');
+      }
+      const fallback = raw || (A && Object.keys(A).length ? 'Transcript processing...' : 'Transcript not available');
+      return escapeHtml(fallback);
+  }
+
+  function taskRc_insightsInlineHtml(r) {
+    const AI = r.aiInsights || {};
+    let paragraph = '';
+    let bulletItems = [];
+    const rawTwilioSummary = (AI && typeof AI.summary === 'string') ? AI.summary.trim() : '';
+    if (rawTwilioSummary) {
+      const parts = rawTwilioSummary.split(' • ').map(s => s.trim()).filter(Boolean);
+      paragraph = parts.shift() || '';
+      bulletItems = parts;
+    } else if (r.aiSummary && String(r.aiSummary).trim()) {
+      paragraph = String(r.aiSummary).trim();
+    } else if (AI && Object.keys(AI).length) {
+      const sentiment = AI.sentiment || 'Unknown';
+      const disposition = AI.disposition || '';
+      const topics = Array.isArray(AI.keyTopics) ? AI.keyTopics.slice(0, 3).join(', ') : '';
+      const who = r.contactName ? `Call with ${r.contactName}` : 'Call';
+      let p = `${who}`;
+      if (disposition) p += ` — ${disposition.toLowerCase()} disposition`;
+      if (topics) p += `. Topics: ${topics}`;
+      if (sentiment) p += `. ${sentiment} sentiment.`;
+      paragraph = p;
+    } else {
+      paragraph = 'No summary available';
+    }
+    const redundant = /(current rate|rate type|supplier|utility|contract|usage|term|budget|timeline|topic|next step|pain point|entities?)/i;
+    const filteredBullets = (bulletItems || []).filter(b => b && !redundant.test(b)).slice(0, 6);
+    const sentiment = AI.sentiment || 'Unknown';
+    const disposition = AI.disposition || '';
+    const keyTopics = Array.isArray(AI.keyTopics) ? AI.keyTopics : [];
+    const nextSteps = Array.isArray(AI.nextSteps) ? AI.nextSteps : [];
+    const pain = Array.isArray(AI.painPoints) ? AI.painPoints : [];
+    const flags = AI.flags || {};
+
+    let transcriptHtml = '';
+    try {
+      const ci = r.conversationalIntelligence || {};
+      const sentences = Array.isArray(ci.sentences) ? ci.sentences : [];
+      const channelMap = ci.channelRoleMap || {};
+      const normalizeChannel = (c) => { const s = (c == null ? '' : String(c)).trim(); if (s === '0') return '1'; if (/^[Aa]$/.test(s)) return '1'; if (/^[Bb]$/.test(s)) return '2'; return s; };
+      const resolveRole = (ch) => {
+        const n = normalizeChannel(ch);
+        const mapped = channelMap[n];
+        if (mapped === 'agent' || mapped === 'customer') return mapped;
+        const agentCh = String(ci.agentChannel || channelMap.agentChannel || '');
+        if (agentCh && n === agentCh) return 'agent';
+        if (agentCh) return 'customer';
+        return '';
+      };
+      if (sentences.length && (Object.keys(channelMap).length || ci.agentChannel != null || channelMap.agentChannel != null)) {
+        const turns = sentences.map(s => {
+          const role = resolveRole(s.channel ?? s.channelNumber ?? s.channel_id ?? s.channelIndex) || 'other';
+          const t = Math.max(0, Number(s.startTime || 0));
+          const text = (s.text || s.transcript || '').trim();
+          return { t, role, text };
+        });
+        transcriptHtml = taskRc_renderTranscriptHtml({ speakerTurns: turns }, '', r);
+      } else {
+        const transcriptToUse = r.formattedTranscript || r.transcript;
+        transcriptHtml = taskRc_renderTranscriptHtml(AI, transcriptToUse, r);
+      }
+    } catch (_) {
+      try { const transcriptToUse = r.formattedTranscript || r.transcript; transcriptHtml = taskRc_renderTranscriptHtml(AI, transcriptToUse, r); } catch (__) { transcriptHtml = 'Transcript not available'; }
+    }
+
+    const rawRec = r.audioUrl || r.recordingUrl || '';
+    let audioSrc = '';
+    if (rawRec) {
+      if (String(rawRec).includes('/api/recording?url=')) {
+        audioSrc = rawRec;
+      } else {
+        const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+        const playbackBase = base; // Use local server for playback
+        audioSrc = `${playbackBase}/api/recording?url=${encodeURIComponent(rawRec)}`;
+      }
+    }
+    const audio = audioSrc ? `<audio controls preload="metadata" style="width:100%; margin-top:8px;"><source src="${audioSrc}" type="audio/mpeg">Your browser does not support audio playback.</audio>` : '<div style="color:var(--text-muted); font-size:12px;">No recording available</div>';
+    const hasAI = AI && Object.keys(AI).length > 0;
+    const svgEye = () => '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+
+    const get = (obj, keys, d = '') => { for (const k of keys) { const v = obj && obj[k]; if (v !== undefined && v !== null && v !== '') return v; } return d; };
+    const toLongDate = (v) => { try { const d = new Date(v); return isNaN(d) ? v : d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }); } catch (_) { return v || ''; } };
+
+    const contract = AI.contract || {};
+    const rate = get(contract, ['currentRate', 'current_rate', 'rate'], 'Unknown');
+    const supplier = get(contract, ['supplier', 'utility'], 'Unknown');
+    const contractEnd = get(contract, ['contractEnd', 'contract_end', 'endDate'], 'Not discussed');
+    const contractEndDisplay = contractEnd ? toLongDate(contractEnd) : 'Not discussed';
+    const usage = String(get(contract, ['usageKWh', 'usage_k_wh', 'usage'], 'Not provided'));
+    const rateType = get(contract, ['rateType', 'rate_type'], 'Unknown');
+    const contractLength = String(get(contract, ['contractLength', 'contract_length'], 'Unknown'));
+    const budget = get(AI, ['budget'], 'Unclear');
+    const timeline = get(AI, ['timeline'], 'Not specified');
+    const entities = Array.isArray(AI.entities) ? AI.entities : [];
+    const entitiesHtml = entities.length ? entities.slice(0, 20).map(e => `<span class="pc-chip">${escapeHtml(e.type || 'Entity')}: ${escapeHtml(e.text || '')}</span>`).join('') : '<span class="pc-chip">None</span>';
+
+    const chips = [
+      `<span class="pc-chip ${sentiment === 'Positive' ? 'ok' : sentiment === 'Negative' ? 'danger' : 'info'}">Sentiment: ${escapeHtml(sentiment)}</span>`,
+      disposition ? `<span class="pc-chip info">Disposition: ${escapeHtml(disposition)}</span>` : '',
+      flags.nonEnglish ? '<span class="pc-chip warn">Non‑English</span>' : '',
+      flags.voicemailDetected ? '<span class="pc-chip warn">Voicemail</span>' : '',
+      flags.callTransfer ? '<span class="pc-chip info">Transferred</span>' : '',
+      flags.doNotContact ? '<span class="pc-chip danger">Do Not Contact</span>' : '',
+      flags.recordingDisclosure ? '<span class="pc-chip ok">Recording Disclosure</span>' : ''
+    ].filter(Boolean).join('');
+    const topicsHtml = keyTopics.length ? keyTopics.map(t => `<span class="pc-chip">${escapeHtml(t)}</span>`).join('') : '<span class="pc-chip">None</span>';
+    const nextHtml = nextSteps.length ? nextSteps.map(t => `<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None</div>';
+    const painHtml = pain.length ? pain.map(t => `<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None mentioned</div>';
+
+    return `
+      <div class="insights-grid">
+        <div>
+          <div class="ip-card">
+            <h4>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14,2 14,8 20,8"></polyline></svg>
+              AI Call Summary
+            </h4>
+            <div class="pc-chips" style="margin:6px 0 10px 0;">${chips}</div>
+            <div style="color:var(--text-secondary); line-height:1.5; margin-bottom:8px;">${escapeHtml(paragraph)}</div>
+            ${filteredBullets.length ? `<ul class="summary-bullets" style="margin:0; padding-left:18px; color:var(--text-secondary);">${filteredBullets.map(b => `<li>${escapeHtml(b)}</li>`).join('')}</ul>` : ''}
+          </div>
+          <div class="ip-card" style="margin-top:12px;">
+            <h4>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+              Call Transcript
+            </h4>
+            <div class="pc-transcript-container">${transcriptHtml}</div>
+          </div>
+        </div>
+        <div>
+          <div class="ip-card">
+            <h4>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+              Call Recording
+            </h4>
+            <div style="color:var(--text-secondary); font-style:italic;">${audio}</div>
+            ${audioSrc ? '' : '<div style="color:var(--text-muted); font-size:12px; margin-top:4px;">Recording may take 1-2 minutes to process after call completion</div>'}
+            ${audioSrc && r.recordingChannels ? `<div style="color:var(--text-secondary); font-size:12px; margin-top:4px;">Recording: ${r.recordingChannels === '2' ? 'Dual-Channel (2 Channels)' : 'Single Channel'} • Source: ${r.recordingSource || 'Unknown'}</div>` : ''}
+            ${hasAI ? '<div style="color:var(--orange-subtle); font-size:12px; margin-top:4px;">✓ AI analysis completed</div>' : '<div style="color:var(--text-muted); font-size:12px; margin-top:4px;">AI analysis in progress...</div>'}
+          </div>
+          <div class="ip-card" style="margin-top:12px;">
+            <h4>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+              Energy & Contract Details
+            </h4>
+            <div class="pc-kv">
+              <div class="k">Current rate</div><div class="v">${escapeHtml(rate)}</div>
+              <div class="k">Supplier/Utility</div><div class="v">${escapeHtml(supplier)}</div>
+              <div class="k">Contract end</div><div class="v">${escapeHtml(contractEndDisplay)}</div>
+              <div class="k">Usage</div><div class="v">${escapeHtml(usage)}</div>
+              <div class="k">Rate type</div><div class="v">${escapeHtml(rateType)}</div>
+              <div class="k">Term</div><div class="v">${escapeHtml(contractLength)}</div>
+              <div class="k">Budget</div><div class="v">${escapeHtml(budget)}</div>
+              <div class="k">Timeline</div><div class="v">${escapeHtml(timeline)}</div>
+            </div>
+          </div>
+          <div class="ip-card" style="margin-top:12px;"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg> Key Topics</h4><div class="pc-chips">${topicsHtml}</div></div>
+          <div class="ip-card" style="margin-top:12px;"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg> Next Steps</h4><div style="color:var(--text-secondary); font-size:12px;">${nextHtml}</div></div>
+          <div class="ip-card" style="margin-top:12px;"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> Pain Points</h4><div style="color:var(--text-secondary); font-size:12px;">${painHtml}</div></div>
+          <div class="ip-card" style="margin-top:12px;"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg> Entities</h4><div class="pc-chips">${entitiesHtml}</div></div>
+          <div class="ip-card" style="margin-top:12px; text-align:right;"><button class="rc-icon-btn" onclick="(function(){ try{ openInsightsModal && openInsightsModal('${String(r.id || '')}'); }catch(_){}})()" title="Open full modal" aria-label="Open full modal">${svgEye()}</button></div>
+        </div>
+      </div>`;
   }
 
   async function triggerTaskCI(callSid, recordingSid, btn) {
@@ -8657,6 +9020,12 @@
         }
 
       } catch (_) { /* noop */ }
+
+      // [Transition Fix] Prepare UI BEFORE navigation to prevent flash of old content
+      // This ensures that when the page becomes visible, it's already in the loading state.
+      if (initDomRefs()) {
+        markTaskLoading();
+      }
 
       // Navigate to task detail page AFTER capturing navigation source
       if (window.crm && typeof window.crm.navigateToPage === 'function') {
