@@ -180,7 +180,7 @@ export default async function handler(req, res) {
     const apolloPeople = searchData.people || [];
 
     if (apolloPeople.length > 0) {
-      logger.info('[Apollo Search] First person raw:', JSON.stringify(apolloPeople[0], null, 2));
+      logger.info('[Apollo Search v2] First person raw:', JSON.stringify(apolloPeople[0], null, 2));
     }
 
     // Map Apollo people to Lusha contact format
@@ -236,12 +236,16 @@ function mapApolloContactToLushaFormat(apolloPerson) {
     (p.type || '').toLowerCase().includes('work')
   );
   
+  const firstName = apolloPerson.first_name || '';
+  const lastName = apolloPerson.last_name || '';
+  const fullName = apolloPerson.name || `${firstName} ${lastName}`.trim();
+
   return {
     contactId: apolloPerson.id,
     id: apolloPerson.id,
-    firstName: apolloPerson.first_name || '',
-    lastName: apolloPerson.last_name || '',
-    fullName: apolloPerson.name || `${apolloPerson.first_name} ${apolloPerson.last_name}`.trim(),
+    firstName: firstName,
+    lastName: lastName,
+    fullName: fullName,
     jobTitle: apolloPerson.title || apolloPerson.headline || '',
     companyName: apolloPerson.organization?.name || '',
     companyId: apolloPerson.organization_id || '',

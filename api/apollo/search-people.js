@@ -82,7 +82,7 @@ export default async function handler(req, res) {
     Object.keys(searchBody).forEach(key => 
       searchBody[key] === undefined && delete searchBody[key]
     );
-    const searchUrl = `${APOLLO_BASE_URL}/mixed_people/search`;
+    const searchUrl = `${APOLLO_BASE_URL}/mixed_people/api_search`;
     const searchResp = await fetchWithRetry(searchUrl, {
       method: 'POST',
       headers: {
@@ -118,12 +118,15 @@ export default async function handler(req, res) {
       }
 
       const domain = person.organization?.primary_domain || person.organization?.domain;
+      const firstName = person.first_name || '';
+      const lastName = person.last_name || '';
+      const fullName = person.name || `${firstName} ${lastName}`.trim();
 
       return {
         id: person.id,
-        name: person.name || `${person.first_name} ${person.last_name}`,
-        firstName: person.first_name,
-        lastName: person.last_name,
+        name: fullName,
+        firstName: firstName,
+        lastName: lastName,
         title: person.title || person.headline,
         company: person.organization?.name,
         companyId: person.organization_id,
@@ -174,6 +177,17 @@ export default async function handler(req, res) {
       });
     }
     // --- END ENRICHMENT STEP ---
+
+    // Construct pagination manually
+    const total_entries = searchData.total_entries || searchData.pagination?.total_entries || 0;
+    const total_pages = searchData.pagination?.total_pages || Math.ceil(total_entries / (Math.min(per_page, 100) || 10));
+    
+    const pagination = {
+        page: parseInt(page),
+        per_page: parseInt(per_page),
+        total_entries: total_entries,
+        total_pages: total_pages
+    };
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
