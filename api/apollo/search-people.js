@@ -105,8 +105,57 @@ export default async function handler(req, res) {
 
     const searchData = await searchResp.json();
     
+    // --- PEOPLE ENRICHMENT STEP ---
+    // The api_search endpoint returns obfuscated/limited data. We must enrich to get names/linkedin.
+    const rawPeople = searchData.people || [];
+    if (rawPeople.length > 0) {
+      try {
+        const enrichedMap = new Map();
+        const chunkSize = 10;
+        
+        for (let i = 0; i < rawPeople.length; i += chunkSize) {
+          const chunk = rawPeople.slice(i, i + chunkSize);
+          const details = chunk.map(p => ({ id: p.id }));
+          
+          const bulkMatchUrl = `${APOLLO_BASE_URL}/people/bulk_match`;
+          const bulkResp = await fetchWithRetry(bulkMatchUrl, {
+            method: 'POST',
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Content-Type': 'application/json',
+              'X-Api-Key': APOLLO_API_KEY
+            },
+            body: JSON.stringify({ 
+              details,
+              reveal_personal_emails: false,
+              reveal_phone_number: false
+            })
+          });
+
+          if (bulkResp.ok) {
+            const bulkData = await bulkResp.json();
+            const matches = bulkData.matches || [];
+            matches.forEach(m => {
+              if (m && m.id) enrichedMap.set(m.id, m);
+            });
+          }
+        }
+
+        // Merge enriched data back into rawPeople
+        rawPeople.forEach((p, index) => {
+          const enriched = enrichedMap.get(p.id);
+          if (enriched) {
+            rawPeople[index] = { ...p, ...enriched };
+          }
+        });
+      } catch (err) {
+        console.error('People enrichment error:', err);
+      }
+    }
+    // --- END PEOPLE ENRICHMENT STEP ---
+
     // Map response to a clean format for the frontend
-    const people = (searchData.people || []).map(person => {
+    const people = rawPeople.map(person => {
       // Robust location extraction
       let location = '';
       if (person.city || person.state || person.country) {
