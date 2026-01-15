@@ -2665,7 +2665,7 @@ class ActivityManager {
           const revealStyle = `style="animation-delay: ${delay}s; cursor: pointer;"`;
 
           return `
-            <div class="activity-item modern-reveal premium-borderline" data-activity-id="${activity.id}" data-activity-type="${activity.type}" ${emailIdAttr} ${clickAttributes} ${revealStyle}>
+            <div class="activity-item premium-borderline" data-activity-id="${activity.id}" data-activity-type="${activity.type}" ${emailIdAttr} ${clickAttributes} ${revealStyle}>
             <div class="activity-entity-avatar">
               ${entityAvatar}
             </div>
@@ -2691,7 +2691,7 @@ class ActivityManager {
           const delay = (index * 0.05).toFixed(2);
           // Return a fallback activity item if individual activity fails
           return `
-            <div class="activity-item modern-reveal" data-activity-id="${activity.id || 'unknown'}" data-activity-type="${activity.type || 'unknown'}" style="animation-delay: ${delay}s;">
+            <div class="activity-item" data-activity-id="${activity.id || 'unknown'}" data-activity-type="${activity.type || 'unknown'}" style="animation-delay: ${delay}s;">
             <div class="activity-icon">
               ${this.getActivityIcon(activity.type || 'note')}
             </div>
@@ -2724,7 +2724,7 @@ class ActivityManager {
     return `
       <div class="activity-skeletons">
         ${Array(4).fill(0).map(() => `
-          <div class="activity-item modern-reveal premium-borderline" style="border: 1px solid rgba(255,255,255,0.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); margin-bottom: 10px; opacity: 0.7; pointer-events: none; display: flex; align-items: center; gap: 12px; padding: 12px 16px; min-height: 85px;">
+          <div class="activity-item premium-borderline" style="border: 1px solid rgba(255,255,255,0.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); margin-bottom: 10px; opacity: 0.7; pointer-events: none; display: flex; align-items: center; gap: 12px; padding: 12px 16px; min-height: 85px;">
             <div class="activity-entity-avatar">
               <div class="skeleton-shimmer" style="width: 36px; height: 36px; border-radius: 50%;"></div>
             </div>

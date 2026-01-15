@@ -75,6 +75,18 @@
     } catch (_) { }
   }
 
+  function cleanupExistingAvatarsAndIcons() {
+    try {
+      const el = els.page || document.getElementById('task-detail-page');
+      if (!el) return;
+      const profileContainer = el.querySelector('.contact-header-profile');
+      if (!profileContainer) return;
+
+      const toRemove = profileContainer.querySelectorAll('.avatar-circle-small, .company-logo-header, .company-favicon-header, .td-header-skel-icon');
+      toRemove.forEach(n => { try { n.remove(); } catch (_) { } });
+    } catch (_) { }
+  }
+
   function markTaskLoading() {
     const el = els.page;
     if (!el) return;
@@ -123,96 +135,198 @@
         els.subtitle.innerHTML = '<div class="task-detail-subtitle-skeleton skeleton-shimmer-modern"><div class="skeleton-shape td-subtitle-shape"></div></div>';
       }
       if (els.content) {
-        els.content.innerHTML = `
-          <div class="td-layout-grid td-skeleton-layer">
-            <div class="main-content">
-              <div class="task-card td-loading-card" id="task-action-card-skeleton">
-                <h3 class="section-title"><span class="td-skel td-skel-title"></span></h3>
-                <div class="linkedin-task-info">
-                  <div class="info-item">
-                    <label>Contact</label>
-                    <div class="info-value"><span class="td-skel td-skel-value td-w-60"></span></div>
-                  </div>
-                  <div class="info-item">
-                    <label>Company</label>
-                    <div class="info-value"><span class="td-skel td-skel-value td-w-55"></span></div>
-                  </div>
+        // [Transition Fix] Handle existing content for smooth cross-fade
+        const oldRealLayer = els.content.querySelector('.td-real-layer');
+        if (oldRealLayer) {
+          oldRealLayer.classList.remove('td-real-layer');
+          oldRealLayer.classList.add('td-old-layer');
+          oldRealLayer.style.pointerEvents = 'none';
+          // Force reflow before transition if needed, but we want immediate fade out
+          requestAnimationFrame(() => {
+            oldRealLayer.style.opacity = '0';
+          });
+          setTimeout(() => {
+            try { oldRealLayer.remove(); } catch (_) { }
+          }, 200);
+        } else {
+          // If no real layer, clear anything else that might be there
+          // but we want to avoid wiping if we just handled the layer
+          if (!els.content.querySelector('.td-old-layer')) {
+            els.content.innerHTML = '';
+          }
+        }
+
+        const skelHtml = `
+          <div class="main-content">
+            <div class="task-card td-loading-card" id="task-action-card-skeleton">
+              <h3 class="section-title"><span class="td-skel td-skel-title"></span></h3>
+              <div class="linkedin-task-info">
+                <div class="info-item">
+                  <label>Contact</label>
+                  <div class="info-value"><span class="td-skel td-skel-value td-w-60"></span></div>
                 </div>
-                <div class="form-row">
-                  <label>Notes</label>
-                  <div class="td-skel td-skel-textarea"></div>
-                </div>
-                <div class="actions">
-                  <button class="btn-primary" disabled><span class="td-skel td-skel-btn"></span></button>
-                  <button class="btn-secondary" disabled><span class="td-skel td-skel-btn"></span></button>
-                </div>
-                <div class="linkedin-guidance">
-                  <p>
-                    <span class="td-skel td-skel-line"></span>
-                    <span class="td-skel td-skel-line"></span>
-                    <span class="td-skel td-skel-line td-short"></span>
-                  </p>
+                <div class="info-item">
+                  <label>Company</label>
+                  <div class="info-value"><span class="td-skel td-skel-value td-w-55"></span></div>
                 </div>
               </div>
+              <div class="form-row">
+                <label>Notes</label>
+                <div class="td-skel td-skel-textarea"></div>
+              </div>
+              <div class="actions">
+                <button class="btn-primary" disabled><span class="td-skel td-skel-btn"></span></button>
+                <button class="btn-secondary" disabled><span class="td-skel td-skel-btn"></span></button>
+              </div>
+              <div class="linkedin-guidance">
+                <p>
+                  <span class="td-skel td-skel-line"></span>
+                  <span class="td-skel td-skel-line"></span>
+                  <span class="td-skel td-skel-line td-short"></span>
+                </p>
+              </div>
+            </div>
 
-              <div class="company-summary-card td-loading-card">
-                <div class="company-summary-header">
-                  <div class="company-logo"><span class="td-skel td-skel-logo"></span></div>
-                  <div class="company-name"><span class="td-skel td-skel-title td-w-70"></span></div>
+            <div class="company-summary-card td-loading-card">
+              <div class="company-summary-header">
+                <div class="company-logo"><span class="td-skel td-skel-logo"></span></div>
+                <div class="company-name"><span class="td-skel td-skel-title td-w-70"></span></div>
+              </div>
+              <div class="company-details">
+                <div class="company-detail-item">
+                  <span class="detail-label">Location:</span>
+                  <span class="detail-value"><span class="td-skel td-skel-value td-w-65"></span></span>
                 </div>
-                <div class="company-details">
-                  <div class="company-detail-item">
-                    <span class="detail-label">Location:</span>
-                    <span class="detail-value"><span class="td-skel td-skel-value td-w-65"></span></span>
+                <div class="company-detail-item">
+                  <span class="detail-label">Industry:</span>
+                  <span class="detail-value"><span class="td-skel td-skel-value td-w-55"></span></span>
+                </div>
+              </div>
+              <div class="company-description">
+                <div class="td-skel td-skel-line"></div>
+                <div class="td-skel td-skel-line td-short"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="sidebar-content">
+            <div class="contact-info-section td-loading-card">
+              <h3 class="section-title">Contact Information</h3>
+              <div class="info-grid">
+                <div class="info-row"><div class="info-label">EMAIL</div><div class="info-value"><span class="td-skel td-skel-value td-w-85"></span></div></div>
+                <div class="info-row"><div class="info-label">MOBILE</div><div class="info-value"><span class="td-skel td-skel-value td-w-75"></span></div></div>
+                <div class="info-row"><div class="info-label">COMPANY PHONE</div><div class="info-value"><span class="td-skel td-skel-value td-w-70"></span></div></div>
+                <div class="info-row"><div class="info-label">CITY</div><div class="info-value"><span class="td-skel td-skel-value td-w-55"></span></div></div>
+                <div class="info-row"><div class="info-label">STATE</div><div class="info-value"><span class="td-skel td-skel-value td-w-45"></span></div></div>
+                <div class="info-row"><div class="info-label">INDUSTRY</div><div class="info-value"><span class="td-skel td-skel-value td-w-60"></span></div></div>
+              </div>
+            </div>
+
+            <div class="contact-info-section td-loading-card">
+              <h3 class="section-title">Energy &amp; Contract</h3>
+              <div class="info-grid">
+                <div class="info-row"><div class="info-label">ELECTRICITY SUPPLIER</div><div class="info-value"><span class="td-skel td-skel-value td-w-80"></span></div></div>
+                <div class="info-row"><div class="info-label">ANNUAL USAGE</div><div class="info-value"><span class="td-skel td-skel-value td-w-60"></span></div></div>
+                <div class="info-row"><div class="info-label">CURRENT RATE</div><div class="info-value"><span class="td-skel td-skel-value td-w-50"></span></div></div>
+                <div class="info-row"><div class="info-label">CONTRACT END</div><div class="info-value"><span class="td-skel td-skel-value td-w-55"></span></div></div>
+              </div>
+            </div>
+
+            <div class="contact-info-section td-loading-card">
+              <h3 class="section-title">Recent Calls</h3>
+              <div class="rc-skeletons">
+                <div class="rc-item premium-borderline" style="opacity: 0.7; pointer-events: none; margin-bottom: 8px;">
+                  <div class="rc-meta skeleton-shimmer-modern" style="min-width: 0;">
+                    <div class="skeleton-shape" style="width: 58%; height: 14px; border-radius: 4px; margin-bottom: 6px;"></div>
+                    <div class="skeleton-shape" style="width: 86%; height: 12px; border-radius: 4px;"></div>
                   </div>
-                  <div class="company-detail-item">
-                    <span class="detail-label">Industry:</span>
-                    <span class="detail-value"><span class="td-skel td-skel-value td-w-55"></span></span>
+                  <div class="rc-actions" style="flex-shrink: 0;">
+                    <span class="rc-outcome" style="border-color: transparent;">
+                      <span class="skeleton-shimmer-modern" style="display: inline-block; vertical-align: middle;">
+                        <span class="skeleton-shape" style="width: 70px; height: 18px; border-radius: 999px;"></span>
+                      </span>
+                    </span>
+                    <button type="button" class="rc-icon-btn" disabled>
+                      <span class="skeleton-shimmer-modern" style="display: inline-block;">
+                        <span class="skeleton-shape" style="width: 16px; height: 16px; border-radius: 4px;"></span>
+                      </span>
+                    </button>
                   </div>
                 </div>
-                <div class="company-description">
-                  <div class="td-skel td-skel-line"></div>
-                  <div class="td-skel td-skel-line td-short"></div>
+                <div class="rc-item premium-borderline" style="opacity: 0.7; pointer-events: none; margin-bottom: 8px;">
+                  <div class="rc-meta skeleton-shimmer-modern" style="min-width: 0;">
+                    <div class="skeleton-shape" style="width: 62%; height: 14px; border-radius: 4px; margin-bottom: 6px;"></div>
+                    <div class="skeleton-shape" style="width: 82%; height: 12px; border-radius: 4px;"></div>
+                  </div>
+                  <div class="rc-actions" style="flex-shrink: 0;">
+                    <span class="rc-outcome" style="border-color: transparent;">
+                      <span class="skeleton-shimmer-modern" style="display: inline-block; vertical-align: middle;">
+                        <span class="skeleton-shape" style="width: 64px; height: 18px; border-radius: 999px;"></span>
+                      </span>
+                    </span>
+                    <button type="button" class="rc-icon-btn" disabled>
+                      <span class="skeleton-shimmer-modern" style="display: inline-block;">
+                        <span class="skeleton-shape" style="width: 16px; height: 16px; border-radius: 4px;"></span>
+                      </span>
+                    </button>
+                  </div>
+                </div>
+                <div class="rc-item premium-borderline" style="opacity: 0.7; pointer-events: none; margin-bottom: 8px;">
+                  <div class="rc-meta skeleton-shimmer-modern" style="min-width: 0;">
+                    <div class="skeleton-shape" style="width: 52%; height: 14px; border-radius: 4px; margin-bottom: 6px;"></div>
+                    <div class="skeleton-shape" style="width: 88%; height: 12px; border-radius: 4px;"></div>
+                  </div>
+                  <div class="rc-actions" style="flex-shrink: 0;">
+                    <span class="rc-outcome" style="border-color: transparent;">
+                      <span class="skeleton-shimmer-modern" style="display: inline-block; vertical-align: middle;">
+                        <span class="skeleton-shape" style="width: 72px; height: 18px; border-radius: 999px;"></span>
+                      </span>
+                    </span>
+                    <button type="button" class="rc-icon-btn" disabled>
+                      <span class="skeleton-shimmer-modern" style="display: inline-block;">
+                        <span class="skeleton-shape" style="width: 16px; height: 16px; border-radius: 4px;"></span>
+                      </span>
+                    </button>
+                  </div>
+                </div>
+                <div class="rc-item premium-borderline" style="opacity: 0.7; pointer-events: none; margin-bottom: 8px;">
+                  <div class="rc-meta skeleton-shimmer-modern" style="min-width: 0;">
+                    <div class="skeleton-shape" style="width: 60%; height: 14px; border-radius: 4px; margin-bottom: 6px;"></div>
+                    <div class="skeleton-shape" style="width: 84%; height: 12px; border-radius: 4px;"></div>
+                  </div>
+                  <div class="rc-actions" style="flex-shrink: 0;">
+                    <span class="rc-outcome" style="border-color: transparent;">
+                      <span class="skeleton-shimmer-modern" style="display: inline-block; vertical-align: middle;">
+                        <span class="skeleton-shape" style="width: 66px; height: 18px; border-radius: 999px;"></span>
+                      </span>
+                    </span>
+                    <button type="button" class="rc-icon-btn" disabled>
+                      <span class="skeleton-shimmer-modern" style="display: inline-block;">
+                        <span class="skeleton-shape" style="width: 16px; height: 16px; border-radius: 4px;"></span>
+                      </span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div class="sidebar-content">
-              <div class="contact-info-section td-loading-card">
-                <h3 class="section-title">Contact Information</h3>
-                <div class="info-grid">
-                  <div class="info-row"><div class="info-label">EMAIL</div><div class="info-value"><span class="td-skel td-skel-value td-w-85"></span></div></div>
-                  <div class="info-row"><div class="info-label">MOBILE</div><div class="info-value"><span class="td-skel td-skel-value td-w-75"></span></div></div>
-                  <div class="info-row"><div class="info-label">COMPANY PHONE</div><div class="info-value"><span class="td-skel td-skel-value td-w-70"></span></div></div>
-                  <div class="info-row"><div class="info-label">CITY</div><div class="info-value"><span class="td-skel td-skel-value td-w-55"></span></div></div>
-                  <div class="info-row"><div class="info-label">STATE</div><div class="info-value"><span class="td-skel td-skel-value td-w-45"></span></div></div>
-                  <div class="info-row"><div class="info-label">INDUSTRY</div><div class="info-value"><span class="td-skel td-skel-value td-w-60"></span></div></div>
-                </div>
-              </div>
-
-              <div class="contact-info-section td-loading-card">
-                <h3 class="section-title">Energy &amp; Contract</h3>
-                <div class="info-grid">
-                  <div class="info-row"><div class="info-label">ELECTRICITY SUPPLIER</div><div class="info-value"><span class="td-skel td-skel-value td-w-80"></span></div></div>
-                  <div class="info-row"><div class="info-label">ANNUAL USAGE</div><div class="info-value"><span class="td-skel td-skel-value td-w-60"></span></div></div>
-                  <div class="info-row"><div class="info-label">CURRENT RATE</div><div class="info-value"><span class="td-skel td-skel-value td-w-50"></span></div></div>
-                  <div class="info-row"><div class="info-label">CONTRACT END</div><div class="info-value"><span class="td-skel td-skel-value td-w-55"></span></div></div>
-                </div>
-              </div>
-
-              <div class="activity-section td-loading-card">
-                <h3 class="section-title">Recent Activity</h3>
-                <div class="activities-list">
-                  <div class="td-activity-skeleton">
-                    <div class="td-skel td-skel-activity"></div>
-                    <div class="td-skel td-skel-activity"></div>
-                    <div class="td-skel td-skel-activity td-short"></div>
-                  </div>
+            <div class="activity-section td-loading-card">
+              <h3 class="section-title">Recent Activity</h3>
+              <div class="activities-list">
+                <div class="td-activity-skeleton">
+                  <div class="td-skel td-skel-activity"></div>
+                  <div class="td-skel td-skel-activity"></div>
+                  <div class="td-skel td-skel-activity td-short"></div>
                 </div>
               </div>
             </div>
           </div>
         `;
+
+        const skelLayer = document.createElement('div');
+        skelLayer.className = 'td-layout-grid td-skeleton-layer';
+        skelLayer.innerHTML = skelHtml;
+        els.content.appendChild(skelLayer);
 
         const realLayer = document.createElement('div');
         realLayer.className = 'td-layout-grid td-real-layer';
@@ -220,11 +334,8 @@
         els.content.appendChild(realLayer);
 
         try {
-          const skelLayer = els.content.querySelector('.td-skeleton-layer');
-          if (skelLayer) {
-             void skelLayer.offsetWidth;
-             queueClassWhenVisible(skelLayer, 'td-enter');
-          }
+          void skelLayer.offsetWidth;
+          queueClassWhenVisible(skelLayer, 'td-enter');
         } catch (_) { }
       }
     } catch (_) { }
@@ -1194,24 +1305,24 @@
       #task-detail-page .td-skeleton-layer {
         pointer-events: none;
         opacity: 0;
-        transform: scale(0.94);
-        transition: opacity 300ms ease, transform 350ms cubic-bezier(0.2, 0.9, 0.2, 1);
+        transform: translateY(2px);
+        transition: opacity 200ms ease, transform 200ms ease;
       }
 
       #task-detail-page.task-loading .td-skeleton-layer {
         opacity: 1;
-        transform: scale(1);
+        transform: translateY(0);
       }
 
       #task-detail-page .td-skeleton-layer.td-enter {
         opacity: 1;
-        transform: scale(1);
+        transform: translateY(0);
       }
 
       #task-detail-page .td-skeleton-layer.td-exit {
         opacity: 0;
-        transform: scale(1.01);
-        transition: opacity 220ms ease, transform 220ms ease;
+        transform: translateY(-2px);
+        transition: opacity 150ms ease, transform 150ms ease;
       }
 
       #task-detail-page .td-real-layer {
@@ -2028,7 +2139,7 @@
         break;
       }
       default:
-        // console.log('Unknown widget action:', which);
+      // console.log('Unknown widget action:', which);
     }
   }
 
@@ -2144,9 +2255,9 @@
       const queue = await getSortedTasksQueue();
       // Filter out completed tasks just in case
       const activeQueue = queue.filter(t => t.status !== 'completed');
-      
+
       const currentIndex = activeQueue.findIndex(t => t.id === state.currentTask.id);
-      
+
       if (currentIndex !== -1 && currentIndex < activeQueue.length - 1) {
         // Next task is the one immediately following current task
         nextQueueTaskId = activeQueue[currentIndex + 1].id;
@@ -2156,11 +2267,11 @@
         nextQueueTaskId = activeQueue[0].id;
         // console.log('[TaskDetail] Current task not in queue, defaulting to first available:', nextQueueTaskId);
       } else if (currentIndex !== -1 && currentIndex === activeQueue.length - 1 && activeQueue.length > 1) {
-         // If we are at the end, maybe go to the first one? Or just null (end of queue)
-         // Let's try to go to the first one if it's different
-         if (activeQueue[0].id !== state.currentTask.id) {
-            nextQueueTaskId = activeQueue[0].id;
-         }
+        // If we are at the end, maybe go to the first one? Or just null (end of queue)
+        // Let's try to go to the first one if it's different
+        if (activeQueue[0].id !== state.currentTask.id) {
+          nextQueueTaskId = activeQueue[0].id;
+        }
       }
     } catch (e) {
       console.warn('[TaskDetail] Failed to pre-calculate next task:', e);
@@ -2405,14 +2516,14 @@
       detail: { taskId: state.currentTask.id, source: 'task-detail' }
     }));
 
-      // Navigate to next task instead of going back
+    // Navigate to next task instead of going back
     try {
       // Clean up any existing avatars/icons before navigation
       cleanupExistingAvatarsAndIcons();
 
       // Small delay to ensure task deletion has been processed
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       // CRITICAL FIX: Prioritize global queue navigation over sequence creation
       // This ensures user flows through their daily list instead of getting stuck in a sequence loop
       if (nextQueueTaskId) {
@@ -3454,8 +3565,8 @@
       if (contactIds.length === 0) return;
 
       // Reset memberships for these contacts to avoid stale data
-      contactIds.forEach(id => { 
-        state._contactListMemberships[id] = []; 
+      contactIds.forEach(id => {
+        state._contactListMemberships[id] = [];
         state._contactSequenceMemberships[id] = [];
       });
 
@@ -3463,7 +3574,7 @@
       const listsData = (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.getListsData === 'function')
         ? window.BackgroundListsLoader.getListsData()
         : [];
-      
+
       const sequencesData = (window.BackgroundSequencesLoader && typeof window.BackgroundSequencesLoader.getSequencesData === 'function')
         ? window.BackgroundSequencesLoader.getSequencesData()
         : [];
@@ -3471,7 +3582,7 @@
       // Fetch in chunks of 30 (Firestore IN limit)
       for (let i = 0; i < contactIds.length; i += 30) {
         const chunk = contactIds.slice(i, i + 30);
-        
+
         // Fetch List Memberships
         const listSnapshot = await db.collection('listMembers')
           .where('targetType', 'in', ['people', 'contact', 'contacts'])
@@ -3555,9 +3666,9 @@
     // Clear currentTask to prevent UI from rendering stale data during load
     // But keep ID if needed? No, loadTaskData takes taskId as arg.
     if (state.currentTask && state.currentTask.id !== taskId) {
-       state.currentTask = null;
+      state.currentTask = null;
     }
-    
+
 
     try {
       // CRITICAL: Re-initialize DOM refs to ensure els.content exists
@@ -3671,8 +3782,8 @@
               }
             }
           } catch (directError) {
-              // console.log('[TaskDetail] Direct document lookup failed, trying queries:', directError);
-            }
+            // console.log('[TaskDetail] Direct document lookup failed, trying queries:', directError);
+          }
 
           // Strategy 2: Query by 'id' field (if taskId is stored as a field)
           if (!task) {
@@ -4526,11 +4637,11 @@
         let companyIconHTML = '';
         try {
           if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
-            companyIconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ 
-              logoUrl, 
-              domain, 
+            companyIconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({
+              logoUrl,
+              domain,
               website: account?.website || '',
-              size: companyIconSize 
+              size: companyIconSize
             });
           }
         } catch (_) { /* noop */ }
@@ -5378,7 +5489,7 @@
       // If we have a skeleton, append the real layer (overlay it)
       // If no skeleton (shouldn't happen usually), this just adds it
       els.content.appendChild(newRealLayer);
-      
+
     }
 
     // CRITICAL FIX: Setup inline editing after every DOM replacement
@@ -5387,7 +5498,19 @@
     requestAnimationFrame(() => {
       // console.log('[TaskDetail] Setting up inline editing for new content...');
       setupInlineEditing();
+
+      const rcList = document.getElementById('task-recent-calls-list');
+      if (rcList) taskRcSetLoading(rcList);
+
       // Load recent calls for the task
+      if (window.PC_DEBUG === true) {
+        try {
+          console.log('[Hypothesis: RC-Lifecycle] renderTaskContent:afterDomSwap -> loadRecentCallsForTask', {
+            taskId: state.currentTask?.id || '',
+            taskType: state.currentTask?.type || ''
+          });
+        } catch (_) { }
+      }
       loadRecentCallsForTask();
     });
 
@@ -5410,21 +5533,21 @@
       if (!markCompleteLinkedInBtn.dataset.pcBoundClick) {
         markCompleteLinkedInBtn.dataset.pcBoundClick = '1';
         markCompleteLinkedInBtn.addEventListener('click', async () => {
-        // Get notes from textarea
-        const notesEl = document.getElementById('linkedin-notes');
-        const notes = notesEl ? notesEl.value.trim() : '';
+          // Get notes from textarea
+          const notesEl = document.getElementById('linkedin-notes');
+          const notes = notesEl ? notesEl.value.trim() : '';
 
-        // Save notes if provided
-        if (notes && state.currentTask) {
-          try {
-            await saveTaskNotesToRecentActivity(state.currentTask, notes);
-          } catch (e) {
-            console.warn('Could not save LinkedIn task notes to recent activity:', e);
+          // Save notes if provided
+          if (notes && state.currentTask) {
+            try {
+              await saveTaskNotesToRecentActivity(state.currentTask, notes);
+            } catch (e) {
+              console.warn('Could not save LinkedIn task notes to recent activity:', e);
+            }
           }
-        }
 
-        // Complete the task
-        await handleTaskComplete();
+          // Complete the task
+          await handleTaskComplete();
         });
       }
     }
@@ -5711,13 +5834,11 @@
         
         <!-- Recent Calls Section -->
         <div class="contact-info-section" style="border-bottom: none; margin-bottom: 0;">
-          <h3 class="section-title">Recent Calls</h3>
-          <div class="recent-calls-list" id="task-recent-calls-list">
-            <div class="rc-loading-overlay">
-              <div class="spinner"></div>
-            </div>
+          <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 class="section-title" style="margin-bottom: 0;">Recent Calls</h3>
+            <div id="task-recent-calls-pagination" class="unified-pagination" style="display: none; margin-top: 0;"></div>
           </div>
-          <div id="task-recent-calls-pagination" class="pagination-controls" style="display: none; margin-top: 10px;"></div>
+          <div class="rc-list recent-calls-list" id="task-recent-calls-list"></div>
         </div>
         
         <!-- Recent Activity -->
@@ -6021,13 +6142,11 @@
 
         <!-- Recent Calls Section -->
         <div class="contact-info-section" style="border-bottom: none; margin-bottom: 0;">
-          <h3 class="section-title">Recent Calls</h3>
-          <div class="recent-calls-list" id="task-recent-calls-list">
-            <div class="rc-loading-overlay">
-              <div class="spinner"></div>
-            </div>
+          <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 class="section-title" style="margin-bottom: 0;">Recent Calls</h3>
+            <div id="task-recent-calls-pagination" class="unified-pagination" style="display: none; margin-top: 0;"></div>
           </div>
-          <div id="task-recent-calls-pagination" class="pagination-controls" style="display: none; margin-top: 10px;"></div>
+          <div class="rc-list recent-calls-list" id="task-recent-calls-list"></div>
         </div>
         
         <!-- Recent Activity -->
@@ -6119,7 +6238,7 @@
     // Get primary phone data with type information
     const phoneData = getPrimaryPhoneData(person);
     const { value: primaryPhone, type: phoneType } = phoneData;
-    
+
     // Domain for phone data
     const deriveDomain = (input) => {
       try {
@@ -6290,13 +6409,11 @@
 
         <!-- Recent Calls Section -->
         <div class="contact-info-section" style="border-bottom: none; margin-bottom: 0;">
-          <h3 class="section-title">Recent Calls</h3>
-          <div class="recent-calls-list" id="task-recent-calls-list">
-            <div class="rc-loading-overlay">
-              <div class="spinner"></div>
-            </div>
+          <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 class="section-title" style="margin-bottom: 0;">Recent Calls</h3>
+            <div id="task-recent-calls-pagination" class="unified-pagination" style="display: none; margin-top: 0;"></div>
           </div>
-          <div id="task-recent-calls-pagination" class="pagination-controls" style="display: none; margin-top: 10px;"></div>
+          <div class="rc-list recent-calls-list" id="task-recent-calls-list"></div>
         </div>
         
         <!-- Recent Activity -->
@@ -6637,11 +6754,7 @@
         <!-- Recent Calls Section -->
         <div class="contact-info-section" style="border-bottom: none; margin-bottom: 0;">
           <h3 class="section-title">Recent Calls</h3>
-          <div class="recent-calls-list" id="task-recent-calls-list">
-            <div class="rc-loading-overlay">
-              <div class="spinner"></div>
-            </div>
-          </div>
+          <div class="rc-list recent-calls-list" id="task-recent-calls-list"></div>
           <div id="task-recent-calls-pagination" class="pagination-controls" style="display: none; margin-top: 10px;"></div>
         </div>
                 
@@ -6962,99 +7075,140 @@
     const list = document.getElementById('task-recent-calls-list');
     if (!list) return;
 
-    // Check for DB availability
-    if (!window.db) {
-      if (retryCount < 10) {
-        setTimeout(() => loadRecentCallsForTask(retryCount + 1), 500);
-        return;
-      }
-      console.warn('[TaskDetail] DB not ready after retries, cannot load calls');
-      list.innerHTML = '<div class="rc-empty">System loading...</div>';
-      return;
+    const page = document.getElementById('task-detail-page');
+    const isVisible = page && page.classList.contains('active') && !page.hidden;
+    if (!isVisible) return;
+
+    const isDebug = window.PC_DEBUG === true;
+    const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+
+    if (isDebug) {
+      try {
+        console.log('[Hypothesis: RC-Lifecycle] loadRecentCallsForTask:start', {
+          retryCount,
+          taskId: state.currentTask?.id || '',
+          taskType: state.currentTask?.type || ''
+        });
+      } catch (_) { }
     }
 
-    // Identify context
     const task = state.currentTask;
     if (!task) return;
 
     const isAcct = isAccountTask(task);
     let entityId = '';
-    let collectionName = ''; // 'contacts' or 'accounts' logic
-
-    // We need to fetch calls. For contact, we use contactId. For account, we use accountId.
-    // We can reuse the queries from contact-detail/account-detail.
 
     if (isAcct) {
-      // Account context
-      const account = state.account || (task.accountId ? { id: task.accountId } : null);
-      if (!account && task.account) {
-         const a = findAccountByIdOrName('', task.account);
-         if (a) entityId = a.id;
-      } else if (account) {
-         entityId = account.id;
+      entityId = (state.account && state.account.id) || task.accountId || task.accountID || '';
+      if (!entityId && task.account) {
+        try {
+          const a = findAccountByIdOrName(task.accountId || '', task.account);
+          if (a && a.id) entityId = a.id;
+        } catch (_) { }
       }
-      
       if (!entityId) {
         list.innerHTML = '<div class="rc-empty">No account context</div>';
+        try { const pager = document.getElementById('task-recent-calls-pagination'); if (pager) pager.style.display = 'none'; } catch (_) { }
         return;
       }
-
-      taskRcSetLoading(list);
-
-      try {
-        // Query calls for this account
-        // Limit to 50 for client-side pagination
-        const snapshot = await window.db.collection('calls')
-          .where('accountId', '==', entityId)
-          .orderBy('timestamp', 'desc')
-          .limit(50)
-          .get();
-        
-        const calls = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        state._rcCalls = calls;
-        state._rcPage = 1;
-        renderTaskRecentCallsPage();
-        bindTaskRecentCallsPager();
-      } catch (err) {
-        console.error('[TaskDetail] Error loading account calls:', err);
-        list.innerHTML = '<div class="rc-empty">Error loading calls</div>';
-      }
-
     } else {
-      // Contact context
-      const contact = state.contact || (task.contactId ? { id: task.contactId } : null);
-      if (!contact && task.contact) {
-         // Try to find by name if no ID
-         // ... (simplified for now, assume state.contact is populated or we have contactId)
+      entityId = (state.contact && state.contact.id) || task.contactId || task.contactID || '';
+      if (!entityId && task.contact) {
+        try {
+          const people = (typeof window.getPeopleData === 'function') ? (window.getPeopleData() || []) : [];
+          const want = String(task.contact || '').trim().toLowerCase();
+          if (want) {
+            const p = people.find(pp => {
+              const full = [pp.firstName, pp.lastName].filter(Boolean).join(' ').trim() || pp.name || '';
+              return full && String(full).trim().toLowerCase() === want;
+            });
+            if (p && p.id) entityId = p.id;
+          }
+        } catch (_) { }
       }
-      entityId = contact ? contact.id : task.contactId;
-
       if (!entityId) {
-         // Fallback: try to find by phone if we have it
-         // But usually we have contactId on the task
-         list.innerHTML = '<div class="rc-empty">No contact context</div>';
-         return;
+        list.innerHTML = '<div class="rc-empty">No contact context</div>';
+        try { const pager = document.getElementById('task-recent-calls-pagination'); if (pager) pager.style.display = 'none'; } catch (_) { }
+        return;
       }
+    }
 
-      taskRcSetLoading(list);
+    const loadingKey = `${isAcct ? 'account' : 'contact'}:${String(entityId)}`;
+    if (state._rcLoadingKey === loadingKey) return;
+    state._rcLoadingKey = loadingKey;
 
+    taskRcSetLoading(list);
+
+    const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+    const endpoint = isAcct ? 'account' : 'contact';
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const token = (window.firebase && window.firebase.auth && window.firebase.auth().currentUser)
+        ? await window.firebase.auth().currentUser.getIdToken()
+        : null;
+
+      let r;
       try {
-        // Query calls for this contact
-        const snapshot = await window.db.collection('calls')
-          .where('contactId', '==', entityId)
-          .orderBy('timestamp', 'desc')
-          .limit(50)
-          .get();
-        
-        const calls = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        state._rcCalls = calls;
-        state._rcPage = 1;
-        renderTaskRecentCallsPage();
-        bindTaskRecentCallsPager();
-      } catch (err) {
-        console.error('[TaskDetail] Error loading contact calls:', err);
-        list.innerHTML = '<div class="rc-empty">Error loading calls</div>';
+        r = await fetch(`${base}/api/calls/${endpoint}/${encodeURIComponent(entityId)}?limit=50`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+          signal: controller.signal
+        });
+      } catch (fetchError) {
+        if (fetchError && fetchError.name === 'AbortError') {
+          return;
+        }
+        throw fetchError;
+      } finally {
+        clearTimeout(timeoutId);
       }
+
+      const j = await r.json().catch(() => ({}));
+      const calls = (j && j.ok && Array.isArray(j.calls)) ? j.calls : [];
+
+      const bizList = Array.isArray(window.CRM_BUSINESS_NUMBERS)
+        ? window.CRM_BUSINESS_NUMBERS.map(n => String(n || '').replace(/\D/g, '').slice(-10)).filter(Boolean)
+        : [];
+      const isBiz = (p) => bizList.includes(p);
+      const norm = (s) => String(s || '').replace(/\D/g, '').slice(-10);
+
+      calls.forEach(c => {
+        if (!c.id) c.id = c.twilioSid || c.callSid || c.sid || `${c.to || ''}_${c.from || ''}_${c.timestamp || c.callTime || ''}`;
+        const to10 = norm(c.to);
+        const from10 = norm(c.from);
+        let direction = 'unknown';
+        if (String(c.from || '').startsWith('client:') || isBiz(from10)) direction = 'outbound';
+        else if (String(c.to || '').startsWith('client:') || isBiz(to10)) direction = 'inbound';
+        const counter10 = direction === 'outbound' ? to10 : (direction === 'inbound' ? from10 : (to10 || from10));
+        const pretty = counter10 ? `+1 (${counter10.slice(0, 3)}) ${counter10.slice(3, 6)}-${counter10.slice(6)}` : '';
+        c.direction = c.direction || direction;
+        c.counterpartyPretty = c.counterpartyPretty || pretty;
+        c.contactPhone = c.contactPhone || pretty;
+
+        try {
+          if (!c.contactName && !isAcct) {
+            const fullName = [state.contact?.firstName, state.contact?.lastName].filter(Boolean).join(' ') || state.contact?.name || task.contact;
+            if (fullName) c.contactName = fullName;
+          }
+          if (!c.accountName) {
+            const acctName = state.account?.accountName || state.account?.name || task.account;
+            if (acctName) c.accountName = acctName;
+          }
+        } catch (_) { }
+      });
+
+      state._rcCalls = calls;
+      state._rcPage = 1;
+      renderTaskRecentCallsPage();
+      bindTaskRecentCallsPager();
+      try { window.ClickToCall?.processSpecificPhoneElements?.(); } catch (_) { }
+    } catch (err) {
+      console.warn('[TaskDetail] Error loading recent calls:', err);
+      list.innerHTML = '<div class="rc-empty">Failed to load recent calls</div>';
+      try { const pager = document.getElementById('task-recent-calls-pagination'); if (pager) pager.style.display = 'none'; } catch (_) { }
+    } finally {
+      try { if (state._rcLoadingKey === loadingKey) state._rcLoadingKey = null; } catch (_) { }
     }
   }
 
@@ -7078,14 +7232,14 @@
 
     // Check signature to avoid unnecessary re-renders (perf optimization)
     try {
-        const key = slice.map(c => `${c.id}|${c.status}|${c.durationSec}|${c.transcript?'1':'0'}|${c.aiInsights?'1':'0'}`).join('||');
-        const sig = `${state.currentTask?.id}::p${page}::${key}`;
-        if (list.dataset.pcRecentCallsSig === sig) return;
-        list.dataset.pcRecentCallsSig = sig;
-    } catch (_) {}
+      const key = slice.map(c => `${c.id}|${c.status}|${c.durationSec}|${c.transcript ? '1' : '0'}|${c.aiInsights ? '1' : '0'}`).join('||');
+      const sig = `${state.currentTask?.id}::p${page}::${key}`;
+      if (list.dataset.pcRecentCallsSig === sig) return;
+      list.dataset.pcRecentCallsSig = sig;
+    } catch (_) { }
 
     taskRcUpdateListAnimated(list, slice.map((call, index) => taskRcItemHtml(call, index)).join(''));
-    
+
     const totalPages = Math.max(1, Math.ceil(total / RC_PAGE_SIZE));
     updateTaskRecentCallsPager(page, totalPages);
   }
@@ -7112,12 +7266,12 @@
     const title = `${name}${(hasContact && rawCompany && rawCompany !== displayName) ? ` • ${company}` : ''}`;
 
     const delay = (index * 0.05).toFixed(2);
-    
+
     // Check if CI is processed
     const hasInsights = c.transcript && c.aiInsights && Object.keys(c.aiInsights).length > 0;
 
     return `
-      <div class="rc-item modern-reveal premium-borderline" data-id="${idAttr}" style="animation-delay: ${delay}s;">
+      <div class="rc-item premium-borderline" data-id="${idAttr}" style="animation-delay: ${delay}s;">
         <div class="rc-meta">
           <div class="rc-title">${title}</div>
           <div class="rc-sub">${when} • <span class="rc-duration">${durStr}</span> • <span class="phone-number">${phone}</span>${direction ? ` • ${direction}` : ''}</div>
@@ -7132,104 +7286,200 @@
   }
 
   function taskRcUpdateListAnimated(list, html) {
-      // Simplified animation update
-      list.innerHTML = html;
-      // Re-bind insights buttons
-      list.querySelectorAll('.rc-insights').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-              e.stopPropagation();
-              const callId = btn.getAttribute('data-id');
-              const call = (state._rcCalls || []).find(c => String(c.id) === String(callId));
-              if (call) toggleTaskRcDetails(btn, call);
-          });
+    // Simplified animation update
+    list.innerHTML = html;
+    // Re-bind insights buttons
+    list.querySelectorAll('.rc-insights').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const callId = btn.getAttribute('data-id');
+        const call = (state._rcCalls || []).find(c => String(c.id) === String(callId));
+        if (call) toggleTaskRcDetails(btn, call);
       });
+    });
   }
 
   function toggleTaskRcDetails(btn, call) {
-      // Reuse logic from contact-detail if possible, or reimplement
-      // For now, simple toggle or trigger CI
-      if (!call.transcript || !call.aiInsights) {
-          triggerTaskCI(call.id, call.recordingSid, btn);
-          return;
-      }
-      // Expand details (simplified for brevity, can be expanded later)
-      alert('Insights: ' + (call.aiInsights.summary || 'No summary available.'));
+    // Reuse logic from contact-detail if possible, or reimplement
+    // For now, simple toggle or trigger CI
+    if (!call.transcript || !call.aiInsights) {
+      triggerTaskCI(call.id, call.recordingSid, btn);
+      return;
+    }
+    // Expand details (simplified for brevity, can be expanded later)
+    alert('Insights: ' + (call.aiInsights.summary || 'No summary available.'));
   }
 
   async function triggerTaskCI(callSid, recordingSid, btn) {
-      if (window.SharedCIProcessor) {
-        await window.SharedCIProcessor.processCall(callSid, recordingSid, btn, {
-            context: 'task-detail',
-            onSuccess: (updatedCall) => {
-                // Update local state
-                if (state._rcCalls) {
-                    const idx = state._rcCalls.findIndex(c => c.id === updatedCall.id);
-                    if (idx !== -1) state._rcCalls[idx] = { ...state._rcCalls[idx], ...updatedCall };
-                }
-                renderTaskRecentCallsPage();
-            }
-        });
-      }
+    if (window.SharedCIProcessor) {
+      await window.SharedCIProcessor.processCall(callSid, recordingSid, btn, {
+        context: 'task-detail',
+        onSuccess: (updatedCall) => {
+          // Update local state
+          if (state._rcCalls) {
+            const idx = state._rcCalls.findIndex(c => c.id === updatedCall.id);
+            if (idx !== -1) state._rcCalls[idx] = { ...state._rcCalls[idx], ...updatedCall };
+          }
+          renderTaskRecentCallsPage();
+        }
+      });
+    }
   }
 
   function taskRcSetLoading(list) {
-      list.innerHTML = '<div class="rc-loading"><div class="spinner"></div></div>';
+    try {
+      if (window.PCSkeletons && typeof window.PCSkeletons.mountListSkeleton === 'function') {
+        window.PCSkeletons.mountListSkeleton(list, { count: 4, variant: 'recentCalls' });
+        return;
+      }
+    } catch (_) { }
+    list.innerHTML = `
+        <div class="rc-skeletons">
+          <div class="rc-item premium-borderline" style="opacity: 0.7; pointer-events: none; margin-bottom: 8px;">
+            <div class="rc-meta skeleton-shimmer-modern" style="min-width: 0;">
+              <div class="skeleton-shape" style="width: 58%; height: 14px; border-radius: 4px; margin-bottom: 6px;"></div>
+              <div class="skeleton-shape" style="width: 86%; height: 12px; border-radius: 4px;"></div>
+            </div>
+            <div class="rc-actions" style="flex-shrink: 0;">
+              <span class="rc-outcome" style="border-color: transparent;">
+                <span class="skeleton-shimmer-modern" style="display: inline-block; vertical-align: middle;">
+                  <span class="skeleton-shape" style="width: 70px; height: 18px; border-radius: 999px;"></span>
+                </span>
+              </span>
+              <button type="button" class="rc-icon-btn" disabled>
+                <span class="skeleton-shimmer-modern" style="display: inline-block;">
+                  <span class="skeleton-shape" style="width: 16px; height: 16px; border-radius: 4px;"></span>
+                </span>
+              </button>
+            </div>
+          </div>
+          <div class="rc-item premium-borderline" style="opacity: 0.7; pointer-events: none; margin-bottom: 8px;">
+            <div class="rc-meta skeleton-shimmer-modern" style="min-width: 0;">
+              <div class="skeleton-shape" style="width: 62%; height: 14px; border-radius: 4px; margin-bottom: 6px;"></div>
+              <div class="skeleton-shape" style="width: 82%; height: 12px; border-radius: 4px;"></div>
+            </div>
+            <div class="rc-actions" style="flex-shrink: 0;">
+              <span class="rc-outcome" style="border-color: transparent;">
+                <span class="skeleton-shimmer-modern" style="display: inline-block; vertical-align: middle;">
+                  <span class="skeleton-shape" style="width: 64px; height: 18px; border-radius: 999px;"></span>
+                </span>
+              </span>
+              <button type="button" class="rc-icon-btn" disabled>
+                <span class="skeleton-shimmer-modern" style="display: inline-block;">
+                  <span class="skeleton-shape" style="width: 16px; height: 16px; border-radius: 4px;"></span>
+                </span>
+              </button>
+            </div>
+          </div>
+          <div class="rc-item premium-borderline" style="opacity: 0.7; pointer-events: none; margin-bottom: 8px;">
+            <div class="rc-meta skeleton-shimmer-modern" style="min-width: 0;">
+              <div class="skeleton-shape" style="width: 52%; height: 14px; border-radius: 4px; margin-bottom: 6px;"></div>
+              <div class="skeleton-shape" style="width: 88%; height: 12px; border-radius: 4px;"></div>
+            </div>
+            <div class="rc-actions" style="flex-shrink: 0;">
+              <span class="rc-outcome" style="border-color: transparent;">
+                <span class="skeleton-shimmer-modern" style="display: inline-block; vertical-align: middle;">
+                  <span class="skeleton-shape" style="width: 72px; height: 18px; border-radius: 999px;"></span>
+                </span>
+              </span>
+              <button type="button" class="rc-icon-btn" disabled>
+                <span class="skeleton-shimmer-modern" style="display: inline-block;">
+                  <span class="skeleton-shape" style="width: 16px; height: 16px; border-radius: 4px;"></span>
+                </span>
+              </button>
+            </div>
+          </div>
+          <div class="rc-item premium-borderline" style="opacity: 0.7; pointer-events: none; margin-bottom: 8px;">
+            <div class="rc-meta skeleton-shimmer-modern" style="min-width: 0;">
+              <div class="skeleton-shape" style="width: 60%; height: 14px; border-radius: 4px; margin-bottom: 6px;"></div>
+              <div class="skeleton-shape" style="width: 84%; height: 12px; border-radius: 4px;"></div>
+            </div>
+            <div class="rc-actions" style="flex-shrink: 0;">
+              <span class="rc-outcome" style="border-color: transparent;">
+                <span class="skeleton-shimmer-modern" style="display: inline-block; vertical-align: middle;">
+                  <span class="skeleton-shape" style="width: 66px; height: 18px; border-radius: 999px;"></span>
+                </span>
+              </span>
+              <button type="button" class="rc-icon-btn" disabled>
+                <span class="skeleton-shimmer-modern" style="display: inline-block;">
+                  <span class="skeleton-shape" style="width: 16px; height: 16px; border-radius: 4px;"></span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
   }
 
   function bindTaskRecentCallsPager() {
-      const container = document.getElementById('task-recent-calls-pagination');
-      if (!container) return;
-      
-      // Clear existing content to avoid duplicates if re-binding
-      container.innerHTML = '';
-      
-      const prevBtn = document.createElement('button');
-      prevBtn.className = 'pagination-arrow';
-      prevBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"></polyline></svg>`;
-      prevBtn.addEventListener('click', () => {
-          if (state._rcPage > 1) {
-              state._rcPage--;
-              renderTaskRecentCallsPage();
-          }
-      });
+    const container = document.getElementById('task-recent-calls-pagination');
+    if (!container) return;
 
-      const nextBtn = document.createElement('button');
-      nextBtn.className = 'pagination-arrow';
-      nextBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,18 15,12 9,6"></polyline></svg>`;
-      nextBtn.addEventListener('click', () => {
-          const total = (state._rcCalls || []).length;
-          const totalPages = Math.max(1, Math.ceil(total / 5));
-          if (state._rcPage < totalPages) {
-              state._rcPage++;
-              renderTaskRecentCallsPage();
-          }
-      });
+    // Clear existing content to avoid duplicates if re-binding
+    container.innerHTML = '';
+    container.className = 'unified-pagination';
 
-      const label = document.createElement('div');
-      label.className = 'pagination-current';
-      label.id = 'task-rc-page-label';
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'pagination-arrow';
+    prevBtn.setAttribute('data-action', 'prev');
+    prevBtn.setAttribute('aria-label', 'Previous page');
+    prevBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-loaded"><polyline points="15,18 9,12 15,6"></polyline></svg>`;
+    prevBtn.addEventListener('click', () => {
+      if (state._rcPage > 1) {
+        state._rcPage--;
+        renderTaskRecentCallsPage();
+      }
+    });
 
-      container.appendChild(prevBtn);
-      container.appendChild(label);
-      container.appendChild(nextBtn);
-      
-      // Store references for updates
-      container._prevBtn = prevBtn;
-      container._nextBtn = nextBtn;
-      container._label = label;
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'pagination-arrow';
+    nextBtn.setAttribute('data-action', 'next');
+    nextBtn.setAttribute('aria-label', 'Next page');
+    nextBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-loaded"><polyline points="9,18 15,12 9,6"></polyline></svg>`;
+    nextBtn.addEventListener('click', () => {
+      const total = (state._rcCalls || []).length;
+      const totalPages = Math.max(1, Math.ceil(total / 5));
+      if (state._rcPage < totalPages) {
+        state._rcPage++;
+        renderTaskRecentCallsPage();
+      }
+    });
+
+    const currentContainer = document.createElement('div');
+    currentContainer.className = 'pagination-current-container';
+
+    const label = document.createElement('button');
+    label.className = 'pagination-current';
+    label.setAttribute('data-action', 'show-picker');
+    label.id = 'task-rc-page-label';
+    label.textContent = '1';
+
+    currentContainer.appendChild(label);
+
+    container.appendChild(prevBtn);
+    container.appendChild(currentContainer);
+    container.appendChild(nextBtn);
+
+    // Store references for updates
+    container._prevBtn = prevBtn;
+    container._nextBtn = nextBtn;
+    container._label = label;
   }
 
   function updateTaskRecentCallsPager(page, totalPages) {
-      const container = document.getElementById('task-recent-calls-pagination');
-      if (!container) return;
+    const container = document.getElementById('task-recent-calls-pagination');
+    if (!container) return;
 
-      // Ensure visible if we have pages
-      container.style.display = totalPages > 1 ? 'flex' : 'none';
-      if (totalPages <= 1) return;
+    // Ensure visible if we have pages
+    container.style.display = totalPages > 1 ? 'flex' : 'none';
+    if (totalPages <= 1) return;
 
-      if (container._label) container._label.textContent = `${page} / ${totalPages}`;
-      if (container._prevBtn) container._prevBtn.disabled = page <= 1;
-      if (container._nextBtn) container._nextBtn.disabled = page >= totalPages;
+    if (container._label) {
+      container._label.textContent = `${page}`;
+      container._label.setAttribute('aria-label', `Current page ${page} of ${totalPages}`);
+    }
+    if (container._prevBtn) container._prevBtn.disabled = page <= 1;
+    if (container._nextBtn) container._nextBtn.disabled = page >= totalPages;
   }
 
   // Process click-to-call and click-to-email elements
@@ -7449,7 +7699,7 @@
         // Get list and sequence name badges
         const listMemberships = state._contactListMemberships[contact.id] || [];
         const sequenceMemberships = state._contactSequenceMemberships[contact.id] || [];
-        
+
         const listIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 4px; opacity: 0.8;"><circle cx="4" cy="6" r="1"></circle><circle cx="4" cy="12" r="1"></circle><circle cx="4" cy="18" r="1"></circle><line x1="8" y1="6" x2="20" y2="6"></line><line x1="8" y1="12" x2="20" y2="12"></line><line x1="8" y1="18" x2="20" y2="18"></line></svg>`;
         const sequenceIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; opacity: 0.8;"><polygon points="7 4 20 12 7 20 7 4"></polygon></svg>`;
 
@@ -7872,7 +8122,7 @@
           };
           // Re-render immediately with optimistic data
           await renderTaskPage();
-          
+
           // Re-process click-to-call to ensure context is updated
           setTimeout(() => {
             processClickToCallAndEmail();
@@ -7885,11 +8135,11 @@
             const contactDoc = await window.firebaseDB.collection('contacts').doc(id).get();
             if (contactDoc.exists) {
               const updatedContact = { id: contactDoc.id, ...contactDoc.data() };
-              
+
               // Only re-render if the fetched data is different from our optimistic state
               // (e.g. server-side timestamps or other fields we didn't have)
               const hasChanges = JSON.stringify(updatedContact) !== JSON.stringify(state.contact);
-              
+
               state.contact = updatedContact;
 
               if (hasChanges) {
@@ -7930,7 +8180,7 @@
   // ==== Inline editing functions for Account Information and Energy & Contract ====
   function setupInlineEditing() {
     const infoGrids = document.querySelectorAll('#task-detail-page .info-grid');
-    
+
     infoGrids.forEach(infoGrid => {
       if (infoGrid && !infoGrid._bound) {
         infoGrid.addEventListener('click', async (e) => {

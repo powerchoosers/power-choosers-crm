@@ -5199,7 +5199,7 @@ a                }
 
     renderTaskSkeletons(count = 3) {
         return Array(count).fill(0).map(() => `
-            <div class="task-item modern-reveal premium-borderline" style="opacity: 0.7; pointer-events: none; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 10px; display: flex; align-items: center; min-height: 60px; padding: 12px 16px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); animation-fill-mode: forwards;">
+            <div class="task-item premium-borderline" style="opacity: 0.7; pointer-events: none; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 10px; display: flex; align-items: center; min-height: 60px; padding: 12px 16px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); animation-fill-mode: forwards;">
                 <div class="task-info" style="flex: 1;">
                     <div class="skeleton-text medium skeleton-shimmer" style="margin-bottom: 8px; height: 14px;"></div>
                     <div class="skeleton-text short skeleton-shimmer" style="height: 12px;"></div>
@@ -5211,7 +5211,7 @@ a                }
 
     renderNewsSkeletons(count = 3) {
         return Array(count).fill(0).map(() => `
-            <div class="news-item modern-reveal premium-borderline" style="opacity: 0.7; pointer-events: none; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 10px; min-height: 84px; display: flex; flex-direction: column; justify-content: center; padding: 12px 16px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); animation-fill-mode: forwards;">
+            <div class="news-item premium-borderline" style="opacity: 0.7; pointer-events: none; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 10px; min-height: 84px; display: flex; flex-direction: column; justify-content: center; padding: 12px 16px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); animation-fill-mode: forwards;">
                 <div class="news-title skeleton-text skeleton-shimmer" style="width: 95%; margin-bottom: 12px; height: 16px;"></div>
                 <div class="news-time skeleton-text short skeleton-shimmer" style="height: 12px;"></div>
             </div>
@@ -5222,7 +5222,7 @@ a                }
         return Array(count).fill(0).map((_, index) => {
             const delay = (index * 0.1).toFixed(2);
             return `
-                <div class="task-item skeleton-task modern-reveal premium-borderline" style="opacity: 0.7; pointer-events: none; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 8px; min-height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; animation-delay: ${delay}s; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); animation-fill-mode: forwards;">
+                <div class="task-item skeleton-task premium-borderline" style="opacity: 0.7; pointer-events: none; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 8px; min-height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; animation-delay: ${delay}s; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); animation-fill-mode: forwards;">
                     <div class="task-info" style="flex: 1;">
                         <div class="task-name skeleton-text skeleton-shimmer" style="width: 85%; margin-bottom: 6px; height: 14px;"></div>
                         <div class="task-time skeleton-text short skeleton-shimmer" style="height: 12px; width: 60%;"></div>

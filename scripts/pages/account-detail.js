@@ -2220,8 +2220,24 @@
   }
   function arcBindPager() { const pager = document.getElementById('account-rc-pager'); if (!pager || pager._bound) return; const prev = document.getElementById('arc-prev'); const next = document.getElementById('arc-next'); prev?.addEventListener('click', (e) => { e.preventDefault(); const total = Math.ceil((state._arcCalls || []).length / ARC_PAGE_SIZE) || 1; state._arcPage = Math.max(1, (state._arcPage || 1) - 1); arcRenderPage(); arcUpdatePager(state._arcPage, total); }); next?.addEventListener('click', (e) => { e.preventDefault(); const total = Math.ceil((state._arcCalls || []).length / ARC_PAGE_SIZE) || 1; state._arcPage = Math.min(total, (state._arcPage || 1) + 1); arcRenderPage(); arcUpdatePager(state._arcPage, total); }); pager._bound = '1'; }
   function arcUpdatePager(current, total) { const pager = document.getElementById('account-rc-pager'); const info = document.getElementById('arc-info'); const prev = document.getElementById('arc-prev'); const next = document.getElementById('arc-next'); if (!pager || !info || !prev || !next) return; const show = total > 1; pager.style.display = show ? 'flex' : 'none'; info.textContent = `${Math.max(1, parseInt(current || 1, 10))} of ${Math.max(1, parseInt(total || 1, 10))}`; prev.disabled = (current <= 1); next.disabled = (current >= total); }
-  function arcSpinnerHtml() { return '<div class="rc-loading"><div class="rc-spinner" aria-hidden="true"></div></div>'; }
-  function arcSetLoading(list) { try { let ov = list.querySelector('.rc-loading-overlay'); if (!ov) { ov = document.createElement('div'); ov.className = 'rc-loading-overlay'; ov.innerHTML = arcSpinnerHtml(); ov.style.position = 'absolute'; ov.style.inset = '0'; ov.style.display = 'flex'; ov.style.alignItems = 'center'; ov.style.justifyContent = 'center'; ov.style.pointerEvents = 'none'; list.appendChild(ov); } ov.style.display = 'flex'; } catch (_) { } }
+  function arcSpinnerHtml() {
+    try {
+      if (window.PCSkeletons && typeof window.PCSkeletons.renderRecentCallsLoadingState === 'function') {
+        return window.PCSkeletons.renderRecentCallsLoadingState(4);
+      }
+      if (window.PCSkeletons && typeof window.PCSkeletons.renderActivityLoadingState === 'function') {
+        return window.PCSkeletons.renderActivityLoadingState(4);
+      }
+    } catch (_) { }
+    return '<div class="activity-skeletons"><div class="activity-item modern-reveal premium-borderline" style="border: 1px solid rgba(255,255,255,0.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); margin-bottom: 10px; opacity: 0.7; pointer-events: none; display: flex; align-items: center; gap: 12px; padding: 12px 16px; min-height: 85px;"><div class="activity-entity-avatar"><div class="skeleton-shimmer" style="width: 36px; height: 36px; border-radius: 50%;"></div></div><div class="activity-content" style="flex: 1;"><div class="skeleton-text medium skeleton-shimmer" style="margin-bottom: 8px; height: 16px;"></div><div class="skeleton-text skeleton-shimmer" style="margin-bottom: 6px; height: 12px; width: 90%;"></div><div class="skeleton-text short skeleton-shimmer" style="height: 10px;"></div></div><div class="activity-icon"><div class="skeleton-shimmer" style="width: 24px; height: 24px; border-radius: 4px;"></div></div></div></div>';
+  }
+  function arcSetLoading(list) {
+    try {
+      const hasRows = !!list.querySelector('.rc-item');
+      if (hasRows) return;
+      list.innerHTML = arcSpinnerHtml();
+    } catch (_) { }
+  }
   function arcUpdateListAnimated(list, html) {
     try {
 

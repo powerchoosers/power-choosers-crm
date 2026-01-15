@@ -2770,17 +2770,9 @@
         ` : ''}
 
         <div class="contact-info-section" id="contact-recent-calls">
-          <div class="rc-header">
-            <h3 class="section-title">Recent Calls</h3>
-            <div class="rc-pager" id="contact-rc-pager" style="display:none">
-              <button class="rc-page-btn" id="rc-prev" aria-label="Previous page">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"/></svg>
-              </button>
-              <div class="rc-page-info" id="rc-info">1 of 1</div>
-              <button class="rc-page-btn" id="rc-next" aria-label="Next page">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,18 15,12 9,6"/></svg>
-              </button>
-            </div>
+          <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 class="section-title" style="margin-bottom: 0;">Recent Calls</h3>
+            <div id="contact-rc-pager" class="unified-pagination" style="display: none; margin-top: 0;"></div>
           </div>
           <div class="rc-list" id="contact-recent-calls-list">
             <div class="rc-empty" style="padding: 12px 0;">
@@ -5485,24 +5477,22 @@
     updateRecentCallsPager(state._rcPage || 1, totalPages);
   }
 
-  function rcSpinnerHtml() { return '<div class="rc-loading"><div class="rc-spinner" aria-hidden="true"></div></div>'; }
+  function rcSpinnerHtml() {
+    try {
+      if (window.PCSkeletons && typeof window.PCSkeletons.renderRecentCallsLoadingState === 'function') {
+        return window.PCSkeletons.renderRecentCallsLoadingState(4);
+      }
+      if (window.PCSkeletons && typeof window.PCSkeletons.renderActivityLoadingState === 'function') {
+        return window.PCSkeletons.renderActivityLoadingState(4);
+      }
+    } catch (_) { }
+    return '<div class="activity-skeletons"><div class="activity-item modern-reveal premium-borderline" style="border: 1px solid rgba(255,255,255,0.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); margin-bottom: 10px; opacity: 0.7; pointer-events: none; display: flex; align-items: center; gap: 12px; padding: 12px 16px; min-height: 85px;"><div class="activity-entity-avatar"><div class="skeleton-shimmer" style="width: 36px; height: 36px; border-radius: 50%;"></div></div><div class="activity-content" style="flex: 1;"><div class="skeleton-text medium skeleton-shimmer" style="margin-bottom: 8px; height: 16px;"></div><div class="skeleton-text skeleton-shimmer" style="margin-bottom: 6px; height: 12px; width: 90%;"></div><div class="skeleton-text short skeleton-shimmer" style="height: 10px;"></div></div><div class="activity-icon"><div class="skeleton-shimmer" style="width: 24px; height: 24px; border-radius: 4px;"></div></div></div></div>';
+  }
   function rcSetLoading(list) {
     try {
-      // Overlay spinner without clearing existing rows to prevent flicker
-      let ov = list.querySelector('.rc-loading-overlay');
-      if (!ov) {
-        ov = document.createElement('div');
-        ov.className = 'rc-loading-overlay';
-        ov.innerHTML = rcSpinnerHtml();
-        ov.style.position = 'absolute';
-        ov.style.inset = '0';
-        ov.style.display = 'flex';
-        ov.style.alignItems = 'center';
-        ov.style.justifyContent = 'center';
-        ov.style.pointerEvents = 'none';
-        list.appendChild(ov);
-      }
-      ov.style.display = 'flex';
+      const hasRows = !!list.querySelector('.rc-item');
+      if (hasRows) return;
+      list.innerHTML = rcSpinnerHtml();
     } catch (_) { }
   }
   function rcUpdateListAnimated(list, html) {
@@ -5566,23 +5556,78 @@
 
   function bindRecentCallsPager() {
     const pager = document.getElementById('contact-rc-pager');
-    const prev = document.getElementById('rc-prev');
-    const next = document.getElementById('rc-next');
-    if (!pager || pager._bound) return;
-    prev?.addEventListener('click', (e) => { e.preventDefault(); const total = Math.ceil((state._rcCalls || []).length / RC_PAGE_SIZE) || 1; state._rcPage = Math.max(1, (state._rcPage || 1) - 1); renderRecentCallsPage(); updateRecentCallsPager(state._rcPage, total); });
-    next?.addEventListener('click', (e) => { e.preventDefault(); const total = Math.ceil((state._rcCalls || []).length / RC_PAGE_SIZE) || 1; state._rcPage = Math.min(total, (state._rcPage || 1) + 1); renderRecentCallsPage(); updateRecentCallsPager(state._rcPage, total); });
+    if (!pager) return;
+    
+    // Clear existing content to avoid duplicates if re-binding
+    pager.innerHTML = '';
+    
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'pagination-arrow';
+    prevBtn.id = 'rc-prev'; // Keep ID for compatibility if needed, though we use listeners here
+    prevBtn.setAttribute('data-action', 'prev');
+    prevBtn.setAttribute('aria-label', 'Previous page');
+    prevBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-loaded"><polyline points="15,18 9,12 15,6"></polyline></svg>`;
+    prevBtn.addEventListener('click', (e) => { 
+        e.preventDefault(); 
+        const total = Math.ceil((state._rcCalls || []).length / RC_PAGE_SIZE) || 1; 
+        state._rcPage = Math.max(1, (state._rcPage || 1) - 1); 
+        renderRecentCallsPage(); 
+        updateRecentCallsPager(state._rcPage, total); 
+    });
+
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'pagination-arrow';
+    nextBtn.id = 'rc-next';
+    nextBtn.setAttribute('data-action', 'next');
+    nextBtn.setAttribute('aria-label', 'Next page');
+    nextBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-loaded"><polyline points="9,18 15,12 9,6"></polyline></svg>`;
+    nextBtn.addEventListener('click', (e) => { 
+        e.preventDefault(); 
+        const total = Math.ceil((state._rcCalls || []).length / RC_PAGE_SIZE) || 1; 
+        state._rcPage = Math.min(total, (state._rcPage || 1) + 1); 
+        renderRecentCallsPage(); 
+        updateRecentCallsPager(state._rcPage, total); 
+    });
+
+    const currentContainer = document.createElement('div');
+    currentContainer.className = 'pagination-current-container';
+    
+    const info = document.createElement('button');
+    info.className = 'pagination-current';
+    info.setAttribute('data-action', 'show-picker');
+    info.id = 'rc-info';
+    info.textContent = '1';
+
+    currentContainer.appendChild(info);
+
+    pager.appendChild(prevBtn);
+    pager.appendChild(currentContainer);
+    pager.appendChild(nextBtn);
+    
     pager._bound = '1';
+    
+    // Store references on pager for easy access
+    pager._prevBtn = prevBtn;
+    pager._nextBtn = nextBtn;
+    pager._info = info;
   }
 
   function updateRecentCallsPager(current, total) {
     const pager = document.getElementById('contact-rc-pager');
-    const info = document.getElementById('rc-info');
-    const prev = document.getElementById('rc-prev');
-    const next = document.getElementById('rc-next');
-    if (!pager || !info || !prev || !next) return;
+    if (!pager) return;
+    
+    const info = pager._info || document.getElementById('rc-info');
+    const prev = pager._prevBtn || document.getElementById('rc-prev');
+    const next = pager._nextBtn || document.getElementById('rc-next');
+    
+    if (!info || !prev || !next) return;
+    
     const show = total > 1;
     pager.style.display = show ? 'flex' : 'none';
-    info.textContent = `${Math.max(1, parseInt(current || 1, 10))} of ${Math.max(1, parseInt(total || 1, 10))}`;
+    
+    info.textContent = `${Math.max(1, parseInt(current || 1, 10))}`;
+    info.setAttribute('aria-label', `Current page ${Math.max(1, parseInt(current || 1, 10))} of ${Math.max(1, parseInt(total || 1, 10))}`);
+    
     prev.disabled = (current <= 1);
     next.disabled = (current >= total);
   }
