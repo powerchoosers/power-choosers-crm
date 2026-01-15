@@ -2581,29 +2581,65 @@ async function handleApiRecording(req, res, parsedUrl) {
     } catch (_) { }
 
     const authHeader = 'Basic ' + Buffer.from(`${sid}:${token}`).toString('base64');
-    const upstream = await fetch(fetchUrl, { headers: { Authorization: authHeader } });
-    if (!upstream.ok) {
+    
+    // Forward Range header to support seeking
+    const headers = { Authorization: authHeader };
+    if (req.headers.range) {
+      headers['Range'] = req.headers.range;
+    }
+
+    const upstream = await fetch(fetchUrl, { headers });
+    
+    if (!upstream.ok && upstream.status !== 206) {
       const txt = await upstream.text().catch(() => '');
       res.writeHead(upstream.status, { 'Content-Type': 'text/plain' });
       res.end(txt || 'Failed to fetch recording');
       return;
     }
 
-    // Stream audio back to the client
-    res.writeHead(200, {
-      'Content-Type': upstream.headers.get('content-type') || 'audio/mpeg',
-      'Cache-Control': 'no-cache',
+    // Forward headers required for streaming/seeking
+    const responseHeaders = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET',
-      'Vary': 'Origin'
+      'Vary': 'Origin',
+      'Cache-Control': 'public, max-age=31536000, immutable' // Recordings are immutable
+    };
+
+    // Copy key headers from upstream
+    const headerKeys = ['content-type', 'content-length', 'content-range', 'accept-ranges', 'date', 'last-modified', 'etag'];
+    headerKeys.forEach(key => {
+      if (upstream.headers.has(key)) {
+        responseHeaders[key] = upstream.headers.get(key);
+      }
     });
-    const reader = upstream.body.getReader();
-    const pump = () => reader.read().then(({ done, value }) => {
-      if (done) { res.end(); return; }
-      res.write(Buffer.from(value));
-      return pump();
-    });
-    await pump();
+
+    // Stream audio back to the client
+    res.writeHead(upstream.status, responseHeaders);
+    
+    if (upstream.body) {
+      // Handle both Node native fetch (ReadableStream) and potential polyfills
+      if (typeof upstream.body.pipe === 'function') {
+        upstream.body.pipe(res);
+      } else {
+        const reader = upstream.body.getReader();
+        const pump = async () => {
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              res.write(Buffer.from(value));
+            }
+            res.end();
+          } catch (e) {
+            console.error('[Server] Stream pump error:', e);
+            res.end();
+          }
+        };
+        await pump();
+      }
+    } else {
+      res.end();
+    }
   } catch (error) {
     console.error('[Server] /api/recording proxy error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
