@@ -5,6 +5,7 @@
  */
 
 import { cors, fetchWithRetry, normalizeDomain, getApiKey, APOLLO_BASE_URL, formatLocation } from './_utils.js';
+import logger from '../_logger.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
@@ -107,20 +108,12 @@ export default async function handler(req, res) {
     
     // COMBINED FILTERING STRATEGY:
     // Use BOTH company name AND domain together for best accuracy
-    // This prevents getting random people when company doesn't exist in Apollo DB
     
     if (companyIds.length > 0) {
       // Priority 1: Company ID filtering (most accurate, requires Apollo company ID)
       searchBody.organization_ids = companyIds;
     } else {
-      // Priority 2: Use BOTH company name AND domain together for maximum accuracy
-      // This ensures we only get people who match BOTH criteria
       let filtersApplied = 0;
-      
-      if (companyNames.length > 0) {
-        searchBody.q_organization_name = companyNames[0];
-        filtersApplied++;
-      }
       
       if (domains.length > 0) {
         const normalizedDomains = domains.map(d => normalizeDomain(d)).filter(d => d);
@@ -128,6 +121,17 @@ export default async function handler(req, res) {
           searchBody.q_organization_domains_list = normalizedDomains;
           filtersApplied++;
         }
+      }
+
+      // Fallback: If we have a company name but no ID/Domain, append it to keywords
+      // q_organization_name is NOT a valid Apollo parameter
+      if (companyNames.length > 0) {
+        if (searchBody.q_keywords) {
+          searchBody.q_keywords += ` "${companyNames[0]}"`;
+        } else {
+          searchBody.q_keywords = `"${companyNames[0]}"`;
+        }
+        filtersApplied++;
       }
       
       if (filtersApplied === 0 && !personName) {
@@ -144,6 +148,10 @@ export default async function handler(req, res) {
     }
 
     const searchUrl = `${APOLLO_BASE_URL}/mixed_people/search`;
+    
+    // Log outgoing request (for debugging)
+    // console.log('[Apollo Search] Body:', JSON.stringify(searchBody, null, 2));
+
     const searchResp = await fetchWithRetry(searchUrl, {
       method: 'POST',
       headers: {
@@ -156,10 +164,12 @@ export default async function handler(req, res) {
 
     if (!searchResp.ok) {
       const text = await searchResp.text();
+      logger.error('[Apollo Search] Error:', searchResp.status, text);
       res.writeHead(searchResp.status, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({  
         error: 'Apollo people search error', 
-        details: text 
+        details: text,
+        requestBody: searchBody // Return request body to help debug
       }));
       return;
     }
