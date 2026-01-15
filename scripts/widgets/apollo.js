@@ -43,8 +43,10 @@
     }
   }
 
-  function lushaLog() {
-    return;
+  function lushaLog(...args) {
+    if (__lushaRealConsole && __lushaRealConsole.log) {
+      __lushaRealConsole.log('[Apollo Widget]', ...args);
+    }
   }
 
   try { window.__apolloWidgetLog = lushaLog; } catch (_) { }
