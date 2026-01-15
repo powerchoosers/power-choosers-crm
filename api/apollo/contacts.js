@@ -31,10 +31,11 @@ export default async function handler(req, res) {
     const companyNames = companyFilters.names || [];
     
     // Require at least one filter
-    if (domains.length === 0 && companyIds.length === 0 && companyNames.length === 0) {
+    console.log('[Hypothesis 2] Server received filters:', JSON.stringify({ domains, companyIds, companyNames, personName }));
+    if (domains.length === 0 && companyIds.length === 0 && companyNames.length === 0 && !personName) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
-        error: 'Missing company filter: domains, ids, or names required',
+        error: 'Missing filter: company (domains, ids, names) or person_name required',
         requestId: `apollo_error_${Date.now()}`,
         contacts: [],
         pagination: { page: 0, size: 0, total: 0, totalPages: 0 }
@@ -123,15 +124,19 @@ export default async function handler(req, res) {
       }
       
       if (domains.length > 0) {
-        const normalizedDomains = domains.map(d => normalizeDomain(d));
-        searchBody.q_organization_domains_list = normalizedDomains;
-        filtersApplied++;
+        const normalizedDomains = domains.map(d => normalizeDomain(d)).filter(d => d);
+        console.log('[Hypothesis 3] Normalized domains (empty filtered out):', normalizedDomains);
+        if (normalizedDomains.length > 0) {
+          searchBody.q_organization_domains_list = normalizedDomains;
+          filtersApplied++;
+        }
       }
       
-      if (filtersApplied === 0) {
+      if (filtersApplied === 0 && !personName) {
+        console.log('[Hypothesis 4] Validation failed: No company filters applied and no person name.');
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ 
-          error: 'No valid company filters could be applied',
+          error: 'No valid company filters could be applied and no person name provided',
           requestId: `apollo_error_${Date.now()}`,
           contacts: [],
           pagination: { page: 0, size: 0, total: 0, totalPages: 0 }
