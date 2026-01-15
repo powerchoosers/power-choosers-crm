@@ -178,7 +178,11 @@ export default async function handler(req, res) {
     const searchData = await searchResp.json();
 
     const apolloPeople = searchData.people || [];
-    
+
+    if (apolloPeople.length > 0) {
+      logger.info('[Apollo Search] First person raw:', JSON.stringify(apolloPeople[0], null, 2));
+    }
+
     // Map Apollo people to Lusha contact format
     const mappedContacts = apolloPeople.map(mapApolloContactToLushaFormat);
     
