@@ -168,7 +168,7 @@ export default async function handler(req, res) {
 
       const domain = person.organization?.primary_domain || person.organization?.domain;
       const firstName = person.first_name || '';
-      const lastName = person.last_name || '';
+      const lastName = person.last_name || person.last_name_obfuscated || '';
       const fullName = person.name || `${firstName} ${lastName}`.trim();
 
       return {

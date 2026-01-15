@@ -182,6 +182,12 @@ export default async function handler(req, res) {
     if (apolloPeople.length > 0) {
       logger.info('[Apollo Search v2] First person raw (pre-enrichment):', JSON.stringify(apolloPeople[0], null, 2));
       
+      // OPTIMIZATION: Do NOT automatically enrich everyone.
+      // The user wants to avoid paying 1 credit per person just to see the list.
+      // We will return the obfuscated data (from api_search) and let the user "Enrich" individual contacts via the UI.
+      // This saves ~10 credits per search.
+      
+      /* 
       // ENRICHMENT STEP: Fetch full details (names, linkedin, etc.) via bulk_match
       // The api_search endpoint returns obfuscated/limited data.
       try {
@@ -232,6 +238,7 @@ export default async function handler(req, res) {
         logger.error('[Apollo Search] Enrichment error:', enrichErr);
         // Continue with raw results if enrichment fails
       }
+      */
     }
 
     // Map Apollo people to Lusha contact format
