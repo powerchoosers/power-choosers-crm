@@ -149,10 +149,6 @@ export default async function handler(req, res) {
 
     const searchUrl = `${APOLLO_BASE_URL}/mixed_people/api_search`;
     
-    // Log outgoing request (for debugging)
-    logger.info('[Apollo Search] URL:', searchUrl);
-    logger.info('[Apollo Search] Body:', JSON.stringify(searchBody, null, 2));
-
     const searchResp = await fetchWithRetry(searchUrl, {
       method: 'POST',
       headers: {
@@ -180,65 +176,11 @@ export default async function handler(req, res) {
     const apolloPeople = searchData.people || [];
 
     if (apolloPeople.length > 0) {
-      logger.info('[Apollo Search v2] First person raw (pre-enrichment):', JSON.stringify(apolloPeople[0], null, 2));
       
       // OPTIMIZATION: Do NOT automatically enrich everyone.
       // The user wants to avoid paying 1 credit per person just to see the list.
       // We will return the obfuscated data (from api_search) and let the user "Enrich" individual contacts via the UI.
       // This saves ~10 credits per search.
-      
-      /* 
-      // ENRICHMENT STEP: Fetch full details (names, linkedin, etc.) via bulk_match
-      // The api_search endpoint returns obfuscated/limited data.
-      try {
-        const enrichedMap = new Map();
-        const chunkSize = 10; // Bulk match limit is 10
-        
-        // Process in chunks
-        for (let i = 0; i < apolloPeople.length; i += chunkSize) {
-          const chunk = apolloPeople.slice(i, i + chunkSize);
-          const details = chunk.map(p => ({ id: p.id }));
-          
-          const bulkMatchUrl = `${APOLLO_BASE_URL}/people/bulk_match`;
-          const bulkResp = await fetchWithRetry(bulkMatchUrl, {
-            method: 'POST',
-            headers: {
-              'Cache-Control': 'no-cache',
-              'Content-Type': 'application/json',
-              'X-Api-Key': APOLLO_API_KEY
-            },
-            body: JSON.stringify({ 
-              details,
-              reveal_personal_emails: false,
-              reveal_phone_number: false
-            })
-          });
-
-          if (bulkResp.ok) {
-            const bulkData = await bulkResp.json();
-            const matches = bulkData.matches || [];
-            matches.forEach(m => {
-              if (m && m.id) enrichedMap.set(m.id, m);
-            });
-          } else {
-            logger.warn('[Apollo Search] Bulk match failed for chunk:', bulkResp.status);
-          }
-        }
-
-        // Merge enriched data back into apolloPeople
-        apolloPeople.forEach((p, index) => {
-          const enriched = enrichedMap.get(p.id);
-          if (enriched) {
-            apolloPeople[index] = { ...p, ...enriched }; // Override with enriched data
-          }
-        });
-        
-        logger.info('[Apollo Search v2] First person enriched:', JSON.stringify(apolloPeople[0], null, 2));
-      } catch (enrichErr) {
-        logger.error('[Apollo Search] Enrichment error:', enrichErr);
-        // Continue with raw results if enrichment fails
-      }
-      */
     }
 
     // Map Apollo people to Lusha contact format
