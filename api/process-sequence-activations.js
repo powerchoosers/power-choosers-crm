@@ -242,7 +242,12 @@ async function processSingleActivation(activationId, isProduction) {
 
     const makeSafePart = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9_-]/g, '_').slice(0, 120);
     const makeSequenceStepId = (prefix, sequenceId, contactId, stepIndex) => {
-      return `${prefix}-seq-${makeSafePart(sequenceId)}-${makeSafePart(contactId)}-${String(stepIndex)}`;
+      // Strip existing 'seq-' prefix from sequenceId to prevent double prefixing (e.g. task-seq-seq-...)
+      let safeSeqId = makeSafePart(sequenceId);
+      if (safeSeqId.startsWith('seq-') || safeSeqId.startsWith('seq_')) {
+        safeSeqId = safeSeqId.substring(4);
+      }
+      return `${prefix}-seq-${safeSeqId}-${makeSafePart(contactId)}-${String(stepIndex)}`;
     };
 
     const failedContactIds = [];
