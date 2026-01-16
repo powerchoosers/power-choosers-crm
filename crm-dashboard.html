@@ -28,6 +28,8 @@
     <link rel="icon"
         href="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png"
         type="image/png">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Twilio Voice SDK for browser calling -->
     <script src="https://unpkg.com/@twilio/voice-sdk@2.11.0/dist/twilio.min.js"></script>
     <!-- Algolia Search Library -->
@@ -541,6 +543,13 @@
                                             </div>
                                             <div class="lead-score">87%</div>
                                         </div>
+                                    </div>
+                                </div>
+
+                                <div class="dashboard-card">
+                                    <h3 class="card-title">Monthly Call KPI</h3>
+                                    <div class="kpi-chart-wrapper" style="position: relative; height: 250px; width: 100%;">
+                                        <canvas id="kpiCallChart"></canvas>
                                     </div>
                                 </div>
 
@@ -4808,8 +4817,9 @@
                 'scripts/widgets/notes.js',
                 'scripts/widgets/health.js',
                 'scripts/widgets/deal.js',
-                'scripts/widgets/apollo.js',
-                'scripts/widgets/maps.js',
+            'scripts/widgets/apollo.js',
+			'scripts/widgets/kpi-tracker.js',
+            'scripts/widgets/maps.js',
                 'scripts/notifications.js',
                 'scripts/click-to-call.js',
                 'scripts/click-to-email.js',

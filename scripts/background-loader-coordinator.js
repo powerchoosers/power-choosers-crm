@@ -39,15 +39,32 @@ class BackgroundLoaderCoordinator {
     this.loading = true;
     this.loadStartTime = Date.now();
     try {
-      // Load collections in priority order
-      for (const collection of this.loadingOrder) {
+      // OPTIMIZATION: Load independent collections in parallel to speed up initial load
+      // Critical dependency: emails depends on contacts
+      const independent = ['contacts', 'accounts', 'calls', 'tasks', 'sequences', 'lists'];
+      
+      // Start independent loads in parallel
+      const independentPromises = independent.map(async (collection) => {
         const startTime = Date.now();
         await this.loadCollection(collection);
-        const loadTime = Date.now() - startTime;
-        this.loadStats.set(collection, loadTime);
-      }
+        this.loadStats.set(collection, Date.now() - startTime);
+      });
+
+      // Wait for contacts specifically before starting emails
+      await this.loadCollection('contacts');
+      
+      // Start emails (depends on contacts)
+      const emailsStartTime = Date.now();
+      const emailsPromise = (async () => {
+        await this.loadCollection('emails');
+        this.loadStats.set('emails', Date.now() - emailsStartTime);
+      })();
+
+      // Wait for everything to finish
+      await Promise.all([...independentPromises, emailsPromise]);
 
       const totalTime = Date.now() - this.loadStartTime;
+      // console.log(`[Coordinator] Coordinated loading finished in ${totalTime}ms`);
     } catch (error) {
       console.error('[Coordinator] Error during coordinated loading:', error);
     } finally {

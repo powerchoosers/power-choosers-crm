@@ -22,7 +22,7 @@
     try { if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') return window.DataManager.getCurrentUserEmail(); return (window.currentUserEmail || '').toLowerCase(); } catch (_) { return (window.currentUserEmail || '').toLowerCase(); }
   };
 
-  const tasksCacheVersion = 2;
+  const tasksCacheVersion = 3;
   const getTasksCacheVersionKey = () => {
     const email = getUserEmail();
     return email ? `pc:tasks-cache-version:${email}` : 'pc:tasks-cache-version';
@@ -91,7 +91,6 @@
   }
 
   async function loadFromFirestore(preserveExisting = false) {
-
     if (!window.firebaseDB && !(window.DataManager && typeof window.DataManager.queryWithOwnership === 'function')) {
       console.warn('[BackgroundTasksLoader] firebaseDB not available');
       return;
@@ -126,9 +125,11 @@
           assignedSnap.forEach(d => { if (!map.has(d.id)) map.set(d.id, { id: d.id, ...d.data() }); });
           createdSnap.forEach(d => { if (!map.has(d.id)) map.set(d.id, { id: d.id, ...d.data() }); });
           newTasks = Array.from(map.values());
-
-
         }
+
+        // Clean up zombie tasks with double prefixes
+        newTasks = newTasks.filter(t => t && t.id && !String(t.id).startsWith('task-seq-seq-'));
+
         // Sort by updatedAt/timestamp desc similar to original
         newTasks.sort((a, b) => new Date(b.updatedAt || b.timestamp || 0) - new Date(a.updatedAt || a.timestamp || 0));
 
@@ -284,6 +285,9 @@
             } else {
               tasksData = cached;
             }
+            
+            // Clean up zombie tasks with double prefixes
+            tasksData = (tasksData || []).filter(t => t && t.id && !String(t.id).startsWith('task-seq-seq-'));
 
             tasksData = filterOutDeletedTasks(tasksData, 'BackgroundTasksLoader.cacheRetry');
             document.dispatchEvent(new CustomEvent('pc:tasks-loaded', {
@@ -449,13 +453,14 @@
       }
 
       // Trigger Today's Tasks widget to refresh (only when dashboard is visible).
-      // Do NOT use timeouts; CRM-side logic already debounces/queues as needed.
-      if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
-        const dashboardActive = !!document.getElementById('dashboard-page')?.classList.contains('active');
-        if (dashboardActive) {
-          window.crm.loadTodaysTasks();
-        }
-      }
+      // REMOVED: main.js already listens to 'tasksUpdated' and triggers loadTodaysTasks.
+      // Having it here causes double-rendering and flicker.
+      // if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
+      //   const dashboardActive = !!document.getElementById('dashboard-page')?.classList.contains('active');
+      //   if (dashboardActive) {
+      //     window.crm.loadTodaysTasks();
+      //   }
+      // }
     } catch (error) {
       console.error('[BackgroundTasksLoader] Error handling tasksUpdated event:', error);
     }
@@ -476,12 +481,14 @@
         
         // CRITICAL FIX: Only trigger refresh if not from task-detail (which handles its own refresh)
         // This prevents duplicate refreshes and race conditions
-        if (source !== 'task-detail' && window.crm && typeof window.crm.loadTodaysTasks === 'function') {
-          const dashboardActive = !!document.getElementById('dashboard-page')?.classList.contains('active');
-          if (dashboardActive) {
-            window.crm.loadTodaysTasks();
-          }
-        }
+        // REMOVED: main.js already listens to 'pc:task-deleted' and triggers loadTodaysTasks.
+        // Having it here causes double-rendering and flicker.
+        // if (source !== 'task-detail' && window.crm && typeof window.crm.loadTodaysTasks === 'function') {
+        //   const dashboardActive = !!document.getElementById('dashboard-page')?.classList.contains('active');
+        //   if (dashboardActive) {
+        //     window.crm.loadTodaysTasks();
+        //   }
+        // }
       } catch (e) {
         console.warn('[BackgroundTasksLoader] Could not remove deleted task from cache:', e);
       }

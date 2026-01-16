@@ -101,7 +101,7 @@ class PowerChoosersCRM {
 
         // CRITICAL FIX: Listen for tasksUpdated events (creation, deletion, or page loads)
         window.addEventListener('tasksUpdated', async (e) => {
-            const { taskId, deleted, source } = e.detail || {};
+            const { taskId, deleted, source, rescheduled, newTaskCreated } = e.detail || {};
             const dashboardActive = !!document.getElementById('dashboard-page')?.classList.contains('active');
 
             // If we're not on the dashboard, don't spam-load Today's Tasks.
@@ -111,8 +111,8 @@ class PowerChoosersCRM {
                 return;
             }
 
-            // Handle both deletions and general updates (like when tasks page loads fresh data)
-            if ((deleted && taskId) || source === 'tasksPageLoad' || source === 'taskCreation') {
+            // Handle deletions, creation, rescheduling, and general updates
+            if ((deleted && taskId) || source === 'tasksPageLoad' || source === 'taskCreation' || rescheduled || newTaskCreated) {
                 if (typeof this.loadTodaysTasks === 'function') {
                     this.loadTodaysTasks();
                 }
@@ -354,8 +354,8 @@ class PowerChoosersCRM {
                     // Lazy-load full data function (loads on demand)
                     window.getAccountsData = (forceFullData = false) => {
                         // If called from a page that needs full data, return full dataset
-                        // FIXED: 'account-details' (with s) for correct page name, added 'dashboard' for task icons, added 'calls' for call enrichment
-                        const needsFullData = forceFullData || ['dashboard', 'accounts', 'account-details', 'task-detail', 'calls'].includes(window.crm?.currentPage);
+                        // FIXED: 'account-details' (with s) for correct page name, added 'dashboard' for task icons, added 'calls' for call enrichment, added 'list-detail' for full list view
+                        const needsFullData = forceFullData || ['dashboard', 'accounts', 'account-details', 'task-detail', 'calls', 'list-detail'].includes(window.crm?.currentPage);
                         if (needsFullData && accountsData.length > 200) {
                             return accountsData;  // Return full dataset when needed
                         }
@@ -373,8 +373,8 @@ class PowerChoosersCRM {
 
                     // Lazy-load full data function (loads on demand)
                     window.getPeopleData = (forceFullData = false) => {
-                        // Added 'dashboard' for task rendering with full contact data, added 'calls' for call enrichment
-                        const needsFullData = forceFullData || ['dashboard', 'people', 'contact-detail', 'task-detail', 'calls'].includes(window.crm?.currentPage);
+                        // Added 'dashboard' for task rendering with full contact data, added 'calls' for call enrichment, added 'list-detail' for full list view
+                        const needsFullData = forceFullData || ['dashboard', 'people', 'contact-detail', 'task-detail', 'calls', 'list-detail'].includes(window.crm?.currentPage);
                         if (needsFullData && contactsData.length > 200) {
                             return contactsData;  // Return full dataset when needed
                         }
@@ -5233,7 +5233,31 @@ a                }
         }).join('');
     }
 
+    // Helper to determine if a task is pending and should be shown
+    _isTaskPending(task) {
+        if (!task || !task.id) return false;
+        
+        // Exclude deleted tasks (tombstoned)
+        if (task._deleted || task.deleted) return false;
+
+        const status = String(task.status || 'pending').toLowerCase();
+        // Explicitly check for completed statuses
+        if (status === 'completed' || status === 'done' || status === 'archived') return false;
+        
+        // Check boolean completion flags
+        if (task.completed === true || task.isCompleted === true) return false;
+        
+        // Check completion timestamps
+        if (task.completedAt || task.completed_at || task.doneAt) return false;
+        
+        // If status is specifically set to something else (like 'in_progress'), we might still want to show it
+        // but for "Today's Tasks", we usually only want 'pending'.
+        // However, some legacy tasks might have no status.
+        return status === 'pending' || !task.status;
+    }
+
     async loadTodaysTasks(skipFirebase = false) {
+        const startTime = Date.now();
         // Prevent multiple calls within 2 seconds AND while actively loading
         const currentTime = Date.now();
         if (this._lastTasksLoad && (currentTime - this._lastTasksLoad) < 2000) {
@@ -5423,8 +5447,6 @@ a                }
                 });
 
                 localTasks = filterOutDeletedTasks(localTasks, "main.js.loadTodaysTasks(localStorage)");
-
-
             }
         } catch (_) { localTasks = []; }
 
@@ -5515,7 +5537,11 @@ a                }
                             }
 
                             if (!usedBackgroundLoader && !usedCache) {
-                                await waitForBackgroundTasks(2000);
+                                // Only wait if the loader isn't already marked as loaded
+                                if (!window.BackgroundTasksLoader || !window.BackgroundTasksLoader.loaded) {
+                                    await waitForBackgroundTasks(2000);
+                                }
+
                                 if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.getTasksData === 'function') {
                                     const bgTasks = window.BackgroundTasksLoader.getTasksData();
                                     if (bgTasks && bgTasks.length > 0) {
@@ -5529,32 +5555,17 @@ a                }
                             // Do NOT re-introduce stale local tasks that are missing from Firebase results.
                             const mergedTasksMap = new Map();
                             firebaseTasks.forEach(t => {
-                                const status = String(t?.status || 'pending').toLowerCase();
-                                const isCompleted = status === 'completed' || status === 'done' || t?.completed === true || t?.isCompleted === true || t?.completedAt || t?.completed_at;
-                                if (t && t.id && !isCompleted) mergedTasksMap.set(t.id, t);
+                                if (this._isTaskPending(t)) mergedTasksMap.set(t.id, t);
                             });
 
                             // CRITICAL FIX: Add LinkedIn sequence tasks (only pending ones)
                             const linkedInTasks = await this.getLinkedInTasksFromSequences();
                             linkedInTasks.forEach(t => {
-                                const status = String(t?.status || 'pending').toLowerCase();
-                                const isCompleted = status === 'completed' || status === 'done' || t?.completed === true || t?.isCompleted === true || t?.completedAt || t?.completed_at;
-                                if (t && t.id && !isCompleted && !mergedTasksMap.has(t.id)) mergedTasksMap.set(t.id, t);
+                                if (this._isTaskPending(t) && !mergedTasksMap.has(t.id)) mergedTasksMap.set(t.id, t);
                             });
 
                             const mergedTasks = Array.from(mergedTasksMap.values());
-
-                            // Final safety check - ensure no completed tasks are saved to localStorage
-                            const finalMergedTasks = mergedTasks.filter(t => {
-                                if (!t || !t.id) return false;
-                                const status = String(t.status || 'pending').toLowerCase();
-                                if (status === 'completed' || status === 'done') return false;
-                                if (t.completed === true || t.isCompleted === true) return false;
-                                if (t.completedAt || t.completed_at) return false;
-                                return true;
-                            });
-
-                            const tombstonedFiltered = filterOutDeletedTasks(finalMergedTasks, "main.js.loadTodaysTasks(merged)");
+                            const tombstonedFiltered = filterOutDeletedTasks(mergedTasks, "main.js.loadTodaysTasks(merged)");
 
                             // CRITICAL FIX: Save to both namespaced and legacy keys for compatibility
                             try {
@@ -5574,6 +5585,9 @@ a                }
                     const cachedTasksRaw = await getCachedTasksNoFetch();
                     const processedTasks = (cachedTasksRaw || []).filter(task => {
                         if (!task) return false;
+                        // Clean up zombie tasks with double prefixes (not in Firestore)
+                        if (task.id && String(task.id).startsWith('task-seq-seq-')) return false;
+
                         const status = String(task.status || 'pending').toLowerCase();
                         if (status === 'completed' || status === 'done') return false;
                         if (task.completed === true || task.isCompleted === true) return false;
@@ -5607,7 +5621,11 @@ a                }
                     }
 
                     if (!usedBackgroundLoader) {
-                        await waitForBackgroundTasks(2000);
+                        // Only wait if the loader isn't already marked as loaded
+                        if (!window.BackgroundTasksLoader || !window.BackgroundTasksLoader.loaded) {
+                            await waitForBackgroundTasks(2000);
+                        }
+                        
                         if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.getTasksData === 'function') {
                             const bgTasks = window.BackgroundTasksLoader.getTasksData();
                             if (bgTasks && bgTasks.length > 0) {
@@ -5626,32 +5644,17 @@ a                }
                     // Do NOT merge in stale localTasks after Firebase load.
                     const allTasksMap = new Map();
                     firebaseTasks.forEach(t => {
-                        const status = String(t?.status || 'pending').toLowerCase();
-                        const isCompleted = status === 'completed' || status === 'done' || t?.completed === true || t?.isCompleted === true || t?.completedAt || t?.completed_at;
-                        if (t && t.id && !isCompleted) allTasksMap.set(t.id, t);
+                        if (this._isTaskPending(t)) allTasksMap.set(t.id, t);
                     });
 
                     // CRITICAL FIX: Add LinkedIn sequence tasks (only pending ones)
                     const linkedInTasks = await this.getLinkedInTasksFromSequences();
                     linkedInTasks.forEach(t => {
-                        const status = String(t?.status || 'pending').toLowerCase();
-                        const isCompleted = status === 'completed' || status === 'done' || t?.completed === true || t?.isCompleted === true || t?.completedAt || t?.completed_at;
-                        if (t && t.id && !isCompleted && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t);
+                        if (this._isTaskPending(t) && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t);
                     });
 
                     const mergedTasks = Array.from(allTasksMap.values());
-
-                    // Final safety check - ensure no completed tasks are saved to localStorage
-                    const finalMergedTasks = mergedTasks.filter(t => {
-                        if (!t || !t.id) return false;
-                        const status = String(t.status || 'pending').toLowerCase();
-                        if (status === 'completed' || status === 'done') return false;
-                        if (t.completed === true || t.isCompleted === true) return false;
-                        if (t.completedAt || t.completed_at) return false;
-                        return true;
-                    });
-
-                    const tombstonedFiltered = filterOutDeletedTasks(finalMergedTasks, "main.js.loadTodaysTasks(adminMerged)");
+                    const tombstonedFiltered = filterOutDeletedTasks(mergedTasks, "main.js.loadTodaysTasks(adminMerged)");
 
                     // Save only to namespaced key (avoid cross-user/browser mixing)
                     try {
@@ -5692,11 +5695,8 @@ a                }
     }
 
     renderTodaysTasks(allTasks, parseDateStrict, parseTimeToMinutes, today) {
-
         const tasksList = document.querySelector('.tasks-list');
-        if (!tasksList) {
-            return;
-        }
+        if (!tasksList) return;
 
         // Pagination navigation should not replay entry animations or trigger re-fetch/skeletons.
         // This flag is set by the pagination click handler below.
@@ -5708,15 +5708,8 @@ a                }
         // allTasks is already merged and deduped by the caller (local first, then Firebase)
 
         // Filter to today's and overdue pending tasks
-        // CRITICAL FIX: Filter out completed tasks and tasks without valid due dates
         let todaysTasks = allTasks.filter(task => {
-            // Exclude completed tasks (broad markers)
-            const status = String(task?.status || 'pending').toLowerCase();
-            if (status === 'completed' || status === 'done') return false;
-            if (task?.completed === true || task?.isCompleted === true) return false;
-            if (task?.completedAt || task?.completed_at) return false;
-            // Only include pending tasks
-            if (status !== 'pending') return false;
+            if (!this._isTaskPending(task)) return false;
             // Must have a valid due date
             const d = parseDateStrict(task.dueDate);
             if (!d) return false;
@@ -5750,7 +5743,12 @@ a                }
             }
 
             // Final tiebreaker: creation time (oldest first to keep stability)
-            return (a.createdAt || 0) - (b.createdAt || 0);
+            const ca = a.createdAt || 0;
+            const cb = b.createdAt || 0;
+            if (ca !== cb) return ca - cb;
+            
+            // Absolute tiebreaker: ID (guaranteed stable sorting for fingerprinting)
+            return String(a.id).localeCompare(String(b.id));
         });
 
         {
@@ -5776,7 +5774,15 @@ a                }
 
         // Smart Render Check: Avoid re-rendering if data hasn't changed (prevents flicker/scroll jumps)
         // This replaces the old "block all updates" logic which broke pagination and live updates.
-        const currentFingerprint = todaysTasks.map(t => t.id + ':' + (t.status || '') + ':' + (t.dueDate || '')).join('|');
+        const generateFingerprint = (tasks) => {
+            return tasks.map(t => {
+                const d = parseDateStrict(t.dueDate);
+                const dateKey = d ? d.getTime() : (t.dueDate || '');
+                return t.id + ':' + (t.status || '') + ':' + dateKey;
+            }).join('|');
+        };
+
+        const currentFingerprint = generateFingerprint(todaysTasks);
         const hasSkeleton = !!tasksList.querySelector('.skeleton-task, .skeleton-text, .skeleton-shimmer');
         if (!isPaginationNav && !hasSkeleton && this._lastRenderedFingerprint === currentFingerprint) {
             return;

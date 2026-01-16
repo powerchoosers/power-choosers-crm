@@ -4227,19 +4227,14 @@
       // console.log('[TaskDetail] BackgroundAccountsLoader returned', accountsData.length, 'accounts');
     }
 
-    // Method 4: If still no data, wait a bit and retry with CacheManager
+    // Method 4: If still no data, retry with CacheManager (no artificial delay)
     if ((contactsData.length === 0 || accountsData.length === 0) && window.CacheManager) {
-      // console.log('[TaskDetail] Waiting for cache to populate...');
-      await new Promise(resolve => setTimeout(resolve, 500));
-
       try {
         if (contactsData.length === 0) {
           contactsData = await window.CacheManager.get('contacts').catch(() => []) || [];
-          // console.log('[TaskDetail] Retry: CacheManager returned', contactsData.length, 'contacts');
         }
         if (accountsData.length === 0) {
           accountsData = await window.CacheManager.get('accounts').catch(() => []) || [];
-          // console.log('[TaskDetail] Retry: CacheManager returned', accountsData.length, 'accounts');
         }
       } catch (e) {
         console.warn('[TaskDetail] Retry CacheManager failed:', e);
@@ -7096,13 +7091,11 @@
     const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 
     if (isDebug) {
-      try {
-        console.log('[Hypothesis: RC-Lifecycle] loadRecentCallsForTask:start', {
-          retryCount,
-          taskId: state.currentTask?.id || '',
-          taskType: state.currentTask?.type || ''
-        });
-      } catch (_) { }
+      // console.log('[TaskDetail] loadRecentCallsForTask:start', {
+      //   retryCount,
+      //   taskId: state.currentTask?.id || '',
+      //   taskType: state.currentTask?.type || ''
+      // });
     }
 
     const task = state.currentTask;
