@@ -80,7 +80,14 @@ function normalizeCallForResponse(call) {
     accountId: call.accountId || '',
     accountName: call.accountName || '',
     contactId: call.contactId || '',
-    contactName: call.contactName || ''
+    contactName: call.contactName || '',
+
+    // Ownership fields (required for client-side scoping + KPI widget)
+    ownerId: call.ownerId || call.agentEmail || call.userEmail || '',
+    assignedTo: call.assignedTo || call.ownerId || call.agentEmail || call.userEmail || '',
+    createdBy: call.createdBy || call.ownerId || call.agentEmail || call.userEmail || '',
+    agentEmail: call.agentEmail || call.ownerId || call.userEmail || '',
+    userEmail: call.userEmail || call.agentEmail || call.ownerId || ''
   };
 }
 
@@ -461,5 +468,4 @@ export default async function handler(req, res) {
     res.end(JSON.stringify({ ok: false, error: 'Internal server error' }));
   }
 }
-
 
