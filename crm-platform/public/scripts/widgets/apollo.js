@@ -1,0 +1,4747 @@
+(function () {
+  'use strict';
+
+  function isDebugEnabled() {
+    try {
+      return (
+        (typeof window !== 'undefined' && (window.VERBOSE_LOGS === true || window.PC_DEBUG === true)) ||
+        (typeof localStorage !== 'undefined' && localStorage.getItem('pc-debug-logs') === 'true' && localStorage.getItem('pc-debug-optin') === 'true')
+      );
+    } catch (_) {
+      return (typeof window !== 'undefined' && (window.VERBOSE_LOGS === true || window.PC_DEBUG === true));
+    }
+  }
+
+  const console = (() => {
+    const base = (typeof window !== 'undefined' && window.console)
+      ? window.console
+      : ((typeof globalThis !== 'undefined' && globalThis.console) ? globalThis.console : null);
+    if (isDebugEnabled() && base) return base;
+    const scoped = base ? Object.create(base) : {};
+    scoped.log = () => {};
+    scoped.warn = () => {};
+    scoped.error = () => {};
+    scoped.debug = () => {};
+    return scoped;
+  })();
+
+  // Lusha API Widget for Contact Detail and Account Detail
+  // Exposes: window.Widgets.openLusha(contactId), window.Widgets.openLushaForAccount(accountId)
+  if (!window.Widgets) window.Widgets = {};
+
+  const WIDGET_ID = 'lusha-widget';
+  let currentContactId = null;
+  let currentAccountId = null;
+  let currentEntityType = 'contact'; // 'contact' or 'account'
+  let currentAccountName = null;
+  let lastCompanyResult = null;
+
+  // Pagination state
+  let allContacts = []; // Store all contacts for pagination
+  let currentPage = 1;
+  const contactsPerPage = 5;
+
+  // Simple logger helper
+  const __lushaRealConsole = (typeof window !== 'undefined' && window.console)
+    ? window.console
+    : ((typeof globalThis !== 'undefined' && globalThis.console) ? globalThis.console : null);
+
+  function isTaskDetailActive() {
+    try {
+      const el = document.getElementById('task-detail-page');
+      return !!(el && el.classList && el.classList.contains('active'));
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function lushaLog(...args) {
+    if (isDebugEnabled()) {
+      try { __lushaRealConsole && __lushaRealConsole.log && __lushaRealConsole.log(...args); } catch (_) { }
+    }
+  }
+
+  function getPanelContentEl() {
+    const panel = document.getElementById('widget-panel');
+    if (!panel) return null;
+    const content = panel.querySelector('.widget-content');
+    return content || panel;
+  }
+
+  // Scroll the widget panel to the top to bring the Apollo widget into view
+  function scrollToWidgetPanelTop() {
+    const panel = document.getElementById('widget-panel');
+    if (panel) {
+      panel.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  // Scroll directly to the widget if it's already open
+  function scrollToWidget(widgetId) {
+    const widget = document.getElementById(widgetId);
+    const panel = document.getElementById('widget-panel');
+    if (widget && panel) {
+      const panelRect = panel.getBoundingClientRect();
+      const widgetRect = widget.getBoundingClientRect();
+      // Add 25px cushion from top
+      const scrollTop = Math.max(0, panel.scrollTop + (widgetRect.top - panelRect.top) - 25);
+      panel.scrollTo({ top: scrollTop, behavior: 'smooth' });
+    }
+  }
+
+  // Update existing widget content when entity changes
+  async function updateWidgetContent(entityId, entityType) {
+    // Clear state for new entity
+    currentEntityType = entityType;
+    if (entityType === 'contact') {
+      currentContactId = entityId;
+      currentAccountId = null;
+    } else {
+      currentAccountId = entityId;
+      currentContactId = null;
+    }
+
+    // Reset results and cache
+    lastCompanyResult = null;
+    window.__lushaLastRequestId = null;
+    window.__lushaOpenedFromCache = false;
+    window.__lushaLastEntityId = entityId;
+    window.__lushaLastEntityType = entityType;
+
+    // Clear company panel and show skeleton
+    const companyPanel = document.getElementById('lusha-panel-company');
+    if (companyPanel) {
+      try { 
+        renderCompanySkeleton(); 
+        renderContactSkeletons();
+      } catch (_) {
+        companyPanel.innerHTML = '';
+      }
+      companyPanel.removeAttribute('data-content-hash');
+    }
+
+    // Prefill and search
+    try { prefillInputs(entityType); } catch (_) { }
+    try { performLushaSearch({ openLiveIfUncached: true }); } catch (_) { }
+    try { renderUsageBar(); } catch (_) { }
+  }
+
+  function removeExistingWidget() {
+    const existing = document.getElementById(WIDGET_ID);
+    if (existing && existing.parentElement) existing.parentElement.removeChild(existing);
+  }
+
+  function closeLushaWidget() {
+    const card = document.getElementById(WIDGET_ID);
+    if (!card) return;
+
+    const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduce) {
+      if (card.parentElement) card.parentElement.removeChild(card);
+      return;
+    }
+
+    // Prepare collapse animation from current height and paddings
+    const cs = window.getComputedStyle(card);
+    const pt = parseFloat(cs.paddingTop) || 0;
+    const pb = parseFloat(cs.paddingBottom) || 0;
+    const start = card.scrollHeight; // includes padding
+    card.style.overflow = 'hidden';
+    card.style.height = start + 'px';
+    card.style.opacity = '1';
+    card.style.transform = 'translateY(0)';
+
+    // Force reflow
+    void card.offsetHeight;
+    card.style.transition = 'height 360ms ease-out, opacity 360ms ease-out, transform 360ms ease-out, padding-top 360ms ease-out, padding-bottom 360ms ease-out';
+    card.style.height = '0px';
+    card.style.paddingTop = '0px';
+    card.style.paddingBottom = '0px';
+    card.style.opacity = '0';
+    card.style.transform = 'translateY(-6px)';
+
+    const pending = new Set(['height', 'padding-top', 'padding-bottom']);
+    const onEnd = (e) => {
+      if (!e) return;
+      if (pending.has(e.propertyName)) pending.delete(e.propertyName);
+      if (pending.size > 0) return;
+      card.removeEventListener('transitionend', onEnd);
+      if (card.parentElement) card.parentElement.removeChild(card);
+    };
+    card.addEventListener('transitionend', onEnd);
+  }
+
+  function makeCard(entityId, entityType = 'contact') {
+    const card = document.createElement('div');
+    card.id = WIDGET_ID;
+    card.className = 'widget-card lusha-card';
+
+    // Store current entity info for later use
+    currentEntityType = entityType;
+    currentContactId = entityId;
+    if (entityType === 'account') {
+      currentAccountId = entityId;
+    }
+    // CRITICAL: Clear lastCompanyResult when opening for a new company to prevent stale data
+    // Only preserve if we're reopening the same company (check by entityId)
+    const previousEntityId = window.__lushaLastEntityId;
+    const previousEntityType = window.__lushaLastEntityType;
+    if (previousEntityId !== entityId || previousEntityType !== entityType) {
+      lastCompanyResult = null;
+      window.__lushaLastRequestId = null;
+      window.__lushaOpenedFromCache = false;
+      // Clear the company panel to force fresh render
+      const companyPanel = document.getElementById('lusha-panel-company');
+      if (companyPanel) {
+        companyPanel.innerHTML = '';
+        companyPanel.removeAttribute('data-content-hash');
+      }
+    }
+    window.__lushaLastEntityId = entityId;
+    window.__lushaLastEntityType = entityType;
+
+    // Get account name for search
+    let accountName = '';
+    
+    // Priority 1: Check task-detail state (for widgets opened from task pages)
+    try {
+      if (isTaskDetailActive() && window.TaskDetail && window.TaskDetail.state) {
+        const taskState = window.TaskDetail.state;
+        if (taskState.account) {
+          accountName = taskState.account.name || taskState.account.accountName || taskState.account.companyName || '';
+        } else if (taskState.contact) {
+          accountName = taskState.contact.companyName || taskState.contact.company || taskState.contact.account || '';
+        }
+      }
+    } catch (_) { }
+    
+    // Priority 2: Check entity-specific detail pages
+    if (!accountName) {
+      if (entityType === 'contact') {
+        // Try to get account name from contact data
+        try {
+          if (window.ContactDetail && window.ContactDetail.state && window.ContactDetail.state.currentContact) {
+            const contact = window.ContactDetail.state.currentContact;
+            accountName = contact.companyName || contact.company || contact.account || '';
+          }
+          // Fallback: try to get from DOM
+          if (!accountName) {
+            const companyLink = document.querySelector('#contact-company-link');
+            if (companyLink) {
+              accountName = companyLink.textContent?.trim() || '';
+            }
+          }
+        } catch (_) { }
+      } else {
+        // Try to get account name from account data
+        try {
+          if (window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount) {
+            const account = window.AccountDetail.state.currentAccount;
+            accountName = account.name || account.accountName || '';
+          }
+          // Fallback: try to get from DOM (use page title, not contact name)
+          if (!accountName) {
+            const accountTitle = document.querySelector('#account-detail-header .page-title') ||
+              document.querySelector('.contact-page-title') ||
+              document.querySelector('#account-details-page .page-title');
+            if (accountTitle) {
+              accountName = accountTitle.textContent?.trim() || '';
+            }
+          }
+        } catch (_) { }
+      }
+    }
+
+    currentAccountName = accountName;
+
+    card.innerHTML = `
+      <div class="widget-card-header">
+        <h3 class="widget-title">Apollo</h3>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="lusha-close" type="button" title="Close Apollo Search" aria-label="Close">×</button>
+        </div>
+      </div>
+      
+      <div class="lusha-body">
+        <!-- Company Summary -->
+        <div id="lusha-panel-company"></div>
+        
+        <!-- Loading indicator -->
+        <div id="lusha-loading" style="display:none;">
+        </div>
+
+        <!-- Results Section -->
+        <div class="lusha-results is-hidden" id="lusha-results">
+          <div class="lusha-results-header" style="opacity:0;transform:translateY(8px);">
+            <div class="lusha-results-header-top">
+              <div class="lusha-results-title-group">
+                <h4>Search Results</h4>
+                <div class="lusha-results-count" id="lusha-results-count">0 contacts found</div>
+              </div>
+              <div class="lusha-pagination" id="lusha-pagination" style="display:flex; visibility: hidden;">
+                <button class="lusha-pagination-arrow" id="lusha-prev-btn" disabled>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15,18 9,12 15,6"/>
+                  </svg>
+                </button>
+                <div class="lusha-pagination-current-container">
+                  <div class="lusha-pagination-current" id="lusha-pagination-current">1</div>
+                </div>
+                <button class="lusha-pagination-arrow" id="lusha-next-btn" disabled>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9,18 15,12 9,6"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="lusha-name-search-container">
+              <input type="text" class="lusha-name-search-input" id="lusha-name-search-input" placeholder="Search by name...">
+              <svg class="lusha-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </div>
+          </div>
+          
+      <div class="lusha-contacts-list" id="lusha-contacts-list">
+        <!-- Results will be populated here -->
+      </div>
+      <!-- Persistent footer so pagination re-renders don't remove the usage bar -->
+      <div class="lusha-usage-footer" id="lusha-usage-footer"></div>
+    </div>
+  </div>
+    `;
+
+    // Smooth expand-in animation - slide down from top
+    const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!prefersReduce) {
+      try { card.classList.add('lusha-anim'); } catch (_) { }
+      // Start hidden and positioned above viewport
+      card.style.opacity = '0';
+      card.style.transform = 'translateY(-100%)';
+      card.style.willChange = 'opacity, transform';
+    }
+
+    const content = getPanelContentEl();
+
+    // Reserve space for the widget to prevent layout jumps
+    if (!prefersReduce) {
+      card.style.height = '0px';
+      card.style.overflow = 'hidden';
+    }
+
+    if (content.firstChild) content.insertBefore(card, content.firstChild);
+    else content.appendChild(card);
+
+    // Reserve space for company summary to avoid container jumps while it loads/animates
+    try {
+      const compPanel = card.querySelector('#lusha-panel-company');
+      if (compPanel) compPanel.style.minHeight = '80px';
+    } catch (_) { }
+
+    if (!prefersReduce) {
+      // Slide down from top animation with height expansion
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const targetHeight = card.scrollHeight;
+          card.style.transition = 'opacity 400ms ease, transform 400ms ease, height 400ms ease';
+          card.style.opacity = '1';
+          card.style.transform = 'translateY(0)';
+          card.style.height = targetHeight + 'px';
+
+          const onEnd = () => {
+            try {
+              card.style.willChange = '';
+              card.style.height = 'auto';
+              card.style.overflow = 'visible';
+              card.removeEventListener('transitionend', onEnd);
+            } catch (_) { }
+          };
+          card.addEventListener('transitionend', onEnd);
+        });
+      });
+    } else {
+      // For reduced motion, just show immediately
+      card.style.height = 'auto';
+      card.style.overflow = 'visible';
+    }
+
+    // Bring panel into view without jumping during transition
+    try {
+      const panel = document.getElementById('widget-panel');
+      if (panel) {
+        requestAnimationFrame(() => { try { panel.scrollTop = 0; } catch (_) { } });
+      }
+    } catch (_) { /* noop */ }
+
+    attachEventListeners();
+    try { prefillInputs(entityType); } catch (_) { }
+
+    // Don't render company panel initially - let it animate when search completes
+
+    // Defer search until after the open animation settles to avoid jank
+    // On open: if cached, use cache; if uncached, perform a small live search (1 credit) to get requestId and summary
+    const scheduleSearch = () => { try { performLushaSearch({ openLiveIfUncached: true }); } catch (_) { } };
+    if (!prefersReduce) {
+      let started = false;
+      const onOpened = () => { if (started) return; started = true; try { card.removeEventListener('transitionend', onOpened); } catch (_) { } scheduleSearch(); };
+      try { card.addEventListener('transitionend', onOpened, { once: true }); } catch (_) { }
+      // Safety fallback if transitionend doesn't fire
+      setTimeout(() => { if (!started) scheduleSearch(); }, 360);
+    } else {
+      scheduleSearch();
+    }
+
+    // Always attempt to render the usage bar on open (throttled internally)
+    try { renderUsageBar(); } catch (_) { }
+
+    return card;
+  }
+
+  function attachEventListeners() {
+    // Close button
+    const closeBtn = document.getElementById(WIDGET_ID)?.querySelector('.lusha-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', closeLushaWidget);
+    }
+
+    // Search button (not rendered anymore, but keep for safety)
+    const searchBtn = document.getElementById('lusha-search-btn');
+    if (searchBtn) {
+      searchBtn.addEventListener('click', () => performLushaSearch({ forceLive: false }));
+    }
+
+    // Reset button removed (combined into reveal/enrich flow)
+
+    // Removed refresh button; live fetch happens via Reveal/Enrich when needed
+
+    // Enter key on inputs
+    const inputs = document.querySelectorAll('#lusha-widget .lusha-form-input');
+    inputs.forEach(input => {
+      input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          performLushaSearch();
+        }
+      });
+    });
+
+    // Pagination buttons
+    const prevBtn = document.getElementById('lusha-prev-btn');
+    const nextBtn = document.getElementById('lusha-next-btn');
+
+    if (prevBtn) {
+      prevBtn.addEventListener('click', () => {
+        if (currentPage > 1) {
+          currentPage--;
+          displayCurrentPage();
+        }
+      });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        const totalPages = Math.ceil(allContacts.length / contactsPerPage);
+        if (currentPage < totalPages) {
+          currentPage++;
+          displayCurrentPage();
+        }
+      });
+    }
+
+    // Name search input
+    const nameSearchInput = document.getElementById('lusha-name-search-input');
+    if (nameSearchInput) {
+      nameSearchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          const name = nameSearchInput.value.trim();
+          performLushaSearch({ forceLive: true, personName: name });
+        }
+      });
+    }
+  }
+
+  async function performLushaSearch(options = {}) {
+
+    // Reset pagination state
+    allContacts = [];
+    currentPage = 1;
+
+    try {
+      if (!options.personName) {
+        renderCompanySkeleton();
+      }
+      renderContactSkeletons();
+    } catch (_) { }
+
+    // derive company + domain from page context (no input fields)
+    const ctx = getContextDefaults(currentEntityType);
+    let companyName = ctx.companyName;
+    let domain = ctx.domain;
+
+    // If we have a preserved result from a previous open of the same entity, use its context to ensure consistent cache keys
+    if (lastCompanyResult) {
+      if (lastCompanyResult.domain) domain = lastCompanyResult.domain;
+      if (lastCompanyResult.name) companyName = lastCompanyResult.name;
+    }
+
+    try {
+      if (!companyName && !domain && !options.personName) {
+        if (options.cachedOnly) {
+          // Show empty results gracefully without hitting live endpoints
+          try { renderCompanyPanel({ name: '', domain: '' }, false); } catch (_) { }
+          updateResults([]);
+          try { crossfadeToResults(); } catch (_) { }
+          try { showCreditsUsed(0, 'cached'); } catch (_) { }
+          try { renderUsageBar(); } catch (_) { }
+          return;
+        }
+        throw new Error('No company context found');
+      }
+
+      // 1) Try cache first (unless forcing live) or when cachedOnly is requested
+      if (!options.forceLive || options.cachedOnly || options.openLiveIfUncached) {
+        const cached = await tryLoadCache({ domain, companyName });
+        if (cached && cached.contacts && cached.contacts.length) {
+          window.__lushaOpenedFromCache = true;
+
+          // Use complete cached company data
+          lastCompanyResult = {
+            name: cached.companyName || companyName || '',
+            domain: cached.domain || domain,
+            website: cached.website || '',
+            // Include all cached company fields
+            id: cached.companyId,
+            logoUrl: cached.logoUrl,
+            description: cached.description,
+            industry: cached.industry,
+            employees: cached.employees,
+            revenue: cached.revenue,
+            location: cached.location,
+            city: cached.city,
+            state: cached.state,
+            country: cached.country,
+            // phone intentionally omitted (Lusha company endpoint does not provide a reliable company phone)
+            email: cached.email,
+            linkedin: cached.linkedin,
+            twitter: cached.twitter,
+            facebook: cached.facebook,
+            // Include full company object if available
+            ...(cached.company || {})
+          };
+
+          // Rebuild name map from cached contacts to ensure names persist after browser refresh
+          try {
+            const nameMap = new Map();
+            cached.contacts.forEach(c => {
+              const id = c.contactId || c.id;
+              const f = c.firstName || c.name?.first || '';
+              const l = c.lastName || c.name?.last || '';
+              const full = (c.name && (c.name.full || c.name)) || `${f} ${l}`.trim();
+              if (id) nameMap.set(id, { f, l, full });
+            });
+            window.__lushaNameMap = nameMap;
+          } catch (_) { }
+
+          const cachedContacts = Array.isArray(cached.contacts) ? cached.contacts : [];
+          const hydratedContacts = cachedContacts.map(c => {
+            const key = c.contactId || c.id;
+            if (!key) return c;
+            try {
+              const rawHard = localStorage.getItem(`lusha_contact_${key}`);
+              if (!rawHard) return c;
+              const hardCached = JSON.parse(rawHard);
+              const merged = Object.assign({}, c);
+              if (hardCached && Array.isArray(hardCached.phones) && hardCached.phones.length > 0) {
+                merged.phones = hardCached.phones;
+                merged.hasPhones = true;
+                merged.phone = hardCached.phone || (hardCached.phones[0] && hardCached.phones[0].number);
+                merged.mobile = hardCached.mobile;
+                merged.workDirectPhone = hardCached.workDirectPhone;
+                merged.otherPhone = hardCached.otherPhone;
+              }
+              if (hardCached && Array.isArray(hardCached.emails) && hardCached.emails.length > 0) {
+                merged.emails = hardCached.emails;
+                merged.hasEmails = true;
+                merged.email = hardCached.email || (hardCached.emails[0] && hardCached.emails[0].address);
+              }
+              return merged;
+            } catch (_) { return c; }
+          });
+
+          renderCompanyPanel(lastCompanyResult, false); // Allow animation for cached results
+          updateResults(hydratedContacts);
+          // Crossfade from loading to results
+          try { crossfadeToResults(); } catch (_) { }
+
+          // Show cache indicator in results
+          showCreditsUsed(0, 'cached');
+          return;
+
+        } else if (options.cachedOnly) {
+          // No cache found and cachedOnly requested → run a minimal, unbilled prospecting search (try small sizes)
+          try {
+            let base = (window.API_BASE_URL || '').replace(/\/$/, '');
+            if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+
+            // Try both domain and name includes to improve match rate (still unbilled)
+            const includeAttempts = [];
+            if (domain) includeAttempts.push({ domains: [domain] });
+            if (companyName) includeAttempts.push({ names: [companyName] });
+            if (includeAttempts.length === 0) includeAttempts.push({});
+
+            let best = null;
+            const sizes = [10, 40];
+            outer: for (const size of sizes) {
+              for (const inc of includeAttempts) {
+                const requestBody = {
+                  pages: { page: 0, size },
+                  filters: { companies: { include: { ...inc } } }
+                };
+                const r = await fetch(`${base}/api/apollo/contacts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
+                if (!r.ok) continue;
+                const data = await r.json();
+                const contacts = Array.isArray(data.contacts) ? data.contacts : [];
+                best = { data, contacts };
+                // Prefer any contacts; otherwise keep the best with requestId
+                if (contacts.length > 0 || data.requestId) break outer;
+              }
+            }
+
+            const data = best ? best.data : { requestId: null };
+            const contacts = best ? best.contacts : [];
+
+            // Store requestId for reveals when present
+            if (data && data.requestId) {
+              window.__lushaLastRequestId = data.requestId;
+            }
+
+            // Minimal company context (avoid company GET)
+            lastCompanyResult = { name: companyName || '', domain: domain || '' };
+            renderCompanyPanel(lastCompanyResult, false);
+            const hydratedContacts = (Array.isArray(contacts) ? contacts : []).map(c => {
+              const key = c.contactId || c.id;
+              if (!key) return c;
+              try {
+                const rawHard = localStorage.getItem(`lusha_contact_${key}`);
+                if (!rawHard) return c;
+                const hardCached = JSON.parse(rawHard);
+                const merged = Object.assign({}, c);
+                if (hardCached && Array.isArray(hardCached.phones) && hardCached.phones.length > 0) {
+                  merged.phones = hardCached.phones;
+                  merged.hasPhones = true;
+                  merged.phone = hardCached.phone || (hardCached.phones[0] && hardCached.phones[0].number);
+                  merged.mobile = hardCached.mobile;
+                  merged.workDirectPhone = hardCached.workDirectPhone;
+                  merged.otherPhone = hardCached.otherPhone;
+                }
+                if (hardCached && Array.isArray(hardCached.emails) && hardCached.emails.length > 0) {
+                  merged.emails = hardCached.emails;
+                  merged.hasEmails = true;
+                  merged.email = hardCached.email || (hardCached.emails[0] && hardCached.emails[0].address);
+                }
+                return merged;
+              } catch (_) { return c; }
+            });
+            updateResults(hydratedContacts);
+            // Persist minimal results to lusha_cache immediately so reopen shows them
+            try { await saveCache({ company: lastCompanyResult, contacts }); } catch (_) { }
+            try { crossfadeToResults(); } catch (_) { }
+            showCreditsUsed(0, 'cached');
+            try { renderUsageBar(); } catch (_) { }
+            return;
+          } catch (minErr) {
+            // Fall through to error handling below
+          }
+        } else if (options.openLiveIfUncached) {
+          // Open-time flow: only run live search if we don't have company data in cache
+          let base = (window.API_BASE_URL || '').replace(/\/$/, '');
+          if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+
+          // Check if we have company data in cache first
+          let hasCompanyData = false;
+          if (cached && cached.companyName) {
+            hasCompanyData = true;
+            lastCompanyResult = {
+              name: cached.companyName,
+              domain: cached.domain || domain,
+              description: cached.description || '',
+              employees: cached.employees || '',
+              industry: cached.industry || '',
+              city: cached.city || '',
+              state: cached.state || '',
+              country: cached.country || '',
+              linkedin: cached.linkedin || '',
+              logoUrl: cached.logoUrl || ''
+            };
+            try { renderCompanyPanel(lastCompanyResult, false); } catch (_) { }
+          }
+
+          // Only fetch company data if we don't have it in cache
+          if (!hasCompanyData) {
+            const params = new URLSearchParams();
+            if (domain) params.append('domain', domain);
+            if (companyName) params.append('company', companyName);
+            const url = `${base}/api/apollo/company?${params.toString()}`;
+            const resp = await fetch(url, { method: 'GET' });
+            if (resp.ok) {
+              const company = await resp.json();
+              lastCompanyResult = company;
+              try { requestAnimationFrame(() => renderCompanyPanel(company, false)); } catch (_) { renderCompanyPanel(company, false); }
+            }
+          }
+
+          // Minimal contacts page (10 contacts = 1 page = 1 credit)
+          const requestBody = {
+            pages: { page: 0, size: 10 },
+            filters: { companies: { include: {} } }
+          };
+          // Use company ID if available (most accurate for account-specific searches)
+          if (lastCompanyResult && lastCompanyResult.id) {
+            requestBody.filters.companies.include.ids = [lastCompanyResult.id];
+          } else if (domain) {
+            requestBody.filters.companies.include.domains = [domain];
+          } else if (companyName) {
+            requestBody.filters.companies.include.names = [companyName];
+          }
+
+          const r = await fetch(`${base}/api/apollo/contacts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const data = await r.json();
+          const contacts = Array.isArray(data.contacts) ? data.contacts : [];
+          if (data.requestId) {
+            window.__lushaLastRequestId = data.requestId;
+          }
+
+          // SMART FALLBACK: If company search returned minimal data (not found in Apollo), 
+          // extract basic company info from first contact's organization (NO extra API call - saves 1 credit!)
+          if (contacts.length > 0 && lastCompanyResult && lastCompanyResult._notFoundInApollo) {
+            const firstContact = contacts[0];
+            lastCompanyResult = {
+              id: firstContact.companyId || null,
+              name: firstContact.companyName || companyName,
+              domain: firstContact.fqdn || domain,
+              website: firstContact.fqdn ? `https://${firstContact.fqdn}` : (domain ? `https://${domain}` : ''),
+              description: '',
+              employees: '',
+              industry: '',
+              city: firstContact.city || '',
+              state: firstContact.state || '',
+              country: firstContact.country || '',
+              address: '',
+              companyPhone: '',
+              location: firstContact.location || '',
+              linkedin: '',
+              logoUrl: null,
+              foundedYear: '',
+              revenue: '',
+              companyType: '',
+              _fromContact: true
+            };
+            try { renderCompanyPanel(lastCompanyResult, false); } catch (_) { }
+          }
+
+          // Save to cache immediately for future free opens
+          try { await saveCache({ company: lastCompanyResult || { name: companyName, domain }, contacts }); } catch (_) { }
+
+          updateResults(contacts, true);
+          try { crossfadeToResults(); } catch (_) { }
+          // Credit usage: Company enrichment (1) + People search (1) = 2 credits
+          // If company data was cached, only 1 credit for people search
+          const creditsUsed = hasCompanyData ? 1 : 2;
+          showCreditsUsed(creditsUsed, 'live');
+          try { renderUsageBar(); } catch (_) { }
+          return;
+        } else {
+        }
+      }
+
+      // If cachedOnly and minimal search failed above, we'll continue to throw below
+      if (options.cachedOnly) {
+        throw new Error('cache_only_no_live');
+      }
+
+      // 2) Live company + contacts search (explicit user action)
+      let base = (window.API_BASE_URL || '').replace(/\/$/, '');
+      if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+
+      // Only fetch company data if we don't have it or if we're forcing live WITHOUT a name search
+      // AND we have at least a domain or company name to search for
+      if ((companyName || domain) && (!lastCompanyResult || (!options.personName && options.forceLive))) {
+        const params = new URLSearchParams();
+        if (domain) params.append('domain', domain);
+        if (companyName) params.append('company', companyName);
+        const url = `${base}/api/apollo/company?${params.toString()}`;
+        const resp = await fetch(url, { method: 'GET' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const company = await resp.json();
+        lastCompanyResult = company;
+        // For uncached live results, animate summary like cached to avoid jitter
+        try {
+          // Allow one frame for layout to settle before animating the company panel
+          requestAnimationFrame(() => renderCompanyPanel(company, false));
+        } catch (_) { renderCompanyPanel(company, false); }
+        window.__lushaOpenedFromCache = false;
+      }
+
+      // Pull all pages (search only, no enrichment)
+      const collected = [];
+      const pageSize = Math.max(10, options.pageSize || 10); // enforce minimum page size of 10
+      let page = 0;
+      let total = 0;
+      do {
+        const requestBody = {
+          pages: { page, size: pageSize },
+          filters: { 
+            companies: { include: {} },
+            person_name: options.personName || ''
+          }
+        };
+        // Prioritize company ID for account-specific searches (most accurate)
+        if (lastCompanyResult && lastCompanyResult.id) {
+          requestBody.filters.companies.include.ids = [lastCompanyResult.id];
+        } else if (lastCompanyResult && lastCompanyResult.domain && lastCompanyResult.domain.trim()) {
+          requestBody.filters.companies.include.domains = [lastCompanyResult.domain.trim()];
+        } else if (lastCompanyResult && lastCompanyResult.name && lastCompanyResult.name.trim()) {
+          requestBody.filters.companies.include.names = [lastCompanyResult.name.trim()];
+        } else {
+        }
+
+        const r = await fetch(`${base}/api/apollo/contacts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = await r.json();
+        const contacts = Array.isArray(data.contacts) ? data.contacts : [];
+        collected.push(...contacts);
+        total = data.total || contacts.length;
+
+        // Store requestId for reveal functionality (only on first page)
+        if (page === 0 && data.requestId) {
+          window.__lushaLastRequestId = data.requestId;
+        }
+
+        page += 1;
+      } while (collected.length < total && page < (options.maxPages || 1)); // minimal pages by default
+
+      // If this is a forced live refresh, merge with existing cached enriched data BEFORE rendering
+      let contactsForUI = collected;
+      if (options.forceLive) {
+        try {
+          contactsForUI = await mergeContactsWithExistingCache(lastCompanyResult, collected);
+        } catch (mergeErr) { lushaLog('Merge with cache failed', mergeErr); }
+      }
+
+      // Build/refresh name map so Unknown Name backfills correctly after refresh
+      try {
+        const nameMap = new Map();
+        collected.forEach(c => {
+          const id = c.contactId || c.id;
+          const f = c.firstName || c.name?.first || '';
+          const l = c.lastName || c.name?.last || '';
+          const full = (c.name && (c.name.full || c.name)) || `${f} ${l}`.trim();
+          if (id) nameMap.set(id, { f, l, full });
+        });
+        window.__lushaNameMap = nameMap;
+      } catch (_) { }
+
+      // Save to cache to avoid future credit usage (save merged set on refresh)
+      if (contactsForUI.length > 0) {
+        try {
+          // Overwrite cache with merged contacts if refresh, else with collected
+          await saveCache({
+            company: lastCompanyResult,
+            contacts: contactsForUI
+          });
+        } catch (e) {
+          lushaLog('Failed to save cache:', e);
+        }
+      }
+
+      updateResults(contactsForUI, true); // Skip animations on refresh
+      // Skip crossfade animation on refresh to avoid opacity transitions
+      try {
+        if (!options.forceLive) crossfadeToResults();
+        else {
+          const resultsEl = document.getElementById('lusha-results');
+          const loadingEl = document.getElementById('lusha-loading');
+          if (resultsEl) {
+            resultsEl.style.transition = 'none';
+            resultsEl.style.display = 'flex';
+            resultsEl.classList.remove('is-hidden');
+            resultsEl.classList.add('is-shown');
+          }
+          if (loadingEl) {
+            loadingEl.style.transition = 'none';
+            loadingEl.style.display = 'none';
+          }
+        }
+      } catch (_) { }
+
+      // People search costs 1 credit per page (we fetch 1 page of 10 contacts)
+      showCreditsUsed(1, 'live');
+      try { renderUsageBar(); } catch (_) { }
+    } catch (error) {
+      lushaLog('Search error:', error);
+      try { window.crm?.showToast && window.crm.showToast('Search failed: ' + error.message); } catch (_) { }
+    } finally {
+      // Ensure loading is hidden
+      const loadingElement = document.getElementById('lusha-loading');
+      if (loadingElement) {
+        // If crossfade already hid it, do nothing; otherwise hide now
+        if (!loadingElement.classList.contains('is-hidden')) loadingElement.style.display = 'none';
+      }
+
+      // Also hide any standalone spinner elements
+      const spinnerElements = document.querySelectorAll('.lusha-spinner, .lusha-loading-text');
+      spinnerElements.forEach(el => {
+        if (el.parentElement && el.parentElement.id !== 'lusha-loading') {
+          el.style.display = 'none';
+        }
+      });
+    }
+  }
+
+  function deriveDomain(raw) {
+    if (!raw) return '';
+    try {
+      let s = String(raw).trim();
+      if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
+      const u = new URL(s);
+      return (u.hostname || '').replace(/^www\./i, '');
+    } catch (_) {
+      return String(raw).replace(/^https?:\/\/(www\.)?/i, '').split('/')[0];
+    }
+  }
+
+  function prefillInputs(entityType) {
+    // retained for compatibility; not used to populate inputs anymore
+    const companyEl = null;
+    const domainEl = null;
+    const contactNameEl = null;
+    const contactEmailEl = null;
+
+    let companyName = '';
+    let domain = '';
+    let contactName = '';
+    let contactEmail = '';
+
+    if (entityType === 'account') {
+      try {
+        const a = window.AccountDetail?.state?.currentAccount || {};
+
+        // Enhanced fallback chain for account name
+        const name = a.name || a.accountName || a.companyName ||
+          document.querySelector('#account-detail-header .page-title')?.textContent?.trim() ||
+          document.querySelector('#account-details-page .page-title')?.textContent?.trim() ||
+          document.querySelector('.contact-page-title')?.textContent?.trim() || '';
+
+        // Enhanced fallback chain for domain/website
+        let d = a.domain || a.website || a.site || a.companyWebsite || a.websiteUrl || '';
+
+        // Try to get domain from website link in the page
+        if (!d) {
+          const websiteLink = document.querySelector('#account-detail-header [data-field="website"] a') ||
+            document.querySelector('#account-details-page [data-field="website"] a');
+          if (websiteLink && websiteLink.href) {
+            d = websiteLink.href;
+          }
+        }
+
+        if (!companyName && name) companyName = name;
+        if (!domain && d) domain = deriveDomain(d);
+      } catch (e) {
+      }
+    } else {
+      try {
+        const c = window.ContactDetail?.state?.currentContact || {};
+        const linkedId = window.ContactDetail?.state?._linkedAccountId;
+
+        // Get contact info
+        contactName = [c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || '';
+        contactEmail = c.email || '';
+
+        if (!companyName) companyName = c.companyName || c.company || c.account || '';
+        if (linkedId && typeof window.getAccountsData === 'function') {
+          const acc = (window.getAccountsData() || []).find(x => (x.id || x.accountId || x._id) === linkedId);
+          if (acc) {
+            const d = acc.domain || acc.website || acc.site || '';
+            if (d) domain = deriveDomain(d);
+            if (!companyName) companyName = acc.name || acc.accountName || '';
+          }
+        }
+        if (!domain) {
+          const alt = c.companyWebsite || c.website || '';
+          if (alt) domain = deriveDomain(alt);
+        }
+      } catch (_) { }
+    }
+
+    // Fallback by name match in accounts cache
+    if (!domain && companyName && typeof window.getAccountsData === 'function') {
+      try {
+        const key = String(companyName).trim().toLowerCase();
+        const hit = (window.getAccountsData() || []).find(a => String(a.name || a.accountName || '').trim().toLowerCase() === key);
+        if (hit) {
+          const d = hit.domain || hit.website || hit.site || '';
+          if (d) domain = deriveDomain(d);
+        }
+      } catch (_) { }
+    }
+
+    // No longer populating input fields (they were removed)
+
+  }
+
+  async function loadEmployees(kind, company) {
+    try {
+      let base = (window.API_BASE_URL || '').replace(/\/$/, '');
+      if (!base || /localhost|127\.0\.0\.1/i.test(base)) {
+        base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+      }
+
+      // Build request body with correct Lusha API structure (10 contacts = 1 credit)
+      const requestBody = {
+        pages: { page: 0, size: 10 },
+        filters: {
+          companies: {
+            include: {}
+          }
+        }
+      };
+
+      // Add company identifier - prioritize domain, then companyId, then companyName
+      if (company?.domain) {
+        requestBody.filters.companies.include.domains = [company.domain];
+      } else if (company?.id) {
+        requestBody.filters.companies.include.ids = [company.id];
+      } else if (company?.name) {
+        requestBody.filters.companies.include.names = [company.name];
+      } else {
+        return;
+      }
+
+      const resp = await fetch(`${base}/api/apollo/contacts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      const contacts = Array.isArray(data.contacts) ? data.contacts : [];
+      const contactIdsFromPayload = Array.isArray(data.contactIds) ? data.contactIds.filter(Boolean) : [];
+
+      // Do NOT auto-enrich to avoid consuming credits; keep requestId for per-contact reveals
+      window.__lushaLastRequestId = data.requestId || null;
+      window.__lushaLastContactIdSet = contactIdsFromPayload;
+
+      // Build a quick name map from search results for backfill later
+      const nameMap = new Map();
+      contacts.forEach(c => {
+        const id = c.contactId || c.id;
+        const f = c.firstName || c.name?.first || '';
+        const l = c.lastName || c.name?.last || '';
+        const full = (c.name && (c.name.full || c.name)) || `${f} ${l}`.trim();
+        nameMap.set(id, { f, l, full });
+      });
+      window.__lushaNameMap = nameMap;
+
+      // Update results UI (search-only; emails/phones hidden until reveal)
+      updateResults(contacts);
+      // Hide spinner if visible
+      const loadingEl = document.getElementById('lusha-loading');
+      if (loadingEl) {
+        loadingEl.style.display = 'none';
+      }
+
+      // If popular returned none, try the full list as a fallback
+      if (kind === 'popular' && contacts.length === 0) {
+        await loadEmployees('all', company);
+      }
+    } catch (_) { }
+  }
+  function formatCompanyPhone(phone) {
+    if (!phone) return '';
+    const cleaned = phone.replace(/\D/g, '');
+
+    // Format as +1 (XXX) XXX-XXXX for US numbers
+    if (cleaned.length === 11 && cleaned.startsWith('1')) {
+      return `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
+    } else if (cleaned.length === 10) {
+      return `+1 (${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+    }
+
+    // For international, return as-is
+    return phone;
+  }
+
+  function resolveContactId(contact) {
+    if (!contact) return '';
+    return (
+      contact.id ||
+      contact.contactId ||
+      contact.personId ||
+      contact.apolloId ||
+      contact.apollo_id ||
+      contact.person_id ||
+      contact.apolloPersonId ||
+      contact.apollo_person_id ||
+      contact.person?.id ||
+      contact.apolloPerson?.id ||
+      ''
+    );
+  }
+
+  function getEnrichedNameParts(enriched) {
+    if (!enriched) return { first: '', last: '', full: '' };
+    const first = enriched.firstName || enriched.first_name || enriched.firstname || '';
+    const last = enriched.lastName || enriched.last_name || enriched.lastname || '';
+    let full = enriched.fullName || enriched.full_name || enriched.name || '';
+    if (!full && (first || last)) full = `${first} ${last}`.trim();
+    return { first, last, full };
+  }
+
+  function applyEnrichedName(contact, enriched) {
+    if (!contact || !enriched) return;
+    const parts = getEnrichedNameParts(enriched);
+    if (parts.first) contact.firstName = parts.first;
+    if (parts.last) contact.lastName = parts.last;
+    if (parts.full) contact.fullName = parts.full;
+  }
+
+  function updateContactNameUI(container, contact) {
+    if (!container || !contact) return;
+    const nameEl = container.querySelector('.lusha-contact-name');
+    if (!nameEl) return;
+    const name = (contact.firstName && contact.lastName)
+      ? `${contact.firstName} ${contact.lastName}`.trim()
+      : (contact.fullName || '').trim();
+    if (!name) return;
+    const prev = nameEl.getAttribute('data-name-value') || '';
+    if (prev && prev === name) return;
+    nameEl.setAttribute('data-name-value', name);
+    animateRevealContent(nameEl, `<span class="lusha-value-item">${escapeHtml(name)}</span>`);
+  }
+
+  function normalizeCompanyName(value) {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/&/g, 'and')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .replace(/\b(inc|incorporated|llc|ltd|co|corp|corporation|company|holdings|group)\b/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function normalizeDomain(value) {
+    const raw = String(value || '').toLowerCase().trim();
+    if (!raw) return '';
+    return raw.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].trim();
+  }
+
+  function getEmailDomain(email) {
+    const value = String(email || '').trim().toLowerCase();
+    const at = value.indexOf('@');
+    return at > -1 ? value.slice(at + 1).trim() : '';
+  }
+
+  function getCompanySignatureFromDoc(doc) {
+    const data = doc && typeof doc.data === 'function' ? doc.data() : {};
+    const name = data.companyName || data.accountName || data.name || '';
+    const domain = data.domain || data.website || data.websiteUrl || data.site || data.companyWebsite || '';
+    return { name, domain };
+  }
+
+  function isSameCompany(targetName, targetDomain, doc) {
+    const sig = getCompanySignatureFromDoc(doc);
+    const tName = normalizeCompanyName(targetName);
+    const dName = normalizeCompanyName(sig.name);
+    const tDomain = normalizeDomain(targetDomain);
+    const dDomain = normalizeDomain(sig.domain);
+    if (tDomain && dDomain && tDomain === dDomain) return true;
+    if (!tName || !dName) return false;
+    if (tName === dName) return true;
+    if (tName.includes(dName) || dName.includes(tName)) return true;
+    return false;
+  }
+
+  function mapProspectingContact(c) {
+    let base = c;
+    try {
+      const key = resolveContactId(c);
+      if (key) {
+        const rawHard = localStorage.getItem(`lusha_contact_${key}`);
+        if (rawHard) {
+          const hardCached = JSON.parse(rawHard);
+          base = Object.assign({}, c);
+          if (hardCached && Array.isArray(hardCached.phones) && hardCached.phones.length > 0) {
+            base.phones = hardCached.phones;
+            base.hasPhones = true;
+            base.phone = hardCached.phone || (hardCached.phones[0] && hardCached.phones[0].number);
+            base.mobile = hardCached.mobile;
+            base.workDirectPhone = hardCached.workDirectPhone;
+            base.otherPhone = hardCached.otherPhone;
+          }
+          if (hardCached && Array.isArray(hardCached.emails) && hardCached.emails.length > 0) {
+            base.emails = hardCached.emails;
+            base.hasEmails = true;
+            base.email = hardCached.email || (hardCached.emails[0] && hardCached.emails[0].address);
+          }
+        }
+      }
+    } catch (_) { }
+
+    const resolvedId = resolveContactId(base);
+    const isEnriched = Array.isArray(base.emails) || Array.isArray(base.phones);
+
+    // Parse Lusha's single "name" field into firstName and lastName
+    let firstName = '';
+    let lastName = '';
+    if (base.name && typeof base.name === 'string') {
+      const nameParts = base.name.trim().split(' ');
+      firstName = nameParts[0] || '';
+      lastName = nameParts.slice(1).join(' ') || '';
+    } else {
+      // Fallback to existing structure if available
+      firstName = base.firstName || base.name?.first || '';
+      lastName = base.lastName || base.name?.last || '';
+    }
+    // If only fullName provided, split it
+    if ((!firstName && !lastName) && typeof base.fullName === 'string' && base.fullName.trim()) {
+      const parts = base.fullName.trim().split(/\s+/);
+      firstName = firstName || parts.shift() || '';
+      lastName = lastName || parts.join(' ');
+    }
+    const fullName = (typeof base.fullName === 'string' && base.fullName.trim())
+      ? base.fullName.trim()
+      : `${firstName} ${lastName}`.trim();
+
+    // Map Lusha phone flags to CRM phone fields
+    const phoneMapping = {
+      mobile: base.hasMobilePhone || false,
+      workDirectPhone: base.hasDirectPhone || false,
+      otherPhone: base.hasPhones || false
+    };
+
+    // Reconstruct phones array from flattened fields if missing
+    let phones = Array.isArray(base.phones) ? [...base.phones] : [];
+    
+    // If phones array is empty but we have flattened fields, reconstruct it
+    if (phones.length === 0) {
+      if (base.workDirectPhone) {
+        phones.push({ number: base.workDirectPhone, type: 'work_direct' });
+      }
+      if (base.mobile) {
+        phones.push({ number: base.mobile, type: 'mobile' });
+      }
+      if (base.otherPhone) {
+        phones.push({ number: base.otherPhone, type: 'other' });
+      }
+      // If we still have no phones but 'phone' field exists
+      if (phones.length === 0 && base.phone) {
+        phones.push({ number: base.phone, type: 'work' });
+      }
+    }
+
+    const mapped = {
+      firstName: firstName,
+      lastName: lastName,
+      fullName: fullName,
+      jobTitle: base.jobTitle || '',
+      company: base.companyName || '',
+      email: isEnriched && base.emails && base.emails.length > 0 ? base.emails[0].address : '',
+      phone: isEnriched && phones.length > 0 ? phones[0].number : '',
+      fqdn: base.fqdn || '',
+      companyId: base.companyId || null,
+      id: resolvedId,
+      contactId: resolvedId,
+      hasEmails: isEnriched ? (base.emails && base.emails.length > 0) : !!base?.hasEmails,
+      hasPhones: isEnriched ? (phones.length > 0) : (!!base?.hasPhones || !!base?.workDirectPhone || !!base?.mobile),
+      // Add phone field mapping for CRM
+      phoneMapping: phoneMapping,
+      emails: base.emails || [],
+      phones: phones,
+      isSuccess: base.isSuccess !== false, // Default to true for search results
+      // Carry through additional helpful fields
+      location: base.location || base.city || '',
+      linkedin: base.linkedin || base.linkedinUrl || (base.social && base.social.linkedin) || '',
+      // Map additional fields for CRM
+      seniority: base.seniority || '',
+      department: base.department || '',
+      city: base.city || '',
+      state: base.state || '',
+      country: base.country || '',
+      industry: base.industry || ''
+    };
+
+    return mapped;
+  }
+
+  function renderCompanyPanel(company, skipAnimation = false) {
+    const el = document.getElementById('lusha-panel-company');
+    if (!el) return;
+
+    // Check if company summary already exists and is visible
+    const existingSummary = el.querySelector('.company-summary');
+
+    // Create content hash to detect if content has actually changed
+    const name = escapeHtml(company?.name || '');
+    const domainRaw = (company?.domain || company?.fqdn || '') || '';
+    const domain = String(domainRaw).replace(/^www\./i, '');
+    const linkedinUrl = company?.linkedin || '';
+    const fullDescription = company?.description || '';
+    const contentHash = `${name}|${domain}|${linkedinUrl}|${fullDescription}`;
+
+    // Check if content is the same as what's already rendered
+    const existingContentHash = el.getAttribute('data-content-hash');
+    const contentUnchanged = existingContentHash === contentHash;
+
+    // Avoid first-open flicker: by default animate unless explicitly skipped
+    let shouldAnimate = !skipAnimation;
+    // Determine source of current open
+    const isFromCache = !!window.__lushaOpenedFromCache;
+    // For uncached live searches, always allow animation (new data from API)
+    const isUncachedLiveSearch = !window.__lushaOpenedFromCache && !skipAnimation;
+    // On very first render, allow animation for both uncached-live and cached opens
+    try { if (!window.__lushaCompanyRenderedOnce) { shouldAnimate = (isUncachedLiveSearch || isFromCache); } } catch (_) { }
+
+    // If content is unchanged and summary already exists, and it's not an uncached live search, don't re-render
+    // BUT: Always re-render if lastCompanyResult was cleared (new company search)
+    const isNewCompany = !lastCompanyResult || (lastCompanyResult && lastCompanyResult.name !== name);
+    if (contentUnchanged && existingSummary && !isUncachedLiveSearch && !isNewCompany) {
+      return;
+    }
+
+    // For uncached live searches, always animate even if content is similar
+    if (isUncachedLiveSearch) {
+      shouldAnimate = true;
+    }
+
+    const website = domain ? `https://${domain}` : '';
+    // In-widget policy: if Lusha provides a logoUrl, show it directly (do NOT route through global helper)
+    const logo = (company && company.logoUrl)
+      ? `<img src="${escapeHtml(company.logoUrl)}" alt="${name} logo" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">`
+      : (domain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(domain, 36) : '') : '');
+
+    // Create collapsible description
+    let descHtml = '';
+    if (fullDescription) {
+      const normalized = String(fullDescription)
+        .replace(/\r\n/g, '\n')
+        .replace(/<br\s*\/?>/gi, '\n');
+      const lines = normalized.split('\n');
+      const shouldToggleByLines = lines.length > 5;
+      const shouldToggleByLength = normalized.length > 420;
+      const hasMoreThan5Lines = shouldToggleByLines || shouldToggleByLength;
+
+      let previewLines = [];
+      let remainingLines = [];
+
+      if (shouldToggleByLines) {
+        previewLines = lines.slice(0, 5);
+        remainingLines = lines.slice(5);
+      } else if (shouldToggleByLength) {
+        let previewText = normalized.slice(0, 420);
+        const lastSpace = previewText.lastIndexOf(' ');
+        if (lastSpace > 300) previewText = previewText.slice(0, lastSpace);
+        const rest = normalized.slice(previewText.length).trim();
+        previewLines = [previewText.trim()];
+        remainingLines = [rest];
+      } else {
+        previewLines = lines;
+        remainingLines = [];
+      }
+
+      descHtml = `
+        <div class="company-desc-container">
+          <div class="company-desc-preview">
+            ${previewLines.map(line => escapeHtml(line)).join('<br>')}
+            ${hasMoreThan5Lines ? '<br><span class="desc-ellipsis">...</span>' : ''}
+          </div>
+          ${hasMoreThan5Lines ? `
+            <div class="company-desc-more" style="display:none;">
+              ${remainingLines.map(line => escapeHtml(line)).join('<br>')}
+            </div>
+            <button class="lusha-desc-toggle">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+              Show more
+            </button>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    // Style overrides for link behavior
+    ensureLushaStyles();
+
+    // Company-level actions
+    const accBtn = `<button class="lusha-action-btn" id="lusha-add-account">Add Account</button>`;
+    const enrBtn = `<button class="lusha-action-btn" id="lusha-enrich-account" style="display:none;">Enrich Account</button>`;
+
+    // Ensure placeholder space remains during animation; cleared on animation end
+    if (!el.style.minHeight) el.style.minHeight = '80px';
+
+    el.innerHTML = `
+      <div class="company-summary fade-in-block" style="padding:8px 0 10px 0;">
+        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:6px;">
+          <div>${logo || ''}</div>
+          <div style="flex:1;min-width:0;">
+            <div class="lusha-company-top">
+              <div class="lusha-company-name">${name}</div>
+              ${linkedinUrl ? `<a href="${escapeHtml(linkedinUrl)}" target="_blank" rel="noopener" class="lusha-linkedin-link" title="Company LinkedIn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                </svg>
+              </a>` : ''}
+            </div>
+            <div class="lusha-company-meta">
+              ${website ? `<a href="${website}" target="_blank" rel="noopener" class="lusha-weblink">${website}</a>` : ''}
+              ${company.companyPhone ? `<div class="lusha-company-phone" style="margin-top:4px;color:var(--text-muted);font-size:14px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:4px;">
+                  <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
+                </svg>
+                <span class="clickable-phone" data-phone="${escapeHtml(company.companyPhone)}" data-company-name="${escapeHtml(company.name)}" data-account-id="${company.id || ''}" style="cursor:pointer;transition:opacity 0.2s ease;">${escapeHtml(formatCompanyPhone(company.companyPhone))}</span>
+              </div>` : ''}
+            </div>
+          </div>
+        </div>
+        ${descHtml}
+        <div style="margin-top:8px;display:flex;gap:8px;width:100%;">${accBtn}${enrBtn}
+          <button class="lusha-action-btn" id="lusha-live-search-btn" style="margin-left:auto;">
+            Search
+          </button>
+        </div>
+      </div>`;
+
+    // Animate in the company summary smoothly using slide-down (max-height) - only if it's new
+    try {
+      const wrap = el.querySelector('.company-summary.fade-in-block');
+      if (wrap && shouldAnimate) {
+        wrap.classList.add('animated');
+        wrap.style.overflow = 'hidden';
+        wrap.style.maxHeight = '0px';
+        wrap.style.opacity = '0';
+        requestAnimationFrame(() => {
+          const target = wrap.scrollHeight;
+          wrap.style.transition = 'max-height 500ms ease, opacity 400ms ease';
+          wrap.style.maxHeight = target + 'px';
+          wrap.style.opacity = '1';
+          const onEnd = () => { try { wrap.style.maxHeight = 'none'; wrap.style.overflow = 'visible'; el.style.minHeight = ''; wrap.removeEventListener('transitionend', onEnd); } catch (_) { } };
+          wrap.addEventListener('transitionend', onEnd);
+        });
+      } else if (wrap && !shouldAnimate) {
+        // If not animating, ensure it's visible immediately
+        wrap.style.opacity = '1';
+        wrap.style.maxHeight = 'none';
+        wrap.style.overflow = 'visible';
+        try { el.style.minHeight = ''; } catch (_) { }
+      }
+    } catch (_) { }
+
+    // Hook up description toggle
+    try {
+      const toggleBtn = el.querySelector('.lusha-desc-toggle');
+      if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+          const preview = el.querySelector('.company-desc-preview');
+          const more = el.querySelector('.company-desc-more');
+          const ellipsis = el.querySelector('.desc-ellipsis');
+
+          if (preview && more) {
+            const isExpanded = more.style.display !== 'none';
+
+            if (isExpanded) {
+              // Collapse with animation
+              const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+              if (!prefersReduce) {
+                // Show ellipsis immediately so layout doesn't jump at the end
+                if (ellipsis) ellipsis.style.display = 'inline';
+                toggleBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>Show more`;
+
+                more.style.overflow = 'hidden';
+                more.style.maxHeight = more.scrollHeight + 'px';
+                requestAnimationFrame(() => {
+                  more.style.transition = 'max-height 300ms ease, opacity 200ms ease';
+                  more.style.maxHeight = '0px';
+                  more.style.opacity = '0';
+                  setTimeout(() => {
+                    more.style.display = 'none';
+                    more.style.maxHeight = 'none';
+                    more.style.opacity = '1';
+                    more.style.overflow = 'visible';
+                  }, 300);
+                });
+              } else {
+                more.style.display = 'none';
+                if (ellipsis) ellipsis.style.display = 'inline';
+                toggleBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>Show more`;
+              }
+            } else {
+              // Expand with animation
+              more.style.display = 'block';
+              if (ellipsis) ellipsis.style.display = 'none';
+              toggleBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform:rotate(180deg)"><polyline points="6 9 12 15 18 9"></polyline></svg>Show less`;
+
+              const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+              if (!prefersReduce) {
+                more.style.overflow = 'hidden';
+                more.style.maxHeight = '0px';
+                more.style.opacity = '0';
+                requestAnimationFrame(() => {
+                  more.style.transition = 'max-height 300ms ease, opacity 200ms ease';
+                  more.style.maxHeight = more.scrollHeight + 'px';
+                  more.style.opacity = '1';
+                  setTimeout(() => {
+                    more.style.maxHeight = 'none';
+                    more.style.overflow = 'visible';
+                  }, 300);
+                });
+              }
+            }
+          }
+        });
+      }
+    } catch (_) { }
+
+    // Store content hash to detect changes in future renders
+    try { el.setAttribute('data-content-hash', contentHash); } catch (_) { }
+
+    // Mark that we've rendered the company summary at least once (enables smooth animation on next renders)
+    try { window.__lushaCompanyRenderedOnce = true; } catch (_) { }
+
+    // Make company phone clickable
+    try {
+      const companyPhoneEl = el.querySelector('.clickable-phone');
+      if (companyPhoneEl && window.ClickToCall) {
+        window.ClickToCall.processSpecificPhoneElements();
+      }
+    } catch (_) { }
+
+    // Hook up account Add/Enrich — avoid flicker on refresh by skipping async existence check
+    try {
+      const addBtn = document.getElementById('lusha-add-account');
+      const enrichBtn = document.getElementById('lusha-enrich-account');
+      const liveBtn = document.getElementById('lusha-live-search-btn');
+      if (skipAnimation) {
+        // On refresh, prioritize Enrich; keep it visible and hide Add to avoid flicker
+        if (enrichBtn) enrichBtn.style.display = '';
+        if (addBtn) addBtn.style.display = 'none';
+        if (addBtn) addBtn.onclick = () => addAccountToCRM({ company: company.name, companyName: company.name, fqdn: company.domain });
+        if (enrichBtn) enrichBtn.onclick = async () => { try { await addAccountToCRM({ company: company.name, companyName: company.name, fqdn: company.domain }); } catch (_) { } };
+      } else {
+        const db = window.firebaseDB;
+        if (db) {
+          const domainKey = (company && company.domain) || '';
+          const nameKey = (company && company.name) || '';
+          (async () => {
+            let exists = false;
+            try {
+              if (domainKey) {
+                const s1 = await db.collection('accounts').where('domain', '==', domainKey).limit(1).get();
+                exists = !!(s1 && s1.docs && s1.docs[0]);
+              }
+              if (!exists && nameKey) {
+                const s2 = await db.collection('accounts').where('accountName', '==', nameKey).limit(1).get();
+                exists = !!(s2 && s2.docs && s2.docs[0]);
+              }
+            } catch (_) { }
+            if (addBtn && enrichBtn) {
+              // If we're on the account details page, always show "Enrich Account" since we're viewing an existing account
+              const isOnAccountDetailsPage = window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount;
+
+              if (isOnAccountDetailsPage) {
+                addBtn.style.display = 'none';
+                enrichBtn.style.display = '';
+                enrichBtn.textContent = 'Enrich Account';
+              } else {
+                addBtn.style.display = exists ? 'none' : '';
+                enrichBtn.style.display = exists ? '' : 'none';
+              }
+
+              addBtn.onclick = () => addAccountToCRM({ company: company.name, companyName: company.name, fqdn: company.domain });
+              enrichBtn.onclick = async () => { try { await addAccountToCRM({ company: company.name, companyName: company.name, fqdn: company.domain }); } catch (_) { } };
+            }
+            if (liveBtn) {
+              // Use a minimum page size of 10 to satisfy Lusha API constraints
+              liveBtn.onclick = () => performLushaSearch({ forceLive: true, pageSize: 10, maxPages: 1 });
+            }
+          })();
+        }
+      }
+    } catch (_) { }
+  }
+
+  function displayLushaResults(data) {
+    const resultsEl = document.getElementById('lusha-results');
+    const countEl = document.getElementById('lusha-results-count');
+    const listEl = document.getElementById('lusha-contacts-list');
+
+    if (!resultsEl || !countEl || !listEl) return;
+
+    const contacts = data.contacts || [];
+    const count = contacts.length;
+
+    // Update count
+    countEl.textContent = `${count} contact${count !== 1 ? 's' : ''} found`;
+
+    // Clear previous results
+    listEl.innerHTML = '';
+
+    if (count === 0) {
+      listEl.innerHTML = `
+        <div class="lusha-no-results">
+          <p>No contacts found for this search.</p>
+          <p>Try adjusting your search criteria.</p>
+        </div>
+      `;
+    } else {
+      // Display contacts
+      contacts.forEach((contact, index) => {
+        const contactEl = createContactElement(contact, index);
+        listEl.appendChild(contactEl);
+      });
+    }
+
+    // Show results
+    resultsEl.style.display = 'flex';
+  }
+
+  function createContactElement(contact, index) {
+    const div = document.createElement('div');
+    div.className = 'lusha-contact-item';
+    div.setAttribute('data-id', contact.id || contact.contactId || '');
+
+    const initialFirstName = (contact.firstName || '').toString().trim();
+    const initialLastName = (contact.lastName || '').toString().trim();
+    let name = initialFirstName && initialLastName
+      ? `${initialFirstName} ${initialLastName}`
+      : contact.fullName || '';
+
+    const title = contact.title || contact.jobTitle || 'No title';
+    // Try fullName first
+    if (!name || name === 'Unknown Name') {
+      const fm = (contact.fullName || '').trim();
+      if (fm) name = fm;
+    }
+    // Backfill from nameMap if still missing
+    if ((!contact.firstName && !contact.lastName) && window.__lushaNameMap && (contact.id || contact.contactId) && window.__lushaNameMap.has(contact.id || contact.contactId)) {
+      const nm = window.__lushaNameMap.get(contact.id || contact.contactId);
+      contact.firstName = contact.firstName || nm.f || '';
+      contact.lastName = contact.lastName || nm.l || '';
+      if (!name) {
+        const rebuilt = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+        if (rebuilt) name = rebuilt;
+      }
+    }
+    if (!name) name = 'Unknown Name';
+
+    const emailsArr = Array.isArray(contact.emails) ? contact.emails.map(e => e.address).filter(Boolean) : [];
+    const phonesArr = Array.isArray(contact.phones) ? contact.phones.map(p => p.number).filter(Boolean) : [];
+    // Format location as City, State if possible
+    let location = contact.location || contact.city || '';
+
+    const emailList = emailsArr.length ? emailsArr : (contact.email ? [contact.email] : []);
+    const phoneList = phonesArr.length ? phonesArr : (contact.phone ? [contact.phone] : []);
+
+    const renderList = (arr, attr) => {
+      if (arr && arr.length > 0) {
+        return arr.map(v => {
+          let content;
+          if (attr === 'email') {
+            content = formatEmailLink(v);
+          } else if (attr === 'phone number') {
+            content = formatPhoneLink(v);
+          } else {
+            content = escapeHtml(v);
+          }
+          return `<div class="lusha-value-item">${content}</div>`;
+        }).join('');
+      } else {
+        // Show placeholder for unrevealed data
+        return `<div class="lusha-placeholder">—</div>`;
+      }
+    };
+
+    // Get LinkedIn URL for the contact
+    const linkedinUrl = contact.linkedin || contact.linkedinUrl || '';
+
+    const hasAnyEmails = Array.isArray(contact.emails) && contact.emails.length > 0;
+    const hasAnyPhones = Array.isArray(contact.phones) && contact.phones.length > 0;
+
+    div.innerHTML = `
+      <div class="lusha-contact-header">
+        <div class="lusha-contact-info">
+          <div class="lusha-contact-name" data-name-value="${escapeHtml(name)}">${escapeHtml(name)}</div>
+          <div class="lusha-contact-title">${escapeHtml(title)}</div>
+        </div>
+        <div class="lusha-contact-actions-header">
+          ${linkedinUrl ? 
+            `<a href="${escapeHtml(linkedinUrl)}" target="_blank" rel="noopener" class="lusha-linkedin-link" title="View LinkedIn Profile">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+              </svg>
+            </a>` : 
+            `<span class="lusha-linkedin-link dimmed" title="LinkedIn available upon reveal">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+              </svg>
+            </span>`
+          }
+        </div>
+      </div>
+      <div class="lusha-contact-details">
+        <div class="lusha-fields">
+          <div class="lusha-field">
+            <div class="lusha-field-header">
+              <div class="lusha-label">Email</div>
+              <button class="lusha-mini-btn" data-reveal="email">${hasAnyEmails ? 'Enrich' : 'Reveal'}</button>
+            </div>
+            <div class="lusha-field-body" data-email-list>
+              ${renderList(emailList, 'email')}
+            </div>
+          </div>
+          <div class="lusha-field">
+            <div class="lusha-field-header">
+              <div class=\"lusha-label\">Phone</div>
+              <button class="lusha-mini-btn" data-reveal="phones">${hasAnyPhones ? 'Enrich' : 'Reveal'}</button>
+            </div>
+            <div class="lusha-field-body" data-phones-list>
+              ${renderList(phoneList, 'phone number')}
+            </div>
+          </div>
+          <div class="lusha-field">
+            <div class="lusha-field-header">
+              <div class="lusha-label">Location</div>
+            </div>
+            <div class="lusha-field-body" data-location-wrapper>
+              ${location ? `<div class="lusha-value-item">${escapeHtml(location)}</div>` : '<div class="lusha-placeholder">—</div>'}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="lusha-contact-actions">
+        <button class="lusha-action-btn" data-action="add-contact" data-contact='${escapeHtml(JSON.stringify(contact))}'>
+          Add Contact
+        </button>
+        <button class="lusha-action-btn" data-action="enrich-contact" data-contact='${escapeHtml(JSON.stringify(contact))}' style="display:none;">
+          Enrich Contact
+        </button>
+        <button class="lusha-action-btn" data-action="copy-info" data-contact='${escapeHtml(JSON.stringify(contact))}'>
+          Copy Info
+        </button>
+      </div>
+    `;
+
+    // Add event listeners for action buttons
+    const addContactBtn = div.querySelector('[data-action="add-contact"]');
+    const enrichContactBtn = div.querySelector('[data-action="enrich-contact"]');
+    const copyBtn = div.querySelector('[data-action="copy-info"]');
+    const revealEmailBtn = div.querySelector('[data-reveal="email"]');
+    const revealPhonesBtn = div.querySelector('[data-reveal="phones"]');
+
+    if (addContactBtn) {
+      addContactBtn.addEventListener('click', () => addContactToCRM(contact, div));
+    }
+    if (enrichContactBtn) {
+      enrichContactBtn.addEventListener('click', () => enrichExistingContact(contact));
+    }
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => copyContactInfo(contact));
+    }
+    if (revealEmailBtn) {
+      revealEmailBtn.addEventListener('click', () => { revealForContact(contact, 'email', div).then(() => { try { renderUsageBar(); } catch (_) { } }); });
+    }
+    if (revealPhonesBtn) {
+      revealPhonesBtn.addEventListener('click', () => { revealForContact(contact, 'phones', div).then(() => { try { renderUsageBar(); } catch (_) { } }); });
+    }
+
+    // Update button labels and show Enrich if exists
+    updateActionButtons(div, contact).catch(() => { });
+
+    return div;
+  }
+
+  async function addContactToCRM(contact, containerEl) {
+    // Check if contact needs enrichment (obfuscated or missing key data)
+    // This handles the "Lazy Reveal" optimization to save credits.
+    const isObfuscated = (contact.lastName || '').includes('***') || (contact.fullName || '').includes('***');
+    const isMissingData = !contact.email && !contact.linkedin;
+    
+    if (isObfuscated || (isMissingData && contact.id)) {
+      try {
+        const enrichResp = await fetch('/api/apollo/enrich', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contactIds: [contact.id],
+            contacts: [contact],
+            revealEmails: true
+          })
+        });
+        
+        if (enrichResp.ok) {
+          const enrichData = await enrichResp.json();
+          if (enrichData.contacts && enrichData.contacts.length > 0) {
+            const enriched = enrichData.contacts[0];
+            // Merge enriched data into contact object
+            Object.assign(contact, enriched);
+            
+            // Update UI if container provided (optional, to show revealed name immediately)
+            // But we are about to save/add it anyway.
+          }
+        }
+      } catch (err) {
+        lushaLog('Error enriching contact before add:', err);
+      }
+    }
+
+    let saved = false;
+    try {
+      const db = window.firebaseDB;
+      if (!db) throw new Error('Firestore not initialized');
+
+      // Check if contact exists (by email or name, within the same company)
+      const email = contact.email || (Array.isArray(contact.emails) && contact.emails[0] && contact.emails[0].address) || '';
+      
+      // CRITICAL: Get target company from contact or the search context (lastCompanyResult)
+      let targetCompany = (contact.company || contact.companyName || '').toString().trim();
+      if (!targetCompany && lastCompanyResult) {
+        targetCompany = (lastCompanyResult.name || lastCompanyResult.companyName || '').toString().trim();
+      }
+      const targetDomain = normalizeDomain(contact.fqdn || contact.domain || (lastCompanyResult && lastCompanyResult.domain) || getEmailDomain(email));
+
+      const firstName = (contact.firstName || '').toString().trim();
+      const lastName = (contact.lastName || '').toString().trim();
+      const fullName = (firstName && lastName) ? `${firstName} ${lastName}`.trim() : (contact.fullName || '').toString().trim();
+      const phone = contact.phone || contact.phoneNumber || (Array.isArray(contact.phones) && contact.phones[0] && contact.phones[0].number) || '';
+
+      let existingId = null;
+
+      // Helper to check if a doc matches the target company
+      const docMatchesCompany = (doc) => {
+        if (!targetCompany && !targetDomain) return true;
+        return isSameCompany(targetCompany, targetDomain, doc);
+      };
+      
+      const checks = [];
+
+      // 1. Try email matching first (limited to company)
+      if (email) {
+        checks.push(
+          db.collection('contacts').where('email', '==', email).limit(5).get()
+            .then(s => {
+               if (!s || !s.docs || s.docs.length === 0) return null;
+               const match = s.docs.find(docMatchesCompany);
+               return match ? match.id : null;
+            })
+            .catch(() => null)
+        );
+      }
+
+      // 2. If no email match (or no email), try name + company matching
+      if (fullName && targetCompany) {
+         checks.push(
+           db.collection('contacts').where('name', '==', fullName).limit(5).get()
+             .then(s => {
+                if (!s || !s.docs || s.docs.length === 0) return null;
+                const match = s.docs.find(docMatchesCompany);
+                return match ? match.id : null;
+             })
+             .catch(() => null)
+         );
+      }
+      
+      // 3. Fallback: Check by Phone (global)
+      if (phone) {
+        checks.push(
+          db.collection('contacts').where('phone', '==', phone).limit(1).get()
+            .then(s => (s && s.docs && s.docs[0]) ? s.docs[0].id : null)
+            .catch(() => null)
+        );
+      }
+
+      if (checks.length > 0) {
+        const results = await Promise.all(checks);
+        existingId = results.find(id => id !== null);
+      }
+
+      // Get current account information for linking
+      let accountId = null;
+      let accountName = '';
+
+      if (currentEntityType === 'account' && currentAccountId) {
+        accountId = currentAccountId;
+        // Get account name from current account state
+        try {
+          if (window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount) {
+            accountName = window.AccountDetail.state.currentAccount.name || window.AccountDetail.state.currentAccount.accountName || '';
+          }
+        } catch (_) { }
+      } else if (currentEntityType === 'contact') {
+        // Try to get account from contact context
+        try {
+          if (window.ContactDetail && window.ContactDetail.state && window.ContactDetail.state._linkedAccountId) {
+            accountId = window.ContactDetail.state._linkedAccountId;
+            // Get account name from accounts data
+            if (typeof window.getAccountsData === 'function') {
+              const accounts = window.getAccountsData() || [];
+              const account = accounts.find(a => (a.id || a.accountId || a._id) === accountId);
+              if (account) {
+                accountName = account.name || account.accountName || '';
+              }
+            }
+          }
+        } catch (_) { }
+      }
+
+      // Prepare payload
+      const payload = {
+        firstName: contact.firstName || '',
+        lastName: contact.lastName || '',
+        name: (contact.firstName && contact.lastName) ? `${contact.firstName} ${contact.lastName}`.trim() : (contact.fullName || ''),
+        email,
+        phone: contact.phone || contact.phoneNumber || (Array.isArray(contact.phones) && contact.phones[0] && contact.phones[0].number) || '',
+        companyName: accountName || companyName, // Use account name if available
+        title: contact.title || contact.jobTitle || '',
+        location: contact.location || contact.city || '',
+        city: contact.city || '',
+        state: contact.state || '',
+        industry: contact.industry || '',
+        seniority: contact.seniority || '',
+        // Department/functional area (best-effort mapping)
+        department: contact.department || contact.departmentName || '',
+        linkedin: contact.linkedin || contact.linkedinUrl || '',
+        // map phone numbers to workDirectPhone/mobile/otherPhone
+        workDirectPhone: selectPhone(contact, 'direct') || selectPhone(contact, 'work') || '',
+        mobile: selectPhone(contact, 'mobile') || '',
+        otherPhone: selectPhone(contact, 'other') || '',
+        // Link to current account
+        accountId: accountId,
+        accountName: accountName,
+        source: 'lusha',
+        updatedAt: new Date(),
+        createdAt: new Date()
+      };
+
+      // Save to CRM contacts collection
+      if (existingId) {
+        // PCSaves.updateContact handles optimistic cache + event emission + async Firestore save
+        await window.PCSaves.updateContact(existingId, payload);
+        saved = true;
+        
+        // Also emit pc:contact-updated explicitly for any page listening to just the event
+        try {
+          const updateEvent = new CustomEvent('pc:contact-updated', {
+            detail: { id: existingId, changes: payload, contact: Object.assign({ id: existingId }, payload), source: 'lusha' }
+          });
+          document.dispatchEvent(updateEvent);
+        } catch (_) { }
+      } else {
+        const ref = await db.collection('contacts').add(payload);
+        const created = Object.assign({ id: ref.id }, payload);
+        saved = true;
+
+        // Emit create event for People page to prepend and other pages to react
+        try {
+          const createEvent = new CustomEvent('pc:contact-created', {
+            detail: { id: ref.id, doc: created, contact: created, source: 'lusha' }
+          });
+          document.dispatchEvent(createEvent);
+        } catch (_) { }
+        
+        // Also emit contact-updated for consistency (some pages only listen to updated)
+        try {
+          const updateEvent = new CustomEvent('pc:contact-updated', {
+            detail: { id: ref.id, changes: payload, contact: created, source: 'lusha' }
+          });
+          document.dispatchEvent(updateEvent);
+        } catch (_) { }
+
+        try {
+          if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+            window.CacheManager.updateRecord('contacts', ref.id, created);
+          }
+        } catch (_) { }
+      }
+
+      try {
+        if (containerEl && saved) {
+          updateActionButtons(containerEl, contact, { forceExists: true }).catch(() => { });
+        }
+      } catch (_) { }
+
+      // SIMULTANEOUSLY save to Lusha cache to reduce future API usage
+      try {
+        await upsertCacheContact({ company: lastCompanyResult }, contact);
+      } catch (cacheError) {
+      }
+
+      try {
+        if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+          window.CacheManager.invalidate('contacts');
+        }
+      } catch (_) { }
+
+      try {
+        const fullName = String(payload.name || '').trim();
+        const iconLetter = (fullName || payload.firstName || payload.companyName || 'C').toString().trim().charAt(0).toUpperCase() || 'C';
+        const titleLine = [payload.title, payload.companyName].filter(Boolean).join(' • ');
+        const hasAnyPhone = Boolean(payload.workDirectPhone || payload.mobile || payload.otherPhone || payload.phone);
+
+        if (window.crm && typeof window.crm.showToast === 'function' && hasAnyPhone) {
+          window.crm.showToast(titleLine || 'Contact', 'save', {
+            title: 'Number saved',
+            details: fullName || '',
+            icon: iconLetter,
+            duration: 3500,
+            sound: false
+          });
+        }
+      } catch (_) { }
+
+    } catch (error) {
+      try { window.crm?.showToast && window.crm.showToast('Failed to add/enrich contact: ' + error.message); } catch (_) { }
+    } finally {
+      // Update UI button state immediately
+      try {
+        const card = containerEl || document.querySelector(`.lusha-contact-item[data-id="${contact.id || contact.contactId}"]`);
+        if (card) updateActionButtons(card, contact, saved ? { forceExists: true } : undefined).catch(() => { });
+      } catch (_) { }
+    }
+  }
+
+  async function addAccountToCRM(contact) {
+    try {
+      const db = window.firebaseDB;
+      if (!db) throw new Error('Firestore not initialized');
+      const domain = contact.fqdn || (contact.companyDomain) || (lastCompanyResult && lastCompanyResult.domain) || '';
+      const companyName = contact.company || contact.companyName || (lastCompanyResult && (lastCompanyResult.name || lastCompanyResult.companyName)) || '';
+      // Use current page context instead of searching by domain/name
+      let existingId = null;
+
+      // Try to get current account ID from page context
+      if (currentEntityType === 'account' && currentAccountId) {
+        existingId = currentAccountId;
+      }
+
+      // Fallback: try to get from AccountDetail state
+      if (!existingId && window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount) {
+        existingId = window.AccountDetail.state.currentAccount.id || window.AccountDetail.state.currentAccount.accountId;
+      }
+
+      // Final fallback: search by domain/name (for cases where we're not on a specific account page)
+      if (!existingId) {
+        try {
+          if (domain) {
+            const s1 = await db.collection('accounts').where('domain', '==', domain).limit(1).get();
+            if (s1 && s1.docs && s1.docs[0]) existingId = s1.docs[0].id;
+          }
+          if (!existingId && companyName) {
+            const s2 = await db.collection('accounts').where('accountName', '==', companyName).limit(1).get();
+            if (s2 && s2.docs && s2.docs[0]) existingId = s2.docs[0].id;
+          }
+        } catch (_) { }
+      }
+      // Build payload by including ONLY non-empty values from Apollo/Lusha to avoid overwriting
+      // existing CRM fields with blanks (we only set fields when API actually provides data)
+      const mainAddress = (contact.address || (lastCompanyResult && lastCompanyResult.address)) ? String(contact.address || lastCompanyResult.address) : '';
+      const candidateFields = {
+        accountName: companyName,
+        name: companyName,
+        domain: domain || (lastCompanyResult && lastCompanyResult.domain) || '',
+        website: contact.website || (lastCompanyResult && lastCompanyResult.website) || (domain ? `https://${domain}` : ''),
+        industry: contact.industry || (lastCompanyResult && lastCompanyResult.industry) || '',
+        employees: contact.employees || (lastCompanyResult && lastCompanyResult.employees) || '',
+        shortDescription: contact.description || contact.shortDescription || (lastCompanyResult && lastCompanyResult.description) || '',
+        logoUrl: (contact.logoUrl || (lastCompanyResult && lastCompanyResult.logoUrl)) ? String(contact.logoUrl || lastCompanyResult.logoUrl) : '',
+        linkedin: (contact.linkedin || (lastCompanyResult && lastCompanyResult.linkedin)) ? String(contact.linkedin || lastCompanyResult.linkedin) : '',
+        city: (contact.city || (lastCompanyResult && lastCompanyResult.city)) ? String(contact.city || lastCompanyResult.city) : '',
+        state: (contact.state || (lastCompanyResult && lastCompanyResult.state)) ? String(contact.state || lastCompanyResult.state) : '',
+        country: (contact.country || (lastCompanyResult && lastCompanyResult.country)) ? String(contact.country || lastCompanyResult.country) : '',
+        // Store a single-line primary address and also map into serviceAddresses for account detail
+        address: mainAddress,
+        // Company phone from Apollo → companyPhone field in CRM (only when provided)
+        companyPhone: (contact.companyPhone || (lastCompanyResult && lastCompanyResult.companyPhone)) ? String(contact.companyPhone || lastCompanyResult.companyPhone) : '',
+        foundedYear: (contact.foundedYear || (lastCompanyResult && lastCompanyResult.foundedYear)) ? String(contact.foundedYear || lastCompanyResult.foundedYear) : '',
+        revenue: (contact.revenue || (lastCompanyResult && lastCompanyResult.revenue)) ? String(contact.revenue || lastCompanyResult.revenue) : '',
+        companyType: (contact.companyType || (lastCompanyResult && lastCompanyResult.companyType)) ? String(contact.companyType || lastCompanyResult.companyType) : ''
+      };
+      const payload = { source: 'lusha', updatedAt: new Date(), createdAt: new Date() };
+      Object.keys(candidateFields).forEach((key) => {
+        const val = candidateFields[key];
+        if (typeof val === 'string') {
+          if (val && val.trim()) payload[key] = val.trim();
+        } else if (val !== null && val !== undefined) {
+          payload[key] = val;
+        }
+      });
+
+      // Add serviceAddresses array if we have an address (for account detail page display)
+      if (mainAddress && mainAddress.trim()) {
+        payload.serviceAddresses = [{ address: mainAddress.trim(), isPrimary: true }];
+      }
+      if (existingId) {
+        // This uses PCSaves.updateAccount which already:
+        // - Updates in-memory cache optimistically
+        // - Dispatches a single pc:account-updated event
+        // - Persists to Firestore
+        await window.PCSaves.updateAccount(existingId, payload);
+
+        // CRITICAL: Update global accounts cache to ensure all parts of the app see the update
+        try {
+          // Update getAccountsData() cache
+          if (typeof window.getAccountsData === 'function') {
+            const accounts = window.getAccountsData(true); // Force full data
+            const idx = accounts.findIndex(a => {
+              const aId = a.id || a.accountId || a._id;
+              return aId && String(aId) === String(existingId);
+            });
+            if (idx !== -1) {
+              Object.assign(accounts[idx], payload);
+              accounts[idx].updatedAt = new Date();
+            }
+          }
+
+          // Update BackgroundAccountsLoader cache if it exists
+          if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
+            const bgAccounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+            const bgIdx = bgAccounts.findIndex(a => {
+              const aId = a.id || a.accountId || a._id;
+              return aId && String(aId) === String(existingId);
+            });
+            if (bgIdx !== -1) {
+              Object.assign(bgAccounts[bgIdx], payload);
+              bgAccounts[bgIdx].updatedAt = new Date();
+            }
+          }
+        } catch (cacheErr) {
+        }
+
+        window.crm?.showToast && window.crm.showToast('Enriched existing account');
+
+        // If we're currently on this account's detail page, refresh it immediately
+        try {
+          if (window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount) {
+            const current = window.AccountDetail.state.currentAccount;
+            // Try multiple ID field formats for matching
+            const currentId = current.id || current.accountId || current._id;
+            const existingIdStr = String(existingId);
+            const currentIdStr = currentId ? String(currentId) : '';
+
+            if (currentIdStr && currentIdStr === existingIdStr) {
+              // Merge enriched fields into current state so UI updates immediately
+              const mergedAccount = Object.assign({}, current, payload);
+              window.AccountDetail.state.currentAccount = mergedAccount;
+
+              // Use requestAnimationFrame to ensure DOM is ready
+              requestAnimationFrame(() => {
+                try {
+                  if (typeof window.AccountDetail.renderAccountDetail === 'function') {
+                    window.AccountDetail.renderAccountDetail();
+                  } else {
+                  }
+                } catch (renderErr) {
+                }
+              });
+            } else {
+            }
+          } else {
+          }
+        } catch (err) {
+        }
+
+        return existingId;
+
+      } else {
+        const ref = await db.collection('accounts').add(payload);
+        const newId = ref.id;
+
+        // CRITICAL: Update global caches immediately so search works without refresh
+        try {
+          const newAccount = { id: newId, ...payload };
+          
+          // 1. Update CacheManager (IndexedDB)
+          if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+            // updateRecord works for new records too (fetches empty, merges, puts)
+            window.CacheManager.updateRecord('accounts', newId, newAccount);
+          }
+          
+          // 2. Update window.getAccountsData (in-memory cache)
+          if (typeof window.getAccountsData === 'function') {
+            const accounts = window.getAccountsData(true);
+            if (Array.isArray(accounts)) {
+              accounts.push(newAccount);
+            }
+          }
+          
+          // 3. Update BackgroundAccountsLoader (in-memory cache)
+          if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
+             const bgAccounts = window.BackgroundAccountsLoader.getAccountsData();
+             if (Array.isArray(bgAccounts)) {
+               bgAccounts.push(newAccount);
+             }
+          }
+          
+        } catch (err) {
+        }
+
+        window.crm?.showToast && window.crm.showToast('Account added to CRM');
+
+        // Dispatch account-created event
+        try {
+          const ev = new CustomEvent('pc:account-created', {
+            detail: {
+              id: newId,
+              doc: payload
+            }
+          });
+          document.dispatchEvent(ev);
+        } catch (_) { /* noop */ }
+
+        return newId;
+      }
+    } catch (e) {
+      window.crm?.showToast && window.crm.showToast('Failed to add/enrich account: ' + (e && e.message ? e.message : ''));
+      return null;
+    }
+  }
+
+  function selectPhone(contact, pref) {
+    try {
+      const phones = Array.isArray(contact.phones) ? contact.phones : [];
+      const byType = (t) => phones.find(p => (p.type || '').toLowerCase().includes(t));
+
+      // Check Lusha phone mapping flags first
+      if (contact.phoneMapping) {
+        if (pref === 'mobile' && contact.phoneMapping.mobile) {
+          return (byType('mobile')?.number) || (phones[0]?.number || '');
+        }
+        if ((pref === 'direct' || pref === 'work') && contact.phoneMapping.workDirectPhone) {
+          return (byType('direct')?.number) || (byType('work')?.number) || (phones[0]?.number || '');
+        }
+        if (pref === 'other' && contact.phoneMapping.otherPhone) {
+          const used = new Set([selectPhone(contact, 'direct'), selectPhone(contact, 'mobile')]);
+          const other = phones.find(p => p.number && !used.has(p.number));
+          return other ? other.number : '';
+        }
+      }
+
+      // Fallback to original logic
+      if (pref === 'mobile') return (byType('mobile') && byType('mobile').number) || '';
+      if (pref === 'direct' || pref === 'work') return (byType('direct')?.number) || (byType('work')?.number) || (phones[0]?.number || '');
+      if (pref === 'other') {
+        const used = new Set([selectPhone(contact, 'direct'), selectPhone(contact, 'mobile')]);
+        const other = phones.find(p => p.number && !used.has(p.number));
+        return other ? other.number : '';
+      }
+      return phones[0]?.number || '';
+    } catch (_) { return ''; }
+  }
+
+  async function enrichExistingContact(contact) {
+    try {
+      // Check if contact already has enriched data in cache
+      const hasEmails = Array.isArray(contact.emails) && contact.emails.length > 0;
+      const hasPhones = Array.isArray(contact.phones) && contact.phones.length > 0;
+
+      let enriched = null;
+
+      // If contact already has enriched data from cache, use it directly
+      if (hasEmails || hasPhones) {
+        enriched = {
+          id: contact.id || contact.contactId,
+          firstName: contact.firstName || '',
+          lastName: contact.lastName || '',
+          jobTitle: contact.jobTitle || contact.title || '',
+          emails: contact.emails || [],
+          phones: contact.phones || [],
+          linkedin: contact.linkedin || '',
+          location: contact.location || '',
+          city: contact.city || '',
+          state: contact.state || '',
+          industry: contact.industry || '',
+          seniority: contact.seniority || '',
+          // Department/functional area if already on the contact
+          department: contact.department || contact.departmentName || ''
+        };
+
+        // Show success toast
+        window.crm?.showToast && window.crm.showToast('Using cached enrichment data...');
+      } else {
+        // No cached data, need to call API
+        let base = (window.API_BASE_URL || '').replace(/\/$/, '');
+        if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+        const requestId = window.__lushaLastRequestId;
+        const id = resolveContactId(contact);
+
+        if (!id) {
+          window.crm?.showToast && window.crm.showToast('Cannot enrich: Missing contact ID');
+          return;
+        }
+
+        // Show loading toast
+        window.crm?.showToast && window.crm.showToast('Enriching contact...');
+
+        // Build request body - if no requestId (cached search), send company context for fresh enrich
+        const requestBody = { 
+          contactIds: [id],
+          contacts: [contact] // Pass full contact object for smart strategies
+        };
+
+        if (requestId) {
+          requestBody.requestId = requestId;
+        } else {
+          // For cached searches without requestId, include company context for direct enrich
+          if (lastCompanyResult) {
+            requestBody.company = {
+              domain: lastCompanyResult.domain,
+              name: lastCompanyResult.name
+            };
+          } else {
+            // Fallback to contact's company info if global context is missing
+            requestBody.company = {
+              name: contact.companyName || contact.company || '',
+              domain: contact.website || contact.companyWebsite || ''
+            };
+          }
+          // Include contact name/title to help backend find the right record
+          if (contact.firstName && contact.lastName) {
+            requestBody.name = `${contact.firstName} ${contact.lastName}`.trim();
+            requestBody.firstName = contact.firstName;
+            requestBody.lastName = contact.lastName;
+          } else if (contact.fullName || contact.name) {
+            requestBody.name = contact.fullName || contact.name;
+          }
+          
+          if (contact.jobTitle || contact.title) {
+            requestBody.title = contact.jobTitle || contact.title;
+          }
+        }
+
+        const resp = await fetch(`${base}/api/apollo/enrich`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!resp.ok) {
+          const errorText = await resp.text();
+          throw new Error(`HTTP ${resp.status}: ${errorText}`);
+        }
+
+        const data = await resp.json();
+
+        enriched = (data.contacts && data.contacts[0]) || null;
+
+        if (!enriched) {
+          window.crm?.showToast && window.crm.showToast('No enrichment data available from API');
+          return;
+        }
+      }
+
+      // Track session credits for enrichments
+      trackSessionCredits('enrichments', 1);
+
+      // Find and update existing contact in CRM
+      const db = window.firebaseDB;
+      if (!db) {
+        window.crm?.showToast && window.crm.showToast('Database not available');
+        return;
+      }
+
+      // Use current page context instead of searching by email/name
+      let existingId = null;
+
+      // Try to get current contact ID from page context
+      if (currentEntityType === 'contact' && currentContactId) {
+        existingId = currentContactId;
+      } else if (currentEntityType === 'account' && currentAccountId) {
+        // For account context, we need to find the most relevant contact
+        try {
+          const snap = await db.collection('contacts').where('accountId', '==', currentAccountId).limit(1).get();
+          if (snap && snap.docs && snap.docs[0]) {
+            existingId = snap.docs[0].id;
+          }
+        } catch (e) {
+        }
+      }
+
+      // Fallback: try to get from ContactDetail state
+      if (!existingId && window.ContactDetail && window.ContactDetail.state && window.ContactDetail.state.currentContact) {
+        existingId = window.ContactDetail.state.currentContact.id || window.ContactDetail.state.currentContact.contactId;
+      }
+
+      if (!existingId) {
+        window.crm?.showToast && window.crm.showToast('Could not find existing contact to enrich - please ensure you are on a contact page');
+        return;
+      }
+
+      applyEnrichedName(contact, enriched);
+
+      // Update existing contact with enriched data
+      const updatePayload = {
+        updatedAt: new Date()
+      };
+
+      const nameParts = getEnrichedNameParts(enriched);
+      if (nameParts.first) updatePayload.firstName = nameParts.first;
+      if (nameParts.last) updatePayload.lastName = nameParts.last;
+      if (nameParts.full) updatePayload.name = nameParts.full;
+
+      // Add enriched email data
+      if (enriched.emails && enriched.emails.length > 0) {
+        updatePayload.email = enriched.emails[0].address || '';
+      }
+
+      // Add enriched phone data
+      if (enriched.phones && enriched.phones.length > 0) {
+        updatePayload.phone = enriched.phones[0].number || '';
+        // Use the selectPhone helper to properly map phone types to CRM fields
+        const mobileNum = selectPhone(enriched, 'mobile');
+        const workNum = selectPhone(enriched, 'direct') || selectPhone(enriched, 'work');
+        const otherNum = selectPhone(enriched, 'other');
+
+        if (mobileNum) updatePayload.mobile = mobileNum;
+        if (workNum) updatePayload.workDirectPhone = workNum;
+        if (otherNum) updatePayload.otherPhone = otherNum;
+      }
+
+      // Add LinkedIn if available
+      if (enriched.linkedin) {
+        updatePayload.linkedin = enriched.linkedin;
+      }
+
+      // Add job title if available
+      if (enriched.jobTitle) {
+        updatePayload.jobTitle = enriched.jobTitle;
+      }
+
+      // Add location fields if available
+      if (enriched.city) {
+        updatePayload.city = enriched.city;
+      }
+      if (enriched.state) {
+        updatePayload.state = enriched.state;
+      }
+      if (enriched.location) {
+        updatePayload.location = enriched.location;
+      }
+
+      // Add industry, seniority, and department if available
+      if (enriched.industry) {
+        updatePayload.industry = enriched.industry;
+      }
+      if (enriched.seniority) {
+        updatePayload.seniority = enriched.seniority;
+      }
+      if (enriched.department) {
+        updatePayload.department = enriched.department;
+      }
+
+      // Update the contact - PCSaves.updateContact handles optimistic cache + event emission + async Firestore save
+      await window.PCSaves.updateContact(existingId, updatePayload);
+      window.crm?.showToast && window.crm.showToast('Contact enriched successfully');
+
+    } catch (e) {
+      window.crm?.showToast && window.crm.showToast('Failed to enrich contact: ' + (e.message || 'Unknown error'));
+    }
+  }
+
+  async function revealForContact(contact, which, container) {
+    try {
+      let base = (window.API_BASE_URL || '').replace(/\/$/, '');
+      if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+      const requestId = window.__lushaOpenedFromCache ? null : window.__lushaLastRequestId; // force live when opened from cache
+      const id = resolveContactId(contact) || container?.getAttribute('data-id') || '';
+
+      let enriched = null;
+
+      // Check if this is an "Enrich" action (contact already has data)
+      const hasExistingData = (which === 'email' && Array.isArray(contact.emails) && contact.emails.length > 0) ||
+        (which === 'phones' && Array.isArray(contact.phones) && contact.phones.length > 0);
+
+      // Check if we already have the requested data in cache to avoid unnecessary API calls
+      let hasRequestedData = false;
+      if (which === 'email' && contact.emails && contact.emails.length > 0) {
+        hasRequestedData = true;
+      } else if (which === 'phones' && contact.phones && contact.phones.length > 0) {
+        hasRequestedData = true;
+      }
+
+      // If we have the data (whether from cache or just existing in the contact object), just display it
+      if (hasRequestedData) {
+        const wrap = which === 'email'
+          ? container.querySelector('[data-email-list]')
+          : container.querySelector('[data-phones-list]');
+        if (!wrap) return;
+        if (which === 'email') {
+          const emails = Array.isArray(contact.emails) ? contact.emails.map(e => e.address || e).filter(Boolean) : [];
+          const newContent = emails.length ? emails.map(v => `<div class="lusha-value-item">${formatEmailLink(v)}</div>`).join('') : '<div class="lusha-value-item">—</div>';
+          animateRevealContent(wrap, newContent);
+        } else if (which === 'phones') {
+          const phones = Array.isArray(contact.phones) ? contact.phones.map(p => ({
+            number: p.number || (typeof p === 'string' ? p : ''),
+            type: p.type || 'work'
+          })).filter(p => p.number) : [];
+          
+          const newContent = phones.length ? phones.map((p, idx) => 
+            `<div class="lusha-value-item">${formatPhoneLink(p.number, p.type, idx === 0)}</div>`
+          ).join('') : '<div class="lusha-value-item">—</div>';
+          
+          animateRevealContent(wrap, newContent);
+        }
+
+        // Update button to show "Enrich" instead of "Reveal"
+        const revealBtn = container.querySelector(`[data-reveal="${which}"]`);
+        if (revealBtn) {
+          revealBtn.textContent = 'Enrich';
+        }
+
+        // Show 0 credits used (cached data)
+        showCreditsUsed(0, 'cached');
+        return;
+      }
+
+      // Always make fresh API call for "Enrich" buttons, or when no requestId available
+      // When opened from cache, always make a fresh enrich call (acts like combined reset+reveal)
+      if (window.__lushaOpenedFromCache || hasExistingData || !requestId) {
+
+        try {
+          const requestBody = {
+            contactIds: [id],
+            // Pass full contact object for smart enrichment strategies
+            contacts: [contact],
+            // Include company context for direct enrich
+            company: lastCompanyResult ? {
+              domain: lastCompanyResult.domain,
+              name: lastCompanyResult.name
+            } : {
+              // Fallback to contact's company info if global context is missing
+              name: contact.companyName || contact.company || '',
+              domain: contact.website || contact.companyWebsite || ''
+            },
+            // Fallback fields for backend if contacts array isn't fully utilized
+            name: (contact.firstName && contact.lastName) ? `${contact.firstName} ${contact.lastName}` : (contact.fullName || ''),
+            firstName: contact.firstName || '',
+            lastName: contact.lastName || '',
+            title: contact.jobTitle || contact.title || '',
+            // Request only the specific datapoint to minimize billing when supported
+            revealEmails: which === 'email',
+            revealPhones: which === 'phones'
+          };
+
+          const enrichResp = await fetch(`${base}/api/apollo/enrich`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
+          });
+
+          if (!enrichResp.ok) {
+            if (enrichResp.status === 403) {
+              window.crm?.showToast && window.crm.showToast('Plan restriction: Individual data reveals not available. Please refresh to get full data.');
+              return;
+            }
+            throw new Error(`HTTP ${enrichResp.status}`);
+          }
+
+          const enrichData = await enrichResp.json();
+          enriched = (enrichData.contacts && enrichData.contacts[0]) || null;
+
+          if (!enriched) {
+            window.crm?.showToast && window.crm.showToast('No data available to reveal.');
+            return;
+          }
+        } catch (directError) {
+          window.crm?.showToast && window.crm.showToast('Enrich failed. Please try again.');
+          return;
+        }
+      } else {
+        // Original logic with requestId for first-time reveals
+        const resp = await fetch(`${base}/api/apollo/enrich`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requestId,
+            contactIds: [id],
+            contacts: [contact],
+            company: lastCompanyResult ? { domain: lastCompanyResult.domain, name: lastCompanyResult.name } : undefined,
+            name: contact.fullName || contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim(),
+            firstName: contact.firstName,
+            lastName: contact.lastName,
+            title: contact.jobTitle || contact.title || '',
+            revealEmails: which === 'email',
+            revealPhones: which === 'phones'
+          })
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        enriched = (data.contacts && data.contacts[0]) || null;
+        if (!enriched) {
+          window.crm?.showToast && window.crm.showToast('No data available to reveal.');
+          return;
+        }
+
+        // Track session credits for reveals/enrichments
+        trackSessionCredits('reveals', 1);
+      }
+      if (!id) {
+        window.crm?.showToast && window.crm.showToast('Contact ID missing.');
+        return;
+      }
+
+      applyEnrichedName(contact, enriched);
+      updateContactNameUI(container, contact);
+
+      // Update UI lists and contact object
+      if (which === 'email') {
+        const wrap = container.querySelector('[data-email-list]');
+        if (wrap) {
+          const emails = Array.isArray(enriched.emails) ? enriched.emails.map(e => e.address).filter(Boolean) : [];
+          const newContent = emails.length ? emails.map(v => `<div class="lusha-value-item">${formatEmailLink(v)}</div>`).join('') : '<div class="lusha-value-item">—</div>';
+          animateRevealContent(wrap, newContent);
+
+          // Update contact object with revealed emails
+          contact.emails = enriched.emails || [];
+          if (emails.length > 0) {
+            contact.email = emails[0]; // Set primary email
+          }
+        }
+      } else if (which === 'phones') {
+        const wrap = container.querySelector('[data-phones-list]');
+        if (wrap) {
+          // First check if contact already has phones from initial search (sometimes Apollo includes them)
+          const existingPhones = Array.isArray(contact.phones) ? contact.phones.map(p => p.number || p).filter(Boolean) : [];
+          if (existingPhones.length > 0) {
+            const newContent = existingPhones.map(v => `<div class="lusha-value-item">${formatPhoneLink(v)}</div>`).join('');
+            animateRevealContent(wrap, newContent);
+            return; // Already have phones, no need to reveal
+          }
+
+          // Check if enrich call returned phones immediately
+          const phones = Array.isArray(enriched.phones) ? enriched.phones.map(p => p.number).filter(Boolean) : [];
+
+          if (phones.length > 0) {
+            const newContent = phones.map(v => `<div class="lusha-value-item">${formatPhoneLink(v)}</div>`).join('');
+            animateRevealContent(wrap, newContent);
+
+            // Update contact object with revealed phones
+            contact.phones = enriched.phones || [];
+            contact.phone = phones[0]; // Set primary phone
+          } else {
+            // Phone numbers are delivered asynchronously via webhook
+            // Show loading indicator and poll for results
+            // Use skeleton animation for better UX during long polling
+            const loadingContent = `
+              <div class="lusha-value-item" title="Revealing phone numbers...">
+                <div class="ai-skeleton medium" style="height: 14px; margin: 4px 0; border-radius: 4px;"></div>
+              </div>
+              <div class="lusha-value-item">
+                <div class="ai-skeleton short" style="height: 14px; margin: 4px 0; border-radius: 4px;"></div>
+              </div>
+            `;
+            animateRevealContent(wrap, loadingContent);
+
+            // Poll for phone numbers (Apollo sends them to webhook asynchronously)
+            const personId = enriched.id || enriched.contactId || id;
+            pollForPhoneNumbers(personId, contact, wrap, container, lastCompanyResult);
+            return;
+          }
+        }
+      }
+
+      // Update LinkedIn if provided by enrich response, and reflect in UI header actions
+      try {
+        if (enriched.linkedin && typeof enriched.linkedin === 'string' && enriched.linkedin.trim()) {
+          contact.linkedin = enriched.linkedin.trim();
+          const actionsHeader = container.querySelector('.lusha-contact-actions-header');
+          if (actionsHeader) {
+            let link = actionsHeader.querySelector('.lusha-linkedin-link');
+            if (!link) {
+              const a = document.createElement('a');
+              a.href = contact.linkedin;
+              a.target = '_blank';
+              a.rel = 'noopener';
+              a.className = 'lusha-linkedin-link';
+              a.title = 'View LinkedIn Profile';
+              a.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>';
+              // Add pulse class for new reveal
+              a.classList.add('lusha-pulse-white');
+              actionsHeader.appendChild(a);
+            } else {
+              // If it was a span (dimmed), replace it
+              if (link.tagName.toLowerCase() === 'span') {
+                const a = document.createElement('a');
+                a.href = contact.linkedin;
+                a.target = '_blank';
+                a.rel = 'noopener';
+                a.className = 'lusha-linkedin-link lusha-pulse-white';
+                a.title = 'View LinkedIn Profile';
+                a.innerHTML = link.innerHTML;
+                link.replaceWith(a);
+              } else {
+                link.href = contact.linkedin;
+              }
+            }
+          }
+        }
+      } catch (_) { }
+
+      // Update Location
+      try {
+        const locationWrap = container.querySelector('[data-location-wrapper]');
+        if (locationWrap) {
+            const city = enriched.city || (enriched.location && enriched.location.split(',')[0]) || '';
+            const state = enriched.state || (enriched.location && enriched.location.includes(',') ? enriched.location.split(',')[1] : '') || '';
+            const country = enriched.country || '';
+            
+            let newLoc = [city, state, country].filter(Boolean).map(s => s.trim()).join(', ');
+            if (!newLoc && enriched.location) newLoc = enriched.location;
+            
+            if (newLoc) {
+               animateRevealContent(locationWrap, `<div class="lusha-value-item">${escapeHtml(newLoc)}</div>`);
+               contact.location = newLoc;
+               contact.city = city;
+               contact.state = state;
+               contact.country = country;
+            }
+        }
+      } catch (_) { }
+
+      // Persist enriched fields in session so paging keeps them
+      try {
+        const id = contact.id || contact.contactId;
+        const idx = allContacts.findIndex(c => (c.id || c.contactId) === id);
+        if (idx >= 0) {
+          const merged = Object.assign({}, allContacts[idx]);
+          if (which === 'email' && Array.isArray(enriched.emails)) {
+            merged.emails = enriched.emails;
+            merged.hasEmails = enriched.emails.length > 0;
+            if (enriched.emails[0] && enriched.emails[0].address) merged.email = enriched.emails[0].address;
+          }
+          if (which === 'phones' && Array.isArray(enriched.phones)) {
+            merged.phones = enriched.phones;
+            merged.hasPhones = enriched.phones.length > 0;
+            // Ensure phone fields are set directly for persistence
+            if (enriched.phones[0] && enriched.phones[0].number) {
+               merged.phone = enriched.phones[0].number;
+               const smartMap = mapApolloPhonesToContact(enriched.phones);
+               merged.mobile = smartMap.mobile;
+               merged.workDirectPhone = smartMap.workDirectPhone;
+               merged.otherPhone = smartMap.otherPhone;
+            }
+          }
+          if (enriched.firstName || enriched.lastName || (enriched.name && (enriched.name.first || enriched.name.last || enriched.name.full))) {
+            merged.firstName = enriched.firstName || (enriched.name && enriched.name.first) || merged.firstName;
+            merged.lastName = enriched.lastName || (enriched.name && enriched.name.last) || merged.lastName;
+            const full = (enriched.name && (enriched.name.full || enriched.name)) || `${merged.firstName || ''} ${merged.lastName || ''}`.trim();
+            if (full) merged.fullName = full;
+            try {
+              if (!window.__lushaNameMap) window.__lushaNameMap = new Map();
+              window.__lushaNameMap.set(id, { f: merged.firstName || '', l: merged.lastName || '', full: merged.fullName || full || '' });
+            } catch (_) { }
+          }
+          allContacts[idx] = merged;
+        }
+      } catch (persistErr) { lushaLog('Persist session merge failed', persistErr); }
+
+      // Update the contact data in the Add Contact button
+      const addContactBtn = container.querySelector('[data-action="add-contact"]');
+      if (addContactBtn) {
+        addContactBtn.setAttribute('data-contact', JSON.stringify(contact));
+      }
+
+      // Persist into cache (merge contact by id) AND update CRM if contact exists
+      try {
+        const id = contact.id || contact.contactId;
+        const idx = allContacts.findIndex(c => (c.id || c.contactId) === id);
+        
+        // Deep copy the object to be cached to avoid reference issues
+        let contactToCache = idx >= 0 
+          ? JSON.parse(JSON.stringify(allContacts[idx])) 
+          : JSON.parse(JSON.stringify(contact));
+
+        // Explicitly force the revealed data into the cached object
+        if (which === 'email' && Array.isArray(enriched.emails)) {
+           contactToCache.emails = enriched.emails;
+           contactToCache.hasEmails = true;
+           if (enriched.emails[0] && enriched.emails[0].address) {
+             contactToCache.email = enriched.emails[0].address;
+           }
+        }
+        
+        if (which === 'phones' && Array.isArray(enriched.phones)) {
+           const smartMap = mapApolloPhonesToContact(enriched.phones);
+           contactToCache.mobile = smartMap.mobile;
+           contactToCache.workDirectPhone = smartMap.workDirectPhone;
+           contactToCache.otherPhone = smartMap.otherPhone;
+           // Ensure phones array is explicitly set
+           contactToCache.phones = enriched.phones;
+           contactToCache.hasPhones = true;
+           // Also set primary phone for legacy compatibility
+           if (enriched.phones[0]) {
+             contactToCache.phone = enriched.phones[0].number;
+           }
+        }
+
+        // Save to cache
+        // Ensure we are passing a valid company object for the cache key
+        // Fallback to current search context if lastCompanyResult is missing
+        const companyCtx = lastCompanyResult || 
+                           (contactToCache.companyName ? { name: contactToCache.companyName, domain: contactToCache.fqdn || '' } : null) ||
+                           { name: document.getElementById('lusha-company-search')?.value || '', domain: document.getElementById('lusha-company-domain')?.value || '' };
+        
+        if (companyCtx && companyCtx.name) {
+           await upsertCacheContact({ company: companyCtx }, contactToCache);
+           
+           // If we're updating a cache entry, we should ALSO try to update the "domain-based" cache key version if it differs
+           // This handles the case where user searches by name "Victoria Group Corp" but domain is "victoriagroup.com"
+           if (companyCtx.domain && companyCtx.name && companyCtx.domain !== companyCtx.name) {
+              await upsertCacheContact({ company: { name: companyCtx.domain, domain: companyCtx.domain } }, contactToCache);
+           }
+           
+           // FORCE SAVE TO LOCALSTORAGE FOR THIS SPECIFIC CONTACT
+           // This acts as a "hard" fallback cache keyed by the contact ID itself, ignoring company/domain context
+           try {
+             const contactCacheKey = `lusha_contact_${id}`;
+             localStorage.setItem(contactCacheKey, JSON.stringify(contactToCache));
+           } catch (_) { }
+
+        } else {
+        }
+        
+        // Update the in-memory array as well to reflect the change immediately if the user re-renders without reload
+        if (idx >= 0) {
+           allContacts[idx] = contactToCache;
+        }
+
+        // Update CRM if contact exists (using cached ID or searching)
+        let existingId = contact._crmId;
+        const enrichBtn = container.querySelector('[data-action="enrich-contact"]');
+        if (!existingId && enrichBtn) {
+           existingId = enrichBtn.getAttribute('data-crm-id');
+        }
+
+        if (window.firebaseDB) {
+          try {
+            const db = window.firebaseDB;
+            const email = enriched.emails && enriched.emails[0] && enriched.emails[0].address;
+            const targetCompany = (contactToCache.companyName || contactToCache.company || '').toString().trim();
+            const targetDomain = normalizeDomain(contactToCache.fqdn || contactToCache.domain || getEmailDomain(email));
+            
+            // Helper to check company match (same as in updateActionButtons)
+            const matchesCompany = (doc) => {
+               if (!targetCompany && !targetDomain) return true;
+               return isSameCompany(targetCompany, targetDomain, doc);
+            };
+
+            if (!existingId) {
+               // Try to find the contact again if we don't have the ID
+               const firstName = (contactToCache.firstName || '').toString().trim();
+               const lastName = (contactToCache.lastName || '').toString().trim();
+               const fullName = (firstName && lastName) ? `${firstName} ${lastName}`.trim() : (contactToCache.fullName || '').toString().trim();
+
+               // 1. Check by Email
+               if (email) {
+                 const s = await db.collection('contacts').where('email', '==', email).limit(5).get();
+                 if (s && s.docs.length > 0) {
+                    const match = s.docs.find(matchesCompany);
+                    if (match) existingId = match.id;
+                 }
+               }
+               
+               // 2. Check by Name (if not found by email)
+               if (!existingId && fullName && targetCompany) {
+                 const s = await db.collection('contacts').where('name', '==', fullName).limit(5).get();
+                 if (s && s.docs.length > 0) {
+                    const match = s.docs.find(matchesCompany);
+                    if (match) existingId = match.id;
+                 }
+               }
+            }
+
+            if (existingId) {
+              const updatePayload = {};
+              const nameParts = getEnrichedNameParts(enriched);
+              if (nameParts.first) updatePayload.firstName = nameParts.first;
+              if (nameParts.last) updatePayload.lastName = nameParts.last;
+              if (nameParts.full) updatePayload.name = nameParts.full;
+              if (which === 'phones' && enriched.phones && enriched.phones.length > 0) {
+                updatePayload.workDirectPhone = selectPhone(enriched, 'direct') || selectPhone(enriched, 'work') || '';
+                updatePayload.mobile = selectPhone(enriched, 'mobile') || '';
+                updatePayload.otherPhone = selectPhone(enriched, 'other') || '';
+                updatePayload.phone = enriched.phones[0].number || '';
+              }
+              if (which === 'email' && enriched.emails && enriched.emails.length > 0) {
+                updatePayload.email = enriched.emails[0].address || '';
+              }
+              if (Object.keys(updatePayload).length > 0) {
+                updatePayload.updatedAt = new Date();
+                // window.PCSaves.updateContact emits pc:contact-updated automatically
+                await window.PCSaves.updateContact(existingId, updatePayload);
+              }
+            }
+          } catch (crmError) {
+             lushaLog('CRM update failed:', crmError);
+          }
+        }
+      } catch (cacheError) {
+      }
+    } catch (_) { }
+  }
+
+  function setActionButtonsState(containerEl, contactExists) {
+    const addBtn = containerEl.querySelector('[data-action="add-contact"]');
+    const enrichBtn = containerEl.querySelector('[data-action="enrich-contact"]');
+    if (enrichBtn) enrichBtn.style.display = contactExists ? '' : 'none';
+    if (addBtn) addBtn.style.display = contactExists ? 'none' : '';
+  }
+
+  async function updateActionButtons(containerEl, contact, opts) {
+    try {
+      if (opts && opts.forceExists) {
+        setActionButtonsState(containerEl, true);
+        return;
+      }
+
+      const db = window.firebaseDB;
+      if (!db) return;
+
+      const email = contact.email || (Array.isArray(contact.emails) && contact.emails[0] && contact.emails[0].address) || '';
+      const firstName = (contact.firstName || '').toString().trim();
+      const lastName = (contact.lastName || '').toString().trim();
+      const fullName = (firstName && lastName) ? `${firstName} ${lastName}`.trim() : (contact.fullName || '').toString().trim();
+      
+      // CRITICAL: Get target company from contact or the search context (lastCompanyResult)
+      // This ensures cached results (which might lack company info per contact) still find matches
+      let targetCompany = (contact.companyName || contact.company || '').toString().trim();
+      if (!targetCompany && lastCompanyResult) {
+        targetCompany = (lastCompanyResult.name || lastCompanyResult.companyName || '').toString().trim();
+      }
+      const targetDomain = normalizeDomain(contact.fqdn || contact.domain || (lastCompanyResult && lastCompanyResult.domain) || getEmailDomain(email));
+      
+      const phone = contact.phone || contact.phoneNumber || (Array.isArray(contact.phones) && contact.phones[0] && contact.phones[0].number) || '';
+
+      const checks = [];
+      
+      // Helper to check if a doc matches the target company
+      const matchesCompany = (doc) => {
+        if (!targetCompany && !targetDomain) return true;
+        return isSameCompany(targetCompany, targetDomain, doc);
+      };
+
+      // 1. Check by Email AND Company
+      if (email) {
+        checks.push(
+          db.collection('contacts').where('email', '==', email).limit(5).get()
+            .then(s => {
+              if (!s || !s.docs || s.docs.length === 0) return null;
+              // User requirement: Must work for same company
+              const match = s.docs.find(matchesCompany);
+              return match ? match.id : null;
+            })
+            .catch(() => null)
+        );
+      }
+
+      // 2. Check by Name AND Company
+      if (fullName && targetCompany) {
+        checks.push(
+          db.collection('contacts').where('name', '==', fullName).limit(5).get()
+            .then(s => {
+              if (!s || !s.docs || s.docs.length === 0) return null;
+              const match = s.docs.find(matchesCompany);
+              return match ? match.id : null;
+            })
+            .catch(() => null)
+        );
+      }
+
+      // 3. Fallback: Check by Phone (global)
+      if (phone) {
+        checks.push(
+          db.collection('contacts').where('phone', '==', phone).limit(1).get()
+            .then(s => (s && s.docs && s.docs[0]) ? s.docs[0].id : null)
+            .catch(() => null)
+        );
+      }
+
+      let existingId = null;
+      if (checks.length > 0) {
+        const results = await Promise.all(checks);
+        existingId = results.find(id => id !== null);
+      }
+
+      if (existingId) {
+        contact._crmId = existingId; // Store for revealForContact
+        const enrichBtn = containerEl.querySelector('[data-action="enrich-contact"]');
+        if (enrichBtn) enrichBtn.setAttribute('data-crm-id', existingId);
+      }
+
+      setActionButtonsState(containerEl, !!existingId);
+    } catch (err) {
+      lushaLog('updateActionButtons failed:', err);
+    }
+  }
+
+  function copyContactInfo(contact) {
+    const info = [
+      `Name: ${contact.firstName || ''} ${contact.lastName || ''}`.trim(),
+      `Title: ${contact.title || contact.jobTitle || ''}`,
+      `Company: ${contact.company || contact.companyName || ''}`,
+      `Email: ${contact.email || ''}`,
+      `Phone: ${contact.phone || contact.phoneNumber || ''}`,
+      `Location: ${contact.location || contact.city || ''}`
+    ].filter(line => line.split(': ')[1]).join('\n');
+
+    navigator.clipboard.writeText(info).then(() => {
+      try { window.crm?.showToast && window.crm.showToast('Contact info copied to clipboard'); } catch (_) { }
+    }).catch(() => {
+      try { window.crm?.showToast && window.crm.showToast('Failed to copy to clipboard'); } catch (_) { }
+    });
+  }
+
+  function getContextDefaults(entityType) {
+    const out = { companyName: '', domain: '' };
+    try {
+      
+      // Check if we're on task-detail page first (priority for task context)
+      const taskState = isTaskDetailActive() ? window.TaskDetail?.state : null;
+      if (taskState && (taskState.account || taskState.contact)) {
+        
+        // Prioritize account data from task state
+        if (taskState.account) {
+          const a = taskState.account;
+          out.companyName = a.name || a.accountName || a.companyName || '';
+          const d = a.domain || a.website || a.site || a.companyWebsite || a.websiteUrl || '';
+          if (d) out.domain = deriveDomain(d);
+        }
+        
+        // If no account domain, try to get from contact's linked account
+        if (!out.domain && taskState.contact) {
+          const c = taskState.contact;
+          out.companyName = out.companyName || c.companyName || c.company || c.account || '';
+          const accountId = c.accountId || c.account_id;
+          if (accountId && typeof window.getAccountsData === 'function') {
+            const acc = (window.getAccountsData() || []).find(x => (x.id || x.accountId || x._id) === accountId);
+            if (acc) {
+              const d = acc?.domain || acc?.website || acc?.site || '';
+              if (d) out.domain = deriveDomain(d);
+              if (!out.companyName) out.companyName = acc?.name || acc?.accountName || '';
+            }
+          }
+          if (!out.domain) {
+            const alt = c.companyWebsite || c.website || '';
+            if (alt) out.domain = deriveDomain(alt);
+          }
+        }
+      }
+      
+      // Fallback to AccountDetail/ContactDetail if no task context
+      if (!out.companyName && !out.domain) {
+        if (entityType === 'account') {
+          const a = window.AccountDetail?.state?.currentAccount || {};
+          out.companyName = a.name || a.accountName || a.companyName || '';
+          const d = a.domain || a.website || a.site || a.companyWebsite || a.websiteUrl || '';
+          if (d) out.domain = deriveDomain(d);
+        } else {
+          const c = window.ContactDetail?.state?.currentContact || {};
+          out.companyName = c.companyName || c.company || c.account || '';
+          const id = window.ContactDetail?.state?._linkedAccountId;
+          if (id && typeof window.getAccountsData === 'function') {
+            const acc = (window.getAccountsData() || []).find(x => (x.id || x.accountId || x._id) === id);
+            const d = acc?.domain || acc?.website || acc?.site || '';
+            if (d) out.domain = deriveDomain(d);
+            if (!out.companyName) out.companyName = acc?.name || acc?.accountName || '';
+          }
+          if (!out.domain) {
+            const alt = c.companyWebsite || c.website || '';
+            if (alt) out.domain = deriveDomain(alt);
+          }
+        }
+      }
+      // Fallbacks to values we captured when the widget opened
+      if (!out.companyName && currentAccountName) out.companyName = currentAccountName;
+      // Use lastCompanyResult domain only if it matches the same company name (avoid cross-account bleed)
+      if (!out.domain && lastCompanyResult && lastCompanyResult.domain) {
+        const lcName = (lastCompanyResult.name || '').toString().trim().toLowerCase();
+        const ocName = (out.companyName || '').toString().trim().toLowerCase();
+        if (lcName && ocName && lcName === ocName) {
+          out.domain = lastCompanyResult.domain;
+        }
+      }
+
+      // DOM fallbacks (page titles and website link anchors)
+      if (!out.companyName) {
+        const titleEl = document.querySelector('#account-detail-header .page-title') ||
+          document.querySelector('#account-details-page .page-title') ||
+          document.querySelector('.contact-page-title');
+        if (titleEl && titleEl.textContent) out.companyName = titleEl.textContent.trim();
+      }
+      if (!out.domain) {
+        const websiteLink = document.querySelector('#account-detail-header [data-field="website"] a') ||
+          document.querySelector('#account-details-page [data-field="website"] a');
+        if (websiteLink && websiteLink.href) out.domain = deriveDomain(websiteLink.href);
+      }
+
+      // Lookup by name in accounts cache
+      if (!out.domain && out.companyName && typeof window.getAccountsData === 'function') {
+        const key = String(out.companyName).trim().toLowerCase();
+        const hit = (window.getAccountsData() || []).find(a => String(a.name || a.accountName || '').trim().toLowerCase() === key);
+        if (hit) {
+          const d = hit.domain || hit.website || hit.site || '';
+          if (d) out.domain = deriveDomain(d);
+        }
+      }
+    } catch (_) { }
+    // Persist/reuse requestId per domain to avoid repeat searches
+    try {
+      if (out.domain) {
+        const key = `__lusha_requestId_${out.domain}`;
+        if (window.__lushaLastRequestId) {
+          localStorage.setItem(key, window.__lushaLastRequestId);
+        } else {
+          const saved = localStorage.getItem(key);
+          if (saved && !window.__lushaLastRequestId) {
+            window.__lushaLastRequestId = saved;
+          }
+        }
+      }
+    } catch (_) { }
+
+    return out;
+  }
+
+  function renderCompanySkeleton() {
+    const compPanel = document.getElementById('lusha-panel-company');
+    if (!compPanel) return;
+
+    compPanel.innerHTML = `
+      <div class="skeleton-shimmer-modern" style="display:flex;align-items:flex-start;gap:12px;margin-bottom:10px;">
+        <div>
+           <div class="skeleton-shape" style="width:36px;height:36px;border-radius:6px;"></div>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div class="skeleton-shape" style="width: 160px; height: 16px; margin-bottom: 8px; border-radius: 4px;"></div>
+          <div class="skeleton-shape" style="width: 120px; height: 14px; border-radius: 4px;"></div>
+        </div>
+      </div>
+      <div class="skeleton-shimmer-modern" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">
+        <div class="skeleton-shape" style="width: 100%; height: 12px; border-radius: 4px;"></div>
+        <div class="skeleton-shape" style="width: 88%; height: 12px; border-radius: 4px;"></div>
+      </div>
+      <div class="skeleton-shimmer-modern" style="display:flex;flex-direction:column;gap:6px;">
+        <div class="skeleton-shape" style="width: 140px; height: 12px; border-radius: 4px;"></div>
+      </div>
+    `;
+    compPanel.style.minHeight = '60px';
+  }
+
+  function renderContactSkeletons() {
+    const listEl = document.getElementById('lusha-contacts-list');
+    if (!listEl) return;
+
+    // Add skeleton for results count
+    const countEl = document.getElementById('lusha-results-count');
+    if (countEl) {
+      countEl.innerHTML = '<div class="skeleton-shimmer-modern" style="display:inline-block;vertical-align:middle;"><div class="skeleton-shape" style="width: 80px; height: 14px; border-radius: 4px;"></div></div>';
+    }
+
+    listEl.innerHTML = '';
+    for (let i = 0; i < 3; i++) {
+      const skel = document.createElement('div');
+      skel.className = 'lusha-contact-item skeleton-shimmer-modern';
+      skel.style.pointerEvents = 'none';
+      skel.innerHTML = `
+        <div class="lusha-contact-header">
+          <div class="lusha-contact-info">
+            <div class="lusha-contact-name skeleton-shape" style="width: 60%; height: 18px; margin-bottom: 4px;"></div>
+            <div class="lusha-contact-title skeleton-shape" style="width: 40%; height: 14px;"></div>
+          </div>
+        </div>
+        <div class="lusha-contact-details" style="margin-bottom: 12px;">
+          <div class="lusha-fields">
+            <div class="lusha-field">
+              <div class="lusha-field-header" style="margin-bottom: 4px;">
+                <div class="lusha-label skeleton-shape" style="width: 30px; height: 10px;"></div>
+              </div>
+              <div class="lusha-field-body">
+                <div class="skeleton-shape" style="width: 80%; height: 14px; margin: 4px 0;"></div>
+              </div>
+            </div>
+            <div class="lusha-field">
+              <div class="lusha-field-header" style="margin-bottom: 4px;">
+                <div class="lusha-label skeleton-shape" style="width: 30px; height: 10px;"></div>
+              </div>
+              <div class="lusha-field-body">
+                <div class="skeleton-shape" style="width: 70%; height: 14px; margin: 4px 0;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="lusha-contact-actions">
+          <div class="lusha-action-btn skeleton-shape" style="height: 34px;"></div>
+          <div class="lusha-action-btn skeleton-shape" style="height: 34px;"></div>
+          <div class="lusha-action-btn skeleton-shape" style="height: 34px;"></div>
+        </div>
+      `;
+      listEl.appendChild(skel);
+    }
+
+    // Ensure the results section is visible so skeletons can be seen
+    const resultsWrap = document.getElementById('lusha-results');
+    if (resultsWrap) {
+      resultsWrap.style.display = 'flex';
+      resultsWrap.classList.add('is-shown');
+      resultsWrap.classList.remove('is-hidden');
+
+      // Ensure the header is visible too
+      const headerEl = resultsWrap.querySelector('.lusha-results-header');
+      if (headerEl) {
+        headerEl.style.opacity = '1';
+        headerEl.style.transform = 'translateY(0)';
+      }
+    }
+  }
+
+  function updateResults(contacts, skipAnimations = false) {
+    try {
+      // Store all contacts for pagination
+      allContacts = contacts;
+      currentPage = 1; // Reset to first page
+
+      const resultsWrap = document.getElementById('lusha-results');
+      const countEl = document.getElementById('lusha-results-count');
+      const listEl = document.getElementById('lusha-contacts-list');
+      const paginationEl = document.getElementById('lusha-pagination');
+
+      if (resultsWrap) {
+        // Ensure results container is shown before animating (for consistent measuring)
+        resultsWrap.style.display = 'flex';
+        resultsWrap.classList.add('is-shown');
+        resultsWrap.classList.remove('is-hidden');
+      }
+      if (countEl) countEl.textContent = `${contacts.length} contact${contacts.length === 1 ? '' : 's'} found`;
+
+      // Show/hide pagination based on contact count
+      if (paginationEl) {
+        if (contacts.length > contactsPerPage) {
+          paginationEl.style.display = 'flex';
+          paginationEl.style.visibility = 'visible';
+          updatePaginationControls();
+        } else {
+          paginationEl.style.visibility = 'hidden';
+          paginationEl.style.display = 'flex';
+        }
+      }
+
+      // Display current page of contacts
+      displayCurrentPage(skipAnimations);
+
+      // During refresh, lock header/pagination styles immediately to prevent any visual jump
+      if (skipAnimations) {
+        try {
+          const headerEl = resultsWrap?.querySelector('.lusha-results-header');
+          const pagEl = document.getElementById('lusha-pagination');
+          if (headerEl) {
+            headerEl.style.transition = 'none';
+            headerEl.style.opacity = '1';
+            headerEl.style.transform = 'none';
+          }
+          if (pagEl) {
+            pagEl.style.transition = 'none';
+            pagEl.style.opacity = '1';
+            pagEl.style.transform = 'none';
+          }
+        } catch (_) { }
+      }
+
+      // Skip animations on refresh
+      if (!skipAnimations) {
+        // Stagger in the items for a smoother appearance
+        try { animateResultItemsIn(); } catch (_) { }
+
+        // Fade-in the results header (title, count, pagination) to avoid jump
+        try {
+          const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          if (!prefersReduce) {
+            const headerEl = resultsWrap?.querySelector('.lusha-results-header');
+            if (headerEl) {
+              headerEl.style.opacity = '0';
+              headerEl.style.transform = 'translateY(8px)';
+              requestAnimationFrame(() => {
+                headerEl.style.transition = 'opacity 400ms ease, transform 400ms ease';
+                headerEl.style.opacity = '1';
+                headerEl.style.transform = 'translateY(0)';
+              });
+            }
+          }
+        } catch (_) { }
+      } else {
+        // Skip animations - ensure everything is visible immediately
+        try {
+          const headerEl = resultsWrap?.querySelector('.lusha-results-header');
+          if (headerEl) {
+            headerEl.style.opacity = '1';
+            headerEl.style.transform = 'translateY(0)';
+          }
+        } catch (_) { }
+      }
+
+    } catch (e) {
+      lushaLog('Update results failed:', e);
+    }
+  }
+
+  function displayCurrentPage(skipAnimations = false) {
+    try {
+      const listEl = document.getElementById('lusha-contacts-list');
+      if (!listEl) return;
+
+      listEl.innerHTML = '';
+
+      if (allContacts.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'lusha-no-results';
+        empty.textContent = 'No results found.';
+        listEl.appendChild(empty);
+        return;
+      }
+
+      // Calculate pagination
+      const startIndex = (currentPage - 1) * contactsPerPage;
+      const endIndex = startIndex + contactsPerPage;
+      const pageContacts = allContacts.slice(startIndex, endIndex);
+
+      // Create contact elements for current page
+      pageContacts.forEach((c, i) => {
+        const mapped = mapProspectingContact(c);
+        const globalIndex = startIndex + i;
+        listEl.appendChild(createContactElement(mapped, globalIndex));
+      });
+
+      // Update pagination controls
+      updatePaginationControls();
+
+      // Skip animations on refresh
+      if (!skipAnimations) {
+        // Simple fade-in for all items at once
+        try {
+          const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          if (!prefersReduce) {
+            requestAnimationFrame(() => {
+              const items = listEl.querySelectorAll('.lusha-contact-item');
+              items.forEach((item, i) => {
+                item.style.opacity = '0';
+                item.style.transform = 'translateY(8px)';
+                setTimeout(() => {
+                  item.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                  item.style.opacity = '1';
+                  item.style.transform = 'translateY(0)';
+                }, i * 80);
+              });
+            });
+          }
+        } catch (_) { }
+      } else {
+        // Skip animations - ensure items are visible immediately and prevent reflow transitions
+        try {
+          const items = listEl.querySelectorAll('.lusha-contact-item');
+          items.forEach((item) => {
+            item.style.transition = 'none';
+            item.style.opacity = '1';
+            item.style.transform = 'none';
+          });
+        } catch (_) { }
+      }
+
+    } catch (e) {
+      lushaLog('Display current page failed:', e);
+    }
+  }
+
+  function updatePaginationControls() {
+    try {
+      const paginationEl = document.getElementById('lusha-pagination');
+      const prevBtn = document.getElementById('lusha-prev-btn');
+      const nextBtn = document.getElementById('lusha-next-btn');
+      const currentEl = document.getElementById('lusha-pagination-current');
+
+      if (!paginationEl || !prevBtn || !nextBtn || !currentEl) return;
+
+      const totalPages = Math.ceil(allContacts.length / contactsPerPage);
+      const startContact = (currentPage - 1) * contactsPerPage + 1;
+      const endContact = Math.min(currentPage * contactsPerPage, allContacts.length);
+
+      // Update current page number
+      currentEl.textContent = currentPage;
+
+      // Update button states
+      prevBtn.disabled = currentPage <= 1;
+      nextBtn.disabled = currentPage >= totalPages;
+
+    } catch (e) {
+      lushaLog('Update pagination controls failed:', e);
+    }
+  }
+
+  function resetLushaForm() {
+    const companyInput = document.getElementById('lusha-company-search');
+    const domainInput = document.getElementById('lusha-company-domain');
+    const contactNameInput = document.getElementById('lusha-contact-name');
+    const contactEmailInput = document.getElementById('lusha-contact-email');
+    const resultsEl = document.getElementById('lusha-results');
+
+    // Clear all fields first
+    if (companyInput) companyInput.value = '';
+    if (domainInput) domainInput.value = '';
+    if (contactNameInput) contactNameInput.value = '';
+    if (contactEmailInput) contactEmailInput.value = '';
+    if (resultsEl) resultsEl.style.display = 'none';
+
+    // Then repopulate with current data
+    try { prefillInputs(currentEntityType); } catch (_) { }
+  }
+
+  // Standardized cache key generation
+  function generateCacheKey(domain, companyName) {
+    if (domain) {
+      return domain.toLowerCase().replace(/^www\./, '').replace(/\/$/, '');
+    }
+    if (companyName) {
+      return `name_${companyName.toLowerCase().trim()}`;
+    }
+    return null;
+  }
+
+  // Cache helpers (optional separate Firebase project)
+  async function getLushaCacheDB() {
+    try {
+      if (!window.firebase) return null;
+      if (window.__LUSHA_CACHE_CONFIG && typeof window.firebase.initializeApp === 'function') {
+        // Use a named secondary app
+        const name = '__lusha_cache__';
+        let app = null;
+        try { app = window.firebase.app(name); } catch (_) { }
+        if (!app) {
+          try { app = window.firebase.initializeApp(window.__LUSHA_CACHE_CONFIG, name); } catch (_) { }
+        }
+        if (app && app.firestore) return app.firestore();
+      }
+      // Fallback to primary DB
+      return window.firebaseDB || null;
+    } catch (_) { return null; }
+  }
+  async function tryLoadCache(key) {
+    try {
+      const db = await getLushaCacheDB();
+      if (!db) {
+        // LocalStorage fallback
+        try {
+          const domain = (key && key.domain) || '';
+          const companyName = (key && key.companyName) || '';
+          const cacheKey = generateCacheKey(domain, companyName);
+          if (cacheKey) {
+            const raw = localStorage.getItem(`lusha_cache_${cacheKey}`);
+            if (raw) {
+              const doc = JSON.parse(raw);
+              if (doc && Array.isArray(doc.contacts) && doc.contacts.length) return doc;
+            }
+          }
+        } catch (_) { }
+        return null;
+      }
+      const domain = (key && key.domain) || '';
+      const companyName = (key && key.companyName) || '';
+      const cacheKey = generateCacheKey(domain, companyName);
+      let doc = null;
+      if (cacheKey) {
+        const snap = await db.collection('lusha_cache').doc(cacheKey).get();
+        if (snap && snap.exists) doc = { id: snap.id, ...snap.data() };
+      }
+      if (doc && doc.contacts && doc.contacts.length) return doc;
+
+      // Fallback to localStorage if Firestore empty
+      try {
+        if (cacheKey) {
+          const raw = localStorage.getItem(`lusha_cache_${cacheKey}`);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && Array.isArray(parsed.contacts) && parsed.contacts.length) return parsed;
+          }
+        }
+      } catch (_) { }
+      return null;
+    } catch (_) { return null; }
+  }
+  // Helper: write to Firestore later if DB not yet available
+  function __lushaScheduleCacheWrite(docId, payload, merge) {
+    try {
+      if (!docId || !payload) return;
+      let attempts = 0;
+      const tryOnce = async () => {
+        attempts++;
+        try {
+          const db = await getLushaCacheDB();
+          if (db) {
+            const ref = db.collection('lusha_cache').doc(docId);
+            if (merge) await ref.set(payload, { merge: true });
+            else await ref.set(payload);
+            return; // success
+          }
+        } catch (_) { }
+        if (attempts < 8) setTimeout(tryOnce, Math.min(1000 * Math.pow(2, attempts - 1), 8000));
+      };
+      setTimeout(tryOnce, 250);
+    } catch (_) { }
+  }
+
+  async function saveCache({ company, contacts }) {
+    try {
+      const db = await getLushaCacheDB();
+      const domain = (company && (company.domain || company.fqdn)) || '';
+      const companyName = company && (company.name || company.companyName) || '';
+      const docId = generateCacheKey(domain, companyName) || 'unknown';
+      let existing = {};
+      let ref = null;
+      if (db) {
+        ref = db.collection('lusha_cache').doc(docId);
+        const snap = await ref.get();
+        existing = snap.exists ? (snap.data() || {}) : {};
+      } else {
+        try {
+          const raw = localStorage.getItem(`lusha_cache_${docId}`);
+          existing = raw ? (JSON.parse(raw) || {}) : {};
+        } catch (_) { }
+      }
+      const existingContacts = Array.isArray(existing.contacts) ? existing.contacts : [];
+      const existingById = new Map(existingContacts.map(c => [resolveContactId(c), c]));
+
+      const mappedIncoming = (contacts || []).map(mapProspectingContact);
+      const mergedMap = new Map();
+
+      mappedIncoming.forEach(nc => {
+        const key = resolveContactId(nc);
+        const ec = key ? existingById.get(key) : null;
+        
+        // CHECK LOCALSTORAGE HARD FALLBACK
+        // This is the "Nuclear Option" - if specific contact data was saved directly to LS, prioritize it over everything else
+        let hardCached = null;
+        if (key) {
+          try {
+            const rawHard = localStorage.getItem(`lusha_contact_${key}`);
+            if (rawHard) {
+               hardCached = JSON.parse(rawHard);
+            }
+          } catch (_) {}
+        }
+
+        let merged = Object.assign({}, ec || {}, nc);
+        
+        // If hard cached data exists, overlay its enriched fields
+        if (hardCached) {
+           if (hardCached.phones && hardCached.phones.length > 0) {
+             merged.phones = hardCached.phones;
+             merged.hasPhones = true;
+             merged.phone = hardCached.phone || (hardCached.phones[0] && hardCached.phones[0].number);
+             merged.mobile = hardCached.mobile;
+             merged.workDirectPhone = hardCached.workDirectPhone;
+             merged.otherPhone = hardCached.otherPhone;
+           }
+           if (hardCached.emails && hardCached.emails.length > 0) {
+             merged.emails = hardCached.emails;
+             merged.hasEmails = true;
+             merged.email = hardCached.email || (hardCached.emails[0] && hardCached.emails[0].address);
+           }
+        }
+        
+        // ALWAYS preserve enriched email/phone arrays from existing cache on refresh
+        if (ec && Array.isArray(ec.emails) && ec.emails.length > 0) {
+          merged.emails = ec.emails;
+          merged.hasEmails = ec.emails.length > 0;
+          if (ec.emails[0] && ec.emails[0].address) merged.email = ec.emails[0].address;
+        }
+        if (ec && Array.isArray(ec.phones) && ec.phones.length > 0) {
+          merged.phones = ec.phones;
+          merged.hasPhones = ec.phones.length > 0;
+          if (ec.phones[0] && ec.phones[0].number) merged.phone = ec.phones[0].number;
+        }
+        // Keep best name info - prioritize fresh data for names
+        merged.firstName = nc.firstName || ec?.firstName || '';
+        merged.lastName = nc.lastName || ec?.lastName || '';
+        const full = (nc.fullName || ec?.fullName || '').trim();
+        if (full) merged.fullName = full;
+        mergedMap.set(key || Math.random().toString(36).slice(2), merged);
+      });
+
+      // Include any existing contacts not present in new search (to avoid losing enriched entries)
+      existingContacts.forEach(ec => {
+        const key = resolveContactId(ec);
+        if (!mergedMap.has(key)) mergedMap.set(key, ec);
+      });
+
+      const mergedContacts = Array.from(mergedMap.values());
+
+      const payload = {
+        domain: domain || '',
+        companyName: companyName || '',
+        website: company && company.website || (domain ? ('https://' + domain) : ''),
+        companyId: company && (company.id || null),
+        // Cache complete company data
+        company: company || {},
+        // Cache all company fields from Lusha
+        logoUrl: company && company.logoUrl || existing.logoUrl || '',
+        description: company && (company.description || company.companyDescription) || existing.description || '',
+        industry: company && company.industry || existing.industry || '',
+        employees: company && company.employees || existing.employees || '',
+        revenue: company && company.revenue || existing.revenue || '',
+        location: company && company.location || existing.location || '',
+        city: company && company.city || existing.city || '',
+        state: company && company.state || existing.state || '',
+        country: company && company.country || existing.country || '',
+        // phone intentionally omitted from cache payload
+        email: company && company.email || existing.email || '',
+        linkedin: company && company.linkedin || existing.linkedin || '',
+        twitter: company && company.twitter || existing.twitter || '',
+        facebook: company && company.facebook || existing.facebook || '',
+        // Persist merged contacts with enriched fields preserved
+        contacts: mergedContacts,
+        updatedAt: new Date()
+      };
+      if (ref) {
+        await ref.set(payload); // overwrite with merged payload
+      } else {
+        // Schedule a Firestore write when DB becomes available
+        __lushaScheduleCacheWrite(docId, payload, false);
+      }
+      // Always persist to localStorage as a fallback cache
+      try { localStorage.setItem(`lusha_cache_${docId}`, JSON.stringify(payload)); } catch (_) { }
+    } catch (_) { }
+  }
+
+  async function upsertCacheContact({ company }, enriched) {
+    try {
+      const db = await getLushaCacheDB();
+      const domain = (company && (company.domain || company.fqdn)) || '';
+      const companyName = company && (company.name || company.companyName) || '';
+      const docId = generateCacheKey(domain, companyName) || 'unknown';
+      let ref = null;
+      let existing = {};
+      if (db) {
+        ref = db.collection('lusha_cache').doc(docId);
+        const snap = await ref.get();
+        existing = snap.exists ? (snap.data() || {}) : {};
+      } else {
+        try {
+          const raw = localStorage.getItem(`lusha_cache_${docId}`);
+          existing = raw ? (JSON.parse(raw) || {}) : {};
+        } catch (_) { }
+      }
+      const arr = Array.isArray(existing.contacts) ? existing.contacts.slice() : [];
+      const idx = arr.findIndex(x => resolveContactId(x) === resolveContactId(enriched));
+      const mapped = mapProspectingContact(enriched);
+      if (idx >= 0) arr[idx] = Object.assign({}, arr[idx], mapped);
+      else arr.push(mapped);
+      // Preserve all existing company data when updating contacts
+      const updateData = {
+        contacts: arr,
+        updatedAt: new Date(),
+        // Preserve existing company data
+        ...(existing.company && { company: existing.company }),
+        ...(existing.logoUrl && { logoUrl: existing.logoUrl }),
+        ...(existing.description && { description: existing.description }),
+        ...(existing.industry && { industry: existing.industry }),
+        ...(existing.employees && { employees: existing.employees }),
+        ...(existing.revenue && { revenue: existing.revenue }),
+        ...(existing.location && { location: existing.location }),
+        ...(existing.city && { city: existing.city }),
+        ...(existing.state && { state: existing.state }),
+        ...(existing.country && { country: existing.country }),
+        ...(existing.phone && { phone: existing.phone }),
+        ...(existing.email && { email: existing.email }),
+        ...(existing.linkedin && { linkedin: existing.linkedin }),
+        ...(existing.twitter && { twitter: existing.twitter }),
+        ...(existing.facebook && { facebook: existing.facebook })
+      };
+      if (ref) await ref.set(updateData, { merge: true });
+      else __lushaScheduleCacheWrite(docId, updateData, true);
+      try { localStorage.setItem(`lusha_cache_${docId}`, JSON.stringify(Object.assign({}, existing, updateData))); } catch (_) { }
+    } catch (_) { }
+  }
+
+  // Merge helper: preserve enriched emails/phones from existing cache, prefer fresh names
+  async function mergeContactsWithExistingCache(company, freshContacts) {
+    try {
+      const db = await getLushaCacheDB();
+      if (!db) return freshContacts;
+      const domain = (company && (company.domain || company.fqdn)) || '';
+      const companyName = company && (company.name || company.companyName) || '';
+      const docId = generateCacheKey(domain, companyName) || 'unknown';
+      const snap = await db.collection('lusha_cache').doc(docId).get();
+      const existing = snap.exists ? (snap.data() || {}) : {};
+      const existingContacts = Array.isArray(existing.contacts) ? existing.contacts : [];
+      const existingById = new Map(existingContacts.map(c => [c.id || c.contactId, c]));
+      const mappedIncoming = (freshContacts || []).map(mapProspectingContact);
+      const merged = mappedIncoming.map(nc => {
+        const key = nc.id || nc.contactId;
+        const ec = key ? existingById.get(key) : null;
+        if (!ec) return nc;
+        const out = Object.assign({}, ec, nc);
+        if (Array.isArray(ec.emails) && ec.emails.length > 0) {
+          out.emails = ec.emails;
+          out.hasEmails = ec.emails.length > 0;
+          if (ec.emails[0]?.address) out.email = ec.emails[0].address;
+        }
+        if (Array.isArray(ec.phones) && ec.phones.length > 0) {
+          out.phones = ec.phones;
+          out.hasPhones = ec.phones.length > 0;
+          if (ec.phones[0]?.number) out.phone = ec.phones[0].number;
+        }
+        // prefer fresh names
+        out.firstName = nc.firstName || ec.firstName || '';
+        out.lastName = nc.lastName || ec.lastName || '';
+        const full = (nc.fullName || ec.fullName || '').trim();
+        if (full) out.fullName = full;
+        return out;
+      });
+      // include any enriched contacts not present in fresh list
+      existingContacts.forEach(ec => {
+        const key = ec.id || ec.contactId;
+        if (!merged.find(m => (m.id || m.contactId) === key)) merged.push(ec);
+      });
+      return merged;
+    } catch (_) {
+      return freshContacts;
+    }
+  }
+
+  // Session-based credit tracking
+  function initializeSessionTracking() {
+    if (!window.__lushaSessionTracking) {
+      window.__lushaSessionTracking = {
+        sessionStart: Date.now(),
+        creditsUsedThisSession: 0,
+        operations: {
+          searches: 0,
+          enrichments: 0,
+          reveals: 0
+        },
+        lastKnownUsage: null
+      };
+    }
+  }
+
+  // Track credits used in current session
+  function trackSessionCredits(operation, creditsUsed) {
+    initializeSessionTracking();
+    window.__lushaSessionTracking.creditsUsedThisSession += creditsUsed;
+    window.__lushaSessionTracking.operations[operation] = (window.__lushaSessionTracking.operations[operation] || 0) + creditsUsed;
+  }
+
+  // Get session credit summary
+  function getSessionCreditSummary() {
+    initializeSessionTracking();
+    return {
+      sessionCreditsUsed: window.__lushaSessionTracking.creditsUsedThisSession,
+      operations: { ...window.__lushaSessionTracking.operations },
+      sessionStart: window.__lushaSessionTracking.sessionStart
+    };
+  }
+
+  // Cache usage data in Firebase
+  async function cacheUsageData(usageData) {
+    try {
+      const db = await getLushaCacheDB();
+      if (!db) {
+        // Fallback to localStorage
+        localStorage.setItem('lusha_usage_cache', JSON.stringify({
+          ...usageData,
+          cachedAt: Date.now()
+        }));
+        return;
+      }
+
+      const usageRef = db.collection('lusha_cache').doc('usage_data');
+      await usageRef.set({
+        ...usageData,
+        cachedAt: Date.now(),
+        lastUpdated: Date.now()
+      });
+    } catch (_) { }
+  }
+
+  // Load cached usage data
+  async function loadCachedUsageData() {
+    try {
+      const db = await getLushaCacheDB();
+      if (!db) {
+        // Fallback to localStorage
+        const cached = localStorage.getItem('lusha_usage_cache');
+        if (cached) {
+          const data = JSON.parse(cached);
+          // Use cache if less than 5 minutes old
+          if (Date.now() - data.cachedAt < 300000) {
+            return data;
+          }
+        }
+        return null;
+      }
+
+      const usageRef = db.collection('lusha_cache').doc('usage_data');
+      const snap = await usageRef.get();
+
+      if (snap.exists) {
+        const data = snap.data();
+        // Use cache if less than 5 minutes old
+        if (Date.now() - data.cachedAt < 300000) {
+          return data;
+        }
+      }
+      return null;
+    } catch (_) { return null; }
+  }
+
+  function ensureLushaStyles() {
+    // Removed inline styles - using main.css styles instead for refined appearance
+    // Only keep essential animation helpers that don't exist in main.css
+    if (document.getElementById('lusha-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'lusha-styles';
+    style.textContent = `
+       /* Simple crossfade helpers - minimal styles not in main.css */
+       #lusha-widget .is-hidden { opacity: 0; pointer-events: none; }
+       #lusha-widget .is-shown { opacity: 1; }
+       #lusha-widget #lusha-loading, #lusha-widget #lusha-results {
+         transition: opacity 500ms ease;
+       }
+
+      /* Company summary fade-in */
+      #lusha-widget .fade-in-block { opacity: 0; transition: opacity 300ms ease; }
+      #lusha-widget .fade-in-block.in { opacity: 1; }
+      
+      /* Animation helper */
+      #lusha-widget.lusha-anim { will-change: opacity, transform; }
+      
+      /* Animation classes for reveal effects */
+      #lusha-widget .lusha-reveal-in {
+        animation: lushaRevealIn 0.4s ease-out forwards;
+      }
+      
+      #lusha-widget .lusha-placeholder-out {
+        animation: lushaPlaceholderOut 0.3s ease-in forwards;
+      }
+      
+      @keyframes lushaRevealIn {
+        0% {
+          opacity: 0;
+          transform: translateY(8px) scale(0.95);
+        }
+        100% {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+      
+      @keyframes lushaPlaceholderOut {
+        0% {
+          opacity: 0.6;
+          transform: scale(1);
+        }
+        100% {
+          opacity: 0;
+          transform: scale(0.95);
+        }
+      }
+
+      /* Usage bar - specific to widget */
+      #lusha-widget .lusha-usage-wrap {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        margin: 10px 0 0 0;
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+      #lusha-widget #lusha-usage-text {
+        margin-left: 8px;
+      }
+      #lusha-widget .lusha-usage-bar {
+        position: relative;
+        height: 8px;
+        border-radius: 6px;
+        background: var(--bg-item);
+        border: 1px solid var(--border-light);
+        flex: 1;
+        overflow: hidden;
+        margin-left: 8px;
+      }
+      #lusha-widget .lusha-usage-fill {
+        position: absolute;
+        left: 0; top: 0; bottom: 0;
+        width: 0%;
+        background: var(--orange-subtle);
+        transition: width .3s ease;
+      }
+
+      /* Layout to keep usage footer stuck to bottom of results */
+      #lusha-widget .lusha-results { display: flex; flex-direction: column; }
+      #lusha-widget #lusha-contacts-list { 
+        flex: 1 1 auto; 
+        perspective: 1000px;
+      }
+      #lusha-widget .lusha-usage-footer { margin-top: 10px; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  // Helper function to format phone numbers as clickable links
+  function formatPhoneLink(phone) {
+    if (!phone) return '—';
+    const cleanPhone = phone.replace(/\D/g, ''); // Remove non-digits
+    const displayPhone = escapeHtml(phone);
+    return `<a href="tel:${cleanPhone}" title="Click to call">${displayPhone}</a>`;
+  }
+
+  // Helper function to format emails as clickable links
+  function formatEmailLink(email) {
+    if (!email) return '—';
+    const displayEmail = escapeHtml(email);
+    return `<a href="mailto:${displayEmail}" title="Click to email">${displayEmail}</a>`;
+  }
+
+  function showCreditsUsed(credits, type) {
+    try {
+      const listEl = document.getElementById('lusha-contacts-list');
+      if (!listEl) return;
+
+      // Remove existing credits chip
+      const existingChip = listEl.querySelector('.lusha-credits-chip');
+      if (existingChip) existingChip.remove();
+
+      // Track session credits
+      if (type !== 'cached' && credits > 0) {
+        trackSessionCredits('searches', credits);
+      }
+
+      // Get session summary for display
+      const sessionSummary = getSessionCreditSummary();
+      const sessionCredits = sessionSummary.sessionCreditsUsed;
+
+      let text;
+      if (type === 'cached') {
+        text = `0 credits used (cached) • ${sessionCredits} this session`;
+      } else {
+        text = `${credits} credit${credits !== 1 ? 's' : ''} used • ${sessionCredits} this session`;
+      }
+
+      const chip = document.createElement('div');
+      chip.className = 'lusha-credits-chip';
+      chip.style.display = 'block';
+      chip.style.textAlign = 'center';
+      chip.style.marginTop = '0px';
+      chip.innerHTML = `
+        <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--orange-subtle);border:1px solid var(--orange-primary);border-radius:16px;font-size:12px;color:#ffffff;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+          </svg>
+          ${escapeHtml(text)}
+        </div>
+      `;
+
+      listEl.appendChild(chip);
+
+      // Also render a live usage bar beneath the chip
+      try { renderUsageBar(); } catch (_) { }
+
+      // Animate in the chip
+      const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!prefersReduce) {
+        chip.style.opacity = '0';
+        chip.style.transform = 'translateY(8px)';
+        requestAnimationFrame(() => {
+          chip.style.transition = 'opacity 300ms ease, transform 300ms ease';
+          chip.style.opacity = '1';
+          chip.style.transform = 'translateY(0)';
+        });
+      }
+    } catch (_) { }
+  }
+
+  // Public API
+  function openLusha(contactId) {
+    const isSameContact = currentEntityType === 'contact' && String(currentContactId) === String(contactId);
+    const existingWidget = document.getElementById(WIDGET_ID);
+
+    // If it's the same contact and widget is already open, scroll to it instead of toggling
+    if (isSameContact && existingWidget) {
+      scrollToWidget(WIDGET_ID);
+      return;
+    }
+
+    currentContactId = contactId;
+    currentEntityType = 'contact';
+    
+    // If widget is already open for a different entity, update it and scroll to it
+    if (existingWidget) {
+      updateWidgetContent(contactId, 'contact');
+      scrollToWidget(WIDGET_ID);
+      return;
+    }
+
+    makeCard(contactId, 'contact');
+    // Removed toast notification
+    scrollToWidgetPanelTop();
+  }
+
+  function openLushaForAccount(accountId) {
+    const isSameAccount = currentEntityType === 'account' && String(currentAccountId) === String(accountId);
+    const existingWidget = document.getElementById(WIDGET_ID);
+
+    // If it's the same account and widget is already open, scroll to it instead of toggling
+    if (isSameAccount && existingWidget) {
+      scrollToWidget(WIDGET_ID);
+      return;
+    }
+
+    currentAccountId = accountId;
+    currentEntityType = 'account';
+    
+    // If widget is already open for a different entity, update it and scroll to it
+    if (existingWidget) {
+      updateWidgetContent(accountId, 'account');
+      scrollToWidget(WIDGET_ID);
+      return;
+    }
+
+    makeCard(accountId, 'account');
+    // Ensure prefill runs after widget is created
+    setTimeout(() => {
+      try { prefillInputs('account'); } catch (e) {
+      }
+    }, 100);
+    // Removed toast notification
+    scrollToWidgetPanelTop();
+  }
+
+  function closeLusha() {
+    closeLushaWidget();
+  }
+
+  function isLushaOpen(entityType, entityId) {
+    const card = document.getElementById(WIDGET_ID);
+    if (!card) return false;
+    
+    // If no type/id provided, just check if open at all
+    if (!entityType || !entityId) return true;
+    
+    // Check if open for specific entity
+    if (entityType === 'contact') {
+      return currentEntityType === 'contact' && String(currentContactId) === String(entityId);
+    } else if (entityType === 'account') {
+      return currentEntityType === 'account' && String(currentAccountId) === String(entityId);
+    }
+    
+    return true;
+  }
+
+  // Expose public API
+  window.Widgets.openLusha = openLusha;
+  window.Widgets.openLushaForAccount = openLushaForAccount;
+  window.Widgets.closeLusha = closeLusha;
+  window.Widgets.isLushaOpen = isLushaOpen;
+  window.Widgets.addAccountToCRM = addAccountToCRM;
+
+})();
+
+// Simple crossfade helper
+function crossfadeToResults() {
+  try {
+    const loadingEl = document.getElementById('lusha-loading');
+    const resultsEl = document.getElementById('lusha-results');
+    if (!loadingEl || !resultsEl) return;
+
+    // Ensure layout is stable before transition
+    void resultsEl.offsetHeight; // force reflow
+
+    // Loading is already hidden, just show results immediately
+    resultsEl.style.display = 'flex';
+    resultsEl.classList.remove('is-hidden');
+    resultsEl.classList.add('is-shown');
+
+    // Clean up loading classes
+    try {
+      loadingEl.classList.remove('is-shown', 'is-hidden');
+    } catch (_) { }
+  } catch (_) { }
+}
+
+// Helper function to animate placeholder out and content in
+function animateRevealContent(container, newContent) {
+  try {
+    const placeholder = container.querySelector('.lusha-placeholder');
+    const contactCard = container.closest('.lusha-contact-item');
+
+    if (placeholder) {
+      // Store current height for smooth transition
+      const currentHeight = container.offsetHeight;
+
+      // Animate placeholder out
+      placeholder.classList.add('lusha-placeholder-out');
+
+      // After placeholder animation, replace with new content
+      setTimeout(() => {
+        // Temporarily set height to prevent layout jump
+        container.style.height = currentHeight + 'px';
+        container.style.transition = 'height 0.3s ease';
+
+        container.innerHTML = newContent;
+
+        // Calculate new height after content is added
+        const newHeight = container.offsetHeight;
+
+        // Animate to new height
+        requestAnimationFrame(() => {
+          container.style.height = newHeight + 'px';
+        });
+
+        // Animate new content in
+        const newItems = container.querySelectorAll('.lusha-value-item');
+        newItems.forEach((item, index) => {
+          item.style.opacity = '0';
+          item.style.transform = 'translateY(8px) scale(0.95)';
+
+          setTimeout(() => {
+            item.classList.add('lusha-reveal-in');
+          }, index * 100); // Stagger animation for multiple items
+        });
+
+        // Remove height constraint after animation
+        setTimeout(() => {
+          container.style.height = '';
+          container.style.transition = '';
+        }, 300);
+
+        // Add subtle card animation if contact card exists
+        if (contactCard) {
+          contactCard.style.transition = 'transform 0.3s ease, box-shadow 0.3s ease';
+          contactCard.style.transform = 'scale(1.01)';
+          contactCard.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.15)';
+
+          setTimeout(() => {
+            contactCard.style.transform = '';
+            contactCard.style.boxShadow = '';
+            contactCard.style.transition = '';
+          }, 300);
+        }
+
+      }, 300); // Match placeholder-out animation duration
+    } else {
+      // No placeholder, just replace content with smooth height transition
+      const currentHeight = container.offsetHeight;
+      container.style.height = currentHeight + 'px';
+      container.style.transition = 'height 0.3s ease';
+
+      container.innerHTML = newContent;
+
+      const newHeight = container.offsetHeight;
+      requestAnimationFrame(() => {
+        container.style.height = newHeight + 'px';
+      });
+
+      const newItems = container.querySelectorAll('.lusha-value-item');
+      newItems.forEach((item, index) => {
+        item.style.opacity = '0';
+        item.style.transform = 'translateY(8px) scale(0.95)';
+
+        setTimeout(() => {
+          item.classList.add('lusha-reveal-in');
+        }, index * 100);
+      });
+
+      // Remove height constraint after animation
+      setTimeout(() => {
+        container.style.height = '';
+        container.style.transition = '';
+      }, 300);
+    }
+  } catch (e) {
+    container.innerHTML = newContent;
+  }
+}
+
+  // Helper function to poll for phone numbers delivered asynchronously via webhook
+  async function pollForPhoneNumbers(personId, contact, wrap, container, companyContext) {
+  // Define helper locally in scope to avoid ReferenceError in async context
+  function formatPhoneLink(phone, type, isPrimary = false) {
+    if (!phone) return '—';
+    const cleanPhone = phone.replace(/\D/g, ''); 
+    const displayPhone = escapeHtml(phone);
+    
+    // Format type label (e.g., "work_direct" -> "Work Direct")
+    let displayType = (type || 'Other').replace(/_/g, ' ');
+    displayType = displayType.charAt(0).toUpperCase() + displayType.slice(1);
+
+    return `
+      <div style="display:flex; flex-direction:column;">
+        <a href="tel:${cleanPhone}" title="Click to call" style="color:inherit; text-decoration:none;">${displayPhone}</a>
+        <span style="font-size:11px; color:var(--text-muted); font-weight:500; margin-top:2px;">
+          ${displayType} ${isPrimary ? '• Primary' : ''}
+        </span>
+      </div>`;
+  }
+  
+  // Need local escapeHtml for the above helper since this runs in async context
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  // Helper to map Apollo phone types to CRM fields (Mobile, Work Direct, Other)
+  function mapApolloPhonesToContact(phones) {
+    const result = { mobile: '', workDirectPhone: '', otherPhone: '' };
+    
+    // Bucket phones by normalized type
+    const mobiles = phones.filter(p => (p.type || '').toLowerCase().includes('mobile')).map(p => p.number);
+    const works = phones.filter(p => {
+        const t = (p.type || '').toLowerCase();
+        return t.includes('work') || t.includes('direct') || t.includes('hq') || t.includes('office');
+    }).map(p => p.number);
+    const others = phones.filter(p => {
+        const t = (p.type || '').toLowerCase();
+        return !t.includes('mobile') && !t.includes('work') && !t.includes('direct') && !t.includes('hq') && !t.includes('office');
+    }).map(p => p.number);
+
+    // 1. Fill Primary Slots
+    if (mobiles.length > 0) result.mobile = mobiles.shift();
+    if (works.length > 0) result.workDirectPhone = works.shift();
+    if (others.length > 0) result.otherPhone = others.shift();
+
+    // 2. Handle Overflow (Mobile -> Other)
+    if (mobiles.length > 0 && !result.otherPhone) {
+        result.otherPhone = mobiles.shift();
+    }
+
+    // 3. Handle Overflow (Work -> Other)
+    if (works.length > 0 && !result.otherPhone) {
+        result.otherPhone = works.shift();
+    }
+
+    // 4. Handle Overflow (Other -> Mobile)
+    if (others.length > 0 && !result.mobile) {
+        result.mobile = others.shift();
+    }
+
+    // 5. Handle Overflow (Other -> Work Direct)
+    if (others.length > 0 && !result.workDirectPhone) {
+        result.workDirectPhone = others.shift();
+    }
+    
+    // 6. Double Overflow Safety (Mobile -> Work Direct?)
+    if (mobiles.length > 0 && !result.workDirectPhone) {
+        result.workDirectPhone = mobiles.shift();
+    }
+
+    return result;
+  }
+
+  const maxAttempts = 20; // Poll for up to ~10 minutes (20 attempts * 30 seconds)
+  const pollInterval = 30000; // 30 seconds between polls
+  let attempts = 0;
+
+  const getNextPollDelayMs = () => {
+    const jitter = Math.round(pollInterval * 0.1 * (Math.random() * 2 - 1));
+    return Math.max(5000, pollInterval + jitter);
+  };
+
+  let base = (window.API_BASE_URL || '').replace(/\/$/, '');
+  if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+
+  const poll = async () => {
+    const uiAlive = !!wrap && document.body.contains(wrap);
+    const containerAlive = !!container && document.body.contains(container);
+
+    attempts++;
+
+    try {
+      const response = await fetch(`${base}/api/apollo/phone-retrieve?personId=${encodeURIComponent(personId)}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Relaxed check: accept empty phones array if ready=true (meaning webhook arrived but had no phones)
+      let readyData = (data && data.ready && Array.isArray(data.phones)) ? data : null;
+      
+      if (!readyData) {
+        try {
+          const localResp = await fetch(`http://localhost:3000/api/apollo/phone-retrieve?personId=${encodeURIComponent(personId)}`);
+          if (localResp.ok) {
+            const localData = await localResp.json();
+            if (localData && localData.ready && Array.isArray(localData.phones)) {
+              readyData = localData;
+            }
+          }
+        } catch (_) { }
+      }
+
+      if (readyData) {
+        try {
+          // Phone numbers (or empty result) arrived!
+
+          // Extract phone numbers
+          const phones = readyData.phones.map(p => ({
+            number: p.sanitized_number || p.raw_number,
+            type: p.type || 'work'
+          }));
+
+          // Update UI
+          const phoneNumbers = phones.map(p => p.number).filter(Boolean);
+          let didSaveToCRM = false;
+          
+          if (uiAlive) {
+            if (phoneNumbers.length > 0) {
+              const newContent = phones.map((p, idx) => {
+                 // Treat first number as primary for display purposes in the widget
+                 return `<div class="lusha-value-item">${formatPhoneLink(p.number, p.type, idx === 0)}</div>`;
+              }).join('');
+              animateRevealContent(wrap, newContent);
+              
+              // Show success toast
+              if (window.crm?.showToast) {
+                window.crm.showToast(`✅ Revealed ${phoneNumbers.length} phone number(s)`, 'success');
+              }
+            } else {
+               // No phones found
+               const noPhonesContent = '<div class="lusha-value-item">—</div>';
+               animateRevealContent(wrap, noPhonesContent);
+               if (window.crm?.showToast) {
+                 window.crm.showToast('No phone numbers found', 'info');
+               }
+            }
+          }
+
+          // Update contact object using Smart Mapping
+          const smartMap = mapApolloPhonesToContact(phones);
+          
+          // Update local contact object
+          if (smartMap.mobile) contact.mobile = smartMap.mobile;
+          if (smartMap.workDirectPhone) contact.workDirectPhone = smartMap.workDirectPhone;
+          if (smartMap.otherPhone) contact.otherPhone = smartMap.otherPhone;
+          contact.hasPhones = phones.length > 0;
+          contact.hasMobilePhone = phones.some(p => (p.type || '').toLowerCase().includes('mobile'));
+          contact.hasDirectPhone = phones.some(p => {
+            const t = (p.type || '').toLowerCase();
+            return t.includes('work') || t.includes('direct') || t.includes('hq') || t.includes('office');
+          });
+          
+          // Also keep the raw array for reference if needed
+          contact.phones = phones;
+          
+          // Legacy fallback
+          if (phoneNumbers.length > 0) {
+            contact.phone = phoneNumbers[0];
+          }
+
+          if (phoneNumbers.length > 0) {
+            try {
+              const db = window.firebaseDB;
+              if (db) {
+                const email = contact.email || (Array.isArray(contact.emails) && contact.emails[0] && contact.emails[0].address) || '';
+                const companyName = String(contact.company || contact.companyName || (companyContext && (companyContext.name || companyContext.companyName)) || '').trim();
+                let existingId = null;
+
+                if (email) {
+                  try {
+                    const snap = await db.collection('contacts').where('email', '==', String(email)).limit(1).get();
+                    if (snap && snap.docs && snap.docs[0]) existingId = snap.docs[0].id;
+                  } catch (_) { }
+                }
+
+                if (!existingId) {
+                  const fullName = String(contact.fullName || contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim()).trim();
+                  if (fullName && companyName) {
+                    try {
+                      const snap = await db.collection('contacts').where('name', '==', fullName).limit(5).get();
+                      if (snap && snap.docs && snap.docs.length > 0) {
+                        const targetCompany = companyName.toLowerCase();
+                        const match = snap.docs.find(doc => {
+                          const data = doc.data();
+                          const dbCompany = String(data.companyName || data.accountName || '').toLowerCase();
+                          return (dbCompany && (dbCompany.includes(targetCompany) || targetCompany.includes(dbCompany)));
+                        });
+                        if (match) existingId = match.id;
+                      }
+                    } catch (_) { }
+                  }
+                }
+
+                if (existingId) {
+                  const updatePayload = {
+                    phone: phoneNumbers[0] || '',
+                    workDirectPhone: smartMap.workDirectPhone || '',
+                    mobile: smartMap.mobile || '',
+                    otherPhone: smartMap.otherPhone || '',
+                    updatedAt: new Date()
+                  };
+
+                  if (window.PCSaves && typeof window.PCSaves.updateContact === 'function') {
+                    await window.PCSaves.updateContact(existingId, updatePayload);
+                  } else {
+                    await db.collection('contacts').doc(String(existingId)).set(updatePayload, { merge: true });
+                  }
+                  didSaveToCRM = true;
+
+                  try {
+                    if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+                      await window.CacheManager.invalidate('contacts');
+                    }
+                  } catch (_) { }
+                }
+              }
+            } catch (_) { }
+          }
+
+          try {
+            const keys = Array.from(new Set([contact.id, contact.contactId, personId].filter(Boolean)));
+            keys.forEach(k => {
+              try {
+                localStorage.setItem(`lusha_contact_${k}`, JSON.stringify(contact));
+              } catch (_) { }
+            });
+          } catch (_) { }
+
+          // Update in allContacts cache
+          let updatedContactForCache = contact;
+          try {
+            const id = contact.id || contact.contactId;
+            const idx = allContacts.findIndex(c => (c.id || c.contactId) === id);
+            if (idx >= 0) {
+              // Apply smart mapping to cache
+              if (smartMap.mobile) allContacts[idx].mobile = smartMap.mobile;
+              if (smartMap.workDirectPhone) allContacts[idx].workDirectPhone = smartMap.workDirectPhone;
+              if (smartMap.otherPhone) allContacts[idx].otherPhone = smartMap.otherPhone;
+              
+              allContacts[idx].phones = phones;
+              allContacts[idx].hasPhones = phones.length > 0;
+              allContacts[idx].hasMobilePhone = contact.hasMobilePhone;
+              allContacts[idx].hasDirectPhone = contact.hasDirectPhone;
+              if (phoneNumbers[0]) allContacts[idx].phone = phoneNumbers[0];
+              updatedContactForCache = allContacts[idx];
+            }
+          } catch (e) {
+          }
+
+          try {
+            if (containerAlive) {
+              const revealBtn = container.querySelector('[data-reveal="phones"]');
+              if (revealBtn) revealBtn.textContent = 'Enrich';
+            }
+          } catch (_) { }
+
+          try {
+            if (containerAlive) {
+              const addContactBtn = container.querySelector('[data-action="add-contact"]');
+              if (addContactBtn) addContactBtn.setAttribute('data-contact', JSON.stringify(contact));
+            }
+          } catch (_) { }
+
+          try {
+            const companyForCache = companyContext || lastCompanyResult || {
+              domain: updatedContactForCache.fqdn || '',
+              name: updatedContactForCache.companyName || updatedContactForCache.company || ''
+            };
+            await upsertCacheContact({ company: companyForCache }, updatedContactForCache);
+          } catch (e) {
+          }
+
+          if (!uiAlive && phoneNumbers.length > 0) {
+            try {
+              const fullName = String(contact.fullName || contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim()).trim();
+              const companyName = String((companyContext && (companyContext.name || companyContext.companyName)) || contact.companyName || contact.company || '').trim();
+              const title = String(contact.jobTitle || contact.title || '').trim();
+              const titleLine = [title, companyName].filter(Boolean).join(' • ');
+              const iconLetter = (fullName || companyName || 'C').toString().trim().charAt(0).toUpperCase() || 'C';
+
+              if (window.crm?.showToast) {
+                window.crm.showToast(titleLine || 'Contact', 'save', {
+                  title: didSaveToCRM ? 'Number saved' : 'Phone ready',
+                  details: didSaveToCRM ? (fullName || '') : ([fullName || '', 'Not saved to CRM yet'].filter(Boolean).join(' • ')),
+                  icon: iconLetter,
+                  duration: 4500,
+                  sound: false
+                });
+              }
+            } catch (_) { }
+          }
+        } catch (processError) {
+          // Show error state in UI so user isn't stuck loading
+          if (uiAlive) {
+            animateRevealContent(wrap, '<div class="lusha-value-item" style="color: var(--danger);">Error displaying data</div>');
+          }
+        }
+
+        return; // Stop polling regardless of success/fail in processing
+      }
+
+      // Not ready yet, continue polling
+      if (attempts < maxAttempts) {
+        const delayMs = getNextPollDelayMs();
+        setTimeout(poll, delayMs);
+      } else {
+        // Timeout - show error
+        if (uiAlive) {
+          const timeoutContent = '<div class="lusha-value-item" style="color: var(--text-muted);">⏱️ Phone reveal timed out. Try again later.</div>';
+          animateRevealContent(wrap, timeoutContent);
+        }
+
+        if (window.crm?.showToast) {
+          window.crm.showToast('Phone reveal is taking longer than expected. Try again later.', 'warning');
+        }
+      }
+
+    } catch (error) {
+
+      // Retry on network error (up to max attempts)
+      if (attempts < maxAttempts) {
+        const delayMs = getNextPollDelayMs();
+        setTimeout(poll, delayMs);
+      } else {
+        if (uiAlive) {
+          const errorContent = '<div class="lusha-value-item">—</div>';
+          animateRevealContent(wrap, errorContent);
+        }
+
+        if (window.crm?.showToast) {
+          window.crm.showToast('Failed to reveal phone numbers', 'error');
+        }
+      }
+    }
+  };
+
+  // Start polling after a short delay
+  setTimeout(poll, 1000);
+}
+
+// Render usage bar with cached data (immediate display)
+function renderUsageBarWithData(cachedData) {
+  try {
+    const usage = cachedData.usage || {};
+    const headers = cachedData.headers || {};
+
+    const toNum = (v) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    // Allow manual override if your plan credits are known (e.g., 600)
+    const configuredTotal = (function () {
+      const fromWindow = toNum(window.LUSHA_CREDITS_TOTAL);
+      if (fromWindow != null) return fromWindow;
+      try { const ls = toNum(localStorage.getItem('LUSHA_CREDITS_TOTAL')); if (ls != null) return ls; } catch (_) { }
+      // Default to 600 credits if not configured
+      return 600;
+    })();
+
+    // Deterministic pick helper (accepts 0 as valid)
+    const pick = (...vals) => {
+      for (const v of vals) { const n = toNum(v); if (n != null) return n; }
+      return null;
+    };
+
+    // Prefer true credits if present in payload
+    const creditsTotal = pick(
+      configuredTotal,
+      usage.total,
+      usage.totalCredits,
+      usage?.credits?.total,
+      usage?.credits?.limit,
+      usage?.plan?.totalCredits,
+      usage?.plan?.limit,
+      usage?.account?.credits?.total,
+      usage?.account?.credits?.limit
+    );
+    const creditsUsed = pick(
+      usage.used,
+      usage.usedCredits,
+      usage?.credits?.used,
+      usage?.account?.credits?.used
+    );
+
+    let label = 'Credits';
+    let limit;
+    let used;
+
+    // Hard code to always show Usage/600 format
+    limit = 600; // Your 600-credit plan
+    used = (creditsUsed != null && creditsUsed >= 0) ? creditsUsed : 0;
+    label = 'Credits';
+
+    const pct = limit > 0 ? Math.max(0, Math.min(100, Math.round((used / limit) * 100))) : 0;
+
+    // Anchor usage bar in persistent footer (not wiped by pagination)
+    const resultsEl = document.getElementById('lusha-results');
+    if (!resultsEl) return;
+    let footer = document.getElementById('lusha-usage-footer');
+    if (!footer) {
+      footer = document.createElement('div');
+      footer.id = 'lusha-usage-footer';
+      footer.className = 'lusha-usage-footer';
+      resultsEl.appendChild(footer);
+    }
+
+    let wrap = document.getElementById('lusha-usage-wrap');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.id = 'lusha-usage-wrap';
+      wrap.className = 'lusha-usage-wrap';
+      wrap.innerHTML = `
+          <div id="lusha-usage-label">${label}</div>
+        <div class="lusha-usage-bar"><div class="lusha-usage-fill" id="lusha-usage-fill"></div></div>
+        <div id="lusha-usage-text">–</div>
+      `;
+      footer.appendChild(wrap);
+    } else if (wrap.parentElement !== footer) {
+      // If it exists somewhere else, move it to footer
+      footer.appendChild(wrap);
+    }
+
+    const fill = document.getElementById('lusha-usage-fill');
+    const txt = document.getElementById('lusha-usage-text');
+    const lab = document.getElementById('lusha-usage-label');
+    if (fill) fill.style.width = pct + '%';
+
+    const displayText = limit ? `${used}/${limit}` : `${used} used`;
+    if (txt) txt.textContent = displayText;
+    if (lab) lab.textContent = label;
+  } catch (_) { }
+}
+
+// Fetch and render live Lusha usage bar (rate-limited server endpoint)
+async function renderUsageBar() {
+  try {
+    // First, try to load cached usage data for immediate display
+    const cachedUsage = await loadCachedUsageData();
+    if (cachedUsage) {
+      renderUsageBarWithData(cachedUsage);
+    }
+
+    // Throttle to avoid exceeding Lusha's ~5/minute usage endpoint limit
+    const now = Date.now();
+    try {
+      if (!window.__lushaUsageLastFetch) window.__lushaUsageLastFetch = 0;
+      // 15s min interval
+      if (now - window.__lushaUsageLastFetch < 15000) return;
+      window.__lushaUsageLastFetch = now;
+    } catch (_) { }
+
+    let base = (window.API_BASE_URL || '').replace(/\/$/, '');
+    if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+    const resp = await fetch(`${base}/api/apollo/usage`, { method: 'GET' });
+    if (!resp.ok) {
+      // Fallback: show hard-coded 600 total with 0 used if API fails
+      const fallbackLimit = 600;
+      const fallbackUsed = 0;
+      const fallbackPct = 0;
+
+      const resultsEl = document.getElementById('lusha-results');
+      if (!resultsEl) return;
+
+      let footer = document.getElementById('lusha-usage-footer');
+      if (!footer) {
+        footer = document.createElement('div');
+        footer.id = 'lusha-usage-footer';
+        footer.className = 'lusha-usage-footer';
+        resultsEl.appendChild(footer);
+      }
+
+      let wrap = document.getElementById('lusha-usage-wrap');
+      if (!wrap) {
+        wrap = document.createElement('div');
+        wrap.id = 'lusha-usage-wrap';
+        wrap.className = 'lusha-usage-wrap';
+        wrap.innerHTML = `
+          <div id="lusha-usage-label">Credits</div>
+          <div class="lusha-usage-bar"><div class="lusha-usage-fill" id="lusha-usage-fill"></div></div>
+          <div id="lusha-usage-text">–</div>
+        `;
+        footer.appendChild(wrap);
+      }
+
+      const fill = document.getElementById('lusha-usage-fill');
+      const txt = document.getElementById('lusha-usage-text');
+      const lab = document.getElementById('lusha-usage-label');
+      if (fill) fill.style.width = fallbackPct + '%';
+      if (txt) txt.textContent = `${fallbackUsed}/${fallbackLimit}`;
+      if (lab) lab.textContent = 'Credits';
+      return;
+    }
+    const data = await resp.json();
+    const usage = data && data.usage ? data.usage : {};
+    const headers = data && data.headers ? data.headers : {};
+
+    // Cache the usage data for immediate display next time
+    await cacheUsageData({ usage, headers });
+
+    const toNum = (v) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    // Allow manual override if your plan credits are known (e.g., 600)
+    const configuredTotal = (function () {
+      const fromWindow = toNum(window.LUSHA_CREDITS_TOTAL);
+      if (fromWindow != null) return fromWindow;
+      try { const ls = toNum(localStorage.getItem('LUSHA_CREDITS_TOTAL')); if (ls != null) return ls; } catch (_) { }
+      // Default to 600 credits if not configured
+      return 600;
+    })();
+
+    // Deterministic pick helper (accepts 0 as valid)
+    const pick = (...vals) => {
+      for (const v of vals) { const n = toNum(v); if (n != null) return n; }
+      return null;
+    };
+
+    // Prefer true credits if present in payload
+    const creditsTotal = pick(
+      configuredTotal,
+      usage.total,
+      usage.totalCredits,
+      usage?.credits?.total,
+      usage?.credits?.limit,
+      usage?.plan?.totalCredits,
+      usage?.plan?.limit,
+      usage?.account?.credits?.total,
+      usage?.account?.credits?.limit
+    );
+    const creditsUsed = pick(
+      usage.used,
+      usage.usedCredits,
+      usage?.credits?.used,
+      usage?.account?.credits?.used
+    );
+
+    let label = 'Credits';
+    let limit;
+    let used;
+
+    // Hard code to always show Usage/600 format
+    limit = 600; // Your 600-credit plan
+    used = (creditsUsed != null && creditsUsed >= 0) ? creditsUsed : 0;
+    label = 'Credits';
+
+    const pct = limit > 0 ? Math.max(0, Math.min(100, Math.round((used / limit) * 100))) : 0;
+
+    // Use the same rendering logic as cached data
+    renderUsageBarWithData({ usage, headers });
+  } catch (_) { }
+}

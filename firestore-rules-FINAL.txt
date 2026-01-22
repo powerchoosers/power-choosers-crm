@@ -1,0 +1,199 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Auth helpers
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserEmail() {
+      // Return lowercase email for consistent comparison
+      return request.auth.token.email.lower();
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && (
+        getUserEmail() == 'l.patterson@powerchoosers.com' || 
+        getUserEmail() == 'l.patterson@nodalpoint.io'
+      );
+    }
+    
+    function isPowerChoosersUser() {
+      return isAuthenticated() && (
+        getUserEmail().matches('.*@powerchoosers.com$') || 
+        getUserEmail().matches('.*@powerchoosrs.com$') ||
+        getUserEmail().matches('.*@nodalpoint.io$')
+      );
+    }
+    
+    function isOwnerOrAssigned(data) {
+      return data.ownerId == getUserEmail() 
+          || data.assignedTo == getUserEmail()
+          || data.createdBy == getUserEmail()
+          || data.ownerId == 'unassigned';
+    }
+
+    // Users collection - Admin sees all, employees see self only
+    match /users/{userId} {
+      allow read: if isAdmin() || getUserEmail() == userId;
+      allow list: if isAdmin();
+      allow create: if isPowerChoosersUser() && getUserEmail() == userId;
+      allow update: if isAdmin() || getUserEmail() == userId;
+      allow delete: if isAdmin();
+    }
+
+    // Personal settings - Admin sees all, employees see own
+    match /settings/{docId} {
+      allow get: if isAdmin() || (isPowerChoosersUser() && (
+        resource.data.ownerId == getUserEmail() ||
+        resource.data.userId == request.auth.uid
+      ));
+      allow list: if isAdmin(); // Employees use get() for specific doc
+      allow create: if isPowerChoosersUser() && (
+        request.resource.data.ownerId == getUserEmail() ||
+        request.resource.data.userId == request.auth.uid
+      );
+      allow update: if isAdmin() || (isPowerChoosersUser()
+        && (resource.data.ownerId == getUserEmail() || resource.data.userId == request.auth.uid)
+        && request.resource.data.ownerId == resource.data.ownerId
+      );
+      allow delete: if isAdmin() || (isPowerChoosersUser() && (
+        resource.data.ownerId == getUserEmail() || resource.data.userId == request.auth.uid
+      ));
+    }
+
+    // Notifications - Admin sees all, employees see own
+    match /notifications/{docId} {
+      allow get, list: if isAdmin() || (isPowerChoosersUser() && (
+        resource.data.ownerId == getUserEmail() ||
+        resource.data.userId == request.auth.uid
+      ));
+      allow create: if isPowerChoosersUser() && (
+        request.resource.data.ownerId == getUserEmail() ||
+        request.resource.data.userId == request.auth.uid
+      );
+      allow update: if isAdmin() || (isPowerChoosersUser()
+        && (resource.data.ownerId == getUserEmail() || resource.data.userId == request.auth.uid)
+        && request.resource.data.ownerId == resource.data.ownerId
+      );
+      allow delete: if isAdmin() || (isPowerChoosersUser() && (
+        resource.data.ownerId == getUserEmail() || resource.data.userId == request.auth.uid
+      ));
+    }
+
+    // Sequences - Admin sees all, employees see own
+    match /sequences/{docId} {
+      allow get, list: if isAdmin() || (isPowerChoosersUser() && isOwnerOrAssigned(resource.data));
+      allow create: if isPowerChoosersUser() && request.resource.data.ownerId == getUserEmail();
+      allow update: if isAdmin() || (isPowerChoosersUser()
+        && isOwnerOrAssigned(resource.data)
+        && request.resource.data.ownerId == resource.data.ownerId);
+      allow delete: if isAdmin() || (isPowerChoosersUser() && isOwnerOrAssigned(resource.data));
+    }
+
+    // Membership docs - Admin sees all
+    match /sequenceMembers/{docId} {
+      allow get, list: if isAdmin() || (isPowerChoosersUser() && (
+        resource.data.ownerId == getUserEmail() || resource.data.userId == request.auth.uid
+      ));
+      allow create: if isPowerChoosersUser() && (
+        request.resource.data.ownerId == getUserEmail() || request.resource.data.userId == request.auth.uid
+      );
+      allow update, delete: if isAdmin() || (isPowerChoosersUser() && (
+        resource.data.ownerId == getUserEmail() || resource.data.userId == request.auth.uid
+      ));
+    }
+    
+    match /listMembers/{docId} {
+      allow get, list: if isAdmin() || (isPowerChoosersUser() && (
+        resource.data.ownerId == getUserEmail() || resource.data.userId == request.auth.uid
+      ));
+      allow create: if isPowerChoosersUser() && (
+        request.resource.data.ownerId == getUserEmail() || request.resource.data.userId == request.auth.uid
+      );
+      allow update, delete: if isAdmin() || (isPowerChoosersUser() && (
+        resource.data.ownerId == getUserEmail() || resource.data.userId == request.auth.uid
+      ));
+    }
+
+    // Call Details - Large fields (transcripts, AI insights) - Admin sees all, employees see own
+    match /callDetails/{docId} {
+      allow get, list: if isAdmin() || (isPowerChoosersUser() && isOwnerOrAssigned(resource.data));
+      allow create: if isPowerChoosersUser() && request.resource.data.ownerId == getUserEmail();
+      allow update: if isAdmin() || (isPowerChoosersUser()
+        && isOwnerOrAssigned(resource.data)
+        && request.resource.data.ownerId == resource.data.ownerId);
+      allow delete: if isAdmin();
+    }
+
+    // Lusha cache: global read for employees; admin full access
+    match /lusha_cache/{docId} {
+      allow read, list: if isPowerChoosersUser();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Twilio webhooks: admin only
+    match /twilio_webhooks/{docId} {
+      allow read, write, list: if isAdmin();
+    }
+
+    // Agents collection - Admin sees all, users can create/read their own
+    match /agents/{docId} {
+      allow read, list: if isAdmin() || (isPowerChoosersUser() && docId == getUserEmail());
+      allow create: if isPowerChoosersUser() && docId == getUserEmail() && request.resource.data.email == getUserEmail();
+      allow update: if isAdmin() || (isPowerChoosersUser() && docId == getUserEmail());
+      allow delete: if isAdmin();
+    }
+
+    // Posts collection - Admin only (for News Updates)
+    match /posts/{docId} {
+      allow read, list, create, update, delete: if isAdmin();
+    }
+
+    // Agent activities - Admin sees all, agents see own
+    match /agent_activities/{docId} {
+      allow get, list: if isAdmin() || (isPowerChoosersUser() && resource.data.agentEmail == getUserEmail());
+      allow create: if isPowerChoosersUser() && request.resource.data.agentEmail == getUserEmail();
+      allow update, delete: if isAdmin();
+    }
+
+    // ========================================
+    // CRITICAL: Generic rule for ALL collections (accounts, contacts, calls, emails, lists, tasks, etc.)
+    // 
+    // CORRECTED BASED ON FIREBASE GEMINI AI VERIFICATION:
+    // Both get() and list() operations MUST use the same resource.data check
+    // This allows Firestore to verify that queries with where() clauses will satisfy the rule
+    // 
+    // How it works:
+    // - When employee queries with where('ownerId', '==', email), Firestore verifies all returned
+    //   documents will satisfy isOwnerOrAssigned(resource.data), so query is allowed
+    // - If employee tries to query without proper where() clauses, Firestore rejects it because
+    //   it cannot guarantee all documents satisfy isOwnerOrAssigned(resource.data)
+    // ========================================
+    match /{collection}/{docId} {
+      // Admin gets unrestricted access to individual docs AND list queries
+      // Employees can only get/list documents where they are owner OR assigned
+      // The resource.data check ensures Firestore can validate queries match this constraint
+      allow get, list: if isAdmin() || (isPowerChoosersUser() && isOwnerOrAssigned(resource.data));
+      
+      // Creation requires ownership
+      allow create: if isPowerChoosersUser() && request.resource.data.ownerId == getUserEmail();
+      
+      // Updates - must maintain ownership
+      allow update: if isAdmin()
+                    || ( isPowerChoosersUser()
+                         && isOwnerOrAssigned(resource.data)
+                         && request.resource.data.ownerId == resource.data.ownerId );
+      
+      // Only admin can delete
+      allow delete: if isAdmin();
+    }
+
+    // Catch-all (subcollections, unknown): admin only
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
+

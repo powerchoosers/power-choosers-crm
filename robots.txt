@@ -1,0 +1,60 @@
+# robots.txt for powerchoosers.com
+# Updated: January 2025
+
+# Default rules for all search engines
+User-agent: *
+Allow: /
+
+# Block admin/private areas and API endpoints
+Disallow: /crm-dashboard.html
+Disallow: /api/
+Disallow: /scripts/
+Disallow: /styles/
+Disallow: /test
+Disallow: /test-
+Disallow: /algolia-reindex.html
+Disallow: /unsubscribe.html
+Disallow: /node_modules/
+Disallow: /backups/
+Disallow: /Uploaded Leads/
+
+# Block JavaScript and JSON files (not needed for SEO)
+Disallow: /*.js$
+Disallow: /*.json$
+
+# Google-specific rules
+User-agent: Googlebot
+Allow: /
+Disallow: /crm-dashboard.html
+Disallow: /api/
+
+# Bing-specific rules
+User-agent: Bingbot
+Allow: /
+Disallow: /crm-dashboard.html
+Disallow: /api/
+
+# AI Search Engine Crawlers
+# Note: Most AI crawlers respect robots.txt, but also check llms.txt
+User-agent: GPTBot
+User-agent: ChatGPT-User
+User-agent: CCBot
+User-agent: anthropic-ai
+User-agent: Claude-Web
+User-agent: PerplexityBot
+Allow: /
+Disallow: /crm-dashboard.html
+Disallow: /api/
+
+# Crawl-delay to prevent server overload (1 second)
+User-agent: *
+Crawl-delay: 1
+
+# Sitemap location
+Sitemap: https://powerchoosers.com/sitemap.xml
+
+
+
+
+
+

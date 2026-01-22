@@ -1,0 +1,29 @@
+---
+inclusion: always
+---
+
+Phone Field Editing (Contact Detail)
+
+- Render a custom dropdown anchored under the active phone input.
+  - Container classes: phone-input-wrap (position: relative), phone-dropdown (position: absolute).
+  - Center the dropdown under the input; default width ~220px; min-width 200px; high z-index.
+  - Items use class phone-dropdown-item, showing a left-aligned type label and right-aligned phone value.
+- Options shown in the dropdown:
+  - Existing numbers for each supported type: mobile, work direct (workDirectPhone), other (otherPhone).
+  - If a type is missing, include an "Add <type>" option that switches the target field to that type.
+- Selection behavior (prior to save):
+  - Update the input value and dataset (data-selected-field, data-selected-type).
+  - Update the field label ("MOBILE", "WORK DIRECT", or "OTHER PHONE") as visual confirmation.
+  - Highlight the selected item.
+- Save behavior:
+  - Persist to the correct underlying field based on the selected type (mobile, workDirectPhone, otherPhone).
+  - Temporarily prefer the chosen type for the next render so the main phone row reflects the change.image.png
+- Cancel behavior:
+  - Restore the original label and value exactly; do not save.
+- Delete behavior:
+  - Confirm, then clear the underlying field for the current row (mobile/workDirectPhone/otherPhone), persist to Firestore, and re-render the phone row using the normal priority (Mobile > Work Direct > Other) unless a preferred type override is active.
+
+Accessibility & UX
+
+- Keep keyboard support (Enter to save, Escape to cancel).
+- Do not change hover semantics project-wide (no underline/bold; subtle color change only).

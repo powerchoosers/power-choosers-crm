@@ -1,0 +1,28 @@
+# Power Choosers CRM - Local Development Environment Setup
+# Copy the contents below to create a .env file in your project root
+
+# Create a file named ".env" in your project root with this content:
+
+API_BASE_URL=https://power-choosers-crm-792458658491.us-south1.run.app
+NODE_ENV=development
+PORT=3000
+
+# Required for Process Call feature (Conversational Intelligence):
+# Copy this value from your Cloud Run environment variables (Variable 35: _TWILIO_INTELLIGENCE_SERVICE_SID)
+TWILIO_INTELLIGENCE_SERVICE_SID=GAf268e3d9baa700c921408
+
+# Optional: Add other environment variables you need for local development
+# (Copy the values from your Cloud Run environment variables)
+# SENDGRID_API_KEY=your_sendgrid_key_here
+# TWILIO_ACCOUNT_SID=your_twilio_sid_here
+# TWILIO_AUTH_TOKEN=your_twilio_token_here
+# PERPLEXITY_API_KEY=your_perplexity_key_here
+
+# Instructions:
+# 1. Create a new file called ".env" in your project root directory
+# 2. Copy the API_BASE_URL and TWILIO_INTELLIGENCE_SERVICE_SID lines above into that file
+# 3. Add any other environment variables you need for local development
+# 4. Save the file
+# 5. Restart your local server (node server.js)
+
+# This will make your local development use the Cloud Run deployment instead of Vercel

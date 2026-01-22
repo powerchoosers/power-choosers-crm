@@ -1,0 +1,149 @@
+{
+  "lusha_current": {
+    "entry_points": [
+      "window.Widgets.openLusha(contactId) - from Contact Detail page",
+      "window.Widgets.openLushaForAccount(accountId) - from Account Detail page"
+    ],
+    "widget_flow": [
+      "1. User clicks Lusha button in header (Contact or Account detail)",
+      "2. makeCard() function creates widget panel",
+      "3. Extract account name from current context (ContactDetail.state or AccountDetail.state)",
+      "4. Call Lusha API to search company (via enrich.js backend endpoint)",
+      "5. Display company summary (logo, website, summary, employees, revenue, linkedin)",
+      "6. Display people list (pagination: 5 per page)",
+      "7. People cards show: name, title, email(?), phone(?), with reveal buttons"
+    ],
+    "company_display": [
+      "Logo (from company data)",
+      "Company name",
+      "Website",
+      "Summary",
+      "LinkedIn URL",
+      "Employees (size)",
+      "Revenue",
+      "Industry"
+    ],
+    "people_display": [
+      "First Name + Last Name",
+      "Title",
+      "Email (if revealed)",
+      "Phone (if revealed)",
+      "LinkedIn (if available)",
+      "Pagination controls"
+    ]
+  },
+  "apollo_equivalent": {
+    "entry_points": [
+      "window.Widgets.openApollo(contactId) - from Contact Detail page",
+      "window.Widgets.openApolloForAccount(accountId) - from Account Detail page"
+    ],
+    "widget_flow": [
+      "1. User clicks Apollo button in header (Contact or Account detail)",
+      "2. makeCard() function creates widget panel",
+      "3. Extract account/company name from current context",
+      "4. Call Apollo API to search company (/mixed_companies/search)",
+      "5. Display company summary (logo, website, summary, employees, revenue, linkedin)",
+      "6. Call Apollo API to search people (/mixed_people/search)",
+      "7. Display people list (pagination: 5 per page)",
+      "8. People cards show: name, title, email(?), phone(?), linkedin"
+    ]
+  },
+  "apollo_credit_costs": {
+    "scenario_no_reveals": {
+      "description": "User opens widget but doesn't click any reveal buttons",
+      "api_calls": [
+        {
+          "endpoint": "/mixed_companies/search",
+          "cost": "1 credit",
+          "note": "Search for company by domain/name"
+        },
+        {
+          "endpoint": "/mixed_people/search",
+          "cost": "1 credit",
+          "note": "Search for people at company (up to 100 results)"
+        }
+      ],
+      "total_credits": 2,
+      "notes": "Partial profiles returned - no contact details enriched"
+    },
+    "scenario_one_email_reveal": {
+      "description": "User opens widget and reveals 1 email",
+      "api_calls": [
+        {
+          "endpoint": "/mixed_companies/search",
+          "cost": "1 credit"
+        },
+        {
+          "endpoint": "/mixed_people/search",
+          "cost": "1 credit"
+        },
+        {
+          "endpoint": "/people/match (for 1 contact)",
+          "cost": "1 credit",
+          "note": "Email reveal"
+        }
+      ],
+      "total_credits": 3
+    },
+    "scenario_one_phone_reveal": {
+      "description": "User opens widget and reveals 1 phone number",
+      "api_calls": [
+        {
+          "endpoint": "/mixed_companies/search",
+          "cost": "1 credit"
+        },
+        {
+          "endpoint": "/mixed_people/search",
+          "cost": "1 credit"
+        },
+        {
+          "endpoint": "/people/match (for 1 contact)",
+          "cost": "5 credits",
+          "note": "Phone reveal"
+        }
+      ],
+      "total_credits": 7
+    },
+    "scenario_heavy_usage": {
+      "description": "User opens widget and reveals 5 emails + 3 phones",
+      "api_calls": [
+        {
+          "endpoint": "/mixed_companies/search",
+          "cost": "1 credit"
+        },
+        {
+          "endpoint": "/mixed_people/search",
+          "cost": "1 credit"
+        },
+        {
+          "endpoint": "/people/bulk_match",
+          "cost": "5 credits (emails) + 15 credits (phones) = 20 credits",
+          "note": "Bulk reveal of 5 emails + 3 phones"
+        }
+      ],
+      "total_credits": 22
+    }
+  },
+  "cost_comparison": {
+    "no_reveals": {
+      "apollo": "2 credits",
+      "lusha": "0 credits",
+      "note": "Apollo charges for search, Lusha doesn't"
+    },
+    "1_email_reveal": {
+      "apollo": "3 credits",
+      "lusha": "1 credit",
+      "apollo_vs_lusha": "3x more"
+    },
+    "1_phone_reveal": {
+      "apollo": "7 credits",
+      "lusha": "10 credits",
+      "apollo_vs_lusha": "Apollo is 30% cheaper"
+    },
+    "5_emails_3_phones": {
+      "apollo": "22 credits",
+      "lusha": "35 credits",
+      "apollo_vs_lusha": "Apollo is 37% cheaper"
+    }
+  }
+}

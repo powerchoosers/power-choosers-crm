@@ -1,0 +1,49 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserEmail() {
+      return request.auth.token.email;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+             getUserEmail() == 'l.patterson@powerchoosers.com';
+    }
+    
+    function isPowerChoosersUser() {
+      return isAuthenticated() && 
+             getUserEmail().matches('.*@powerchoosers.com$');
+    }
+    
+    function isOwnerOrAssigned(data) {
+      // Allow if no ownership fields yet (for migration)
+      return !('ownerId' in data) || 
+             data.ownerId == getUserEmail() || 
+             data.assignedTo == getUserEmail();
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if isPowerChoosersUser();
+    }
+    
+    // ALL DATA COLLECTIONS - Lenient during migration
+    match /{collection}/{docId} {
+      allow read: if isAdmin() || (isPowerChoosersUser() && isOwnerOrAssigned(resource.data));
+      allow create: if isPowerChoosersUser();
+      allow update: if isAdmin() || (isPowerChoosersUser() && isOwnerOrAssigned(resource.data));
+      allow delete: if isAdmin();
+    }
+    
+    // Catch-all: Admin can access everything
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
