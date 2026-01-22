@@ -1,0 +1,180 @@
+---
+inclusion: manual
+---
+# Power Choosers CRM Development Rules
+
+## Server & Deployment
+- Only stop and restart server if explicitly requested or when editing server.js file
+- Always use Cloud Run deployment as base URL for all API calls (https://power-choosers-crm-792458658491.us-south1.run.app)
+- Use PowerShell-compatible command syntax (semicolon instead of &&)
+- Implement proper environment variable validation on startup
+
+## UI/UX Standards
+- Use white vector icons instead of emojis for all UI elements and logos
+- Apply two-tone grey theme with 25px margin system for all layouts
+- Use consistent border-radius and 1px subtle borders throughout
+- No white backgrounds - use light grey for main content, darker grey for sidebars
+- For hover effects on links, phone numbers, emails: no underline, no bold text, slightly lighter color on hover
+
+## Security & Validation
+- Always validate required fields before API calls
+- Implement proper input sanitization for user data
+- Use secure origins (HTTPS or localhost) for microphone access
+- Always include proper authentication checks for sensitive operations
+- Implement proper rate limiting and backoff strategies
+- Use PUBLIC_BASE_URL for webhook callbacks to prevent 401 errors
+
+## API Integration Standards
+- Use real API integrations (Twilio, Gemini) over demo/mock data
+- Always use Firebase Admin SDK for server-side operations
+- Implement proper CORS handling for cross-origin requests
+- Always include comprehensive error logging for debugging
+- Implement proper session management and authentication flows
+
+## Email & Communication
+- Use Gemini AI for email generation with specific prompt templates
+- Implement email tracking with 1x1 transparent pixels
+- Always include time/season awareness in email greetings
+- Use natural language personalization (no {{templates}} in final output)
+- Subject lines should never use brackets and should include recipient's name along with actual contact or company name
+- Email templates should never include bracketed placeholders; dynamically insert actual contact names if available based on notes, otherwise say 'I recently spoke with a colleague at <company name>'
+
+## Performance & Architecture
+- Use lazy loading for non-critical components
+- Implement proper caching strategies for API responses
+- Use modular JavaScript with separate files per page
+- Always include proper cleanup for event listeners
+- Implement proper memory management for in-memory stores
+
+## Twilio Integration Specifics
+- Always use Twilio Call SID as primary identifier (never Recording SID or Transcript SID)
+- Ensure one call logged per Call SID across all pages (contact details and calls page)
+- Use resolveToCallSid() function for proper ID resolution in webhooks
+- Maintain consistency between contact details page and calls page for call insights display
+- Use real Twilio and Gemini APIs to fetch call insights data instead of demo data
+
+### Recording & Diarization (2025-09 Update)
+- TwiML must request dual-channel recording on ALL <Dial> verbs:
+  - Set `record="record-from-answer-dual"`, `answerOnBridge="true"`.
+  - Set `recordingStatusCallback` to `/api/twilio/recording` with method `POST`.
+  - Prefer computing absolute callback base URL from request headers; fallback to `PUBLIC_BASE_URL`.
+  - Files: `api/twilio/voice.js`, `api/twilio/bridge.js`.
+- REST API recording fallback (optimized to prevent interference):
+  - Wait 5 seconds after dial status events before checking for existing recordings.
+  - Only start REST API recording if NO DialVerb recording exists (check `source === 'DialVerb'`).
+  - Skip REST API fallback entirely if any DialVerb recording is found to avoid interference.
+  - Files: `api/twilio/dial-status.js`, `api/twilio/status.js`.
+- Recording webhook acceptance and metadata storage:
+  - Accept DialVerb dual completions when `RecordingChannels` is `"2"`, `"dual"`, `"both"`, or numeric `2`.
+  - Store recording metadata: `recordingChannels`, `recordingTrack`, `recordingSource` in call records.
+  - Always normalize playback URL to `.mp3` and append `?RequestedChannels=2` for dual-channel playback.
+  - Monitor for dual-channel failures: log warnings when `RecordingChannels="1"` with `RecordingSource="DialVerb"`.
+  - File: `api/twilio/recording.js`.
+- Calls persistence contract (enhanced):
+  - `/api/calls` upserts strictly by valid Twilio Call SID (no cross-call merge by phone pair).
+  - Store `targetPhone`, `businessPhone`, `recordingChannels`, `recordingTrack`, `recordingSource`.
+  - Store both `transcript` and `formattedTranscript` (with speaker labels) for better display.
+  - File: `api/calls.js`.
+- Conversational Intelligence and transcript processing:
+  - Require `TWILIO_INTELLIGENCE_SERVICE_SID` in production.
+  - Map channels to speakers: Channel 1 = Customer (PSTN caller), Channel 2 = Agent (Client agent).
+  - Create formatted transcripts with speaker labels: `"Customer: Hello\n\nAgent: Hi there"`.
+  - Store speaker mapping in `conversationalIntelligence.speakerMapping`.
+  - Implement retry/polling for transcript status (queued → in-progress → completed).
+  - Files: `api/twilio/conversational-intelligence-webhook.js`, `api/twilio/recording.js`.
+- UI rendering rules (enhanced):
+  - Display recording info: "Recording: Dual-Channel (2 Channels) • Source: DialVerb".
+  - Use `formattedTranscript` with speaker labels when available, fallback to regular `transcript`.
+  - Show transcript processing status: "Transcript processing..." vs "✓ AI analysis completed".
+  - Never render blank Contact; fallback to company then formatted phone.
+  - Files: `scripts/pages/calls.js`, `scripts/pages/contact-detail.js`, `scripts/pages/account-detail.js`.
+- Environment variables (production):
+  - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`.
+  - `BUSINESS_NUMBERS` (comma-separated E.164 or 10D normalized for mapping).
+  - `PUBLIC_BASE_URL` (optional; header-derived base URL preferred in code).
+  - `TWILIO_INTELLIGENCE_SERVICE_SID` (required for diarized sentences/roles).
+  - `GEMINI_API_KEY` (optional; alternative AI summary pipeline).
+- Operational notes:
+  - Prefer ≥60–120s bridged two-party calls (avoid IVR/voicemail) for reliable CI diarization.
+  - Dual-channel recordings provide significantly better transcript accuracy and speaker separation.
+  - Telemetry: log dial/status attempts to Firestore collection `twilio_webhooks` when available.
+
+### Calls Endpoint Behavior (Hard Requirements)
+- Frontend must never create calls with placeholder IDs (e.g., `call_<ts>_rand`). If a placeholder exists from legacy code, backend must not persist it.
+- Backend `POST /api/calls` must upsert strictly by valid Call SID. If missing, respond `202 { pending: true }` and do not create a row.
+- Do NOT merge across different calls by phone pair or contact/account. No cross-call dedupe. One row per Twilio Call SID only; subsequent updates (status/recording/insights) MUST update that same Call SID row.
+- Webhooks (`status`, `recording`, `language/CI`) must resolve to Call SID via `resolveToCallSid()` before posting updates.
+
+### Deletion and CORS
+- Backend CORS must allow: `GET, POST, DELETE, OPTIONS` and `Content-Type, Authorization`.
+- `DELETE /api/calls` must accept `id`, `callSid`, `twilioSid`, or `ids[]` in body or query. Resolve to Call SID when needed and delete both resolved SID docs and any legacy non-SID IDs.
+
+### Rendering Resilience
+- UI must guard optional helpers (e.g., `window.__pcAccountsIcon`) and provide a white vector fallback to prevent render crashes and demo-data fallback.
+
+## Data Management
+- Use Firebase Firestore for data persistence
+- Follow established field mapping patterns for data consistency
+- Implement proper error handling for all API calls
+- Maintain modular JavaScript architecture with separate files per page
+
+## Code Quality
+- Always implement proper error handling for API calls
+- Use consistent coding patterns and naming conventions
+- Prefer editing existing files over creating new ones
+- Maintain clean, readable code with proper comments
+
+## Performance Optimization Guidelines
+- **Scroll Event Optimization**: Always use `requestAnimationFrame` + `cancelAnimationFrame` for scroll handlers to prevent freezing
+- **Event Listener Management**: Use bound flags (e.g., `_listenerBound`) to prevent duplicate event listeners and memory leaks
+- **DOM Query Caching**: Cache frequently accessed DOM elements (e.g., `state._cachedElement`) to avoid repeated queries
+- **Memory Management**: Implement batch cleanup for Maps/Sets and only clean up when necessary (e.g., when size > 10)
+- **Event Dispatching**: Throttle frequent events (e.g., live duration updates every 2 seconds instead of every second)
+- **Periodic Refresh**: Add time-based throttling to prevent unnecessary API calls during rapid user interactions
+- **Animation Optimization**: Use `requestAnimationFrame` for animation cleanup and consolidate multiple `setTimeout` calls
+- **Live Data Updates**: Implement efficient caching strategies for live data (e.g., live call durations) with proper cleanup
+- **Scroll Performance**: Use `{ passive: true }` for scroll event listeners to improve scroll performance
+- **Timer Management**: Consolidate multiple timers into single loops and use `requestAnimationFrame` for smoother animations
+
+## Debug Logging System
+**Status**: Debug logs are **SILENCED BY DEFAULT** for performance and better speed
+
+### Quick Methods to Turn On Debug Logs:
+
+#### Method 1: Browser Console (Fastest)
+```javascript
+// Turn ON debug logs
+localStorage.setItem('pc-debug-logs', 'true');
+// Refresh page, then logs will appear
+
+// Turn OFF debug logs  
+localStorage.removeItem('pc-debug-logs');
+```
+
+#### Method 2: Global Debug Flag
+```javascript
+// Turn ON debug logs
+window.PC_DEBUG = true;
+// Refresh page, then logs will appear
+
+// Turn OFF debug logs
+window.PC_DEBUG = false;
+```
+
+#### Method 3: Code Modification (Permanent)
+- Open `scripts/pages/task-detail.js` around line 186
+- Uncomment console.log statements as needed
+- Save and refresh
+
+### Debug Log Locations:
+- **Task Detail Navigation**: `scripts/pages/task-detail.js` lines 186, 208, 210, 262, 267
+- **Accounts State Capture**: `scripts/main.js` lines 3056, 3070, 3084, 3098
+- **Accounts Restore**: `scripts/pages/accounts.js` lines 20, 32, 38, 52
+- **Email Composition**: `scripts/pages/emails.js` enter key handlers and signature injection
+
+### Debug Log Types:
+- **Navigation Source Detection**: Shows what page user came from
+- **State Capture**: Shows what data is being saved for restoration  
+- **State Restoration**: Shows what data is being restored
+- **Fallback Cases**: Shows when navigation falls back to default behavior
+- **Email Editor**: Shows enter key handling, signature injection, and cursor positioning

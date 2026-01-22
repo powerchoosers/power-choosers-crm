@@ -1,0 +1,680 @@
+/**
+ * Background Tasks Loader
+ * 
+ * Loads tasks data immediately from cache (or Firestore if cache empty)
+ * on app initialization, making data globally available for instant access.
+ * 
+ * Features:
+ * - Cache-first loading (zero Firestore reads after first visit)
+ * - Global data availability via window.BackgroundTasksLoader
+ * - Event notifications when data is ready
+ * - Automatic fallback to Firestore if cache is empty
+ */
+
+(function () {
+  let tasksData = [];
+  let lastLoadedDoc = null; // Track last document for pagination
+  let hasMoreData = true; // Flag to indicate if more data exists
+  const isAdmin = () => {
+    try { if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') return window.DataManager.isCurrentUserAdmin(); return window.currentUserRole === 'admin'; } catch (_) { return false; }
+  };
+  const isTasksPageActive = () => {
+    try {
+      if (window.crm && window.crm.currentPage) return window.crm.currentPage === 'tasks';
+      const active = document.querySelector('.page.active');
+      if (active && active.getAttribute('data-page') === 'tasks') return true;
+      const page = document.getElementById('tasks-page');
+      if (!page) return false;
+      if (page.style && page.style.display === 'none') return false;
+      return page.offsetParent !== null;
+    } catch (_) { return false; }
+  };
+  const getUserEmail = () => {
+    try { if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') return window.DataManager.getCurrentUserEmail(); return (window.currentUserEmail || '').toLowerCase(); } catch (_) { return (window.currentUserEmail || '').toLowerCase(); }
+  };
+
+
+  const tasksCacheVersion = 3;
+  const getTasksCacheVersionKey = () => {
+    const email = getUserEmail();
+    return email ? `pc:tasks-cache-version:${email}` : 'pc:tasks-cache-version';
+  };
+
+  const getDeletedTasksKey = () => {
+    const email = getUserEmail();
+    return email ? `pc:deleted-tasks:${email}` : 'pc:deleted-tasks';
+  };
+
+  function getDeletedTaskIdsSet() {
+    try {
+      const key = getDeletedTasksKey();
+      const raw = localStorage.getItem(key);
+      const parsed = raw ? JSON.parse(raw) : {};
+      const now = Date.now();
+      const ttlMs = 7 * 24 * 60 * 60 * 1000;
+      const map = Array.isArray(parsed)
+        ? parsed.reduce((acc, v) => {
+          if (v && typeof v === 'object' && v.id) acc[String(v.id)] = v.ts || v.timestamp || now;
+          return acc;
+        }, {})
+        : (parsed && typeof parsed === 'object' ? parsed : {});
+
+      let changed = false;
+      for (const [id, ts] of Object.entries(map)) {
+        const t = typeof ts === 'number' ? ts : parseInt(String(ts || '0'), 10);
+        if (!id || !t || (now - t) > ttlMs) {
+          delete map[id];
+          changed = true;
+        }
+      }
+
+      const ids = new Set(Object.keys(map));
+
+      if (changed) {
+        try { localStorage.setItem(key, JSON.stringify(map)); } catch (_) { }
+      }
+
+      return ids;
+    } catch (_) {
+      return new Set();
+    }
+  }
+
+  function tombstoneTaskId(taskId, source) {
+    if (!taskId) return;
+    try {
+      const key = getDeletedTasksKey();
+      const raw = localStorage.getItem(key);
+      const parsed = raw ? JSON.parse(raw) : {};
+      const now = Date.now();
+      const map = (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+      map[String(taskId)] = now;
+      localStorage.setItem(key, JSON.stringify(map));
+    } catch (_) { }
+  }
+
+  function filterOutDeletedTasks(tasks, source) {
+    const deleted = getDeletedTaskIdsSet();
+    if (!deleted || deleted.size === 0) return tasks;
+    const before = Array.isArray(tasks) ? tasks.length : 0;
+    const filtered = (tasks || []).filter(t => t && t.id && !deleted.has(String(t.id)));
+    const removed = before - filtered.length;
+    return filtered;
+  }
+
+  async function loadFromFirestore(preserveExisting = false) {
+    if (!window.firebaseDB && !(window.DataManager && typeof window.DataManager.queryWithOwnership === 'function')) {
+      console.warn('[BackgroundTasksLoader] firebaseDB not available');
+      return;
+    }
+
+    try {
+      const loadStart = performance.now();
+      
+      // CRITICAL FIX: Preserve existing tasks if this is a refresh (not initial load)
+      const existingTasksMap = preserveExisting ? new Map() : null;
+      if (preserveExisting && tasksData.length > 0) {
+        tasksData.forEach(t => {
+          if (t && t.id) existingTasksMap.set(t.id, t);
+        });
+      }
+      
+      if (!isAdmin()) {
+        let newTasks = [];
+        const onTasksPage = isTasksPageActive();
+        const limit = onTasksPage ? 500 : 100;
+
+        if (window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
+          const dmStart = performance.now();
+          newTasks = await window.DataManager.queryWithOwnership('tasks', { limit });
+          
+        } else {
+          const email = getUserEmail();
+          const db = window.firebaseDB;
+          const fbStart = performance.now();
+          const [ownedSnap, assignedSnap, createdSnap] = await Promise.all([
+            db.collection('tasks').where('ownerId', '==', email).limit(limit).get(),
+            db.collection('tasks').where('assignedTo', '==', email).limit(limit).get(),
+            db.collection('tasks').where('createdBy', '==', email).limit(limit).get()
+          ]);
+          const map = new Map();
+          ownedSnap.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
+          assignedSnap.forEach(d => { if (!map.has(d.id)) map.set(d.id, { id: d.id, ...d.data() }); });
+          createdSnap.forEach(d => { if (!map.has(d.id)) map.set(d.id, { id: d.id, ...d.data() }); });
+          newTasks = Array.from(map.values());
+          
+        }
+
+        // Clean up zombie tasks with double prefixes
+        newTasks = newTasks.filter(t => t && t.id && !String(t.id).startsWith('task-seq-seq-'));
+
+        // Sort by updatedAt/timestamp desc similar to original
+        newTasks.sort((a, b) => new Date(b.updatedAt || b.timestamp || 0) - new Date(a.updatedAt || a.timestamp || 0));
+
+        // Merge with existing tasks if preserving
+        if (preserveExisting && existingTasksMap) {
+          const newTasksMap = new Map();
+          newTasks.forEach(t => {
+            if (t && t.id) newTasksMap.set(t.id, t);
+          });
+          // Add existing tasks that weren't in the reload
+          existingTasksMap.forEach((task, id) => {
+            if (!newTasksMap.has(id)) {
+              newTasksMap.set(id, task);
+            }
+          });
+          tasksData = Array.from(newTasksMap.values());
+          tasksData.sort((a, b) => new Date(b.updatedAt || b.timestamp || 0) - new Date(a.updatedAt || a.timestamp || 0));
+
+
+        } else {
+        tasksData = newTasks;
+
+
+        }
+        tasksData = filterOutDeletedTasks(tasksData, 'BackgroundTasksLoader.loadFromFirestore(non-admin)');
+        lastLoadedDoc = null;
+        hasMoreData = false;
+      } else {
+        // Admin path: original unfiltered query
+        const onTasksPage = isTasksPageActive();
+        const limit = onTasksPage ? 1000 : 200;
+        
+        
+        let newTasks = [];
+        if (window.CacheManager && typeof window.CacheManager.fetchFromFirestore === 'function' && onTasksPage) {
+          const fresh = await window.CacheManager.fetchFromFirestore('tasks');
+          newTasks = Array.isArray(fresh) ? fresh : [];
+        } else if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+          const cached = await window.CacheManager.get('tasks');
+          newTasks = Array.isArray(cached) ? cached : [];
+        } else {
+          const snapshot = await window.firebaseDB.collection('tasks')
+            .limit(5000)
+            .get();
+          newTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        }
+        if (newTasks.length > limit) {
+          newTasks.sort((a, b) => new Date(b.updatedAt || b.timestamp || b.createdAt || b.dueTimestamp || 0) - new Date(a.updatedAt || a.timestamp || a.createdAt || a.dueTimestamp || 0));
+          newTasks = newTasks.slice(0, limit);
+        }
+
+        // Merge with existing tasks if preserving
+        if (preserveExisting && existingTasksMap) {
+          const newTasksMap = new Map();
+          newTasks.forEach(t => {
+            if (t && t.id) newTasksMap.set(t.id, t);
+          });
+          // Add existing tasks that weren't in the reload (beyond the 500 limit)
+          existingTasksMap.forEach((task, id) => {
+            if (!newTasksMap.has(id)) {
+              newTasksMap.set(id, task);
+            }
+          });
+          tasksData = Array.from(newTasksMap.values());
+          tasksData.sort((a, b) => new Date(b.updatedAt || b.timestamp || 0) - new Date(a.updatedAt || a.timestamp || 0));
+
+
+        } else {
+        tasksData = newTasks;
+
+
+        }
+        tasksData = filterOutDeletedTasks(tasksData, 'BackgroundTasksLoader.loadFromFirestore(admin)');
+        // Admin pagination disabled (we load all tasks in one go)
+        lastLoadedDoc = null;
+        hasMoreData = false;
+      }
+
+      // Pagination handled per role above
+
+
+      // Save to cache for future sessions
+      if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+        await window.CacheManager.set('tasks', tasksData);
+      }
+
+      // Notify other modules
+      document.dispatchEvent(new CustomEvent('pc:tasks-loaded', {
+        detail: { count: tasksData.length, fromFirestore: true }
+      }));
+    } catch (error) {
+      console.error('[BackgroundTasksLoader] Failed to load from Firestore:', error);
+    }
+  }
+
+  // Load from cache immediately on module init
+  (async function () {
+    if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+      try {
+        try {
+          const key = getTasksCacheVersionKey();
+          const current = parseInt(localStorage.getItem(key) || '0', 10);
+          if (current !== tasksCacheVersion && typeof window.CacheManager.invalidate === 'function') {
+            await window.CacheManager.invalidate('tasks');
+            localStorage.setItem(key, String(tasksCacheVersion));
+          }
+        } catch (_) { }
+
+        const cached = await window.CacheManager.get('tasks');
+        if (cached && Array.isArray(cached) && cached.length > 0) {
+        if (!isAdmin()) {
+            const email = getUserEmail();
+            // CRITICAL FIX: Include createdBy field in ownership check to match filterTasksByOwnership()
+            tasksData = (cached || []).filter(t => {
+              if (!t) return false;
+              const ownerId = (t.ownerId || '').toLowerCase();
+              const assignedTo = (t.assignedTo || '').toLowerCase();
+              const createdBy = (t.createdBy || '').toLowerCase();
+              return ownerId === email || assignedTo === email || createdBy === email;
+            });
+
+
+          } else {
+            tasksData = cached;
+
+
+          }
+
+          tasksData = filterOutDeletedTasks(tasksData, 'BackgroundTasksLoader.cacheInit');
+
+          // Notify that cached data is available
+          document.dispatchEvent(new CustomEvent('pc:tasks-loaded', {
+            detail: { count: cached.length, cached: true }
+          }));
+        } else {
+          // Cache empty, load from Firestore
+          await loadFromFirestore();
+        }
+      } catch (e) {
+        console.warn('[BackgroundTasksLoader] Cache load failed:', e);
+        await loadFromFirestore();
+      }
+    } else {
+      console.warn('[BackgroundTasksLoader] CacheManager not available, waiting...');
+      // Retry after a short delay if CacheManager isn't ready yet
+      setTimeout(async () => {
+        if (window.CacheManager) {
+          try {
+            const key = getTasksCacheVersionKey();
+            const current = parseInt(localStorage.getItem(key) || '0', 10);
+            if (current !== tasksCacheVersion && typeof window.CacheManager.invalidate === 'function') {
+              await window.CacheManager.invalidate('tasks');
+              localStorage.setItem(key, String(tasksCacheVersion));
+            }
+          } catch (_) { }
+
+          const cached = await window.CacheManager.get('tasks');
+          if (cached && Array.isArray(cached) && cached.length > 0) {
+            if (!isAdmin()) {
+              const email = getUserEmail();
+              // CRITICAL FIX: Include createdBy field in ownership check to match filterTasksByOwnership()
+              tasksData = (cached || []).filter(t => {
+                if (!t) return false;
+                const ownerId = (t.ownerId || '').toLowerCase();
+                const assignedTo = (t.assignedTo || '').toLowerCase();
+                const createdBy = (t.createdBy || '').toLowerCase();
+                return ownerId === email || assignedTo === email || createdBy === email;
+              });
+            } else {
+              tasksData = cached;
+            }
+            
+            // Clean up zombie tasks with double prefixes
+            tasksData = (tasksData || []).filter(t => t && t.id && !String(t.id).startsWith('task-seq-seq-'));
+
+            tasksData = filterOutDeletedTasks(tasksData, 'BackgroundTasksLoader.cacheRetry');
+            document.dispatchEvent(new CustomEvent('pc:tasks-loaded', {
+              detail: { count: cached.length, cached: true }
+            }));
+          } else {
+            await loadFromFirestore();
+          }
+        }
+      }, 500);
+    }
+  })();
+
+  // Load more tasks (next batch of 100)
+  async function loadMoreTasks() {
+    if (!hasMoreData) {
+      return { loaded: 0, hasMore: false };
+    }
+
+    if (!window.firebaseDB) {
+      console.warn('[BackgroundTasksLoader] firebaseDB not available');
+      return { loaded: 0, hasMore: false };
+    }
+
+    try {
+      if (!isAdmin()) return { loaded: 0, hasMore: false };
+      let query = window.firebaseDB.collection('tasks')
+        .orderBy('timestamp', 'desc')
+        .startAfter(lastLoadedDoc)
+        .limit(200);
+
+      const snapshot = await query.get();
+      const newTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      // Append to existing data
+      tasksData = [...tasksData, ...newTasks];
+
+      // Update pagination tracking
+      if (snapshot.docs.length > 0) {
+        lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
+        hasMoreData = snapshot.docs.length === 200; // CRITICAL FIX: Match the limit we're using
+      } else {
+        hasMoreData = false;
+      }
+
+
+      // Update cache
+      if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+        await window.CacheManager.set('tasks', tasksData);
+      }
+
+      // Notify listeners
+      document.dispatchEvent(new CustomEvent('pc:tasks-loaded-more', {
+        detail: { count: newTasks.length, total: tasksData.length, hasMore: hasMoreData }
+      }));
+
+      return { loaded: newTasks.length, hasMore: hasMoreData };
+    } catch (error) {
+      console.error('[BackgroundTasksLoader] Failed to load more:', error);
+      return { loaded: 0, hasMore: false };
+    }
+  }
+
+  // OPTIMIZED: Get total count using Firestore aggregation (no document loads!)
+  // This reduces Firestore reads from thousands to just 1-2 per count query
+  async function getTotalCount() {
+    if (!window.firebaseDB) return tasksData.length;
+
+    try {
+      const email = (window.currentUserEmail || '').toLowerCase();
+      if (window.currentUserRole !== 'admin' && email) {
+        // Non-admin: use aggregation count for owned/assigned tasks
+        try {
+          const [ownedCount, assignedCount] = await Promise.all([
+            window.firebaseDB.collection('tasks').where('ownerId', '==', email).count().get(),
+            window.firebaseDB.collection('tasks').where('assignedTo', '==', email).count().get()
+          ]);
+          const owned = ownedCount.data().count || 0;
+          const assigned = assignedCount.data().count || 0;
+          return Math.max(owned, assigned, tasksData.length);
+        } catch (aggError) {
+          console.warn('[BackgroundTasksLoader] Aggregation not supported, using loaded count');
+          return tasksData.length;
+        }
+      } else {
+        // Admin: use aggregation count for all tasks
+        try {
+          const countSnap = await window.firebaseDB.collection('tasks').count().get();
+          return countSnap.data().count || tasksData.length;
+        } catch (aggError) {
+          console.warn('[BackgroundTasksLoader] Aggregation not supported, using loaded count');
+          return tasksData.length;
+        }
+      }
+    } catch (error) {
+      console.error('[BackgroundTasksLoader] Failed to get total count:', error);
+      return tasksData.length; // Fallback to loaded count
+    }
+  }
+
+  // Listen for task updates and reload data
+  window.addEventListener('tasksUpdated', async (event) => {
+    const { source, taskId, deleted, newTaskCreated, rescheduled, taskData } = event.detail || {};
+
+    if (source === 'tasksPageLoad' || source === 'navigation') {
+      return;
+    }
+
+    if (deleted && taskId) {
+      try {
+        tasksData = tasksData.filter(t => t && t.id !== taskId);
+
+        if (window.CacheManager && typeof window.CacheManager.deleteRecord === 'function') {
+          await window.CacheManager.deleteRecord('tasks', taskId);
+        }
+      } catch (e) {
+        console.warn('[BackgroundTasksLoader] Could not remove deleted task from cache:', e);
+      }
+    }
+
+    if (newTaskCreated && taskData && taskData.id) {
+      try {
+        tasksData = tasksData.filter(t => t && t.id !== taskData.id);
+        tasksData.push(taskData);
+        tasksData.sort((a, b) => new Date(b.updatedAt || b.timestamp || 0) - new Date(a.updatedAt || a.timestamp || 0));
+
+        if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+          await window.CacheManager.updateRecord('tasks', taskData.id, taskData);
+        }
+      } catch (_) { }
+    }
+
+    // CRITICAL FIX: If a task was rescheduled, remove it from cache and force reload
+    // This ensures the task appears in its new position (sorted by new dueDate/dueTime)
+    // and is removed from its old position
+    if (rescheduled && taskId) {
+      try {
+        // Remove the old task from cache (with old dueDate/dueTime)
+        tasksData = tasksData.filter(t => t && t.id !== taskId);
+        
+        // Update cache immediately to remove old position
+        if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+          await window.CacheManager.set('tasks', tasksData);
+        }
+      } catch (e) {
+        console.warn('[BackgroundTasksLoader] Could not remove rescheduled task from cache:', e);
+      }
+    }
+
+    try {
+      const shouldReloadForNewTask = !!(newTaskCreated && (!taskData || !taskData.id));
+      const shouldReload = shouldReloadForNewTask || !!rescheduled;
+
+      if (shouldReload && window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+        await window.CacheManager.invalidate('tasks');
+      }
+
+      if (shouldReload) {
+        if (rescheduled) {
+          await new Promise(resolve => setTimeout(resolve, 150));
+        }
+        await loadFromFirestore(true);
+      }
+
+      // Trigger Today's Tasks widget to refresh (only when dashboard is visible).
+      // REMOVED: main.js already listens to 'tasksUpdated' and triggers loadTodaysTasks.
+      // Having it here causes double-rendering and flicker.
+      // if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
+      //   const dashboardActive = !!document.getElementById('dashboard-page')?.classList.contains('active');
+      //   if (dashboardActive) {
+      //     window.crm.loadTodaysTasks();
+      //   }
+      // }
+    } catch (error) {
+      console.error('[BackgroundTasksLoader] Error handling tasksUpdated event:', error);
+    }
+  });
+
+  // CRITICAL FIX: Listen for task deletion events for cross-browser sync
+  document.addEventListener('pc:task-deleted', async (event) => {
+    const { taskId, source } = event.detail || {};
+    if (taskId) {
+      try {
+        tombstoneTaskId(taskId, source || 'pc:task-deleted');
+        // Remove from local cache
+        tasksData = tasksData.filter(t => t && t.id !== taskId);
+
+        if (window.CacheManager && typeof window.CacheManager.deleteRecord === 'function') {
+          await window.CacheManager.deleteRecord('tasks', taskId);
+        }
+        
+        // CRITICAL FIX: Only trigger refresh if not from task-detail (which handles its own refresh)
+        // This prevents duplicate refreshes and race conditions
+        // REMOVED: main.js already listens to 'pc:task-deleted' and triggers loadTodaysTasks.
+        // Having it here causes double-rendering and flicker.
+        // if (source !== 'task-detail' && window.crm && typeof window.crm.loadTodaysTasks === 'function') {
+        //   const dashboardActive = !!document.getElementById('dashboard-page')?.classList.contains('active');
+        //   if (dashboardActive) {
+        //     window.crm.loadTodaysTasks();
+        //   }
+        // }
+      } catch (e) {
+        console.warn('[BackgroundTasksLoader] Could not remove deleted task from cache:', e);
+      }
+    }
+  });
+
+  // Reload tasks when user returns to tab (to catch changes from other browsers)
+  document.addEventListener('visibilitychange', async () => {
+    if (!document.hidden) {
+
+      try {
+        // Check cache age
+        const cacheAge = window.CacheManager && typeof window.CacheManager.getMeta === 'function'
+          ? await window.CacheManager.getMeta('tasks')
+          : null;
+        const age = cacheAge?.timestamp ? (Date.now() - cacheAge.timestamp) : Infinity;
+
+        const tasksCacheExpiry = (window.CacheManager && typeof window.CacheManager.tasksCacheExpiry === 'number')
+          ? window.CacheManager.tasksCacheExpiry
+          : (2 * 60 * 60 * 1000);
+
+        // If cache is older than expiry time, refresh
+        if (age > tasksCacheExpiry) {
+          
+          // CRITICAL FIX: Preserve existing tasks during refresh to prevent loss
+          const existingTasksMap = new Map();
+          tasksData.forEach(t => {
+            if (t && t.id) existingTasksMap.set(t.id, t);
+          });
+          
+          if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+            await window.CacheManager.invalidate('tasks');
+          }
+          await loadFromFirestore(true); // Preserve existing tasks during refresh
+          
+          // Merge new tasks with existing ones (prefer new data, but keep old if new doesn't have it)
+          const newTasksMap = new Map();
+          tasksData.forEach(t => {
+            if (t && t.id) newTasksMap.set(t.id, t);
+          });
+          
+          // Add any existing tasks that weren't in the reload (beyond the initial limit)
+          existingTasksMap.forEach((task, id) => {
+            if (!newTasksMap.has(id)) {
+              newTasksMap.set(id, task);
+            }
+          });
+          
+          tasksData = Array.from(newTasksMap.values());
+          // Re-sort by timestamp
+          tasksData.sort((a, b) => new Date(b.updatedAt || b.timestamp || 0) - new Date(a.updatedAt || a.timestamp || 0));
+          
+          // Update cache with merged data
+          if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+            await window.CacheManager.set('tasks', tasksData);
+          }
+
+          // Trigger Today's Tasks widget to refresh
+          if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
+            // Avoid redundant widget refreshes if we just refreshed recently.
+            // (Keeps Home from feeling like it is "battling" in the background.)
+            const last = window.crm._lastTasksLoad || 0;
+            const deltaMs = Date.now() - last;
+            if (!last || deltaMs > 5000) {
+              window.crm.loadTodaysTasks();
+            } else {
+            }
+          }
+        } else {
+        }
+      } catch (error) {
+        console.error('[BackgroundTasksLoader] Error checking cache on visibility change:', error);
+      }
+    }
+  });
+
+  // Remove a task from the local cache immediately
+  function removeTask(taskId) {
+    if (!taskId) return false;
+    try {
+      tombstoneTaskId(taskId, 'BackgroundTasksLoader.removeTask');
+      const beforeCount = tasksData.length;
+      tasksData = tasksData.filter(t => t && t.id !== taskId);
+      const removed = tasksData.length < beforeCount;
+      
+      if (removed) {
+        
+        // Update cache immediately
+        if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+          window.CacheManager.set('tasks', tasksData).catch(e => {
+            console.warn('[BackgroundTasksLoader] Could not update cache after removal:', e);
+          });
+        }
+      }
+      
+      return removed;
+    } catch (e) {
+      console.warn('[BackgroundTasksLoader] Error removing task:', e);
+      return false;
+    }
+  }
+
+  // Export public API
+  window.BackgroundTasksLoader = {
+    getTasksData: () => tasksData,
+    reload: loadFromFirestore,
+    forceReload: async (preserveExisting = true) => {
+      try {
+        if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+          await window.CacheManager.invalidate('tasks');
+        }
+        if (!preserveExisting) {
+          await loadFromFirestore(false);
+          return tasksData;
+        }
+
+        const existingTasksMap = new Map();
+        tasksData.forEach(t => {
+          if (t && t.id) existingTasksMap.set(t.id, t);
+        });
+
+        await loadFromFirestore(true);
+
+        const newTasksMap = new Map();
+        tasksData.forEach(t => {
+          if (t && t.id) newTasksMap.set(t.id, t);
+        });
+
+        existingTasksMap.forEach((task, id) => {
+          if (!newTasksMap.has(id)) {
+            newTasksMap.set(id, task);
+          }
+        });
+
+        tasksData = Array.from(newTasksMap.values());
+        tasksData.sort((a, b) => new Date(b.updatedAt || b.timestamp || 0) - new Date(a.updatedAt || a.timestamp || 0));
+
+        if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+          await window.CacheManager.set('tasks', tasksData);
+        }
+        
+        return tasksData;
+      } catch (error) {
+        console.error('[BackgroundTasksLoader] Error during force reload:', error);
+        return tasksData;
+      }
+    },
+    removeTask: removeTask,
+    loadMore: loadMoreTasks,
+    hasMore: () => hasMoreData,
+    getCount: () => tasksData.length,
+    getTotalCount: getTotalCount
+  };
+
+})();

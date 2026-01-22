@@ -1,0 +1,623 @@
+/* ============================================
+   Training Tool Animations
+   Scoped animations for training-tool.html only
+   ============================================ */
+
+/* ============================================
+   PAGE LOAD ANIMATIONS
+   ============================================ */
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* ============================================
+   MAIN CONTAINER ANIMATIONS
+   ============================================ */
+
+.training-container {
+    animation: fadeIn 0.4s ease-out;
+}
+
+.brand-header {
+    animation: slideDown 0.5s ease-out;
+}
+
+.page-header {
+    animation: slideDown 0.5s ease-out 0.1s both;
+}
+
+/* ============================================
+   SCRIPT DISPLAY ANIMATIONS
+   ============================================ */
+
+@keyframes contentUpdate {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.85;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Only animate script display on initial load (when no has-content class) */
+.script-display:not(.has-content) {
+    animation: fadeInUp 0.5s ease-out;
+    animation-fill-mode: both;
+}
+
+.script-display.updating {
+    animation: contentUpdate 0.3s ease-out;
+    animation-fill-mode: both;
+}
+
+/* Prevent animation restart on content change */
+.script-display {
+    will-change: opacity;
+}
+
+/* Badge animations - only on initial load, not on content updates */
+.name-badge,
+.badge {
+    will-change: transform, opacity;
+}
+
+/* No automatic animations on badges/markers in dynamic content */
+/* They should appear instantly when content updates to avoid flickering */
+
+/* ============================================
+   PAUSE INDICATOR ENHANCED ANIMATION
+   ============================================ */
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 0.6;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.2);
+    }
+}
+
+.pause-indicator {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.pause-indicator:nth-of-type(1) { animation-delay: 0s; }
+.pause-indicator:nth-of-type(2) { animation-delay: 0.2s; }
+.pause-indicator:nth-of-type(3) { animation-delay: 0.4s; }
+.pause-indicator:nth-of-type(4) { animation-delay: 0.6s; }
+.pause-indicator:nth-of-type(5) { animation-delay: 0.8s; }
+
+/* ============================================
+   BUTTON ANIMATIONS
+   ============================================ */
+
+@keyframes buttonSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes buttonPress {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(0.96);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes buttonRipple {
+    0% {
+        transform: scale(0);
+        opacity: 0.6;
+    }
+    50% {
+        opacity: 0.3;
+    }
+    100% {
+        transform: scale(4);
+        opacity: 0;
+    }
+}
+
+/* Only animate buttons when first created, not on every render */
+.response-btn:not(.animated),
+.dial-btn:not(.animated) {
+    animation: buttonSlideIn 0.4s ease-out backwards;
+}
+
+.response-btn.animated,
+.dial-btn.animated {
+    /* No animation on subsequent renders */
+}
+
+/* Click animation removed - keeping only hover effects */
+
+.response-btn:nth-child(1) { animation-delay: 0.05s; }
+.response-btn:nth-child(2) { animation-delay: 0.1s; }
+.response-btn:nth-child(3) { animation-delay: 0.15s; }
+.response-btn:nth-child(4) { animation-delay: 0.2s; }
+.response-btn:nth-child(5) { animation-delay: 0.25s; }
+
+/* Action buttons */
+.action-btn {
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.action-btn::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 107, 53, 0.2);
+    transform: translate(-50%, -50%);
+    transition: width 0.4s, height 0.4s;
+}
+
+.action-btn:active::after {
+    width: 200px;
+    height: 200px;
+}
+
+/* ============================================
+   PHASE NAVIGATION ANIMATIONS
+   ============================================ */
+
+@keyframes phaseActivePulse {
+    0%, 100% {
+        box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+    }
+    50% {
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.5);
+    }
+}
+
+@keyframes phaseComplete {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.phase-btn {
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.phase-btn::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 0;
+    height: 2px;
+    background: var(--orange-primary);
+    transform: translateX(-50%);
+    transition: width 0.3s ease;
+}
+
+.phase-btn:hover::after {
+    width: 80%;
+}
+
+/* Desktop: pulse effect on active phase */
+@media (min-width: 768px) {
+    .phase-btn.active {
+        animation: phaseActivePulse 2s ease-in-out infinite;
+    }
+}
+
+/* Mobile: disable pulse animation - no distracting animations */
+@media (max-width: 767px) {
+    .phase-btn.active {
+        animation: none !important;
+    }
+}
+
+.phase-btn.completed {
+    animation: phaseComplete 0.5s ease-out;
+}
+
+/* ============================================
+   OPENER SELECTOR ANIMATIONS
+   ============================================ */
+
+@keyframes openerAppear {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Only animate opener buttons when first created */
+.opener-btn:not(.animated) {
+    animation: openerAppear 0.3s ease-out backwards;
+    position: relative;
+    overflow: hidden;
+}
+
+.opener-btn.animated {
+    position: relative;
+    overflow: hidden;
+}
+
+.opener-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transition: left 0.5s;
+}
+
+.opener-btn:hover::before {
+    left: 100%;
+}
+
+.opener-btn:nth-child(1) { animation-delay: 0.05s; }
+.opener-btn:nth-child(2) { animation-delay: 0.1s; }
+.opener-btn:nth-child(3) { animation-delay: 0.15s; }
+.opener-btn:nth-child(4) { animation-delay: 0.2s; }
+
+.opener-btn.active {
+    animation: activeGlow 2s ease-in-out infinite;
+}
+
+@keyframes activeGlow {
+    0%, 100% {
+        box-shadow: 0 0 12px rgba(255, 107, 53, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 18px rgba(255, 107, 53, 0.6);
+    }
+}
+
+/* ============================================
+   TOOLBAR ANIMATIONS
+   ============================================ */
+
+.toolbar-with-openers {
+    animation: fadeIn 0.6s ease-out;
+}
+
+.phase-navigation {
+    animation: fadeIn 0.6s ease-out 0.1s both;
+}
+
+/* ============================================
+   TIPS PANEL ANIMATIONS
+   ============================================ */
+
+@keyframes tipCardSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Only animate tip cards on initial load */
+.tip-card:not(.animated) {
+    animation: tipCardSlideIn 0.4s ease-out backwards;
+    transition: all 0.2s ease;
+}
+
+.tip-card.animated {
+    transition: all 0.2s ease;
+}
+
+.tip-card:nth-child(1) { animation-delay: 0.1s; }
+.tip-card:nth-child(2) { animation-delay: 0.15s; }
+.tip-card:nth-child(3) { animation-delay: 0.2s; }
+.tip-card:nth-child(4) { animation-delay: 0.25s; }
+.tip-card:nth-child(5) { animation-delay: 0.3s; }
+.tip-card:nth-child(6) { animation-delay: 0.35s; }
+.tip-card:nth-child(7) { animation-delay: 0.4s; }
+.tip-card:nth-child(8) { animation-delay: 0.45s; }
+.tip-card:nth-child(9) { animation-delay: 0.5s; }
+.tip-card:nth-child(10) { animation-delay: 0.55s; }
+
+.tips-header {
+    animation: fadeIn 0.6s ease-out 0.2s both;
+}
+
+.tips-panel {
+    animation: slideInRight 0.5s ease-out;
+}
+
+/* Tone badge animations - only on initial load */
+.tone-badge:not(.animated) {
+    animation: scaleIn 0.3s ease-out backwards;
+}
+
+.tone-item:not(.animated) {
+    animation: fadeIn 0.3s ease-out backwards;
+}
+
+.tone-item:nth-child(1) { animation-delay: 0.1s; }
+.tone-item:nth-child(2) { animation-delay: 0.15s; }
+.tone-item:nth-child(3) { animation-delay: 0.2s; }
+.tone-item:nth-child(4) { animation-delay: 0.25s; }
+.tone-item:nth-child(5) { animation-delay: 0.3s; }
+.tone-item:nth-child(6) { animation-delay: 0.35s; }
+.tone-item:nth-child(7) { animation-delay: 0.4s; }
+
+/* ============================================
+   RESPONSE BUTTONS CONTAINER
+   ============================================ */
+
+.response-buttons-container {
+    animation: slideUpFade 0.4s ease-out;
+}
+
+@keyframes slideUpFade {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.response-buttons {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* ============================================
+   MOBILE DRAWER ANIMATIONS
+   ============================================ */
+
+@keyframes drawerSlide {
+    from {
+        max-height: 0;
+        opacity: 0;
+    }
+    to {
+        max-height: 600px;
+        opacity: 1;
+    }
+}
+
+.tips-panel.expanded {
+    animation: drawerSlide 0.4s ease-out;
+}
+
+.mobile-tips-toggle {
+    transition: all 0.3s ease;
+}
+
+/* ============================================
+   HOVER EFFECTS WITH ANIMATIONS
+   ============================================ */
+
+.tip-card:hover {
+    transform: translateX(4px);
+    transition: transform 0.2s ease;
+}
+
+.phase-btn:hover {
+    transform: translateY(-1px);
+    transition: transform 0.2s ease;
+}
+
+.action-btn:hover {
+    transform: translateY(-1px);
+    transition: transform 0.2s ease;
+}
+
+.opener-btn:hover {
+    transform: translateY(-1px);
+    transition: transform 0.2s ease;
+}
+
+.response-btn:hover,
+.dial-btn:hover {
+    transform: translateY(-2px);
+    transition: transform 0.2s ease;
+}
+
+/* ============================================
+   STAGE INDICATOR ANIMATION
+   ============================================ */
+
+@keyframes stagePulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.8;
+    }
+}
+
+.stage-indicator {
+    animation: stagePulse 2s ease-in-out infinite;
+}
+
+/* ============================================
+   PERFORMANCE OPTIMIZATIONS
+   ============================================ */
+
+/* Use GPU acceleration for smoother animations */
+.training-container,
+.script-display,
+.response-btn,
+.dial-btn,
+.phase-btn,
+.opener-btn,
+.tip-card {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
+}
+
+/* Smooth scrolling */
+.main-content,
+.script-display,
+.tips-panel {
+    scroll-behavior: smooth;
+}
+
+/* ============================================
+   MOBILE OPENER SELECTOR EXIT ANIMATIONS
+   ============================================ */
+
+@keyframes slideOutLeft {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+        max-height: 200px;
+    }
+    to {
+        opacity: 0;
+        transform: translateX(-100%);
+        max-height: 0;
+    }
+}
+
+/* Mobile-only animations for opener selector exit */
+@media (max-width: 767px) {
+    /* Opener selector sliding out to the left */
+    .opener-selector.exiting {
+        animation: slideOutLeft 0.4s ease-in-out forwards;
+        overflow: hidden;
+    }
+    
+    /* After animation completes, hide the opener selector and let it collapse naturally */
+    .opener-selector.exited {
+        display: none !important;
+    }
+    
+    /* Collapse the gap in toolbar-with-openers when opener exits - smooth transition */
+    .toolbar-with-openers.has-exiting-opener {
+        transition: gap 0.4s ease-in-out;
+        gap: 0;
+    }
+    
+    /* Toolbar (Back/Restart buttons) stays in place - no changes needed */
+    .toolbar {
+        /* Natural position - no transforms or forced positioning */
+    }
+    
+    /* DO NOT force content movement - let natural layout flow handle it */
+    /* The opener collapse will naturally cause content below to flow up */
+}
+
+/* ============================================
+   ACCESSIBILITY - REDUCE MOTION
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+

@@ -1,0 +1,4 @@
+---
+description: When generating email templates or content, never use bracketed placeholders like {{name}} - use natural language personalization and dynamic insertion of actual contact names
+alwaysApply: false
+---

@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Unsubscribe - Power Choosers</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Shared Public Styles -->
+  <link rel="stylesheet" href="styles/public.css">
+
+  <style>
+    /* Page-specific styles */
+
+    /* Main Content */
+    .main-content {
+      min-height: calc(100vh - 80px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px
+    }
+
+    .container {
+      background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
+      border: 1px solid rgba(229, 231, 235, .6);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      padding: 48px;
+      max-width: 600px;
+      width: 100%;
+      text-align: center;
+      position: relative;
+      overflow: hidden
+    }
+
+    .container::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(245, 158, 11, .05), transparent);
+      border-radius: 50%;
+      pointer-events: none
+    }
+
+    .logo {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--brand-blue);
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px
+    }
+
+    .logo img {
+      height: 40px;
+      width: 40px;
+      border-radius: 50%
+    }
+
+    .success {
+      color: #16a34a;
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px
+    }
+
+    .error {
+      color: #dc2626;
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px
+    }
+
+    .info {
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.7;
+      margin-bottom: 24px
+    }
+
+    .info strong {
+      color: var(--text);
+      font-weight: 600
+    }
+
+    .persuasion-box {
+      background: linear-gradient(135deg, rgba(245, 158, 11, .08) 0%, rgba(11, 27, 69, .04) 100%);
+      border: 2px solid rgba(245, 158, 11, .2);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin: 32px 0;
+      text-align: left
+    }
+
+    .persuasion-box h3 {
+      color: var(--brand-blue);
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px
+    }
+
+    .persuasion-box ul {
+      list-style: none;
+      padding: 0;
+      margin: 0
+    }
+
+    .persuasion-box li {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.8;
+      margin-bottom: 8px;
+      padding-left: 24px;
+      position: relative
+    }
+
+    .persuasion-box li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: var(--brand-orange);
+      font-weight: 700
+    }
+
+    .persuasion-box li:last-child {
+      margin-bottom: 0
+    }
+
+    .button-group {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 32px
+    }
+
+    .button {
+      background: linear-gradient(135deg, var(--brand-orange) 0%, #d97706 100%);
+      color: #0a0f1f;
+      border: none;
+      padding: 14px 28px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: var(--transition);
+      box-shadow: 0 4px 12px rgba(245, 158, 11, .3)
+    }
+
+    .button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(245, 158, 11, .4)
+    }
+
+    .button-secondary {
+      background: transparent;
+      color: var(--brand-blue);
+      border: 2px solid var(--border);
+      box-shadow: none
+    }
+
+    .button-secondary:hover {
+      border-color: var(--brand-orange);
+      color: var(--brand-orange);
+      background: rgba(245, 158, 11, .05);
+      transform: translateY(-2px)
+    }
+
+    .email-display {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin: 16px 0;
+      font-family: monospace;
+      color: var(--text);
+      font-size: 14px
+    }
+  </style>
+  <!-- Apollo Tracking Script -->
+  <script>function initApollo() { var n = Math.random().toString(36).substring(7), o = document.createElement("script"); o.src = "https://assets.apollo.io/micro/website-tracker/tracker.iife.js?nocache=" + n, o.async = !0, o.defer = !0, o.onload = function () { window.trackingFunctions.onLoad({ appId: "67ec3b5820289a0021c5a43c" }) }, document.head.appendChild(o) } initApollo();</script>
+</head>
+
+<body>
+  <header class="site-header">
+    <nav class="nav">
+      <a href="index.html" class="brand">
+        <img
+          src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png"
+          alt="Power Choosers" />
+        <span class="brand-name">Power Choosers</span>
+      </a>
+      <button class="menu-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
+      <div class="nav-links">
+        <a href="index.html" class="btn btn-outline">Home</a>
+        <a href="about.html" class="btn btn-outline">About</a>
+        <a href="services.html" class="btn btn-outline">Services</a>
+        <a href="resources.html" class="btn btn-outline">Resources</a>
+        <a href="schedule.html" class="btn btn-outline">Schedule</a>
+        <a href="index.html#get-started" class="btn btn-primary">Contact</a>
+      </div>
+    </nav>
+  </header>
+
+  <div class="main-content">
+    <div class="container">
+      <div class="logo">
+        <img
+          src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png"
+          alt="Power Choosers" />
+        Power Choosers
+      </div>
+      <div id="status"></div>
+      <div id="message"></div>
+    </div>
+  </div>
+
+  <script>
+    // Get email from URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const email = urlParams.get('email');
+
+    if (!email) {
+      document.getElementById('status').innerHTML = '<div class="error">Invalid unsubscribe link</div>';
+      document.getElementById('message').innerHTML = '<p>This unsubscribe link is invalid. Please contact support if you continue to receive unwanted emails.</p>';
+    } else {
+      // Process unsubscribe
+      processUnsubscribe(email);
+    }
+
+    async function processUnsubscribe(email) {
+      // Show persuasion message first if email is valid
+      if (email) {
+        document.getElementById('status').innerHTML = '<div class="info" style="color:var(--brand-blue);font-size:18px;font-weight:600;margin-bottom:16px">We\'re sorry to see you go!</div>';
+        document.getElementById('message').innerHTML = `
+                    <div class="persuasion-box">
+                        <h3>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
+                            Stay connected and save more
+                        </h3>
+                        <ul>
+                            <li>Get exclusive energy savings tips and market insights</li>
+                            <li>Be the first to know about special pricing opportunities</li>
+                            <li>Receive helpful reminders about contract renewals</li>
+                            <li>Access expert advice on energy efficiency</li>
+                        </ul>
+                    </div>
+                    <p class="info">If you'd still like to unsubscribe, we'll process your request below.</p>
+                    <div class="email-display">${email}</div>
+                    <div class="button-group">
+                        <button class="button" onclick="confirmUnsubscribe('${email}')">Yes, Unsubscribe</button>
+                        <a href="index.html" class="button button-secondary">Stay Subscribed</a>
+                    </div>
+                `;
+      } else {
+        // Process unsubscribe immediately if no email
+        await performUnsubscribe(email);
+      }
+    }
+
+    async function confirmUnsubscribe(email) {
+      await performUnsubscribe(email);
+    }
+
+    async function performUnsubscribe(email) {
+      try {
+        const response = await fetch('/api/email/unsubscribe', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email: email })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          document.getElementById('status').innerHTML = '<div class="success"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Successfully Unsubscribed</div>';
+          document.getElementById('message').innerHTML = `
+                        <p class="info">You have been successfully unsubscribed from all future marketing emails.</p>
+                        <div class="email-display">${email}</div>
+                        <p class="info" style="margin-top:24px">You will no longer receive marketing emails from Power Choosers. If you need to contact us, you can still reach us at <a href="mailto:renewals@powerchoosers.com" style="color:var(--brand-orange);text-decoration:underline">renewals@powerchoosers.com</a>.</p>
+                        <div class="button-group">
+                            <a href="index.html" class="button">Return to Home</a>
+                        </div>
+                    `;
+        } else {
+          document.getElementById('status').innerHTML = '<div class="error"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Unsubscribe Failed</div>';
+          document.getElementById('message').innerHTML = `
+                        <p class="info">There was an error processing your unsubscribe request.</p>
+                        <p class="info">Please contact support at <a href="mailto:renewals@powerchoosers.com" style="color:var(--brand-orange);text-decoration:underline">renewals@powerchoosers.com</a> and we'll help you unsubscribe manually.</p>
+                        <div class="button-group">
+                            <a href="index.html" class="button">Return to Home</a>
+                        </div>
+                    `;
+        }
+      } catch (error) {
+        console.error('Unsubscribe error:', error);
+        document.getElementById('status').innerHTML = '<div class="error"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Unsubscribe Failed</div>';
+        document.getElementById('message').innerHTML = `
+                    <p class="info">There was an error processing your unsubscribe request.</p>
+                    <p class="info">Please contact support at <a href="mailto:renewals@powerchoosers.com" style="color:var(--brand-orange);text-decoration:underline">renewals@powerchoosers.com</a> and we'll help you unsubscribe manually.</p>
+                    <div class="button-group">
+                        <a href="index.html" class="button">Return to Home</a>
+                    </div>
+                `;
+      }
+    }
+  </script>
+
+  <!-- Shared Public Scripts -->
+  <script src="scripts/public.js"></script>
+</body>
+
+</html>

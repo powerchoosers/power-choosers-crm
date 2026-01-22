@@ -1,0 +1,139 @@
+<!-- Power Choosers Energy Tips & Tricks Email Template -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Energy Tips & Tricks - Power Choosers</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; padding:0; background:#f1f5fa; font-family:'Segoe UI',Arial,sans-serif; color:#1e3a8a;}
+    .container { max-width:600px; margin:30px auto; background:#fff; border-radius:14px;
+      box-shadow:0 6px 28px rgba(30,64,175,0.11),0 1.5px 4px rgba(30,64,175,0.03);
+      overflow:hidden;
+    }
+    .header { padding:32px 24px 18px 24px;
+      background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);
+      color:#fff; text-align:center;
+    }
+    .header img { max-width:190px; margin:0 auto 10px; display:block;}
+    .brandline { font-size:16px; font-weight:600; letter-spacing:0.08em; opacity:0.92;}
+    .tips-badge {
+      margin:20px 24px 2px 24px; font-size:14px; color:#2563eb;
+      font-weight:600; letter-spacing:0.02em; opacity:0.93;
+      background:#dbeafe; padding:8px 15px; border-radius:6px; display:inline-block;
+    }
+    .intro { margin:0 24px 18px 24px; padding:18px 0 2px 0; }
+    .intro p { margin:0 0 12px 0; font-size:16px; color:#1e3a8a; line-height:1.6; }
+    .tip-card {
+      background:#eff6ff; border-left:4px solid #3b82f6; padding:18px 20px;
+      margin:0 24px 16px 24px; border-radius:6px;
+      box-shadow:0 2px 8px rgba(59,130,246,0.08);
+    }
+    .tip-card h4 { margin:0 0 8px 0; color:#1e40af; font-size:16px; display:flex; align-items:center; gap:8px; }
+    .tip-card p { margin:0; color:#1f2937; font-size:14px; line-height:1.6; }
+    .tip-icon { font-size:20px; }
+    .savings-highlight {
+      background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);
+      border:1px solid #fbbf24; padding:16px 20px; margin:0 24px 18px 24px;
+      border-radius:8px; text-align:center;
+    }
+    .savings-highlight strong { color:#b45309; font-size:18px; }
+    .savings-highlight p { margin:0; color:#92400e; font-size:14px; }
+    .cta-container {
+      text-align:center; padding:22px 24px;
+      background:#eff6ff; border-radius:8px; margin:0 24px 18px 24px;
+      box-shadow:0 2px 6px rgba(59,130,246,0.05);
+    }
+    .cta-btn {
+      display:inline-block; padding:13px 36px; background:#3b82f6; color:#fff;
+      border-radius:7px; font-weight:700; font-size:16px; text-decoration:none;
+      box-shadow:0 2px 8px rgba(59,130,246,0.13);
+      transition:background 0.18s;
+    }
+    .cta-btn:hover { background:#2563eb;}
+    .signature {
+      margin:15px 24px 22px 24px; font-size:15.3px; color:#1e40af;
+      font-weight:500; padding:14px 0 0 0; border-top:1px solid #e9ebf3;
+    }
+    .footer {
+      padding:22px 24px; color:#aaa; text-align:center; font-size:13px;
+      background: #f1f5fa; border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+      letter-spacing:0.08em;
+    }
+    @media (max-width:650px){
+      .container, .cta-container, .intro, .tips-badge {margin:0 3vw;}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- HEADER -->
+    <div class="header">
+      <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png" alt="Power Choosers">
+      <div class="brandline">Your Energy Partner</div>
+    </div>
+    <!-- TIPS BADGE -->
+    <div class="tips-badge">💡 This Week's Energy Tips</div>
+    <!-- OPENING PARAGRAPH -->
+    <div class="intro">
+      <p>Hi {{CONTACT_NAME}},</p>
+      <p>
+        This week, we're sharing practical energy-saving strategies that can help {{CONTACT_COMPANY}} reduce consumption and lower your monthly bills. These tips are easy to implement and can make a significant impact on your bottom line.
+      </p>
+    </div>
+    <!-- TIP CARDS -->
+    <div class="tip-card">
+      <h4><span class="tip-icon">🌡️</span> Optimize HVAC Scheduling</h4>
+      <p>
+        Adjust your heating and cooling systems to run 2-3 degrees closer to outside temperatures during non-operational hours. This simple change can reduce HVAC energy consumption by 10-15% without impacting comfort during business hours.
+      </p>
+    </div>
+    <div class="tip-card">
+      <h4><span class="tip-icon">💡</span> Upgrade to LED Lighting</h4>
+      <p>
+        If you haven't already, replacing traditional fluorescent bulbs with LED fixtures can cut lighting costs by up to 75%. LEDs also last 3-5 times longer, reducing maintenance expenses.
+      </p>
+    </div>
+    <div class="tip-card">
+      <h4><span class="tip-icon">⚡</span> Monitor Peak Demand Hours</h4>
+      <p>
+        Many utilities charge higher rates during peak hours (typically 2-7 PM). Shifting non-critical operations outside these windows can result in substantial savings, especially for facilities with high energy usage.
+      </p>
+    </div>
+    <!-- SAVINGS HIGHLIGHT -->
+    <div class="savings-highlight">
+      <p><strong>Potential Savings:</strong> Implementing these three tips could reduce your monthly energy costs by 15-25%</p>
+    </div>
+    <!-- CTA BUTTON BOX -->
+    <div class="cta-container">
+      <a href="https://powerchoosers.com/schedule" class="cta-btn">Get a Custom Energy Audit</a>
+      <div style="margin-top:8px;font-size:14px;color:#1e3a8a;opacity:0.83;">
+        Want more personalized recommendations? Let's discuss your facility's specific needs.
+      </div>
+    </div>
+    <!-- SIGNATURE BLOCK -->
+    <div class="signature">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        <img src="{{SENDER_AVATAR}}" alt="{{SENDER_NAME}}" 
+             style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">{{SENDER_NAME}}</div>
+          <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">{{SENDER_TITLE}}</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #1e40af; margin: 4px 0 0 0; line-height: 1.4;">
+        {{SENDER_LOCATION}}<br>
+        {{SENDER_PHONE}}<br>
+        {{SENDER_EMAIL}}<br>
+        {{COMPANY_NAME}}
+      </div>
+    </div>
+    <!-- FOOTER -->
+    <div class="footer">
+      Power Choosers &bull; Your Energy Partner<br>
+      &copy; 2025 PowerChoosers.com. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
+

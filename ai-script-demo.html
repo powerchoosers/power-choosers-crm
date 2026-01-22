@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Script Visual Demo</title>
+    <!-- Link to the main CRM styles -->
+    <link rel="stylesheet" href="styles/main.css">
+    <style>
+        body {
+            background-color: #0a0b10;
+            color: #e2e8f0;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            padding: 40px;
+            display: flex;
+            justify-content: center;
+        }
+        .demo-container {
+            max-width: 600px;
+            width: 100%;
+            background: #161b22;
+            padding: 24px;
+            border-radius: 12px;
+            border: 1px solid #30363d;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .demo-header {
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #30363d;
+        }
+        .demo-header h1 {
+            font-size: 1.25rem;
+            margin: 0;
+            color: #fff;
+        }
+        .demo-header p {
+            font-size: 0.85rem;
+            color: #8b949e;
+            margin: 4px 0 0 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="demo-container">
+        <div class="demo-header">
+            <h1>AI Script Visualization Demo</h1>
+            <p>This is how generated scripts appear in the Phone Widget</p>
+        </div>
+
+        <div class="ai-content">
+            <!-- PRE-CALL SECTION -->
+            <div class="ai-section" data-type="Pre-call" style="animation-delay: 0.1s;">
+                <div class="ai-section-header">
+                    <div class="ai-section-label">Pre-call</div>
+                </div>
+                <div class="ai-section-body">
+                    Target Contact: John Doe<br>
+                    Current Supplier: <span class="ai-highlight">SCE</span><br>
+                    Account Status: <span class="ai-highlight">Renewal Date</span> coming up on <span class="ai-highlight">2026-01-15</span>.
+                </div>
+            </div>
+
+            <!-- OPENER SECTION -->
+            <div class="ai-section" data-type="Opener" style="animation-delay: 0.2s;">
+                <div class="ai-section-header">
+                    <div class="ai-section-label">Opener</div>
+                </div>
+                <div class="ai-section-body">
+                    "Hi John, this is Trey from Power Choosers. I'm calling regarding your energy account in <span class="ai-highlight">Los Angeles</span>. I noticed your current supply agreement is set to expire soon."
+                </div>
+            </div>
+
+            <!-- SITUATION SECTION -->
+            <div class="ai-section" data-type="Situation" style="animation-delay: 0.3s;">
+                <div class="ai-section-header">
+                    <div class="ai-section-label">Situation</div>
+                </div>
+                <div class="ai-section-body">
+                    "I see you're currently with <span class="ai-highlight">National Grid</span> and your average usage is around <span class="ai-highlight">4,500 kWh</span> per month. Does that sound correct?"
+                </div>
+            </div>
+
+            <!-- PROBLEM SECTION -->
+            <div class="ai-section" data-type="Problem" style="animation-delay: 0.4s;">
+                <div class="ai-section-header">
+                    <div class="ai-section-label">Problem</div>
+                </div>
+                <div class="ai-section-body">
+                    "With the <span class="ai-highlight">Energy Market</span> fluctuations in <span class="ai-highlight">California</span>, your current <span class="ai-highlight">Supply rate</span> is likely to increase by over <span class="ai-highlight">15%</span> if you default to the standard utility rate."
+                </div>
+            </div>
+
+            <!-- SOLUTION SECTION -->
+            <div class="ai-section" data-type="Solution" style="animation-delay: 0.5s;">
+                <div class="ai-section-header">
+                    <div class="ai-section-label">Solution</div>
+                </div>
+                <div class="ai-section-body">
+                    "I can lock you into a fixed rate with <span class="ai-highlight">Green Mountain</span> for the next 24 months, which would save you approximately <span class="ai-highlight">$450</span> per year on your <span class="ai-highlight">Electricity</span> bills."
+                </div>
+            </div>
+
+            <!-- CLOSE SECTION -->
+            <div class="ai-section" data-type="Close" style="animation-delay: 0.6s;">
+                <div class="ai-section-header">
+                    <div class="ai-section-label">Close</div>
+                </div>
+                <div class="ai-section-body">
+                    "All I need to move forward is a quick digital signature on the <span class="ai-highlight">LOA</span>. Can I send that over to your email now?"
+                </div>
+            </div>
+
+            <!-- SETTLE SECTION -->
+            <div class="ai-section" data-type="Settle" style="animation-delay: 0.7s;">
+                <div class="ai-section-header">
+                    <div class="ai-section-label">Settle</div>
+                </div>
+                <div class="ai-section-body">
+                    "Great. You'll receive a confirmation from the <span class="ai-highlight">Deregulated</span> energy provider within 3-5 business days. I'll follow up on <span class="ai-highlight">January 20th</span> to ensure everything is set."
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Simple script to handle copy button feedback in demo
+        document.querySelectorAll('.ai-copy-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const originalContent = btn.innerHTML;
+                btn.classList.add('copied');
+                btn.innerHTML = `
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>Copied!</span>
+                `;
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btn.innerHTML = originalContent;
+                }, 2000);
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,150 @@
+<!-- Power Choosers Welcome Email Template -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Welcome Email - Power Choosers</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; padding:0; background:#f1f5fa; font-family:'Segoe UI',Arial,sans-serif; color:#1e3a8a;}
+    .container { max-width:600px; margin:30px auto; background:#fff; border-radius:14px;
+      box-shadow:0 6px 28px rgba(30,64,175,0.11),0 1.5px 4px rgba(30,64,175,0.03);
+      overflow:hidden;
+    }
+    .header { padding:32px 24px 18px 24px;
+      background:linear-gradient(135deg,#10b981 0%,#059669 100%);
+      color:#fff; text-align:center;
+    }
+    .header img { max-width:190px; margin:0 auto 10px; display:block;}
+    .brandline { font-size:16px; font-weight:600; letter-spacing:0.08em; opacity:0.92;}
+    .welcome-badge {
+      margin:20px 24px 2px 24px; font-size:14px; color:#059669;
+      font-weight:600; letter-spacing:0.02em; opacity:0.93;
+      background:#d1fae5; padding:8px 15px; border-radius:6px; display:inline-block;
+    }
+    .intro { margin:0 24px 18px 24px; padding:18px 0 2px 0; }
+    .intro p { margin:0 0 12px 0; font-size:16px; color:#1e3a8a; line-height:1.6; }
+    .intro p:last-child { margin-bottom:0; }
+    .welcome-box {
+      background:linear-gradient(135deg,#ecfdf5 0%,#d1fae5 100%);
+      border:1px solid #a7f3d0; padding:20px 24px; margin:0 24px 18px 24px;
+      border-radius:8px; box-shadow:0 2px 8px rgba(16,185,129,0.06);
+    }
+    .welcome-box h3 { margin:0 0 12px 0; color:#047857; font-size:18px; }
+    .welcome-box p { margin:0; color:#1f2937; font-size:15px; line-height:1.6; }
+    .features-grid {
+      display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:0 24px 18px 24px;
+    }
+    .feature-card {
+      background:#f0fdf4; border:1px solid #bbf7d0; padding:16px;
+      border-radius:8px; text-align:center;
+    }
+    .feature-icon { font-size:24px; margin-bottom:8px; }
+    .feature-title { font-weight:600; color:#047857; font-size:14px; margin:0 0 4px 0; }
+    .feature-desc { font-size:12px; color:#1f2937; margin:0; line-height:1.4; }
+    .cta-container {
+      text-align:center; padding:22px 24px;
+      background:#ecfdf5; border-radius:8px; margin:0 24px 18px 24px;
+      box-shadow:0 2px 6px rgba(16,185,129,0.05);
+    }
+    .cta-btn {
+      display:inline-block; padding:13px 36px; background:#10b981; color:#fff;
+      border-radius:7px; font-weight:700; font-size:16px; text-decoration:none;
+      box-shadow:0 2px 8px rgba(16,185,129,0.13);
+      transition:background 0.18s;
+    }
+    .cta-btn:hover { background:#059669;}
+    .signature {
+      margin:15px 24px 22px 24px; font-size:15.3px; color:#1e40af;
+      font-weight:500; padding:14px 0 0 0; border-top:1px solid #e9ebf3;
+    }
+    .footer {
+      padding:22px 24px; color:#aaa; text-align:center; font-size:13px;
+      background: #f1f5fa; border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+      letter-spacing:0.08em;
+    }
+    @media (max-width:650px){
+      .features-grid { grid-template-columns:1fr; }
+      .container, .cta-container, .intro, .welcome-badge {margin:0 3vw;}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- HEADER -->
+    <div class="header">
+      <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png" alt="Power Choosers">
+      <div class="brandline">Your Energy Partner</div>
+    </div>
+    <!-- WELCOME BADGE -->
+    <div class="welcome-badge">🎉 Welcome to Power Choosers!</div>
+    <!-- OPENING PARAGRAPH -->
+    <div class="intro">
+      <p>Hi {{CONTACT_NAME}},</p>
+      <p>
+        We're thrilled to have {{CONTACT_COMPANY}} as part of the Power Choosers family! You've taken an important step toward optimizing your energy costs and gaining better control over your facility's energy strategy.
+      </p>
+    </div>
+    <!-- WELCOME BOX -->
+    <div class="welcome-box">
+      <h3>What to Expect</h3>
+      <p>
+        Over the coming weeks, you'll receive regular updates, energy-saving tips, market insights, and exclusive opportunities to further reduce your energy costs. Our team is here to ensure you get maximum value from your partnership with us.
+      </p>
+    </div>
+    <!-- FEATURES GRID -->
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <div class="feature-title">Market Insights</div>
+        <div class="feature-desc">Weekly updates on energy market trends</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">💡</div>
+        <div class="feature-title">Energy Tips</div>
+        <div class="feature-desc">Practical advice to reduce consumption</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">💰</div>
+        <div class="feature-title">Savings Opportunities</div>
+        <div class="feature-desc">Exclusive offers and rate comparisons</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🎯</div>
+        <div class="feature-title">Expert Support</div>
+        <div class="feature-desc">Direct access to our energy strategists</div>
+      </div>
+    </div>
+    <!-- CTA BUTTON BOX -->
+    <div class="cta-container">
+      <a href="https://powerchoosers.com/schedule" class="cta-btn">Schedule Your Onboarding Call</a>
+      <div style="margin-top:8px;font-size:14px;color:#047857;opacity:0.83;">
+        Questions? Reply to this email—we're here to help!
+      </div>
+    </div>
+    <!-- SIGNATURE BLOCK -->
+    <div class="signature">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        <img src="{{SENDER_AVATAR}}" alt="{{SENDER_NAME}}" 
+             style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">{{SENDER_NAME}}</div>
+          <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">{{SENDER_TITLE}}</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #1e40af; margin: 4px 0 0 0; line-height: 1.4;">
+        {{SENDER_LOCATION}}<br>
+        {{SENDER_PHONE}}<br>
+        {{SENDER_EMAIL}}<br>
+        {{COMPANY_NAME}}
+      </div>
+    </div>
+    <!-- FOOTER -->
+    <div class="footer">
+      Power Choosers &bull; Your Energy Partner<br>
+      &copy; 2025 PowerChoosers.com. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
+
