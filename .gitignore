@@ -45,3 +45,7 @@ private.key
 *.key
 *.pem
 client_secret_*.json
+
+# INI files
+*.ini
+# Power Choosers CRM - Local Development.ini
