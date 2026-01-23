@@ -856,6 +856,16 @@ const server = http.createServer(async (req, res) => {
     return handleApiPerplexityEmail(req, res);
   }
   if (pathname === '/api/analyze-bill') {
+    if (req.method === 'POST') {
+      try {
+        req.body = await parseRequestBody(req);
+      } catch (error) {
+        console.error('[Server] Analyze Bill - Body Parse Error:', error.message);
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid request body' }));
+        return;
+      }
+    }
     return handleApiAnalyzeBill(req, res);
   }
 
