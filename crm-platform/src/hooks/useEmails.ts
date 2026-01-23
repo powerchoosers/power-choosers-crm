@@ -27,7 +27,7 @@ const COLLECTION_NAME = 'emails'
 const PAGE_SIZE = 50
 
 export function useEmails() {
-  const { user, role, loading } = useAuth()
+  const { user, role, loading, profile } = useAuth()
   const queryClient = useQueryClient()
 
   const emailsQuery = useInfiniteQuery({
@@ -89,6 +89,19 @@ export function useEmails() {
 
   const sendEmailMutation = useMutation({
     mutationFn: async (emailData: { to: string, subject: string, content: string }) => {
+      if (!user?.email) {
+        throw new Error('You must be logged in to send email')
+      }
+
+      const escapeHtml = (value: string) =>
+        value
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+
+      const htmlContent = `<div style="white-space:pre-wrap;">${escapeHtml(emailData.content)}</div>`
+      const fromName = profile.name || user.displayName || undefined
+
       // Call the existing API endpoint
       const response = await fetch('/api/email/sendgrid-send', {
         method: 'POST',
@@ -98,10 +111,12 @@ export function useEmails() {
         body: JSON.stringify({
           to: emailData.to,
           subject: emailData.subject,
-          content: emailData.content,
+          content: htmlContent,
+          plainTextContent: emailData.content,
           isHtmlEmail: true,
-          userEmail: user?.email, // Pass user email for ownership
-          from: user?.email // Default from
+          userEmail: user.email,
+          from: user.email,
+          fromName,
         }),
       });
 

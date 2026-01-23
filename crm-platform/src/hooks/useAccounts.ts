@@ -62,15 +62,15 @@ export function useAccounts() {
           return { 
             id: doc.id, 
             ...data,
-            name: data.name || 'Unknown Account',
+            name: data.name || data.accountName || data.companyName || 'Unknown Account',
             industry: data.industry || '',
-            domain: data.domain || '',
+            domain: data.domain || (data.website ? String(data.website).replace(/^https?:\/\/(www\.)?/i, '').split('/')[0] : '') || '',
             logoUrl: data.logoUrl || data.logoURL || '',
             companyPhone: data.companyPhone || data.phone || '',
-            contractEnd: data.contractEnd || '',
-            sqft: data.sqft || '',
-            occupancy: data.occupancy || '',
-            employees: data.employees || '',
+            contractEnd: data.contractEnd || data.contractEndDate || data.contract_end_date || '',
+            sqft: data.sqft || data.squareFootage || data.square_feet || '',
+            occupancy: data.occupancy || data.occupancyPct || data.occupancy_percentage || '',
+            employees: data.employees || data.employeeCount || data.numEmployees || '',
             location: data.location || (data.city ? `${data.city}, ${data.state || ''}` : '') || '',
             updated: data.updated || new Date().toISOString()
           }

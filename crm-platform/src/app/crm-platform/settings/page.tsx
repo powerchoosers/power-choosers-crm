@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -8,8 +9,60 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { User, Bell, Shield, Palette, Database } from 'lucide-react'
+import { useAuth } from '@/context/AuthContext'
+import { db } from '@/lib/firebase'
+import { doc, setDoc } from 'firebase/firestore'
+import { toast } from 'sonner'
 
 export default function SettingsPage() {
+  const { user, profile } = useAuth()
+
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [bio, setBio] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    setFirstName(profile.firstName || '')
+    setLastName(profile.lastName || '')
+  }, [profile.firstName, profile.lastName])
+
+  const computedName = useMemo(() => {
+    const full = `${firstName} ${lastName}`.trim()
+    return full || profile.name || user?.displayName || ''
+  }, [firstName, lastName, profile.name, user?.displayName])
+
+  const handleSaveProfile = async () => {
+    if (!user?.email) {
+      toast.error('You must be logged in to save profile changes')
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const ref = doc(db, 'users', user.email.toLowerCase())
+      await setDoc(
+        ref,
+        {
+          email: user.email.toLowerCase(),
+          firstName: firstName.trim() || null,
+          lastName: lastName.trim() || null,
+          name: computedName ? computedName : null,
+          displayName: computedName ? computedName : null,
+          bio: bio.trim() || null,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      )
+      toast.success('Profile updated')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to save profile'
+      toast.error(message)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -51,24 +104,54 @@ export default function SettingsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="firstName" className="text-zinc-400">First name</Label>
-                  <Input id="firstName" placeholder="John" className="bg-zinc-950/50 border-white/10 text-zinc-200" />
+                  <Input
+                    id="firstName"
+                    placeholder="John"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="bg-zinc-950/50 border-white/10 text-zinc-200"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="lastName" className="text-zinc-400">Last name</Label>
-                  <Input id="lastName" placeholder="Doe" className="bg-zinc-950/50 border-white/10 text-zinc-200" />
+                  <Input
+                    id="lastName"
+                    placeholder="Doe"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="bg-zinc-950/50 border-white/10 text-zinc-200"
+                  />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-zinc-400">Email</Label>
-                <Input id="email" type="email" placeholder="john.doe@example.com" className="bg-zinc-950/50 border-white/10 text-zinc-200" />
+                <Input
+                  id="email"
+                  type="email"
+                  value={user?.email || ''}
+                  readOnly
+                  className="bg-zinc-950/50 border-white/10 text-zinc-200"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="bio" className="text-zinc-400">Bio</Label>
-                <Input id="bio" placeholder="Sales Representative" className="bg-zinc-950/50 border-white/10 text-zinc-200" />
+                <Input
+                  id="bio"
+                  placeholder="Sales Representative"
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  className="bg-zinc-950/50 border-white/10 text-zinc-200"
+                />
               </div>
             </CardContent>
             <CardFooter>
-              <Button className="bg-[#004eea] hover:bg-[#003bb0] text-white">Save Changes</Button>
+              <Button
+                onClick={handleSaveProfile}
+                disabled={isSaving || !user?.email}
+                className="bg-[#004eea] hover:bg-[#003bb0] text-white"
+              >
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </Button>
             </CardFooter>
           </Card>
         </TabsContent>

@@ -4,7 +4,8 @@ import logger from '../_logger.js';
 
 // Base URL for tracking endpoints
 const getBaseUrl = () => {
-  return process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
+  const raw = process.env.PUBLIC_BASE_URL || process.env.API_BASE_URL || 'http://localhost:3001';
+  return String(raw).trim().replace(/\/+$/, '');
 };
 
 /**

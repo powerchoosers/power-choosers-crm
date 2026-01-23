@@ -105,7 +105,7 @@ export default function EmailDetailPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 bg-white/0">
+        <div className="flex-1 overflow-y-auto p-8 bg-white/0 np-scroll">
           {email.html ? (
             <div 
               className="prose prose-invert max-w-none text-zinc-300 prose-headings:text-zinc-100 prose-a:text-indigo-400 prose-strong:text-zinc-100 prose-code:text-indigo-300"

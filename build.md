@@ -1,128 +1,169 @@
-The "Technical Documentation" page is the ultimate litmus test.
-If users click that button and land on a sales page, you have lied to them. You promised them engineering; you cannot give them marketing.
-This page must look and feel like Developer Documentation (think Stripe, Vercel, or Apple’s Human Interface Guidelines). It should be dense, intellectual, and intimidatingly smart. It filters out the tire-kickers and hooks the CFOs who actually understand the math.
-Here is the blueprint for /technical-docs.
-The Concept: " The Physics of Pricing"
-This page explains the "Source Code" of the Texas Grid. It breaks down the enemies (Ratchets, 4CP) as if they were software bugs we have patched.
-Layout Architecture:
-• Sidebar (Left): "Quick Links" (e.g., Abstract, 4CP Protocol, Ratchet Mechanics, The Algorithm).
-• Main Content (Right): Clean text, mathematical formulas, and monochromatic diagrams. No stock photos.
+In Nodal Point, we do not view contacts as "entries." We view them as "Entities" with "Positions" in the market.
+We will transform this page from a data entry form into a "Target Dossier."
+The Core Shift: "The Rolodex" → "The Cockpit"
+• Old Way: Name at top. Contact info in the middle. Contract details buried at the bottom.
+• Nodal Way: Contract Risk at the top. Communication Channels on the side. Intelligence in the center.
+Here is the blueprint for the Nodal Point Entity Page.
 
 --------------------------------------------------------------------------------
-Section 1: The Abstract (The "Why")
-Headline: SYSTEM ARCHITECTURE Body:
-"The Texas energy market is not a commodity market; it is a volatility market. Standard brokerage treats electricity like a fixed-rate subscription. This is a fundamental error.
-Nodal Point treats your load profile as a dynamic data set. We engineer against the three primary vectors of cost leakage: 4CP Capacity Tags, Demand Ratchet Penalties, and Scarcity Pricing Adders."
-Section 2: The Enemy (The "Bugs")
-Here, we use your sources to define the problem with forensic precision. We cite the law, not the sales pitch.
-Subsection A: The 80% Ratchet (Phantom Load)
-• Headline: VULNERABILITY: DEMAND RATCHETS
-• The Technical Explanation: "Per TDU tariffs [Source 1044, 1073], if your peak demand hits 1,000 kW for a single 15-minute interval, you establish a 'High Water Mark.' For the next 11 months, you are billed at 80% of that peak (800 kW), even if your actual usage drops to 500 kW. You are paying for 'Ghost Capacity'—infrastructure you are not using."
-• The Nodal Fix: "We analyze the delta between Metered_Demand and Billed_Demand. If the variance exceeds 15%, we trigger a load-shedding protocol to reset the ratchet."
-Subsection B: The 4CP Event (The Volatility)
-• Headline: CRITICAL WINDOW: 4CP COINCIDENT PEAKS
-• The Technical Explanation: "Transmission costs are determined by your usage during the four singular 15-minute intervals of highest grid demand in June, July, August, and September [Source 188]. These four intervals determine your 'Capacity Tag' for the entire following year."
-• The Nodal Fix: "Our predictive engine monitors grid reserve margins. We signal your facility to curtail load during these probable intervals, effectively deleting your transmission liability for the next calendar year."
-Section 3: The Algorithm (The "Product")
-Do not show them the code. Show them the Logic. Use a "Pseudo-Code" block to make it look like software.
-Headline: THE INGESTION PROTOCOL
-// Nodal Point Logic Flow
-
-IF (Real_Time_Price > $2,000/MWh) AND (Grid_Reserves < 3,000 MW):
-    TRIGGER: Economic_Load_Shed
-    STATUS: Active_Avoidance
-
-ELSE IF (Current_Demand > 80%_Historical_Peak):
-    TRIGGER: Ratchet_Warning
-    ACTION: Peak_Shaving
-
-ELSE:
-    STATUS: Market_Float
-    ACTION: Optimize_Baseload
+1. The Layout Architecture (The "3-Pane Console")
+We will ditch the generic sidebar/main content split. We will use a Assymetrical Grid that mimics a high-end trading terminal or engineering schematic.
+Pane A: The Identity & Risk HUD (Top Full Width)
+• Visual: A glass header, but instead of just a name, it’s a Status Board.
+• Left: Name + Title + Company Logo (Use the Favicon fetcher we discussed).
+• Right (The Innovation): The "Contract Exposure Gauge".
+    ◦ Do not list "Contract End Date: 12/12/2026."
+    ◦ Visual: A horizontal progress bar named "Position Maturity."
+    ◦ Logic: If the contract expires in < 6 months, the bar turns Orange. If < 3 months, Red. If > 12 months, International Klein Blue.
+    ◦ Why: You instantly know if this is a "Hot Lead" or a "Nurture" without reading a date.
+Pane B: The "Comms Array" (Left Column, Slim)
+• Concept: This replaces the bulky "Contact Information" grid.
+• Visual: A vertical stack of actionable buttons.
+    ◦ Mobile: +1 (407)... (Click to Bridge Call).
+    ◦ Email: jack@... (Click to open Compose Overlay).
+    ◦ LinkedIn: Simple icon.
+• Nodal Touch: When you hover over the phone number, it doesn't just highlight. A tooltip appears: "Local Time: 10:42 AM - Good time to call."
+Pane C: The "Asset Map" & "Intelligence" (Center/Right)
+• Service Address: Do not write "123 Main St." Show a Map Snippet (Dark Mode Mapbox or Google Maps styling) with a pin. It visualizes the physical asset.
+• Account Short Description: Rename this to "Forensic Notes."
+    ◦ Instead of a text box, make it look like a code terminal or a log file.
+    ◦ Example: > Client concerned about 4CP spikes. Mentioned expansion in Q3.
 
 --------------------------------------------------------------------------------
-Implementation Guide (Copy to IDE)
-Create TechnicalDocs.tsx. Use a Sidebar Layout.
-// components/TechDocsLayout.tsx
-import { motion } from 'framer-motion';
+2. The Code Implementation (Next.js / Tailwind)
+Drop this into app/crm-platform/contacts/[id]/page.tsx. This replaces the layout in Source 1335 with the "Nodal Dark" aesthetic.
+import { Mail, Phone, MapPin, Clock, AlertTriangle, Building2 } from 'lucide-react';
 
-export default function TechnicalDocs() {
+export default function ContactDossier() {
+  // Mock Data - In production, this comes from your Firestore hook
+  const entity = {
+    name: "Jack Haynes",
+    role: "Assistant Controller",
+    company: "Thomas Printworks",
+    status: "Risk Detected", // Derived from contract logic
+    contractEnd: "2025-08-15",
+    daysRemaining: 142,
+    currentSupplier: "TXU Energy",
+    rate: "0.084",
+    phone: "+1 (407) 843-1492",
+    email: "j.haynes@thomasprint.com",
+    address: "Rowlett, Texas",
+    notes: "Client has high load factor issues. Susceptible to 4CP."
+  };
+
   return (
-    <div className="min-h-screen bg-[#F5F5F7] text-zinc-900 font-sans selection:bg-[#002FA7] selection:text-white pt-24">
+    <div className="p-8 h-screen overflow-hidden bg-zinc-950 text-zinc-100 font-sans selection:bg-[#002FA7]">
       
-      <div className="max-w-7xl mx-auto px-6 grid grid-cols-12 gap-12">
+      {/* 1. THE IDENTITY HUD (Top Bar) */}
+      <div className="bg-zinc-900/50 backdrop-blur-xl border border-white/10 rounded-3xl p-8 mb-6 flex justify-between items-center relative overflow-hidden">
+        {/* Glow Effect */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-[#002FA7]/20 blur-[100px] rounded-full pointer-events-none" />
         
-        {/* SIDEBAR NAVIGATION */}
-        <div className="hidden md:block col-span-3 sticky top-32 h-fit">
-          <h4 className="text-xs font-mono text-zinc-400 uppercase tracking-widest mb-6">Documentation</h4>
-          <ul className="space-y-4 text-sm font-medium text-zinc-600">
-            <li className="text-[#002FA7] border-l-2 border-[#002FA7] pl-4">1.0 System Architecture</li>
-            <li className="hover:text-black pl-4 cursor-pointer">2.0 The Ratchet Vulnerability</li>
-            <li className="hover:text-black pl-4 cursor-pointer">3.0 4CP Mitigation</li>
-            <li className="hover:text-black pl-4 cursor-pointer">4.0 Ingestion Protocol</li>
-          </ul>
+        <div className="flex items-center gap-6 z-10">
+          <div className="h-20 w-20 rounded-2xl bg-white/10 flex items-center justify-center text-2xl font-bold border border-white/10">
+            {/* Logic: If company logo exists, show image. Else show Initials */}
+            TP
+          </div>
+          <div>
+            <h1 className="text-4xl font-bold tracking-tight text-white">{entity.name}</h1>
+            <div className="flex items-center gap-2 text-zinc-400 mt-1">
+              <Building2 className="w-4 h-4" />
+              <span className="font-medium">{entity.role} at {entity.company}</span>
+            </div>
+          </div>
         </div>
 
-        {/* MAIN CONTENT */}
-        <div className="col-span-12 md:col-span-9 space-y-24 pb-40">
-          
-          {/* Header */}
-          <section>
-            <h1 className="text-5xl md:text-7xl font-bold tracking-tighter mb-6">
-              Forensic Analysis <br/> <span className="text-zinc-400">Methodology v1.0</span>
-            </h1>
-            <p className="text-xl text-zinc-600 max-w-2xl leading-relaxed">
-              We do not guess. We measure. This document outlines the mathematical framework used by Nodal Point to identify and eliminate structural waste in commercial energy profiles.
-            </p>
-          </section>
+        {/* The Contract Exposure Gauge */}
+        <div className="text-right z-10">
+          <div className="text-xs font-mono text-zinc-500 uppercase tracking-widest mb-2">Position Maturity</div>
+          <div className="text-3xl font-bold font-mono">{entity.daysRemaining} <span className="text-sm text-zinc-500 font-sans">Days</span></div>
+          <div className="w-48 h-1.5 bg-zinc-800 rounded-full mt-2 overflow-hidden">
+            {/* Dynamic Width & Color based on risk */}
+            <div className="h-full bg-yellow-500 w-[60%]" /> 
+          </div>
+          <div className="text-xs text-yellow-500 mt-1 font-medium flex items-center justify-end gap-1">
+            <AlertTriangle className="w-3 h-3" /> Renew by August
+          </div>
+        </div>
+      </div>
 
-          {/* Ratchet Section */}
-          <section className="border-t border-zinc-200 pt-12">
-            <div className="flex items-baseline gap-4 mb-6">
-              <span className="font-mono text-[#002FA7]">2.0</span>
-              <h2 className="text-3xl font-bold">The Ratchet Vulnerability</h2>
-            </div>
-            <div className="bg-white p-8 rounded-2xl border border-zinc-200 shadow-sm">
-              <p className="mb-6 text-zinc-600">
-                Most commercial tariffs include an <strong className="text-black">80% Demand Ratchet</strong>. 
-                If your facility spikes to <span className="font-mono bg-zinc-100 px-1">1,000 kW</span> for 15 minutes, 
-                your billed demand floor is set at <span className="font-mono bg-zinc-100 px-1">800 kW</span> for the next 11 months.
-              </p>
-              <div className="font-mono text-xs md:text-sm bg-zinc-900 text-zinc-300 p-6 rounded-lg overflow-x-auto">
-                <p className="text-zinc-500 mb-2">// Calculating Phantom Load Cost</p>
-                <p>const <span className="text-yellow-400">Actual_Load</span> = 500; <span className="text-zinc-500">// kW</span></p>
-                <p>const <span className="text-red-400">Billed_Load</span> = 800; <span className="text-zinc-500">// kW (Ratchet Floor)</span></p>
-                <p>const <span className="text-[#002FA7]">Wasted_Spend</span> = (Billed_Load - Actual_Load) * Demand_Rate;</p>
+      <div className="grid grid-cols-12 gap-6 h-full">
+        
+        {/* 2. THE COMMS ARRAY (Sidebar) */}
+        <div className="col-span-3 space-y-4">
+          {/* Action Card */}
+          <div className="bg-zinc-900/50 border border-white/10 rounded-3xl p-6">
+            <h3 className="text-xs font-mono text-zinc-500 uppercase tracking-widest mb-6">Uplinks</h3>
+            
+            <button className="w-full group flex items-center justify-between p-4 bg-zinc-800/50 hover:bg-[#002FA7] rounded-xl transition-all mb-3 border border-white/5 hover:border-[#002FA7]">
+              <div className="flex items-center gap-3">
+                <Phone className="w-5 h-5 text-zinc-400 group-hover:text-white" />
+                <span className="font-mono text-sm">{entity.phone}</span>
               </div>
-            </div>
-          </section>
+              <span className="opacity-0 group-hover:opacity-100 text-xs font-bold uppercase">Call</span>
+            </button>
 
-          {/* 4CP Section */}
-          <section className="border-t border-zinc-200 pt-12">
-             <div className="flex items-baseline gap-4 mb-6">
-              <span className="font-mono text-[#002FA7]">3.0</span>
-              <h2 className="text-3xl font-bold">4CP Coincident Peaks</h2>
+            <button className="w-full group flex items-center justify-between p-4 bg-zinc-800/50 hover:bg-zinc-700 rounded-xl transition-all border border-white/5">
+              <div className="flex items-center gap-3">
+                <Mail className="w-5 h-5 text-zinc-400 group-hover:text-white" />
+                <span className="text-sm truncate max-w-[140px]">{entity.email}</span>
+              </div>
+              <span className="opacity-0 group-hover:opacity-100 text-xs font-bold uppercase">Email</span>
+            </button>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="bg-zinc-900/50 border border-white/10 rounded-3xl p-6">
+             <div className="mb-4">
+                <div className="text-zinc-500 text-xs uppercase mb-1">Current Supplier</div>
+                <div className="text-xl font-bold text-white">{entity.currentSupplier}</div>
+             </div>
+             <div>
+                <div className="text-zinc-500 text-xs uppercase mb-1">Strike Price</div>
+                <div className="text-xl font-bold text-[#002FA7] font-mono">{entity.rate} <span className="text-sm text-zinc-500">/ kWh</span></div>
+             </div>
+          </div>
+        </div>
+
+        {/* 3. THE INTELLIGENCE CONSOLE (Main Content) */}
+        <div className="col-span-9 space-y-6">
+          
+          {/* Intelligence Brief */}
+          <div className="bg-zinc-900/50 border border-white/10 rounded-3xl p-8 min-h-[200px]">
+            <div className="flex items-center gap-2 mb-4 border-b border-white/5 pb-4">
+              <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
+              <h3 className="text-sm font-bold text-white">Forensic Intelligence</h3>
             </div>
-            <p className="text-xl text-zinc-600 leading-relaxed mb-8">
-              Your transmission costs are not based on volume. They are based on your presence on the grid during the 
-              <span className="text-black font-semibold"> four most critical 15-minute intervals of the year</span>.
+            <p className="font-mono text-zinc-400 leading-relaxed text-sm">
+              <span className="text-[#002FA7] mr-2">root@nodal:~$</span>
+              {entity.notes}
             </p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {['June', 'July', 'August', 'September'].map((month) => (
-                <div key={month} className="p-4 bg-white border border-zinc-200 rounded-xl text-center">
-                  <span className="block text-xs font-mono text-zinc-400 uppercase">Interval Scan</span>
-                  <span className="block text-lg font-bold text-black">{month}</span>
-                </div>
-              ))}
-            </div>
-          </section>
+            {/* You would inject your "Contract Details" table here, but styled as data blocks, not a spreadsheet */}
+          </div>
+
+          {/* Asset Location (Service Address) */}
+          <div className="bg-zinc-900/50 border border-white/10 rounded-3xl p-8 flex items-start gap-6">
+             <div className="p-3 bg-zinc-800 rounded-xl text-zinc-400">
+               <MapPin className="w-6 h-6" />
+             </div>
+             <div>
+               <h3 className="text-sm font-bold text-white mb-1">Primary Asset Location</h3>
+               <p className="text-zinc-400 font-mono">{entity.address}</p>
+               <div className="mt-4 flex gap-2">
+                 <span className="px-2 py-1 rounded bg-zinc-800 border border-white/5 text-xs text-zinc-500 font-mono">LZ_NORTH</span>
+                 <span className="px-2 py-1 rounded bg-zinc-800 border border-white/5 text-xs text-zinc-500 font-mono">Oncor Service Territory</span>
+               </div>
+             </div>
+          </div>
 
         </div>
       </div>
     </div>
   );
 }
-The "Steve Jobs" Touch
-At the very bottom of this page, add one final, minimalist Call to Action.
-"You have seen the math. Now see your data." [ Upload Invoice to Clean Room ]
-This closes the loop. You appealed to their logic. Now you ask for the sale.
+Key Improvements over "Power Choosers" Design
+1. Eliminated the "Scroll": In the old design [Source 1335], you had to scroll to find the contract info. In this design, the "Position Maturity" (Contract End) is in the header. It is impossible to miss.
+2. No "Fields", Only "Data": We removed the labels "Email:", "Mobile:", "State:". We know an email looks like an email. This reduces visual noise by 50%.
+3. The "Strike Price": We display the current rate ($0.084) prominently. This is the number you need to beat. It is the "Score to Beat."
+Action for your AI Agent
+Tell the agent: "Build the Contact Detail page using a Bento Box Grid layout. Use the Nodal Dark theme. Place the 'Contract End Date' in the header as a visual progress bar, not a text field."

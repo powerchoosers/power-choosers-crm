@@ -134,7 +134,7 @@ export function EmailList({ emails, isLoading, onRefresh, isSyncing, onSelectEma
       </div>
 
       {/* Scrollable List */}
-      <div className="flex-1 overflow-y-auto min-h-0 scroll-smooth">
+      <div className="flex-1 overflow-y-auto min-h-0 scroll-smooth np-scroll">
         <div className="divide-y divide-white/5">
           {paginatedEmails.map((email) => (
             <div

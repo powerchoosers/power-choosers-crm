@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { 
   flexRender,
   getCoreRowModel,
@@ -41,6 +42,7 @@ import { cn } from '@/lib/utils'
 const PAGE_SIZE = 50
 
 export default function PeoplePage() {
+  const router = useRouter()
   const { data, isLoading: queryLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useContacts()
   const { data: totalContacts } = useContactsCount()
   const { data: accountsData } = useAccounts()
@@ -162,7 +164,7 @@ export default function PeoplePage() {
         cell: ({ row }) => {
           const contact = row.original
           return (
-            <div className="flex items-center justify-end gap-2">
+            <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
               <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10">
                 <Phone className="h-4 w-4" />
               </Button>
@@ -177,7 +179,12 @@ export default function PeoplePage() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="bg-zinc-950 border-white/10 text-zinc-300">
                   <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                  <DropdownMenuItem className="hover:bg-white/5 cursor-pointer">View Details</DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="hover:bg-white/5 cursor-pointer"
+                    onClick={() => router.push(`/crm-platform/contacts/${contact.id}`)}
+                  >
+                    View Details
+                  </DropdownMenuItem>
                   <DropdownMenuItem className="hover:bg-white/5 cursor-pointer">Edit Person</DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-white/10" />
                   <DropdownMenuItem className="text-red-400 hover:bg-red-500/10 cursor-pointer">Delete</DropdownMenuItem>
@@ -188,7 +195,7 @@ export default function PeoplePage() {
         },
       },
     ]
-  }, [accountByName])
+  }, [accountByName, router])
 
   const table = useReactTable({
     data: contacts,
@@ -253,7 +260,7 @@ export default function PeoplePage() {
       </div>
 
       <div className="flex-1 rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl overflow-hidden flex flex-col relative">
-        <div className="flex-1 overflow-auto relative scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+        <div className="flex-1 overflow-auto relative scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
             <Table>
             <TableHeader className="sticky top-0 bg-zinc-900/95 backdrop-blur-sm z-20 shadow-sm border-b border-white/5">
                 {table.getHeaderGroups().map((headerGroup) => (
@@ -291,7 +298,8 @@ export default function PeoplePage() {
                     <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
-                    className="border-white/5 hover:bg-white/5 transition-colors group"
+                    className="border-white/5 hover:bg-white/5 transition-colors group cursor-pointer"
+                    onClick={() => router.push(`/crm-platform/contacts/${row.original.id}`)}
                     >
                     {row.getVisibleCells().map((cell) => (
                         <TableCell key={cell.id} className="py-4">

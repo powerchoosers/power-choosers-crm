@@ -83,8 +83,10 @@ The legacy dashboard file `c:\Users\Lap3p\OneDrive\Documents\Power Choosers CRM\
     -   `flex-1 rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl overflow-hidden flex flex-col relative`
 5.  **Sticky Table Header**:
     -   `sticky top-0 bg-zinc-900/95 backdrop-blur-sm z-20 shadow-sm border-b border-white/5`
-6.  **Input Fields**:
+6.8.  **Input Fields**:
     -   Focus ring: `focus-visible:ring-indigo-500`
+9.  **Page Entry Animation**:
+    -   Standard: `initial={{ opacity: 0, filter: "blur(10px)" }}` → `animate={{ opacity: 1, filter: "blur(0px)" }}`.
 
 ## ⚠️ Migration Rules
 1.  **No Regression**: The new feature must perform at least as well as the legacy one.

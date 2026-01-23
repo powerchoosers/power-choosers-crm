@@ -112,6 +112,14 @@
     @apply bg-zinc-700;
   }
 
+  .np-scroll {
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.274 0.006 286.033) transparent;
+  }
+
   /* Landing Page Animations */
   .reveal-on-scroll {
     opacity: 0;
