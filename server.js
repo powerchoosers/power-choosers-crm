@@ -2159,14 +2159,7 @@ async function handleApiAnalyzeBill(req, res) {
     return;
   }
 
-  try {
-    req.body = await parseRequestBody(req);
-  } catch (error) {
-    res.writeHead(400, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Invalid request body' }));
-    return;
-  }
-
+  // Body is already parsed by the main router
   return await analyzeBillHandler(req, res);
 }
 
