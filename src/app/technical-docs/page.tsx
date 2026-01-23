@@ -72,7 +72,7 @@ export default function TechnicalDocs() {
               Sign In
             </Link>
             {/* The Primary Trigger */}
-            <a href="/bill-debugger.html"
+            <a href="/bill-debugger"
               className="hidden md:flex items-center gap-2 bg-[#002FA7] text-white px-5 py-2.5 rounded-full text-sm font-medium hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40">
               <Activity className="w-4 h-4" />
               <span>Run Analysis</span>
@@ -105,18 +105,18 @@ export default function TechnicalDocs() {
           {[
             { label: 'The Philosophy', href: '/philosophy' },
             { label: 'The Methodology', href: '/technical-docs' },
-            { label: 'Market Data', href: '#' },
-            { label: 'Contact', href: '#' }
+            { label: 'Market Data', href: '/market-data' },
+            { label: 'Contact', href: '/contact' }
           ].map((item, i) => (
              <a key={item.label} href={item.href}
-             className={`menu-item text-4xl md:text-5xl font-light tracking-tight text-black hover:text-[#002FA7] transition-colors duration-500 translate-y-5 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0'} delay-${(i + 1) * 100}`}>
+             className={`menu-item text-4xl md:text-5xl font-light tracking-tight text-black hover:text-[#002FA7] transition-all duration-500 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'} delay-${(i + 1) * 100}`}>
              {item.label}
            </a>
           ))}
 
           {/* Mobile CTA inside menu */}
           <div className={`mt-8 md:hidden transition-all duration-500 delay-500 menu-item ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}>
-            <a href="/bill-debugger.html"
+            <a href="/bill-debugger"
               className="flex items-center gap-2 bg-[#002FA7] text-white px-5 py-2.5 rounded-full text-lg font-medium hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40 inline-flex">
               <Activity className="w-5 h-5" />
               <span>Run Analysis</span>
@@ -125,10 +125,18 @@ export default function TechnicalDocs() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 grid grid-cols-1 md:grid-cols-12 gap-12 pt-32 md:pt-40">
+      {/* BACKGROUND TEXTURE: The "Digital Grain" */}
+      <div className="fixed inset-0 bg-[radial-gradient(#002FA7_1px,transparent_1px)] [background-size:20px_20px] opacity-[0.1] pointer-events-none z-0" />
+
+      <div className="max-w-7xl mx-auto px-4 md:px-6 grid grid-cols-1 md:grid-cols-12 gap-12 pt-32 md:pt-40 relative z-10">
         
         {/* SIDEBAR NAVIGATION (Desktop Sticky) */}
-        <div className="hidden md:block col-span-3 sticky top-32 h-fit">
+        <motion.div 
+          initial={{ opacity: 0, x: -20, filter: "blur(10px)" }}
+          animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="hidden md:block col-span-3 sticky top-32 h-fit"
+        >
           <h4 className="text-xs font-mono text-zinc-400 uppercase tracking-widest mb-6">Documentation</h4>
           <ul className="space-y-4 text-sm font-medium text-zinc-600">
             <li 
@@ -156,10 +164,15 @@ export default function TechnicalDocs() {
               4.0 Ingestion Protocol
             </li>
           </ul>
-        </div>
+        </motion.div>
 
         {/* MAIN CONTENT */}
-        <div className="col-span-12 md:col-span-9 space-y-24 pb-40 w-full max-w-full overflow-x-hidden">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
+          animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="col-span-12 md:col-span-9 space-y-24 pb-40 w-full max-w-full overflow-x-hidden"
+        >
           
           {/* Header */}
           <section id="abstract" className="scroll-mt-32">
@@ -301,17 +314,16 @@ export default function TechnicalDocs() {
 
           {/* CTA Section - "The Steve Jobs Touch" */}
           <section className="border-t border-zinc-200 pt-20 pb-20 text-center">
-             <h3 className="text-3xl md:text-5xl font-bold tracking-tighter mb-8">
-               You have seen the math.<br/>Now see your data.
-             </h3>
-             <a href="/bill-debugger.html" className="inline-flex items-center gap-3 bg-black text-white px-8 py-4 rounded-full text-lg font-medium hover:scale-105 transition-transform shadow-xl hover:shadow-2xl">
-               <FileText className="w-5 h-5" />
-               <span>Upload Invoice to Clean Room</span>
-               <ArrowRight className="w-5 h-5" />
-             </a>
+            <h3 className="text-3xl md:text-5xl font-bold tracking-tighter mb-8">
+              You have seen the math.<br/>Now see your data.
+            </h3>
+            <a href="/bill-debugger" className="inline-flex items-center gap-3 bg-black text-white px-8 py-4 rounded-full text-lg font-medium hover:scale-105 transition-transform shadow-xl hover:shadow-2xl">
+              <Activity className="w-5 h-5" />
+              <span>Run Forensic Analysis</span>
+            </a>
           </section>
 
-        </div>
+        </motion.div>
       </div>
 
       {/* FOOTER - Consistent with other pages */}
