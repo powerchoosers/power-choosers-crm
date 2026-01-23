@@ -189,7 +189,7 @@ export default function TechnicalDocs() {
               </p>
             </motion.div>
 
-            <div className="mt-12 p-6 md:p-8 bg-white rounded-2xl border border-zinc-200 shadow-sm">
+            <div className="mt-12 p-4 md:p-8 bg-white rounded-2xl border border-zinc-200 shadow-sm">
               <h3 className="text-sm font-mono text-zinc-400 uppercase tracking-widest mb-4">System Architecture</h3>
               <p className="text-lg text-zinc-800 leading-relaxed">
                 The Texas energy market is not a commodity market; it is a volatility market. Standard brokerage treats electricity like a fixed-rate subscription. This is a fundamental error.
@@ -219,7 +219,7 @@ export default function TechnicalDocs() {
                 </div>
               </div>
 
-              <div className="font-mono text-xs md:text-sm bg-[#1e1e1e] text-zinc-300 p-6 rounded-lg overflow-x-auto shadow-inner w-full max-w-[85vw] md:max-w-full">
+              <div className="font-mono text-xs md:text-sm bg-[#1e1e1e] text-zinc-300 p-6 rounded-lg overflow-x-auto shadow-inner w-full">
                 <p className="text-zinc-500 mb-2">{"// Calculating Phantom Load Cost"}</p>
                 <div className="space-y-1 whitespace-pre-wrap">
                   <p>const <span className="text-yellow-400">Actual_Load</span> = 500; <span className="text-zinc-500">{"// kW (What you used)"}</span></p>
