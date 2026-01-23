@@ -307,8 +307,8 @@ export default function LandingPage() {
                 Exposing hidden TDU charges and &quot;pass-through&quot; leaks. We simulate your bill against 100+
                 supplier tariffs.
               </p>
-              <div className="w-full aspect-[4/3] mb-8 overflow-hidden rounded-xl border border-white/50">
-                <img src="/images/prism.jpg" alt="True Cost Revealer Visualization" className="w-full h-full object-cover" />
+              <div className="w-full mb-8 overflow-hidden rounded-xl border border-white/50">
+                <img src="/images/graph-scattered.jpg" alt="True Cost Revealer Visualization" className="w-full h-auto" />
               </div>
             </div>
 
@@ -320,8 +320,8 @@ export default function LandingPage() {
                 The 2026 Market Navigator. We forecast capacity markets and hedge against regulatory shifts
                 before they happen.
               </p>
-              <div className="w-full aspect-[4/3] mb-8 overflow-hidden rounded-xl border border-white/50">
-                <img src="/images/future-proof-engine.png" alt="Future-Proof Engine Visualization" className="w-full h-full object-cover" />
+              <div className="w-full mb-8 overflow-hidden rounded-xl border border-white/50">
+                <img src="/images/line-graph.jpg" alt="Future-Proof Engine Visualization" className="w-full h-auto" />
               </div>
             </div>
 
@@ -332,8 +332,8 @@ export default function LandingPage() {
               <p className="text-zinc-500 mb-8">
                 Multi-site management unified into a single stream of truth. One dashboard. Zero noise.
               </p>
-              <div className="w-full aspect-[4/3] mb-8 overflow-hidden rounded-xl border border-white/50">
-                <img src="/images/energy-minimalism-v2.png" alt="Energy Minimalism Visualization" className="w-full h-full object-cover" />
+              <div className="w-full mb-8 overflow-hidden rounded-xl border border-white/50">
+                <img src="/images/centralization.jpg" alt="Energy Minimalism Visualization" className="w-full h-auto" />
               </div>
             </div>
 
