@@ -128,14 +128,13 @@ export default function TechnicalDocs() {
       {/* BACKGROUND TEXTURE: The "Digital Grain" */}
       <div className="fixed inset-0 bg-[radial-gradient(#002FA7_1px,transparent_1px)] [background-size:20px_20px] opacity-[0.1] pointer-events-none z-0" />
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 grid grid-cols-1 md:grid-cols-12 gap-12 pt-32 md:pt-40 relative z-10">
-        
-        {/* SIDEBAR NAVIGATION (Desktop Sticky) */}
+      <main className="max-w-7xl mx-auto px-4 md:px-6 grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12 pt-32 md:pt-40 relative z-10 w-full">
+        {/* Sidebar Navigation (Desktop) */}
         <motion.div 
-          initial={{ opacity: 0, x: -20, filter: "blur(10px)" }}
-          animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-          className="hidden md:block col-span-3 sticky top-32 h-fit"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+          className="hidden md:block col-span-3 sticky top-40 self-start space-y-8"
         >
           <h4 className="text-xs font-mono text-zinc-400 uppercase tracking-widest mb-6">Documentation</h4>
           <ul className="space-y-4 text-sm font-medium text-zinc-600">
@@ -200,18 +199,18 @@ export default function TechnicalDocs() {
             </div>
           </section>
 
-          {/* Ratchet Section */}
-          <section id="ratchet" className="border-t border-zinc-200 pt-12 scroll-mt-32">
-            <div className="flex items-baseline gap-4 mb-6">
-              <span className="font-mono text-[#002FA7]">2.0</span>
+          {/* Section 2: Ratchet */}
+          <section id="ratchet" className="scroll-mt-32">
+            <div className="mb-8">
+              <span className="text-[#002FA7] font-mono text-xs tracking-widest uppercase mb-2 block">Vector 1</span>
               <h2 className="text-3xl font-bold">The Ratchet Vulnerability</h2>
             </div>
-            <div className="bg-white p-6 md:p-8 rounded-2xl border border-zinc-200 shadow-sm">
+            <div className="bg-white p-4 md:p-8 rounded-2xl border border-zinc-200 shadow-sm w-full">
               <div className="flex items-start gap-4 mb-6">
                 <ShieldAlert className="w-6 h-6 text-red-500 flex-shrink-0 mt-1" />
                 <div>
                   <h3 className="font-bold text-lg mb-2">The &ldquo;Ghost Capacity&rdquo; Problem</h3>
-                  <p className="text-zinc-600 leading-relaxed">
+                  <p className="text-zinc-600 leading-relaxed text-sm">
                     Most commercial tariffs include an <strong className="text-black">80% Demand Ratchet</strong>. 
                     If your facility spikes to <span className="font-mono bg-zinc-100 px-1 rounded text-sm">1,000 kW</span> for just one 15-minute interval, 
                     your billed demand floor is set at <span className="font-mono bg-zinc-100 px-1 rounded text-sm">800 kW</span> for the next 11 months.
@@ -219,9 +218,9 @@ export default function TechnicalDocs() {
                 </div>
               </div>
 
-              <div className="font-mono text-xs md:text-sm bg-[#1e1e1e] text-zinc-300 p-6 rounded-lg overflow-x-auto shadow-inner w-full">
+              <div className="font-mono text-xs md:text-sm bg-[#1e1e1e] text-zinc-300 p-4 md:p-6 rounded-lg overflow-x-auto shadow-inner w-full">
                 <p className="text-zinc-500 mb-2">{"// Calculating Phantom Load Cost"}</p>
-                <div className="space-y-1 whitespace-pre-wrap">
+                <div className="space-y-1 whitespace-pre-wrap break-words">
                   <p>const <span className="text-yellow-400">Actual_Load</span> = 500; <span className="text-zinc-500">{"// kW (What you used)"}</span></p>
                   <p>const <span className="text-red-400">Billed_Load</span> = 800; <span className="text-zinc-500">{"// kW (Ratchet Floor)"}</span></p>
                   <p>const <span className="text-[#002FA7]">Wasted_Spend</span> = (Billed_Load - Actual_Load) * Demand_Rate;</p>
@@ -275,7 +274,7 @@ export default function TechnicalDocs() {
               <h2 className="text-3xl font-bold">The Ingestion Protocol</h2>
             </div>
             
-            <div className="bg-[#1e1e1e] rounded-2xl overflow-hidden shadow-2xl w-full max-w-[85vw] md:max-w-full">
+            <div className="bg-[#1e1e1e] rounded-2xl overflow-hidden shadow-2xl w-full">
               <div className="bg-[#2d2d2d] px-4 py-2 flex items-center gap-2 border-b border-white/5">
                 <div className="flex gap-1.5">
                   <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
@@ -324,7 +323,7 @@ export default function TechnicalDocs() {
           </section>
 
         </motion.div>
-      </div>
+      </main>
 
       {/* FOOTER - Consistent with other pages */}
       <footer className="bg-zinc-900 text-zinc-400 py-20 px-6 border-t border-zinc-800 relative z-10">
