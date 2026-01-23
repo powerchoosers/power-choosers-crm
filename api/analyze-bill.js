@@ -20,7 +20,7 @@ export default async function handleApiAnalyzeBill(req, res) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.0-flash',
       generationConfig: { responseMimeType: "application/json" }
     });
 
