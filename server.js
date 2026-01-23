@@ -210,7 +210,7 @@ const mimeTypes = {
 };
 
 // Configuration
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 const LOCAL_DEV_MODE = process.env.NODE_ENV !== 'production';
 const API_BASE_URL = process.env.API_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
 // Only used for external webhooks, not internal API routing
@@ -1045,83 +1045,91 @@ const server = http.createServer(async (req, res) => {
     pathname = '/index.html';
   }
 
+  // Map Next.js static app assets
+  if (pathname.startsWith('/_next/')) {
+    pathname = '/crm-platform/out' + pathname;
+  }
+
+  // Map /crm-platform routes to static export
+  if (pathname === '/crm-platform' || pathname === '/crm-platform/') {
+    console.log('[Server] Mapping /crm-platform to static export');
+    pathname = '/crm-platform/out/crm-platform.html';
+  } else if (pathname.startsWith('/crm-platform/') && !pathname.startsWith('/crm-platform/out/')) {
+    console.log('[Server] Mapping /crm-platform sub-route to static export');
+    // Map subpages: /crm-platform/accounts -> /crm-platform/out/crm-platform/accounts
+    // The file server logic below will add .html if needed
+    const relativePath = pathname.replace('/crm-platform', '');
+    pathname = '/crm-platform/out/crm-platform' + relativePath;
+  }
+
+  // Map /login to legacy dashboard for now (until login page static export is fixed)
+  if (pathname === '/login' || pathname === '/login/') {
+    pathname = '/crm-dashboard.html';
+  }
+
   // Construct file path using the robust __dirname equivalent
   let filePath = path.join(__dirname, pathname);
 
+  // Prioritize .html files for extensionless paths to avoid serving directories (EISDIR)
+  // This is critical for Next.js static exports where /page exists as a directory (assets) AND /page.html exists
+  const ext = path.extname(pathname);
+  if (!ext && pathname !== '/') {
+    const cleanPath = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+    const htmlPath = cleanPath + '.html';
+    const htmlFilePath = path.join(__dirname, htmlPath);
+    
+    // Check if the .html file exists
+    if (fs.existsSync(htmlFilePath)) {
+      filePath = htmlFilePath;
+      pathname = htmlPath; // Update pathname for logging
+    }
+  }
+
   logger.debug('Attempting to serve static file', 'Server', { filePath });
 
-  // Check if file exists first
-  if (!fs.existsSync(filePath)) {
-    // If file doesn't exist and pathname doesn't have an extension, try adding .html
-    // This allows clean URLs like /resources instead of /resources.html
-    const ext = path.extname(pathname);
-    if (!ext && pathname !== '/') {
-      const htmlPath = pathname + '.html';
-      const htmlFilePath = path.join(__dirname, htmlPath);
-      if (fs.existsSync(htmlFilePath)) {
-        filePath = htmlFilePath;
-        pathname = htmlPath; // Update pathname for logging
-        logger.debug('Found file with .html extension', 'Server', { original: pathname, found: htmlPath });
-      } else {
-        console.error(`[Server] File not found at constructed path: ${filePath} or ${htmlFilePath}`);
-        res.writeHead(404, { 'Content-Type': 'text/html' });
-        res.end(`
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-              <meta charset="UTF-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>404 - File Not Found</title>
-              <style>
-                  body { font-family: Arial, sans-serif; background-color: #f0f0f0; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-                  .container { background-color: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); text-align: center; }
-                  h1 { color: #ff5722; font-size: 2.5em; margin-bottom: 10px; }
-                  p { color: #555; font-size: 1.1em; margin-bottom: 20px; }
-                  a { color: #ff5722; text-decoration: none; font-weight: bold; }
-                  a:hover { text-decoration: underline; }
-              </style>
-          </head>
-          <body>
-              <div class="container">
-                  <h1>404 - File Not Found</h1>
-                  <p>The requested file ${pathname} was not found.</p>
-                  <p><a href="/">Back to Power Choosers CRM</a></p>
-              </div>
-          </body>
-          </html>
-        `);
-        return;
-      }
-    } else {
-      console.error(`[Server] File not found at constructed path: ${filePath}`);
-      res.writeHead(404, { 'Content-Type': 'text/html' });
-      res.end(`
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>404 - File Not Found</title>
-            <style>
-                body { font-family: Arial, sans-serif; background-color: #f0f0f0; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-                .container { background-color: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); text-align: center; }
-                h1 { color: #ff5722; font-size: 2.5em; margin-bottom: 10px; }
-                p { color: #555; font-size: 1.1em; margin-bottom: 20px; }
-                a { color: #ff5722; text-decoration: none; font-weight: bold; }
-                a:hover { text-decoration: underline; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>404 - File Not Found</h1>
-                <p>The requested file ${pathname} was not found.</p>
-                <p><a href="/">Back to Power Choosers CRM</a></p>
-            </div>
-        </body>
-        </html>
-      `);
-      return;
+  // Check if file exists and is a file (not a directory)
+  let fileExists = false;
+  let isDirectory = false;
+  
+  try {
+    if (fs.existsSync(filePath)) {
+      const stats = fs.statSync(filePath);
+      fileExists = true;
+      isDirectory = stats.isDirectory();
     }
+  } catch (e) {
+    logger.error('Error stating file', 'Server', { filePath, error: e.message });
+  }
+
+  if (!fileExists || isDirectory) {
+    console.error(`[Server] File not found or is directory: ${filePath}`);
+    res.writeHead(404, { 'Content-Type': 'text/html' });
+    res.end(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>404 - File Not Found</title>
+          <style>
+              body { font-family: Arial, sans-serif; background-color: #f0f0f0; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+              .container { background-color: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); text-align: center; }
+              h1 { color: #ff5722; font-size: 2.5em; margin-bottom: 10px; }
+              p { color: #555; font-size: 1.1em; margin-bottom: 20px; }
+              a { color: #ff5722; text-decoration: none; font-weight: bold; }
+              a:hover { text-decoration: underline; }
+          </style>
+      </head>
+      <body>
+          <div class="container">
+              <h1>404 - File Not Found</h1>
+              <p>The requested file ${pathname} was not found.</p>
+              <p><a href="/">Back to Power Choosers CRM</a></p>
+          </div>
+      </body>
+      </html>
+    `);
+    return;
   }
 
   try {
