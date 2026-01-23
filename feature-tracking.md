@@ -35,3 +35,12 @@
     - Implemented Data Refresh logic (with toast notification).
     - Added manual Dialer trigger button.
     - Added Notification bell (UI only).
+
+### Bill Debugger & Analysis
+- **Status**: In Progress
+- **Description**: Fixing bill analysis API connectivity and error handling.
+- **Actions**:
+  - [x] **Backend**: Added body parsing to `/api/analyze-bill` in `server.js`.
+  - [x] **Model**: Downgraded Gemini model to stable `gemini-2.0-flash` in `api/analyze-bill.js`.
+  - [x] **Proxy**: Updated `next.config.ts` to use `127.0.0.1` for reliable local proxying.
+  - [x] **Frontend**: Enhanced error handling in `bill-debugger/page.tsx` to catch non-JSON server errors.

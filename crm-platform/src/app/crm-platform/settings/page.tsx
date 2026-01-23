@@ -8,10 +8,10 @@ import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { User, Bell, Shield, Palette, Database } from 'lucide-react'
+import { User, Bell, Shield, Palette, Database, Trash2, Plus, Phone } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { db } from '@/lib/firebase'
-import { doc, setDoc } from 'firebase/firestore'
+import { doc, setDoc, getDoc } from 'firebase/firestore'
 import { toast } from 'sonner'
 
 export default function SettingsPage() {
@@ -20,12 +20,49 @@ export default function SettingsPage() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [bio, setBio] = useState('')
+  const [twilioNumbers, setTwilioNumbers] = useState<Array<{ name: string; number: string }>>([])
+  const [selectedPhoneNumber, setSelectedPhoneNumber] = useState<string | null>(null)
+  const [bridgeToMobile, setBridgeToMobile] = useState(false)
+  const [newNumber, setNewNumber] = useState('')
+  const [newNumberName, setNewNumberName] = useState('')
   const [isSaving, setIsSaving] = useState(false)
 
+  // Sync with profile and check legacy settings
   useEffect(() => {
     setFirstName(profile.firstName || '')
     setLastName(profile.lastName || '')
-  }, [profile.firstName, profile.lastName])
+    setBio(profile.bio || '')
+    setTwilioNumbers(profile.twilioNumbers || [])
+    setSelectedPhoneNumber(profile.selectedPhoneNumber || null)
+    setBridgeToMobile(profile.bridgeToMobile || false)
+
+    // Legacy Data Migration Check
+    const checkLegacyData = async () => {
+      if (!user?.email) return
+      // Only check if we don't have numbers yet (avoid overwriting if user has already migrated/saved)
+      if (profile.twilioNumbers && profile.twilioNumbers.length > 0) return
+
+      try {
+        const legacyId = `user-settings-${user.email.toLowerCase()}`
+        const legacyRef = doc(db, 'settings', legacyId)
+        const legacySnap = await getDoc(legacyRef)
+
+        if (legacySnap.exists()) {
+          const data = legacySnap.data()
+          if (data.twilioNumbers && Array.isArray(data.twilioNumbers) && data.twilioNumbers.length > 0) {
+            setTwilioNumbers(data.twilioNumbers)
+            if (data.selectedPhoneNumber) setSelectedPhoneNumber(data.selectedPhoneNumber)
+            if (typeof data.bridgeToMobile === 'boolean') setBridgeToMobile(data.bridgeToMobile)
+            toast.info('Legacy phone settings detected. Click "Save Changes" to import them.')
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to check legacy settings:', err)
+      }
+    }
+
+    checkLegacyData()
+  }, [profile, user?.email])
 
   const computedName = useMemo(() => {
     const full = `${firstName} ${lastName}`.trim()
@@ -60,6 +97,27 @@ export default function SettingsPage() {
       toast.error(message)
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleAddNumber = () => {
+    if (!newNumber || !newNumberName) return
+    const updated = [...twilioNumbers, { name: newNumberName, number: newNumber }]
+    setTwilioNumbers(updated)
+    // If it's the first number, select it automatically
+    if (updated.length === 1) {
+      setSelectedPhoneNumber(newNumber)
+    }
+    setNewNumber('')
+    setNewNumberName('')
+  }
+
+  const handleDeleteNumber = (index: number) => {
+    const updated = [...twilioNumbers]
+    const removed = updated.splice(index, 1)[0]
+    setTwilioNumbers(updated)
+    if (selectedPhoneNumber === removed.number) {
+      setSelectedPhoneNumber(null)
     }
   }
 

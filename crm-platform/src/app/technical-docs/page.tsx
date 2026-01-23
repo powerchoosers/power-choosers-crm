@@ -52,11 +52,11 @@ export default function TechnicalDocs() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F5F7] text-zinc-900 font-sans selection:bg-[#002FA7] selection:text-white">
+    <div className="min-h-screen bg-[#F5F5F7] text-zinc-900 font-sans selection:bg-[#002FA7] selection:text-white overflow-x-hidden">
       
       {/* HEADER (Heads-Up Display) - Consistent with other pages */}
-      <header id="main-header" className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${isScrolled ? 'bg-white/80 backdrop-blur-xl h-16 shadow-sm' : 'bg-transparent h-24'}`}>
-        <div className="w-full px-8 h-full flex items-center justify-between">
+      <header id="main-header" className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${isScrolled ? 'bg-white/80 backdrop-blur-xl h-16 shadow-sm' : 'bg-transparent h-20 md:h-24'}`}>
+        <div className="w-full px-4 md:px-8 h-full flex items-center justify-between">
           {/* 1. Identity */}
           <Link href="/" className="z-50 flex items-center gap-2 cursor-pointer">
             <img src="/images/nodalpoint.png" alt="Nodal Point Logo" className="h-10 w-auto" />
@@ -128,7 +128,7 @@ export default function TechnicalDocs() {
       {/* BACKGROUND TEXTURE: The "Digital Grain" */}
       <div className="fixed inset-0 bg-[radial-gradient(#002FA7_1px,transparent_1px)] [background-size:20px_20px] opacity-[0.1] pointer-events-none z-0" />
 
-      <main className="max-w-7xl mx-auto px-4 md:px-6 grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12 pt-32 md:pt-40 relative z-10 w-full">
+      <main className="max-w-7xl mx-auto px-4 md:px-8 flex flex-col md:grid md:grid-cols-12 gap-8 md:gap-12 pt-32 md:pt-40 relative z-10 w-full">
         {/* Sidebar Navigation (Desktop) */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
@@ -170,7 +170,7 @@ export default function TechnicalDocs() {
           initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
           animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
           transition={{ duration: 0.8, ease: "easeOut" }}
-          className="col-span-12 md:col-span-9 space-y-24 pb-40 w-full max-w-full overflow-x-hidden"
+          className="col-span-12 md:col-span-9 space-y-24 pb-40 w-full"
         >
           
           {/* Header */}

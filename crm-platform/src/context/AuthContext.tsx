@@ -10,6 +10,10 @@ type UserProfile = {
   name: string | null
   firstName: string | null
   lastName: string | null
+  bio: string | null
+  twilioNumbers: Array<{ name: string; number: string }> | null
+  selectedPhoneNumber: string | null
+  bridgeToMobile: boolean | null
 }
 
 interface AuthContextType {
@@ -23,14 +27,30 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   role: null,
-  profile: { name: null, firstName: null, lastName: null },
+  profile: { 
+    name: null, 
+    firstName: null, 
+    lastName: null,
+    bio: null,
+    twilioNumbers: null,
+    selectedPhoneNumber: null,
+    bridgeToMobile: null
+  },
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [role, setRole] = useState<string | null>(null)
-  const [profile, setProfile] = useState<UserProfile>({ name: null, firstName: null, lastName: null })
+  const [profile, setProfile] = useState<UserProfile>({ 
+    name: null, 
+    firstName: null, 
+    lastName: null,
+    bio: null,
+    twilioNumbers: null,
+    selectedPhoneNumber: null,
+    bridgeToMobile: null
+  })
   const router = useRouter()
 
   useEffect(() => {
@@ -61,7 +81,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 (firstName ? `${firstName} ${lastName || ''}`.trim() : null) ||
                 (user.displayName?.trim() || null)
 
-              setProfile({ name: derivedName, firstName, lastName })
+              setProfile({ 
+                name: derivedName, 
+                firstName, 
+                lastName,
+                bio: typeof data.bio === 'string' ? data.bio : null,
+                twilioNumbers: Array.isArray(data.twilioNumbers) ? data.twilioNumbers : [],
+                selectedPhoneNumber: typeof data.selectedPhoneNumber === 'string' ? data.selectedPhoneNumber : null,
+                bridgeToMobile: typeof data.bridgeToMobile === 'boolean' ? data.bridgeToMobile : false
+              })
 
               if (!storedName && derivedName) {
                 try {
@@ -80,7 +108,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } else {
               setRole('employee')
               const derivedName = user.displayName?.trim() || null
-              setProfile({ name: derivedName, firstName: null, lastName: null })
+              setProfile({ 
+                name: derivedName, 
+                firstName: null, 
+                lastName: null,
+                bio: null,
+                twilioNumbers: [],
+                selectedPhoneNumber: null,
+                bridgeToMobile: false
+              })
 
               try {
                 await setDoc(
@@ -99,12 +135,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } catch (error) {
             console.error("Error fetching user role:", error)
             setRole('employee') // Fallback
-            setProfile({ name: user.displayName?.trim() || null, firstName: null, lastName: null })
+            setProfile({ 
+              name: user.displayName?.trim() || null, 
+              firstName: null, 
+              lastName: null,
+              bio: null,
+              twilioNumbers: [],
+              selectedPhoneNumber: null,
+              bridgeToMobile: false
+            })
           }
         }
       } else {
         setRole(null)
-        setProfile({ name: null, firstName: null, lastName: null })
+        setProfile({ 
+          name: null, 
+          firstName: null, 
+          lastName: null,
+          bio: null,
+          twilioNumbers: null,
+          selectedPhoneNumber: null,
+          bridgeToMobile: null
+        })
         // Clear session cookie
         document.cookie = 'np_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;'
       }

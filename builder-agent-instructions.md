@@ -58,9 +58,10 @@ The legacy dashboard file `c:\Users\Lap3p\OneDrive\Documents\Power Choosers CRM\
 - **Dashboard**: `crm-platform/src/app/crm-platform/page.tsx`
 - **Images**: `crm-platform/public/images/`
 
-## 🎨 Design System
+##### 🎨 Design System
 - **Brand**: Nodal Point (Clean, Modern, Enterprise).
 - **Theme**: Dark/Light mode support (System default).
+- **Visual Style**: **Glassmorphism** (Frosted glass, high blur, subtle borders) over solid opaque backgrounds for floating elements.
 - **Layout**: Sidebar navigation (Left), Header (Top), Main Content (Center).
 - **AI Icon**: Use the "Sparkles" icon for all AI features.
 

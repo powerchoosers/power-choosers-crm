@@ -64,6 +64,14 @@ export default function BillDebuggerPage() {
             })
         })
 
+        // Check for non-JSON response (e.g., 500 Internal Server Error html/text)
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            const text = await response.text();
+            console.error('Non-JSON response:', text);
+            throw new Error(`Server error (${response.status}): ${text.substring(0, 100)}`);
+        }
+
         const result = await response.json()
 
         if (!response.ok || !result.success) {
