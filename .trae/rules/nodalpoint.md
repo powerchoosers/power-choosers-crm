@@ -42,37 +42,32 @@ Power Choosers CRM/
 └── feature-tracking.md     # Migration Status Log
 ```
 
-## ⚡ Quick Start
+## ⚡ Quick Start & Architecture
 
-To run the full platform, you need to start both the **Frontend** and **Backend** servers.
+The platform operates using a **Three-Server Architecture**:
 
-### 1. Start the Backend API (Legacy Server)
-This handles API requests and legacy routing.
+### 1. Frontend (Next.js)
+The modern UI for users.
+- **Local**: `http://localhost:3000`
+- **Command**: `cd crm-platform; npm run dev -- --port 3000`
 
-Open a terminal in the root directory:
-```powershell
-node server.js
-```
-*Runs on Port 3001 (or configured port).*
+### 2. Local Backend (Node.js)
+Handles API requests and legacy logic during development.
+- **Local**: `http://127.0.0.1:3001`
+- **Command**: `node server.js` (Root Directory)
 
-### 2. Start the Frontend (Next.js)
-This serves the modern user interface.
+### 3. Production Backend (Cloud Run)
+The live API for the deployed platform.
+- **URL**: `https://power-choosers-crm-792458658491.us-south1.run.app`
 
-Open a **new** terminal, navigate to `crm-platform`, and run the dev server:
-```powershell
-cd crm-platform
-npm run dev -- --port 3000
-```
-*Runs on [http://localhost:3000](http://localhost:3000)*
+## 📍 Routing & Proxy Logic
 
-## 📍 Routing & URL Structure
+We use **Next.js Rewrites** (`next.config.ts`) to handle seamless communication between the frontend and the correct backend:
 
-- **Landing Page**: `http://localhost:3000/` (Served by `src/app/page.tsx`)
-- **Philosophy**: `http://localhost:3000/philosophy` (The "Why" - Mission Statement)
-- **Technical Docs**: `http://localhost:3000/technical-docs` (The "How" - Methodology)
-- **App Dashboard**: `http://localhost:3000/crm-platform` (Protected Route)
-- **Bill Debugger**: `http://localhost:3000/bill-debugger` (Next.js Page)
-- **Login**: `http://localhost:3000/login`
+- **In Development**: All `/api/*` requests are proxied to the **Local Backend** (`127.0.0.1:3001`).
+- **In Production**: All `/api/*` requests are proxied to the **Cloud Run** URL.
+
+This ensures that code remains environment-agnostic while maintaining full functionality across `localhost` and `nodalpoint.io`.
 
 ## 🧠 Nodal Point Philosophy & Methodology
 
