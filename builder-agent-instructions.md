@@ -44,13 +44,24 @@ The legacy dashboard file `c:\Users\Lap3p\OneDrive\Documents\Power Choosers CRM\
 - **Goal**: Ensure that documentation never drifts from the codebase state.
 
 ## 🚀 Server & Development
-- **New Platform (Development - MAIN)**: The new app lives in `crm-platform/`.
-  - **Run Command**: `npm run dev -- --port 3000` (inside `crm-platform/`)
-  - **URL**: `http://localhost:3000`
-  - **Static Files**: Any HTML files (like `bill-debugger.html`) or images must be placed in `crm-platform/public/`.
-  - **Routing**: The new platform uses file-system routing in `crm-platform/src/app`.
-- **Legacy Server (API/Backend)**: Run `node server.js` (Port 3001) for API support.
-  - **Note**: Do not rely on `server.js` for serving frontend pages anymore.
+The platform operates across three distinct environments/servers:
+
+1.  **New Platform (Frontend - Next.js)**: 
+    - **Local**: `http://localhost:3000`
+    - **Run Command**: `npm run dev -- --port 3000` (inside `crm-platform/`)
+2.  **Legacy Server (Backend API - Node.js)**:
+    - **Local**: `http://127.0.0.1:3001` (or `localhost:3001`)
+    - **Run Command**: `node server.js` (in root directory)
+3.  **Production Backend (Cloud Run)**:
+    - **URL**: `https://power-choosers-crm-792458658491.us-south1.run.app`
+    - **Role**: Serves as the primary API for deployed instances of the platform.
+
+### 🌐 Routing Logic (Proxying)
+To ensure the frontend can communicate with the backend regardless of environment, we use **Next.js Rewrites** in `crm-platform/next.config.ts`:
+- **Local Development**: Proxies `/api/*` to `http://127.0.0.1:3001`.
+- **Production**: Proxies `/api/*` to the **Cloud Run** URL.
+
+**CRITICAL**: Always ensure that any new API endpoints are tested against both the local backend and verified for Cloud Run compatibility.
 
 ## 📂 File Locations & "Source of Truth"
 - **Landing Page**: `crm-platform/src/app/page.tsx`
