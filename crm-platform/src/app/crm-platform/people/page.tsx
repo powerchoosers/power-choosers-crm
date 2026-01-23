@@ -186,8 +186,8 @@ export default function PeoplePage() {
             <h1 className="text-3xl font-bold tracking-tight text-white">People</h1>
             <p className="text-zinc-400 mt-1">Manage your clients and prospects.</p>
             </div>
-            <Button className="bg-signal hover:bg-blue-700 text-white transition-colors gap-2">
-            <Plus size={18} />
+            <Button className="bg-white text-zinc-950 hover:bg-zinc-200 font-medium">
+            <Plus size={18} className="mr-2" />
             Add Person
             </Button>
         </div>

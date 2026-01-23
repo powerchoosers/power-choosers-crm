@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { Button } from '@/components/ui/button'
@@ -24,8 +25,9 @@ export default function LoginPage() {
 
     try {
       await signInWithEmailAndPassword(auth, email, password)
+      document.cookie = 'np_session=1; Path=/; SameSite=Lax'
       toast.success('Logged in successfully')
-      router.push('/')
+      router.push('/crm-platform')
     } catch (error: any) {
       console.error('Login error:', error)
       toast.error(error.message || 'Failed to login')
@@ -39,8 +41,9 @@ export default function LoginPage() {
     try {
       const provider = new GoogleAuthProvider()
       await signInWithPopup(auth, provider)
+      document.cookie = 'np_session=1; Path=/; SameSite=Lax'
       toast.success('Logged in with Google successfully')
-      router.push('/')
+      router.push('/crm-platform')
     } catch (error: any) {
       console.error('Google login error:', error)
       toast.error(error.message || 'Failed to login with Google')
@@ -59,9 +62,11 @@ export default function LoginPage() {
 
       <Card className="w-full max-w-md border-zinc-800 bg-zinc-900/80 backdrop-blur-xl text-zinc-100 shadow-2xl relative z-10">
         <CardHeader className="space-y-1 text-center">
-            <div className="mx-auto bg-blue-600/20 p-3 rounded-full w-fit mb-4">
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                    N
+            <div className="mx-auto mb-6">
+                <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center mx-auto shadow-lg p-4">
+                    <div className="relative w-full h-full">
+                        <Image src="/images/nodalpoint.png" alt="Nodal Point" fill className="object-contain" priority />
+                    </div>
                 </div>
             </div>
           <CardTitle className="text-2xl font-bold tracking-tight text-white">Welcome Back</CardTitle>

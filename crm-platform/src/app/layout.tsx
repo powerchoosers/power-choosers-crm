@@ -3,8 +3,8 @@ import Providers from './providers'
 import { Toaster } from 'sonner'
 
 export const metadata = {
-  title: 'Nodal Point',
-  description: 'Smart Energy Choices. Real Savings.',
+  title: 'Nodal Point | Signal Over Noise in the Texas Energy Market',
+  description: 'The Texas grid is designed to confuse. We view complexity as a design flaw. Nodal Point is the forensic engine that decodes volatility, eliminates demand ratchets, and reveals the true cost of power.',
 }
 
 export default function RootLayout({
