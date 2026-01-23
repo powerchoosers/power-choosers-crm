@@ -10,18 +10,21 @@ export function GlobalSearch() {
   const [isOpen, setIsOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const { data: contacts } = useContacts()
-  const { data: accounts } = useAccounts()
+  const { data: contactsData } = useContacts()
+  const { data: accountsData } = useAccounts()
+
+  const contacts = contactsData?.pages.flatMap(page => page.contacts) || []
+  const accounts = accountsData?.pages.flatMap(page => page.accounts) || []
 
   // Filter contacts logic
-  const filteredContacts = contacts?.filter(contact => 
+  const filteredContacts = contacts.filter(contact => 
     contact.name.toLowerCase().includes(query.toLowerCase()) ||
     contact.email.toLowerCase().includes(query.toLowerCase()) ||
     contact.company.toLowerCase().includes(query.toLowerCase())
   ).slice(0, 3)
 
   // Filter accounts logic
-  const filteredAccounts = accounts?.filter(account => 
+  const filteredAccounts = accounts.filter(account => 
     account.name.toLowerCase().includes(query.toLowerCase()) ||
     account.industry.toLowerCase().includes(query.toLowerCase()) ||
     account.domain.toLowerCase().includes(query.toLowerCase())

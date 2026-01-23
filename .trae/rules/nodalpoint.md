@@ -26,14 +26,16 @@ The project is divided into two main parts:
 
 ```
 Power Choosers CRM/
-├── crm-platform/           # New Next.js Application
+├── crm-platform/           # New Next.js Application (MAIN ENTRY POINT)
 │   ├── src/
 │   │   ├── app/            # App Router (Pages & Layouts)
 │   │   ├── components/     # Reusable UI Components
 │   │   ├── context/        # React Context Providers
 │   │   ├── lib/            # Utilities & Firebase Config
 │   │   └── store/          # Zustand Stores
-│   ├── public/             # Static Assets
+│   ├── public/             # Static Assets (Images, Legacy HTML Tools)
+│   │   ├── bill-debugger.html # The "Bill Debugger" tool lives here
+│   │   └── images/         # Image assets
 │   └── package.json        # Frontend Dependencies
 ├── api/                    # Backend API Endpoints
 ├── backups/                # Legacy HTML Dashboard (Reference Only)
@@ -64,6 +66,43 @@ npm run dev -- --port 3000
 ```
 *Runs on [http://localhost:3000](http://localhost:3000)*
 
+## 📍 Routing & URL Structure
+
+- **Landing Page**: `http://localhost:3000/` (Served by `src/app/page.tsx`)
+- **Philosophy**: `http://localhost:3000/philosophy` (The "Why" - Mission Statement)
+- **Technical Docs**: `http://localhost:3000/technical-docs` (The "How" - Methodology)
+- **App Dashboard**: `http://localhost:3000/crm-platform` (Protected Route)
+- **Bill Debugger**: `http://localhost:3000/bill-debugger.html` (Static file in `public/`)
+- **Login**: `http://localhost:3000/login`
+
+## 🧠 Nodal Point Philosophy & Methodology
+
+The Nodal Point platform is not just a CRM; it is an implementation of a specific market thesis. All public-facing pages and tools must align with this worldview.
+
+### 1. The Core Concept: "The Physics of Pricing"
+The Texas energy market is not a commodity market; it is a **volatility market**. Standard brokerage treats electricity like a fixed-rate subscription, which is a fundamental error. Nodal Point treats a client's load profile as a dynamic data set to be engineered.
+
+### 2. The Three Vectors of Cost Leakage
+We do not guess. We measure. Our software is designed to mitigate three specific "enemies" in the grid code:
+
+1.  **Demand Ratchets ("Ghost Capacity")**:
+    -   *Problem*: Spiking to 1,000 kW for 15 minutes sets a billing floor of 800 kW for 11 months.
+    -   *Fix*: Real-time variance monitoring (Metered vs. Billed) to trigger load shedding.
+2.  **4CP Coincident Peaks (Transmission Costs)**:
+    -   *Problem*: Costs based on the 4 highest usage intervals in June, July, August, Sept.
+    -   *Fix*: Predictive curtailment to "delete" transmission liability for the next year.
+3.  **Scarcity Pricing (The Volatility)**:
+    -   *Problem*: Real-time prices spiking to $5,000/MWh.
+    -   *Fix*: Algorithmic avoidance based on Grid Reserve margins.
+
+### 3. Public Design Ethos ("The Steve Jobs Touch")
+-   **Tone**: Dense, intellectual, and intimidatingly smart. We filter out tire-kickers.
+-   **Visuals**: Monochromatic diagrams, clean text, mathematical formulas. No stock photos of wind turbines or handshakes.
+-   **Structure**:
+    -   **Philosophy**: Abstract, high-level, "Data is Truth".
+    -   **Methodology**: "Source Code of the Grid", pseudo-code blocks, technical specs.
+    -   **Call to Action**: "You have seen the math. Now see your data." (Drive users to the Bill Debugger).
+
 ## 🔑 Authentication
 
 The platform uses **Firebase Authentication**.
@@ -88,6 +127,14 @@ The platform uses **Firebase Authentication**.
 - **Brand**: "Nodal Point" - Clean, Enterprise, Modern.
 - **AI Integration**: Use the "Sparkles" icon for AI-powered features.
 - **Layout**: Sidebar (Left), Top Bar (Header), Right Panel (Contextual Widgets).
+
+### 🔡 Typography & Branding Consistency
+- **Public Pages (Landing, Philosophy, etc.)**:
+  - **Headers**: `font-semibold`, `tracking-tighter`, `text-zinc-900`.
+  - **Body Text**: `font-light` or `font-normal`, `text-zinc-500` or `text-zinc-600`.
+  - **Accent**: `text-[#002FA7]` (International Klein Blue).
+  - **Font Family**: System Default Sans (via Tailwind `font-sans`). Do NOT override with Inter unless globally applied.
+- **Platform App**: Uses `Inter` (via `layout.tsx`).
 
 ## 📐 Standardized Page Layout
 

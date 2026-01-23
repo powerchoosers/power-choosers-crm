@@ -5,12 +5,26 @@ import { GoogleAuthProvider, signInWithPopup, User } from 'firebase/auth';
 import { toast } from 'sonner';
 
 // Gmail API Types
+interface GmailHeader {
+  name: string;
+  value: string;
+}
+
+interface GmailMessagePart {
+  mimeType?: string;
+  headers?: GmailHeader[];
+  body?: {
+    data?: string;
+  };
+  parts?: GmailMessagePart[];
+}
+
 interface GmailMessage {
   id: string;
   threadId: string;
   labelIds: string[];
   snippet: string;
-  payload: any;
+  payload?: GmailMessagePart;
   internalDate: string;
 }
 
@@ -58,14 +72,14 @@ export function useGmailSync() {
 
   // Parse Gmail Message (Ported from legacy script)
   const parseGmailMessage = (message: GmailMessage, userEmail: string) => {
-    const headers = message.payload?.headers || [];
-    const getHeader = (name: string) => headers.find((h: any) => h.name.toLowerCase() === name.toLowerCase())?.value || '';
+    const headers = message.payload?.headers ?? [];
+    const getHeader = (name: string) => headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? '';
 
     // Extract body parts (simplified logic from legacy)
     let htmlBody = '';
     let textBody = '';
     
-    const extractParts = (part: any) => {
+    const extractParts = (part?: GmailMessagePart) => {
       if (!part) return;
       if (part.mimeType === 'text/html' && part.body?.data) {
         htmlBody = decodeBase64Url(part.body.data);

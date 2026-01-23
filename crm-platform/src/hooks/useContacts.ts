@@ -1,5 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, where } from 'firebase/firestore'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { collection, getCountFromServer, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, limit, startAfter, QueryDocumentSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/context/AuthContext'
 
@@ -15,26 +15,44 @@ export interface Contact {
 }
 
 const COLLECTION_NAME = 'contacts'
+const PAGE_SIZE = 50
 
 export function useContacts() {
   const { user, role, loading } = useAuth()
 
-  return useQuery({
-    queryKey: ['contacts', user?.email, role],
-    queryFn: async () => {
+  return useInfiniteQuery({
+    queryKey: ['contacts', user?.email ?? 'guest', role ?? 'unknown'],
+    initialPageParam: undefined as QueryDocumentSnapshot | undefined,
+    queryFn: async ({ pageParam }) => {
       try {
-        let q = query(collection(db, COLLECTION_NAME));
+        // If loading, return empty immediately to avoid unnecessary queries
+        if (loading) return { contacts: [], lastDoc: null };
+        
+        // If no user and not loading (logged out), return empty
+        if (!user && !loading) return { contacts: [], lastDoc: null };
+
+        const baseQuery = collection(db, COLLECTION_NAME);
+        let q;
 
         if (role !== 'admin' && user?.email) {
-           q = query(collection(db, COLLECTION_NAME), where('ownerId', '==', user.email));
+           q = query(baseQuery, where('ownerId', '==', user.email));
         } else if (role !== 'admin' && !user?.email) {
-            if (!loading) return [];
+            // Should be covered by early returns, but just in case
+            return { contacts: [], lastDoc: null };
+        } else {
+            q = query(baseQuery);
+        }
+        
+        q = query(q, limit(PAGE_SIZE));
+        
+        if (pageParam) {
+          q = query(q, startAfter(pageParam));
         }
 
         const snapshot = await getDocs(q);
         
-        if (snapshot.empty) {
-          return [];
+        if (snapshot.empty || !snapshot.docs) {
+          return { contacts: [], lastDoc: null };
         }
 
         const contacts = snapshot.docs.map(doc => {
@@ -51,17 +69,47 @@ export function useContacts() {
             lastContact: data.lastContact || new Date().toISOString()
           }
         }) as Contact[];
-
-        // Client-side sort to avoid Firestore composite index requirements
-        return contacts.sort((a, b) => a.name.localeCompare(b.name));
+        
+        return { 
+          contacts, 
+          lastDoc: snapshot.docs?.at(-1) ?? null
+        };
       } catch (error) {
         console.error("Error fetching contacts from Firebase:", error);
         throw error;
       }
     },
+    getNextPageParam: (lastPage) => lastPage?.lastDoc || undefined,
     enabled: !loading && !!user,
-    staleTime: 1000 * 60 * 60 * 8, // 8 hours: Data is considered fresh for 8 hours
-    gcTime: 1000 * 60 * 60 * 24,   // 24 hours: Keep in garbage collection/storage for 24 hours
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 60 * 24,   // 24 hours
+  })
+}
+
+export function useContactsCount() {
+  const { user, role, loading } = useAuth()
+
+  return useQuery({
+    queryKey: ['contacts-count', user?.email ?? 'guest', role ?? 'unknown'],
+    queryFn: async () => {
+      if (loading) return 0
+      if (!user) return 0
+
+      const baseQuery = collection(db, COLLECTION_NAME)
+
+      if (role !== 'admin' && user.email) {
+        const q = query(baseQuery, where('ownerId', '==', user.email))
+        const snapshot = await getCountFromServer(q)
+        return snapshot.data().count
+      }
+
+      if (role !== 'admin') return 0
+
+      const snapshot = await getCountFromServer(baseQuery)
+      return snapshot.data().count
+    },
+    enabled: !loading && !!user,
+    staleTime: 1000 * 60 * 5,
   })
 }
 
@@ -69,9 +117,35 @@ export function useCreateContact() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (newContact: Omit<Contact, 'id'>) => {
-      // const docRef = await addDoc(collection(db, COLLECTION_NAME), newContact)
-      // return { id: docRef.id, ...newContact }
-      return { id: Math.random().toString(), ...newContact }
+      const docRef = await addDoc(collection(db, COLLECTION_NAME), newContact)
+      return { id: docRef.id, ...newContact }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+    }
+  })
+}
+
+export function useUpdateContact() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<Contact> & { id: string }) => {
+      const docRef = doc(db, COLLECTION_NAME, id)
+      await updateDoc(docRef, updates)
+      return { id, ...updates }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+    }
+  })
+}
+
+export function useDeleteContact() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await deleteDoc(doc(db, COLLECTION_NAME, id))
+      return id
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] })

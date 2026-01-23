@@ -12,7 +12,7 @@ import {
   SortingState,
   ColumnFiltersState,
 } from '@tanstack/react-table'
-import { Search, Plus, Filter, MoreHorizontal, Zap, ArrowUpDown } from 'lucide-react'
+import { Search, Plus, Filter, MoreHorizontal, Zap, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEnergyPlans, EnergyPlan } from '@/hooks/useEnergy'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -142,6 +142,16 @@ export default function EnergyPage() {
     },
   })
 
+  const pageIndex = table.getState().pagination.pageIndex
+  const pageSize = table.getState().pagination.pageSize
+  const filteredRowCount = table.getFilteredRowModel().rows.length
+  const showingStart = filteredRowCount === 0
+    ? 0
+    : Math.min(filteredRowCount, pageIndex * pageSize + 1)
+  const showingEnd = filteredRowCount === 0
+    ? 0
+    : Math.min(filteredRowCount, (pageIndex + 1) * pageSize)
+
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex-none space-y-4">
@@ -221,27 +231,35 @@ export default function EnergyPage() {
         </div>
         
         <div className="flex-none border-t border-white/10 bg-zinc-900/50 p-4 flex items-center justify-between z-10 backdrop-blur-md">
-          <div className="text-sm text-zinc-500">
-            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+          <div className="flex items-center gap-3 text-sm text-zinc-500">
+            <span>Showing {showingStart}–{showingEnd}</span>
+            <Badge variant="outline" className="border-white/10 bg-white/5 text-zinc-400">
+              Total {filteredRowCount}
+            </Badge>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
               className="border-white/10 bg-transparent text-zinc-400 hover:text-white hover:bg-white/5"
+              aria-label="Previous page"
             >
-              Previous
+              <ChevronLeft className="h-4 w-4" />
             </Button>
+            <div className="min-w-8 text-center text-sm text-zinc-400 tabular-nums">
+              {pageIndex + 1}
+            </div>
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
               className="border-white/10 bg-transparent text-zinc-400 hover:text-white hover:bg-white/5"
+              aria-label="Next page"
             >
-              Next
+              <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
         </div>

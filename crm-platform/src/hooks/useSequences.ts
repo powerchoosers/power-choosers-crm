@@ -1,5 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { collection, getCountFromServer, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, limit, startAfter, QueryDocumentSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { toast } from 'sonner'
 
@@ -9,8 +9,8 @@ export interface Sequence {
   description?: string
   status: 'active' | 'inactive' | 'draft'
   steps: SequenceStep[]
-  createdAt: any
-  updatedAt?: any
+  createdAt: unknown
+  updatedAt?: unknown
 }
 
 export interface SequenceStep {
@@ -22,43 +22,60 @@ export interface SequenceStep {
 }
 
 const COLLECTION_NAME = 'sequences'
+const PAGE_SIZE = 50
 
 export function useSequences() {
   const queryClient = useQueryClient()
 
-  const fetchSequences = async (): Promise<Sequence[]> => {
-    try {
-      // Note: Legacy data might not have createdAt, so we might need a fallback sort or index
-      const q = query(collection(db, COLLECTION_NAME), orderBy('createdAt', 'desc'))
-      const snapshot = await getDocs(q)
-      return snapshot.docs.map(doc => {
-        const data = doc.data()
-        return {
-          id: doc.id,
-          status: 'draft', // Default status
-          ...data,
-          steps: data.steps || [] // Ensure steps is always an array
-        }
-      }) as Sequence[]
-    } catch (error) {
-      console.error('Error fetching sequences:', error)
-      // Fallback if index is missing
-      const snapshot = await getDocs(collection(db, COLLECTION_NAME))
-      return snapshot.docs.map(doc => {
-        const data = doc.data()
-        return {
-          id: doc.id,
-          status: 'draft', // Default status
-          ...data,
-          steps: data.steps || [] // Ensure steps is always an array
-        }
-      }) as Sequence[]
-    }
-  }
-
-  const sequencesQuery = useQuery({
+  const sequencesQuery = useInfiniteQuery({
     queryKey: ['sequences'],
-    queryFn: fetchSequences,
+    initialPageParam: undefined as QueryDocumentSnapshot | undefined,
+    queryFn: async ({ pageParam }) => {
+      try {
+        let q = query(collection(db, COLLECTION_NAME), orderBy('createdAt', 'desc'), limit(PAGE_SIZE))
+        
+        if (pageParam) {
+          q = query(q, startAfter(pageParam))
+        }
+
+        const snapshot = await getDocs(q)
+        
+        return {
+          sequences: snapshot.docs.map(doc => {
+            const data = doc.data()
+            return {
+              id: doc.id,
+              status: 'draft', // Default status
+              ...data,
+              steps: data.steps || [] // Ensure steps is always an array
+            }
+          }) as Sequence[],
+          lastDoc: snapshot.docs?.at(-1) ?? null
+        }
+      } catch (error: unknown) {
+        console.error('Error fetching sequences:', error)
+        const errorCode = typeof error === 'object' && error !== null && 'code' in error
+          ? (error as { code?: string }).code
+          : undefined
+
+        // Fallback if index is missing
+        if (errorCode === 'failed-precondition') {
+           const q = query(collection(db, COLLECTION_NAME), limit(PAGE_SIZE))
+           const snapshot = await getDocs(q)
+           return {
+             sequences: snapshot.docs.map(doc => ({
+               id: doc.id,
+               status: 'draft',
+               ...doc.data(),
+               steps: doc.data().steps || []
+             })) as Sequence[],
+             lastDoc: null // Pagination might be broken without index, but better than crashing
+           }
+        }
+        throw error
+      }
+    },
+    getNextPageParam: (lastPage) => lastPage?.lastDoc || undefined,
     staleTime: 1000 * 60 * 5, // 5 minutes
   })
 
@@ -120,8 +137,23 @@ export function useSequences() {
     data: sequencesQuery.data,
     isLoading: sequencesQuery.isLoading,
     isError: sequencesQuery.isError,
+    fetchNextPage: sequencesQuery.fetchNextPage,
+    hasNextPage: sequencesQuery.hasNextPage,
+    isFetchingNextPage: sequencesQuery.isFetchingNextPage,
     addSequence: addSequenceMutation.mutate,
     updateSequence: updateSequenceMutation.mutate,
     deleteSequence: deleteSequenceMutation.mutate
   }
+}
+
+export function useSequencesCount() {
+  return useQuery({
+    queryKey: ['sequences-count'],
+    queryFn: async () => {
+      const baseQuery = collection(db, COLLECTION_NAME)
+      const snapshot = await getCountFromServer(baseQuery)
+      return snapshot.data().count
+    },
+    staleTime: 1000 * 60 * 5,
+  })
 }

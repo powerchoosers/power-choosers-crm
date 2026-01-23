@@ -44,16 +44,31 @@ The legacy dashboard file `c:\Users\Lap3p\OneDrive\Documents\Power Choosers CRM\
 - **Goal**: Ensure that documentation never drifts from the codebase state.
 
 ## 🚀 Server & Development
-- **Legacy Server (Reference)**: Run `node server.js` (Port 3000) to view the *legacy* dashboard at `/crm-dashboard.html` or `/crm-platform` (temporarily mapped). Use this to verify how the feature *used* to work.
-- **New Platform (Development)**: The new app lives in `crm-platform/`.
-  - **Caution**: The Next.js dev server (`npm run dev`) is resource-intensive. If it causes crashes, prefer building static components or running in short bursts.
+- **New Platform (Development - MAIN)**: The new app lives in `crm-platform/`.
+  - **Run Command**: `npm run dev -- --port 3000` (inside `crm-platform/`)
+  - **URL**: `http://localhost:3000`
+  - **Static Files**: Any HTML files (like `bill-debugger.html`) or images must be placed in `crm-platform/public/`.
   - **Routing**: The new platform uses file-system routing in `crm-platform/src/app`.
+- **Legacy Server (API/Backend)**: Run `node server.js` (Port 3001) for API support.
+  - **Note**: Do not rely on `server.js` for serving frontend pages anymore.
+
+## 📂 File Locations & "Source of Truth"
+- **Landing Page**: `crm-platform/src/app/page.tsx`
+- **Bill Debugger**: `crm-platform/public/bill-debugger.html` (Accessible at `/bill-debugger.html`)
+- **Dashboard**: `crm-platform/src/app/crm-platform/page.tsx`
+- **Images**: `crm-platform/public/images/`
 
 ## 🎨 Design System
 - **Brand**: Nodal Point (Clean, Modern, Enterprise).
 - **Theme**: Dark/Light mode support (System default).
 - **Layout**: Sidebar navigation (Left), Header (Top), Main Content (Center).
 - **AI Icon**: Use the "Sparkles" icon for all AI features.
+
+### 🔡 Typography Standards (STRICT)
+- **Public-Facing Pages** (`/`, `/philosophy`, etc.) MUST use the **System Font Stack** (Default Tailwind `font-sans`).
+- **Headers**: ALWAYS use `font-semibold` (NOT `font-bold`) and `tracking-tighter`.
+- **Color**: Use `text-zinc-900` for primary headers, NOT `text-black`.
+- **Consistency**: Before creating a new public page, check `src/app/page.tsx` styles to ensure exact matching.
 
 ### 📐 UI/UX Standards (MANDATORY)
 **All page layouts MUST follow these specific Tailwind patterns:**

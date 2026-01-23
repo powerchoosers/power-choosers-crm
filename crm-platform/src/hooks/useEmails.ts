@@ -1,5 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { collection, getDocs, query, where, orderBy, limit, addDoc, updateDoc, doc } from 'firebase/firestore'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { collection, getCountFromServer, getDocs, query, where, orderBy, limit, addDoc, updateDoc, doc, startAfter, QueryDocumentSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
@@ -24,49 +24,67 @@ export interface Email {
 }
 
 const COLLECTION_NAME = 'emails'
+const PAGE_SIZE = 50
 
 export function useEmails() {
   const { user, role, loading } = useAuth()
   const queryClient = useQueryClient()
 
-  const { data: emails, isLoading, error } = useQuery({
-    queryKey: ['emails', user?.email],
-    queryFn: async () => {
-      if (!user?.email) return [];
+  const emailsQuery = useInfiniteQuery({
+    queryKey: ['emails', user?.email ?? 'guest'],
+    initialPageParam: undefined as QueryDocumentSnapshot | undefined,
+    queryFn: async ({ pageParam }) => {
+      if (loading) return { emails: [], lastDoc: null };
+      if (!user?.email) return { emails: [], lastDoc: null };
 
       try {
         // Query for emails owned by the user
-        const q = query(
+        let q = query(
           collection(db, COLLECTION_NAME),
           where('ownerId', '==', user.email.toLowerCase()),
           orderBy('timestamp', 'desc'), // Assuming you have a composite index or single field index
-          limit(100)
+          limit(PAGE_SIZE)
         );
+
+        if (pageParam) {
+          q = query(q, startAfter(pageParam))
+        }
 
         const snapshot = await getDocs(q);
         
-        return snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Email[];
-      } catch (error: any) {
+        return {
+          emails: snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })) as Email[],
+          lastDoc: snapshot.docs?.at(-1) ?? null
+        }
+      } catch (error: unknown) {
         console.error("Error fetching emails:", error);
+        const errorCode = typeof error === 'object' && error !== null && 'code' in error
+          ? (error as { code?: string }).code
+          : undefined
+
         // Fallback if index is missing (client-side sort)
-        if (error.code === 'failed-precondition') {
+        if (errorCode === 'failed-precondition') {
              const q = query(
                 collection(db, COLLECTION_NAME),
                 where('ownerId', '==', user.email.toLowerCase()),
-                limit(100)
+                limit(PAGE_SIZE)
               );
               const snapshot = await getDocs(q);
               const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Email));
-              return docs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+              return {
+                emails: docs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+                lastDoc: null
+              }
         }
         throw error;
       }
     },
+    getNextPageParam: (lastPage) => lastPage?.lastDoc || undefined,
     enabled: !loading && !!user,
-    staleTime: 1000 * 60, // 1 minute
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
   const sendEmailMutation = useMutation({
@@ -104,10 +122,35 @@ export function useEmails() {
   });
 
   return {
-    emails,
-    isLoading,
-    error,
+    data: emailsQuery.data,
+    isLoading: emailsQuery.isLoading,
+    error: emailsQuery.error,
+    fetchNextPage: emailsQuery.fetchNextPage,
+    hasNextPage: emailsQuery.hasNextPage,
+    isFetchingNextPage: emailsQuery.isFetchingNextPage,
     sendEmail: sendEmailMutation.mutate,
     isSending: sendEmailMutation.isPending
   };
+}
+
+export function useEmailsCount() {
+  const { user, loading } = useAuth()
+
+  return useQuery({
+    queryKey: ['emails-count', user?.email ?? 'guest'],
+    queryFn: async () => {
+      if (loading) return 0
+      if (!user?.email) return 0
+
+      const q = query(
+        collection(db, COLLECTION_NAME),
+        where('ownerId', '==', user.email.toLowerCase()),
+      )
+
+      const snapshot = await getCountFromServer(q)
+      return snapshot.data().count
+    },
+    enabled: !loading && !!user,
+    staleTime: 1000 * 60 * 5,
+  })
 }

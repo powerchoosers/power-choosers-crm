@@ -77,7 +77,7 @@ export default function SettingsPage() {
           <Card className="bg-zinc-900/30 border-white/5">
             <CardHeader>
               <CardTitle className="text-zinc-100">Password</CardTitle>
-              <CardDescription className="text-zinc-500">Change your password here. After saving, you'll be logged out.</CardDescription>
+              <CardDescription className="text-zinc-500">Change your password here. After saving, you&apos;ll be logged out.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">

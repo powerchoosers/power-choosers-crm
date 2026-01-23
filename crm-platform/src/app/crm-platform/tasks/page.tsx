@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { 
   flexRender,
   getCoreRowModel,
@@ -11,11 +11,13 @@ import {
   ColumnDef,
   SortingState,
   ColumnFiltersState,
+  PaginationState,
 } from '@tanstack/react-table'
-import { Search, Plus, Filter, MoreHorizontal, CheckCircle2, Circle, Clock, ArrowUpDown, Calendar } from 'lucide-react'
-import { useTasks, Task } from '@/hooks/useTasks'
+import { Search, Plus, Filter, MoreHorizontal, CheckCircle2, Circle, Clock, ArrowUpDown, Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useTasks, useTasksCount, Task } from '@/hooks/useTasks'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 import {
   Table,
   TableBody,
@@ -35,18 +37,36 @@ import {
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
 
+const PAGE_SIZE = 50
+
 export default function TasksPage() {
-  const { data: tasks, isLoading: queryLoading, isError, updateTask, deleteTask } = useTasks()
+  const { data, isLoading: queryLoading, isError, updateTask, deleteTask, fetchNextPage, hasNextPage, isFetchingNextPage } = useTasks()
+  const { data: totalTasks } = useTasksCount()
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = useState('')
   const [isMounted, setIsMounted] = useState(false)
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: PAGE_SIZE })
 
   useEffect(() => {
     setIsMounted(true)
   }, [])
 
+  const tasks = useMemo(() => data?.pages.flatMap(page => page.tasks) || [], [data])
   const isLoading = queryLoading || !isMounted
+
+  const effectiveTotalRecords = totalTasks ?? tasks.length
+  const totalPages = Math.max(1, Math.ceil(effectiveTotalRecords / PAGE_SIZE))
+  const displayTotalPages = totalTasks == null && hasNextPage
+    ? Math.max(totalPages, pagination.pageIndex + 2)
+    : totalPages
+
+  useEffect(() => {
+    const needed = (pagination.pageIndex + 2) * PAGE_SIZE
+    if (hasNextPage && !isFetchingNextPage && tasks.length < needed) {
+      fetchNextPage()
+    }
+  }, [pagination.pageIndex, tasks.length, hasNextPage, isFetchingNextPage, fetchNextPage])
 
   const columns: ColumnDef<Task>[] = [
     {
@@ -171,7 +191,7 @@ export default function TasksPage() {
   ]
 
   const table = useReactTable({
-    data: tasks || [],
+    data: tasks,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -180,17 +200,22 @@ export default function TasksPage() {
     onColumnFiltersChange: setColumnFilters,
     getFilteredRowModel: getFilteredRowModel(),
     onGlobalFilterChange: setGlobalFilter,
-    initialState: {
-        pagination: {
-            pageSize: 50
-        }
-    },
+    onPaginationChange: setPagination,
     state: {
       sorting,
       columnFilters,
       globalFilter,
+      pagination,
     },
   })
+
+  const filteredRowCount = table.getFilteredRowModel().rows.length
+  const showingStart = filteredRowCount === 0
+    ? 0
+    : Math.min(filteredRowCount, pagination.pageIndex * PAGE_SIZE + 1)
+  const showingEnd = filteredRowCount === 0
+    ? 0
+    : Math.min(filteredRowCount, (pagination.pageIndex + 1) * PAGE_SIZE)
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -212,7 +237,10 @@ export default function TasksPage() {
             <Input 
                 placeholder="Search tasks..." 
                 value={globalFilter ?? ""}
-                onChange={(event) => setGlobalFilter(event.target.value)}
+                onChange={(event) => {
+                  setGlobalFilter(event.target.value)
+                  setPagination((p) => ({ ...p, pageIndex: 0 }))
+                }}
                 className="pl-10 bg-zinc-950 border-white/10 text-white placeholder:text-zinc-600 focus-visible:ring-indigo-500"
             />
             </div>
@@ -277,27 +305,47 @@ export default function TasksPage() {
         </div>
         
         <div className="flex-none border-t border-white/10 bg-zinc-900/50 p-4 flex items-center justify-between z-10 backdrop-blur-md">
-            <div className="text-sm text-zinc-500">
-                Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+            <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 text-sm text-zinc-500">
+                  <span>Showing {showingStart}–{showingEnd}</span>
+                  <Badge variant="outline" className="border-white/10 bg-white/5 text-zinc-400">
+                    Total {effectiveTotalRecords}
+                  </Badge>
+                </div>
             </div>
             <div className="flex items-center space-x-2">
                 <Button
                     variant="outline"
-                    size="sm"
-                    onClick={() => table.previousPage()}
-                    disabled={!table.getCanPreviousPage()}
+                    size="icon"
+                    onClick={() => setPagination((p) => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))}
+                    disabled={pagination.pageIndex === 0}
                     className="border-white/10 bg-transparent text-zinc-400 hover:text-white hover:bg-white/5"
+                    aria-label="Previous page"
                 >
-                    Previous
+                    <ChevronLeft className="h-4 w-4" />
                 </Button>
+                <div className="min-w-8 text-center text-sm text-zinc-400 tabular-nums">
+                  {pagination.pageIndex + 1}
+                </div>
                 <Button
                     variant="outline"
-                    size="sm"
-                    onClick={() => table.nextPage()}
-                    disabled={!table.getCanNextPage()}
+                    size="icon"
+                    onClick={async () => {
+                      const nextPageIndex = pagination.pageIndex + 1
+                      if (nextPageIndex >= displayTotalPages) return
+
+                      const needed = (nextPageIndex + 1) * PAGE_SIZE
+                      if (tasks.length < needed && hasNextPage && !isFetchingNextPage) {
+                        await fetchNextPage()
+                      }
+
+                      setPagination((p) => ({ ...p, pageIndex: nextPageIndex }))
+                    }}
+                    disabled={pagination.pageIndex + 1 >= displayTotalPages || (!hasNextPage && tasks.length < (pagination.pageIndex + 2) * PAGE_SIZE)}
                     className="border-white/10 bg-transparent text-zinc-400 hover:text-white hover:bg-white/5"
+                    aria-label="Next page"
                 >
-                    Next
+                    <ChevronRight className="h-4 w-4" />
                 </Button>
             </div>
         </div>
