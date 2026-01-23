@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
-import { Mail, ArrowUpRight, ArrowDownLeft, Search, RefreshCw, Loader2, Star, Trash2, Clock, Eye, MousePointerClick, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Mail, ArrowUpRight, ArrowDownLeft, RefreshCw, Loader2, Eye, MousePointerClick, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Email } from '@/hooks/useEmails'
 import { cn } from '@/lib/utils'
 import { Badge } from "@/components/ui/badge"
@@ -14,9 +14,13 @@ interface EmailListProps {
   isSyncing: boolean
   onSelectEmail: (email: Email) => void
   selectedEmailId?: string
+  totalEmails?: number
+  hasNextPage?: boolean
+  fetchNextPage?: () => void
+  isFetchingNextPage?: boolean
 }
 
-export function EmailList({ emails, isLoading, onRefresh, isSyncing, onSelectEmail, selectedEmailId }: EmailListProps) {
+export function EmailList({ emails, isLoading, onRefresh, isSyncing, onSelectEmail, selectedEmailId, totalEmails, hasNextPage, fetchNextPage, isFetchingNextPage }: EmailListProps) {
   const [filter, setFilter] = useState<'all' | 'received' | 'sent'>('all')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 15
@@ -27,8 +31,15 @@ export function EmailList({ emails, isLoading, onRefresh, isSyncing, onSelectEma
   })
 
   // Pagination Logic
-  const totalPages = Math.ceil(filteredEmails.length / itemsPerPage)
+  const totalPages = Math.max(1, Math.ceil(filteredEmails.length / itemsPerPage))
   const paginatedEmails = filteredEmails.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+
+  const showingStart = filteredEmails.length === 0
+    ? 0
+    : Math.min(filteredEmails.length, (currentPage - 1) * itemsPerPage + 1)
+  const showingEnd = filteredEmails.length === 0
+    ? 0
+    : Math.min(filteredEmails.length, currentPage * itemsPerPage)
 
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage)
@@ -110,7 +121,7 @@ export function EmailList({ emails, isLoading, onRefresh, isSyncing, onSelectEma
             </button>
         </div>
         <div className="text-xs text-zinc-500">
-            {filteredEmails.length} messages
+          Total {totalEmails ?? filteredEmails.length}
         </div>
       </div>
 
@@ -194,27 +205,53 @@ export function EmailList({ emails, isLoading, onRefresh, isSyncing, onSelectEma
 
       {/* Pagination Footer */}
       <div className="flex-none border-t border-white/10 bg-zinc-900/90 p-4 flex items-center justify-between backdrop-blur-sm z-10">
-        <div className="text-sm text-zinc-500">
-            Showing {filteredEmails.length > 0 ? ((currentPage - 1) * itemsPerPage) + 1 : 0} to {Math.min(currentPage * itemsPerPage, filteredEmails.length)} of {filteredEmails.length} emails
+        <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 text-sm text-zinc-500">
+              <span>Showing {showingStart}–{showingEnd}</span>
+              <Badge variant="outline" className="border-white/10 bg-white/5 text-zinc-400">
+                Total {totalEmails ?? filteredEmails.length}
+              </Badge>
+            </div>
         </div>
         <div className="flex items-center gap-2">
             <Button 
                 variant="outline" 
-                size="sm" 
+                size="icon" 
                 onClick={() => handlePageChange(Math.max(1, currentPage - 1))} 
                 disabled={currentPage === 1}
-                className="border-white/10 hover:bg-white/5"
+                className="border-white/10 bg-transparent text-zinc-400 hover:text-white hover:bg-white/5"
+                aria-label="Previous page"
             >
-                <ChevronLeft className="w-4 h-4 mr-1" /> Previous
+                <ChevronLeft className="h-4 w-4" />
             </Button>
+            <div className="min-w-8 text-center text-sm text-zinc-400 tabular-nums">
+              {currentPage}
+            </div>
             <Button 
                 variant="outline" 
-                size="sm" 
-                onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))} 
-                disabled={currentPage === totalPages || totalPages === 0}
-                className="border-white/10 hover:bg-white/5"
+                size="icon" 
+                onClick={async () => {
+                  const nextPage = currentPage + 1
+                  const needed = nextPage * itemsPerPage
+
+                  if (
+                    fetchNextPage &&
+                    hasNextPage &&
+                    !isFetchingNextPage &&
+                    filteredEmails.length < needed
+                  ) {
+                    await fetchNextPage()
+                  }
+
+                  if (hasNextPage || nextPage <= totalPages) {
+                    handlePageChange(nextPage)
+                  }
+                }}
+                disabled={(!hasNextPage && currentPage >= totalPages) || isFetchingNextPage}
+                className="border-white/10 bg-transparent text-zinc-400 hover:text-white hover:bg-white/5"
+                aria-label="Next page"
             >
-                Next <ChevronRight className="w-4 h-4 ml-1" />
+                <ChevronRight className="h-4 w-4" />
             </Button>
         </div>
       </div>

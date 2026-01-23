@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useSequences, Sequence } from '@/hooks/useSequences'
+import { useEffect, useMemo, useState } from 'react'
+import { useSequences, useSequencesCount, Sequence } from '@/hooks/useSequences'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -32,22 +32,76 @@ import {
   Edit, 
   Trash2, 
   ListOrdered,
-  Loader2
+  Loader2,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
+import { Badge } from '@/components/ui/badge'
+
+const PAGE_SIZE = 50
+
+function toDisplayDate(value: unknown): Date | null {
+  if (!value) return null
+  if (value instanceof Date) return value
+
+  if (typeof value === 'string' || typeof value === 'number') {
+    const d = new Date(value)
+    return Number.isNaN(d.getTime()) ? null : d
+  }
+
+  if (typeof value === 'object' && value !== null && 'seconds' in value) {
+    const seconds = (value as { seconds?: unknown }).seconds
+    if (typeof seconds === 'number') return new Date(seconds * 1000)
+  }
+
+  return null
+}
 
 export default function SequencesPage() {
-  const { data: sequences, isLoading, addSequence, updateSequence, deleteSequence } = useSequences()
+  const { data, isLoading, addSequence, updateSequence, deleteSequence, fetchNextPage, hasNextPage, isFetchingNextPage } = useSequences()
+  const { data: totalSequences } = useSequencesCount()
   const [searchQuery, setSearchQuery] = useState('')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [newSequenceName, setNewSequenceName] = useState('')
   const [newSequenceDesc, setNewSequenceDesc] = useState('')
+  const [pageIndex, setPageIndex] = useState(0)
 
-  const filteredSequences = sequences?.filter(seq => 
-    seq.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    seq.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || []
+  const sequences = useMemo(() => data?.pages.flatMap(page => page.sequences) || [], [data])
+
+  const filteredSequences = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return sequences
+    return sequences.filter((seq) => {
+      return (
+        seq.name.toLowerCase().includes(q) ||
+        seq.description?.toLowerCase().includes(q)
+      )
+    })
+  }, [sequences, searchQuery])
+
+  const effectiveTotalRecords = totalSequences ?? sequences.length
+  const totalPages = Math.max(1, Math.ceil(effectiveTotalRecords / PAGE_SIZE))
+  const displayTotalPages = totalSequences == null && hasNextPage
+    ? Math.max(totalPages, pageIndex + 2)
+    : totalPages
+
+  useEffect(() => {
+    const needed = (pageIndex + 2) * PAGE_SIZE
+    if (hasNextPage && !isFetchingNextPage && sequences.length < needed) {
+      fetchNextPage()
+    }
+  }, [pageIndex, sequences.length, hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  const pagedSequences = useMemo(() => {
+    const start = pageIndex * PAGE_SIZE
+    return filteredSequences.slice(start, start + PAGE_SIZE)
+  }, [filteredSequences, pageIndex])
+
+  const filteredCount = filteredSequences.length
+  const showingStart = filteredCount === 0 ? 0 : Math.min(filteredCount, pageIndex * PAGE_SIZE + 1)
+  const showingEnd = filteredCount === 0 ? 0 : Math.min(filteredCount, (pageIndex + 1) * PAGE_SIZE)
 
   const handleCreate = async () => {
     if (!newSequenceName.trim()) return
@@ -139,7 +193,10 @@ export default function SequencesPage() {
             <Input 
                 placeholder="Search sequences..." 
                 value={searchQuery} 
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value)
+                  setPageIndex(0)
+                }}
                 className="pl-10 bg-zinc-950 border-white/10 text-white placeholder:text-zinc-600 focus-visible:ring-indigo-500"
             />
             </div>
@@ -170,7 +227,7 @@ export default function SequencesPage() {
                 </TableRow>
                 </TableHeader>
                 <TableBody>
-                {filteredSequences.map((sequence) => (
+                {pagedSequences.map((sequence) => (
                     <TableRow key={sequence.id} className="border-white/5 hover:bg-white/5 transition-colors group">
                     <TableCell className="font-medium text-zinc-200">
                         <div className="flex flex-col">
@@ -202,7 +259,10 @@ export default function SequencesPage() {
                         </div>
                     </TableCell>
                     <TableCell className="text-zinc-500 text-sm">
-                        {sequence.createdAt?.seconds ? formatDistanceToNow(new Date(sequence.createdAt.seconds * 1000), { addSuffix: true }) : '-'}
+                        {(() => {
+                          const date = toDisplayDate(sequence.createdAt)
+                          return date ? formatDistanceToNow(date, { addSuffix: true }) : '-'
+                        })()}
                     </TableCell>
                     <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -235,25 +295,47 @@ export default function SequencesPage() {
         </div>
         
         <div className="flex-none border-t border-white/10 bg-zinc-900/50 p-4 flex items-center justify-between z-10 backdrop-blur-md">
-            <div className="text-sm text-zinc-500">
-                {filteredSequences.length} sequence{filteredSequences.length !== 1 ? 's' : ''} found
+            <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 text-sm text-zinc-500">
+                  <span>Showing {showingStart}–{showingEnd}</span>
+                  <Badge variant="outline" className="border-white/10 bg-white/5 text-zinc-400">
+                    Total {effectiveTotalRecords}
+                  </Badge>
+                </div>
             </div>
             <div className="flex items-center space-x-2">
                 <Button
-                    variant="outline"
-                    size="sm"
-                    disabled
-                    className="border-white/10 bg-transparent text-zinc-400 hover:text-white hover:bg-white/5 opacity-50 cursor-not-allowed"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
+                  disabled={pageIndex === 0}
+                  className="border-white/10 bg-transparent text-zinc-400 hover:text-white hover:bg-white/5"
+                  aria-label="Previous page"
                 >
-                    Previous
+                  <ChevronLeft className="h-4 w-4" />
                 </Button>
+                <div className="min-w-8 text-center text-sm text-zinc-400 tabular-nums">
+                  {pageIndex + 1}
+                </div>
                 <Button
-                    variant="outline"
-                    size="sm"
-                    disabled
-                    className="border-white/10 bg-transparent text-zinc-400 hover:text-white hover:bg-white/5 opacity-50 cursor-not-allowed"
+                  variant="outline"
+                  size="icon"
+                  onClick={async () => {
+                    const nextPageIndex = pageIndex + 1
+                    if (nextPageIndex >= displayTotalPages) return
+
+                    const needed = (nextPageIndex + 1) * PAGE_SIZE
+                    if (sequences.length < needed && hasNextPage && !isFetchingNextPage) {
+                      await fetchNextPage()
+                    }
+
+                    setPageIndex(nextPageIndex)
+                  }}
+                  disabled={pageIndex + 1 >= displayTotalPages || (!hasNextPage && sequences.length < (pageIndex + 2) * PAGE_SIZE)}
+                  className="border-white/10 bg-transparent text-zinc-400 hover:text-white hover:bg-white/5"
+                  aria-label="Next page"
                 >
-                    Next
+                  <ChevronRight className="h-4 w-4" />
                 </Button>
             </div>
         </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useEmails, Email } from '@/hooks/useEmails'
+import { useEmails, useEmailsCount, Email } from '@/hooks/useEmails'
 import { useGmailSync } from '@/hooks/useGmailSync'
 import { useAuth } from '@/context/AuthContext'
 import { EmailList } from '@/components/emails/EmailList'
@@ -15,12 +15,15 @@ import { format } from 'date-fns'
 
 export default function EmailsPage() {
   const { user } = useAuth()
-  const { emails, isLoading: isLoadingEmails, error } = useEmails()
+  const { data, isLoading: isLoadingEmails, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useEmails()
+  const { data: totalEmails } = useEmailsCount()
   const { syncGmail, isSyncing, syncStatus } = useGmailSync()
   const router = useRouter()
   
   const [isComposeOpen, setIsComposeOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+
+  const emails = data?.pages.flatMap(page => page.emails) || []
 
   // Auto-sync on mount if user is logged in
   useEffect(() => {
@@ -89,6 +92,10 @@ export default function EmailsPage() {
                 onRefresh={handleSync}
                 isSyncing={isSyncing}
                 onSelectEmail={(email) => router.push(`/crm-platform/emails/${email.id}`)}
+                totalEmails={totalEmails}
+                hasNextPage={hasNextPage}
+                fetchNextPage={fetchNextPage}
+                isFetchingNextPage={isFetchingNextPage}
             />
       </div>
 

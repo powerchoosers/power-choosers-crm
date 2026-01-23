@@ -1,206 +1,128 @@
-cution details
-Build artifacts
-Log viewer toolbar
-starting build "0dd3889e-f131-49fa-866a-336966755268"
-FETCHSOURCE
-From https://github.com/powerchoosers/power-choosers-crm
- * branch            ad34de1f49b93e84d14e868113760e70f63faea2 -> FETCH_HEAD
-Updating files:   8% (826/10000)Updating files:   9% (900/10000)Updating files:  10% (1000/10000)Updating files:  11% (1100/10000)Updating files:  12% (1200/10000)Updating files:  13% (1300/10000)Updating files:  14% (1400/10000)Updating files:  15% (1500/10000)Updating files:  16% (1600/10000)Updating files:  17% (1700/10000)Updating files:  18% (1800/10000)Updating files:  19% (1900/10000)Updating files:  20% (2000/10000)Updating files:  21% (2100/10000)Updating files:  22% (2200/10000)Updating files:  23% (2300/10000)Updating files:  24% (2400/10000)Updating files:  25% (2500/10000)Updating files:  26% (2600/10000)Updating files:  27% (2700/10000)Updating files:  28% (2800/10000)Updating files:  29% (2900/10000)Updating files:  30% (3000/10000)Updating files:  31% (3100/10000)Updating files:  32% (3200/10000)Updating files:  32% (3213/10000)Updating files:  33% (3300/10000)Updating files:  34% (3400/10000)Updating files:  35% (3500/10000)Updating files:  36% (3600/10000)Updating files:  37% (3700/10000)Updating files:  38% (3800/10000)Updating files:  39% (3900/10000)Updating files:  40% (4000/10000)Updating files:  41% (4100/10000)Updating files:  42% (4200/10000)Updating files:  43% (4300/10000)Updating files:  44% (4400/10000)Updating files:  45% (4500/10000)Updating files:  46% (4600/10000)Updating files:  47% (4700/10000)Updating files:  48% (4800/10000)Updating files:  49% (4900/10000)Updating files:  50% (5000/10000)Updating files:  51% (5100/10000)Updating files:  52% (5200/10000)Updating files:  53% (5300/10000)Updating files:  54% (5400/10000)Updating files:  55% (5500/10000)Updating files:  56% (5600/10000)Updating files:  57% (5700/10000)Updating files:  58% (5800/10000)Updating files:  59% (5900/10000)Updating files:  60% (6000/10000)Updating files:  61% (6100/10000)Updating files:  62% (6200/10000)Updating files:  62% (6295/10000)Updating files:  63% (6300/10000)Updating files:  64% (6400/10000)Updating files:  65% (6500/10000)Updating files:  66% (6600/10000)Updating files:  67% (6700/10000)Updating files:  68% (6800/10000)Updating files:  69% (6900/10000)Updating files:  70% (7000/10000)Updating files:  71% (7100/10000)Updating files:  72% (7200/10000)Updating files:  73% (7300/10000)Updating files:  74% (7400/10000)Updating files:  75% (7500/10000)Updating files:  76% (7600/10000)Updating files:  77% (7700/10000)Updating files:  78% (7800/10000)Updating files:  79% (7900/10000)Updating files:  80% (8000/10000)Updating files:  81% (8100/10000)Updating files:  82% (8200/10000)Updating files:  83% (8300/10000)Updating files:  84% (8400/10000)Updating files:  85% (8500/10000)Updating files:  86% (8600/10000)Updating files:  87% (8700/10000)Updating files:  88% (8800/10000)Updating files:  89% (8900/10000)Updating files:  90% (9000/10000)Updating files:  91% (9100/10000)Updating files:  92% (9200/10000)Updating files:  93% (9300/10000)Updating files:  94% (9400/10000)Updating files:  95% (9500/10000)Updating files:  96% (9600/10000)Updating files:  97% (9700/10000)Updating files:  98% (9800/10000)Updating files:  99% (9900/10000)Updating files: 100% (10000/10000)Updating files: 100% (10000/10000), done.
-HEAD is now at ad34de1 Fix TypeScript error: Add snippet property to Email interface
-GitCommit:
-ad34de1f49b93e84d14e868113760e70f63faea2
-BUILD
-Starting Step #0
-Already have image (with digest): gcr.io/cloud-builders/docker
-Sending build context to Docker daemon   41.1MB
-Step 1/39 : FROM node:22-alpine AS base
-22-alpine: Pulling from library/node
-1074353eec0d: Already exists
-27dda044491a: Pulling fs layer
-0a5453a6a95e: Pulling fs layer
-cd007ec038c4: Pulling fs layer
-0a5453a6a95e: Verifying Checksum
-0a5453a6a95e: Download complete
-cd007ec038c4: Verifying Checksum
-cd007ec038c4: Download complete
-27dda044491a: Verifying Checksum
-27dda044491a: Download complete
-27dda044491a: Pull complete
-0a5453a6a95e: Pull complete
-cd007ec038c4: Pull complete
-Digest: sha256:a9cd9bac76cf2396abf14ff0d1c3671a8175fe577ce350e62ab0fc1678050176
-Status: Downloaded newer image for node:22-alpine
- ---> ff729bb6df6b
-Step 2/39 : FROM base AS deps
- ---> ff729bb6df6b
-Step 3/39 : RUN apk add --no-cache libc6-compat
- ---> Running in c376541b9dab
-(1/3) Installing musl-obstack (1.2.3-r2)
-(2/3) Installing libucontext (1.3.3-r0)
-(3/3) Installing gcompat (1.1.0-r4)
-OK: 11.0 MiB in 21 packages
-Removing intermediate container c376541b9dab
- ---> e9e604f85b2e
-Step 4/39 : WORKDIR /app
- ---> Running in 09a560180397
-Removing intermediate container 09a560180397
- ---> 88902093a583
-Step 5/39 : COPY package.json package-lock.json* ./
- ---> f85943891a62
-Step 6/39 : RUN npm ci
- ---> Running in 4c9a107a2d9f
-added 587 packages, and audited 588 packages in 31s
-160 packages are looking for funding
-  run `npm fund` for details
-found 0 vulnerabilities
-npm notice
-npm notice New major version of npm available! 10.9.4 -> 11.8.0
-npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.8.0
-npm notice To update run: npm install -g npm@11.8.0
-npm notice
-Removing intermediate container 4c9a107a2d9f
- ---> 2ee5b265bbde
-Step 7/39 : FROM base AS builder
- ---> ff729bb6df6b
-Step 8/39 : WORKDIR /app
- ---> Running in 128c256d899f
-Removing intermediate container 128c256d899f
- ---> 11b0558530c7
-Step 9/39 : COPY --from=deps /app/node_modules ./node_modules
- ---> 3e1ba97bd02f
-Step 10/39 : COPY . .
- ---> 35ff0daf5e90
-Step 11/39 : ARG NEXT_PUBLIC_FIREBASE_API_KEY
- ---> Running in 3cfa41cb70cf
-Removing intermediate container 3cfa41cb70cf
- ---> 32c6962d9156
-Step 12/39 : ARG NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
- ---> Running in c9ca731eff63
-Removing intermediate container c9ca731eff63
- ---> 5f546ef006c0
-Step 13/39 : ARG NEXT_PUBLIC_FIREBASE_PROJECT_ID
- ---> Running in 3dadd1ecde40
-Removing intermediate container 3dadd1ecde40
- ---> 9cbacf6b0c47
-Step 14/39 : ARG NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
- ---> Running in 9b1f74eb1a13
-Removing intermediate container 9b1f74eb1a13
- ---> 60861fd30719
-Step 15/39 : ARG NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
- ---> Running in 53ed9285b9e4
-Removing intermediate container 53ed9285b9e4
- ---> 37dda15fa248
-Step 16/39 : ARG NEXT_PUBLIC_FIREBASE_APP_ID
- ---> Running in 01b30417c792
-Removing intermediate container 01b30417c792
- ---> 99bab6e2eb46
-Step 17/39 : ENV NEXT_PUBLIC_FIREBASE_API_KEY=$NEXT_PUBLIC_FIREBASE_API_KEY
- ---> Running in 09d24efe0f19
-Removing intermediate container 09d24efe0f19
- ---> d6b40180bc03
-Step 18/39 : ENV NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=$NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
- ---> Running in 5084f5faae48
-Removing intermediate container 5084f5faae48
- ---> 47d5fa65ef27
-Step 19/39 : ENV NEXT_PUBLIC_FIREBASE_PROJECT_ID=$NEXT_PUBLIC_FIREBASE_PROJECT_ID
- ---> Running in 313f3530a674
-Removing intermediate container 313f3530a674
- ---> f2b1709765d7
-Step 20/39 : ENV NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=$NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
- ---> Running in 416a165d3bc0
-Removing intermediate container 416a165d3bc0
- ---> 77cc3a5ea334
-Step 21/39 : ENV NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=$NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
- ---> Running in cd228ad7c719
-Removing intermediate container cd228ad7c719
- ---> 92e4ce788531
-Step 22/39 : ENV NEXT_PUBLIC_FIREBASE_APP_ID=$NEXT_PUBLIC_FIREBASE_APP_ID
- ---> Running in 18af4c4ddaf2
-Removing intermediate container 18af4c4ddaf2
- ---> c2afc32e6deb
-Step 23/39 : ENV NEXT_TELEMETRY_DISABLED 1
- ---> Running in ff9e1128c18e
-Removing intermediate container ff9e1128c18e
- ---> 429175663cfa
-Step 24/39 : RUN npm run build
- ---> Running in e400b4d25816
-> crm-platform@0.1.0 build
-> next build
-▲ Next.js 16.1.4 (Turbopack)
-  Creating an optimized production build ...
-✓ Compiled successfully in 25.4s
-  Running TypeScript ...
-  Collecting page data using 1 worker ...
-  Generating static pages using 1 worker (0/16) ...
-Firebase Config Loaded: {
-  projectId: 'power-choosers-crm',
-  authDomain: 'power-choosers-crm.firebaseapp.com',
-  apiKeyPresent: true
+The "Technical Documentation" page is the ultimate litmus test.
+If users click that button and land on a sales page, you have lied to them. You promised them engineering; you cannot give them marketing.
+This page must look and feel like Developer Documentation (think Stripe, Vercel, or Apple’s Human Interface Guidelines). It should be dense, intellectual, and intimidatingly smart. It filters out the tire-kickers and hooks the CFOs who actually understand the math.
+Here is the blueprint for /technical-docs.
+The Concept: " The Physics of Pricing"
+This page explains the "Source Code" of the Texas Grid. It breaks down the enemies (Ratchets, 4CP) as if they were software bugs we have patched.
+Layout Architecture:
+• Sidebar (Left): "Quick Links" (e.g., Abstract, 4CP Protocol, Ratchet Mechanics, The Algorithm).
+• Main Content (Right): Clean text, mathematical formulas, and monochromatic diagrams. No stock photos.
+
+--------------------------------------------------------------------------------
+Section 1: The Abstract (The "Why")
+Headline: SYSTEM ARCHITECTURE Body:
+"The Texas energy market is not a commodity market; it is a volatility market. Standard brokerage treats electricity like a fixed-rate subscription. This is a fundamental error.
+Nodal Point treats your load profile as a dynamic data set. We engineer against the three primary vectors of cost leakage: 4CP Capacity Tags, Demand Ratchet Penalties, and Scarcity Pricing Adders."
+Section 2: The Enemy (The "Bugs")
+Here, we use your sources to define the problem with forensic precision. We cite the law, not the sales pitch.
+Subsection A: The 80% Ratchet (Phantom Load)
+• Headline: VULNERABILITY: DEMAND RATCHETS
+• The Technical Explanation: "Per TDU tariffs [Source 1044, 1073], if your peak demand hits 1,000 kW for a single 15-minute interval, you establish a 'High Water Mark.' For the next 11 months, you are billed at 80% of that peak (800 kW), even if your actual usage drops to 500 kW. You are paying for 'Ghost Capacity'—infrastructure you are not using."
+• The Nodal Fix: "We analyze the delta between Metered_Demand and Billed_Demand. If the variance exceeds 15%, we trigger a load-shedding protocol to reset the ratchet."
+Subsection B: The 4CP Event (The Volatility)
+• Headline: CRITICAL WINDOW: 4CP COINCIDENT PEAKS
+• The Technical Explanation: "Transmission costs are determined by your usage during the four singular 15-minute intervals of highest grid demand in June, July, August, and September [Source 188]. These four intervals determine your 'Capacity Tag' for the entire following year."
+• The Nodal Fix: "Our predictive engine monitors grid reserve margins. We signal your facility to curtail load during these probable intervals, effectively deleting your transmission liability for the next calendar year."
+Section 3: The Algorithm (The "Product")
+Do not show them the code. Show them the Logic. Use a "Pseudo-Code" block to make it look like software.
+Headline: THE INGESTION PROTOCOL
+// Nodal Point Logic Flow
+
+IF (Real_Time_Price > $2,000/MWh) AND (Grid_Reserves < 3,000 MW):
+    TRIGGER: Economic_Load_Shed
+    STATUS: Active_Avoidance
+
+ELSE IF (Current_Demand > 80%_Historical_Peak):
+    TRIGGER: Ratchet_Warning
+    ACTION: Peak_Shaving
+
+ELSE:
+    STATUS: Market_Float
+    ACTION: Optimize_Baseload
+
+--------------------------------------------------------------------------------
+Implementation Guide (Copy to IDE)
+Create TechnicalDocs.tsx. Use a Sidebar Layout.
+// components/TechDocsLayout.tsx
+import { motion } from 'framer-motion';
+
+export default function TechnicalDocs() {
+  return (
+    <div className="min-h-screen bg-[#F5F5F7] text-zinc-900 font-sans selection:bg-[#002FA7] selection:text-white pt-24">
+      
+      <div className="max-w-7xl mx-auto px-6 grid grid-cols-12 gap-12">
+        
+        {/* SIDEBAR NAVIGATION */}
+        <div className="hidden md:block col-span-3 sticky top-32 h-fit">
+          <h4 className="text-xs font-mono text-zinc-400 uppercase tracking-widest mb-6">Documentation</h4>
+          <ul className="space-y-4 text-sm font-medium text-zinc-600">
+            <li className="text-[#002FA7] border-l-2 border-[#002FA7] pl-4">1.0 System Architecture</li>
+            <li className="hover:text-black pl-4 cursor-pointer">2.0 The Ratchet Vulnerability</li>
+            <li className="hover:text-black pl-4 cursor-pointer">3.0 4CP Mitigation</li>
+            <li className="hover:text-black pl-4 cursor-pointer">4.0 Ingestion Protocol</li>
+          </ul>
+        </div>
+
+        {/* MAIN CONTENT */}
+        <div className="col-span-12 md:col-span-9 space-y-24 pb-40">
+          
+          {/* Header */}
+          <section>
+            <h1 className="text-5xl md:text-7xl font-bold tracking-tighter mb-6">
+              Forensic Analysis <br/> <span className="text-zinc-400">Methodology v1.0</span>
+            </h1>
+            <p className="text-xl text-zinc-600 max-w-2xl leading-relaxed">
+              We do not guess. We measure. This document outlines the mathematical framework used by Nodal Point to identify and eliminate structural waste in commercial energy profiles.
+            </p>
+          </section>
+
+          {/* Ratchet Section */}
+          <section className="border-t border-zinc-200 pt-12">
+            <div className="flex items-baseline gap-4 mb-6">
+              <span className="font-mono text-[#002FA7]">2.0</span>
+              <h2 className="text-3xl font-bold">The Ratchet Vulnerability</h2>
+            </div>
+            <div className="bg-white p-8 rounded-2xl border border-zinc-200 shadow-sm">
+              <p className="mb-6 text-zinc-600">
+                Most commercial tariffs include an <strong className="text-black">80% Demand Ratchet</strong>. 
+                If your facility spikes to <span className="font-mono bg-zinc-100 px-1">1,000 kW</span> for 15 minutes, 
+                your billed demand floor is set at <span className="font-mono bg-zinc-100 px-1">800 kW</span> for the next 11 months.
+              </p>
+              <div className="font-mono text-xs md:text-sm bg-zinc-900 text-zinc-300 p-6 rounded-lg overflow-x-auto">
+                <p className="text-zinc-500 mb-2">// Calculating Phantom Load Cost</p>
+                <p>const <span className="text-yellow-400">Actual_Load</span> = 500; <span className="text-zinc-500">// kW</span></p>
+                <p>const <span className="text-red-400">Billed_Load</span> = 800; <span className="text-zinc-500">// kW (Ratchet Floor)</span></p>
+                <p>const <span className="text-[#002FA7]">Wasted_Spend</span> = (Billed_Load - Actual_Load) * Demand_Rate;</p>
+              </div>
+            </div>
+          </section>
+
+          {/* 4CP Section */}
+          <section className="border-t border-zinc-200 pt-12">
+             <div className="flex items-baseline gap-4 mb-6">
+              <span className="font-mono text-[#002FA7]">3.0</span>
+              <h2 className="text-3xl font-bold">4CP Coincident Peaks</h2>
+            </div>
+            <p className="text-xl text-zinc-600 leading-relaxed mb-8">
+              Your transmission costs are not based on volume. They are based on your presence on the grid during the 
+              <span className="text-black font-semibold"> four most critical 15-minute intervals of the year</span>.
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {['June', 'July', 'August', 'September'].map((month) => (
+                <div key={month} className="p-4 bg-white border border-zinc-200 rounded-xl text-center">
+                  <span className="block text-xs font-mono text-zinc-400 uppercase">Interval Scan</span>
+                  <span className="block text-lg font-bold text-black">{month}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </div>
+  );
 }
-  Generating static pages using 1 worker (4/16) 
-  Generating static pages using 1 worker (8/16) 
-  Generating static pages using 1 worker (12/16) 
-✓ Generating static pages using 1 worker (16/16) in 866.2ms
-  Finalizing page optimization ...
-Route (app)
-┌ ○ /
-├ ○ /_not-found
-├ ○ /crm-platform
-├ ○ /crm-platform/accounts
-├ ○ /crm-platform/calls
-├ ○ /crm-platform/emails
-├ ƒ /crm-platform/emails/[id]
-├ ○ /crm-platform/energy
-├ ○ /crm-platform/people
-├ ○ /crm-platform/scripts
-├ ○ /crm-platform/sequences
-├ ○ /crm-platform/settings
-├ ○ /crm-platform/tasks
-├ ○ /icon.png
-└ ○ /login
-ƒ Proxy (Middleware)
-○  (Static)   prerendered as static content
-ƒ  (Dynamic)  server-rendered on demand
-npm notice
-npm notice New major version of npm available! 10.9.4 -> 11.8.0
-npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.8.0
-npm notice To update run: npm install -g npm@11.8.0
-npm notice
-Removing intermediate container e400b4d25816
- ---> f8d7a13e8404
-Step 25/39 : FROM base AS runner
- ---> ff729bb6df6b
-Step 26/39 : WORKDIR /app
- ---> Using cache
- ---> 11b0558530c7
-Step 27/39 : ENV NODE_ENV production
- ---> Running in f7c2cc90279b
-Removing intermediate container f7c2cc90279b
- ---> 9dfa12c58ff8
-Step 28/39 : ENV NEXT_TELEMETRY_DISABLED 1
- ---> Running in 4943aa5d113b
-Removing intermediate container 4943aa5d113b
- ---> fd903d91b868
-Step 29/39 : RUN addgroup --system --gid 1001 nodejs
- ---> Running in ef4c8ea4bcb7
-Removing intermediate container ef4c8ea4bcb7
- ---> 30e4eb2f3543
-Step 30/39 : RUN adduser --system --uid 1001 nextjs
- ---> Running in 236ae38e4d01
-Removing intermediate container 236ae38e4d01
- ---> 3a94596827f0
-Step 31/39 : COPY --from=builder /app/public ./public
- ---> 60e4da2c37e0
-Step 32/39 : RUN mkdir .next
- ---> Running in f7db7c48c58f
-Removing intermediate container f7db7c48c58f
- ---> 957b1e27cd74
-Step 33/39 : RUN chown nextjs:nodejs .next
- ---> Running in 09e935e30c87
-Removing intermediate container 09e935e30c87
- ---> 6af0ab54e545
-Step 34/39 : COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY failed: stat app/.next/standalone: file does not exist
-Finished Step #0
-ERROR
-ERROR: build step 0 "gcr.io/cloud-builders/docker" failed: step exited with non-zero status: 1
+The "Steve Jobs" Touch
+At the very bottom of this page, add one final, minimalist Call to Action.
+"You have seen the math. Now see your data." [ Upload Invoice to Clean Room ]
+This closes the loop. You appealed to their logic. Now you ask for the sale.
