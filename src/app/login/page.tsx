@@ -28,9 +28,10 @@ export default function LoginPage() {
       document.cookie = 'np_session=1; Path=/; SameSite=Lax'
       toast.success('Logged in successfully')
       router.push('/crm-platform')
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Login error:', error)
-      toast.error(error.message || 'Failed to login')
+      const message = error instanceof Error ? error.message : 'Failed to login'
+      toast.error(message)
     } finally {
       setIsLoading(false)
     }
@@ -44,9 +45,10 @@ export default function LoginPage() {
       document.cookie = 'np_session=1; Path=/; SameSite=Lax'
       toast.success('Logged in with Google successfully')
       router.push('/crm-platform')
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Google login error:', error)
-      toast.error(error.message || 'Failed to login with Google')
+      const message = error instanceof Error ? error.message : 'Failed to login with Google'
+      toast.error(message)
     } finally {
       setIsGoogleLoading(false)
     }

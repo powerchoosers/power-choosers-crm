@@ -17,14 +17,27 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     },
   }))
 
-  const [persister] = useState(() => createIDBPersister())
+  const [persister] = useState(() => createIDBPersister('reactQuery-v2'))
 
   return (
     <PersistQueryClientProvider 
       client={queryClient} 
       persistOptions={{ 
         persister, 
-        maxAge: 1000 * 60 * 60 * 24 // Persist for 24 hours
+        buster: 'v2',
+        maxAge: 1000 * 60 * 60 * 24, // Persist for 24 hours
+        dehydrateOptions: {
+          shouldDehydrateMutation: () => false,
+          shouldDehydrateQuery: (query) => {
+            const key0 = Array.isArray(query.queryKey) ? query.queryKey[0] : undefined
+            if (typeof key0 !== 'string') return false
+            return [
+              'calls',
+              'energy-plans',
+              'scripts',
+            ].includes(key0)
+          },
+        },
       }}
     >
       <AuthProvider>

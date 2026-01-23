@@ -1,5 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, Timestamp } from 'firebase/firestore'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { collection, getCountFromServer, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, limit, startAfter, QueryDocumentSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { toast } from 'sonner'
 
@@ -18,27 +18,37 @@ export interface Task {
 }
 
 const COLLECTION_NAME = 'tasks'
+const PAGE_SIZE = 50
 
 export function useTasks() {
   const queryClient = useQueryClient()
 
-  const fetchTasks = async (): Promise<Task[]> => {
-    try {
-      const q = query(collection(db, COLLECTION_NAME), orderBy('createdAt', 'desc'))
-      const snapshot = await getDocs(q)
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Task[]
-    } catch (error) {
-      console.error('Error fetching tasks:', error)
-      throw error
-    }
-  }
-
-  const tasksQuery = useQuery({
+  const tasksQuery = useInfiniteQuery({
     queryKey: ['tasks'],
-    queryFn: fetchTasks,
+    initialPageParam: undefined as QueryDocumentSnapshot | undefined,
+    queryFn: async ({ pageParam }) => {
+      try {
+        let q = query(collection(db, COLLECTION_NAME), orderBy('createdAt', 'desc'), limit(PAGE_SIZE))
+        
+        if (pageParam) {
+          q = query(q, startAfter(pageParam))
+        }
+
+        const snapshot = await getDocs(q)
+        
+        return {
+          tasks: snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })) as Task[],
+          lastDoc: snapshot.docs?.at(-1) ?? null
+        }
+      } catch (error) {
+        console.error('Error fetching tasks:', error)
+        throw error
+      }
+    },
+    getNextPageParam: (lastPage) => lastPage?.lastDoc || undefined,
     staleTime: 1000 * 60 * 5, // 5 minutes
   })
 
@@ -97,8 +107,23 @@ export function useTasks() {
     data: tasksQuery.data,
     isLoading: tasksQuery.isLoading,
     isError: tasksQuery.isError,
+    fetchNextPage: tasksQuery.fetchNextPage,
+    hasNextPage: tasksQuery.hasNextPage,
+    isFetchingNextPage: tasksQuery.isFetchingNextPage,
     addTask: addTaskMutation.mutate,
     updateTask: updateTaskMutation.mutate,
     deleteTask: deleteTaskMutation.mutate
   }
+}
+
+export function useTasksCount() {
+  return useQuery({
+    queryKey: ['tasks-count'],
+    queryFn: async () => {
+      const baseQuery = collection(db, COLLECTION_NAME)
+      const snapshot = await getCountFromServer(baseQuery)
+      return snapshot.data().count
+    },
+    staleTime: 1000 * 60 * 5,
+  })
 }

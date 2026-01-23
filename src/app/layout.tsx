@@ -1,6 +1,13 @@
 import './globals.css'
 import Providers from './providers'
 import { Toaster } from 'sonner'
+import { Inter } from 'next/font/google'
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+})
 
 export const metadata = {
   title: 'Nodal Point | Signal Over Noise in the Texas Energy Market',
@@ -13,8 +20,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className="antialiased bg-zinc-950 text-zinc-50">
+    <html lang="en" className={`${inter.variable} antialiased`}>
+      <body className="bg-zinc-950 text-zinc-50">
         <Providers>
           {children}
           <Toaster position="top-right" theme="dark" />

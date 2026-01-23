@@ -12,7 +12,7 @@
  *   cleanupOrphanedEmails(true) - Clear cache AND delete orphaned emails from Firestore (DESTRUCTIVE)
  */
 
-(async function cleanupOrphanedEmails(removeFromFirestore = false) {
+async function cleanupOrphanedEmails(removeFromFirestore = false) {
   console.log('[Cleanup] Starting orphaned emails cleanup...');
   
   try {
@@ -197,11 +197,7 @@
   }
 }
 
-  // Make it available globally for future use
-  window.cleanupOrphanedEmails = cleanupOrphanedEmails;
-  
-  return result;
-})();
+window.cleanupOrphanedEmails = cleanupOrphanedEmails
 
 // Auto-run the cleanup (just clears cache, doesn't delete)
 console.log('✓ Cleanup script loaded!');
