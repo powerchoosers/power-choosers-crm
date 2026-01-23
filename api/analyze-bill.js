@@ -10,7 +10,7 @@ export default async function handleApiAnalyzeBill(req, res) {
       return;
     }
 
-    const apiKey = process.env.GEMINI_API_KEY || process.env.FREE_GEMINI_KEY;
+    const apiKey = process.env.FREE_GEMINI_KEY || process.env.GEMINI_API_KEY;
     if (!apiKey) {
       console.error('[Bill Debugger] GEMINI_API_KEY not configured');
       res.writeHead(500, { 'Content-Type': 'application/json' });
