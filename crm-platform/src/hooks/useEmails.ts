@@ -11,6 +11,7 @@ export interface Email {
   to: string | string[]
   html?: string
   text?: string
+  snippet?: string
   date: string
   timestamp?: number
   unread: boolean
