@@ -8,7 +8,7 @@ export class GmailService {
         this.gmail = null;
         this.lastInitializedEmail = null; // Cache to avoid re-initializing for same user
         this.fromEmail = process.env.GMAIL_SENDER_EMAIL || '';
-        this.fromName = process.env.GMAIL_SENDER_NAME || 'Power Choosers CRM';
+        this.fromName = process.env.GMAIL_SENDER_NAME || 'Nodal Point CRM';
     }
     
     /**
@@ -30,9 +30,14 @@ export class GmailService {
             
             if (userDoc.exists) {
                 const userData = userDoc.data();
+
+                const firstName = typeof userData.firstName === 'string' ? userData.firstName.trim() : '';
+                const lastName = typeof userData.lastName === 'string' ? userData.lastName.trim() : '';
+                const derivedFullName = firstName ? `${firstName} ${lastName}`.trim() : '';
+
                 return {
                     email: emailLower,
-                    name: userData.name || userData.displayName || emailLower.split('@')[0]
+                    name: userData.name || userData.displayName || derivedFullName || emailLower.split('@')[0]
                 };
             }
             
@@ -193,4 +198,3 @@ export class GmailService {
 }
 
 export default GmailService;
-

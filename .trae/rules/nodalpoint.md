@@ -33,8 +33,7 @@ Power Choosers CRM/
 │   │   ├── context/        # React Context Providers
 │   │   ├── lib/            # Utilities & Firebase Config
 │   │   └── store/          # Zustand Stores
-│   ├── public/             # Static Assets (Images, Legacy HTML Tools)
-│   │   ├── bill-debugger.html # The "Bill Debugger" tool lives here
+│   ├── public/             # Static Assets (Images)
 │   │   └── images/         # Image assets
 │   └── package.json        # Frontend Dependencies
 ├── api/                    # Backend API Endpoints
@@ -72,7 +71,7 @@ npm run dev -- --port 3000
 - **Philosophy**: `http://localhost:3000/philosophy` (The "Why" - Mission Statement)
 - **Technical Docs**: `http://localhost:3000/technical-docs` (The "How" - Methodology)
 - **App Dashboard**: `http://localhost:3000/crm-platform` (Protected Route)
-- **Bill Debugger**: `http://localhost:3000/bill-debugger.html` (Static file in `public/`)
+- **Bill Debugger**: `http://localhost:3000/bill-debugger` (Next.js Page)
 - **Login**: `http://localhost:3000/login`
 
 ## 🧠 Nodal Point Philosophy & Methodology
@@ -127,6 +126,9 @@ The platform uses **Firebase Authentication**.
 - **Brand**: "Nodal Point" - Clean, Enterprise, Modern.
 - **AI Integration**: Use the "Sparkles" icon for AI-powered features.
 - **Layout**: Sidebar (Left), Top Bar (Header), Right Panel (Contextual Widgets).
+- **Animations**:
+  - **Page Entry**: Public pages use a standard "Blur In" effect (`filter: blur(10px)` → `blur(0px)`) combined with opacity fade.
+  - **Staggered Elements**: Lists and grids should use staggered entry delays.
 
 ### 🔡 Typography & Branding Consistency
 - **Public Pages (Landing, Philosophy, etc.)**:

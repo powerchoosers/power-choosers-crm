@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { motion } from 'framer-motion'
 import { Activity, ArrowRight, Layers, Menu, X, Users } from 'lucide-react'
 
 export default function LandingPage() {
@@ -118,7 +119,7 @@ export default function LandingPage() {
               Sign In
             </Link>
             {/* The Primary Trigger */}
-            <a href="/bill-debugger.html"
+            <a href="/bill-debugger"
               className="hidden md:flex items-center gap-2 bg-[#002FA7] text-white px-5 py-2.5 rounded-full text-sm font-medium hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40">
               <Activity className="w-4 h-4" />
               <span>Run Analysis</span>
@@ -136,7 +137,7 @@ export default function LandingPage() {
 
       {/* 3. The Full Screen Menu Overlay */}
       <div 
-        className={`fixed inset-0 z-50 bg-white/95 backdrop-blur-3xl flex items-center justify-center transition-opacity duration-300 ${isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 z-50 bg-white/10 backdrop-blur-[20px] flex items-center justify-center transition-opacity duration-300 ${isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
       >
         {/* Close Button */}
         <button 
@@ -151,18 +152,18 @@ export default function LandingPage() {
           {[
             { label: 'The Philosophy', href: '/philosophy' },
             { label: 'The Methodology', href: '/technical-docs' },
-            { label: 'Market Data', href: '#' },
-            { label: 'Contact', href: '#' }
+            { label: 'Market Data', href: '/market-data' },
+            { label: 'Contact', href: '/contact' }
           ].map((item, i) => (
              <a key={item.label} href={item.href}
-             className={`menu-item text-4xl md:text-5xl font-light tracking-tight text-black hover:text-[#002FA7] transition-colors duration-500 translate-y-5 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0'} delay-${(i + 1) * 100}`}>
+             className={`menu-item text-4xl md:text-5xl font-light tracking-tight text-black hover:text-[#002FA7] transition-all duration-500 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'} delay-${(i + 1) * 100}`}>
              {item.label}
            </a>
           ))}
 
           {/* Mobile CTA inside menu */}
           <div className={`mt-8 md:hidden transition-all duration-500 delay-500 menu-item ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}>
-            <a href="/bill-debugger.html"
+            <a href="/bill-debugger"
               className="flex items-center gap-2 bg-[#002FA7] text-white px-5 py-2.5 rounded-full text-lg font-medium hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40 inline-flex">
               <Activity className="w-5 h-5" />
               <span>Run Analysis</span>
@@ -173,22 +174,27 @@ export default function LandingPage() {
 
       {/* ACT 1: THE HERO (The Hook) */}
       <section className="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden pt-20 md:pt-32">
-        <div className="max-w-5xl mx-auto text-center z-10">
-          <h1 className="text-5xl md:text-8xl font-semibold tracking-tighter leading-tight mb-8 reveal-on-scroll text-zinc-900 break-words">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
+          animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="max-w-5xl mx-auto text-center z-10"
+        >
+          <h1 className="text-5xl md:text-8xl font-semibold tracking-tighter leading-tight mb-8 text-zinc-900 break-words">
             The Texas Grid is<br />
             Designed to Confuse.
           </h1>
-          <p className="text-xl md:text-2xl text-zinc-600 font-light tracking-tight mb-12 max-w-2xl mx-auto reveal-on-scroll delay-200">
+          <p className="text-xl md:text-2xl text-zinc-600 font-light tracking-tight mb-12 max-w-2xl mx-auto">
             We view complexity as a design flaw. We fixed it.
           </p>
-          <div className="reveal-on-scroll delay-300">
-            <a href="/bill-debugger.html"
+          <div>
+            <a href="/bill-debugger"
               className="animate-subtle-pulse inline-flex items-center gap-2 px-6 md:px-8 py-4 bg-[#002FA7] text-white rounded-full text-base md:text-lg font-medium hover:scale-105 hover:bg-blue-800 transition-all duration-300 shadow-lg shadow-blue-900/20 group whitespace-nowrap">
               <span>[ Debug My Bill ]</span>
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </a>
           </div>
-        </div>
+        </motion.div>
 
         {/* BACKGROUND TEXTURE: The "Digital Grain" */}
         <div className="fixed inset-0 bg-[radial-gradient(#002FA7_1px,transparent_1px)] [background-size:20px_20px] opacity-[0.1] pointer-events-none z-0" />
@@ -397,10 +403,10 @@ export default function LandingPage() {
             Upload your bill. See the signal.
           </p>
 
-          <a href="/bill-debugger.html"
-            className="group relative inline-flex items-center gap-3 bg-[#002FA7] text-white px-6 md:px-10 py-5 rounded-full text-lg md:text-xl font-medium shadow-xl shadow-blue-900/20 hover:shadow-2xl hover:shadow-blue-900/30 hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300 whitespace-nowrap">
-            <span>[ Debug My Bill ]</span>
-            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+          <a href="/bill-debugger"
+            className="inline-flex items-center gap-3 bg-black text-white px-8 py-4 rounded-full text-lg font-medium hover:scale-105 transition-transform shadow-xl hover:shadow-2xl">
+            <Activity className="w-5 h-5" />
+            <span>Run Forensic Analysis</span>
           </a>
         </div>
       </section>

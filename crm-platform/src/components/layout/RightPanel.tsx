@@ -4,7 +4,7 @@ import { Bell, Calendar, CheckSquare, Clock, Zap } from 'lucide-react'
 
 export function RightPanel() {
   return (
-    <aside className="fixed right-0 top-0 bottom-0 z-30 w-80 bg-zinc-950/50 backdrop-blur-xl border-l border-white/5 pt-24 pb-8 px-6 flex flex-col gap-8 overflow-y-auto hidden lg:flex">
+    <aside className="fixed right-0 top-0 bottom-0 z-30 w-80 bg-zinc-950/50 backdrop-blur-xl border-l border-white/5 pt-24 pb-8 px-6 flex flex-col gap-8 overflow-y-auto hidden lg:flex np-scroll">
       
       {/* Upcoming Tasks Widget */}
       <div className="space-y-4">

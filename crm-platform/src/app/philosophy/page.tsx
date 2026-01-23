@@ -45,7 +45,7 @@ export default function Philosophy() {
               Sign In
             </Link>
             {/* The Primary Trigger */}
-            <a href="/bill-debugger.html"
+            <a href="/bill-debugger"
               className="hidden md:flex items-center gap-2 bg-[#002FA7] text-white px-5 py-2.5 rounded-full text-sm font-medium hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40">
               <Activity className="w-4 h-4" />
               <span>Run Analysis</span>
@@ -63,7 +63,7 @@ export default function Philosophy() {
 
       {/* 3. The Full Screen Menu Overlay */}
       <div 
-        className={`fixed inset-0 z-50 bg-white/95 backdrop-blur-3xl flex items-center justify-center transition-opacity duration-300 ${isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 z-50 bg-white/10 backdrop-blur-[20px] flex items-center justify-center transition-opacity duration-300 ${isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
       >
         {/* Close Button */}
         <button 
@@ -78,18 +78,18 @@ export default function Philosophy() {
           {[
             { label: 'The Philosophy', href: '/philosophy' },
             { label: 'The Methodology', href: '/technical-docs' },
-            { label: 'Market Data', href: '#' },
-            { label: 'Contact', href: '#' }
+            { label: 'Market Data', href: '/market-data' },
+            { label: 'Contact', href: '/contact' }
           ].map((item, i) => (
              <a key={item.label} href={item.href}
-             className={`menu-item text-4xl md:text-5xl font-light tracking-tight text-black hover:text-[#002FA7] transition-colors duration-500 translate-y-5 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0'} delay-${(i + 1) * 100}`}>
+             className={`menu-item text-4xl md:text-5xl font-light tracking-tight text-black hover:text-[#002FA7] transition-all duration-500 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'} delay-${(i + 1) * 100}`}>
              {item.label}
            </a>
           ))}
 
           {/* Mobile CTA inside menu */}
           <div className={`mt-8 md:hidden transition-all duration-500 delay-500 menu-item ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}>
-            <a href="/bill-debugger.html"
+            <a href="/bill-debugger"
               className="flex items-center gap-2 bg-[#002FA7] text-white px-5 py-2.5 rounded-full text-lg font-medium hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40 inline-flex">
               <Activity className="w-5 h-5" />
               <span>Run Analysis</span>
@@ -104,8 +104,8 @@ export default function Philosophy() {
       {/* SECTION 1: THE DECLARATION */}
       <section className="min-h-[70vh] md:min-h-screen pt-24 md:pt-40 flex flex-col items-center justify-center px-6 relative z-10">
         <motion.div
-          initial={{ opacity: 0, y: 40, filter: "blur(10px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
+          animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
           transition={{ duration: 1, ease: "easeOut" }}
           className="max-w-6xl mx-auto text-center"
         >

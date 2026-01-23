@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { collection, getCountFromServer, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, limit, startAfter, QueryDocumentSnapshot } from 'firebase/firestore'
+import { collection, getCountFromServer, getDocs, addDoc, updateDoc, deleteDoc, doc, getDoc, query, where, limit, startAfter, QueryDocumentSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/context/AuthContext'
 
@@ -12,6 +12,21 @@ export interface Contact {
   companyDomain?: string
   status: 'Lead' | 'Customer' | 'Churned'
   lastContact: string
+}
+
+export type ContactDetail = Contact & {
+  firstName?: string
+  lastName?: string
+  title?: string
+  companyName?: string
+  city?: string
+  state?: string
+  industry?: string
+  linkedinUrl?: string
+  website?: string
+  notes?: string
+  accountId?: string
+  linkedAccountId?: string
 }
 
 const COLLECTION_NAME = 'contacts'
@@ -110,6 +125,48 @@ export function useContactsCount() {
     },
     enabled: !loading && !!user,
     staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useContact(id: string) {
+  const { user, loading } = useAuth()
+
+  return useQuery({
+    queryKey: ['contact', id, user?.email ?? 'guest'],
+    queryFn: async () => {
+      if (!id) return null
+      if (loading) return null
+      if (!user) return null
+
+      const docRef = doc(db, COLLECTION_NAME, id)
+      const docSnap = await getDoc(docRef)
+
+      if (!docSnap.exists()) return null
+
+      const data = docSnap.data() as Record<string, unknown>
+      const firstName = (data.firstName as string | undefined) ?? undefined
+      const lastName = (data.lastName as string | undefined) ?? undefined
+
+      return {
+        id: docSnap.id,
+        ...(data as object),
+        name:
+          (data.name as string | undefined) ||
+          (firstName ? `${firstName} ${lastName || ''}`.trim() : 'Unknown'),
+        email: (data.email as string | undefined) || '',
+        phone: (data.phone as string | undefined) || '',
+        company: (data.company as string | undefined) || (data.companyName as string | undefined) || '',
+        companyDomain:
+          (data.companyDomain as string | undefined) ||
+          (data.domain as string | undefined) ||
+          undefined,
+        status: (data.status as Contact['status'] | undefined) || 'Lead',
+        lastContact: (data.lastContact as string | undefined) || new Date().toISOString(),
+      } as ContactDetail
+    },
+    enabled: !!id && !loading && !!user,
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 60 * 24,
   })
 }
 

@@ -94,7 +94,7 @@ function ComposePanel({
           isMinimized ? "opacity-0 invisible" : "opacity-100 visible"
         )}
       >
-        <div className="p-6 space-y-4 flex-1 overflow-y-auto">
+        <div className="p-6 space-y-4 flex-1 overflow-y-auto np-scroll">
           <div className="space-y-2">
             <Input
               placeholder="To"
