@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User, onAuthStateChanged } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore'
 import { useRouter } from 'next/navigation'
 
 type UserProfile = {
@@ -54,6 +54,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
+    let unsubProfile: (() => void) | null = null
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user)
       
@@ -62,12 +64,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         document.cookie = 'np_session=1; Path=/; SameSite=Lax'
 
         if (user.email) {
-          try {
-            // Fetch user role
-            const userDocRef = doc(db, 'users', user.email.toLowerCase())
-            const userDoc = await getDoc(userDocRef)
-            if (userDoc.exists()) {
-              const data = userDoc.data() as Record<string, unknown>
+          // Listen for real-time updates to user profile
+          const userDocRef = doc(db, 'users', user.email.toLowerCase())
+          
+          unsubProfile = onSnapshot(userDocRef, (doc) => {
+            if (doc.exists()) {
+              const data = doc.data() as Record<string, unknown>
               setRole((data.role as string | undefined) || 'employee')
 
               const firstName = typeof data.firstName === 'string' ? data.firstName.trim() || null : null
@@ -90,21 +92,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 selectedPhoneNumber: typeof data.selectedPhoneNumber === 'string' ? data.selectedPhoneNumber : null,
                 bridgeToMobile: typeof data.bridgeToMobile === 'boolean' ? data.bridgeToMobile : false
               })
-
-              if (!storedName && derivedName) {
-                try {
-                  await setDoc(
-                    userDocRef,
-                    {
-                      email: user.email.toLowerCase(),
-                      name: derivedName,
-                      displayName: derivedName,
-                      updatedAt: new Date().toISOString(),
-                    },
-                    { merge: true }
-                  )
-                } catch {}
-              }
             } else {
               setRole('employee')
               const derivedName = user.displayName?.trim() || null
@@ -117,36 +104,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 selectedPhoneNumber: null,
                 bridgeToMobile: false
               })
+            }
+          })
 
-              try {
-                await setDoc(
-                  userDocRef,
-                  {
-                    email: user.email.toLowerCase(),
-                    role: 'employee',
-                    ...(derivedName ? { name: derivedName, displayName: derivedName } : {}),
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                  },
-                  { merge: true }
-                )
-              } catch {}
+          // Initial check/setup for user document if it doesn't exist
+          try {
+            const userDoc = await getDoc(userDocRef)
+            if (!userDoc.exists()) {
+              const derivedName = user.displayName?.trim() || null
+              await setDoc(
+                userDocRef,
+                {
+                  email: user.email.toLowerCase(),
+                  role: 'employee',
+                  ...(derivedName ? { name: derivedName, displayName: derivedName } : {}),
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                },
+                { merge: true }
+              )
             }
           } catch (error) {
-            console.error("Error fetching user role:", error)
-            setRole('employee') // Fallback
-            setProfile({ 
-              name: user.displayName?.trim() || null, 
-              firstName: null, 
-              lastName: null,
-              bio: null,
-              twilioNumbers: [],
-              selectedPhoneNumber: null,
-              bridgeToMobile: false
-            })
+            console.error("Error setting up user document:", error)
           }
         }
       } else {
+        if (unsubProfile) {
+          unsubProfile()
+          unsubProfile = null
+        }
         setRole(null)
         setProfile({ 
           name: null, 
@@ -175,7 +161,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })
 
-    return () => unsubscribe()
+    return () => {
+      unsubscribe()
+      if (unsubProfile) unsubProfile()
+    }
   }, [router])
 
   return (

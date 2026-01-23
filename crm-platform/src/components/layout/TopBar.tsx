@@ -2,10 +2,11 @@
 
 import { useCallStore } from '@/store/callStore'
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion'
-import { Phone, Mic, PhoneOff, ArrowRightLeft, FileText, RefreshCw, Bell, X } from 'lucide-react'
+import { Phone, Mic, PhoneOff, ArrowRightLeft, FileText, RefreshCw, Bell, X, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GlobalSearch } from '@/components/search/GlobalSearch'
 import { useEffect, useState, useRef } from 'react'
+import { useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -14,11 +15,15 @@ import { Button } from '@/components/ui/button'
 
 export function TopBar() {
   const { isActive, status, setActive, setStatus } = useCallStore()
+  const { profile } = useAuth()
   const pathname = usePathname()
   
   const [isDialerOpen, setIsDialerOpen] = useState(false)
   const [phoneNumber, setPhoneNumber] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const selectedNumber = profile.selectedPhoneNumber || (profile.twilioNumbers && profile.twilioNumbers.length > 0 ? profile.twilioNumbers[0].number : null)
+  const selectedNumberName = profile.twilioNumbers?.find(n => n.number === selectedNumber)?.name || "Default"
 
   useEffect(() => {
     // Show toast on mount as a replacement for the "System Ready" indicator
@@ -86,10 +91,20 @@ export function TopBar() {
         toast.error("Invalid Phone Number")
         return
     }
+
+    if (!selectedNumber) {
+        toast.error("No Caller ID selected", {
+            description: "Please select a phone number in Settings."
+        })
+        return
+    }
+
     setIsDialerOpen(false)
     setActive(true)
     setStatus('dialing')
-    toast.success(`Calling ${phoneNumber}...`)
+    toast.success(`Calling ${phoneNumber}...`, {
+        description: `Using Caller ID: ${selectedNumberName}`
+    })
   }
 
   return (
@@ -170,8 +185,22 @@ export function TopBar() {
                 }}
                 className="bg-zinc-900/70 backdrop-blur-xl border border-white/10 shadow-lg overflow-hidden flex flex-col origin-top-right relative"
             >
-                <motion.div layout="position" className="flex items-center justify-end gap-2 w-full min-h-[36px]">
-                    <div className="flex items-center gap-2">
+                <motion.div layout="position" className="flex items-center justify-between gap-2 w-full min-h-[36px]">
+                    <AnimatePresence>
+                        {isDialerOpen && selectedNumber && (
+                            <motion.div 
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -10 }}
+                                className="flex items-center gap-1.5 text-[10px] text-zinc-400 bg-white/5 px-2 py-0.5 rounded-full border border-white/5"
+                            >
+                                <ShieldCheck size={10} className="text-signal" />
+                                <span>From: {selectedNumberName}</span>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    <div className="flex items-center gap-2 ml-auto">
                         <Link 
                             href="/crm-platform/scripts"
                             className={cn(
@@ -227,6 +256,9 @@ export function TopBar() {
                             transition={{ duration: 0.2, delay: 0.1 }}
                             className="flex flex-col gap-3 pt-4 absolute top-12 left-4 right-4"
                         >
+                            <div className="flex items-center justify-between px-1">
+                                <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Manual Dial</span>
+                            </div>
                             <Input 
                                 ref={inputRef}
                                 value={phoneNumber}

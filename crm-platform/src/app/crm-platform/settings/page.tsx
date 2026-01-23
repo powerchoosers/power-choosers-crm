@@ -8,9 +8,10 @@ import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { User, Bell, Shield, Palette, Database, Trash2, Plus, Phone } from 'lucide-react'
+import { Bell, Shield, Palette, Database, Trash2, Plus, Phone, User as UserIcon } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { db } from '@/lib/firebase'
+import { cn } from '@/lib/utils'
 import { doc, setDoc, getDoc } from 'firebase/firestore'
 import { toast } from 'sonner'
 
@@ -87,6 +88,9 @@ export default function SettingsPage() {
           name: computedName ? computedName : null,
           displayName: computedName ? computedName : null,
           bio: bio.trim() || null,
+          twilioNumbers: twilioNumbers,
+          selectedPhoneNumber: selectedPhoneNumber,
+          bridgeToMobile: bridgeToMobile,
           updatedAt: new Date().toISOString(),
         },
         { merge: true }
@@ -131,7 +135,7 @@ export default function SettingsPage() {
       <Tabs defaultValue="profile" className="space-y-4">
         <TabsList className="bg-zinc-900/50 border border-white/5 p-1 h-auto grid grid-cols-2 md:grid-cols-5 w-full md:w-auto">
           <TabsTrigger value="profile" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-zinc-400">
-            <User className="w-4 h-4 mr-2" />
+            <UserIcon className="w-4 h-4 mr-2" />
             Profile
           </TabsTrigger>
           <TabsTrigger value="account" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-zinc-400">
@@ -198,10 +202,84 @@ export default function SettingsPage() {
                   placeholder="Sales Representative"
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
-                  className="bg-zinc-950/50 border-white/10 text-zinc-200"
-                />
+                className="bg-zinc-950/50 border-white/10 text-zinc-200"
+              />
+            </div>
+
+            <Separator className="bg-white/5 my-6" />
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-medium text-zinc-200">Phone Numbers</h4>
+                  <p className="text-xs text-zinc-500">Manage your Twilio numbers and routing.</p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Label htmlFor="bridgeToMobile" className="text-xs text-zinc-400">Bridge to Mobile</Label>
+                  <Switch
+                    id="bridgeToMobile"
+                    checked={bridgeToMobile}
+                    onCheckedChange={setBridgeToMobile}
+                  />
+                </div>
               </div>
-            </CardContent>
+
+              <div className="space-y-3">
+                {twilioNumbers.map((num, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-zinc-950/30 border border-white/5 group">
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className={cn(
+                          "w-4 h-4 rounded-full border flex items-center justify-center cursor-pointer transition-colors",
+                          selectedPhoneNumber === num.number 
+                            ? "bg-[#004eea] border-[#004eea]" 
+                            : "border-white/20 hover:border-white/40"
+                        )}
+                        onClick={() => setSelectedPhoneNumber(num.number)}
+                      >
+                        {selectedPhoneNumber === num.number && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-zinc-200">{num.name}</p>
+                        <p className="text-xs text-zinc-500">{num.number}</p>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleDeleteNumber(idx)}
+                      className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 transition-all"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+                  <Input
+                    placeholder="Number Name (e.g. Office)"
+                    value={newNumberName}
+                    onChange={(e) => setNewNumberName(e.target.value)}
+                    className="bg-zinc-950/50 border-white/10 text-zinc-200"
+                  />
+                  <Input
+                    placeholder="+1 (555) 000-0000"
+                    value={newNumber}
+                    onChange={(e) => setNewNumber(e.target.value)}
+                    className="bg-zinc-950/50 border-white/10 text-zinc-200"
+                  />
+                  <Button 
+                    onClick={handleAddNumber}
+                    variant="outline"
+                    className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Number
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
             <CardFooter>
               <Button
                 onClick={handleSaveProfile}
@@ -290,7 +368,27 @@ export default function SettingsPage() {
                  <Button variant="outline" size="sm" className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5">Configure</Button>
                </div>
                
-                <div className="flex items-center justify-between p-4 border border-white/5 rounded-lg bg-transparent">
+                <div className="flex items-center justify-between p-4 border border-white/5 rounded-lg bg-white/5">
+                 <div className="flex items-center space-x-4">
+                   <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center text-red-500">
+                     <Phone className="w-5 h-5" />
+                   </div>
+                   <div>
+                     <p className="text-sm font-medium text-zinc-200">Twilio</p>
+                     <p className="text-xs text-zinc-500">{twilioNumbers.length > 0 ? 'Connected' : 'Not Configured'}</p>
+                   </div>
+                 </div>
+                 <Button 
+                   variant="outline" 
+                   size="sm" 
+                   onClick={() => document.querySelector('[value="profile"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))}
+                   className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5"
+                 >
+                   Manage Numbers
+                 </Button>
+               </div>
+
+               <div className="flex items-center justify-between p-4 border border-white/5 rounded-lg bg-transparent">
                  <div className="flex items-center space-x-4">
                    <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500">
                      <Database className="w-5 h-5" />
