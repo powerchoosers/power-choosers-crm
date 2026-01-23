@@ -21,8 +21,8 @@ export function TopBar() {
   }, [])
 
   return (
-    // Updated positioning: constrained to match main content area (left-16 for sidebar, xl:right-80 for widget panel)
-    <div className="fixed top-0 left-16 right-0 xl:right-80 z-40 flex items-start justify-center p-6 pointer-events-none">
+    // Updated positioning: constrained to match main content area (left-16 for sidebar, lg:right-80 for widget panel)
+    <div className="fixed top-0 left-16 right-0 lg:right-80 z-40 flex items-start justify-center p-6 pointer-events-none">
       <div className="w-full max-w-3xl pointer-events-auto">
         <AnimatePresence mode="wait">
           {!isActive ? (

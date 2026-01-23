@@ -175,8 +175,8 @@ export default function AccountsPage() {
             <h1 className="text-3xl font-bold tracking-tight text-white">Accounts</h1>
             <p className="text-zinc-400 mt-1">Manage your business accounts and territories.</p>
             </div>
-            <Button className="bg-signal hover:bg-blue-700 text-white transition-colors gap-2">
-            <Plus size={18} />
+            <Button className="bg-white text-zinc-950 hover:bg-zinc-200 font-medium">
+            <Plus className="w-4 h-4 mr-2" />
             Add Account
             </Button>
         </div>
@@ -188,7 +188,7 @@ export default function AccountsPage() {
                 placeholder="Filter current view..." 
                 value={globalFilter ?? ""}
                 onChange={(event) => setGlobalFilter(event.target.value)}
-                className="pl-10 bg-zinc-950 border-white/10 text-white placeholder:text-zinc-600 focus-visible:ring-signal"
+                className="pl-10 bg-zinc-950 border-white/10 text-white placeholder:text-zinc-600 focus-visible:ring-indigo-500"
             />
             </div>
             <Button variant="outline" className="gap-2 bg-zinc-900 border-white/10 text-zinc-400 hover:text-white hover:bg-white/5">

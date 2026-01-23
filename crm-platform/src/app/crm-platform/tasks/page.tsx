@@ -12,12 +12,10 @@ import {
   SortingState,
   ColumnFiltersState,
 } from '@tanstack/react-table'
-import { Search, Plus, Filter, MoreHorizontal, Mail, Phone, ArrowUpDown } from 'lucide-react'
-import { useContacts, Contact } from '@/hooks/useContacts'
-import { useAccounts } from '@/hooks/useAccounts'
+import { Search, Plus, Filter, MoreHorizontal, CheckCircle2, Circle, Clock, ArrowUpDown, Calendar } from 'lucide-react'
+import { useTasks, Task } from '@/hooks/useTasks'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import {
   Table,
   TableBody,
@@ -35,27 +33,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from '@/lib/utils'
+import { format } from 'date-fns'
 
-function CompanyCell({ companyName, companyDomain }: { companyName: string, companyDomain?: string }) {
-  const { data: accounts } = useAccounts()
-  const account = accounts?.find(a => a.name === companyName)
-  
-  return (
-    <div className="flex items-center gap-2">
-      <CompanyIcon 
-        logoUrl={account?.logoUrl} 
-        domain={account?.domain || companyDomain} 
-        name={companyName} 
-        size={20}
-        className="w-5 h-5 rounded-sm" 
-      />
-      <span className="text-zinc-400">{companyName}</span>
-    </div>
-  )
-}
-
-export default function PeoplePage() {
-  const { data: contacts, isLoading: queryLoading, isError } = useContacts()
+export default function TasksPage() {
+  const { data: tasks, isLoading: queryLoading, isError, updateTask, deleteTask } = useTasks()
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = useState('')
@@ -67,9 +48,9 @@ export default function PeoplePage() {
 
   const isLoading = queryLoading || !isMounted
 
-  const columns: ColumnDef<Contact>[] = [
+  const columns: ColumnDef<Task>[] = [
     {
-      accessorKey: 'name',
+      accessorKey: 'title',
       header: ({ column }) => {
         return (
           <Button
@@ -77,64 +58,87 @@ export default function PeoplePage() {
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             className="-ml-4 hover:bg-white/5 hover:text-white"
           >
-            Name
+            Task
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         )
       },
       cell: ({ row }) => {
-        const contact = row.original
+        const task = row.original
         return (
           <div className="flex items-center gap-3">
-             <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 border border-white/5">
-                {contact.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+             <div className={cn(
+               "w-8 h-8 rounded-full flex items-center justify-center border border-white/5",
+               task.priority === 'High' ? "bg-red-500/10 text-red-500" :
+               task.priority === 'Medium' ? "bg-yellow-500/10 text-yellow-500" :
+               "bg-zinc-800 text-zinc-400"
+             )}>
+                {task.status === 'Completed' ? <CheckCircle2 size={16} /> : <Circle size={16} />}
              </div>
              <div>
-                <div className="font-medium text-zinc-200">{contact.name}</div>
-                <div className="text-xs text-zinc-500">{contact.email}</div>
+                <div className={cn("font-medium", task.status === 'Completed' ? "text-zinc-500 line-through" : "text-zinc-200")}>
+                  {task.title}
+                </div>
+                {task.description && <div className="text-xs text-zinc-500 truncate max-w-[300px]">{task.description}</div>}
              </div>
           </div>
         )
       }
     },
     {
-      accessorKey: 'company',
-      header: 'Company',
-      cell: ({ row }) => <CompanyCell companyName={row.getValue('company')} companyDomain={row.original.companyDomain} />,
-    },
-    {
-      accessorKey: 'status',
-      header: 'Status',
+      accessorKey: 'priority',
+      header: 'Priority',
       cell: ({ row }) => {
-        const status = row.getValue('status') as string
+        const priority = row.getValue('priority') as string
         return (
           <span className={cn(
             "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border",
-            status === 'Customer' && "bg-green-500/10 text-green-500 border-green-500/20",
-            status === 'Lead' && "bg-blue-500/10 text-blue-500 border-blue-500/20",
-            status === 'Churned' && "bg-red-500/10 text-red-500 border-red-500/20",
+            priority === 'High' && "bg-red-500/10 text-red-500 border-red-500/20",
+            priority === 'Medium' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
+            priority === 'Low' && "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
+            priority === 'Sequence' && "bg-purple-500/10 text-purple-500 border-purple-500/20",
           )}>
-            {status}
+            {priority}
           </span>
         )
       },
     },
     {
-      accessorKey: 'lastContact',
-      header: 'Last Contact',
-      cell: ({ row }) => <div className="text-zinc-500">{row.getValue('lastContact')}</div>,
+      accessorKey: 'dueDate',
+      header: 'Due Date',
+      cell: ({ row }) => {
+        const date = row.getValue('dueDate') as string
+        if (!date) return <span className="text-zinc-600">-</span>
+        return (
+          <div className="flex items-center gap-2 text-zinc-400">
+            <Calendar size={14} />
+            <span>{format(new Date(date), 'MMM d, yyyy')}</span>
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: 'relatedTo',
+      header: 'Related To',
+      cell: ({ row }) => {
+        const related = row.original.relatedTo
+        if (!related) return <span className="text-zinc-600">-</span>
+        return <div className="text-zinc-300 font-medium">{related}</div>
+      },
     },
     {
       id: "actions",
       cell: ({ row }) => {
-        const contact = row.original
+        const task = row.original
         return (
           <div className="flex items-center justify-end gap-2">
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10">
-              <Phone className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10">
-              <Mail className="h-4 w-4" />
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className={cn("h-8 w-8 hover:text-white hover:bg-white/10", task.status === 'Completed' ? "text-green-500" : "text-zinc-400")}
+              onClick={() => updateTask({ id: task.id, status: task.status === 'Completed' ? 'Pending' : 'Completed' })}
+            >
+              <CheckCircle2 className="h-4 w-4" />
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -144,10 +148,20 @@ export default function PeoplePage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-zinc-950 border-white/10 text-zinc-300">
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                <DropdownMenuItem className="hover:bg-white/5 cursor-pointer">View Details</DropdownMenuItem>
-                <DropdownMenuItem className="hover:bg-white/5 cursor-pointer">Edit Person</DropdownMenuItem>
+                <DropdownMenuItem className="hover:bg-white/5 cursor-pointer">Edit Task</DropdownMenuItem>
+                <DropdownMenuItem 
+                  className="hover:bg-white/5 cursor-pointer"
+                  onClick={() => updateTask({ id: task.id, status: task.status === 'Completed' ? 'Pending' : 'Completed' })}
+                >
+                  Mark as {task.status === 'Completed' ? 'Pending' : 'Completed'}
+                </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-white/10" />
-                <DropdownMenuItem className="text-red-400 hover:bg-red-500/10 cursor-pointer">Delete</DropdownMenuItem>
+                <DropdownMenuItem 
+                  className="text-red-400 hover:bg-red-500/10 cursor-pointer"
+                  onClick={() => deleteTask(task.id)}
+                >
+                  Delete
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -157,7 +171,7 @@ export default function PeoplePage() {
   ]
 
   const table = useReactTable({
-    data: contacts || [],
+    data: tasks || [],
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -183,12 +197,12 @@ export default function PeoplePage() {
       <div className="flex-none space-y-4">
         <div className="flex items-center justify-between">
             <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">People</h1>
-            <p className="text-zinc-400 mt-1">Manage your clients and prospects.</p>
+            <h1 className="text-3xl font-bold tracking-tight text-white">Tasks</h1>
+            <p className="text-zinc-400 mt-1">Manage your daily activities and follow-ups.</p>
             </div>
             <Button className="bg-white text-zinc-950 hover:bg-zinc-200 font-medium">
             <Plus size={18} className="mr-2" />
-            Add Person
+            New Task
             </Button>
         </div>
 
@@ -196,15 +210,15 @@ export default function PeoplePage() {
             <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
             <Input 
-                placeholder="Filter current view..." 
+                placeholder="Search tasks..." 
                 value={globalFilter ?? ""}
                 onChange={(event) => setGlobalFilter(event.target.value)}
-                className="pl-10 bg-zinc-950 border-white/10 text-white placeholder:text-zinc-600 focus-visible:ring-signal"
+                className="pl-10 bg-zinc-950 border-white/10 text-white placeholder:text-zinc-600 focus-visible:ring-indigo-500"
             />
             </div>
             <Button variant="outline" className="gap-2 bg-zinc-900 border-white/10 text-zinc-400 hover:text-white hover:bg-white/5">
-            <Filter size={16} />
-            Filter
+                <Filter size={16} />
+                Filter
             </Button>
         </div>
       </div>
@@ -232,17 +246,11 @@ export default function PeoplePage() {
             </TableHeader>
             <TableBody>
                 {isLoading ? (
-                <TableRow>
-                    <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
-                        Loading people...
-                    </TableCell>
-                </TableRow>
-                ) : isError ? (
-                <TableRow>
-                    <TableCell colSpan={columns.length} className="h-24 text-center text-red-400">
-                        Error loading people. Please check your internet connection or permissions.
-                    </TableCell>
-                </TableRow>
+                    <TableRow>
+                        <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
+                            Loading tasks...
+                        </TableCell>
+                    </TableRow>
                 ) : table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row) => (
                     <TableRow
@@ -260,7 +268,7 @@ export default function PeoplePage() {
                 ) : (
                 <TableRow>
                     <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
-                    No people found.
+                    No tasks found.
                     </TableCell>
                 </TableRow>
                 )}
