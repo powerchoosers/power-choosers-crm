@@ -28,24 +28,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user)
       
-      if (user && user.email) {
-        try {
-          // Fetch user role
-          const userDocRef = doc(db, 'users', user.email.toLowerCase())
-          const userDoc = await getDoc(userDocRef)
-          if (userDoc.exists()) {
-            setRole(userDoc.data().role || 'employee')
-          } else {
-             // Default to employee if no profile found (or handle creation if needed)
-             // For now, assume employee to be safe
-             setRole('employee')
+      if (user) {
+        // Ensure session cookie is set for middleware
+        document.cookie = 'np_session=1; Path=/; SameSite=Lax'
+
+        if (user.email) {
+          try {
+            // Fetch user role
+            const userDocRef = doc(db, 'users', user.email.toLowerCase())
+            const userDoc = await getDoc(userDocRef)
+            if (userDoc.exists()) {
+              setRole(userDoc.data().role || 'employee')
+            } else {
+               // Default to employee if no profile found (or handle creation if needed)
+               // For now, assume employee to be safe
+               setRole('employee')
+            }
+          } catch (error) {
+            console.error("Error fetching user role:", error)
+            setRole('employee') // Fallback
           }
-        } catch (error) {
-          console.error("Error fetching user role:", error)
-          setRole('employee') // Fallback
         }
       } else {
         setRole(null)
+        // Clear session cookie
+        document.cookie = 'np_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;'
       }
 
       setLoading(false)
