@@ -8,6 +8,7 @@ export interface Email {
   id: string
   subject: string
   from: string
+  fromName?: string | null
   to: string | string[]
   html?: string
   text?: string

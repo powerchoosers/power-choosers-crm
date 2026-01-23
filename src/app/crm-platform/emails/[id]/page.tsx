@@ -39,6 +39,22 @@ export default function EmailDetailPage() {
     )
   }
 
+  const parseMailbox = (value: string) => {
+    const v = String(value || '').trim()
+    const angleMatch = v.match(/^(.*)<\s*([^>]+)\s*>\s*$/)
+    if (angleMatch) {
+      const name = angleMatch[1].trim().replace(/^"|"$/g, '')
+      const address = angleMatch[2].trim()
+      return { name: name || null, address: address || null }
+    }
+    return { name: null, address: v || null }
+  }
+
+  const fromMailbox = parseMailbox(email.from)
+  const displayFromName = (email.type === 'sent' ? (email.fromName || null) : fromMailbox.name) || email.from
+  const displayFromAddress = (email.type === 'sent' ? email.from : fromMailbox.address) || null
+  const replyToAddress = email.type === 'received' ? (fromMailbox.address || '') : ''
+
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header Actions */}
@@ -86,8 +102,10 @@ export default function EmailDetailPage() {
               </Avatar>
               <div>
                 <div className="flex items-baseline gap-2">
-                    <span className="font-medium text-white text-lg">{email.from}</span>
-                    <span className="text-sm text-zinc-500">&lt;{email.from}&gt;</span>
+                    <span className="font-medium text-white text-lg">{displayFromName}</span>
+                    {displayFromAddress ? (
+                      <span className="text-sm text-zinc-500">&lt;{displayFromAddress}&gt;</span>
+                    ) : null}
                 </div>
                 <div className="text-sm text-zinc-400">
                   To: <span className="text-zinc-300">{Array.isArray(email.to) ? email.to.join(', ') : email.to}</span>
@@ -132,7 +150,7 @@ export default function EmailDetailPage() {
       <ComposeModal 
         isOpen={isComposeOpen} 
         onClose={() => setIsComposeOpen(false)} 
-        to={email.type === 'received' ? email.from : ''}
+        to={replyToAddress}
         subject={`Re: ${email.subject}`}
       />
     </div>
