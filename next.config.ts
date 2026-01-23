@@ -12,12 +12,12 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:3001/api/:path*',
+        destination: 'http://127.0.0.1:3001/api/:path*',
       },
       // Proxy legacy dashboard for verification if needed
       {
         source: '/crm-dashboard.html',
-        destination: 'http://localhost:3001/crm-dashboard.html',
+        destination: 'http://127.0.0.1:3001/crm-dashboard.html',
       },
     ];
   },
