@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, UploadCloud, Check, Activity } from 'lucide-react'
+import { X, UploadCloud, Check, AlertCircle, ArrowRight, Loader2 } from 'lucide-react'
 
 type ExtractedData = {
   customer_name: string
@@ -14,18 +14,13 @@ type ExtractedData = {
 }
 
 export default function BillDebuggerPage() {
-  const [view, setView] = useState<'upload' | 'console' | 'success'>('upload')
+  const [view, setView] = useState<'upload' | 'console' | 'analyzing' | 'email' | 'success' | 'error'>('upload')
   const [footerText, setFooterText] = useState('Waiting for input stream...')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
   
-  // Mock Data
-  const [extractedData, setExtractedData] = useState({
-    customer_name: 'Unknown',
-    provider_name: 'Unknown',
-    billing_period: '--',
-    total_usage_kwh: '0',
-    billed_demand_kw: '0'
-  })
+  // Data State
+  const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
 
   // Console Logic
   const processMessages = [
@@ -37,18 +32,93 @@ export default function BillDebuggerPage() {
     "Analysis Complete."
   ]
 
-  const handleUpload = (files: FileList | null) => {
+  const handleUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return
     if (isProcessing) return
     
     setIsProcessing(true)
     setFooterText('PROCESSING...')
+    setErrorMsg('')
     
-    // Transition to Console
-    setTimeout(() => {
-        setView('console')
-    }, 300)
+    // 1. Transition to Console immediately for UX
+    setView('console')
+
+    try {
+        const file = files[0]
+
+        // 2. Convert to Base64
+        const base64Data = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.onerror = reject
+            reader.readAsDataURL(file)
+        })
+
+        // 3. Call API
+        const response = await fetch('/api/analyze-bill', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fileData: base64Data,
+                mimeType: file.type
+            })
+        })
+
+        const result = await response.json()
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || result.message || 'Failed to analyze bill')
+        }
+
+        // 4. Store Data
+        setExtractedData({
+            customer_name: result.data.customer_name || 'Unknown Client',
+            provider_name: result.data.provider_name || 'Unknown Provider',
+            billing_period: result.data.billing_period || 'Unknown Period',
+            total_usage_kwh: result.data.total_usage_kwh?.toLocaleString() || '0',
+            billed_demand_kw: result.data.billed_demand_kw?.toLocaleString() || '0'
+        })
+
+    } catch (err: any) {
+        console.error('Analysis Error:', err)
+        setErrorMsg(err.message || 'An error occurred during analysis')
+        // We let the console finish before showing error
+    }
   }
+
+  // Handle transition from Console
+  const handleConsoleComplete = () => {
+      if (errorMsg) {
+          setView('error')
+          setFooterText('ANALYSIS FAILED')
+          setIsProcessing(false)
+          return
+      }
+
+      if (extractedData) {
+          // Data is ready, go to email capture
+          setView('email')
+          setFooterText('AWAITING AUTHORIZATION')
+      } else {
+          // Data not ready yet, go to analyzing/loading state
+          setView('analyzing')
+          setFooterText('FINALIZING...')
+      }
+  }
+
+  // Watch for data arrival if we are in 'analyzing' state
+  useEffect(() => {
+      if (view === 'analyzing') {
+          if (errorMsg) {
+              setView('error')
+              setFooterText('ANALYSIS FAILED')
+              setIsProcessing(false)
+          } else if (extractedData) {
+              setView('email')
+              setFooterText('AWAITING AUTHORIZATION')
+          }
+      }
+  }, [view, extractedData, errorMsg])
 
   return (
     <div className="min-h-screen w-full bg-white text-zinc-900 selection:bg-[#002FA7] selection:text-white relative overflow-x-hidden font-sans flex flex-col">
@@ -74,32 +144,36 @@ export default function BillDebuggerPage() {
                 {view === 'console' && (
                     <ConsoleView 
                         messages={processMessages} 
-                        onComplete={() => {
-                            // Mock Data Set
-                            setExtractedData({
-                                customer_name: 'Nodal Client',
-                                provider_name: 'Retail Energy Provider',
-                                billing_period: '06/01/2025 - 07/01/2025',
-                                total_usage_kwh: '142,500',
-                                billed_demand_kw: '850'
-                            })
-                            
-                            setTimeout(() => {
-                                setView('success')
-                                setFooterText('DIAGNOSTIC COMPLETE')
-                            }, 500)
-                        }} 
+                        onComplete={handleConsoleComplete} 
                     />
                 )}
-                {view === 'success' && (
+                {view === 'analyzing' && (
+                    <AnalyzingView />
+                )}
+                {view === 'email' && (
+                    <EmailCaptureView onComplete={() => {
+                        setView('success')
+                        setFooterText('DIAGNOSTIC COMPLETE')
+                    }} />
+                )}
+                {view === 'success' && extractedData && (
                     <SuccessView data={extractedData} />
+                )}
+                {view === 'error' && (
+                    <ErrorView message={errorMsg} onRetry={() => {
+                        setView('upload')
+                        setIsProcessing(false)
+                        setFooterText('Waiting for input stream...')
+                        setExtractedData(null)
+                        setErrorMsg('')
+                    }} />
                 )}
             </AnimatePresence>
         </main>
 
         {/* Technical Micro-copy Footer */}
         <footer className="w-full p-6 text-center z-10 shrink-0">
-            <p className={`font-mono text-xs text-zinc-400 tracking-wider uppercase opacity-60 ${view === 'console' ? 'animate-pulse' : ''} ${view === 'success' ? 'text-[#002FA7] opacity-100' : ''}`}>
+            <p className={`font-mono text-xs text-zinc-400 tracking-wider uppercase opacity-60 ${view === 'console' || view === 'analyzing' ? 'animate-pulse' : ''} ${view === 'success' ? 'text-[#002FA7] opacity-100' : ''}`}>
                 {footerText}
             </p>
         </footer>
@@ -238,6 +312,69 @@ function ConsoleView({ messages, onComplete }: { messages: string[], onComplete:
     )
 }
 
+function AnalyzingView() {
+    return (
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex flex-col items-center justify-center space-y-6"
+        >
+            <Loader2 className="w-12 h-12 text-[#002FA7] animate-spin" />
+            <p className="text-zinc-500 font-mono text-sm tracking-widest">FINALIZING ANALYSIS...</p>
+        </motion.div>
+    )
+}
+
+function EmailCaptureView({ onComplete }: { onComplete: () => void }) {
+    const [email, setEmail] = useState('')
+    const [loading, setLoading] = useState(false)
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setLoading(true)
+        // Simulate email capture or actually send it if we had an endpoint
+        // For now, just proceed after a short delay
+        await new Promise(resolve => setTimeout(resolve, 800))
+        setLoading(false)
+        onComplete()
+    }
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="w-full max-w-md mx-auto text-center"
+        >
+            <div className="bg-white/80 backdrop-blur-xl border border-zinc-200 rounded-2xl p-8 shadow-xl">
+                <h3 className="text-2xl font-semibold text-zinc-900 mb-2">Unlock Your Report</h3>
+                <p className="text-zinc-500 mb-6">Enter your email to view the forensic analysis of your invoice.</p>
+                
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <input 
+                            type="email" 
+                            required
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="name@company.com"
+                            className="w-full px-4 py-3 rounded-xl border border-zinc-200 bg-white focus:ring-2 focus:ring-[#002FA7] focus:border-transparent outline-none transition-all"
+                        />
+                    </div>
+                    <button 
+                        type="submit" 
+                        disabled={loading}
+                        className="w-full bg-[#002FA7] text-white font-medium py-3 rounded-xl hover:bg-[#002FA7]/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Reveal Data <ArrowRight className="w-5 h-5" /></>}
+                    </button>
+                </form>
+            </div>
+        </motion.div>
+    )
+}
+
 function SuccessView({ data }: { data: ExtractedData }) {
     return (
         <motion.div
@@ -307,6 +444,28 @@ function SuccessView({ data }: { data: ExtractedData }) {
 
             <button onClick={() => window.location.reload()} className="mt-8 text-sm text-zinc-400 hover:text-[#002FA7] transition-colors">
                 Analyze Another Bill
+            </button>
+        </motion.div>
+    )
+}
+
+function ErrorView({ message, onRetry }: { message: string, onRetry: () => void }) {
+    return (
+        <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md mx-auto text-center"
+        >
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mb-6 text-red-600">
+                <AlertCircle className="w-8 h-8" />
+            </div>
+            <h3 className="text-2xl font-semibold text-zinc-900 mb-2">Analysis Failed</h3>
+            <p className="text-zinc-500 mb-8">{message}</p>
+            <button 
+                onClick={onRetry}
+                className="px-6 py-3 bg-zinc-900 text-white rounded-xl hover:bg-zinc-800 transition-colors font-medium"
+            >
+                Try Again
             </button>
         </motion.div>
     )
