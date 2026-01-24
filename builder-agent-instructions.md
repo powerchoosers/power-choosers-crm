@@ -53,13 +53,13 @@ The platform operates across three distinct environments/servers:
     - **Local**: `http://127.0.0.1:3001` (or `localhost:3001`)
     - **Run Command**: `node server.js` (in root directory)
 3.  **Production Backend (Cloud Run)**:
-    - **URL**: `https://power-choosers-crm-792458658491.us-south1.run.app`
-    - **Role**: Serves as the primary API for deployed instances of the platform.
+    - **UI/Frontend URL**: `https://power-choosers-crm-792458658491.us-south1.run.app`
+    - **Role**: Serves as the primary API and UI service for the platform.
 
 ### 🌐 Routing Logic (Proxying)
 To ensure the frontend can communicate with the backend regardless of environment, we use **Next.js Rewrites** in `crm-platform/next.config.ts`:
 - **Local Development**: Proxies `/api/*` to `http://127.0.0.1:3001`.
-- **Production**: Proxies `/api/*` to the **Cloud Run** URL.
+- **Production**: Proxies `/api/*` to the **Cloud Run** URL (`power-choosers-crm`).
 
 **CRITICAL**: Always ensure that any new API endpoints are tested against both the local backend and verified for Cloud Run compatibility.
 

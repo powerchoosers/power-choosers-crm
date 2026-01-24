@@ -59,6 +59,7 @@ Handles API requests and legacy logic during development.
 ### 3. Production Backend (Cloud Run)
 The live API for the deployed platform.
 - **URL**: `https://power-choosers-crm-792458658491.us-south1.run.app`
+- **Architecture**: Single-service architecture where both UI and API reside on the same Cloud Run instance.
 
 ## 📍 Routing & Proxy Logic
 
