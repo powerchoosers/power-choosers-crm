@@ -312,12 +312,6 @@ export function TopBar() {
                         >
                             <div className="flex items-center justify-between px-1">
                                 <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Manual Dial</span>
-                                {selectedNumber && (
-                                    <div className="flex items-center gap-1.5 text-[10px] text-zinc-400">
-                                        <ShieldCheck size={10} className="text-[#002FA7]" />
-                                        <span>Using: {selectedNumberName}</span>
-                                    </div>
-                                )}
                             </div>
                             <Input 
                                 ref={inputRef}
