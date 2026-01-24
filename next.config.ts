@@ -12,7 +12,7 @@ const nextConfig: NextConfig = {
   async rewrites() {
     const isProd = process.env.NODE_ENV === 'production';
     const backendUrl = isProd 
-      ? 'https://power-choosers-crm-792458658491.us-south1.run.app'
+      ? 'https://nodal-point-network-792458658491.us-south1.run.app'
       : 'http://127.0.0.1:3001';
 
     return [
