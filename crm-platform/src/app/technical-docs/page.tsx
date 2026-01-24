@@ -52,7 +52,7 @@ export default function TechnicalDocs() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F5F7] text-zinc-900 font-sans selection:bg-[#002FA7] selection:text-white overflow-x-hidden">
+    <div className="min-h-screen bg-[#F5F5F7] text-zinc-900 font-sans selection:bg-[#002FA7] selection:text-white">
       
       {/* HEADER (Heads-Up Display) - Consistent with other pages */}
       <header id="main-header" className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${isScrolled ? 'bg-white/80 backdrop-blur-xl h-16 shadow-sm' : 'bg-transparent h-20 md:h-24'}`}>
@@ -130,40 +130,42 @@ export default function TechnicalDocs() {
 
       <main className="max-w-7xl mx-auto px-4 md:px-8 flex flex-col md:grid md:grid-cols-12 gap-8 md:gap-12 pt-32 md:pt-40 relative z-10 w-full">
         {/* Sidebar Navigation (Desktop) */}
-        <motion.div 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="hidden md:block col-span-3 sticky top-40 self-start space-y-8"
-        >
-          <h4 className="text-xs font-mono text-zinc-400 uppercase tracking-widest mb-6">Documentation</h4>
-          <ul className="space-y-4 text-sm font-medium text-zinc-600">
-            <li 
-              onClick={() => scrollToSection('abstract')} 
-              className={`pl-4 cursor-pointer border-l-2 transition-all ${activeSection === 'abstract' ? 'text-[#002FA7] border-[#002FA7]' : 'hover:text-black border-transparent hover:border-zinc-300'}`}
-            >
-              1.0 System Architecture
-            </li>
-            <li 
-              onClick={() => scrollToSection('ratchet')} 
-              className={`pl-4 cursor-pointer border-l-2 transition-all ${activeSection === 'ratchet' ? 'text-[#002FA7] border-[#002FA7]' : 'hover:text-black border-transparent hover:border-zinc-300'}`}
-            >
-              2.0 The Ratchet Vulnerability
-            </li>
-            <li 
-              onClick={() => scrollToSection('4cp')} 
-              className={`pl-4 cursor-pointer border-l-2 transition-all ${activeSection === '4cp' ? 'text-[#002FA7] border-[#002FA7]' : 'hover:text-black border-transparent hover:border-zinc-300'}`}
-            >
-              3.0 4CP Mitigation
-            </li>
-            <li 
-              onClick={() => scrollToSection('algorithm')} 
-              className={`pl-4 cursor-pointer border-l-2 transition-all ${activeSection === 'algorithm' ? 'text-[#002FA7] border-[#002FA7]' : 'hover:text-black border-transparent hover:border-zinc-300'}`}
-            >
-              4.0 Ingestion Protocol
-            </li>
-          </ul>
-        </motion.div>
+        <aside className="hidden md:block col-span-3 sticky top-40 h-fit self-start">
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="space-y-8"
+          >
+            <h4 className="text-xs font-mono text-zinc-400 uppercase tracking-widest mb-6">Documentation</h4>
+            <ul className="space-y-4 text-sm font-medium text-zinc-600">
+              <li 
+                onClick={() => scrollToSection('abstract')} 
+                className={`pl-4 cursor-pointer border-l-2 transition-all ${activeSection === 'abstract' ? 'text-[#002FA7] border-[#002FA7]' : 'hover:text-black border-transparent hover:border-zinc-300'}`}
+              >
+                1.0 System Architecture
+              </li>
+              <li 
+                onClick={() => scrollToSection('ratchet')} 
+                className={`pl-4 cursor-pointer border-l-2 transition-all ${activeSection === 'ratchet' ? 'text-[#002FA7] border-[#002FA7]' : 'hover:text-black border-transparent hover:border-zinc-300'}`}
+              >
+                2.0 The Ratchet Vulnerability
+              </li>
+              <li 
+                onClick={() => scrollToSection('4cp')} 
+                className={`pl-4 cursor-pointer border-l-2 transition-all ${activeSection === '4cp' ? 'text-[#002FA7] border-[#002FA7]' : 'hover:text-black border-transparent hover:border-zinc-300'}`}
+              >
+                3.0 4CP Mitigation
+              </li>
+              <li 
+                onClick={() => scrollToSection('algorithm')} 
+                className={`pl-4 cursor-pointer border-l-2 transition-all ${activeSection === 'algorithm' ? 'text-[#002FA7] border-[#002FA7]' : 'hover:text-black border-transparent hover:border-zinc-300'}`}
+              >
+                4.0 Ingestion Protocol
+              </li>
+            </ul>
+          </motion.div>
+        </aside>
 
         {/* MAIN CONTENT */}
         <motion.div 

@@ -11,12 +11,11 @@ function normalizePhoneNumber(value) {
     if (!value) return null;
     const str = String(value).trim();
     if (!str) return null;
-    const digits = str.replace(/\D/g, '');
-    if (!digits) return null;
-    if (str.startsWith('+')) return `+${digits}`;
-    if (digits.length === 10) return `+1${digits}`;
-    if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
-    return `+${digits}`;
+    const cleaned = str.replace(/\D/g, '');
+    if (cleaned.length === 10) return `+1${cleaned}`;
+    if (cleaned.length === 11 && cleaned.startsWith('1')) return `+${cleaned}`;
+    if (str.startsWith('+')) return str.replace(/\s+/g, '');
+    return null;
 }
 
 function digitsOnly(value) {
@@ -111,7 +110,8 @@ export default async function handler(req, res) {
 
         // For outbound calls, use From as callerId (this is the selected Twilio number from settings)
         // For inbound calls, use businessNumber as callerId when dialing to browser client
-        const callerIdForDial = isInboundToBusiness ? businessNumber : (From || businessNumber);
+        const sanitizedFrom = normalizePhoneNumber(From);
+        const callerIdForDial = isInboundToBusiness ? businessNumber : (sanitizedFrom || businessNumber);
         
         // Ensure absolute base URL for Twilio callbacks (prefer headers)
         const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
