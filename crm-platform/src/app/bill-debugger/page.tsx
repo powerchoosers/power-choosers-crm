@@ -87,9 +87,10 @@ export default function BillDebuggerPage() {
             billed_demand_kw: result.data.billed_demand_kw?.toLocaleString() || '0'
         })
 
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error('Analysis Error:', err)
-        setErrorMsg(err.message || 'An error occurred during analysis')
+        const message = err instanceof Error ? err.message : 'An error occurred during analysis'
+        setErrorMsg(message)
         // We let the console finish before showing error
     }
   }

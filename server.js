@@ -212,7 +212,7 @@ const mimeTypes = {
 // Configuration
 const PORT = process.env.PORT || 3001;
 const LOCAL_DEV_MODE = process.env.NODE_ENV !== 'production';
-const API_BASE_URL = process.env.API_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
+const API_BASE_URL = process.env.API_BASE_URL || 'https://nodal-point-network-792458658491.us-south1.run.app';
 // Only used for external webhooks, not internal API routing
 // Email sending now handled by Gmail API via frontend
 

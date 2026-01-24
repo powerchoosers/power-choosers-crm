@@ -32,8 +32,50 @@ export type ContactDetail = Contact & {
   annualUsage?: string
   currentRate?: string
   contractEnd?: string
-  serviceAddresses?: any[]
+  serviceAddresses?: unknown[]
   accountDescription?: string
+}
+
+type ContactMetadata = {
+  company?: string
+  domain?: string
+  city?: string
+  state?: string
+  website?: string
+}
+
+type AccountJoin = {
+  name?: string | null
+  domain?: string | null
+  logo_url?: string | null
+  city?: string | null
+  state?: string | null
+  industry?: string | null
+  electricity_supplier?: string | null
+  annual_usage?: string | null
+  current_rate?: string | null
+  contract_end_date?: string | null
+  service_addresses?: unknown[] | null
+  description?: string | null
+}
+
+type ContactRow = {
+  id: string
+  name?: string | null
+  firstName?: string | null
+  lastName?: string | null
+  email?: string | null
+  phone?: string | null
+  mobile?: string | null
+  workPhone?: string | null
+  status?: Contact['status'] | null
+  created_at?: string | null
+  lastContactedAt?: string | null
+  accountId?: string | null
+  title?: string | null
+  linkedinUrl?: string | null
+  metadata?: ContactMetadata | null
+  accounts?: AccountJoin | AccountJoin[] | null
 }
 
 const PAGE_SIZE = 50
@@ -70,21 +112,20 @@ export function useContacts() {
         }
         if (!data) return { contacts: [], nextCursor: null };
 
-        const contacts = data.map(item => {
-          // Handle Supabase join result (it returns an object, not array, for single FK)
-          const account = Array.isArray(item.accounts) ? item.accounts[0] : item.accounts as any; 
+        const contacts = (data as ContactRow[]).map(item => {
+          const account = Array.isArray(item.accounts) ? item.accounts[0] : item.accounts
           
           return { 
             id: item.id, 
             name: item.name || (item.firstName ? `${item.firstName} ${item.lastName || ''}`.trim() : 'Unknown'),
             email: item.email || '',
-            phone: item.phone || item.mobile || item["workPhone"] || '',
+            phone: item.phone || item.mobile || item.workPhone || '',
             company: account?.name || item.metadata?.company || '',
             companyDomain: account?.domain || item.metadata?.domain || '',
             logoUrl: account?.logo_url || '',
             status: item.status || 'Lead',
-            lastContact: item["lastContactedAt"] || item.created_at || new Date().toISOString(),
-            accountId: item["accountId"]
+            lastContact: item.lastContactedAt || item.created_at || new Date().toISOString(),
+            accountId: item.accountId || undefined
           }
         }) as Contact[];
         
@@ -158,33 +199,36 @@ export function useContact(id: string) {
 
       if (error) return null
 
-      const account = Array.isArray(data.accounts) ? data.accounts[0] : data.accounts as any;
-      const firstName = data["firstName"] as string | undefined
-      const lastName = data["lastName"] as string | undefined
+      const typedData = data as ContactRow
+      const account = Array.isArray(typedData.accounts) ? typedData.accounts[0] : typedData.accounts
+      const firstName = typedData.firstName || undefined
+      const lastName = typedData.lastName || undefined
+
+      const { id: contactId, ...rest } = typedData
 
       return {
-        id: data.id,
-        ...data,
-        name: data.name || (firstName ? `${firstName} ${lastName || ''}`.trim() : 'Unknown'),
-        email: data.email || '',
-        phone: data.phone || data["mobile"] || '',
-        company: account?.name || data.metadata?.company || '',
-        companyDomain: account?.domain || data.metadata?.domain || undefined,
+        id: contactId,
+        ...rest,
+        name: typedData.name || (firstName ? `${firstName} ${lastName || ''}`.trim() : 'Unknown'),
+        email: typedData.email || '',
+        phone: typedData.phone || typedData.mobile || '',
+        company: account?.name || typedData.metadata?.company || '',
+        companyDomain: account?.domain || typedData.metadata?.domain || undefined,
         logoUrl: account?.logo_url || '',
-        status: (data.status as Contact['status'] | undefined) || 'Lead',
-        lastContact: data["lastContactedAt"] || new Date().toISOString(),
+        status: typedData.status || 'Lead',
+        lastContact: typedData.lastContactedAt || new Date().toISOString(),
         
         // Detail fields
         firstName,
         lastName,
-        title: data["title"],
-        companyName: account?.name || data.metadata?.company,
-        city: account?.city || data.metadata?.city,
-        state: account?.state || data.metadata?.state,
+        title: typedData.title || undefined,
+        companyName: account?.name || typedData.metadata?.company,
+        city: account?.city || typedData.metadata?.city,
+        state: account?.state || typedData.metadata?.state,
         industry: account?.industry,
-        linkedinUrl: data["linkedinUrl"],
-        website: account?.domain || data.metadata?.website,
-        linkedAccountId: data["accountId"],
+        linkedinUrl: typedData.linkedinUrl || undefined,
+        website: account?.domain || typedData.metadata?.website,
+        linkedAccountId: typedData.accountId || undefined,
         
         // Enhanced account details
         electricitySupplier: account?.electricity_supplier,
@@ -237,7 +281,7 @@ export function useUpdateContact() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Contact> & { id: string }) => {
-      const dbUpdates: any = {}
+      const dbUpdates: Record<string, string | null> = {}
       if (updates.name !== undefined) dbUpdates.name = updates.name
       if (updates.email !== undefined) dbUpdates.email = updates.email
       if (updates.phone !== undefined) dbUpdates.phone = updates.phone

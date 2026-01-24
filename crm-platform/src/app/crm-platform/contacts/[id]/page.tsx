@@ -72,9 +72,12 @@ export default function ContactDossierPage() {
   const forensicNotes = contact?.notes || contact?.accountDescription || ''
 
   const primaryServiceAddress = useMemo(() => {
-    const addrs = Array.isArray(contact?.serviceAddresses) ? contact?.serviceAddresses : []
-    const primary = addrs.find((a: any) => a?.isPrimary) || addrs[0]
-    return primary?.address ? String(primary.address) : ''
+    const addrs = Array.isArray(contact?.serviceAddresses)
+      ? (contact?.serviceAddresses as Array<{ isPrimary?: boolean; address?: unknown }>)
+      : []
+    const primary = addrs.find((addr) => addr?.isPrimary) || addrs[0]
+    if (!primary?.address) return ''
+    return typeof primary.address === 'string' ? primary.address : String(primary.address)
   }, [contact?.serviceAddresses])
 
   if (isLoading) {
