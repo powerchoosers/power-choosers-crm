@@ -80,7 +80,6 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
       const newDevice = new Device(data.token, {
         codecPreferences: [Call.Codec.Opus, Call.Codec.PCMU],
-        fakeLocalDTMF: true,
         enableImprovedSignalingErrorPrecision: true,
       })
 
