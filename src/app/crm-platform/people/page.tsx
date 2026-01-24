@@ -16,7 +16,6 @@ import {
 } from '@tanstack/react-table'
 import { Search, Plus, Filter, MoreHorizontal, Mail, Phone, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useContacts, useContactsCount, Contact } from '@/hooks/useContacts'
-import { useAccounts } from '@/hooks/useAccounts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
@@ -45,7 +44,6 @@ export default function PeoplePage() {
   const router = useRouter()
   const { data, isLoading: queryLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useContacts()
   const { data: totalContacts } = useContactsCount()
-  const { data: accountsData } = useAccounts()
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = useState('')
@@ -53,14 +51,6 @@ export default function PeoplePage() {
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: PAGE_SIZE })
 
   const contacts = useMemo(() => data?.pages.flatMap(page => page.contacts) || [], [data])
-  const accounts = useMemo(() => accountsData?.pages.flatMap(page => page.accounts) || [], [accountsData])
-  const accountByName = useMemo(() => {
-    const map = new Map<string, (typeof accounts)[number]>()
-    for (const a of accounts) {
-      if (a?.name) map.set(a.name, a)
-    }
-    return map
-  }, [accounts])
 
   useEffect(() => {
     setIsMounted(true)
@@ -122,12 +112,12 @@ export default function PeoplePage() {
         header: 'Company',
         cell: ({ row }) => {
           const companyName = row.getValue('company') as string
-          const account = accountByName.get(companyName)
+          const contact = row.original
           return (
             <div className="flex items-center gap-2">
               <CompanyIcon
-                logoUrl={account?.logoUrl}
-                domain={account?.domain || row.original.companyDomain}
+                logoUrl={contact.logoUrl}
+                domain={contact.companyDomain}
                 name={companyName}
                 size={20}
                 className="w-5 h-5 rounded-sm"
@@ -195,7 +185,7 @@ export default function PeoplePage() {
         },
       },
     ]
-  }, [accountByName, router])
+  }, [router])
 
   const table = useReactTable({
     data: contacts,
@@ -311,7 +301,7 @@ export default function PeoplePage() {
                 ) : (
                 <TableRow>
                     <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
-                    No people found.
+                        No people found.
                     </TableCell>
                 </TableRow>
                 )}
