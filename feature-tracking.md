@@ -24,17 +24,23 @@
   - [x] **Account Context**: Resolved linked account via contact accountId / name match and rendered energy fields when present.
   - [x] **Navigation**: Made People table rows and “View Details” open `/crm-platform/contacts/[id]`.
 
-### Top Bar & Global Search
+### Twilio Integration & Voice
 - **Status**: Completed
-- **Description**: Migrated the Top Bar navigation and Global Search features from the legacy dashboard.
+- **Description**: Migrated legacy Twilio voice dialer to the new Next.js platform with full real-time status tracking.
 - **Actions**:
-  - [x] **Top Bar Layout**: Updated `TopBar.tsx` to include Scripts, Refresh, Notifications, and Call actions.
-  - [x] **Global Search**: Enhanced `GlobalSearch.tsx` to include "Prospect People" and "Prospect Accounts" quick actions.
-  - [x] **Functionality**:
-    - Connected Scripts button to `/crm-platform/scripts`.
-    - Implemented Data Refresh logic (with toast notification).
-    - Added manual Dialer trigger button.
-    - Added Notification bell (UI only).
+  - [x] **SDK Integration**: Integrated `@twilio/voice-sdk` into `VoiceContext.tsx`.
+  - [x] **State Management**: Created `useCallStore` (Zustand) for global call status and duration tracking.
+  - [x] **UI Implementation**: 
+    - Built interactive Dialer widget in `TopBar.tsx` with manual dial and contact-integrated calling.
+    - Added "Active Call" HUD with duration tracking, mute, and hangup controls.
+  - [x] **Deployment**: Resolved TypeScript type errors in Voice SDK initialization for successful Cloud Build.
+
+### UI & Layout Polishing
+- **Status**: Ongoing
+- **Description**: Refining component layouts and fixing UX regressions.
+- **Actions**:
+  - [x] **Sticky Sidebar**: Fixed scrolling constraints on `TechnicalDocs` page to ensure documentation navigation remains visible.
+  - [x] **Clean Up**: Removed redundant "Using: Nodal Point" indicators in TopBar to simplify the UI hierarchy.
 
 ### Bill Debugger & Analysis
 - **Status**: In Progress
