@@ -55,8 +55,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let unsubProfile: (() => void) | null = null
+    let didResolve = false
+
+    const timeoutId = window.setTimeout(() => {
+      if (!didResolve) {
+        setUser(null)
+        setRole(null)
+        setProfile({
+          name: null,
+          firstName: null,
+          lastName: null,
+          bio: null,
+          twilioNumbers: null,
+          selectedPhoneNumber: null,
+          bridgeToMobile: null
+        })
+        document.cookie = 'np_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;'
+        setLoading(false)
+      }
+    }, 5000)
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      didResolve = true
+      window.clearTimeout(timeoutId)
       setUser(user)
       
       if (user) {
@@ -164,6 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       unsubscribe()
       if (unsubProfile) unsubProfile()
+      window.clearTimeout(timeoutId)
     }
   }, [router])
 

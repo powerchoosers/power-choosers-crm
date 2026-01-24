@@ -1,7 +1,6 @@
-import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
-import { formatDuration } from '@/lib/utils' // Assuming this exists or I'll implement simple format
 
 export interface Call {
   id: string
@@ -16,6 +15,27 @@ export interface Call {
   summary?: string
   transcript?: string
   contactId?: string
+}
+
+type CallContact = {
+  name?: string | null
+  ownerId?: string | null
+}
+
+type CallRow = {
+  id: string
+  direction?: string | null
+  status?: string | null
+  duration?: number | null
+  timestamp?: string | null
+  created_at?: string | null
+  summary?: string | null
+  recordingUrl?: string | null
+  transcript?: string | null
+  contactId?: string | null
+  from?: string | null
+  to?: string | null
+  contacts?: CallContact | CallContact[] | null
 }
 
 const PAGE_SIZE = 50
@@ -61,8 +81,8 @@ export function useCalls() {
         throw error
       }
 
-      const calls = data.map(item => {
-        const contact = Array.isArray(item.contacts) ? item.contacts[0] : item.contacts as any
+      const calls = (data as CallRow[]).map(item => {
+        const contact = Array.isArray(item.contacts) ? item.contacts[0] : item.contacts
         
         // Map direction/status to UI types
         const type = item.direction === 'inbound' ? 'Inbound' : 'Outbound'

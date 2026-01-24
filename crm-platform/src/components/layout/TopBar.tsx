@@ -25,6 +25,7 @@ export function TopBar() {
   const [callDuration, setCallDuration] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const durationInterval = useRef<NodeJS.Timeout | null>(null)
+  const callStartRef = useRef<number | null>(null)
 
   const selectedNumber = profile.selectedPhoneNumber || (profile.twilioNumbers && profile.twilioNumbers.length > 0 ? profile.twilioNumbers[0].number : null)
   const selectedNumberName = profile.twilioNumbers?.find(n => n.number === selectedNumber)?.name || "Default"
@@ -32,12 +33,16 @@ export function TopBar() {
   // Track call duration
   useEffect(() => {
     if (status === 'connected') {
-      setCallDuration(0)
+      callStartRef.current = Date.now()
+      if (durationInterval.current) clearInterval(durationInterval.current)
       durationInterval.current = setInterval(() => {
-        setCallDuration(prev => prev + 1)
+        if (callStartRef.current) {
+          setCallDuration(Math.floor((Date.now() - callStartRef.current) / 1000))
+        }
       }, 1000)
     } else {
       if (durationInterval.current) clearInterval(durationInterval.current)
+      callStartRef.current = null
     }
     return () => {
       if (durationInterval.current) clearInterval(durationInterval.current)

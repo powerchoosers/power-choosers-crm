@@ -25,12 +25,28 @@ export default function CrmLayout({
     }
   }, [loading, user, router])
 
-  if (loading || !user) {
+  if (loading) {
     return (
       <div className={cn(inter.className, "bg-background text-foreground antialiased min-h-screen flex items-center justify-center")}> 
         <div className="flex flex-col items-center gap-4">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-700 border-t-zinc-400" />
           <div className="text-sm text-zinc-400">Loading Nodal Point...</div>
+        </div>
+      </div>
+    )
+  }
+  if (!user) {
+    return (
+      <div className={cn(inter.className, "bg-background text-foreground antialiased min-h-screen flex items-center justify-center")}> 
+        <div className="flex flex-col items-center gap-4">
+          <div className="text-sm text-zinc-400">Redirecting to login...</div>
+          <button
+            type="button"
+            onClick={() => router.replace('/login')}
+            className="px-4 py-2 rounded-md bg-white text-zinc-950 hover:bg-zinc-200 font-medium"
+          >
+            Go to Login
+          </button>
         </div>
       </div>
     )

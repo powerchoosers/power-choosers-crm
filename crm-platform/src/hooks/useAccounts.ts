@@ -164,7 +164,7 @@ export function useUpdateAccount() {
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Account> & { id: string }) => {
       // Map updates to DB columns
-      const dbUpdates: any = {}
+      const dbUpdates: Record<string, string | number | null> = {}
       if (updates.name !== undefined) dbUpdates.name = updates.name
       if (updates.industry !== undefined) dbUpdates.industry = updates.industry
       if (updates.domain !== undefined) dbUpdates.domain = updates.domain

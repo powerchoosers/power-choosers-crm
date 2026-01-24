@@ -232,7 +232,7 @@ export default function CallsPage() {
                 ) : (
                 <TableRow>
                     <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
-                    {isLoading ? 'Loading calls...' : 'No calls found.'}
+                    {queryLoading ? 'Loading calls...' : 'No calls found.'}
                     </TableCell>
                 </TableRow>
                 )}
