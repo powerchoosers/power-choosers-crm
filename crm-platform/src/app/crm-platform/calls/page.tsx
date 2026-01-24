@@ -36,7 +36,8 @@ import {
 import { cn } from '@/lib/utils'
 
 export default function CallsPage() {
-  const { data: calls, isLoading, isError } = useCalls()
+  const { data, isLoading: queryLoading, isError } = useCalls()
+  const calls = useMemo(() => data?.pages.flatMap(page => page.calls) || [], [data])
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = useState('')
