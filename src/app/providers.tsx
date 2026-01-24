@@ -4,6 +4,7 @@ import { QueryClient } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { useState } from 'react'
 import { AuthProvider } from '@/context/AuthContext'
+import { VoiceProvider } from '@/context/VoiceContext'
 import { createIDBPersister } from '@/lib/persister'
 
 export default function Providers({ children }: { children: React.ReactNode }) {
@@ -41,7 +42,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       }}
     >
       <AuthProvider>
-        {children}
+        <VoiceProvider>
+          {children}
+        </VoiceProvider>
       </AuthProvider>
     </PersistQueryClientProvider>
   )

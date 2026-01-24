@@ -1,13 +1,14 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   output: "standalone",
   images: {
     unoptimized: true,
   },
-  // turbopack: {
-  //   root: "C:/Users/Lap3p/OneDrive/Documents/Power Choosers CRM/crm-platform",
-  // },
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   async rewrites() {
     const isProd = process.env.NODE_ENV === 'production';
     const backendUrl = isProd 
