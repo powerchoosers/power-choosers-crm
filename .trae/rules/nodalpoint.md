@@ -10,6 +10,9 @@ Welcome to the **Nodal Point CRM Platform**, a modern, scalable, and high-perfor
 - **State Management:**
   - [Zustand](https://github.com/pmndrs/zustand) (Global Client State)
   - [TanStack Query](https://tanstack.com/query/latest) (Server State / Async Data)
+- **Database:**
+  - **Supabase** (PostgreSQL) - Primary Data & Vector Store
+  - **Firestore** (Legacy/Deprecating) - Read-only reference
 - **UI Components:**
   - [Radix UI](https://www.radix-ui.com/) (Headless Primitives)
   - [Lucide React](https://lucide.dev/) (Icons)

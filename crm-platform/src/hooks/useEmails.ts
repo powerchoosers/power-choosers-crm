@@ -1,6 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { collection, getCountFromServer, getDocs, query, where, orderBy, limit, addDoc, updateDoc, doc, startAfter, QueryDocumentSnapshot } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
 
@@ -24,7 +23,6 @@ export interface Email {
   clickCount?: number
 }
 
-const COLLECTION_NAME = 'emails'
 const PAGE_SIZE = 50
 
 export function useEmails() {
@@ -33,60 +31,65 @@ export function useEmails() {
 
   const emailsQuery = useInfiniteQuery({
     queryKey: ['emails', user?.email ?? 'guest'],
-    initialPageParam: undefined as QueryDocumentSnapshot | undefined,
-    queryFn: async ({ pageParam }) => {
-      if (loading) return { emails: [], lastDoc: null };
-      if (!user?.email) return { emails: [], lastDoc: null };
+    initialPageParam: 0,
+    queryFn: async ({ pageParam = 0 }) => {
+      if (loading) return { emails: [], nextCursor: null }
+      if (!user?.email) return { emails: [], nextCursor: null }
 
       try {
-        // Query for emails owned by the user
-        let q = query(
-          collection(db, COLLECTION_NAME),
-          where('ownerId', '==', user.email.toLowerCase()),
-          orderBy('timestamp', 'desc'), // Assuming you have a composite index or single field index
-          limit(PAGE_SIZE)
-        );
-
-        if (pageParam) {
-          q = query(q, startAfter(pageParam))
-        }
-
-        const snapshot = await getDocs(q);
+        let query = supabase
+          .from('emails')
+          .select('*', { count: 'exact' })
         
-        return {
-          emails: snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          })) as Email[],
-          lastDoc: snapshot.docs?.at(-1) ?? null
+        // Filter by owner using metadata->>ownerId since ownerId is not a top-level column in schema
+        if (role !== 'admin') {
+           // Note: This relies on the metadata JSONB column containing 'ownerId'
+           // If migration populated this correctly, it will work.
+           query = query.eq('metadata->>ownerId', user.email)
         }
-      } catch (error: unknown) {
-        console.error("Error fetching emails:", error);
-        const errorCode = typeof error === 'object' && error !== null && 'code' in error
-          ? (error as { code?: string }).code
-          : undefined
 
-        // Fallback if index is missing (client-side sort)
-        if (errorCode === 'failed-precondition') {
-             const q = query(
-                collection(db, COLLECTION_NAME),
-                where('ownerId', '==', user.email.toLowerCase()),
-                limit(PAGE_SIZE)
-              );
-              const snapshot = await getDocs(q);
-              const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Email));
-              return {
-                emails: docs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
-                lastDoc: null
-              }
+        const from = pageParam * PAGE_SIZE
+        const to = from + PAGE_SIZE - 1
+
+        const { data, error, count } = await query
+          .range(from, to)
+          .order('timestamp', { ascending: false })
+
+        if (error) throw error
+
+        const emails = data.map(item => ({
+          id: item.id,
+          subject: item.subject,
+          from: item.from,
+          to: item.to, // JSONB
+          html: item.html,
+          text: item.text,
+          snippet: item.text?.slice(0, 100),
+          date: item.timestamp || item.created_at,
+          timestamp: new Date(item.timestamp || item.created_at).getTime(),
+          unread: !item.is_read,
+          type: (['received', 'sent', 'scheduled', 'draft'].includes(item.type) ? item.type : 'received') as Email['type'],
+          status: item.status,
+          ownerId: item.metadata?.ownerId || user.email,
+          openCount: item.openCount,
+          clickCount: item.clickCount
+        })) as Email[]
+
+        const hasNextPage = count ? from + PAGE_SIZE < count : false
+
+        return {
+          emails,
+          nextCursor: hasNextPage ? pageParam + 1 : null
         }
-        throw error;
+      } catch (error) {
+        console.error("Error fetching emails:", error)
+        throw error
       }
     },
-    getNextPageParam: (lastPage) => lastPage?.lastDoc || undefined,
+    getNextPageParam: (lastPage) => lastPage?.nextCursor ?? undefined,
     enabled: !loading && !!user,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
+    staleTime: 1000 * 60 * 5,
+  })
 
   const sendEmailMutation = useMutation({
     mutationFn: async (emailData: { to: string, subject: string, content: string }) => {
@@ -94,16 +97,10 @@ export function useEmails() {
         throw new Error('You must be logged in to send email')
       }
 
-      const escapeHtml = (value: string) =>
-        value
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-
-      const htmlContent = `<div style="white-space:pre-wrap;">${escapeHtml(emailData.content)}</div>`
+      // Simple HTML wrapping
+      const htmlContent = `<div style="white-space:pre-wrap;">${emailData.content}</div>`
       const fromName = profile.name || user.displayName || undefined
 
-      // Call the existing API endpoint
       const response = await fetch('/api/email/sendgrid-send', {
         method: 'POST',
         headers: {
@@ -150,7 +147,7 @@ export function useEmails() {
 }
 
 export function useEmailsCount() {
-  const { user, loading } = useAuth()
+  const { user, role, loading } = useAuth()
 
   return useQuery({
     queryKey: ['emails-count', user?.email ?? 'guest'],
@@ -158,13 +155,18 @@ export function useEmailsCount() {
       if (loading) return 0
       if (!user?.email) return 0
 
-      const q = query(
-        collection(db, COLLECTION_NAME),
-        where('ownerId', '==', user.email.toLowerCase()),
-      )
+      let query = supabase.from('emails').select('*', { count: 'exact', head: true })
 
-      const snapshot = await getCountFromServer(q)
-      return snapshot.data().count
+      if (role !== 'admin') {
+         query = query.eq('metadata->>ownerId', user.email)
+      }
+
+      const { count, error } = await query
+      if (error) {
+        console.error("Error fetching emails count:", error)
+        return 0
+      }
+      return count || 0
     },
     enabled: !loading && !!user,
     staleTime: 1000 * 60 * 5,

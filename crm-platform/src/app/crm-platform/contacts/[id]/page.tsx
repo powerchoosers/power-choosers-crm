@@ -2,35 +2,11 @@
 
 import { useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { useQuery } from '@tanstack/react-query'
-import { doc, getDoc } from 'firebase/firestore'
 import { differenceInCalendarDays, format, isValid, parseISO } from 'date-fns'
 import { AlertTriangle, ArrowLeft, Building2, Mail, MapPin, Phone } from 'lucide-react'
-import { db } from '@/lib/firebase'
 import { useContact } from '@/hooks/useContacts'
-import { useAccounts } from '@/hooks/useAccounts'
 import { Button } from '@/components/ui/button'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
-
-type AccountLike = {
-  id: string
-  name?: string
-  accountName?: string
-  companyName?: string
-  domain?: string
-  website?: string
-  logoUrl?: string
-  companyPhone?: string
-  phone?: string
-  electricitySupplier?: string
-  annualUsage?: number | string
-  currentRate?: number | string
-  contractEnd?: string
-  contractEndDate?: string
-  contract_end_date?: string
-  shortDescription?: string
-  serviceAddresses?: Array<{ address?: string; isPrimary?: boolean }>
-}
 
 function parseContractEndDate(raw: unknown): Date | null {
   if (!raw) return null
@@ -61,43 +37,17 @@ export default function ContactDossierPage() {
   const router = useRouter()
   const id = (params?.id as string) || ''
 
-  const { data: contact, isLoading: isLoadingContact } = useContact(id)
-  const { data: accountsData } = useAccounts()
-  const accounts = useMemo(() => accountsData?.pages.flatMap((p) => p.accounts) || [], [accountsData])
-
-  const resolvedAccountId =
-    (contact as { accountId?: string; account_id?: string; linkedAccountId?: string } | null)?.accountId ||
-    (contact as { accountId?: string; account_id?: string; linkedAccountId?: string } | null)?.account_id ||
-    (contact as { accountId?: string; account_id?: string; linkedAccountId?: string } | null)?.linkedAccountId ||
-    (contact?.company
-      ? accounts.find((a) => String(a.name || '').trim().toLowerCase() === String(contact.company).trim().toLowerCase())?.id
-      : undefined) ||
-    ''
-
-  const { data: linkedAccount, isLoading: isLoadingAccount } = useQuery({
-    queryKey: ['account-raw', resolvedAccountId],
-    queryFn: async () => {
-      if (!resolvedAccountId) return null
-      const docRef = doc(db, 'accounts', resolvedAccountId)
-      const docSnap = await getDoc(docRef)
-      if (!docSnap.exists()) return null
-      return { id: docSnap.id, ...(docSnap.data() as object) } as AccountLike
-    },
-    enabled: !!resolvedAccountId,
-    staleTime: 1000 * 60 * 5,
-    gcTime: 1000 * 60 * 60 * 24,
-  })
+  const { data: contact, isLoading } = useContact(id)
 
   const contactName = contact?.name || 'Unknown Contact'
-  const contactTitle = (contact as { title?: string } | null)?.title || ''
-  const companyName = contact?.company || (contact as { companyName?: string } | null)?.companyName || ''
+  const contactTitle = contact?.title || ''
+  const companyName = contact?.companyName || contact?.company || ''
   const email = contact?.email || ''
   const phone = contact?.phone || ''
 
-  const contractEndRaw =
-    linkedAccount?.contractEnd || linkedAccount?.contractEndDate || linkedAccount?.contract_end_date || ''
-  const contractEndDate = useMemo(() => parseContractEndDate(contractEndRaw), [contractEndRaw])
+  const contractEndDate = useMemo(() => parseContractEndDate(contact?.contractEnd), [contact?.contractEnd])
   const daysRemaining = contractEndDate ? differenceInCalendarDays(contractEndDate, new Date()) : null
+  
   const maturityPct = useMemo(() => {
     if (daysRemaining == null) return 0
     return clamp01(1 - daysRemaining / 365)
@@ -116,19 +66,18 @@ export default function ContactDossierPage() {
     return `Renew by ${format(contractEndDate, 'MMMM')}`
   }, [contractEndDate, daysRemaining])
 
-  const supplier = linkedAccount?.electricitySupplier || ''
-  const strikePrice = linkedAccount?.currentRate != null ? String(linkedAccount.currentRate) : ''
-  const annualUsage = linkedAccount?.annualUsage != null ? String(linkedAccount.annualUsage) : ''
-  const forensicNotes =
-    (contact as { notes?: string } | null)?.notes || linkedAccount?.shortDescription || ''
+  const supplier = contact?.electricitySupplier || ''
+  const strikePrice = contact?.currentRate || ''
+  const annualUsage = contact?.annualUsage || ''
+  const forensicNotes = contact?.notes || contact?.accountDescription || ''
 
   const primaryServiceAddress = useMemo(() => {
-    const addrs = Array.isArray(linkedAccount?.serviceAddresses) ? linkedAccount?.serviceAddresses : []
-    const primary = addrs.find((a) => a?.isPrimary) || addrs[0]
+    const addrs = Array.isArray(contact?.serviceAddresses) ? contact?.serviceAddresses : []
+    const primary = addrs.find((a: any) => a?.isPrimary) || addrs[0]
     return primary?.address ? String(primary.address) : ''
-  }, [linkedAccount?.serviceAddresses])
+  }, [contact?.serviceAddresses])
 
-  if (isLoadingContact || isLoadingAccount) {
+  if (isLoading) {
     return (
       <div className="flex flex-col h-[calc(100vh-8rem)] items-center justify-center space-y-4">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-700 border-t-zinc-400" />
@@ -148,14 +97,9 @@ export default function ContactDossierPage() {
     )
   }
 
-  const domain =
-    linkedAccount?.domain ||
-    (linkedAccount?.website ? String(linkedAccount.website).replace(/^https?:\/\/(www\.)?/i, '').split('/')[0] : '') ||
-    contact.companyDomain ||
-    ''
-
-  const logoUrl = linkedAccount?.logoUrl || undefined
-  const companyLabel = companyName || linkedAccount?.name || linkedAccount?.accountName || ''
+  const domain = contact.companyDomain || contact.website || ''
+  const logoUrl = contact.logoUrl
+  const companyLabel = companyName
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -323,7 +267,7 @@ export default function ContactDossierPage() {
             </div>
           </div>
         </div>
-    </div>
+      </div>
     </div>
   )
 }
