@@ -50,3 +50,19 @@
   - [x] **Model**: Downgraded Gemini model to stable `gemini-2.0-flash` in `api/analyze-bill.js`.
   - [x] **Proxy**: Updated `next.config.ts` to use `127.0.0.1` for reliable local proxying.
   - [x] **Frontend**: Enhanced error handling in `bill-debugger/page.tsx` to catch non-JSON server errors.
+
+## 🚧 Active Development (Nodal Point Migration)
+
+### 1. Data Layer Migration (Supabase)
+- **Status**: 🏗️ In Progress
+- **Priority**: Critical (Cost Reduction)
+- **Owner**: Nodal Point Builder
+- **Description**: Migrating from Firestore to Supabase (PostgreSQL) to eliminate read costs and enable vector search.
+- **Tasks**:
+  - [x] Install `@supabase/supabase-js`
+  - [x] Initialize Client (`src/lib/supabase.ts`)
+  - [ ] Create Database Tables (Accounts, Contacts, Calls)
+  - [ ] Migrate `api/calls` logic to SQL queries
+  - [ ] Migrate `api/search` logic to SQL queries
+
+### 2. Dashboard Widgets
