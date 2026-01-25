@@ -58,7 +58,7 @@ We are actively expanding the agent's "Brain" to include these forensic energy t
 - **Voice Intelligence**: (Planned) Summarizing Twilio call transcripts to extract "Commitment Events" and sentiment.
 
 ## 🛠️ Technical Implementation
-- **Model**: `gemini-1.5-flash` (Optimized for speed and tool-calling accuracy).
+- **Model**: `gemini-3-flash-preview` (Next-generation intelligence for high-precision tool calling).
 - **Backend**: Node.js Proxy on Port 3001.
 - **Frontend**: Next.js 15 with Framer Motion "Obsidian & Glass" UI.
 - **Security**: All tool calls are gated by Supabase RLS and server-side validation.
