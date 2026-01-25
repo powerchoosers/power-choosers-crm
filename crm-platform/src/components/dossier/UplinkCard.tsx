@@ -12,6 +12,7 @@ interface UplinkCardProps {
 }
 
 type PhoneType = 'mobile' | 'workDirectPhone' | 'otherPhone' | 'companyPhone'
+type PrimaryPhoneType = Exclude<PhoneType, 'companyPhone'>
 
 interface PhoneEntry {
   id: PhoneType
@@ -23,7 +24,7 @@ interface PhoneEntry {
 export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onUpdate }) => {
   // Local state for editing phones
   const [phones, setPhones] = useState<PhoneEntry[]>([])
-  const [primaryField, setPrimaryField] = useState<string>(contact.primaryPhoneField || 'mobile')
+  const [primaryField, setPrimaryField] = useState<PrimaryPhoneType>(contact.primaryPhoneField || 'mobile')
   const [email, setEmail] = useState(contact.email || '')
 
   useEffect(() => {
@@ -48,14 +49,14 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onUp
       phoneEntries.push({ id: 'mobile', label: 'Mobile', value: '', icon: Smartphone })
     }
 
-    setPhones(prev => JSON.stringify(prev) !== JSON.stringify(phoneEntries) ? phoneEntries : prev)
-    setPrimaryField(prev => {
-      const next = contact.primaryPhoneField || (phoneEntries[0]?.id as string) || 'mobile'
-      return prev !== next ? next : prev
-    })
-    setEmail(prev => {
-      const next = contact.email || ''
-      return prev !== next ? next : prev
+    const firstNonCompany = phoneEntries.find((p) => p.id !== 'companyPhone')
+    const nextPrimary = (contact.primaryPhoneField || (firstNonCompany?.id ?? 'mobile')) as PrimaryPhoneType
+    const nextEmail = contact.email || ''
+
+    Promise.resolve().then(() => {
+      setPhones((prev) => (JSON.stringify(prev) !== JSON.stringify(phoneEntries) ? phoneEntries : prev))
+      setPrimaryField((prev) => (prev !== nextPrimary ? nextPrimary : prev))
+      setEmail((prev) => (prev !== nextEmail ? nextEmail : prev))
     })
   }, [contact, isEditing])
 
@@ -78,10 +79,10 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onUp
     onUpdate({ email: val })
   }
 
-  const togglePrimary = (id: string) => {
-    if (id === 'companyPhone') return // Company phone cannot be primary for contact
+  const togglePrimary = (id: PhoneType) => {
+    if (id === 'companyPhone') return
     setPrimaryField(id)
-    onUpdate({ primaryPhoneField: id as any })
+    onUpdate({ primaryPhoneField: id })
   }
 
   const addPhoneField = (type: PhoneType) => {

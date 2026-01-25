@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Search, X, Building2, Users, Plus, Sparkles, Loader2, ListOrdered, CheckCircle2 } from 'lucide-react'
+import { Search, X, Building2, Users, Plus, Sparkles, Loader2, ListOrdered, CheckCircle2, Phone, Mail } from 'lucide-react'
 import { useSearchContacts } from '@/hooks/useContacts'
 import { useSearchAccounts } from '@/hooks/useAccounts'
 import { useSearchSequences } from '@/hooks/useSequences'
 import { useSearchTasks } from '@/hooks/useTasks'
+import { useSearchCalls } from '@/hooks/useCalls'
+import { useSearchEmails } from '@/hooks/useEmails'
 import { useRouter } from 'next/navigation'
 
 export function GlobalSearch() {
@@ -27,8 +29,10 @@ export function GlobalSearch() {
   const { data: filteredAccounts = [], isLoading: isSearchingAccounts } = useSearchAccounts(debouncedQuery)
   const { data: filteredSequences = [], isLoading: isSearchingSequences } = useSearchSequences(debouncedQuery)
   const { data: filteredTasks = [], isLoading: isSearchingTasks } = useSearchTasks(debouncedQuery)
+  const { data: filteredCalls = [], isLoading: isSearchingCalls } = useSearchCalls(debouncedQuery)
+  const { data: filteredEmails = [], isLoading: isSearchingEmails } = useSearchEmails(debouncedQuery)
 
-  const isSearching = isSearchingContacts || isSearchingAccounts || isSearchingSequences || isSearchingTasks
+  const isSearching = isSearchingContacts || isSearchingAccounts || isSearchingSequences || isSearchingTasks || isSearchingCalls || isSearchingEmails
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -49,7 +53,9 @@ export function GlobalSearch() {
     (filteredContacts?.length || 0) + 
     (filteredAccounts?.length || 0) + 
     (filteredSequences?.length || 0) + 
-    (filteredTasks?.length || 0) > 0
+    (filteredTasks?.length || 0) +
+    (filteredCalls?.length || 0) +
+    (filteredEmails?.length || 0) > 0
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -61,7 +67,7 @@ export function GlobalSearch() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleSelect = (id: string, type: 'people' | 'account' | 'sequence' | 'task') => {
+  const handleSelect = (id: string, type: 'people' | 'account' | 'sequence' | 'task' | 'call' | 'email') => {
     setIsOpen(false)
     setQuery('')
     if (type === 'people') {
@@ -72,6 +78,10 @@ export function GlobalSearch() {
         router.push(`/crm-platform/sequences`)
     } else if (type === 'task') {
         router.push(`/crm-platform/tasks`)
+    } else if (type === 'call') {
+        router.push(`/crm-platform/calls`)
+    } else if (type === 'email') {
+        router.push(`/crm-platform/emails`)
     }
   }
 
@@ -268,6 +278,60 @@ export function GlobalSearch() {
                             <div className="min-w-0 flex-1">
                                 <div className="text-sm font-medium text-zinc-200 group-hover:text-white truncate">{task.title}</div>
                                 <div className="text-xs text-zinc-500 truncate">{task.status}</div>
+                            </div>
+                            </button>
+                        ))}
+                        </div>
+                    </div>
+                    )}
+
+                    {/* Calls Section */}
+                    {filteredCalls.length > 0 && (
+                    <div className="mb-2">
+                        <div className="text-xs font-semibold text-zinc-500 px-3 py-2 uppercase tracking-wider flex justify-between">
+                        <span>Calls</span>
+                        <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-zinc-400">{filteredCalls.length}</span>
+                        </div>
+                        <div className="space-y-1">
+                        {filteredCalls.map(call => (
+                            <button
+                            key={call.id}
+                            onClick={() => handleSelect(call.id, 'call')}
+                            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors text-left group"
+                            >
+                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
+                                <Phone size={14} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <div className="text-sm font-medium text-zinc-200 group-hover:text-white truncate">{call.contactName}</div>
+                                <div className="text-xs text-zinc-500 truncate">{call.summary || 'No summary'}</div>
+                            </div>
+                            </button>
+                        ))}
+                        </div>
+                    </div>
+                    )}
+
+                    {/* Emails Section */}
+                    {filteredEmails.length > 0 && (
+                    <div className="mb-2">
+                        <div className="text-xs font-semibold text-zinc-500 px-3 py-2 uppercase tracking-wider flex justify-between">
+                        <span>Emails</span>
+                        <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-zinc-400">{filteredEmails.length}</span>
+                        </div>
+                        <div className="space-y-1">
+                        {filteredEmails.map(email => (
+                            <button
+                            key={email.id}
+                            onClick={() => handleSelect(email.id, 'email')}
+                            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors text-left group"
+                            >
+                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
+                                <Mail size={14} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <div className="text-sm font-medium text-zinc-200 group-hover:text-white truncate">{email.subject}</div>
+                                <div className="text-xs text-zinc-500 truncate">From: {email.from}</div>
                             </div>
                             </button>
                         ))}

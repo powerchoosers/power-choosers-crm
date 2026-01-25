@@ -72,7 +72,7 @@ export default function ContactDossierPage() {
   const [editWorkDirect, setEditWorkDirect] = useState('')
   const [editOther, setEditOther] = useState('')
   const [editCompanyPhone, setEditCompanyPhone] = useState('')
-  const [editPrimaryField, setEditPrimaryField] = useState<string>('mobile')
+  const [editPrimaryField, setEditPrimaryField] = useState<'mobile' | 'workDirectPhone' | 'otherPhone'>('mobile')
 
   // Sync local state when contact data arrives
   useEffect(() => {
@@ -95,10 +95,15 @@ export default function ContactDossierPage() {
 
       const rawAddrs = Array.isArray(contact.serviceAddresses) ? contact.serviceAddresses : []
       setEditServiceAddresses(
-        rawAddrs.map((addr: any) => ({
-          address: typeof addr.address === 'string' ? addr.address : String(addr.address || ''),
-          isPrimary: !!addr.isPrimary
-        }))
+        rawAddrs
+          .map((addr) => {
+            if (!addr || typeof addr !== 'object') return null
+            const record = addr as Record<string, unknown>
+            const address = typeof record.address === 'string' ? record.address : String(record.address || '')
+            const isPrimary = Boolean(record.isPrimary)
+            return { address, isPrimary }
+          })
+          .filter((v): v is { address: string; isPrimary: boolean } => v !== null)
       )
     }
   }, [contact, isEditing])
@@ -131,7 +136,7 @@ export default function ContactDossierPage() {
             workDirectPhone: editWorkDirect,
             otherPhone: editOther,
             companyPhone: editCompanyPhone,
-            primaryPhoneField: editPrimaryField as any
+            primaryPhoneField: editPrimaryField
           })
           setShowSynced(true)
           setTimeout(() => setShowSynced(false), 3000)
@@ -464,7 +469,7 @@ export default function ContactDossierPage() {
                       workDirectPhone: editWorkDirect,
                       otherPhone: editOther,
                       companyPhone: editCompanyPhone,
-                      primaryPhoneField: editPrimaryField as any
+                      primaryPhoneField: editPrimaryField
                     }}
                     isEditing={isEditing}
                     onUpdate={(updates) => {

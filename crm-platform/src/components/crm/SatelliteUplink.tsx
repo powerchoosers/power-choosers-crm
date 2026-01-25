@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { MapPin, Satellite, Wifi, Loader2 } from 'lucide-react';
 
 export default function SatelliteUplink({ address }: { address: string }) {
@@ -7,18 +7,31 @@ export default function SatelliteUplink({ address }: { address: string }) {
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    if (isActive && !apiKey && !isLoading) {
-      setIsLoading(true);
-      fetch('/api/maps/config')
-        .then(res => res.json())
-        .then(data => {
-          if (data.apiKey) setApiKey(data.apiKey)
-        })
-        .catch(err => console.error('Failed to load Maps API key:', err))
-        .finally(() => setIsLoading(false));
+  const establishUplink = async () => {
+    if (isLoading) return
+    if (apiKey) {
+      setIsActive(true)
+      return
     }
-  }, [isActive, apiKey, isLoading]);
+
+    setIsLoading(true)
+    try {
+      const res = await fetch('/api/maps/config')
+      const data: unknown = await res.json()
+      const nextKey =
+        data && typeof data === 'object' && typeof (data as Record<string, unknown>).apiKey === 'string'
+          ? ((data as Record<string, unknown>).apiKey as string)
+          : null
+      if (nextKey) {
+        setApiKey(nextKey)
+        setIsActive(true)
+      }
+    } catch (err) {
+      console.error('Failed to load Maps API key:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
     <div className="bg-zinc-900/40 backdrop-blur-xl border border-white/5 rounded-3xl overflow-hidden relative group">
@@ -58,7 +71,7 @@ export default function SatelliteUplink({ address }: { address: string }) {
                 <Satellite className="w-5 h-5" />
               </div>
               <button 
-                onClick={() => setIsActive(true)}
+                onClick={establishUplink}
                 className="text-xs font-mono text-[#002FA7] border border-[#002FA7]/30 bg-[#002FA7]/5 px-4 py-2 rounded hover:bg-[#002FA7] hover:text-white transition-all uppercase tracking-wider flex items-center gap-2"
               >
                 <Wifi className="w-3 h-3" /> Establish Uplink

@@ -66,7 +66,7 @@ export default function GlobalTasksWidget() {
                     </span>
                     {task.relatedTo && (
                       <span className="text-[8px] font-mono text-zinc-700 truncate">
-                        // {task.relatedTo}
+                        {task.relatedTo}
                       </span>
                     )}
                   </div>

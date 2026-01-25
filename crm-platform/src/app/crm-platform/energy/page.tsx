@@ -1,13 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { 
   flexRender,
   getCoreRowModel,
   useReactTable,
   getPaginationRowModel,
   getSortedRowModel,
-  getFilteredRowModel,
   ColumnDef,
   SortingState,
   ColumnFiltersState,
@@ -37,10 +36,20 @@ import { cn } from '@/lib/utils'
 import { Badge } from "@/components/ui/badge"
 
 export default function EnergyPage() {
-  const { data: plans, isLoading } = useEnergyPlans()
+  const [globalFilter, setGlobalFilter] = useState('')
+  const [debouncedFilter, setDebouncedFilter] = useState('')
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedFilter(globalFilter)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [globalFilter])
+
+  const { data: plans, isLoading } = useEnergyPlans(debouncedFilter)
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [globalFilter, setGlobalFilter] = useState('')
 
   const columns: ColumnDef<EnergyPlan>[] = [
     {
@@ -132,26 +141,23 @@ export default function EnergyPage() {
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
-    onGlobalFilterChange: setGlobalFilter,
     state: {
       sorting,
       columnFilters,
-      globalFilter,
     },
   })
 
   const pageIndex = table.getState().pagination.pageIndex
   const pageSize = table.getState().pagination.pageSize
-  const filteredRowCount = table.getFilteredRowModel().rows.length
-  const showingStart = filteredRowCount === 0
+  const totalRecords = plans?.length || 0
+  const showingStart = totalRecords === 0
     ? 0
-    : Math.min(filteredRowCount, pageIndex * pageSize + 1)
-  const showingEnd = filteredRowCount === 0
+    : Math.min(totalRecords, pageIndex * pageSize + 1)
+  const showingEnd = totalRecords === 0
     ? 0
-    : Math.min(filteredRowCount, (pageIndex + 1) * pageSize)
+    : Math.min(totalRecords, (pageIndex + 1) * pageSize)
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -220,9 +226,9 @@ export default function EnergyPage() {
         <div className="flex-none border-t border-white/5 bg-zinc-900/90 p-4 flex items-center justify-between backdrop-blur-sm z-10">
           <div className="flex items-center gap-4">
               <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
-                <span>Sync_Block {showingStart}–{showingEnd}</span>
+                <span>Sync_Block {showingStart.toString().padStart(2, '0')}–{showingEnd.toString().padStart(2, '0')}</span>
                 <div className="h-1 w-1 rounded-full bg-zinc-800" />
-                <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{filteredRowCount}</span></span>
+                <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{totalRecords}</span></span>
               </div>
           </div>
           <div className="flex items-center gap-2">

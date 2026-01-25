@@ -11,12 +11,12 @@ export interface EnergyPlan {
   renewable: number // percentage
 }
 
-export function useEnergyPlans() {
+export function useEnergyPlans(searchQuery?: string) {
   return useQuery({
-    queryKey: ['energy-plans'],
+    queryKey: ['energy-plans', searchQuery],
     queryFn: async () => {
       // Mock Data Fallback
-      return [
+      const plans = [
         { 
           id: '1', 
           provider: 'Reliant', 
@@ -68,6 +68,17 @@ export function useEnergyPlans() {
           renewable: 15
         },
       ] as EnergyPlan[]
+
+      if (searchQuery) {
+        const search = searchQuery.toLowerCase();
+        return plans.filter(p => 
+          p.provider.toLowerCase().includes(search) || 
+          p.planName.toLowerCase().includes(search) ||
+          p.type.toLowerCase().includes(search)
+        );
+      }
+
+      return plans;
     }
   })
 }

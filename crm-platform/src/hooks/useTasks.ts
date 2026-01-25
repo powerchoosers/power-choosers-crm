@@ -19,7 +19,7 @@ export interface Task {
   ownerId?: string
   createdAt: string
   updatedAt?: string
-  metadata?: any
+  metadata?: Record<string, unknown> | null
 }
 
 const PAGE_SIZE = 50
@@ -60,7 +60,7 @@ export function useTasks(searchQuery?: string) {
           tasks: (data || []) as Task[],
           nextCursor: count && (pageParam + 1) * PAGE_SIZE < count ? pageParam + 1 : null
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Error fetching tasks:', error)
         throw error
       }
@@ -220,4 +220,3 @@ export function useSearchTasks(queryTerm: string) {
     staleTime: 1000 * 60 * 1,
   })
 }
-

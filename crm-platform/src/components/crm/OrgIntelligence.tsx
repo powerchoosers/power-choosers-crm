@@ -11,13 +11,25 @@ interface OrgIntelligenceProps {
   accountId?: string;
 }
 
+type ApolloContactRow = {
+  name: string
+  title?: string
+  email: string
+  status: 'verified' | 'unverified'
+  isMonitored: boolean
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 export default function OrgIntelligence({ domain: initialDomain, companyName, website, accountId }: OrgIntelligenceProps) {
   const domain = initialDomain || (website ? website.replace(/^https?:\/\/(www\.)?/, '').split('/')[0] : companyName?.toLowerCase().replace(/\s+/g, '') + '.com');
   const [scanStatus, setScanStatus] = useState<'idle' | 'scanning' | 'complete'>('idle');
-  const [data, setData] = useState<any[]>([]); 
+  const [data, setData] = useState<ApolloContactRow[]>([]); 
   const [acquiringEmail, setAcquiringEmail] = useState<string | null>(null);
 
-  const handleAcquire = async (person: any) => {
+  const handleAcquire = async (person: ApolloContactRow) => {
     if (!accountId) {
       toast.error('No account ID provided for acquisition');
       return;
@@ -88,12 +100,13 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         throw new Error('Failed to fetch from Apollo');
       }
 
-      const result = await response.json();
-      const apolloContacts = result.contacts || [];
+      const result: unknown = await response.json();
+      const apolloContacts: unknown[] =
+        isRecord(result) && Array.isArray(result.contacts) ? (result.contacts as unknown[]) : []
 
       // Extract all emails to check in Supabase
       const emailsToCheck = apolloContacts
-        .map((c: any) => c.email)
+        .map((c) => (isRecord(c) && typeof c.email === 'string' ? c.email : null))
         .filter(Boolean);
 
       let existingEmails = new Set<string>();
@@ -110,13 +123,19 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       }
       
       // Map Apollo results to our table format with monitored status
-      const mappedData = apolloContacts.map((contact: any) => ({
-        name: contact.name,
-        title: contact.title,
-        email: contact.email || 'N/A',
-        status: contact.email_status === 'verified' ? 'verified' : 'unverified',
-        isMonitored: contact.email && existingEmails.has(contact.email)
-      }));
+      const mappedData: ApolloContactRow[] = apolloContacts
+        .map((contact): ApolloContactRow | null => {
+          if (!isRecord(contact)) return null
+          const name = typeof contact.name === 'string' ? contact.name : ''
+          if (!name) return null
+          const title = typeof contact.title === 'string' ? contact.title : undefined
+          const email = typeof contact.email === 'string' ? contact.email : 'N/A'
+          const emailStatus = typeof contact.email_status === 'string' ? contact.email_status : ''
+          const status: ApolloContactRow['status'] = emailStatus === 'verified' ? 'verified' : 'unverified'
+          const isMonitored = email !== 'N/A' && existingEmails.has(email)
+          return { name, title, email, status, isMonitored }
+        })
+        .filter((v): v is ApolloContactRow => v !== null)
 
       setData(mappedData);
       setScanStatus('complete');
@@ -213,4 +232,3 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     </div>
   );
 }
-

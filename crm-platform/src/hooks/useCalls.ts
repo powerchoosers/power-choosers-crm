@@ -17,6 +17,47 @@ export interface Call {
   contactId?: string
 }
 
+export function useSearchCalls(queryTerm: string) {
+  const { user, role, loading } = useAuth()
+
+  return useQuery({
+    queryKey: ['calls-search', queryTerm, user?.email ?? 'guest', role],
+    queryFn: async () => {
+      if (!queryTerm || queryTerm.length < 2) return []
+      if (loading || !user) return []
+
+      let query = supabase
+        .from('calls')
+        .select('*, contacts!inner(name, ownerId)')
+    
+      if (role !== 'admin' && user.email) {
+         query = query.filter('contacts.ownerId', 'eq', user.email)
+      }
+
+      query = query.or(`summary.ilike.%${queryTerm}%,transcript.ilike.%${queryTerm}%,contacts.name.ilike.%${queryTerm}%`)
+
+      const { data, error } = await query.limit(5)
+
+      if (error) {
+        console.error('Search calls error:', error)
+        return []
+      }
+
+      return (data as CallRow[]).map(item => {
+        const contact = Array.isArray(item.contacts) ? item.contacts[0] : item.contacts
+        return {
+          id: item.id,
+          contactName: contact?.name || 'Unknown',
+          summary: item.summary,
+          date: item.timestamp || item.created_at
+        }
+      })
+    },
+    enabled: queryTerm.length >= 2 && !loading && !!user,
+    staleTime: 1000 * 60 * 1,
+  })
+}
+
 export function useCallsCount(searchQuery?: string) {
   const { user, role, loading } = useAuth()
 

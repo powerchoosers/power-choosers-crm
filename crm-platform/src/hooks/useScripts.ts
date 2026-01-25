@@ -8,12 +8,12 @@ export interface Script {
   lastUpdated: string
 }
 
-export function useScripts() {
+export function useScripts(searchQuery?: string) {
   return useQuery({
-    queryKey: ['scripts'],
+    queryKey: ['scripts', searchQuery],
     queryFn: async () => {
       // Mock Data Fallback
-      return [
+      const scripts = [
         { 
           id: '1', 
           title: 'Cold Call Intro', 
@@ -43,6 +43,17 @@ export function useScripts() {
           lastUpdated: '2023-12-15' 
         },
       ] as Script[]
+
+      if (searchQuery) {
+        const search = searchQuery.toLowerCase();
+        return scripts.filter(s => 
+          s.title.toLowerCase().includes(search) || 
+          s.category.toLowerCase().includes(search) ||
+          s.content.toLowerCase().includes(search)
+        );
+      }
+
+      return scripts;
     }
   })
 }
