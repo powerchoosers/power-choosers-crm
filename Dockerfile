@@ -10,6 +10,9 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install --only=production
 
+# Explicitly copy server.js to fail fast if missing
+COPY server.js ./
+
 # Copy application code
 COPY . .
 

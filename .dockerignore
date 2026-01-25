@@ -51,3 +51,8 @@ tests/
 __tests__/
 *.test.js
 *.spec.js
+
+# Explicitly include critical files
+!server.js
+!api/
+!package.json
