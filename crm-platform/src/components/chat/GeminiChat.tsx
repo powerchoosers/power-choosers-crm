@@ -40,6 +40,40 @@ function Waveform() {
   )
 }
 
+function ImageWithSkeleton({ src, alt, className, isLoading: isExternalLoading }: { src: string | null, alt: string, className?: string, isLoading?: boolean }) {
+  const [isImageLoaded, setIsImageLoaded] = useState(false)
+  const showSkeleton = isExternalLoading || !src || !isImageLoaded
+
+  return (
+    <div className={cn("relative overflow-hidden bg-zinc-800", className)}>
+      <AnimatePresence>
+        {showSkeleton && (
+          <motion.div
+            key="skeleton"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 flex items-center justify-center overflow-hidden z-10 bg-zinc-800"
+          >
+            <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+            <User size={14} className="text-zinc-700" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {src && (
+        <img
+          src={src}
+          alt={alt}
+          onLoad={() => setIsImageLoaded(true)}
+          className={cn(
+            "w-full h-full object-cover transition-opacity duration-500",
+            isImageLoaded ? "opacity-100" : "opacity-0"
+          )}
+        />
+      )}
+    </div>
+  )
+}
+
 function ComponentRenderer({ type, data }: { type: string, data: any }) {
   switch (type) {
     case 'news_ticker':
@@ -108,7 +142,7 @@ export function GeminiChatTrigger(props: { onToggle?: () => void }) {
       )}
       title={isOpen ? "Close Gemini" : "Chat with Gemini"}
     >
-      {isOpen ? <X size={18} /> : <Copy size={18} />}
+      {isOpen ? <X size={18} /> : <Activity size={18} />}
     </button>
   )
 }
@@ -123,6 +157,7 @@ export function GeminiChatPanel() {
   
   // State for hosted avatar to avoid Google CORS issues
   const [hostedAvatarUrl, setHostedAvatarUrl] = useState<string | null>(null)
+  const [isAvatarLoading, setIsAvatarLoading] = useState(false)
 
   // Contextual Intel Logic
   const contextInfo = useMemo(() => {
@@ -138,11 +173,17 @@ export function GeminiChatPanel() {
   useEffect(() => {
     const hostAvatar = async () => {
       const photoURL = user?.photoURL || profile?.photoURL
-      if (!photoURL) return
+      if (!photoURL) {
+        setIsAvatarLoading(false)
+        return
+      }
+
+      setIsAvatarLoading(true)
 
       // If it's already an imgur link or not a google link, use it directly
       if (photoURL.includes('imgur.com') || (!photoURL.includes('googleusercontent.com') && !photoURL.includes('ggpht.com'))) {
         setHostedAvatarUrl(photoURL)
+        setIsAvatarLoading(false)
         return
       }
 
@@ -154,13 +195,20 @@ export function GeminiChatPanel() {
         })
         if (response.ok) {
           const data = await response.json()
-          if (data.imageUrl) setHostedAvatarUrl(data.imageUrl)
+          if (data.imageUrl) {
+            setHostedAvatarUrl(data.imageUrl)
+            // Preload the image
+            const img = new Image()
+            img.src = data.imageUrl
+          }
         } else {
           setHostedAvatarUrl(photoURL) // Fallback
         }
       } catch (err) {
         console.error('Failed to host avatar:', err)
         setHostedAvatarUrl(photoURL) // Fallback
+      } finally {
+        setIsAvatarLoading(false)
       }
     }
 
@@ -263,11 +311,7 @@ export function GeminiChatPanel() {
         <div className="flex items-center gap-2">
           <div className="relative">
             <div className="w-8 h-8 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center relative z-10 overflow-hidden">
-              {hostedAvatarUrl ? (
-                <img src={hostedAvatarUrl} alt="User" className="w-full h-full object-cover" />
-              ) : (
-                <Copy size={16} className="text-indigo-400" />
-              )}
+              <Activity size={16} className="text-indigo-400" />
             </div>
             {/* Ambient Hum Animation */}
             <motion.div
@@ -303,8 +347,13 @@ export function GeminiChatPanel() {
                 m.role === 'user' ? "bg-zinc-800" : "bg-indigo-950/30 border border-indigo-500/20"
               )}>
                 {m.role === 'user' ? (
-                  hostedAvatarUrl ? (
-                    <img src={hostedAvatarUrl} alt="User" className="w-full h-full object-cover" />
+                  isAvatarLoading || hostedAvatarUrl ? (
+                    <ImageWithSkeleton 
+                      src={hostedAvatarUrl} 
+                      isLoading={isAvatarLoading} 
+                      alt="User" 
+                      className="w-full h-full" 
+                    />
                   ) : (
                     <User size={14} />
                   )
