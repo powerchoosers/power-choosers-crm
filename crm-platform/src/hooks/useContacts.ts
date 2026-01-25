@@ -186,6 +186,67 @@ function buildContactName(args: {
   return rawName || email || 'Unknown'
 }
 
+export function useSearchContacts(queryTerm: string) {
+  const { user, role, loading } = useAuth()
+
+  return useQuery({
+    queryKey: ['contacts-search', queryTerm, user?.email ?? 'guest', role ?? 'unknown'],
+    queryFn: async () => {
+      if (!queryTerm || queryTerm.length < 2) return []
+      if (loading || !user) return []
+
+      try {
+        let query = supabase
+          .from('contacts')
+          .select('*, accounts(name, domain, logo_url)');
+
+        if (role !== 'admin' && user?.email) {
+          query = query.eq('ownerId', user.email);
+        }
+
+        // Search across multiple columns
+        query = query.or(`name.ilike.%${queryTerm}%,email.ilike.%${queryTerm}%,firstName.ilike.%${queryTerm}%,lastName.ilike.%${queryTerm}%,first_name.ilike.%${queryTerm}%,last_name.ilike.%${queryTerm}%`);
+
+        const { data, error } = await query.limit(10);
+
+        if (error) {
+          console.error("Search error:", error);
+          return [];
+        }
+
+        return (data as ContactRow[]).map(item => {
+          const account = Array.isArray(item.accounts) ? item.accounts[0] : item.accounts;
+          const metadata = normalizeMetadata(item.metadata);
+          
+          const fName = item.firstName || item.first_name || item.firstname || item.FirstName || metadata?.firstName || metadata?.first_name || metadata?.general?.firstName || metadata?.general?.first_name || metadata?.contact?.firstName || metadata?.contact?.first_name;
+          const lName = item.lastName || item.last_name || item.lastname || item.LastName || metadata?.lastName || metadata?.last_name || metadata?.general?.lastName || metadata?.general?.last_name || metadata?.contact?.lastName || metadata?.contact?.last_name;
+
+          const fullName = buildContactName({
+            firstName: fName,
+            lastName: lName,
+            rawName: item.name,
+            email: item.email || metadata?.email || metadata?.general?.email || metadata?.contact?.email,
+            companyCandidate: account?.name || metadata?.company || metadata?.companyName || metadata?.general?.company || metadata?.general?.companyName,
+          });
+
+          return {
+            id: item.id,
+            name: fullName,
+            email: item.email || metadata?.email || metadata?.general?.email || metadata?.contact?.email || '',
+            company: account?.name || metadata?.company || metadata?.general?.company || '',
+            logoUrl: account?.logo_url || '',
+          };
+        });
+      } catch (err) {
+        console.error("Search hook error:", err);
+        return [];
+      }
+    },
+    enabled: queryTerm.length >= 2 && !loading && !!user,
+    staleTime: 1000 * 60 * 1,
+  });
+}
+
 export function useContacts() {
   const { user, role, loading } = useAuth()
 

@@ -23,6 +23,48 @@ export interface Account {
 const COLLECTION_NAME = 'accounts'
 const PAGE_SIZE = 50
 
+export function useSearchAccounts(queryTerm: string) {
+  const { user, role, loading } = useAuth()
+
+  return useQuery({
+    queryKey: ['accounts-search', queryTerm, user?.email ?? 'guest', role ?? 'unknown'],
+    queryFn: async () => {
+      if (!queryTerm || queryTerm.length < 2) return []
+      if (loading || !user) return []
+
+      try {
+        let query = supabase.from('accounts').select('*');
+
+        if (role !== 'admin' && user?.email) {
+          query = query.eq('ownerId', user.email);
+        }
+
+        query = query.or(`name.ilike.%${queryTerm}%,domain.ilike.%${queryTerm}%,industry.ilike.%${queryTerm}%`);
+
+        const { data, error } = await query.limit(10);
+
+        if (error) {
+          console.error("Search error:", error);
+          return [];
+        }
+
+        return data.map(item => ({
+          id: item.id,
+          name: item.name || 'Unknown Account',
+          industry: item.industry || '',
+          domain: item.domain || '',
+          logoUrl: item.logo_url || '',
+        }));
+      } catch (err) {
+        console.error("Search hook error:", err);
+        return [];
+      }
+    },
+    enabled: queryTerm.length >= 2 && !loading && !!user,
+    staleTime: 1000 * 60 * 1,
+  });
+}
+
 export function useAccounts() {
   const { user, role, loading } = useAuth()
 

@@ -108,7 +108,7 @@ export function GeminiChatTrigger(props: { onToggle?: () => void }) {
       )}
       title={isOpen ? "Close Gemini" : "Chat with Gemini"}
     >
-      {isOpen ? <X size={18} /> : <Activity size={18} />}
+      {isOpen ? <X size={18} /> : <Copy size={18} />}
     </button>
   )
 }
@@ -117,9 +117,13 @@ export function GeminiChatPanel() {
   const isOpen = useGeminiStore((state) => state.isOpen)
   const auth = useAuth()
   const profile = auth?.profile
+  const user = auth?.user
   const pathname = usePathname()
   const params = useParams()
   
+  // State for hosted avatar to avoid Google CORS issues
+  const [hostedAvatarUrl, setHostedAvatarUrl] = useState<string | null>(null)
+
   // Contextual Intel Logic
   const contextInfo = useMemo(() => {
     if (pathname.includes('/people/')) return { type: 'contact', id: params.id }
@@ -130,21 +134,57 @@ export function GeminiChatPanel() {
 
   const [messages, setMessages] = useState<Message[]>([])
   
+  // Host Google Avatar if needed
+  useEffect(() => {
+    const hostAvatar = async () => {
+      const photoURL = user?.photoURL || profile?.photoURL
+      if (!photoURL) return
+
+      // If it's already an imgur link or not a google link, use it directly
+      if (photoURL.includes('imgur.com') || (!photoURL.includes('googleusercontent.com') && !photoURL.includes('ggpht.com'))) {
+        setHostedAvatarUrl(photoURL)
+        return
+      }
+
+      try {
+        const response = await fetch('/api/upload/host-google-avatar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ googlePhotoURL: photoURL })
+        })
+        if (response.ok) {
+          const data = await response.json()
+          if (data.imageUrl) setHostedAvatarUrl(data.imageUrl)
+        } else {
+          setHostedAvatarUrl(photoURL) // Fallback
+        }
+      } catch (err) {
+        console.error('Failed to host avatar:', err)
+        setHostedAvatarUrl(photoURL) // Fallback
+      }
+    }
+
+    if (isOpen) {
+      hostAvatar()
+    }
+  }, [isOpen, user?.photoURL, profile?.photoURL])
+
   // Initialize with Contextual Greeting
   useEffect(() => {
     if (isOpen && messages.length === 0) {
+      const firstName = profile?.firstName || 'Trey'
       setMessages([
         { 
           role: 'assistant', 
           content: contextInfo.type === 'contact' 
-            ? `System ready. I see you're viewing contact ${params.id}. Scanning Gmail for recent threads and Apollo for firmographics...`
+            ? `System ready, ${firstName}. I see you're viewing contact ${params.id}. Scanning Gmail for recent threads and Apollo for firmographics...`
             : contextInfo.type === 'account'
-            ? `System ready. Analyzing account data for ${params.id}. Checking energy market conditions for this node...`
-            : 'System ready. Awaiting command for Nodal Point intelligence network.'
+            ? `System ready, ${firstName}. Analyzing account data for ${params.id}. Checking energy market conditions for this node...`
+            : `System ready, ${firstName}. Awaiting command for Nodal Point intelligence network.`
         }
       ])
     }
-  }, [isOpen, contextInfo, params.id])
+  }, [isOpen, contextInfo, params.id, profile?.firstName])
 
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -187,7 +227,8 @@ export function GeminiChatPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           messages: updatedMessages,
-          context: contextInfo
+          context: contextInfo,
+          userProfile: profile
         })
       })
 
@@ -221,8 +262,12 @@ export function GeminiChatPanel() {
       <div className="p-4 border-b border-white/5 flex items-center justify-between bg-zinc-900/10 relative z-10">
         <div className="flex items-center gap-2">
           <div className="relative">
-            <div className="w-8 h-8 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center relative z-10">
-              <Activity size={16} className="text-indigo-400" />
+            <div className="w-8 h-8 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center relative z-10 overflow-hidden">
+              {hostedAvatarUrl ? (
+                <img src={hostedAvatarUrl} alt="User" className="w-full h-full object-cover" />
+              ) : (
+                <Copy size={16} className="text-indigo-400" />
+              )}
             </div>
             {/* Ambient Hum Animation */}
             <motion.div
@@ -258,8 +303,8 @@ export function GeminiChatPanel() {
                 m.role === 'user' ? "bg-zinc-800" : "bg-indigo-950/30 border border-indigo-500/20"
               )}>
                 {m.role === 'user' ? (
-                  profile?.photoURL ? (
-                    <img src={profile.photoURL} alt="User" className="w-full h-full object-cover" />
+                  hostedAvatarUrl ? (
+                    <img src={hostedAvatarUrl} alt="User" className="w-full h-full object-cover" />
                   ) : (
                     <User size={14} />
                   )
@@ -285,19 +330,17 @@ export function GeminiChatPanel() {
                   })}
                 </div>
                 {m.role === 'assistant' && i === messages.length - 1 && error && (
-                  <div className="mt-2 pt-2 border-t border-white/5 flex flex-col gap-2">
-                    <p className="text-[10px] text-red-400 font-mono leading-tight">
+                  <div className="mt-2 pt-2 border-t border-white/5 flex items-center gap-2">
+                    <p className="text-[10px] text-red-400 font-mono leading-tight flex-1">
                       {error}
                     </p>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <button 
                       onClick={copyDebugInfo}
-                      className="h-7 text-[10px] bg-zinc-950/50 border-white/10 hover:bg-white/5 text-zinc-400 hover:text-white transition-all w-fit gap-1.5"
+                      className="w-8 h-8 inline-flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+                      title="Copy Prompt for Backend Dev"
                     >
-                      <Copy size={10} />
-                      Copy Prompt for Backend Dev
-                    </Button>
+                      <Copy size={16} />
+                    </button>
                   </div>
                 )}
               </div>
