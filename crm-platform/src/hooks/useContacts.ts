@@ -34,6 +34,8 @@ export type ContactDetail = Contact & {
   contractEnd?: string
   serviceAddresses?: unknown[]
   accountDescription?: string
+  // Location
+  address?: string
   // Phone fields
   mobile?: string
   workDirectPhone?: string
@@ -48,6 +50,7 @@ type ContactMetadata = {
   domain?: string
   city?: string
   state?: string
+  address?: string
   website?: string
   firstName?: string
   lastName?: string
@@ -132,6 +135,13 @@ type ContactRow = {
 const PAGE_SIZE = 50
 
 const CONTACTS_QUERY_BUSTER = 'v5'
+
+const PRIMARY_PHONE_FIELDS = ['mobile', 'workDirectPhone', 'otherPhone'] as const
+
+function normalizePrimaryPhoneField(value: unknown): ContactDetail['primaryPhoneField'] {
+  if (typeof value !== 'string') return 'mobile'
+  return (PRIMARY_PHONE_FIELDS as readonly string[]).includes(value) ? (value as ContactDetail['primaryPhoneField']) : 'mobile'
+}
 
 function cleanText(value: unknown): string {
   if (value == null) return ''
@@ -248,6 +258,7 @@ export function useContacts() {
             name: fullName,
             email: item.email || metadata?.email || metadata?.general?.email || metadata?.contact?.email || '',
             phone: item.phone || item.mobile || item.workPhone || item.otherPhone || metadata?.mobile || metadata?.workDirectPhone || metadata?.otherPhone || metadata?.general?.phone || metadata?.contact?.phone || '',
+            address: (account?.service_addresses?.[0] as any)?.address || metadata?.address || '',
             company: account?.name || metadata?.company || metadata?.general?.company || '',
             companyDomain: account?.domain || metadata?.domain || metadata?.general?.domain || '',
             logoUrl: account?.logo_url || '',
@@ -395,12 +406,15 @@ export function useContact(id: string) {
         serviceAddresses: account?.service_addresses,
         accountDescription: account?.description,
         
+        // Location
+        address: (account?.service_addresses?.[0] as any)?.address || metadata?.address || '',
+
         // Phone fields
         mobile: typedData.mobile || metadata?.mobile || metadata?.general?.phone || '',
         workDirectPhone: typedData.workPhone || metadata?.workDirectPhone || metadata?.general?.workDirectPhone || '',
         otherPhone: typedData.otherPhone || metadata?.otherPhone || '',
         companyPhone: account?.phone || '',
-        primaryPhoneField: (typedData.primaryPhoneField as any) || 'mobile'
+        primaryPhoneField: normalizePrimaryPhoneField(typedData.primaryPhoneField)
       } as ContactDetail
     },
     enabled: !!id && !loading && !!user,
@@ -445,7 +459,7 @@ export function useUpdateContact() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<ContactDetail> & { id: string }) => {
-      const dbUpdates: Record<string, any> = {}
+      const dbUpdates: Record<string, unknown> = {}
       if (updates.name !== undefined) dbUpdates.name = updates.name
       if (updates.email !== undefined) dbUpdates.email = updates.email
       if (updates.phone !== undefined) dbUpdates.phone = updates.phone
@@ -483,7 +497,7 @@ export function useUpdateContact() {
       }
 
       if (targetAccountId) {
-        const accountUpdates: Record<string, any> = {}
+        const accountUpdates: Record<string, unknown> = {}
         if (updates.electricitySupplier !== undefined) accountUpdates.electricity_supplier = updates.electricitySupplier
         if (updates.annualUsage !== undefined) accountUpdates.annual_usage = updates.annualUsage
         if (updates.currentRate !== undefined) accountUpdates.current_rate = updates.currentRate

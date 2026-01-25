@@ -19,6 +19,7 @@ import { useGeminiStore } from '@/store/geminiStore'
 export function TopBar() {
   const { isActive, status, setActive, setStatus } = useCallStore()
   const isGeminiOpen = useGeminiStore((state) => state.isOpen)
+  const setIsGeminiOpen = useGeminiStore((state) => state.setIsOpen)
   const { profile } = useAuth()
   const { connect, disconnect, mute, isMuted, metadata } = useVoice()
   const pathname = usePathname()
@@ -28,20 +29,6 @@ export function TopBar() {
   const [callDuration, setCallDuration] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Sync state: if Gemini opens, close Dialer
-  useEffect(() => {
-    if (isGeminiOpen && isDialerOpen) {
-      setIsDialerOpen(false)
-    }
-  }, [isGeminiOpen, isDialerOpen])
-
-  // Sync state: if Dialer opens, close Gemini
-  const setIsGeminiOpen = useGeminiStore((state) => state.setIsOpen)
-  useEffect(() => {
-    if (isDialerOpen && isGeminiOpen) {
-      setIsGeminiOpen(false)
-    }
-  }, [isDialerOpen, isGeminiOpen, setIsGeminiOpen])
   const durationInterval = useRef<NodeJS.Timeout | null>(null)
   const callStartRef = useRef<number | null>(null)
 
@@ -287,7 +274,11 @@ export function TopBar() {
 
                     {/* Right Side Buttons - Pinned Absolute */}
                     <div className="absolute right-2 top-0 h-12 flex items-center gap-1 pointer-events-auto leading-none">
-                        <GeminiChatTrigger />
+                        <GeminiChatTrigger
+                          onToggle={() => {
+                            if (!isGeminiOpen) setIsDialerOpen(false)
+                          }}
+                        />
                         
                         <button 
                             onClick={handleRefresh}
@@ -308,7 +299,11 @@ export function TopBar() {
                         {/* Manual Dialer Trigger */}
                         {!isActive && (
                             <button 
-                                onClick={() => setIsDialerOpen(!isDialerOpen)}
+                                onClick={() => {
+                                  const nextOpen = !isDialerOpen
+                                  if (nextOpen) setIsGeminiOpen(false)
+                                  setIsDialerOpen(nextOpen)
+                                }}
                                 className={cn(
                                     "w-8 h-8 inline-flex items-center justify-center rounded-full transition-colors duration-200",
                                     isDialerOpen ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white hover:bg-white/10"
