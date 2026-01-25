@@ -14,6 +14,7 @@
     - Created dedicated Detail Page (`src/app/crm-platform/emails/[id]/page.tsx`) for full-view reading and replying.
   - [x] **Tracking**: Integrated Open/Click tracking stats display in the email list (leveraging existing backend tracking system).
   - [x] **Navigation**: Added "Emails" link to the Sidebar.
+  - [x] **Sender Name**: Ensured outgoing emails use user's first/last name (Auth + Gmail service lookup) instead of email prefix.
 
 ### Contact Dossier (People → Contact Detail)
 - **Status**: Completed

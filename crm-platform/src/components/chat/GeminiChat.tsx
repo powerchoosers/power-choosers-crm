@@ -314,8 +314,12 @@ export function GeminiChatPanel() {
 
     const userMessage: Message = { role: 'user', content: input }
     const updatedMessages = [...messages, userMessage]
+    
+    // Ensure history starts with a user message and is trimmed to last 10 for performance
     const firstUserIndex = updatedMessages.findIndex((m) => m.role === 'user')
-    const messagesForApi = firstUserIndex > 0 ? updatedMessages.slice(firstUserIndex) : updatedMessages
+    const relevantHistory = firstUserIndex > 0 ? updatedMessages.slice(firstUserIndex) : updatedMessages
+    const messagesForApi = relevantHistory.slice(-10)
+
     setMessages(updatedMessages)
     setInput('')
     setIsLoading(true)
@@ -328,7 +332,9 @@ export function GeminiChatPanel() {
         body: JSON.stringify({ 
           messages: messagesForApi,
           context: contextInfo,
-          userProfile: profile
+          userProfile: {
+            firstName: profile?.firstName || 'Trey'
+          }
         })
       })
 
@@ -338,8 +344,14 @@ export function GeminiChatPanel() {
       setMessages(prev => [...prev, { role: 'assistant', content: data.content }])
     } catch (err: unknown) {
       console.error('Chat error:', err)
-      setError(err instanceof Error ? err.message : 'Internal server error')
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }])
+      const errorMessage = err instanceof Error ? err.message : 'Internal server error'
+      setError(errorMessage)
+      
+      const assistantFallback = errorMessage.includes('overloaded') || errorMessage.includes('503')
+        ? "The intelligence network is currently under heavy load. I'm initiating a localized retry protocol, but if this persists, please try again in a moment."
+        : "Sorry, I encountered an error. Please try again."
+        
+      setMessages(prev => [...prev, { role: 'assistant', content: assistantFallback }])
     } finally {
       setIsLoading(false)
     }
