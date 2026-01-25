@@ -10,6 +10,34 @@ export class GmailService {
         this.fromEmail = process.env.GMAIL_SENDER_EMAIL || '';
         this.fromName = process.env.GMAIL_SENDER_NAME || 'Nodal Point CRM';
     }
+
+    sanitizeHeaderValue(value) {
+        return String(value || '').replace(/[\r\n]+/g, ' ').trim();
+    }
+
+    encodeDisplayName(name) {
+        const safe = this.sanitizeHeaderValue(name);
+        if (!safe) return '';
+
+        const hasNonAscii = /[^\x00-\x7F]/.test(safe);
+        if (hasNonAscii) {
+            return `=?UTF-8?B?${Buffer.from(safe, 'utf8').toString('base64')}?=`;
+        }
+
+        const needsQuotes = /[()<>@,;:\\".\[\]\s]/.test(safe);
+        if (needsQuotes) {
+            const escaped = safe.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+            return `"${escaped}"`;
+        }
+
+        return safe;
+    }
+
+    formatFromHeader(name, email) {
+        const safeEmail = this.sanitizeHeaderValue(email);
+        const display = this.encodeDisplayName(name);
+        return display ? `${display} <${safeEmail}>` : `<${safeEmail}>`;
+    }
     
     /**
      * Look up user profile from Firestore to get sender name and email
@@ -126,8 +154,8 @@ export class GmailService {
             const boundary = '----=_Part_' + Date.now().toString(36);
             
             let mimeMessage = [
-                `From: ${senderName} <${senderEmail}>`,
-                `To: ${to}`,
+                `From: ${this.formatFromHeader(senderName, senderEmail)}`,
+                `To: ${this.sanitizeHeaderValue(to)}`,
                 `Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`,
                 'MIME-Version: 1.0',
                 `Content-Type: multipart/alternative; boundary="${boundary}"`,

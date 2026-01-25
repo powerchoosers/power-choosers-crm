@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Search, Plus, FileText, ChevronRight, Filter, ChevronLeft, Loader2 } from 'lucide-react'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { format, formatDistanceToNow, isAfter, subMonths } from 'date-fns'
@@ -18,19 +18,21 @@ import {
 import { Badge } from "@/components/ui/badge"
 
 export default function ScriptsPage() {
-  const { data: scripts, isLoading } = useScripts()
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
 
-  const filteredScripts = scripts?.filter(script => {
-    const search = searchTerm.toLowerCase();
-    return (
-      (script.title?.toLowerCase() ?? "").includes(search) ||
-      (script.category?.toLowerCase() ?? "").includes(search)
-    );
-  }) || []
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  const { data: scripts, isLoading } = useScripts(debouncedSearch)
 
   const totalRecords = scripts?.length || 0
-  const showingCount = filteredScripts.length
+  const showingCount = scripts?.length || 0
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -69,8 +71,8 @@ export default function ScriptsPage() {
                     <CardContent className="h-20" />
                     </Card>
                 ))
-                ) : filteredScripts?.length ? (
-                filteredScripts.map((script) => (
+                ) : scripts?.length ? (
+                scripts.map((script) => (
                     <Card key={script.id} className="nodal-glass nodal-glass-hover transition-all group cursor-pointer overflow-hidden border-white/5">
                     <CardHeader className="pb-3">
                         <div className="flex justify-between items-start">

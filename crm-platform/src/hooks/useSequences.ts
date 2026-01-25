@@ -9,8 +9,8 @@ export interface Sequence {
   description?: string
   status: 'active' | 'inactive' | 'draft'
   steps: SequenceStep[]
-  createdAt: string | Date | any
-  updatedAt?: string | Date | any
+  createdAt: string | Date
+  updatedAt?: string | Date
   ownerId?: string
 }
 
@@ -63,7 +63,7 @@ export function useSequences(searchQuery?: string) {
           })) as Sequence[],
           nextCursor: count && (pageParam + 1) * PAGE_SIZE < count ? pageParam + 1 : null
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Error fetching sequences:', error)
         throw error
       }
@@ -223,4 +223,3 @@ export function useSearchSequences(queryTerm: string) {
     staleTime: 1000 * 60 * 1,
   })
 }
-

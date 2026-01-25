@@ -89,6 +89,18 @@
   - [x] **API Protocol**: Standardized `JSON_DATA:END_JSON` delimiters for structured backend communication.
   - [x] **History Fix**: Resolved Gemini API role-alternation errors by implementing robust history filtering in `api/gemini/chat.js`.
 
+### Unified Global Search & Server-Side Search
+- **Status**: Completed
+- **Description**: Implemented high-performance, server-side search across all platform entities (Supabase) and a centralized Command Palette (⌘K).
+- **Actions**:
+  - [x] **Global Search Modal (⌘K)**: Updated `GlobalSearch.tsx` to search across Contacts, Accounts, Sequences, Tasks, Calls, and Emails using Supabase server-side queries.
+  - [x] **Page-Specific Search**: Migrated all page-level search functions (People, Accounts, Sequences, Tasks, Calls, Emails, Scripts, Energy) from client-side filtering to 400ms debounced server-side Supabase `ilike` queries.
+  - [x] **Supabase Integration**:
+    - Implemented `useSearchContacts`, `useSearchAccounts`, `useSearchSequences`, `useSearchTasks`, `useSearchCalls`, and `useSearchEmails` hooks.
+    - Added total record counting (`useTasksCount`, `useCallsCount`, etc.) for accurate pagination during search.
+  - [x] **Ownership Filtering**: Ensured all search queries respect user roles (admin vs. non-admin) and `ownerId` metadata.
+  - [x] **Performance**: Optimized API calls using `useInfiniteQuery` and range-based pagination, reducing client-side memory load.
+
 ### 1. Data Layer Migration (Supabase)
 - **Status**: 🏗️ In Progress
 - **Priority**: Critical (Cost Reduction)

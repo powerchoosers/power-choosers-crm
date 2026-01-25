@@ -103,6 +103,14 @@ type AccountJoin = {
   phone?: string | null
 }
 
+function getFirstServiceAddressAddress(serviceAddresses: unknown[] | null | undefined) {
+  if (!Array.isArray(serviceAddresses) || serviceAddresses.length === 0) return ''
+  const first = serviceAddresses[0]
+  if (!first || typeof first !== 'object') return ''
+  const address = (first as Record<string, unknown>).address
+  return typeof address === 'string' ? address : ''
+}
+
 type ContactRow = {
   id: string
   name?: string | null
@@ -324,7 +332,7 @@ export function useContacts(searchQuery?: string) {
             name: fullName,
             email: item.email || metadata?.email || metadata?.general?.email || metadata?.contact?.email || '',
             phone: item.phone || item.mobile || item.workPhone || item.otherPhone || metadata?.mobile || metadata?.workDirectPhone || metadata?.otherPhone || metadata?.general?.phone || metadata?.contact?.phone || '',
-            address: (account?.service_addresses?.[0] as any)?.address || metadata?.address || '',
+            address: getFirstServiceAddressAddress(account?.service_addresses) || metadata?.address || '',
             company: account?.name || metadata?.company || metadata?.general?.company || '',
             companyDomain: account?.domain || metadata?.domain || metadata?.general?.domain || '',
             logoUrl: account?.logo_url || '',
@@ -477,7 +485,7 @@ export function useContact(id: string) {
         accountDescription: account?.description,
         
         // Location
-        address: (account?.service_addresses?.[0] as any)?.address || metadata?.address || '',
+        address: getFirstServiceAddressAddress(account?.service_addresses) || metadata?.address || '',
 
         // Phone fields
         mobile: typedData.mobile || metadata?.mobile || metadata?.general?.phone || '',

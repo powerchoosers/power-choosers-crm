@@ -293,6 +293,21 @@ export default async function handler(req, res) {
       return;
     }
 
+    const cleanedMessages = messages
+      .filter((m) => m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant' || m.role === 'model'))
+      .map((m) => ({ role: m.role, content: m.content.trim() }))
+      .filter((m) => m.content.length > 0);
+
+    const lastUserIndex = cleanedMessages.map((m) => m.role).lastIndexOf('user');
+    if (lastUserIndex === -1) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'No user prompt provided' }));
+      return;
+    }
+
+    const prompt = cleanedMessages[lastUserIndex].content;
+    const historyCandidates = cleanedMessages.slice(0, lastUserIndex);
+
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
       model: 'gemini-3-flash-preview',
@@ -322,20 +337,19 @@ export default async function handler(req, res) {
     const validHistory = [];
     let nextExpectedRole = 'user';
 
-    // We process all messages except the last one (which is the new prompt)
-    // CRITICAL: History MUST start with a 'user' message.
-    for (const m of messages.slice(0, -1)) {
+    let startIndex = 0;
+    const firstUserInHistory = historyCandidates.findIndex((m) => m.role === 'user');
+    if (firstUserInHistory > 0) startIndex = firstUserInHistory;
+
+    for (const m of historyCandidates.slice(startIndex)) {
       const role = m.role === 'user' ? 'user' : 'model';
-      
-      // If we are looking for a user message and find one, add it
-      // If we are looking for a model message and find one, add it
-      if (role === nextExpectedRole) {
-        validHistory.push({
-          role: role,
-          parts: [{ text: m.content || '' }]
-        });
-        nextExpectedRole = nextExpectedRole === 'user' ? 'model' : 'user';
-      }
+      if (role !== nextExpectedRole) continue;
+
+      validHistory.push({
+        role,
+        parts: [{ text: m.content }],
+      });
+      nextExpectedRole = nextExpectedRole === 'user' ? 'model' : 'user';
     }
 
     const chat = model.startChat({
@@ -345,13 +359,7 @@ export default async function handler(req, res) {
       },
     });
 
-    // Ensure the last message (the actual prompt) is treated as a user message
-    const lastMessage = messages[messages.length - 1].content;
-    
-    // If for some reason the last message in history was a user message, 
-    // we can't send another user message immediately. 
-    // We'll append it to the last history item if that happens, but our filter prevents this.
-    let result = await chat.sendMessage(lastMessage);
+    let result = await chat.sendMessage(prompt);
     let response = result.response;
     
     // Handle function calls
