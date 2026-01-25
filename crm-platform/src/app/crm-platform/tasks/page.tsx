@@ -41,11 +41,21 @@ import { format, formatDistanceToNow, subMonths, isAfter } from 'date-fns'
 const PAGE_SIZE = 50
 
 export default function TasksPage() {
-  const { data, isLoading: queryLoading, isError, updateTask, deleteTask, fetchNextPage, hasNextPage, isFetchingNextPage } = useTasks()
-  const { data: totalTasks } = useTasksCount()
+  const [globalFilter, setGlobalFilter] = useState('')
+  const [debouncedFilter, setDebouncedFilter] = useState('')
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedFilter(globalFilter)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [globalFilter])
+
+  const { data, isLoading: queryLoading, isError, updateTask, deleteTask, fetchNextPage, hasNextPage, isFetchingNextPage } = useTasks(debouncedFilter)
+  const { data: totalTasks } = useTasksCount(debouncedFilter)
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [globalFilter, setGlobalFilter] = useState('')
   const [isMounted, setIsMounted] = useState(false)
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: PAGE_SIZE })
 
@@ -211,24 +221,21 @@ export default function TasksPage() {
     onSortingChange: setSorting,
     getSortedRowModel: getSortedRowModel(),
     onColumnFiltersChange: setColumnFilters,
-    getFilteredRowModel: getFilteredRowModel(),
-    onGlobalFilterChange: setGlobalFilter,
     onPaginationChange: setPagination,
     state: {
       sorting,
       columnFilters,
-      globalFilter,
       pagination,
     },
   })
 
-  const filteredRowCount = table.getFilteredRowModel().rows.length
-  const showingStart = filteredRowCount === 0
+  const totalRowCount = tasks.length
+  const showingStart = totalRowCount === 0
     ? 0
-    : Math.min(filteredRowCount, pagination.pageIndex * PAGE_SIZE + 1)
-  const showingEnd = filteredRowCount === 0
+    : Math.min(totalRowCount, pagination.pageIndex * PAGE_SIZE + 1)
+  const showingEnd = totalRowCount === 0
     ? 0
-    : Math.min(filteredRowCount, (pagination.pageIndex + 1) * PAGE_SIZE)
+    : Math.min(totalRowCount, (pagination.pageIndex + 1) * PAGE_SIZE)
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">

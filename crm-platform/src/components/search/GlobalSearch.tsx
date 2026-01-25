@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Search, X, Building2, Users, Plus, Sparkles, Loader2 } from 'lucide-react'
+import { Search, X, Building2, Users, Plus, Sparkles, Loader2, ListOrdered, CheckCircle2 } from 'lucide-react'
 import { useSearchContacts } from '@/hooks/useContacts'
 import { useSearchAccounts } from '@/hooks/useAccounts'
+import { useSearchSequences } from '@/hooks/useSequences'
+import { useSearchTasks } from '@/hooks/useTasks'
 import { useRouter } from 'next/navigation'
 
 export function GlobalSearch() {
@@ -23,8 +25,10 @@ export function GlobalSearch() {
 
   const { data: filteredContacts = [], isLoading: isSearchingContacts } = useSearchContacts(debouncedQuery)
   const { data: filteredAccounts = [], isLoading: isSearchingAccounts } = useSearchAccounts(debouncedQuery)
+  const { data: filteredSequences = [], isLoading: isSearchingSequences } = useSearchSequences(debouncedQuery)
+  const { data: filteredTasks = [], isLoading: isSearchingTasks } = useSearchTasks(debouncedQuery)
 
-  const isSearching = isSearchingContacts || isSearchingAccounts
+  const isSearching = isSearchingContacts || isSearchingAccounts || isSearchingSequences || isSearchingTasks
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -41,7 +45,11 @@ export function GlobalSearch() {
     return () => document.removeEventListener('keydown', down)
   }, [isOpen])
 
-  const hasResults = (filteredContacts?.length || 0) + (filteredAccounts?.length || 0) > 0
+  const hasResults = 
+    (filteredContacts?.length || 0) + 
+    (filteredAccounts?.length || 0) + 
+    (filteredSequences?.length || 0) + 
+    (filteredTasks?.length || 0) > 0
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -53,13 +61,17 @@ export function GlobalSearch() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleSelect = (id: string, type: 'people' | 'account') => {
+  const handleSelect = (id: string, type: 'people' | 'account' | 'sequence' | 'task') => {
     setIsOpen(false)
     setQuery('')
     if (type === 'people') {
         router.push(`/crm-platform/contacts/${id}`)
-    } else {
+    } else if (type === 'account') {
         router.push(`/crm-platform/accounts/${id}`)
+    } else if (type === 'sequence') {
+        router.push(`/crm-platform/sequences`)
+    } else if (type === 'task') {
+        router.push(`/crm-platform/tasks`)
     }
   }
 
@@ -183,7 +195,7 @@ export function GlobalSearch() {
                     <div className="mb-2">
                         <div className="text-xs font-semibold text-zinc-500 px-3 py-2 uppercase tracking-wider flex justify-between">
                         <span>Accounts</span>
-                        <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-zinc-400">{filteredAccounts.length} found</span>
+                        <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-zinc-400">{filteredAccounts.length}</span>
                         </div>
                         <div className="space-y-1">
                         {filteredAccounts.map(account => (
@@ -202,6 +214,60 @@ export function GlobalSearch() {
                             <div className="min-w-0 flex-1">
                                 <div className="text-sm font-medium text-zinc-200 group-hover:text-white truncate">{account.name}</div>
                                 <div className="text-xs text-zinc-500 truncate">{account.industry}</div>
+                            </div>
+                            </button>
+                        ))}
+                        </div>
+                    </div>
+                    )}
+
+                    {/* Sequences Section */}
+                    {filteredSequences.length > 0 && (
+                    <div className="mb-2">
+                        <div className="text-xs font-semibold text-zinc-500 px-3 py-2 uppercase tracking-wider flex justify-between">
+                        <span>Sequences</span>
+                        <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-zinc-400">{filteredSequences.length}</span>
+                        </div>
+                        <div className="space-y-1">
+                        {filteredSequences.map(sequence => (
+                            <button
+                            key={sequence.id}
+                            onClick={() => handleSelect(sequence.id, 'sequence')}
+                            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors text-left group"
+                            >
+                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
+                                <ListOrdered size={14} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <div className="text-sm font-medium text-zinc-200 group-hover:text-white truncate">{sequence.name}</div>
+                                <div className="text-xs text-zinc-500 truncate">{sequence.steps?.length || 0} steps</div>
+                            </div>
+                            </button>
+                        ))}
+                        </div>
+                    </div>
+                    )}
+
+                    {/* Tasks Section */}
+                    {filteredTasks.length > 0 && (
+                    <div className="mb-2">
+                        <div className="text-xs font-semibold text-zinc-500 px-3 py-2 uppercase tracking-wider flex justify-between">
+                        <span>Tasks</span>
+                        <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-zinc-400">{filteredTasks.length}</span>
+                        </div>
+                        <div className="space-y-1">
+                        {filteredTasks.map(task => (
+                            <button
+                            key={task.id}
+                            onClick={() => handleSelect(task.id, 'task')}
+                            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors text-left group"
+                            >
+                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
+                                <CheckCircle2 size={14} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <div className="text-sm font-medium text-zinc-200 group-hover:text-white truncate">{task.title}</div>
+                                <div className="text-xs text-zinc-500 truncate">{task.status}</div>
                             </div>
                             </button>
                         ))}

@@ -172,7 +172,7 @@ export function GeminiChatPanel() {
   // Host Google Avatar if needed
   useEffect(() => {
     const hostAvatar = async () => {
-      const photoURL = user?.photoURL || profile?.photoURL
+      const photoURL = user?.photoURL
       if (!photoURL) {
         setIsAvatarLoading(false)
         return
@@ -215,7 +215,7 @@ export function GeminiChatPanel() {
     if (isOpen) {
       hostAvatar()
     }
-  }, [isOpen, user?.photoURL, profile?.photoURL])
+  }, [isOpen, user?.photoURL])
 
   // Initialize with Contextual Greeting
   useEffect(() => {
