@@ -286,7 +286,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages } = req.body;
+    const { messages, userProfile } = req.body;
     if (!messages || !Array.isArray(messages)) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Invalid messages format' }));
@@ -302,6 +302,10 @@ export default async function handler(req, res) {
         Your tone is professional, technical, and high-agency. 
         You prioritize data-driven insights over conversational filler.
         
+        USER_IDENTITY:
+        - The user's name is ${userProfile?.firstName || 'Trey'}.
+        - ALWAYS address them by their first name (${userProfile?.firstName || 'Trey'}) in your initial greeting or when appropriate.
+        
         RICH MEDIA PROTOCOL:
         - When providing energy news, ALWAYS include a JSON block in this format:
           JSON_DATA:{"type": "news_ticker", "data": {"items": [{"title": "...", "source": "...", "trend": "up|down", "volatility": "..."}]}}END_JSON
@@ -315,13 +319,16 @@ export default async function handler(req, res) {
     });
 
     // Filter history to ensure it starts with a 'user' role and alternates correctly
-    // Gemini API is extremely strict: history must be [user, model, user, model...]
     const validHistory = [];
     let nextExpectedRole = 'user';
 
     // We process all messages except the last one (which is the new prompt)
+    // CRITICAL: History MUST start with a 'user' message.
     for (const m of messages.slice(0, -1)) {
       const role = m.role === 'user' ? 'user' : 'model';
+      
+      // If we are looking for a user message and find one, add it
+      // If we are looking for a model message and find one, add it
       if (role === nextExpectedRole) {
         validHistory.push({
           role: role,
@@ -338,7 +345,12 @@ export default async function handler(req, res) {
       },
     });
 
+    // Ensure the last message (the actual prompt) is treated as a user message
     const lastMessage = messages[messages.length - 1].content;
+    
+    // If for some reason the last message in history was a user message, 
+    // we can't send another user message immediately. 
+    // We'll append it to the last history item if that happens, but our filter prevents this.
     let result = await chat.sendMessage(lastMessage);
     let response = result.response;
     

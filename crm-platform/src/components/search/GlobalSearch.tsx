@@ -1,19 +1,30 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Search, X, Building2, Users, Plus, Sparkles } from 'lucide-react'
-import { useContacts } from '@/hooks/useContacts'
-import { useAccounts } from '@/hooks/useAccounts'
+import { Search, X, Building2, Users, Plus, Sparkles, Loader2 } from 'lucide-react'
+import { useSearchContacts } from '@/hooks/useContacts'
+import { useSearchAccounts } from '@/hooks/useAccounts'
 import { useRouter } from 'next/navigation'
 
 export function GlobalSearch() {
   const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const { data: contactsData } = useContacts()
-  const { data: accountsData } = useAccounts()
   const router = useRouter()
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [query])
+
+  const { data: filteredContacts = [], isLoading: isSearchingContacts } = useSearchContacts(debouncedQuery)
+  const { data: filteredAccounts = [], isLoading: isSearchingAccounts } = useSearchAccounts(debouncedQuery)
+
+  const isSearching = isSearchingContacts || isSearchingAccounts
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -29,23 +40,6 @@ export function GlobalSearch() {
     document.addEventListener('keydown', down)
     return () => document.removeEventListener('keydown', down)
   }, [isOpen])
-
-  const contacts = contactsData?.pages.flatMap(page => page.contacts) || []
-  const accounts = accountsData?.pages.flatMap(page => page.accounts) || []
-
-  // Filter contacts logic
-  const filteredContacts = contacts.filter(contact => 
-    contact.name.toLowerCase().includes(query.toLowerCase()) ||
-    contact.email.toLowerCase().includes(query.toLowerCase()) ||
-    contact.company.toLowerCase().includes(query.toLowerCase())
-  ).slice(0, 3)
-
-  // Filter accounts logic
-  const filteredAccounts = accounts.filter(account => 
-    account.name.toLowerCase().includes(query.toLowerCase()) ||
-    account.industry.toLowerCase().includes(query.toLowerCase()) ||
-    account.domain.toLowerCase().includes(query.toLowerCase())
-  ).slice(0, 3)
 
   const hasResults = (filteredContacts?.length || 0) + (filteredAccounts?.length || 0) > 0
 
@@ -95,9 +89,12 @@ export function GlobalSearch() {
           className="w-full h-12 nodal-glass rounded-full pl-12 pr-16 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[#002FA7]/40 focus:bg-zinc-900/80 transition-all shadow-2xl"
         />
         <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-3">
+          {isSearching && (
+            <Loader2 className="animate-spin text-signal" size={16} />
+          )}
           {query && (
             <button 
-              onClick={() => { setQuery(''); inputRef.current?.focus() }}
+              onClick={() => { setQuery(''); setDebouncedQuery(''); inputRef.current?.focus() }}
               className="text-zinc-500 hover:text-white transition-colors p-1 hover:bg-white/5 rounded-full"
             >
               <X size={16} />
@@ -146,12 +143,12 @@ export function GlobalSearch() {
                 </button>
             </div>
 
-            {query && (
+            {query && query.length >= 2 && (
                 <>
                     <div className="h-px bg-white/5 my-2 mx-2" />
                     
                     {/* People Section */}
-                    {filteredContacts && filteredContacts.length > 0 && (
+                    {filteredContacts.length > 0 && (
                     <div className="mb-2">
                         <div className="text-xs font-semibold text-zinc-500 px-3 py-2 uppercase tracking-wider flex justify-between">
                         <span>People</span>
@@ -164,8 +161,12 @@ export function GlobalSearch() {
                             onClick={() => handleSelect(contact.id, 'people')}
                             className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors text-left group"
                             >
-                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors">
-                                {contact.name.charAt(0)}
+                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
+                                {contact.logoUrl ? (
+                                    <img src={contact.logoUrl} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                    contact.name.charAt(0)
+                                )}
                             </div>
                             <div className="min-w-0 flex-1">
                                 <div className="text-sm font-medium text-zinc-200 group-hover:text-white truncate">{contact.name}</div>
@@ -178,7 +179,7 @@ export function GlobalSearch() {
                     )}
                     
                     {/* Accounts Section */}
-                    {filteredAccounts && filteredAccounts.length > 0 && (
+                    {filteredAccounts.length > 0 && (
                     <div className="mb-2">
                         <div className="text-xs font-semibold text-zinc-500 px-3 py-2 uppercase tracking-wider flex justify-between">
                         <span>Accounts</span>
@@ -191,8 +192,12 @@ export function GlobalSearch() {
                             onClick={() => handleSelect(account.id, 'account')}
                             className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors text-left group"
                             >
-                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors">
-                                <Building2 size={14} />
+                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
+                                {account.logoUrl ? (
+                                    <img src={account.logoUrl} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                    <Building2 size={14} />
+                                )}
                             </div>
                             <div className="min-w-0 flex-1">
                                 <div className="text-sm font-medium text-zinc-200 group-hover:text-white truncate">{account.name}</div>
@@ -204,12 +209,24 @@ export function GlobalSearch() {
                     </div>
                     )}
 
-                    {!hasResults && (
-                        <div className="p-4 text-center text-zinc-500 text-sm">
-                            No results found for &quot;{query}&quot;
+                    {!isSearching && !hasResults && query.length >= 2 && (
+                        <div className="p-8 text-center">
+                            <Search className="mx-auto h-8 w-8 text-zinc-700 mb-3" />
+                            <div className="text-zinc-500 text-sm">
+                                No results found for &quot;{query}&quot;
+                            </div>
+                            <div className="text-zinc-600 text-[10px] mt-1">
+                                Try searching for names, emails, or company domains
+                            </div>
                         </div>
                     )}
                 </>
+            )}
+
+            {query && query.length < 2 && (
+                <div className="p-4 text-center text-zinc-600 text-[10px] uppercase tracking-widest">
+                    Type at least 2 characters to search...
+                </div>
             )}
             
             <div className="border-t border-white/5 mt-2 pt-2 px-3 py-1.5 flex justify-between items-center text-[10px] text-zinc-600">
