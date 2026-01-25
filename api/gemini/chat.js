@@ -314,18 +314,28 @@ export default async function handler(req, res) {
       `,
     });
 
-    // Filter history to ensure it starts with a 'user' role as required by Gemini
-    const history = messages.slice(0, -1).map(m => ({
-      role: m.role === 'user' ? 'user' : 'model',
-      parts: [{ text: m.content }]
-    }));
+    // Filter history to ensure it starts with a 'user' role and alternates correctly
+    // Gemini API is extremely strict: history must be [user, model, user, model...]
+    const validHistory = [];
+    let nextExpectedRole = 'user';
 
-    // Find the first 'user' message index
-    const firstUserIndex = history.findIndex(m => m.role === 'user');
-    const validHistory = firstUserIndex !== -1 ? history.slice(firstUserIndex) : [];
+    // We process all messages except the last one (which is the new prompt)
+    for (const m of messages.slice(0, -1)) {
+      const role = m.role === 'user' ? 'user' : 'model';
+      if (role === nextExpectedRole) {
+        validHistory.push({
+          role: role,
+          parts: [{ text: m.content || '' }]
+        });
+        nextExpectedRole = nextExpectedRole === 'user' ? 'model' : 'user';
+      }
+    }
 
     const chat = model.startChat({
       history: validHistory,
+      generationConfig: {
+        maxOutputTokens: 2048,
+      },
     });
 
     const lastMessage = messages[messages.length - 1].content;

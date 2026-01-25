@@ -77,21 +77,17 @@
   - [x] **Obsidian & Glass**: Standardized `nodal-glass` system and `space-y-8` grid gaps across core pages (People, Accounts, Emails, Settings).
   - [x] **Collection Standardization**: Mirrored Emails page header/footer styles (Sync_Block, Total_Nodes) across all list pages (People, Accounts, Tasks, Sequences, Calls, Energy, Scripts).
 
-### Gemini AI Assistant (CRM Copilot)
+### Nodal Architect (Glass Intelligence Overhaul)
 - **Status**: Completed
-- **Description**: Integrated Gemini 1.5 Flash as a conversational CRM assistant capable of performing actions across the platform.
+- **Description**: Transformed the Gemini assistant into the "Nodal Architect," a contextual, high-agency intelligence layer with a forensic instrument aesthetic.
 - **Actions**:
-  - [x] **Core Chat**: Implemented `GeminiChat.tsx` with a forensic instrument aesthetic (Obsidian & Glass, pulsing LED).
-  - [x] **Tool Integration**: Added 10+ CRM tools for Gemini:
-    - `list_contacts`, `get_contact_details`, `update_contact`, `create_contact`.
-    - `list_accounts`.
-    - `list_tasks`, `create_task`.
-    - `send_email`: Automatic email sending via `GmailService` with threading and user profile lookup.
-    - `search_prospects`: Prospecting for new people/companies via Apollo API.
-    - `enrich_organization`: Data enrichment for companies using domain names.
-    - `get_energy_news`: Real-time Texas energy market news retrieval.
-  - [x] **UX**: Added to `TopBar.tsx` for global access.
-  - [x] **State**: Persistent chat state via `useGeminiStore`.
+  - [x] **UI Overhaul**: Implemented "Glass Intelligence" design (backdrop-blur-2xl, frosted glass, monospace typography).
+  - [x] **Ambient Hum**: Added `Waveform` component and ambient animations for system status feedback.
+  - [x] **Zero-Click Start**: Implemented contextual awareness (route-specific greetings and proactive insights for Contacts/Accounts).
+  - [x] **Adaptive UI (Rich Media)**: Built `ComponentRenderer` to handle structured JSON data for `news_ticker` and `mini_profile` cards.
+  - [x] **Voice Command Mode**: Integrated hold-to-speak functionality with visual feedback.
+  - [x] **API Protocol**: Standardized `JSON_DATA:END_JSON` delimiters for structured backend communication.
+  - [x] **History Fix**: Resolved Gemini API role-alternation errors by implementing robust history filtering in `api/gemini/chat.js`.
 
 ### 1. Data Layer Migration (Supabase)
 - **Status**: 🏗️ In Progress
