@@ -44,11 +44,21 @@ const PAGE_SIZE = 50
 
 export default function PeoplePage() {
   const router = useRouter()
-  const { data, isLoading: queryLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useContacts()
-  const { data: totalContacts } = useContactsCount()
+  const [globalFilter, setGlobalFilter] = useState('')
+  const [debouncedFilter, setDebouncedFilter] = useState('')
+
+  // Debounce search query to avoid excessive API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedFilter(globalFilter)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [globalFilter])
+
+  const { data, isLoading: queryLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useContacts(debouncedFilter)
+  const { data: totalContacts } = useContactsCount(debouncedFilter)
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [globalFilter, setGlobalFilter] = useState('')
   const [isMounted, setIsMounted] = useState(false)
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: PAGE_SIZE })
 

@@ -14,6 +14,14 @@ const config: Config = {
       letterSpacing: {
         DEFAULT: '-0.02em', // This creates that dense, premium look
       },
+      keyframes: {
+        shimmer: {
+          '100%': { transform: 'translateX(100%)' },
+        },
+      },
+      animation: {
+        shimmer: 'shimmer 2s infinite',
+      },
     },
   },
   plugins: [],
