@@ -54,6 +54,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
+    const titleize = (value: string) => {
+      const trimmed = value.trim()
+      if (!trimmed) return ''
+      return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase()
+    }
+
+    const inferNameFromString = (value: string | null | undefined) => {
+      const raw = typeof value === 'string' ? value.trim() : ''
+      if (!raw) return null
+      const parts = raw.split(/\s+/).filter(Boolean)
+      if (parts.length < 2) return null
+      const firstName = titleize(parts[0])
+      const lastName = titleize(parts.slice(1).join(' '))
+      const fullName = `${firstName} ${lastName}`.trim()
+      return { firstName, lastName, fullName }
+    }
+
+    const inferNameFromEmail = (email: string) => {
+      const emailLower = String(email).toLowerCase().trim()
+      const prefix = emailLower.split('@')[0] || ''
+      const parts = prefix.split(/[._-]+/).filter(Boolean)
+      if (parts.length < 2) return null
+      const firstName = titleize(parts[0])
+      const lastName = titleize(parts.slice(1).join(' '))
+      const fullName = `${firstName} ${lastName}`.trim()
+      return { firstName, lastName, fullName }
+    }
+
     let unsubProfile: (() => void) | null = null
     let didResolve = false
 
@@ -87,6 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (user.email) {
           // Listen for real-time updates to user profile
           const userDocRef = doc(db, 'users', user.email.toLowerCase())
+          const emailLower = user.email.toLowerCase().trim()
           
           unsubProfile = onSnapshot(userDocRef, (doc) => {
             if (doc.exists()) {
@@ -98,16 +127,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const storedName = typeof data.name === 'string' ? data.name.trim() || null : null
               const storedDisplayName = typeof data.displayName === 'string' ? data.displayName.trim() || null : null
 
+              const inferred =
+                inferNameFromString(storedDisplayName) ||
+                inferNameFromString(user.displayName) ||
+                inferNameFromString(storedName) ||
+                inferNameFromEmail(emailLower)
+
+              const resolvedFirstName = firstName || inferred?.firstName || null
+              const resolvedLastName = lastName || inferred?.lastName || null
+              const explicitFullName = resolvedFirstName ? `${resolvedFirstName} ${resolvedLastName || ''}`.trim() : null
+
               const derivedName =
+                explicitFullName ||
                 storedName ||
                 storedDisplayName ||
-                (firstName ? `${firstName} ${lastName || ''}`.trim() : null) ||
                 (user.displayName?.trim() || null)
+
+              if ((!firstName || !lastName) && inferred?.fullName) {
+                const nextName = inferred.fullName
+                const shouldOverrideName = !storedName || !storedName.includes(' ')
+                void setDoc(
+                  userDocRef,
+                  {
+                    ...(resolvedFirstName ? { firstName: resolvedFirstName } : {}),
+                    ...(resolvedLastName ? { lastName: resolvedLastName } : {}),
+                    ...(shouldOverrideName ? { name: nextName, displayName: nextName } : {}),
+                    updatedAt: new Date().toISOString(),
+                  },
+                  { merge: true }
+                )
+              }
 
               setProfile({ 
                 name: derivedName, 
-                firstName, 
-                lastName,
+                firstName: resolvedFirstName, 
+                lastName: resolvedLastName,
                 bio: typeof data.bio === 'string' ? data.bio : null,
                 twilioNumbers: Array.isArray(data.twilioNumbers) ? data.twilioNumbers : [],
                 selectedPhoneNumber: typeof data.selectedPhoneNumber === 'string' ? data.selectedPhoneNumber : null,
@@ -115,11 +169,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               })
             } else {
               setRole('employee')
-              const derivedName = user.displayName?.trim() || null
+              const inferred = inferNameFromString(user.displayName) || inferNameFromEmail(emailLower)
+              const derivedName = inferred?.fullName || user.displayName?.trim() || null
               setProfile({ 
                 name: derivedName, 
-                firstName: null, 
-                lastName: null,
+                firstName: inferred?.firstName || null, 
+                lastName: inferred?.lastName || null,
                 bio: null,
                 twilioNumbers: [],
                 selectedPhoneNumber: null,
@@ -132,13 +187,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             const userDoc = await getDoc(userDocRef)
             if (!userDoc.exists()) {
-              const derivedName = user.displayName?.trim() || null
+              const inferred = inferNameFromString(user.displayName) || inferNameFromEmail(emailLower)
+              const derivedName = inferred?.fullName || user.displayName?.trim() || null
               await setDoc(
                 userDocRef,
                 {
-                  email: user.email.toLowerCase(),
+                  email: emailLower,
                   role: 'employee',
                   ...(derivedName ? { name: derivedName, displayName: derivedName } : {}),
+                  ...(inferred?.firstName ? { firstName: inferred.firstName } : {}),
+                  ...(inferred?.lastName ? { lastName: inferred.lastName } : {}),
                   createdAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString(),
                 },
