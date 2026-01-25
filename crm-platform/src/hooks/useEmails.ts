@@ -100,7 +100,8 @@ export function useEmails(searchQuery?: string) {
 
       // Simple HTML wrapping
       const htmlContent = `<div style="white-space:pre-wrap;">${emailData.content}</div>`
-      const fromName = profile.name || user.displayName || undefined
+      const explicitFromName = [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim()
+      const fromName = explicitFromName || profile.name || user.displayName || undefined
 
       const response = await fetch('/api/email/sendgrid-send', {
         method: 'POST',
@@ -147,33 +148,75 @@ export function useEmails(searchQuery?: string) {
   };
 }
 
+export function useSearchEmails(queryTerm: string) {
+  const { user, role, loading } = useAuth()
+
+  return useQuery({
+    queryKey: ['emails-search', queryTerm, user?.email ?? 'guest', role],
+    queryFn: async () => {
+      if (!queryTerm || queryTerm.length < 2) return []
+      if (loading || !user) return []
+
+      try {
+        let query = supabase
+          .from('emails')
+          .select('*')
+        
+        if (role !== 'admin') {
+           query = query.eq('metadata->>ownerId', user.email)
+        }
+
+        query = query.or(`subject.ilike.%${queryTerm}%,from.ilike.%${queryTerm}%,text.ilike.%${queryTerm}%`)
+
+        const { data, error } = await query.limit(5)
+
+        if (error) throw error
+
+        return data.map(item => ({
+          id: item.id,
+          subject: item.subject,
+          from: item.from,
+          date: item.timestamp || item.created_at
+        }))
+      } catch (error) {
+        console.error("Search emails error:", error)
+        return []
+      }
+    },
+    enabled: queryTerm.length >= 2 && !loading && !!user,
+    staleTime: 1000 * 60 * 1,
+  })
+}
+
 export function useEmailsCount(searchQuery?: string) {
   const { user, role, loading } = useAuth()
 
   return useQuery({
-    queryKey: ['emails-count', user?.email ?? 'guest', role, searchQuery],
+    queryKey: ['emails-count', user?.email, role, searchQuery],
     queryFn: async () => {
-      if (loading) return 0
-      if (!user?.email) return 0
+      if (loading || !user) return 0
 
-      let query = supabase.from('emails').select('*', { count: 'exact', head: true })
+      try {
+        let query = supabase
+          .from('emails')
+          .select('*', { count: 'exact', head: true })
+        
+        if (role !== 'admin') {
+           query = query.eq('metadata->>ownerId', user.email)
+        }
 
-      if (role !== 'admin') {
-         query = query.eq('metadata->>ownerId', user.email)
-      }
+        if (searchQuery) {
+          query = query.or(`subject.ilike.%${searchQuery}%,from.ilike.%${searchQuery}%,text.ilike.%${searchQuery}%`)
+        }
 
-      if (searchQuery) {
-        query = query.or(`subject.ilike.%${searchQuery}%,from.ilike.%${searchQuery}%,text.ilike.%${searchQuery}%`)
-      }
-
-      const { count, error } = await query
-      if (error) {
+        const { count, error } = await query
+        if (error) throw error
+        return count || 0
+      } catch (error) {
         console.error("Error fetching emails count:", error)
         return 0
       }
-      return count || 0
     },
     enabled: !loading && !!user,
-    staleTime: 1000 * 60 * 5,
   })
 }
