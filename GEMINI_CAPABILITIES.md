@@ -1,10 +1,10 @@
-# 🤖 Gemini Agent: Capabilities & Intelligence Roadmap
+# 🤖 Nodal Architect: Capabilities & Intelligence Roadmap
 
-The **Gemini AI Assistant** is the cognitive core of the Nodal Point platform. It is not just a chatbot; it is a **Function-Calling Agent** integrated directly into our Supabase backend, Gmail services, and market intelligence APIs.
+The **Nodal Architect** (powered by Gemini) is the cognitive core of the Nodal Point platform. It is not just a chatbot; it is a **Function-Calling Agent** integrated directly into our Supabase backend, Gmail services, and market intelligence APIs.
 
 ## 🚀 Current Active Capabilities
 
-The agent is currently equipped with the following "Tools" which it can execute autonomously based on natural language commands:
+The agent is currently equipped with the following "Tools" and UI protocols which it executes autonomously:
 
 ### 🗄️ CRM Operations (Supabase Integrated)
 - **Contact Management**:
@@ -33,15 +33,30 @@ The agent is currently equipped with the following "Tools" which it can execute 
 
 ---
 
+## 🎨 UI/UX Protocol: "Glass Intelligence"
+
+The Nodal Architect features a "Steve Jobs" inspired forensic interface:
+
+- **Contextual Awareness**: The agent automatically detects the user's current route (Contact, Account, Dashboard) and offers proactive insights upon opening without a single click.
+- **Rich Media Rendering**: Instead of text walls, the agent returns structured UI components:
+    - **Market Volatility Tickers**: Live-scrolling cards for energy news with trend indicators.
+    - **Mini-Profile Cards**: Visual prospect cards with "Inject Node" action buttons.
+- **Visual Status**: 
+    - **Live Waveform**: A dynamic bar animation that visualizes the AI's "thinking" process.
+    - **Ambient Hum**: A subtle pulsing glow signifying active background monitoring.
+- **Forensic Aesthetic**: Backdrop-blur-2xl glass containers, monospace typography, and a dedicated **Walkie-Talkie Mode** (Microphone) for future voice commands.
+
+---
+
 ## 🧠 Intelligence Philosophy: "The Physics of Pricing"
 
-The Gemini Agent is being trained to align with the **Nodal Point Thesis**. It doesn't just manage data; it understands the "Source Code of the Grid."
+The Nodal Architect is trained to align with the **Nodal Point Thesis**. It doesn't just manage data; it understands the "Source Code of the Grid."
 
 ### 1. Data Normalization
-The agent understands our Supabase schema, including the complex `metadata` mapping from legacy Firestore data. It can bridge the gap between "Old CRM" and "New Platform" data structures seamlessly.
+The agent understands our Supabase schema, including the complex `metadata` mapping from legacy Firestore data. It bridges the gap between "Old CRM" and "New Platform" data structures.
 
 ### 2. Forensic Analysis
-When discussing accounts, the agent is designed to prioritize the "Three Vectors of Cost Leakage":
+When discussing accounts, the agent prioritizes the "Three Vectors of Cost Leakage":
 - Identifying **Demand Ratchets**.
 - Monitoring **4CP Coincident Peaks**.
 - Predicting **Scarcity Pricing** risks.
@@ -50,12 +65,12 @@ When discussing accounts, the agent is designed to prioritize the "Three Vectors
 
 ## 🔮 Roadmap: Future Capabilities (Coming Soon)
 
-We are actively expanding the agent's "Brain" to include these forensic energy tools:
+We are actively expanding the Architect's "Brain" to include these forensic energy tools:
 
-- **AI Bill Debugger**: (Planned) Direct integration with the Bill Debugger logic to analyze uploaded invoices and identify hidden billing errors.
-- **Predictive Curtailment Alerts**: (Planned) Proactive notification logic where the agent warns users of upcoming high-price intervals.
-- **Sequence Orchestration**: (Planned) The ability for Gemini to enroll contacts into automated multi-channel follow-up sequences.
-- **Voice Intelligence**: (Planned) Summarizing Twilio call transcripts to extract "Commitment Events" and sentiment.
+- **AI Bill Debugger**: Direct integration with the Bill Debugger logic to analyze uploaded invoices and identify hidden billing errors.
+- **Predictive Curtailment Alerts**: Proactive notification logic where the agent warns users of upcoming high-price intervals.
+- **Sequence Orchestration**: The ability for Gemini to enroll contacts into automated multi-channel follow-up sequences.
+- **Voice Intelligence**: Summarizing Twilio call transcripts to extract "Commitment Events" and sentiment via the Walkie-Talkie interface.
 
 ## 🛠️ Technical Implementation
 - **Model**: `gemini-3-flash-preview` (Next-generation intelligence for high-precision tool calling).
@@ -65,4 +80,4 @@ We are actively expanding the agent's "Brain" to include these forensic energy t
 
 ---
 *Last Updated: 2026-01-25*
-*Status: Operational / Evolving*
+*Status: Nodal Architect v1.0 Operational*
