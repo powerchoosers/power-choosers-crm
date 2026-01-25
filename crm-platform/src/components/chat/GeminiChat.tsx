@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { Sparkles, Send, X, Loader2, User, Bot, Mic, Activity } from 'lucide-react'
+import { Copy, Send, X, Loader2, User, Bot, Mic, Activity } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -101,12 +101,12 @@ export function GeminiChatTrigger(props: { onToggle?: () => void }) {
       className={cn(
         "w-8 h-8 p-0 rounded-full transition-all duration-200",
         isOpen 
-          ? "bg-white/10 text-white shadow-lg scale-110" 
+          ? "bg-white/10 text-white" 
           : "text-zinc-400 hover:text-white hover:bg-white/10"
       )}
       title={isOpen ? "Close Gemini" : "Chat with Gemini"}
     >
-      {isOpen ? <X size={18} /> : <Sparkles size={18} />}
+      {isOpen ? <X size={18} /> : <Activity size={18} />}
     </Button>
   )
 }
@@ -217,13 +217,11 @@ export function GeminiChatPanel() {
       <div className="p-4 border-b border-white/5 flex items-center justify-between bg-zinc-900/10 relative z-10">
         <div className="flex items-center gap-2">
           <div className="relative">
-            <div className="w-8 h-8 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center relative z-10">
-              <Activity size={16} className="text-indigo-400" />
-            </div>
+            <Activity size={18} className="text-indigo-400 relative z-10" />
             {/* Ambient Hum Animation */}
             <motion.div
               animate={{
-                scale: [1, 1.2, 1],
+                scale: [1, 1.5, 1],
                 opacity: [0.3, 0.6, 0.3],
               }}
               transition={{
@@ -283,7 +281,7 @@ export function GeminiChatPanel() {
                       onClick={copyDebugInfo}
                       className="h-7 text-[10px] bg-zinc-950/50 border-white/10 hover:bg-white/5 text-zinc-400 hover:text-white transition-all w-fit gap-1.5"
                     >
-                      <Sparkles size={10} />
+                      <Copy size={10} />
                       Copy Prompt for Backend Dev
                     </Button>
                   </div>
