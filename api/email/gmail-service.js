@@ -37,7 +37,7 @@ export class GmailService {
 
                 return {
                     email: emailLower,
-                    name: userData.name || userData.displayName || derivedFullName || emailLower.split('@')[0]
+                    name: derivedFullName || userData.name || userData.displayName || emailLower.split('@')[0]
                 };
             }
             
