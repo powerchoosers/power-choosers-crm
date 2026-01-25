@@ -7,14 +7,18 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
-COPY package.json package-lock.json* ./
+# COPY from crm-platform subdirectory because build context is root
+COPY crm-platform/package.json crm-platform/package-lock.json* ./
 RUN npm ci
 
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+
+# COPY crm-platform contents to /app (root of the image)
+# This "hoists" the app so standard Next.js paths work
+COPY crm-platform/ .
 
 # Accept build arguments for client-side variables
 ARG NEXT_PUBLIC_FIREBASE_API_KEY
@@ -74,4 +78,4 @@ ENV PORT 3000
 
 # server.js is created by next build from the standalone output
 # https://nextjs.org/docs/pages/api-reference/next-config-js/output
-CMD ["node", "crm-platform/server.js"]
+CMD ["node", "server.js"]
