@@ -123,6 +123,7 @@ type ContactRow = {
   accountId?: string | null
   title?: string | null
   linkedinUrl?: string | null
+  website?: string | null
   notes?: string | null
   metadata?: ContactMetadata | string | null
   accounts?: AccountJoin | AccountJoin[] | null

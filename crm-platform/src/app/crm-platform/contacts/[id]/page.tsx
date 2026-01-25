@@ -350,12 +350,12 @@ export default function ContactDossierPage() {
                           </a>
                           <div className="w-px h-3 bg-white/10" />
                           <a 
-                            href={contact?.linkedin || '#'} 
+                            href={contact?.linkedinUrl || '#'} 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className={cn(
                               "p-1.5 rounded-full transition-colors",
-                              contact?.linkedin ? "hover:bg-[#0077b5] text-white" : "text-zinc-600 cursor-not-allowed"
+                              contact?.linkedinUrl ? "hover:bg-[#0077b5] text-white" : "text-zinc-600 cursor-not-allowed"
                             )} 
                             title="View LinkedIn"
                           >
