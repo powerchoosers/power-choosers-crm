@@ -9,6 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGeminiStore } from '@/store/geminiStore'
 import { usePathname, useParams } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -93,26 +94,29 @@ export function GeminiChatTrigger(props: { onToggle?: () => void }) {
   const isOpen = useGeminiStore((state) => state.isOpen)
   const toggleChat = useGeminiStore((state) => state.toggleChat)
 
-  return (    <Button
+  return (
+    <button
       onClick={() => {
         props.onToggle?.()
         toggleChat()
       }}
       className={cn(
-        "w-8 h-8 p-0 rounded-full transition-all duration-200",
+        "w-8 h-8 inline-flex items-center justify-center rounded-full transition-all duration-200",
         isOpen 
-          ? "bg-white/10 text-white" 
+          ? "bg-white/10 text-white shadow-lg" 
           : "text-zinc-400 hover:text-white hover:bg-white/10"
       )}
       title={isOpen ? "Close Gemini" : "Chat with Gemini"}
     >
       {isOpen ? <X size={18} /> : <Activity size={18} />}
-    </Button>
+    </button>
   )
 }
 
 export function GeminiChatPanel() {
   const isOpen = useGeminiStore((state) => state.isOpen)
+  const auth = useAuth()
+  const profile = auth?.profile
   const pathname = usePathname()
   const params = useParams()
   
@@ -217,11 +221,13 @@ export function GeminiChatPanel() {
       <div className="p-4 border-b border-white/5 flex items-center justify-between bg-zinc-900/10 relative z-10">
         <div className="flex items-center gap-2">
           <div className="relative">
-            <Activity size={18} className="text-indigo-400 relative z-10" />
+            <div className="w-8 h-8 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center relative z-10">
+              <Activity size={16} className="text-indigo-400" />
+            </div>
             {/* Ambient Hum Animation */}
             <motion.div
               animate={{
-                scale: [1, 1.5, 1],
+                scale: [1, 1.2, 1],
                 opacity: [0.3, 0.6, 0.3],
               }}
               transition={{
@@ -248,10 +254,18 @@ export function GeminiChatPanel() {
           {messages.map((m, i) => (
             <div key={i} className={cn("flex gap-3", m.role === 'user' ? "flex-row-reverse" : "flex-row")}>
               <div className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+                "w-8 h-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden",
                 m.role === 'user' ? "bg-zinc-800" : "bg-indigo-950/30 border border-indigo-500/20"
               )}>
-                {m.role === 'user' ? <User size={14} /> : <Bot size={14} className="text-indigo-400" />}
+                {m.role === 'user' ? (
+                  profile?.photoURL ? (
+                    <img src={profile.photoURL} alt="User" className="w-full h-full object-cover" />
+                  ) : (
+                    <User size={14} />
+                  )
+                ) : (
+                  <Bot size={14} className="text-indigo-400" />
+                )}
               </div>
               <div className={cn(
                 "max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed",
