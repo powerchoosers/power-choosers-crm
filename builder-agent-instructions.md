@@ -56,6 +56,10 @@ The platform operates across three distinct environments/servers:
     -   **Frontend (UI)**: `https://power-choosers-crm-792458658491.us-south1.run.app`
     -   **Backend (Network/API)**: `https://nodal-point-network-792458658491.us-south1.run.app`
     -   **Role**: The "Network" service handles Twilio webhooks, heavy API processing, and legacy backend logic to prevent recursive loops within the Next.js frontend service.
+    -   **Deployment Strategy (Docker)**:
+        -   **Context**: Build runs from root (`.`) to access all files.
+        -   **Structure**: `server.js` is located at `/app/crm-platform/server.js`, while `node_modules` are at `/app/node_modules`.
+        -   **Resolution**: We rely on Node.js native module resolution (looking in parent directories) so `crm-platform/server.js` correctly finds dependencies in `/app/node_modules` without needing `NODE_PATH` adjustments.
 
 ### 🌐 Routing Logic (Proxying)
 To ensure the frontend can communicate with the backend regardless of environment, we use **Next.js Rewrites** in `crm-platform/next.config.ts`:
