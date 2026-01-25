@@ -70,12 +70,14 @@ export class GmailService {
     async initialize(impersonateEmail = null) {
         try {
             // Decode service account key from base64
-            const keyBase64 = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-            if (!keyBase64) {
+            const rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+            const keyValue = typeof rawKey === 'string' ? rawKey.trim() : '';
+            if (!keyValue) {
                 throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY environment variable not set');
             }
-            
-            const keyJson = Buffer.from(keyBase64, 'base64').toString('utf8');
+
+            const unquoted = keyValue.startsWith('"') && keyValue.endsWith('"') ? keyValue.slice(1, -1) : keyValue;
+            const keyJson = unquoted.startsWith('{') ? unquoted : Buffer.from(unquoted, 'base64').toString('utf8');
             const key = JSON.parse(keyJson);
             
             // Create JWT auth with domain-wide delegation
@@ -192,7 +194,7 @@ export class GmailService {
             
         } catch (error) {
             logger.error('[Gmail] Send error:', error);
-            throw new Error(`Failed to send email via Gmail: ${error.message}`);
+            throw error;
         }
     }
 }
