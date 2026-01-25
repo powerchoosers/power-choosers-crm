@@ -310,7 +310,7 @@ export default async function handler(req, res) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-1.5-flash',
       tools,
       systemInstruction: `
         You are the Nodal Architect, the cognitive core of the Nodal Point CRM.
@@ -334,14 +334,16 @@ export default async function handler(req, res) {
     });
 
     // Filter history to ensure it starts with a 'user' role and alternates correctly
+    // Trim to last 10 messages to optimize context window and reduce load
     const validHistory = [];
     let nextExpectedRole = 'user';
 
+    const historyToProcess = historyCandidates.slice(-10);
     let startIndex = 0;
-    const firstUserInHistory = historyCandidates.findIndex((m) => m.role === 'user');
+    const firstUserInHistory = historyToProcess.findIndex((m) => m.role === 'user');
     if (firstUserInHistory > 0) startIndex = firstUserInHistory;
 
-    for (const m of historyCandidates.slice(startIndex)) {
+    for (const m of historyToProcess.slice(startIndex)) {
       const role = m.role === 'user' ? 'user' : 'model';
       if (role !== nextExpectedRole) continue;
 
@@ -356,10 +358,31 @@ export default async function handler(req, res) {
       history: validHistory,
       generationConfig: {
         maxOutputTokens: 2048,
+        temperature: 0.7,
       },
     });
 
-    let result = await chat.sendMessage(prompt);
+    // Helper for retrying Gemini calls
+    const callGeminiWithRetry = async (payload, maxRetries = 3) => {
+      let lastError;
+      for (let i = 0; i < maxRetries; i++) {
+        try {
+          return await chat.sendMessage(payload);
+        } catch (error) {
+          lastError = error;
+          if (error.message?.includes('503') || error.message?.includes('overloaded')) {
+            const delay = Math.pow(2, i) * 1000;
+            logger.warn(`[Gemini Chat] Model overloaded, retrying in ${delay}ms... (Attempt ${i + 1}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+          throw error;
+        }
+      }
+      throw lastError;
+    };
+
+    let result = await callGeminiWithRetry(prompt);
     let response = result.response;
     
     // Handle function calls
@@ -394,7 +417,7 @@ export default async function handler(req, res) {
         };
       }));
 
-      result = await chat.sendMessage(toolResponses);
+      result = await callGeminiWithRetry(toolResponses);
       response = result.response;
     }
 
