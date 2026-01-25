@@ -18,19 +18,20 @@ export function GeminiChatTrigger(props: { onToggle?: () => void }) {
   const isOpen = useGeminiStore((state) => state.isOpen)
   const toggleChat = useGeminiStore((state) => state.toggleChat)
 
-  return (
-    <Button
+  return (    <Button
       onClick={() => {
         props.onToggle?.()
         toggleChat()
       }}
       className={cn(
         "w-8 h-8 p-0 rounded-full transition-all duration-200",
-        isOpen ? "bg-indigo-600 text-white shadow-lg scale-110" : "text-zinc-400 hover:text-white hover:bg-white/10"
+        isOpen 
+          ? "bg-white/10 text-white shadow-lg scale-110" 
+          : "text-zinc-400 hover:text-white hover:bg-white/10"
       )}
-      title="Chat with Gemini"
+      title={isOpen ? "Close Gemini" : "Chat with Gemini"}
     >
-      <Sparkles size={18} className={isOpen ? "animate-pulse" : ""} />
+      {isOpen ? <X size={18} /> : <Sparkles size={18} />}
     </Button>
   )
 }
@@ -121,9 +122,6 @@ export function GeminiChatPanel() {
             </div>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="text-zinc-400 hover:text-white">
-          <X size={18} />
-        </Button>
       </div>
 
       {/* Messages */}
