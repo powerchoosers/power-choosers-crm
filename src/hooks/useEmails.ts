@@ -25,12 +25,12 @@ export interface Email {
 
 const PAGE_SIZE = 50
 
-export function useEmails() {
+export function useEmails(searchQuery?: string) {
   const { user, role, loading, profile } = useAuth()
   const queryClient = useQueryClient()
 
   const emailsQuery = useInfiniteQuery({
-    queryKey: ['emails', user?.email ?? 'guest'],
+    queryKey: ['emails', user?.email ?? 'guest', role, searchQuery],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       if (loading) return { emails: [], nextCursor: null }
@@ -41,11 +41,12 @@ export function useEmails() {
           .from('emails')
           .select('*', { count: 'exact' })
         
-        // Filter by owner using metadata->>ownerId since ownerId is not a top-level column in schema
         if (role !== 'admin') {
-           // Note: This relies on the metadata JSONB column containing 'ownerId'
-           // If migration populated this correctly, it will work.
            query = query.eq('metadata->>ownerId', user.email)
+        }
+
+        if (searchQuery) {
+          query = query.or(`subject.ilike.%${searchQuery}%,from.ilike.%${searchQuery}%,text.ilike.%${searchQuery}%`)
         }
 
         const from = pageParam * PAGE_SIZE
@@ -146,11 +147,11 @@ export function useEmails() {
   };
 }
 
-export function useEmailsCount() {
+export function useEmailsCount(searchQuery?: string) {
   const { user, role, loading } = useAuth()
 
   return useQuery({
-    queryKey: ['emails-count', user?.email ?? 'guest'],
+    queryKey: ['emails-count', user?.email ?? 'guest', role, searchQuery],
     queryFn: async () => {
       if (loading) return 0
       if (!user?.email) return 0
@@ -159,6 +160,10 @@ export function useEmailsCount() {
 
       if (role !== 'admin') {
          query = query.eq('metadata->>ownerId', user.email)
+      }
+
+      if (searchQuery) {
+        query = query.or(`subject.ilike.%${searchQuery}%,from.ilike.%${searchQuery}%,text.ilike.%${searchQuery}%`)
       }
 
       const { count, error } = await query

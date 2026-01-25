@@ -1,4 +1,4 @@
-import { useInfiniteQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 
@@ -15,6 +15,34 @@ export interface Call {
   summary?: string
   transcript?: string
   contactId?: string
+}
+
+export function useCallsCount(searchQuery?: string) {
+  const { user, role, loading } = useAuth()
+
+  return useQuery({
+    queryKey: ['calls-count', user?.email, role, searchQuery],
+    queryFn: async () => {
+      if (loading || !user) return 0
+
+      let query = supabase
+        .from('calls')
+        .select('*, contacts!inner(name, ownerId)', { count: 'exact', head: true })
+
+      if (role !== 'admin' && user.email) {
+        query = query.filter('contacts.ownerId', 'eq', user.email)
+      }
+
+      if (searchQuery) {
+        query = query.or(`summary.ilike.%${searchQuery}%,transcript.ilike.%${searchQuery}%,contacts.name.ilike.%${searchQuery}%`)
+      }
+
+      const { count, error } = await query
+      if (error) throw error
+      return count || 0
+    },
+    enabled: !loading && !!user,
+  })
 }
 
 type CallContact = {
@@ -40,33 +68,27 @@ type CallRow = {
 
 const PAGE_SIZE = 50
 
-export function useCalls() {
+export function useCalls(searchQuery?: string) {
   const { user, role, loading } = useAuth()
 
   return useInfiniteQuery({
-    queryKey: ['calls', user?.email ?? 'guest'],
+    queryKey: ['calls', user?.email ?? 'guest', role, searchQuery],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       if (loading) return { calls: [], nextCursor: null }
       if (!user) return { calls: [], nextCursor: null }
 
-      // We need to filter calls by owner. 
-      // Calls table has accountId/contactId but not ownerId explicitly in schema, 
-      // but migration script put everything in metadata. 
-      // Also, we can join contacts and filter by contact's owner.
-      
       let query = supabase
         .from('calls')
         .select('*, contacts!inner(name, ownerId)', { count: 'exact' })
       
-      // If we want to filter by owner, we might need to filter on the joined contact's ownerId
-      // However, Supabase simple filtering on joined tables is: .eq('contacts.ownerId', user.email)
-      // But for "inner join" filtering behavior, we use !inner
-      
       if (role !== 'admin' && user.email) {
-         // Filter calls where the associated contact belongs to the user
-         // or use metadata if ownerId was preserved on the call itself
          query = query.filter('contacts.ownerId', 'eq', user.email)
+      }
+
+      if (searchQuery) {
+        // Search in contact name, summary, or transcript
+        query = query.or(`summary.ilike.%${searchQuery}%,transcript.ilike.%${searchQuery}%,contacts.name.ilike.%${searchQuery}%`)
       }
 
       const from = pageParam * PAGE_SIZE
