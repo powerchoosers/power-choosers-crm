@@ -48,9 +48,15 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onUp
       phoneEntries.push({ id: 'mobile', label: 'Mobile', value: '', icon: Smartphone })
     }
 
-    setPhones(phoneEntries)
-    setPrimaryField(contact.primaryPhoneField || (phoneEntries[0]?.id as string) || 'mobile')
-    setEmail(contact.email || '')
+    setPhones(prev => JSON.stringify(prev) !== JSON.stringify(phoneEntries) ? phoneEntries : prev)
+    setPrimaryField(prev => {
+      const next = contact.primaryPhoneField || (phoneEntries[0]?.id as string) || 'mobile'
+      return prev !== next ? next : prev
+    })
+    setEmail(prev => {
+      const next = contact.email || ''
+      return prev !== next ? next : prev
+    })
   }, [contact, isEditing])
 
   const handlePhoneChange = (id: PhoneType, value: string) => {
