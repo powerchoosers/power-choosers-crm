@@ -65,11 +65,11 @@ export function useSearchAccounts(queryTerm: string) {
   });
 }
 
-export function useAccounts() {
+export function useAccounts(searchQuery?: string) {
   const { user, role, loading } = useAuth()
 
   return useInfiniteQuery({
-    queryKey: ['accounts', user?.email ?? 'guest', role ?? 'unknown'],
+    queryKey: ['accounts', user?.email ?? 'guest', role ?? 'unknown', searchQuery],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       try {
@@ -81,6 +81,10 @@ export function useAccounts() {
         // Apply ownership filter for non-admin users
         if (role !== 'admin' && user?.email) {
            query = query.eq('ownerId', user.email);
+        }
+
+        if (searchQuery) {
+          query = query.or(`name.ilike.%${searchQuery}%,domain.ilike.%${searchQuery}%,industry.ilike.%${searchQuery}%`);
         }
 
         const from = pageParam * PAGE_SIZE;
@@ -180,11 +184,11 @@ export function useAccount(id: string) {
   })
 }
 
-export function useAccountsCount() {
+export function useAccountsCount(searchQuery?: string) {
   const { user, role, loading } = useAuth()
 
   return useQuery({
-    queryKey: ['accounts-count', user?.email ?? 'guest', role ?? 'unknown'],
+    queryKey: ['accounts-count', user?.email ?? 'guest', role ?? 'unknown', searchQuery],
     queryFn: async () => {
       if (loading) return 0
       if (!user) return 0
@@ -193,6 +197,10 @@ export function useAccountsCount() {
 
       if (role !== 'admin' && user.email) {
         query = query.eq('ownerId', user.email)
+      }
+
+      if (searchQuery) {
+        query = query.or(`name.ilike.%${searchQuery}%,domain.ilike.%${searchQuery}%,industry.ilike.%${searchQuery}%`);
       }
 
       const { count, error } = await query

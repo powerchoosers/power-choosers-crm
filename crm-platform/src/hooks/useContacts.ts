@@ -204,8 +204,9 @@ export function useSearchContacts(queryTerm: string) {
           query = query.eq('ownerId', user.email);
         }
 
-        // Search across multiple columns
-        query = query.or(`name.ilike.%${queryTerm}%,email.ilike.%${queryTerm}%,firstName.ilike.%${queryTerm}%,lastName.ilike.%${queryTerm}%,first_name.ilike.%${queryTerm}%,last_name.ilike.%${queryTerm}%`);
+        // Search across multiple columns - more conservative list to avoid invalid column errors
+        // name and email are standard. firstName/lastName are used in ordering so they should exist.
+        query = query.or(`name.ilike.%${queryTerm}%,email.ilike.%${queryTerm}%,firstName.ilike.%${queryTerm}%,lastName.ilike.%${queryTerm}%`);
 
         const { data, error } = await query.limit(10);
 
@@ -247,11 +248,11 @@ export function useSearchContacts(queryTerm: string) {
   });
 }
 
-export function useContacts() {
+export function useContacts(searchQuery?: string) {
   const { user, role, loading } = useAuth()
 
   return useInfiniteQuery({
-    queryKey: ['contacts', CONTACTS_QUERY_BUSTER, user?.email ?? 'guest', role ?? 'unknown'],
+    queryKey: ['contacts', CONTACTS_QUERY_BUSTER, user?.email ?? 'guest', role ?? 'unknown', searchQuery],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       try {
@@ -264,6 +265,10 @@ export function useContacts() {
 
         if (role !== 'admin' && user?.email) {
            query = query.eq('ownerId', user.email);
+        }
+
+        if (searchQuery) {
+          query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,firstName.ilike.%${searchQuery}%,lastName.ilike.%${searchQuery}%`);
         }
 
         const from = pageParam * PAGE_SIZE;
@@ -348,11 +353,11 @@ export function useContacts() {
   })
 }
 
-export function useContactsCount() {
+export function useContactsCount(searchQuery?: string) {
   const { user, role, loading } = useAuth()
 
   return useQuery({
-    queryKey: ['contacts-count', CONTACTS_QUERY_BUSTER, user?.email ?? 'guest', role ?? 'unknown'],
+    queryKey: ['contacts-count', CONTACTS_QUERY_BUSTER, user?.email ?? 'guest', role ?? 'unknown', searchQuery],
     queryFn: async () => {
       if (loading) return 0
       if (!user) return 0
@@ -361,6 +366,10 @@ export function useContactsCount() {
 
       if (role !== 'admin' && user.email) {
         query = query.eq('ownerId', user.email)
+      }
+
+      if (searchQuery) {
+        query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,firstName.ilike.%${searchQuery}%,lastName.ilike.%${searchQuery}%`);
       }
 
       const { count, error } = await query
