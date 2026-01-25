@@ -1,12 +1,14 @@
-// Firestore-backed Calls API (GET recent calls, POST upsert by Call SID)
-// Uses Firebase Admin via api/_firebase.js; falls back to in-memory map if Firestore unavailable
+// Supabase-backed Calls API (GET recent calls, POST upsert by Call SID)
+// Migrated from Firestore to Supabase (PostgreSQL)
 import { cors } from './_cors.js';
-import { db } from './_firebase.js';
+import { supabaseAdmin } from './_supabase.js';
 import { resolveToCallSid, isCallSid } from './_twilio-ids.js';
 import logger from './_logger.js';
 
-// In-memory fallback store (for local/dev when Firestore isn't configured)
+// In-memory fallback store (for local/dev when Supabase isn't configured)
 const memoryStore = new Map();
+
+const isSupabaseEnabled = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Derive outcome from call status and duration
 function deriveOutcome(call) {
@@ -91,6 +93,101 @@ function normalizeCallForResponse(call) {
   };
 }
 
+// Map Supabase snake_case row to camelCase object
+function mapSupabaseToCall(row) {
+  if (!row) return {};
+  return {
+    id: row.id,
+    callSid: row.call_sid,
+    twilioSid: row.twilio_sid,
+    to: row.to_phone,
+    from: row.from_phone,
+    status: row.status,
+    duration: row.duration,
+    durationSec: row.duration_sec,
+    timestamp: row.timestamp,
+    callTime: row.call_time,
+    outcome: row.outcome,
+    transcript: row.transcript,
+    formattedTranscript: row.formatted_transcript,
+    aiSummary: row.ai_summary,
+    aiInsights: row.ai_insights,
+    recordingUrl: row.recording_url,
+    recordingChannels: row.recording_channels,
+    recordingTrack: row.recording_track,
+    recordingSource: row.recording_source,
+    conversationalIntelligence: row.conversational_intelligence,
+    accountId: row.account_id,
+    accountName: row.account_name,
+    contactId: row.contact_id,
+    contactName: row.contact_name,
+    targetPhone: row.target_phone,
+    businessPhone: row.business_phone,
+    source: row.source,
+    ownerId: row.owner_id,
+    assignedTo: row.assigned_to,
+    createdBy: row.created_by,
+    agentEmail: row.agent_email,
+    userEmail: row.user_email,
+    updatedAt: row.updated_at,
+    createdAt: row.created_at,
+    ...row.metadata // Spread any extra metadata
+  };
+}
+
+// Map camelCase object to Supabase snake_case row
+function mapCallToSupabase(call) {
+  const metadata = { ...call };
+  // Remove core fields from metadata to avoid duplication
+  const coreFields = [
+    'id', 'callSid', 'twilioSid', 'to', 'from', 'status', 'duration', 'durationSec',
+    'timestamp', 'callTime', 'outcome', 'transcript', 'formattedTranscript', 'aiSummary',
+    'aiInsights', 'recordingUrl', 'recordingChannels', 'recordingTrack', 'recordingSource',
+    'conversationalIntelligence', 'accountId', 'accountName', 'contactId', 'contactName',
+    'targetPhone', 'businessPhone', 'source', 'ownerId', 'assignedTo', 'createdBy',
+    'agentEmail', 'userEmail', 'updatedAt', 'createdAt'
+  ];
+  coreFields.forEach(field => delete metadata[field]);
+
+  return {
+    id: call.id || call.callSid,
+    call_sid: call.callSid || call.id,
+    twilio_sid: call.twilioSid || call.callSid,
+    to_phone: call.to,
+    from_phone: call.from,
+    status: call.status,
+    duration: call.duration,
+    duration_sec: call.durationSec,
+    timestamp: call.timestamp || call.callTime,
+    call_time: call.callTime || call.timestamp,
+    outcome: call.outcome,
+    transcript: call.transcript,
+    formatted_transcript: call.formattedTranscript,
+    ai_summary: call.aiSummary,
+    ai_insights: call.aiInsights,
+    recording_url: call.recordingUrl,
+    recording_channels: call.recordingChannels ? String(call.recordingChannels) : null,
+    recording_track: call.recordingTrack,
+    recording_source: call.recordingSource,
+    conversational_intelligence: call.conversationalIntelligence,
+    account_id: call.accountId,
+    account_name: call.accountName,
+    contact_id: call.contactId,
+    contact_name: call.contactName,
+    target_phone: call.targetPhone,
+    business_phone: call.businessPhone,
+    source: call.source,
+    owner_id: call.ownerId,
+    assigned_to: call.assignedTo,
+    created_by: call.createdBy,
+    agent_email: call.agentEmail,
+    user_email: call.userEmail,
+    updated_at: call.updatedAt,
+    created_at: call.createdAt,
+    metadata: metadata
+  };
+}
+
 function norm10(v) {
   try { return (v == null ? '' : String(v)).replace(/\D/g, '').slice(-10); } catch(_) { return ''; }
 }
@@ -106,21 +203,39 @@ function pickBusinessAndTarget({ to, from, targetPhone, businessPhone }) {
   return { businessPhone: biz || '', targetPhone: tgt || '' };
 }
 
-async function getCallsFromFirestore(limit = 0) {
-  if (!db) return null;
-  let q = db.collection('calls').orderBy('timestamp', 'desc');
-  if (limit && Number(limit) > 0) q = q.limit(Number(limit));
-  const snap = await q.get();
-  const rows = [];
-  snap.forEach((doc) => {
-    const data = doc.data() || {};
-    rows.push(normalizeCallForResponse({ id: doc.id, ...data }));
-  });
-  return rows;
+async function getCallsFromSupabase(limit = 0, offset = 0, callSid = null) {
+  if (!isSupabaseEnabled) return null;
+  
+  let query = supabaseAdmin
+    .from('calls')
+    .select('*')
+    .order('timestamp', { ascending: false });
+
+  if (callSid) {
+    query = query.eq('id', callSid);
+  }
+
+  if (limit > 0) {
+    query = query.limit(limit);
+  }
+  
+  if (offset > 0) {
+    query = query.range(offset, offset + limit - 1);
+  }
+
+  const { data, error } = await query;
+  
+  if (error) {
+    logger.error('Supabase fetch error:', error);
+    return [];
+  }
+  
+  return data.map(row => normalizeCallForResponse(mapSupabaseToCall(row)));
 }
 
-async function upsertCallInFirestore(payload) {
-  if (!db) return null;
+async function upsertCallInSupabase(payload) {
+  if (!isSupabaseEnabled) return null;
+  
   const nowIso = new Date().toISOString();
   // Resolve a proper Twilio Call SID. Never create a document without a valid Call SID.
   let callId = (payload.callSid && String(payload.callSid)) || '';
@@ -134,7 +249,7 @@ async function upsertCallInFirestore(payload) {
     } catch (_) {}
   }
   if (!isCallSid(callId)) {
-    // No valid Call SID → do not persist to Firestore
+    // No valid Call SID → do not persist
     return null;
   }
 
@@ -146,13 +261,17 @@ async function upsertCallInFirestore(payload) {
     businessPhone: payload.businessPhone
   });
 
-  // Extract user email for ownership (from payload or agentEmail field)
+  // Extract user email for ownership
   const userEmail = (payload.userEmail || payload.agentEmail || '').toLowerCase().trim();
 
-  // Strict policy: upsert by Call SID only; do not cross-merge by phone pair
-  // Try exact doc first
-  const currentSnap = await db.collection('calls').doc(callId).get();
-  const current = currentSnap.exists ? (currentSnap.data() || {}) : {};
+  // Fetch current state to merge
+  const { data: currentData } = await supabaseAdmin
+    .from('calls')
+    .select('*')
+    .eq('id', callId)
+    .single();
+
+  const current = currentData ? mapSupabaseToCall(currentData) : {};
 
   const primaryId = callId;
 
@@ -168,7 +287,7 @@ async function upsertCallInFirestore(payload) {
     durationSec: payload.durationSec != null ? payload.durationSec : (current.durationSec != null ? current.durationSec : (payload.duration || current.duration || 0)),
     timestamp: current.timestamp || payload.callTime || payload.timestamp || nowIso,
     callTime: payload.callTime || current.callTime || current.timestamp || nowIso,
-        outcome: payload.outcome || current.outcome || deriveOutcome({...current, ...payload}),
+    outcome: payload.outcome || current.outcome || deriveOutcome({...current, ...payload}),
     transcript: payload.transcript != null ? payload.transcript : current.transcript,
     formattedTranscript: payload.formattedTranscript != null ? payload.formattedTranscript : current.formattedTranscript,
     aiInsights: payload.aiInsights != null ? payload.aiInsights : current.aiInsights || null,
@@ -192,9 +311,7 @@ async function upsertCallInFirestore(payload) {
     createdAt: current.createdAt || nowIso
   };
 
-  // CRITICAL: Add ownership fields for Firestore security rules
-  // For new documents (no existing ownerId), always set ownership with fallback
-  // For existing documents, preserve ownership or update if userEmail provided
+  // Ownership logic
   const hasExistingOwner = current.ownerId && current.ownerId.trim();
   const finalOwnerEmail = (userEmail && userEmail.trim()) 
     ? userEmail.toLowerCase().trim() 
@@ -203,9 +320,19 @@ async function upsertCallInFirestore(payload) {
   merged.ownerId = finalOwnerEmail;
   merged.assignedTo = finalOwnerEmail;
   merged.createdBy = current.createdBy || finalOwnerEmail;
-  merged.agentEmail = finalOwnerEmail; // Also set agentEmail for compatibility
+  merged.agentEmail = finalOwnerEmail;
 
-  await db.collection('calls').doc(primaryId).set(merged, { merge: true });
+  // Convert to DB row
+  const dbRow = mapCallToSupabase(merged);
+
+  const { error } = await supabaseAdmin
+    .from('calls')
+    .upsert(dbRow);
+
+  if (error) {
+    logger.error('Supabase upsert error:', error);
+    return null;
+  }
 
   return normalizeCallForResponse(merged);
 }
@@ -221,40 +348,17 @@ export default async function handler(req, res) {
       const limit = parseInt(urlObj.searchParams.get('limit')) || 0;
       const offset = parseInt(urlObj.searchParams.get('offset')) || 0;
 
-      if (db) {
+      if (isSupabaseEnabled) {
         if (callSid) {
-          const snap = await db.collection('calls').doc(callSid).get();
-          if (snap.exists) {
-            const data = snap.data() || {};
-            const one = normalizeCallForResponse({ id: snap.id, ...data });
-            res.statusCode = 200;
-            res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ ok: true, calls: [one] }));
-            return;
-          } else {
-            res.statusCode = 200;
-            res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ ok: true, calls: [] }));
-            return;
-          }
+          const calls = await getCallsFromSupabase(1, 0, callSid);
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: true, calls }));
+          return;
         }
 
-        // Support pagination with limit and offset
-        let q = db.collection('calls').orderBy('timestamp', 'desc');
-        if (limit > 0) {
-          q = q.limit(limit);
-        }
-        if (offset > 0) {
-          q = q.offset(offset);
-        }
-        
-        const snap = await q.get();
-        const calls = [];
-        snap.forEach((doc) => {
-          const data = doc.data() || {};
-          calls.push(normalizeCallForResponse({ id: doc.id, ...data }));
-        });
-
+        // Support pagination
+        const calls = await getCallsFromSupabase(limit || 50, offset);
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ ok: true, calls, hasMore: calls.length === limit }));
@@ -284,14 +388,13 @@ export default async function handler(req, res) {
       pushId(body.callSid);
       pushId(body.twilioSid);
       if (Array.isArray(body.ids)) body.ids.forEach(pushId);
-      // If no body (e.g., some clients send query ids), check query param
+      
       const urlObj = new URL(req.url, `http://${req.headers.host}`);
       const qId = urlObj.searchParams.get('id');
       const qCallSid = urlObj.searchParams.get('callSid');
       const qTwilio = urlObj.searchParams.get('twilioSid');
       [qId, qCallSid, qTwilio].forEach(pushId);
 
-      // Resolve to valid Call SIDs; also keep raw ids list to purge legacy docs
       const resolved = [];
       for (const raw of ids) {
         let sid = raw;
@@ -301,16 +404,13 @@ export default async function handler(req, res) {
         if (isCallSid(sid)) resolved.push(sid);
       }
 
-      if (db) {
+      if (isSupabaseEnabled) {
         let deleted = 0;
-        // Delete exact Call SID docs
         for (const sid of resolved) {
-          try { await db.collection('calls').doc(sid).delete(); deleted++; } catch(_) {}
-        }
-        // Attempt cleanup of any legacy/non-SID ids that match raw inputs
-        for (const raw of ids) {
-          if (isCallSid(raw)) continue;
-          try { await db.collection('calls').doc(raw).delete(); deleted++; } catch(_) {}
+          try { 
+            const { error } = await supabaseAdmin.from('calls').delete().eq('id', sid);
+            if (!error) deleted++;
+          } catch(_) {}
         }
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
@@ -321,7 +421,6 @@ export default async function handler(req, res) {
       // Memory fallback
       let deleted = 0;
       for (const sid of resolved) { if (memoryStore.has(sid)) { memoryStore.delete(sid); deleted++; } }
-      for (const raw of ids) { if (!isCallSid(raw) && memoryStore.has(raw)) { memoryStore.delete(raw); deleted++; } }
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ ok: true, deleted, requested: ids.length }));
@@ -331,7 +430,6 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const payload = (req.body && typeof req.body === 'object') ? req.body : await readJson(req);
 
-      // Strict de-dup policy: only persist when we have a valid Twilio Call SID
       let callId = (payload.callSid && String(payload.callSid)) || '';
       if (!isCallSid(callId)) {
         try {
@@ -343,10 +441,9 @@ export default async function handler(req, res) {
         } catch (_) {}
       }
 
-      if (db) {
-        const saved = await upsertCallInFirestore({ ...payload, callSid: callId || payload.callSid });
+      if (isSupabaseEnabled) {
+        const saved = await upsertCallInSupabase({ ...payload, callSid: callId || payload.callSid });
         if (!saved) {
-          // No valid Call SID yet; acknowledge but do not create a row
           res.statusCode = 202;
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ ok: true, pending: true, reason: 'Awaiting valid Call SID' }));
@@ -358,7 +455,7 @@ export default async function handler(req, res) {
         return;
       }
 
-      // Memory fallback upsert: only by valid Call SID; no cross-call merging
+      // Memory fallback upsert
       if (!isCallSid(callId)) {
         res.statusCode = 202;
         res.setHeader('Content-Type', 'application/json');
@@ -414,22 +511,23 @@ export default async function handler(req, res) {
         return;
       }
 
-      if (db) {
-        // Update in Firestore
+      if (isSupabaseEnabled) {
         try {
-          const callRef = db.collection('calls').doc(callId);
           const updateData = {};
-          if (contactName) updateData.contactName = contactName;
-          if (contactId) updateData.contactId = contactId;
+          if (contactName) updateData.contact_name = contactName;
+          if (contactId) updateData.contact_id = contactId;
           
-          await callRef.update(updateData);
+          await supabaseAdmin
+            .from('calls')
+            .update(updateData)
+            .eq('id', callId);
           
           res.statusCode = 200;
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ ok: true, updated: true }));
           return;
         } catch (error) {
-          logger.error('Error updating call in Firestore:', error);
+          logger.error('Error updating call in Supabase:', error);
           res.statusCode = 500;
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ error: 'Failed to update call' }));
@@ -459,13 +557,11 @@ export default async function handler(req, res) {
     res.statusCode = 405;
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ error: 'Method not allowed' }));
+
   } catch (error) {
-    try {
-      logger.error('[api/calls] Error:', error);
-    } catch (_) {}
+    logger.error('API Error:', error);
     res.statusCode = 500;
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ ok: false, error: 'Internal server error' }));
+    res.end(JSON.stringify({ error: 'Internal Server Error' }));
   }
 }
-
