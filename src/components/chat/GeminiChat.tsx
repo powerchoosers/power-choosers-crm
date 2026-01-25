@@ -15,7 +15,24 @@ interface Message {
   role: 'user' | 'assistant'
   content: string
   type?: 'text' | 'component'
-  componentData?: any
+  componentData?: unknown
+}
+
+type NewsTickerItem = {
+  title: string
+  source?: string
+  trend?: 'up' | 'down'
+  volatility?: string
+}
+
+type MiniProfile = {
+  name: string
+  company?: string
+  title?: string
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
 }
 
 function Waveform() {
@@ -74,9 +91,25 @@ function ImageWithSkeleton({ src, alt, className, isLoading: isExternalLoading }
   )
 }
 
-function ComponentRenderer({ type, data }: { type: string, data: any }) {
+function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
   switch (type) {
     case 'news_ticker':
+      {
+        const items: NewsTickerItem[] = (() => {
+          if (!isRecord(data) || !Array.isArray(data.items)) return []
+          return data.items
+            .map((item): NewsTickerItem | null => {
+              if (!isRecord(item)) return null
+              const title = typeof item.title === 'string' ? item.title : ''
+              const source = typeof item.source === 'string' ? item.source : undefined
+              const trend = item.trend === 'up' || item.trend === 'down' ? item.trend : undefined
+              const volatility = typeof item.volatility === 'string' ? item.volatility : undefined
+              if (!title) return null
+              return { title, source, trend, volatility }
+            })
+            .filter((v): v is NewsTickerItem => v !== null)
+        })()
+
       return (
         <div className="flex flex-col gap-2 w-full overflow-hidden">
           <div className="flex items-center justify-between px-1">
@@ -84,7 +117,7 @@ function ComponentRenderer({ type, data }: { type: string, data: any }) {
             <Activity size={10} className="text-emerald-500" />
           </div>
           <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-            {data.items?.map((item: any, i: number) => (
+            {items.map((item, i) => (
               <div key={i} className="min-w-[200px] p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-1 hover:bg-white/10 transition-colors">
                 <div className="flex items-center justify-between text-[10px] font-mono">
                   <span className="text-zinc-400">{item.source || 'ERCOT'}</span>
@@ -100,10 +133,26 @@ function ComponentRenderer({ type, data }: { type: string, data: any }) {
           </div>
         </div>
       )
+      }
     case 'mini_profile':
+      {
+        const profiles: MiniProfile[] = (() => {
+          if (!isRecord(data) || !Array.isArray(data.profiles)) return []
+          return data.profiles
+            .map((profile): MiniProfile | null => {
+              if (!isRecord(profile)) return null
+              const name = typeof profile.name === 'string' ? profile.name : ''
+              const company = typeof profile.company === 'string' ? profile.company : undefined
+              const title = typeof profile.title === 'string' ? profile.title : undefined
+              if (!name) return null
+              return { name, company, title }
+            })
+            .filter((v): v is MiniProfile => v !== null)
+        })()
+
       return (
         <div className="grid grid-cols-1 gap-2 w-full">
-          {data.profiles?.map((profile: any, i: number) => (
+          {profiles.map((profile, i) => (
             <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group">
               <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 font-bold border border-white/5 group-hover:border-indigo-500/50 transition-colors">
                 {profile.name?.charAt(0)}
@@ -119,6 +168,7 @@ function ComponentRenderer({ type, data }: { type: string, data: any }) {
           ))}
         </div>
       )
+      }
     default:
       return null
   }
@@ -264,6 +314,8 @@ export function GeminiChatPanel() {
 
     const userMessage: Message = { role: 'user', content: input }
     const updatedMessages = [...messages, userMessage]
+    const firstUserIndex = updatedMessages.findIndex((m) => m.role === 'user')
+    const messagesForApi = firstUserIndex > 0 ? updatedMessages.slice(firstUserIndex) : updatedMessages
     setMessages(updatedMessages)
     setInput('')
     setIsLoading(true)
@@ -274,7 +326,7 @@ export function GeminiChatPanel() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          messages: updatedMessages,
+          messages: messagesForApi,
           context: contextInfo,
           userProfile: profile
         })
@@ -284,9 +336,9 @@ export function GeminiChatPanel() {
       if (data.error) throw new Error(data.message || data.error)
 
       setMessages(prev => [...prev, { role: 'assistant', content: data.content }])
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Chat error:', err)
-      setError(err.message || 'Internal server error')
+      setError(err instanceof Error ? err.message : 'Internal server error')
       setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }])
     } finally {
       setIsLoading(false)
