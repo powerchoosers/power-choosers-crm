@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { LayoutDashboard, Users, Phone, FileText, Zap, Settings, Building2, LogOut, CheckSquare, Play, Mail } from 'lucide-react'
+import { LayoutDashboard, Users, Phone, Sparkles, Zap, Settings, Building2, LogOut, CheckSquare, Play, Mail } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -10,6 +10,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { auth } from '@/lib/firebase'
 import { toast } from 'sonner'
+import { GeminiChat } from '@/components/chat/GeminiChat'
+import { useGeminiStore } from '@/store/geminiStore'
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/crm-platform' },
@@ -19,7 +21,7 @@ const navItems = [
   { icon: Play, label: 'Sequences', href: '/crm-platform/sequences' },
   { icon: Mail, label: 'Emails', href: '/crm-platform/emails' },
   { icon: Phone, label: 'Calls', href: '/crm-platform/calls' },
-  { icon: FileText, label: 'Scripts', href: '/crm-platform/scripts' },
+  { icon: Sparkles, label: 'Gemini', href: '#', isChat: true },
   { icon: Zap, label: 'Energy', href: '/crm-platform/energy' },
   { icon: Settings, label: 'Settings', href: '/crm-platform/settings' },
 ]
@@ -29,6 +31,7 @@ export function Sidebar() {
   const router = useRouter()
   const { user, role } = useAuth()
   const [isHovered, setIsHovered] = useState(false)
+  const toggleGemini = useGeminiStore(state => state.toggleChat)
 
   const handleLogout = async () => {
     try {
@@ -45,7 +48,7 @@ export function Sidebar() {
   return (
     <aside 
       className={cn(
-        "fixed left-0 top-0 bottom-0 z-40 bg-zinc-950/90 backdrop-blur-xl border-r border-white/5 flex flex-col transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        "fixed left-0 top-0 bottom-0 z-40 bg-zinc-950 border-r border-white/5 flex flex-col transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
         isHovered ? "w-64 shadow-2xl shadow-black/50" : "w-16"
       )}
       onMouseEnter={() => setIsHovered(true)}
@@ -70,19 +73,9 @@ export function Sidebar() {
       <nav className="flex-1 py-6 flex flex-col gap-2 px-3 overflow-hidden">
         {navItems.map((item) => {
           const isActive = pathname === item.href
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              prefetch={false}
-              className={cn(
-                "flex items-center rounded-xl transition-all duration-300 group relative h-11 justify-start",
-                isHovered ? "px-3" : "pl-2.5", // pl-2.5 (10px) + nav px-3 (12px) = 22px. Centers 20px icon in 64px sidebar.
-                isActive 
-                  ? "text-white" 
-                  : "text-zinc-400 hover:text-zinc-200"
-              )}
-            >
+          
+          const content = (
+            <>
               <AnimatePresence>
                 {isActive && (
                   <>
@@ -133,6 +126,39 @@ export function Sidebar() {
                   </motion.span>
                 )}
               </AnimatePresence>
+            </>
+          );
+
+          if ('isChat' in item && item.isChat) {
+            return (
+              <button
+                key={item.label}
+                onClick={toggleGemini}
+                className={cn(
+                  "flex items-center rounded-xl transition-all duration-300 group relative h-11 justify-start w-full text-left",
+                  isHovered ? "px-3" : "pl-2.5",
+                  "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]"
+                )}
+              >
+                {content}
+              </button>
+            )
+          }
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              prefetch={false}
+              className={cn(
+                "flex items-center rounded-xl transition-all duration-300 group relative h-11 justify-start",
+                isHovered ? "px-3" : "pl-2.5",
+                isActive 
+                  ? "text-white" 
+                  : "text-zinc-400 hover:text-zinc-200"
+              )}
+            >
+              {content}
             </Link>
           )
         })}

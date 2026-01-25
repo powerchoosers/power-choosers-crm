@@ -113,6 +113,8 @@ steps:
     - '--set-env-vars'
     - 'TWILIO_TWIML_APP_SID=${_TWILIO_TWIML_APP_SID}'
     - '--set-env-vars'
+    - 'SUPABASE_SERVICE_ROLE_KEY=${_SUPABASE_SERVICE_ROLE_KEY}'
+    - '--set-env-vars'
     - 'TWILIO_PHONE_NUMBER=${_TWILIO_PHONE_NUMBER}'
     - '--set-env-vars'
     - 'GOOGLE_SERVICE_ACCOUNT_KEY=${_GOOGLE_SERVICE_ACCOUNT_KEY}'

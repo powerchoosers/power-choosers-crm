@@ -141,6 +141,7 @@ import twilioTranscribeHandler from './api/twilio/transcribe.js';
 import twilioDialCompleteHandler from './api/twilio/dial-complete.js';
 import twilioProcessExistingTranscriptsHandler from './api/twilio/process-existing-transcripts.js';
 import energyNewsHandler from './api/energy-news.js';
+import geminiChatHandler from './api/gemini/chat.js';
 import logoHandler from './api/logo.js';
 import twilioBridgeHandler from './api/twilio/bridge.js';
 import twilioOperatorWebhookHandler from './api/twilio/operator-webhook.js';
@@ -177,6 +178,7 @@ if (process.env.NODE_ENV !== 'production') {
     hasTwilioAuthToken: !!process.env.TWILIO_AUTH_TOKEN,
     hasPerplexityApiKey: !!process.env.PERPLEXITY_API_KEY,
     hasGeminiApiKey: !!process.env.GEMINI_API_KEY,
+    hasSupabaseServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     hasFreeGeminiKey: !!process.env.FREE_GEMINI_KEY,
     nodeEnv: process.env.NODE_ENV || 'development',
     port: process.env.PORT || 3000
@@ -841,6 +843,20 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/search') {
     return handleApiSearch(req, res, parsedUrl);
+  }
+  if (pathname === '/api/gemini/chat') {
+    // Parse body for chat handler
+    if (req.method === 'POST') {
+      try {
+        req.body = await parseRequestBody(req);
+      } catch (error) {
+        console.error('[Server] Gemini Chat - Body Parse Error:', error.message);
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid request body' }));
+        return;
+      }
+    }
+    return geminiChatHandler(req, res);
   }
   if (pathname === '/api/logo') {
     return handleApiLogo(req, res, parsedUrl);

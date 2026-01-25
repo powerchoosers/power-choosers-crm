@@ -126,14 +126,14 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-white">Settings</h1>
-        <p className="text-sm text-zinc-400 mt-1">Manage your account settings and preferences.</p>
+    <div className="flex flex-col h-[calc(100vh-8rem)] space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex-none">
+        <h1 className="text-4xl font-semibold tracking-tighter text-white">Settings</h1>
+        <p className="text-zinc-500 mt-1">Manage your account settings and preferences.</p>
       </div>
 
-      <Tabs defaultValue="profile" className="space-y-4">
-        <TabsList className="bg-zinc-900/50 border border-white/5 p-1 h-auto grid grid-cols-2 md:grid-cols-5 w-full md:w-auto">
+      <Tabs defaultValue="profile" className="flex-1 flex flex-col min-h-0 space-y-6">
+        <TabsList className="nodal-glass p-1 h-auto grid grid-cols-2 md:grid-cols-5 w-full md:w-auto shrink-0">
           <TabsTrigger value="profile" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-zinc-400">
             <UserIcon className="w-4 h-4 mr-2" />
             Profile
@@ -156,253 +156,256 @@ export default function SettingsPage() {
           </TabsTrigger>
         </TabsList>
         
-        <TabsContent value="profile" className="space-y-4">
-          <Card className="bg-zinc-900/30 border-white/5">
-            <CardHeader>
-              <CardTitle className="text-zinc-100">Profile Information</CardTitle>
-              <CardDescription className="text-zinc-500">Update your profile details and public information.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="flex-1 overflow-y-auto pr-2 np-scroll">
+          <TabsContent value="profile" className="space-y-6 mt-0">
+            <Card className="nodal-glass">
+              <CardHeader>
+                <CardTitle className="text-zinc-100">Profile Information</CardTitle>
+                <CardDescription className="text-zinc-500">Update your profile details and public information.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName" className="text-zinc-400">First name</Label>
+                    <Input
+                      id="firstName"
+                      placeholder="John"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      className="bg-transparent border-white/10 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-[#002FA7]"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName" className="text-zinc-400">Last name</Label>
+                    <Input
+                      id="lastName"
+                      placeholder="Doe"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      className="bg-transparent border-white/10 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-[#002FA7]"
+                    />
+                  </div>
+                </div>
                 <div className="space-y-2">
-                  <Label htmlFor="firstName" className="text-zinc-400">First name</Label>
+                  <Label htmlFor="email" className="text-zinc-400">Email</Label>
                   <Input
-                    id="firstName"
-                    placeholder="John"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className="bg-zinc-950/50 border-white/10 text-zinc-200"
+                    id="email"
+                    type="email"
+                    value={user?.email || ''}
+                    readOnly
+                    className="bg-transparent border-white/10 text-zinc-500 font-mono tabular-nums"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName" className="text-zinc-400">Last name</Label>
+                  <Label htmlFor="bio" className="text-zinc-400">Bio</Label>
                   <Input
-                    id="lastName"
-                    placeholder="Doe"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    className="bg-zinc-950/50 border-white/10 text-zinc-200"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-zinc-400">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={user?.email || ''}
-                  readOnly
-                  className="bg-zinc-950/50 border-white/10 text-zinc-200"
+                    id="bio"
+                    placeholder="Sales Representative"
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                  className="bg-transparent border-white/10 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-[#002FA7]"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="bio" className="text-zinc-400">Bio</Label>
-                <Input
-                  id="bio"
-                  placeholder="Sales Representative"
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                className="bg-zinc-950/50 border-white/10 text-zinc-200"
-              />
-            </div>
 
-            <Separator className="bg-white/5 my-6" />
+              <Separator className="bg-white/5 my-6" />
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-medium text-zinc-200">Phone Numbers</h4>
-                  <p className="text-xs text-zinc-500">Manage your Twilio numbers and routing.</p>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-medium text-zinc-200">Phone Numbers</h4>
+                    <p className="text-xs text-zinc-500">Manage your Twilio numbers and routing.</p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Label htmlFor="bridgeToMobile" className="text-xs text-zinc-400">Bridge to Mobile</Label>
+                    <Switch
+                      id="bridgeToMobile"
+                      checked={bridgeToMobile}
+                      onCheckedChange={setBridgeToMobile}
+                      className="data-[state=checked]:bg-[#002FA7]"
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Label htmlFor="bridgeToMobile" className="text-xs text-zinc-400">Bridge to Mobile</Label>
-                  <Switch
-                    id="bridgeToMobile"
-                    checked={bridgeToMobile}
-                    onCheckedChange={setBridgeToMobile}
-                  />
-                </div>
-              </div>
 
-              <div className="space-y-3">
-                {twilioNumbers.map((num, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-zinc-950/30 border border-white/5 group">
-                    <div className="flex items-center gap-3">
-                      <div 
-                        className={cn(
-                          "w-4 h-4 rounded-full border flex items-center justify-center cursor-pointer transition-colors",
-                          selectedPhoneNumber === num.number 
-                            ? "bg-[#004eea] border-[#004eea]" 
-                            : "border-white/20 hover:border-white/40"
-                        )}
-                        onClick={() => setSelectedPhoneNumber(num.number)}
+                <div className="space-y-3">
+                  {twilioNumbers.map((num, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 rounded-lg nodal-glass nodal-glass-hover group">
+                      <div className="flex items-center gap-3">
+                        <div 
+                          className={cn(
+                            "w-4 h-4 rounded-full border flex items-center justify-center cursor-pointer transition-colors",
+                            selectedPhoneNumber === num.number 
+                              ? "bg-[#002FA7] border-[#002FA7]" 
+                              : "border-white/20 hover:border-white/40"
+                          )}
+                          onClick={() => setSelectedPhoneNumber(num.number)}
+                        >
+                          {selectedPhoneNumber === num.number && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-zinc-200">{num.name}</p>
+                          <p className="text-xs text-zinc-500 font-mono tabular-nums tracking-tight">{num.number}</p>
+                        </div>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handleDeleteNumber(idx)}
+                        className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 transition-all"
                       >
-                        {selectedPhoneNumber === num.number && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-zinc-200">{num.name}</p>
-                        <p className="text-xs text-zinc-500">{num.number}</p>
-                      </div>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
+                  ))}
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                    <Input
+                      placeholder="Number Name (e.g. Office)"
+                      value={newNumberName}
+                      onChange={(e) => setNewNumberName(e.target.value)}
+                      className="bg-transparent border-white/10 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-[#002FA7]"
+                    />
+                    <Input
+                      placeholder="+1 (555) 000-0000"
+                      value={newNumber}
+                      onChange={(e) => setNewNumber(e.target.value)}
+                      className="bg-transparent border-white/10 text-zinc-200 font-mono tabular-nums placeholder:text-zinc-600 focus-visible:ring-[#002FA7]"
+                    />
                     <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => handleDeleteNumber(idx)}
-                      className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 transition-all"
+                      onClick={handleAddNumber}
+                      variant="outline"
+                      className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Number
                     </Button>
                   </div>
-                ))}
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
-                  <Input
-                    placeholder="Number Name (e.g. Office)"
-                    value={newNumberName}
-                    onChange={(e) => setNewNumberName(e.target.value)}
-                    className="bg-zinc-950/50 border-white/10 text-zinc-200"
-                  />
-                  <Input
-                    placeholder="+1 (555) 000-0000"
-                    value={newNumber}
-                    onChange={(e) => setNewNumber(e.target.value)}
-                    className="bg-zinc-950/50 border-white/10 text-zinc-200"
-                  />
-                  <Button 
-                    onClick={handleAddNumber}
-                    variant="outline"
-                    className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Number
-                  </Button>
                 </div>
               </div>
-            </div>
-          </CardContent>
-            <CardFooter>
-              <Button
-                onClick={handleSaveProfile}
-                disabled={isSaving || !user?.email}
-                className="bg-[#004eea] hover:bg-[#003bb0] text-white"
-              >
-                {isSaving ? 'Saving...' : 'Save Changes'}
-              </Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="account" className="space-y-4">
-          <Card className="bg-zinc-900/30 border-white/5">
-            <CardHeader>
-              <CardTitle className="text-zinc-100">Password</CardTitle>
-              <CardDescription className="text-zinc-500">Change your password here. After saving, you&apos;ll be logged out.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="current" className="text-zinc-400">Current password</Label>
-                <Input id="current" type="password" className="bg-zinc-950/50 border-white/10 text-zinc-200" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="new" className="text-zinc-400">New password</Label>
-                <Input id="new" type="password" className="bg-zinc-950/50 border-white/10 text-zinc-200" />
-              </div>
             </CardContent>
-            <CardFooter>
-              <Button className="bg-[#004eea] hover:bg-[#003bb0] text-white">Change Password</Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="notifications" className="space-y-4">
-          <Card className="bg-zinc-900/30 border-white/5">
-            <CardHeader>
-              <CardTitle className="text-zinc-100">Notification Preferences</CardTitle>
-              <CardDescription className="text-zinc-500">Choose what you want to be notified about.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between space-x-2">
-                <Label htmlFor="emails" className="flex flex-col space-y-1 text-zinc-200">
-                  <span>Email Notifications</span>
-                  <span className="font-normal text-xs text-zinc-500">Receive emails about your account activity.</span>
-                </Label>
-                <Switch id="emails" />
-              </div>
-              <Separator className="bg-white/5" />
-              <div className="flex items-center justify-between space-x-2">
-                <Label htmlFor="marketing" className="flex flex-col space-y-1 text-zinc-200">
-                  <span>Marketing Emails</span>
-                  <span className="font-normal text-xs text-zinc-500">Receive emails about new products, features, and more.</span>
-                </Label>
-                <Switch id="marketing" />
-              </div>
-              <Separator className="bg-white/5" />
-               <div className="flex items-center justify-between space-x-2">
-                <Label htmlFor="security" className="flex flex-col space-y-1 text-zinc-200">
-                  <span>Security Emails</span>
-                  <span className="font-normal text-xs text-zinc-500">Receive emails about your account security.</span>
-                </Label>
-                <Switch id="security" defaultChecked />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              <CardFooter>
+                <Button
+                  onClick={handleSaveProfile}
+                  disabled={isSaving || !user?.email}
+                  className="bg-white text-zinc-950 hover:bg-zinc-200 font-medium"
+                >
+                  {isSaving ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </CardFooter>
+            </Card>
+          </TabsContent>
 
-        <TabsContent value="integrations" className="space-y-4">
-          <Card className="bg-zinc-900/30 border-white/5">
-             <CardHeader>
-              <CardTitle className="text-zinc-100">API Integrations</CardTitle>
-              <CardDescription className="text-zinc-500">Manage your connected services.</CardDescription>
-            </CardHeader>
-             <CardContent className="space-y-4">
-               <div className="flex items-center justify-between p-4 border border-white/5 rounded-lg bg-white/5">
-                 <div className="flex items-center space-x-4">
-                   <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-500">
-                     <Database className="w-5 h-5" />
-                   </div>
-                   <div>
-                     <p className="text-sm font-medium text-zinc-200">Firebase</p>
-                     <p className="text-xs text-zinc-500">Connected</p>
-                   </div>
-                 </div>
-                 <Button variant="outline" size="sm" className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5">Configure</Button>
-               </div>
-               
-                <div className="flex items-center justify-between p-4 border border-white/5 rounded-lg bg-white/5">
-                 <div className="flex items-center space-x-4">
-                   <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center text-red-500">
-                     <Phone className="w-5 h-5" />
-                   </div>
-                   <div>
-                     <p className="text-sm font-medium text-zinc-200">Twilio</p>
-                     <p className="text-xs text-zinc-500">{twilioNumbers.length > 0 ? 'Connected' : 'Not Configured'}</p>
-                   </div>
-                 </div>
-                 <Button 
-                   variant="outline" 
-                   size="sm" 
-                   onClick={() => document.querySelector('[value="profile"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))}
-                   className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5"
-                 >
-                   Manage Numbers
-                 </Button>
-               </div>
+          <TabsContent value="account" className="space-y-6 mt-0">
+            <Card className="nodal-glass">
+              <CardHeader>
+                <CardTitle className="text-zinc-100">Password</CardTitle>
+                <CardDescription className="text-zinc-500">Change your password here. After saving, you&apos;ll be logged out.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="current" className="text-zinc-400">Current password</Label>
+                  <Input id="current" type="password" className="bg-transparent border-white/10 text-zinc-200 focus-visible:ring-[#002FA7]" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new" className="text-zinc-400">New password</Label>
+                  <Input id="new" type="password" className="bg-transparent border-white/10 text-zinc-200 focus-visible:ring-[#002FA7]" />
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button className="bg-white text-zinc-950 hover:bg-zinc-200 font-medium">Change Password</Button>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="notifications" className="space-y-6 mt-0">
+            <Card className="nodal-glass">
+              <CardHeader>
+                <CardTitle className="text-zinc-100">Notification Preferences</CardTitle>
+                <CardDescription className="text-zinc-500">Choose what you want to be notified about.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between space-x-2">
+                  <Label htmlFor="emails" className="flex flex-col space-y-1 text-zinc-200">
+                    <span>Email Notifications</span>
+                    <span className="font-normal text-xs text-zinc-500">Receive emails about your account activity.</span>
+                  </Label>
+                  <Switch id="emails" className="data-[state=checked]:bg-[#002FA7]" />
+                </div>
+                <Separator className="bg-white/5" />
+                <div className="flex items-center justify-between space-x-2">
+                  <Label htmlFor="marketing" className="flex flex-col space-y-1 text-zinc-200">
+                    <span>Marketing Emails</span>
+                    <span className="font-normal text-xs text-zinc-500">Receive emails about new products, features, and more.</span>
+                  </Label>
+                  <Switch id="marketing" className="data-[state=checked]:bg-[#002FA7]" />
+                </div>
+                <Separator className="bg-white/5" />
+                 <div className="flex items-center justify-between space-x-2">
+                  <Label htmlFor="security" className="flex flex-col space-y-1 text-zinc-200">
+                    <span>Security Emails</span>
+                    <span className="font-normal text-xs text-zinc-500">Receive emails about your account security.</span>
+                  </Label>
+                  <Switch id="security" defaultChecked className="data-[state=checked]:bg-[#002FA7]" />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-               <div className="flex items-center justify-between p-4 border border-white/5 rounded-lg bg-transparent">
-                 <div className="flex items-center space-x-4">
-                   <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500">
-                     <Database className="w-5 h-5" />
+          <TabsContent value="integrations" className="space-y-6 mt-0">
+            <Card className="nodal-glass">
+               <CardHeader>
+                <CardTitle className="text-zinc-100">API Integrations</CardTitle>
+                <CardDescription className="text-zinc-500">Manage your connected services.</CardDescription>
+              </CardHeader>
+               <CardContent className="space-y-4">
+                 <div className="flex items-center justify-between p-4 rounded-lg nodal-glass nodal-glass-hover">
+                   <div className="flex items-center space-x-4">
+                     <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-500">
+                       <Database className="w-5 h-5" />
+                     </div>
+                     <div>
+                       <p className="text-sm font-medium text-zinc-200">Firebase</p>
+                       <p className="text-xs text-zinc-500">Connected</p>
+                     </div>
                    </div>
-                   <div>
-                     <p className="text-sm font-medium text-zinc-200">Stripe</p>
-                     <p className="text-xs text-zinc-500">Not Connected</p>
-                   </div>
+                   <Button variant="outline" size="sm" className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5">Configure</Button>
                  </div>
-                 <Button variant="outline" size="sm" className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5">Connect</Button>
-               </div>
-             </CardContent>
-          </Card>
-        </TabsContent>
+                 
+                  <div className="flex items-center justify-between p-4 rounded-lg nodal-glass nodal-glass-hover">
+                   <div className="flex items-center space-x-4">
+                     <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center text-red-500">
+                       <Phone className="w-5 h-5" />
+                     </div>
+                     <div>
+                       <p className="text-sm font-medium text-zinc-200">Twilio</p>
+                       <p className="text-xs text-zinc-500 font-mono tabular-nums">{twilioNumbers.length > 0 ? 'Connected' : 'Not Configured'}</p>
+                     </div>
+                   </div>
+                   <Button 
+                     variant="outline" 
+                     size="sm" 
+                     onClick={() => document.querySelector('[value="profile"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))}
+                     className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5"
+                   >
+                     Manage Numbers
+                   </Button>
+                 </div>
+
+                 <div className="flex items-center justify-between p-4 rounded-lg bg-transparent border border-white/5">
+                   <div className="flex items-center space-x-4">
+                     <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500">
+                       <Database className="w-5 h-5" />
+                     </div>
+                     <div>
+                       <p className="text-sm font-medium text-zinc-200">Stripe</p>
+                       <p className="text-xs text-zinc-500">Not Connected</p>
+                     </div>
+                   </div>
+                   <Button variant="outline" size="sm" className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5">Connect</Button>
+                 </div>
+               </CardContent>
+            </Card>
+          </TabsContent>
+        </div>
       </Tabs>
     </div>
   )

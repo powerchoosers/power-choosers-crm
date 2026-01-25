@@ -34,14 +34,54 @@ export type ContactDetail = Contact & {
   contractEnd?: string
   serviceAddresses?: unknown[]
   accountDescription?: string
+  // Phone fields
+  mobile?: string
+  workDirectPhone?: string
+  otherPhone?: string
+  companyPhone?: string
+  primaryPhoneField?: 'mobile' | 'workDirectPhone' | 'otherPhone'
 }
 
 type ContactMetadata = {
   company?: string
+  companyName?: string
   domain?: string
   city?: string
   state?: string
   website?: string
+  firstName?: string
+  lastName?: string
+  first_name?: string
+  last_name?: string
+  workDirectPhone?: string
+  mobile?: string
+  otherPhone?: string
+  primaryPhoneField?: string
+  email?: string
+  general?: {
+    firstName?: string
+    lastName?: string
+    first_name?: string
+    last_name?: string
+    email?: string
+    phone?: string
+    mobile?: string
+    otherPhone?: string
+    workDirectPhone?: string
+    company?: string
+    companyName?: string
+    domain?: string
+  }
+  contact?: {
+    firstName?: string
+    lastName?: string
+    first_name?: string
+    last_name?: string
+    email?: string
+    phone?: string
+    mobile?: string
+    otherPhone?: string
+  }
 }
 
 type AccountJoin = {
@@ -57,34 +97,89 @@ type AccountJoin = {
   contract_end_date?: string | null
   service_addresses?: unknown[] | null
   description?: string | null
+  phone?: string | null
 }
 
 type ContactRow = {
   id: string
   name?: string | null
   firstName?: string | null
+  first_name?: string | null
+  firstname?: string | null
+  FirstName?: string | null
   lastName?: string | null
+  last_name?: string | null
+  lastname?: string | null
+  LastName?: string | null
   email?: string | null
   phone?: string | null
   mobile?: string | null
   workPhone?: string | null
+  otherPhone?: string | null
+  primaryPhoneField?: string | null
   status?: Contact['status'] | null
   created_at?: string | null
   lastContactedAt?: string | null
   accountId?: string | null
   title?: string | null
   linkedinUrl?: string | null
-  metadata?: ContactMetadata | null
+  notes?: string | null
+  metadata?: ContactMetadata | string | null
   accounts?: AccountJoin | AccountJoin[] | null
 }
 
 const PAGE_SIZE = 50
 
+const CONTACTS_QUERY_BUSTER = 'v5'
+
+function cleanText(value: unknown): string {
+  if (value == null) return ''
+  return String(value).replace(/\s+/g, ' ').trim()
+}
+
+function normalizeMetadata(value: ContactMetadata | string | null | undefined): ContactMetadata | null {
+  if (!value) return null
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value) as ContactMetadata
+    } catch {
+      return null
+    }
+  }
+  return value
+}
+
+function buildContactName(args: {
+  firstName?: unknown
+  lastName?: unknown
+  rawName?: unknown
+  email?: unknown
+  companyCandidate?: unknown
+}): string {
+  const firstName = cleanText(args.firstName)
+  const lastName = cleanText(args.lastName)
+  const rawName = cleanText(args.rawName)
+  const email = cleanText(args.email)
+  const companyCandidate = cleanText(args.companyCandidate)
+
+  const combined = cleanText([firstName, lastName].filter(Boolean).join(' '))
+  if (combined) return combined
+
+  const looksLikeCompany = !!rawName && /\b(llc|l\.l\.c\.?|inc|inc\.|ltd|ltd\.|co\.|corp|corporation|company|plc|pc|l\.p\.?|lp|llp)\b/i.test(rawName)
+  if (looksLikeCompany) return email || 'Unknown'
+
+  if (rawName && companyCandidate && rawName.toLowerCase() === companyCandidate.toLowerCase()) {
+    return email || 'Unknown'
+  }
+
+  return rawName || email || 'Unknown'
+}
+
 export function useContacts() {
   const { user, role, loading } = useAuth()
 
   return useInfiniteQuery({
-    queryKey: ['contacts', user?.email ?? 'guest', role ?? 'unknown'],
+    queryKey: ['contacts', CONTACTS_QUERY_BUSTER, user?.email ?? 'guest', role ?? 'unknown'],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       try {
@@ -104,7 +199,9 @@ export function useContacts() {
 
         const { data, error, count } = await query
           .range(from, to)
-          .order('name', { ascending: true });
+          .order('lastName', { ascending: true })
+          .order('firstName', { ascending: true })
+          .order('createdAt', { ascending: false });
 
         if (error) {
           console.error("Supabase error:", error);
@@ -114,18 +211,49 @@ export function useContacts() {
 
         const contacts = (data as ContactRow[]).map(item => {
           const account = Array.isArray(item.accounts) ? item.accounts[0] : item.accounts
+          const metadata = normalizeMetadata(item.metadata)
           
-          return { 
-            id: item.id, 
-            name: item.name || (item.firstName ? `${item.firstName} ${item.lastName || ''}`.trim() : 'Unknown'),
-            email: item.email || '',
-            phone: item.phone || item.mobile || item.workPhone || '',
-            company: account?.name || item.metadata?.company || '',
-            companyDomain: account?.domain || item.metadata?.domain || '',
+          const fName = item.firstName
+            || item.first_name
+            || item.firstname
+            || item.FirstName
+            || metadata?.firstName
+            || metadata?.first_name
+            || metadata?.general?.firstName
+            || metadata?.general?.first_name
+            || metadata?.contact?.firstName
+            || metadata?.contact?.first_name
+          const lName = item.lastName
+            || item.last_name
+            || item.lastname
+            || item.LastName
+            || metadata?.lastName
+            || metadata?.last_name
+            || metadata?.general?.lastName
+            || metadata?.general?.last_name
+            || metadata?.contact?.lastName
+            || metadata?.contact?.last_name
+
+          const fullName = buildContactName({
+            firstName: fName,
+            lastName: lName,
+            rawName: item.name,
+            email: item.email || metadata?.email || metadata?.general?.email || metadata?.contact?.email,
+            companyCandidate: account?.name || metadata?.company || metadata?.companyName || metadata?.general?.company || metadata?.general?.companyName,
+          })
+
+          return {
+            id: item.id,
+            name: fullName,
+            email: item.email || metadata?.email || metadata?.general?.email || metadata?.contact?.email || '',
+            phone: item.phone || item.mobile || item.workPhone || item.otherPhone || metadata?.mobile || metadata?.workDirectPhone || metadata?.otherPhone || metadata?.general?.phone || metadata?.contact?.phone || '',
+            company: account?.name || metadata?.company || metadata?.general?.company || '',
+            companyDomain: account?.domain || metadata?.domain || metadata?.general?.domain || '',
             logoUrl: account?.logo_url || '',
             status: item.status || 'Lead',
             lastContact: item.lastContactedAt || item.created_at || new Date().toISOString(),
-            accountId: item.accountId || undefined
+            accountId: item.accountId || undefined,
+            website: item.website || account?.domain || metadata?.website || undefined
           }
         }) as Contact[];
         
@@ -151,7 +279,7 @@ export function useContactsCount() {
   const { user, role, loading } = useAuth()
 
   return useQuery({
-    queryKey: ['contacts-count', user?.email ?? 'guest', role ?? 'unknown'],
+    queryKey: ['contacts-count', CONTACTS_QUERY_BUSTER, user?.email ?? 'guest', role ?? 'unknown'],
     queryFn: async () => {
       if (loading) return 0
       if (!user) return 0
@@ -178,7 +306,7 @@ export function useContact(id: string) {
   const { user, loading } = useAuth()
 
   return useQuery({
-    queryKey: ['contact', id, user?.email ?? 'guest'],
+    queryKey: ['contact', CONTACTS_QUERY_BUSTER, id, user?.email ?? 'guest'],
     queryFn: async () => {
       if (!id) return null
       if (loading) return null
@@ -191,7 +319,7 @@ export function useContact(id: string) {
           accounts (
             name, domain, logo_url, city, state, industry,
             electricity_supplier, annual_usage, current_rate, contract_end_date,
-            service_addresses, description
+            service_addresses, description, phone
           )
         `)
         .eq('id', id)
@@ -201,33 +329,61 @@ export function useContact(id: string) {
 
       const typedData = data as ContactRow
       const account = Array.isArray(typedData.accounts) ? typedData.accounts[0] : typedData.accounts
-      const firstName = typedData.firstName || undefined
-      const lastName = typedData.lastName || undefined
+      const metadata = normalizeMetadata(typedData.metadata)
+      
+      const fName = typedData.firstName
+        || typedData.first_name
+        || typedData.firstname
+        || typedData.FirstName
+        || metadata?.firstName
+        || metadata?.first_name
+        || metadata?.general?.firstName
+        || metadata?.general?.first_name
+        || metadata?.contact?.firstName
+        || metadata?.contact?.first_name
+      const lName = typedData.lastName
+        || typedData.last_name
+        || typedData.lastname
+        || typedData.LastName
+        || metadata?.lastName
+        || metadata?.last_name
+        || metadata?.general?.lastName
+        || metadata?.general?.last_name
+        || metadata?.contact?.lastName
+        || metadata?.contact?.last_name
 
       const { id: contactId, ...rest } = typedData
+
+      const fullName = buildContactName({
+        firstName: fName,
+        lastName: lName,
+        rawName: typedData.name,
+        email: typedData.email || metadata?.email || metadata?.general?.email || metadata?.contact?.email,
+        companyCandidate: account?.name || metadata?.company || metadata?.companyName || metadata?.general?.company || metadata?.general?.companyName,
+      })
 
       return {
         id: contactId,
         ...rest,
-        name: typedData.name || (firstName ? `${firstName} ${lastName || ''}`.trim() : 'Unknown'),
-        email: typedData.email || '',
-        phone: typedData.phone || typedData.mobile || '',
-        company: account?.name || typedData.metadata?.company || '',
-        companyDomain: account?.domain || typedData.metadata?.domain || undefined,
+        name: fullName,
+        email: typedData.email || metadata?.email || metadata?.general?.email || metadata?.contact?.email || '',
+        phone: typedData.phone || typedData.mobile || typedData.workPhone || typedData.otherPhone || metadata?.mobile || metadata?.workDirectPhone || metadata?.otherPhone || metadata?.general?.phone || metadata?.contact?.phone || '',
+        company: account?.name || metadata?.company || metadata?.companyName || metadata?.general?.company || metadata?.general?.companyName || '',
+        companyDomain: account?.domain || metadata?.domain || metadata?.general?.domain || undefined,
         logoUrl: account?.logo_url || '',
         status: typedData.status || 'Lead',
         lastContact: typedData.lastContactedAt || new Date().toISOString(),
         
         // Detail fields
-        firstName,
-        lastName,
+        firstName: fName,
+        lastName: lName,
         title: typedData.title || undefined,
-        companyName: account?.name || typedData.metadata?.company,
-        city: account?.city || typedData.metadata?.city,
-        state: account?.state || typedData.metadata?.state,
+        companyName: account?.name || metadata?.company || metadata?.companyName || metadata?.general?.company || metadata?.general?.companyName,
+        city: account?.city || metadata?.city,
+        state: account?.state || metadata?.state,
         industry: account?.industry,
         linkedinUrl: typedData.linkedinUrl || undefined,
-        website: account?.domain || typedData.metadata?.website,
+        website: account?.domain || metadata?.website,
         linkedAccountId: typedData.accountId || undefined,
         
         // Enhanced account details
@@ -236,7 +392,14 @@ export function useContact(id: string) {
         currentRate: account?.current_rate,
         contractEnd: account?.contract_end_date,
         serviceAddresses: account?.service_addresses,
-        accountDescription: account?.description
+        accountDescription: account?.description,
+        
+        // Phone fields
+        mobile: typedData.mobile || metadata?.mobile || metadata?.general?.phone || '',
+        workDirectPhone: typedData.workPhone || metadata?.workDirectPhone || metadata?.general?.workDirectPhone || '',
+        otherPhone: typedData.otherPhone || metadata?.otherPhone || '',
+        companyPhone: account?.phone || '',
+        primaryPhoneField: (typedData.primaryPhoneField as any) || 'mobile'
       } as ContactDetail
     },
     enabled: !!id && !loading && !!user,
@@ -280,26 +443,72 @@ export function useCreateContact() {
 export function useUpdateContact() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<Contact> & { id: string }) => {
-      const dbUpdates: Record<string, string | null> = {}
+    mutationFn: async ({ id, ...updates }: Partial<ContactDetail> & { id: string }) => {
+      const dbUpdates: Record<string, any> = {}
       if (updates.name !== undefined) dbUpdates.name = updates.name
       if (updates.email !== undefined) dbUpdates.email = updates.email
       if (updates.phone !== undefined) dbUpdates.phone = updates.phone
       if (updates.status !== undefined) dbUpdates.status = updates.status
       if (updates.accountId !== undefined) dbUpdates.accountId = updates.accountId
+      if (updates.notes !== undefined) dbUpdates.notes = updates.notes
+      if (updates.title !== undefined) dbUpdates.title = updates.title
+      if (updates.linkedinUrl !== undefined) dbUpdates.linkedinUrl = updates.linkedinUrl
+      if (updates.mobile !== undefined) dbUpdates.mobile = updates.mobile
+      if (updates.workDirectPhone !== undefined) dbUpdates.workPhone = updates.workDirectPhone
+      if (updates.otherPhone !== undefined) dbUpdates.otherPhone = updates.otherPhone
+      if (updates.primaryPhoneField !== undefined) dbUpdates.primaryPhoneField = updates.primaryPhoneField
       
       dbUpdates.updatedAt = new Date().toISOString()
 
-      const { error } = await supabase
+      // 1. Update Contact Table
+      const { error: contactError } = await supabase
         .from('contacts')
         .update(dbUpdates)
         .eq('id', id)
 
-      if (error) throw error
+      if (contactError) throw contactError
+
+      // 2. Update Account Table if account-specific fields are present
+      // We first need to get the accountId if not provided in updates
+      let targetAccountId = updates.accountId || updates.linkedAccountId
+      
+      if (!targetAccountId) {
+        const { data: contactData } = await supabase
+          .from('contacts')
+          .select('accountId')
+          .eq('id', id)
+          .single()
+        targetAccountId = contactData?.accountId
+      }
+
+      if (targetAccountId) {
+        const accountUpdates: Record<string, any> = {}
+        if (updates.electricitySupplier !== undefined) accountUpdates.electricity_supplier = updates.electricitySupplier
+        if (updates.annualUsage !== undefined) accountUpdates.annual_usage = updates.annualUsage
+        if (updates.currentRate !== undefined) accountUpdates.current_rate = updates.currentRate
+        if (updates.contractEnd !== undefined) accountUpdates.contract_end_date = updates.contractEnd
+        if (updates.serviceAddresses !== undefined) accountUpdates.service_addresses = updates.serviceAddresses
+        if (updates.companyName !== undefined) accountUpdates.name = updates.companyName
+        if (updates.companyPhone !== undefined) accountUpdates.phone = updates.companyPhone
+
+        if (Object.keys(accountUpdates).length > 0) {
+          const { error: accountError } = await supabase
+            .from('accounts')
+            .update(accountUpdates)
+            .eq('id', targetAccountId)
+          
+          if (accountError) {
+            console.error('Failed to update associated account:', accountError)
+            // We don't throw here to avoid failing the whole sync if only account update fails
+          }
+        }
+      }
+
       return { id, ...updates }
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      queryClient.invalidateQueries({ queryKey: ['contact', CONTACTS_QUERY_BUSTER, variables.id] })
     }
   })
 }

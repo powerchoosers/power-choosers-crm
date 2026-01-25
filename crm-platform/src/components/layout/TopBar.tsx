@@ -13,9 +13,12 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { GeminiChatTrigger, GeminiChatPanel } from '@/components/chat/GeminiChat'
+import { useGeminiStore } from '@/store/geminiStore'
 
 export function TopBar() {
   const { isActive, status, setActive, setStatus } = useCallStore()
+  const isGeminiOpen = useGeminiStore((state) => state.isOpen)
   const { profile } = useAuth()
   const { connect, disconnect, mute, isMuted, metadata } = useVoice()
   const pathname = usePathname()
@@ -24,6 +27,21 @@ export function TopBar() {
   const [phoneNumber, setPhoneNumber] = useState('')
   const [callDuration, setCallDuration] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Sync state: if Gemini opens, close Dialer
+  useEffect(() => {
+    if (isGeminiOpen && isDialerOpen) {
+      setIsDialerOpen(false)
+    }
+  }, [isGeminiOpen, isDialerOpen])
+
+  // Sync state: if Dialer opens, close Gemini
+  const setIsGeminiOpen = useGeminiStore((state) => state.setIsOpen)
+  useEffect(() => {
+    if (isDialerOpen && isGeminiOpen) {
+      setIsGeminiOpen(false)
+    }
+  }, [isDialerOpen, isGeminiOpen, setIsGeminiOpen])
   const durationInterval = useRef<NodeJS.Timeout | null>(null)
   const callStartRef = useRef<number | null>(null)
 
@@ -116,6 +134,13 @@ export function TopBar() {
     setPhoneNumber(formatPhoneNumber(inputVal))
   }
 
+  const handleDialerKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+        e.preventDefault()
+        handleCall()
+    }
+  }
+
   const handleCall = async () => {
     if (phoneNumber.length < 10) {
         toast.error("Invalid Phone Number")
@@ -148,27 +173,25 @@ export function TopBar() {
 
   return (
     // Updated positioning: constrained to match main content area
-    <div className="fixed top-0 left-16 right-0 lg:right-80 z-40 flex items-start justify-center p-6 pointer-events-none">
-      <LayoutGroup>
-        <div className="w-full max-w-5xl flex items-start gap-4 pointer-events-auto">
-            {/* Left Side: Search or Active Call */}
-            <motion.div 
-                layout 
-                className="flex-1 min-w-0"
-                transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            >
-                <AnimatePresence mode="wait">
-                {!isActive ? (
-                    <motion.div
-                        key="search"
-                        initial={{ opacity: 0, y: -20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
-                        className="w-full"
-                    >
-                        <GlobalSearch />
-                    </motion.div>
-                ) : (
+    <header className="fixed top-0 left-16 right-0 lg:right-80 z-40 flex items-start justify-center p-6 pointer-events-none nodal-glass !border-none !shadow-none">
+      <div className="w-full max-w-5xl flex items-start gap-4 pointer-events-auto">
+          {/* Left Side: Search or Active Call */}
+          <motion.div 
+              className="flex-1 min-w-0"
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          >
+              <AnimatePresence mode="wait">
+              {!isActive ? (
+                  <motion.div
+                      key="search"
+                      initial={{ opacity: 0, y: -20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
+                      className="w-full"
+                  >
+                      <GlobalSearch />
+                  </motion.div>
+              ) : (
                     <motion.div
                         key="active-call"
                         initial={{ opacity: 0, y: -20 }}
@@ -176,7 +199,7 @@ export function TopBar() {
                         exit={{ opacity: 0, y: -20 }}
                         className="flex justify-center"
                     >
-                        <div className="w-full max-w-2xl h-[50px] bg-zinc-900/90 backdrop-blur-xl border border-signal/50 rounded-full shadow-[0_10px_30px_-10px_rgba(0,47,167,0.5)] flex items-center justify-between px-6">
+                        <div className="w-full max-w-2xl h-[50px] nodal-glass border-signal/50 rounded-full shadow-[0_10px_30px_-10px_rgba(0,47,167,0.5)] flex items-center justify-between px-6">
                             <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center border border-white/5 overflow-hidden">
                                     {metadata?.logoUrl ? (
@@ -229,60 +252,53 @@ export function TopBar() {
 
             {/* Right Actions / Dialer Widget */}
             <motion.div 
-                layout
                 initial={false}
                 animate={{ 
-                    width: isDialerOpen ? 320 : 172, // Explicit width matches content (4 icons + gaps)
-                    height: isDialerOpen ? 200 : 48,
+                    width: (isDialerOpen || isGeminiOpen) ? 320 : 172,
                     borderRadius: 24,
-                    padding: isDialerOpen ? 16 : 6
                 }}
                 transition={{ 
-                    type: "spring", 
-                    stiffness: 300, 
-                    damping: 30
+                    type: "spring",
+                    stiffness: 320,
+                    damping: 35,
+                    mass: 0.8
                 }}
-                className="bg-zinc-900/70 backdrop-blur-xl border border-white/10 shadow-lg overflow-hidden flex flex-col origin-top-right relative"
+                className="glass-panel shadow-lg overflow-visible flex flex-col relative h-12"
             >
-                <motion.div layout="position" className="flex items-center justify-between gap-2 w-full min-h-[36px]">
+                {/* Header Row - Absolute to prevent vertical jumps */}
+                <div 
+                    className="absolute top-0 left-0 right-0 h-12 z-20 pointer-events-none transform-gpu translate-y-0 isolate"
+                    style={{ willChange: 'transform' }}
+                >
                     <AnimatePresence>
                         {isDialerOpen && selectedNumber && (
                             <motion.div 
                                 initial={{ opacity: 0, x: -10 }}
                                 animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -10 }}
-                                className="flex items-center gap-1.5 text-[10px] text-zinc-400 bg-white/5 px-2 py-0.5 rounded-full border border-white/5"
+                                exit={{ opacity: 0, x: -10, transition: { duration: 0.1 } }}
+                                transition={{ delay: 0.15 }}
+                                className="absolute left-4 top-0 bottom-0 my-auto h-fit flex items-center gap-1.5 text-[10px] text-zinc-400 bg-white/5 px-2 py-0.5 rounded-full border border-white/5 whitespace-nowrap pointer-events-auto"
                             >
-                                <ShieldCheck size={10} className="text-signal" />
+                                <ShieldCheck size={10} className="text-signal shrink-0" />
                                 <span>From: {selectedNumberName}</span>
                             </motion.div>
                         )}
                     </AnimatePresence>
 
-                    <div className="flex items-center gap-2 ml-auto">
-                        <Link 
-                            href="/crm-platform/scripts"
-                            className={cn(
-                                "p-2 rounded-full transition-all duration-200",
-                                pathname === '/crm-platform/scripts' 
-                                    ? "bg-white text-black shadow-sm" 
-                                    : "text-zinc-400 hover:text-white hover:bg-white/10"
-                            )}
-                            title="Phone Scripts"
-                        >
-                            <FileText size={18} />
-                        </Link>
+                    {/* Right Side Buttons - Pinned Absolute */}
+                    <div className="absolute right-2 top-0 h-12 flex items-center gap-1 pointer-events-auto leading-none">
+                        <GeminiChatTrigger />
                         
                         <button 
                             onClick={handleRefresh}
-                            className="p-2 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                            className="w-8 h-8 inline-flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
                             title="Refresh Data"
                         >
                             <RefreshCw size={18} />
                         </button>
 
                         <button 
-                            className="p-2 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors relative"
+                            className="w-8 h-8 inline-flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors relative"
                             title="Notifications"
                         >
                             <Bell size={18} />
@@ -294,49 +310,59 @@ export function TopBar() {
                             <button 
                                 onClick={() => setIsDialerOpen(!isDialerOpen)}
                                 className={cn(
-                                    "p-2 rounded-full transition-all duration-300",
-                                    isDialerOpen ? "bg-white/10 text-white rotate-90" : "text-zinc-400 hover:text-white hover:bg-white/10 rotate-0"
+                                    "w-8 h-8 inline-flex items-center justify-center rounded-full transition-colors duration-200",
+                                    isDialerOpen ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white hover:bg-white/10"
                                 )}
                                 title={isDialerOpen ? "Close Dialer" : "Open Dialer"}
                             >
-                                {isDialerOpen ? <X size={18} /> : <Phone size={18} />}
+                                <span className="w-5 h-5 flex items-center justify-center">
+                                    {isDialerOpen ? <X size={18} /> : <Phone size={18} />}
+                                </span>
                             </button>
                         )}
                     </div>
-                </motion.div>
+                </div>
 
-                {/* Expanded Dialer Content */}
+                {/* Expanded Content: Dialer or Gemini */}
                 <AnimatePresence>
                     {isDialerOpen && (
                         <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 10, transition: { duration: 0.1 } }}
-                            transition={{ duration: 0.2, delay: 0.1 }}
-                            className="flex flex-col gap-3 pt-4 absolute top-12 left-4 right-4"
+                            key="dialer-panel"
+                            initial={{ opacity: 0, y: 4, scaleY: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scaleY: 1 }}
+                            exit={{ opacity: 0, y: 4, scaleY: 0.98, transition: { duration: 0.12 } }}
+                            transition={{ duration: 0.18, delay: 0.05 }}
+                            style={{ transformOrigin: 'top' }}
+                            className="absolute top-12 left-0 right-0 mt-2 mx-2 flex flex-col gap-3 rounded-2xl bg-zinc-900/40 backdrop-blur-xl border border-white/10 shadow-2xl p-4 overflow-hidden"
                         >
-                            <div className="flex items-center justify-between px-1">
+                            {/* Nodal Point Glass Highlight - Subtle Blue Glow */}
+                            <div className="absolute inset-0 bg-gradient-to-tr from-[#002FA7]/5 via-transparent to-white/5 pointer-events-none" />
+                            
+                            <div className="flex items-center justify-between px-1 relative z-10">
                                 <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Manual Dial</span>
                             </div>
                             <Input 
                                 ref={inputRef}
                                 value={phoneNumber}
                                 onChange={handlePhoneChange}
+                                onKeyDown={handleDialerKeyDown}
                                 placeholder="+1 (555) 000-0000"
-                                className="bg-black/20 border-white/10 text-lg tracking-wider font-mono h-12"
+                                className="bg-black/40 border-white/10 text-lg tracking-wider font-mono h-12 relative z-10"
                             />
                             <Button 
                                 onClick={handleCall}
-                                className="w-full bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-medium h-10 rounded-xl shadow-lg shadow-blue-900/20"
+                                className="w-full bg-white text-zinc-950 hover:bg-zinc-200 font-medium h-10 rounded-xl shadow-lg shadow-white/5 relative z-10"
                             >
                                 Call Now
                             </Button>
                         </motion.div>
                     )}
+                    {isGeminiOpen && (
+                        <GeminiChatPanel />
+                    )}
                 </AnimatePresence>
             </motion.div>
-        </div>
-      </LayoutGroup>
-    </div>
-  )
+          </div>
+        </header>
+    )
 }

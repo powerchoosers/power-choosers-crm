@@ -16,7 +16,7 @@ const data = [
 
 export function ActivityChart() {
   return (
-    <div className="rounded-3xl border border-white/10 bg-zinc-900/50 backdrop-blur-xl p-6 h-[400px]">
+    <div className="nodal-glass p-6 h-[400px] rounded-2xl">
       <div className="mb-6">
         <h3 className="text-lg font-medium text-white">Call Activity</h3>
         <p className="text-sm text-zinc-400">Live call volume tracking</p>

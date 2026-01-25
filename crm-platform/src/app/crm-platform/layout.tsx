@@ -27,32 +27,32 @@ export default function CrmLayout({
 
   if (loading) {
     return (
-      <div className={cn(inter.className, "bg-background text-foreground antialiased min-h-screen flex items-center justify-center")}> 
+      <div className={cn(inter.className, "bg-zinc-950 text-foreground antialiased min-h-screen flex items-center justify-center")}> 
         <div className="flex flex-col items-center gap-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-700 border-t-zinc-400" />
-          <div className="text-sm text-zinc-400">Loading Nodal Point...</div>
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-800 border-t-[#002FA7]" />
+          <div className="text-sm text-zinc-500 font-mono uppercase tracking-widest">Initialising Terminal...</div>
         </div>
       </div>
     )
   }
   if (!user) {
     return (
-      <div className={cn(inter.className, "bg-background text-foreground antialiased min-h-screen flex items-center justify-center")}> 
+      <div className={cn(inter.className, "bg-zinc-950 text-foreground antialiased min-h-screen flex items-center justify-center")}> 
         <div className="flex flex-col items-center gap-4">
-          <div className="text-sm text-zinc-400">Redirecting to login...</div>
+          <div className="text-sm text-zinc-500 font-mono uppercase tracking-widest">Unauthorized Access Detected</div>
           <button
             type="button"
             onClick={() => router.replace('/login')}
-            className="px-4 py-2 rounded-md bg-white text-zinc-950 hover:bg-zinc-200 font-medium"
+            className="px-6 py-2 rounded-xl nodal-glass nodal-glass-hover text-white font-medium transition-all"
           >
-            Go to Login
+            Authenticate
           </button>
         </div>
       </div>
     )
   }
   return (
-    <div className={cn(inter.className, "bg-background text-foreground antialiased overflow-hidden selection:bg-signal selection:text-white h-screen w-screen relative")}>
+    <div className={cn(inter.className, "bg-zinc-950 text-foreground antialiased overflow-hidden selection:bg-[#002FA7] selection:text-white h-screen w-screen relative")}>
         <TopBar />
         <Sidebar />
         <RightPanel />
