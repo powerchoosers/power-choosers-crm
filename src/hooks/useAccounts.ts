@@ -7,6 +7,7 @@ export interface Account {
   name: string
   industry: string
   domain: string
+  description: string
   logoUrl?: string
   companyPhone: string
   contractEnd: string
@@ -92,6 +93,48 @@ export function useAccounts() {
   })
 }
 
+export function useAccount(id: string) {
+  const { user, loading } = useAuth()
+
+  return useQuery({
+    queryKey: ['account', id, user?.email ?? 'guest'],
+    queryFn: async () => {
+      if (!id || loading || !user) return null
+
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+      if (error) {
+        console.error("Error fetching account from Supabase:", error)
+        throw error
+      }
+
+      if (!data) return null
+
+      return { 
+        id: data.id, 
+        name: data.name || 'Unknown Account',
+        industry: data.industry || '',
+        domain: data.domain || '',
+        logoUrl: data.logo_url || '',
+        companyPhone: data.phone || '',
+        contractEnd: data.contract_end_date || '',
+        employees: data.employees?.toString() || '',
+        location: data.city ? `${data.city}, ${data.state || ''}` : (data.address || ''),
+        updated: data.updated_at || new Date().toISOString(),
+        sqft: data.metadata?.sqft || '',
+        occupancy: data.metadata?.occupancy || '',
+        ownerId: data.ownerId
+      } as Account
+    },
+    enabled: !!id && !loading && !!user,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  })
+}
+
 export function useAccountsCount() {
   const { user, role, loading } = useAuth()
 
@@ -168,6 +211,7 @@ export function useUpdateAccount() {
       if (updates.name !== undefined) dbUpdates.name = updates.name
       if (updates.industry !== undefined) dbUpdates.industry = updates.industry
       if (updates.domain !== undefined) dbUpdates.domain = updates.domain
+      if (updates.description !== undefined) dbUpdates.description = updates.description
       if (updates.logoUrl !== undefined) dbUpdates.logo_url = updates.logoUrl
       if (updates.companyPhone !== undefined) dbUpdates.phone = updates.companyPhone
       if (updates.contractEnd !== undefined) dbUpdates.contract_end_date = updates.contractEnd || null

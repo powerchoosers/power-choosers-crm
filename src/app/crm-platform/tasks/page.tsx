@@ -13,7 +13,8 @@ import {
   ColumnFiltersState,
   PaginationState,
 } from '@tanstack/react-table'
-import { Search, Plus, Filter, MoreHorizontal, CheckCircle2, Circle, Clock, ArrowUpDown, Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowUpDown, Calendar, ChevronLeft, ChevronRight, CheckCircle2, Circle, Clock, Plus, Filter, MoreHorizontal, Search } from 'lucide-react'
+import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { useTasks, useTasksCount, Task } from '@/hooks/useTasks'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -35,7 +36,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from '@/lib/utils'
-import { format } from 'date-fns'
+import { format, formatDistanceToNow, subMonths, isAfter } from 'date-fns'
 
 const PAGE_SIZE = 50
 
@@ -127,14 +128,26 @@ export default function TasksPage() {
       accessorKey: 'dueDate',
       header: 'Due Date',
       cell: ({ row }) => {
-        const date = row.getValue('dueDate') as string
-        if (!date) return <span className="text-zinc-600">-</span>
-        return (
-          <div className="flex items-center gap-2 text-zinc-400">
-            <Calendar size={14} />
-            <span>{format(new Date(date), 'MMM d, yyyy')}</span>
-          </div>
-        )
+        const dateStr = row.getValue('dueDate') as string
+        if (!dateStr) return <span className="text-zinc-600 font-mono text-xs">--</span>
+        try {
+          const date = new Date(dateStr)
+          const threeMonthsAgo = subMonths(new Date(), 3)
+          const isRecent = isAfter(date, threeMonthsAgo)
+          
+          return (
+            <div className="flex items-center gap-2 text-zinc-500 font-mono text-xs tabular-nums">
+              <Calendar size={14} className="text-zinc-600" />
+              <span>
+                {isRecent 
+                  ? formatDistanceToNow(date, { addSuffix: true })
+                  : format(date, 'MMM d, yyyy')}
+              </span>
+            </div>
+          )
+        } catch (e) {
+          return <span className="text-zinc-600 font-mono text-xs">{dateStr}</span>
+        }
       },
     },
     {
@@ -219,47 +232,31 @@ export default function TasksPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex-none space-y-4">
-        <div className="flex items-center justify-between">
-            <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">Tasks</h1>
-            <p className="text-zinc-400 mt-1">Manage your daily activities and follow-ups.</p>
-            </div>
-            <Button className="bg-white text-zinc-950 hover:bg-zinc-200 font-medium">
-            <Plus size={18} className="mr-2" />
-            New Task
-            </Button>
-        </div>
-
-        <div className="flex items-center gap-4 bg-zinc-900/50 p-4 rounded-xl border border-white/5 backdrop-blur-sm">
-            <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
-            <Input 
-                placeholder="Search tasks..." 
-                value={globalFilter ?? ""}
-                onChange={(event) => {
-                  setGlobalFilter(event.target.value)
-                  setPagination((p) => ({ ...p, pageIndex: 0 }))
-                }}
-                className="pl-10 bg-zinc-950 border-white/10 text-white placeholder:text-zinc-600 focus-visible:ring-indigo-500"
-            />
-            </div>
-            <Button variant="outline" className="gap-2 bg-zinc-900 border-white/10 text-zinc-400 hover:text-white hover:bg-white/5">
-                <Filter size={16} />
-                Filter
-            </Button>
-        </div>
-      </div>
+      <CollapsiblePageHeader
+        title="Tasks"
+        description="Stay on top of your daily workflow."
+        globalFilter={globalFilter}
+        onSearchChange={(value) => {
+          setGlobalFilter(value)
+          setPagination((p) => ({ ...p, pageIndex: 0 }))
+        }}
+        primaryAction={{
+          label: "Add Task",
+          onClick: () => {},
+          icon: <Plus size={18} className="mr-2" />
+        }}
+      />
 
       <div className="flex-1 rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl overflow-hidden flex flex-col relative">
+        <div className="absolute inset-0 border border-white/5 rounded-2xl pointer-events-none bg-gradient-to-b from-white/5 to-transparent z-10" />
         <div className="flex-1 overflow-auto relative scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
             <Table>
-            <TableHeader className="sticky top-0 bg-zinc-900/95 backdrop-blur-sm z-20 shadow-sm border-b border-white/5">
+            <TableHeader className="sticky top-0 bg-zinc-900/80 backdrop-blur-sm z-20 border-b border-white/5">
                 {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="border-white/5 hover:bg-transparent">
+                <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
                     {headerGroup.headers.map((header) => {
                     return (
-                        <TableHead key={header.id} className="text-zinc-400 font-medium">
+                        <TableHead key={header.id} className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">
                         {header.isPlaceholder
                             ? null
                             : flexRender(
@@ -284,10 +281,10 @@ export default function TasksPage() {
                     <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
-                    className="border-white/5 hover:bg-white/5 transition-colors group"
+                    className="border-white/5 hover:bg-white/[0.02] transition-colors group"
                     >
                     {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className="py-4">
+                        <TableCell key={cell.id} className="py-3">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </TableCell>
                     ))}
@@ -304,28 +301,27 @@ export default function TasksPage() {
             </Table>
         </div>
         
-        <div className="flex-none border-t border-white/10 bg-zinc-900/50 p-4 flex items-center justify-between z-10 backdrop-blur-md">
+        <div className="flex-none border-t border-white/5 bg-zinc-900/90 p-4 flex items-center justify-between backdrop-blur-sm z-10">
             <div className="flex items-center gap-4">
-                <div className="flex items-center gap-3 text-sm text-zinc-500">
-                  <span>Showing {showingStart}–{showingEnd}</span>
-                  <Badge variant="outline" className="border-white/10 bg-white/5 text-zinc-400">
-                    Total {effectiveTotalRecords}
-                  </Badge>
+                <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
+                  <span>Sync_Block {showingStart}–{showingEnd}</span>
+                  <div className="h-1 w-1 rounded-full bg-zinc-800" />
+                  <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{effectiveTotalRecords}</span></span>
                 </div>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-2">
                 <Button
                     variant="outline"
                     size="icon"
                     onClick={() => setPagination((p) => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))}
                     disabled={pagination.pageIndex === 0}
-                    className="border-white/10 bg-transparent text-zinc-400 hover:text-white hover:bg-white/5"
+                    className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
                     aria-label="Previous page"
                 >
-                    <ChevronLeft className="h-4 w-4" />
+                    <ChevronLeft className="h-3.5 w-3.5" />
                 </Button>
-                <div className="min-w-8 text-center text-sm text-zinc-400 tabular-nums">
-                  {pagination.pageIndex + 1}
+                <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
+                  {(pagination.pageIndex + 1).toString().padStart(2, '0')}
                 </div>
                 <Button
                     variant="outline"
@@ -342,10 +338,10 @@ export default function TasksPage() {
                       setPagination((p) => ({ ...p, pageIndex: nextPageIndex }))
                     }}
                     disabled={pagination.pageIndex + 1 >= displayTotalPages || (!hasNextPage && tasks.length < (pagination.pageIndex + 2) * PAGE_SIZE)}
-                    className="border-white/10 bg-transparent text-zinc-400 hover:text-white hover:bg-white/5"
+                    className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
                     aria-label="Next page"
                 >
-                    <ChevronRight className="h-4 w-4" />
+                    <ChevronRight className="h-3.5 w-3.5" />
                 </Button>
             </div>
         </div>
