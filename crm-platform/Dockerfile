@@ -4,20 +4,19 @@ FROM node:22-alpine AS base
 FROM base AS deps
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
 RUN apk add --no-cache libc6-compat
-WORKDIR /app
+WORKDIR /app/crm-platform
 
 # Install dependencies based on the preferred package manager
-# COPY from crm-platform subdirectory because build context is root
+# COPY from crm-platform subdirectory
 COPY crm-platform/package.json crm-platform/package-lock.json* ./
 RUN npm ci
 
 # Rebuild the source code only when needed
 FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+WORKDIR /app/crm-platform
+COPY --from=deps /app/crm-platform/node_modules ./node_modules
 
-# COPY crm-platform contents to /app (root of the image)
-# This "hoists" the app so standard Next.js paths work
+# COPY crm-platform contents to /app/crm-platform
 COPY crm-platform/ .
 
 # Accept build arguments for client-side variables
@@ -59,16 +58,20 @@ ENV NEXT_TELEMETRY_DISABLED 1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/public ./public
-
 # Set the correct permission for prerender cache
 RUN mkdir .next
 RUN chown nextjs:nodejs .next
 
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Copy standalone output (which includes crm-platform/server.js and crm-platform/.next)
+COPY --from=builder --chown=nextjs:nodejs /app/crm-platform/.next/standalone ./
+
+# Copy public directory to the correct location (inside crm-platform because server.js is there)
+COPY --from=builder --chown=nextjs:nodejs /app/crm-platform/public ./crm-platform/public
+
+# Copy static files to the correct location (inside crm-platform/.next)
+COPY --from=builder --chown=nextjs:nodejs /app/crm-platform/.next/static ./crm-platform/.next/static
 
 USER nextjs
 
@@ -76,6 +79,5 @@ EXPOSE 3000
 
 ENV PORT 3000
 
-# server.js is created by next build from the standalone output
-# https://nextjs.org/docs/pages/api-reference/next-config-js/output
-CMD ["node", "server.js"]
+# server.js is located in crm-platform/server.js due to turbopack root config
+CMD ["node", "crm-platform/server.js"]
