@@ -41,6 +41,7 @@ export function GeminiChatPanel() {
     { role: 'assistant', content: 'Hello! I am Gemini, your CRM assistant. How can I help you today? I can search contacts, update info, and more.' }
   ])
   const [input, setInput] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
