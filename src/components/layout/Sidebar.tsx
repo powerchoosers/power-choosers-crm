@@ -10,7 +10,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { auth } from '@/lib/firebase'
 import { toast } from 'sonner'
-import { GeminiChat } from '@/components/chat/GeminiChat'
 import { useGeminiStore } from '@/store/geminiStore'
 
 const navItems = [
