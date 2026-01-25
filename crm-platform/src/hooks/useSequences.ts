@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { collection, getCountFromServer, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, limit, startAfter, QueryDocumentSnapshot } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { useAuth } from '@/context/AuthContext'
 
 export interface Sequence {
   id: string
@@ -9,8 +9,9 @@ export interface Sequence {
   description?: string
   status: 'active' | 'inactive' | 'draft'
   steps: SequenceStep[]
-  createdAt: unknown
-  updatedAt?: unknown
+  createdAt: string | Date | any
+  updatedAt?: string | Date | any
+  ownerId?: string
 }
 
 export interface SequenceStep {
@@ -21,73 +22,73 @@ export interface SequenceStep {
   subject?: string // For emails
 }
 
-const COLLECTION_NAME = 'sequences'
 const PAGE_SIZE = 50
 
-export function useSequences() {
+export function useSequences(searchQuery?: string) {
+  const { user, role, loading } = useAuth()
   const queryClient = useQueryClient()
 
   const sequencesQuery = useInfiniteQuery({
-    queryKey: ['sequences'],
-    initialPageParam: undefined as QueryDocumentSnapshot | undefined,
-    queryFn: async ({ pageParam }) => {
+    queryKey: ['sequences', user?.email, role, searchQuery],
+    initialPageParam: 0,
+    queryFn: async ({ pageParam = 0 }) => {
       try {
-        let q = query(collection(db, COLLECTION_NAME), orderBy('createdAt', 'desc'), limit(PAGE_SIZE))
+        if (loading || !user) return { sequences: [], nextCursor: null }
+
+        let query = supabase
+          .from('sequences')
+          .select('*', { count: 'exact' })
         
-        if (pageParam) {
-          q = query(q, startAfter(pageParam))
+        if (role !== 'admin' && user.email) {
+          query = query.eq('ownerId', user.email)
         }
 
-        const snapshot = await getDocs(q)
+        if (searchQuery) {
+          query = query.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
+        }
+
+        const from = pageParam * PAGE_SIZE
+        const to = from + PAGE_SIZE - 1
+
+        const { data, error, count } = await query
+          .range(from, to)
+          .order('createdAt', { ascending: false })
+        
+        if (error) throw error
         
         return {
-          sequences: snapshot.docs.map(doc => {
-            const data = doc.data()
-            return {
-              id: doc.id,
-              status: 'draft', // Default status
-              ...data,
-              steps: data.steps || [] // Ensure steps is always an array
-            }
-          }) as Sequence[],
-          lastDoc: snapshot.docs?.at(-1) ?? null
+          sequences: (data || []).map(item => ({
+            ...item,
+            steps: item.steps || []
+          })) as Sequence[],
+          nextCursor: count && (pageParam + 1) * PAGE_SIZE < count ? pageParam + 1 : null
         }
-      } catch (error: unknown) {
+      } catch (error: any) {
         console.error('Error fetching sequences:', error)
-        const errorCode = typeof error === 'object' && error !== null && 'code' in error
-          ? (error as { code?: string }).code
-          : undefined
-
-        // Fallback if index is missing
-        if (errorCode === 'failed-precondition') {
-           const q = query(collection(db, COLLECTION_NAME), limit(PAGE_SIZE))
-           const snapshot = await getDocs(q)
-           return {
-             sequences: snapshot.docs.map(doc => ({
-               id: doc.id,
-               status: 'draft',
-               ...doc.data(),
-               steps: doc.data().steps || []
-             })) as Sequence[],
-             lastDoc: null // Pagination might be broken without index, but better than crashing
-           }
-        }
         throw error
       }
     },
-    getNextPageParam: (lastPage) => lastPage?.lastDoc || undefined,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    getNextPageParam: (lastPage) => lastPage?.nextCursor ?? undefined,
+    enabled: !loading && !!user,
+    staleTime: 1000 * 60 * 5,
   })
 
   const addSequenceMutation = useMutation({
     mutationFn: async (newSequence: Omit<Sequence, 'id' | 'createdAt'>) => {
-      const docRef = await addDoc(collection(db, COLLECTION_NAME), {
-        ...newSequence,
-        createdAt: new Date(),
-        status: newSequence.status || 'draft',
-        steps: newSequence.steps || []
-      })
-      return { id: docRef.id, ...newSequence }
+      const { data, error } = await supabase
+        .from('sequences')
+        .insert({
+          ...newSequence,
+          ownerId: user?.email,
+          createdAt: new Date().toISOString(),
+          status: newSequence.status || 'draft',
+          steps: newSequence.steps || []
+        })
+        .select()
+        .single()
+      
+      if (error) throw error
+      return data as Sequence
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sequences'] })
@@ -101,12 +102,18 @@ export function useSequences() {
 
   const updateSequenceMutation = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Sequence> & { id: string }) => {
-      const docRef = doc(db, COLLECTION_NAME, id)
-      await updateDoc(docRef, {
-        ...updates,
-        updatedAt: new Date()
-      })
-      return { id, ...updates }
+      const { data, error } = await supabase
+        .from('sequences')
+        .update({
+          ...updates,
+          updatedAt: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single()
+      
+      if (error) throw error
+      return data as Sequence
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sequences'] })
@@ -120,7 +127,12 @@ export function useSequences() {
 
   const deleteSequenceMutation = useMutation({
     mutationFn: async (id: string) => {
-      await deleteDoc(doc(db, COLLECTION_NAME, id))
+      const { error } = await supabase
+        .from('sequences')
+        .delete()
+        .eq('id', id)
+      
+      if (error) throw error
       return id
     },
     onSuccess: () => {
@@ -146,14 +158,69 @@ export function useSequences() {
   }
 }
 
-export function useSequencesCount() {
+export function useSequencesCount(searchQuery?: string) {
+  const { user, role, loading } = useAuth()
+
   return useQuery({
-    queryKey: ['sequences-count'],
+    queryKey: ['sequences-count', user?.email, role, searchQuery],
     queryFn: async () => {
-      const baseQuery = collection(db, COLLECTION_NAME)
-      const snapshot = await getCountFromServer(baseQuery)
-      return snapshot.data().count
+      if (loading || !user) return 0
+
+      let query = supabase.from('sequences').select('*', { count: 'exact', head: true })
+
+      if (role !== 'admin' && user.email) {
+        query = query.eq('ownerId', user.email)
+      }
+
+      if (searchQuery) {
+        query = query.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
+      }
+
+      const { count, error } = await query
+      if (error) {
+        console.error("Error fetching sequences count:", error)
+        return 0
+      }
+      return count || 0
     },
+    enabled: !loading && !!user,
     staleTime: 1000 * 60 * 5,
   })
 }
+
+export function useSearchSequences(queryTerm: string) {
+  const { user, role, loading } = useAuth()
+
+  return useQuery({
+    queryKey: ['sequences-search', queryTerm, user?.email, role],
+    queryFn: async () => {
+      if (!queryTerm || queryTerm.length < 2) return []
+      if (loading || !user) return []
+
+      try {
+        let query = supabase.from('sequences').select('*')
+
+        if (role !== 'admin' && user.email) {
+          query = query.eq('ownerId', user.email)
+        }
+
+        query = query.or(`name.ilike.%${queryTerm}%,description.ilike.%${queryTerm}%`)
+
+        const { data, error } = await query.limit(10)
+
+        if (error) {
+          console.error("Search error:", error)
+          return []
+        }
+
+        return data as Sequence[]
+      } catch (err) {
+        console.error("Search hook error:", err)
+        return []
+      }
+    },
+    enabled: queryTerm.length >= 2 && !loading && !!user,
+    staleTime: 1000 * 60 * 1,
+  })
+}
+

@@ -63,26 +63,25 @@ function toDisplayDate(value: unknown): Date | null {
 }
 
 export default function SequencesPage() {
-  const { data, isLoading, addSequence, updateSequence, deleteSequence, fetchNextPage, hasNextPage, isFetchingNextPage } = useSequences()
-  const { data: totalSequences } = useSequencesCount()
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  const { data, isLoading, addSequence, updateSequence, deleteSequence, fetchNextPage, hasNextPage, isFetchingNextPage } = useSequences(debouncedQuery)
+  const { data: totalSequences } = useSequencesCount(debouncedQuery)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [newSequenceName, setNewSequenceName] = useState('')
   const [newSequenceDesc, setNewSequenceDesc] = useState('')
   const [pageIndex, setPageIndex] = useState(0)
 
   const sequences = useMemo(() => data?.pages.flatMap(page => page.sequences) || [], [data])
-
-  const filteredSequences = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    if (!q) return sequences
-    return sequences.filter((seq) => {
-      return (
-        (seq.name?.toLowerCase() ?? "").includes(q) ||
-        (seq.description?.toLowerCase() ?? "").includes(q)
-      )
-    })
-  }, [sequences, searchQuery])
 
   const effectiveTotalRecords = totalSequences ?? sequences.length
   const totalPages = Math.max(1, Math.ceil(effectiveTotalRecords / PAGE_SIZE))
@@ -99,10 +98,10 @@ export default function SequencesPage() {
 
   const pagedSequences = useMemo(() => {
     const start = pageIndex * PAGE_SIZE
-    return filteredSequences.slice(start, start + PAGE_SIZE)
-  }, [filteredSequences, pageIndex])
+    return sequences.slice(start, start + PAGE_SIZE)
+  }, [sequences, pageIndex])
 
-  const filteredCount = filteredSequences.length
+  const filteredCount = sequences.length
   const showingStart = filteredCount === 0 ? 0 : Math.min(filteredCount, pageIndex * PAGE_SIZE + 1)
   const showingEnd = filteredCount === 0 ? 0 : Math.min(filteredCount, (pageIndex + 1) * PAGE_SIZE)
 
@@ -199,7 +198,7 @@ export default function SequencesPage() {
             <div className="flex items-center justify-center h-full">
                 <Loader2 className="h-8 w-8 animate-spin text-zinc-500" />
             </div>
-            ) : filteredSequences.length === 0 ? (
+            ) : sequences.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-zinc-500">
                 <ListOrdered className="h-12 w-12 mb-4 opacity-20" />
                 <p>No sequences found</p>

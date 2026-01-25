@@ -17,13 +17,23 @@ import { cn } from '@/lib/utils'
 
 export default function EmailsPage() {
   const { user } = useAuth()
-  const { data, isLoading: isLoadingEmails, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useEmails()
-  const { data: totalEmails } = useEmailsCount()
+  const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  const { data, isLoading: isLoadingEmails, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useEmails(debouncedSearch)
+  const { data: totalEmails } = useEmailsCount(debouncedSearch)
   const { syncGmail, isSyncing, syncStatus } = useGmailSync()
   const router = useRouter()
   
   const [isComposeOpen, setIsComposeOpen] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
 
   const emails = data?.pages.flatMap(page => page.emails) || []
 
@@ -39,15 +49,6 @@ export default function EmailsPage() {
     if (!user) return
     syncGmail(user)
   }
-
-  const filteredEmails = emails?.filter(email => {
-    const search = searchTerm.toLowerCase();
-    return (
-      (email.subject?.toLowerCase() ?? "").includes(search) ||
-      (email.from?.toLowerCase() ?? "").includes(search) ||
-      (typeof email.to === 'string' && email.to.toLowerCase().includes(search))
-    );
-  }) || []
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -80,7 +81,7 @@ export default function EmailsPage() {
       <div className="flex-1 rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl overflow-hidden flex flex-col relative">
         <div className="absolute inset-0 border border-white/5 rounded-2xl pointer-events-none bg-gradient-to-b from-white/5 to-transparent z-10" />
             <EmailList 
-                emails={filteredEmails} 
+                emails={emails} 
                 isLoading={isLoadingEmails} 
                 onRefresh={handleSync}
                 isSyncing={isSyncing}
