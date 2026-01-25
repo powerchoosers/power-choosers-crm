@@ -52,14 +52,15 @@ The platform operates across three distinct environments/servers:
 2.  **Legacy Server (Backend API - Node.js)**:
     - **Local**: `http://127.0.0.1:3001` (or `localhost:3001`)
     - **Run Command**: `node server.js` (in root directory)
-3.  **Production Backend (Cloud Run)**:
-    - **UI/Frontend URL**: `https://power-choosers-crm-792458658491.us-south1.run.app`
-    - **Role**: Serves as the primary API and UI service for the platform.
+3.  **Production Environment (Cloud Run)**:
+    -   **Frontend (UI)**: `https://power-choosers-crm-792458658491.us-south1.run.app`
+    -   **Backend (Network/API)**: `https://nodal-point-network-792458658491.us-south1.run.app`
+    -   **Role**: The "Network" service handles Twilio webhooks, heavy API processing, and legacy backend logic to prevent recursive loops within the Next.js frontend service.
 
 ### 🌐 Routing Logic (Proxying)
 To ensure the frontend can communicate with the backend regardless of environment, we use **Next.js Rewrites** in `crm-platform/next.config.ts`:
 - **Local Development**: Proxies `/api/*` to `http://127.0.0.1:3001`.
-- **Production**: Proxies `/api/*` to the **Cloud Run** URL (`power-choosers-crm`).
+- **Production**: Proxies `/api/*` to the **Network/API** Cloud Run URL (`nodal-point-network`).
 
 **CRITICAL**: Always ensure that any new API endpoints are tested against both the local backend and verified for Cloud Run compatibility.
 
@@ -72,7 +73,13 @@ To ensure the frontend can communicate with the backend regardless of environmen
 ##### 🎨 Design System
 - **Brand**: Nodal Point (Clean, Modern, Enterprise).
 - **Theme**: Dark/Light mode support (System default).
-- **Visual Style**: **Glassmorphism** (Frosted glass, high blur, subtle borders) over solid opaque backgrounds for floating elements.
+- **Visual Style**: **Obsidian & Glass** (Frosted glass, high blur, subtle borders) over solid opaque backgrounds for floating elements.
+- **Forensic Instrument Aesthetic**: Components should feel like physical instruments (cockpit displays, stereo receivers).
+    - **Monolith Borders**: Use gradient overlays (`from-white/5 to-transparent`) to simulate light catching the top edge.
+    - **Tabular Numerals**: ALWAYS use `font-mono tabular-nums tracking-tight` for all data fields (Phone, Days, Prices, IDs, Counts).
+    - **Haptic Bloom**: Use `hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)]` for primary buttons.
+    - **Sync_Block Protocol**: All collection pages MUST feature a `Sync_Block` footer displaying the current range (e.g., `Sync_Block 01–50`) and `Total_Nodes` count.
+    - **LED Status**: Use pulsing LED dots for status indicators (Active, Operational) instead of generic pills.
 - **Layout**: Sidebar navigation (Left), Header (Top), Main Content (Center).
 - **AI Icon**: Use the "Sparkles" icon for all AI features.
 
@@ -95,9 +102,9 @@ To ensure the frontend can communicate with the backend regardless of environmen
     -   `flex-1 rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl overflow-hidden flex flex-col relative`
 5.  **Sticky Table Header**:
     -   `sticky top-0 bg-zinc-900/95 backdrop-blur-sm z-20 shadow-sm border-b border-white/5`
-6.8.  **Input Fields**:
+6.  **Input Fields**:
     -   Focus ring: `focus-visible:ring-indigo-500`
-9.  **Page Entry Animation**:
+7.  **Page Entry Animation**:
     -   Standard: `initial={{ opacity: 0, filter: "blur(10px)" }}` → `animate={{ opacity: 1, filter: "blur(0px)" }}`.
 
 ## ⚠️ Migration Rules

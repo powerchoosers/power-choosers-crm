@@ -37,15 +37,15 @@ export function KPIGrid() {
       {stats.map((stat) => (
         <div
           key={stat.title}
-          className="rounded-3xl border border-white/10 bg-zinc-900/50 backdrop-blur-xl p-6 hover:bg-zinc-900/70 transition-colors group"
+          className="nodal-glass p-6 nodal-glass-hover group rounded-2xl"
         >
           <div className="flex items-center justify-between space-y-0 pb-2">
             <span className="text-sm font-medium text-zinc-400 group-hover:text-zinc-300 transition-colors">{stat.title}</span>
             <stat.icon className="h-4 w-4 text-zinc-500 group-hover:text-signal transition-colors" />
           </div>
           <div className="flex items-center justify-between pt-4">
-             <div className="text-3xl font-bold text-white tracking-tight">{stat.value}</div>
-             <div className={`text-xs flex items-center ${stat.trend === 'up' ? 'text-green-500' : 'text-red-500'}`}>
+             <div className="text-3xl font-semibold text-white tracking-tighter font-mono tabular-nums">{stat.value}</div>
+             <div className={`text-xs flex items-center font-mono tabular-nums ${stat.trend === 'up' ? 'text-green-500' : 'text-red-500'}`}>
                 {stat.trend === 'up' ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
                 <span className="ml-1">{stat.change}</span>
              </div>

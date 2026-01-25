@@ -45,6 +45,21 @@ Power Choosers CRM/
 └── feature-tracking.md     # Migration Status Log
 ```
 
+## 🗄️ Database & Migration
+
+The platform has transitioned from **Firebase/Firestore** to **Supabase (PostgreSQL)**.
+
+### 1. Supabase Schema Strategy
+- **Relational Integrity**: We use foreign keys (e.g., `contacts.accountId` -> `accounts.id`) to maintain data consistency.
+- **Metadata JSONB**: Every migrated record includes a `metadata` column containing the **original Firestore document**. This ensures no data is lost during the transition.
+- **Unified Contacts**: The legacy `people` and `contacts` collections have been merged into a single `contacts` table in Supabase.
+
+### 2. Data Mapping & Normalization
+Due to varying structures in legacy data, we use a normalization layer in our hooks (see `useContacts.ts`):
+- **Name Resolution**: We prioritize `firstName`/`lastName` columns, then fall back to `first_name`/`last_name` (underscore format), and finally check nested paths in `metadata` (e.g., `metadata.general.firstName`).
+- **Metadata Parsing**: In some cases, Supabase returns the `metadata` column as a stringified JSON string. We use `normalizeMetadata` to safely parse these values.
+- **Energy Data**: Account-level energy metrics (Strike Price, Annual Usage, etc.) are promoted to top-level columns in the `accounts` table for performance.
+
 ## ⚡ Quick Start & Architecture
 
 The platform operates using a **Three-Server Architecture**:
@@ -59,17 +74,18 @@ Handles API requests and legacy logic during development.
 - **Local**: `http://127.0.0.1:3001`
 - **Command**: `node server.js` (Root Directory)
 
-### 3. Production Backend (Cloud Run)
-The live API for the deployed platform.
-- **URL**: `https://power-choosers-crm-792458658491.us-south1.run.app`
-- **Architecture**: Single-service architecture where both UI and API reside on the same Cloud Run instance.
+### 3. Production Environment (Cloud Run)
+The live platform operates across two distinct Cloud Run services to prevent recursive loops:
+- **Frontend (UI)**: `https://power-choosers-crm-792458658491.us-south1.run.app`
+- **Backend (Network/API)**: `https://nodal-point-network-792458658491.us-south1.run.app`
+- **Architecture**: The Frontend service handles the UI and routing, while the Network service handles Twilio webhooks, heavy API processing, and legacy backend logic.
 
 ## 📍 Routing & Proxy Logic
 
 We use **Next.js Rewrites** (`next.config.ts`) to handle seamless communication between the frontend and the correct backend:
 
 - **In Development**: All `/api/*` requests are proxied to the **Local Backend** (`127.0.0.1:3001`).
-- **In Production**: All `/api/*` requests are proxied to the **Cloud Run** URL.
+- **In Production**: All `/api/*` requests are proxied to the **Network/API Service** (`nodal-point-network`).
 
 This ensures that code remains environment-agnostic while maintaining full functionality across `localhost` and `nodalpoint.io`.
 
@@ -123,11 +139,22 @@ The platform uses **Firebase Authentication**.
 
 - **Theme**: Dark/Light mode support (System default).
 - **Brand**: "Nodal Point" - Clean, Enterprise, Modern.
-- **AI Integration**: Use the "Sparkles" icon for AI-powered features.
+- **Visual Style**: **Obsidian & Glass** (Frosted glass, high blur, subtle borders) over solid opaque backgrounds for floating elements.
+  - **Forensic Instrument Aesthetic**: Components should feel like physical instruments (e.g., cockpit displays, high-end stereo receivers).
+  - **Monolith Borders**: Use `bg-gradient-to-b from-white/5 to-transparent` on a `relative` container with a 1px border to simulate a top-down light source catching the edge.
+  - **Tabular Data**: ALWAYS use `font-mono tabular-nums tracking-tight` for phone numbers, currency, dates, mathematical values, and IDs.
+  - **Haptic Buttons**: Primary action buttons should use a "Bloom" effect on hover (`hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)]`).
+  - **Sync_Block Protocol**: All collection pages MUST feature a `Sync_Block` footer displaying the current range (e.g., `Sync_Block 01–50`) and `Total_Nodes` count.
+  - **LED Status**: Use pulsing LED dots for status indicators (Active, Operational) instead of generic pills.
+- **AI Integration**: Use the "Sparkles" icon (`lucide-react/Sparkles`) for all AI-powered features.
+- **Contact Avatars**: **STRICT RULE**: Use letter glyphs (initials) instead of company logos for contact avatars.
+  - **Styles**: `rounded-full`, `bg-zinc-800`, `text-zinc-400`, `border-white/5`.
+  - Applies to both `PeoplePage` table rows and the `ContactDossierPage` header.
 - **Layout**: Sidebar (Left), Top Bar (Header), Right Panel (Contextual Widgets).
 - **Animations**:
   - **Page Entry**: Public pages use a standard "Blur In" effect (`filter: blur(10px)` → `blur(0px)`) combined with opacity fade.
   - **Staggered Elements**: Lists and grids should use staggered entry delays.
+  - **Enter Transitions**: `animate-in fade-in slide-in-from-bottom-4 duration-500`.
 
 ### 🔡 Typography & Branding Consistency
 - **Public Pages (Landing, Philosophy, etc.)**:
@@ -139,27 +166,31 @@ The platform uses **Firebase Authentication**.
 
 ## 📐 Standardized Page Layout
 
-All main application pages (Accounts, People, Sequences, etc.) must follow this standardized layout structure:
+All main application pages (Accounts, People, Sequences, etc.) must follow this standardized layout structure to ensure a consistent UX:
 
 1.  **Container**: Fixed height with entry animation.
     ```tsx
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
     ```
-2.  **Primary Button**: White background, dark text.
+2.  **Primary Action Button**: White background, dark text (Klein Blue is for accents, not primary buttons).
     ```tsx
     <Button className="bg-white text-zinc-950 hover:bg-zinc-200 font-medium">
     ```
-3.  **Search Bar**: Backdrop blur, zinc-900/50 background.
+3.  **Search/Filter Bar**: Backdrop blur, zinc-900/50 background, input with `focus-visible:ring-indigo-500`.
     ```tsx
     <div className="flex items-center gap-4 bg-zinc-900/50 p-4 rounded-xl border border-white/5 backdrop-blur-sm">
     ```
-4.  **Data Table/Grid Container**: Rounded, bordered, backdrop blur.
+4.  **Data Container (Table/Grid)**: Rounded, bordered, backdrop blur.
     ```tsx
     <div className="flex-1 rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl overflow-hidden flex flex-col relative">
     ```
-5.  **Sticky Header**: For tables, the header must be sticky.
+5.  **Sticky Header**: For tables, the header must be sticky with a subtle blur.
     ```tsx
     <TableHeader className="sticky top-0 bg-zinc-900/95 backdrop-blur-sm z-20 shadow-sm border-b border-white/5">
+    ```
+6.  **Table Rows**: Hover effects and click-to-navigate.
+    ```tsx
+    <TableRow className="border-white/5 hover:bg-white/5 transition-colors group cursor-pointer">
     ```
 
 ## 📚 Documentation Maintenance

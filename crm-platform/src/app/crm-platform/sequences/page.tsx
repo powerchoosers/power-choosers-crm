@@ -34,10 +34,13 @@ import {
   ListOrdered,
   Loader2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Clock,
+  Filter
 } from 'lucide-react'
+import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { toast } from 'sonner'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
 import { Badge } from '@/components/ui/badge'
 
 const PAGE_SIZE = 50
@@ -75,8 +78,8 @@ export default function SequencesPage() {
     if (!q) return sequences
     return sequences.filter((seq) => {
       return (
-        seq.name.toLowerCase().includes(q) ||
-        seq.description?.toLowerCase().includes(q)
+        (seq.name?.toLowerCase() ?? "").includes(q) ||
+        (seq.description?.toLowerCase() ?? "").includes(q)
       )
     })
   }, [sequences, searchQuery])
@@ -137,73 +140,60 @@ export default function SequencesPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex-none space-y-4">
-        <div className="flex items-center justify-between">
-            <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">Sequences</h1>
-            <p className="text-zinc-400 mt-1">Manage your automated outreach campaigns.</p>
-            </div>
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-                <Button className="bg-white text-zinc-950 hover:bg-zinc-200 font-medium">
-                <Plus className="h-4 w-4 mr-2" />
-                New Sequence
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-zinc-950 border-white/10 text-zinc-100">
-                <DialogHeader>
-                <DialogTitle>Create New Sequence</DialogTitle>
-                <DialogDescription className="text-zinc-400">
-                    Start a new automated outreach campaign.
-                </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                    <Label htmlFor="name">Name</Label>
-                    <Input 
-                    id="name" 
-                    value={newSequenceName} 
-                    onChange={(e) => setNewSequenceName(e.target.value)} 
-                    placeholder="e.g. Cold Outreach Q1"
-                    className="bg-zinc-900 border-white/10"
-                    />
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="desc">Description</Label>
-                    <Input 
-                    id="desc" 
-                    value={newSequenceDesc} 
-                    onChange={(e) => setNewSequenceDesc(e.target.value)} 
-                    placeholder="Optional description"
-                    className="bg-zinc-900 border-white/10"
-                    />
-                </div>
-                </div>
-                <DialogFooter>
-                <Button variant="ghost" onClick={() => setIsCreateOpen(false)} className="hover:bg-white/10 hover:text-white text-zinc-400">Cancel</Button>
-                <Button onClick={handleCreate} className="bg-white text-zinc-950 hover:bg-zinc-200">Create Sequence</Button>
-                </DialogFooter>
-            </DialogContent>
-            </Dialog>
-        </div>
+      <CollapsiblePageHeader
+        title="Sequences"
+        description="Automate your outreach with smart multi-step sequences."
+        globalFilter={searchQuery}
+        onSearchChange={(val) => {
+          setSearchQuery(val)
+          setPageIndex(0)
+        }}
+        primaryAction={{
+          label: "Create Sequence",
+          onClick: () => setIsCreateOpen(true),
+          icon: <Plus size={18} className="mr-2" />
+        }}
+      />
 
-        <div className="flex items-center gap-4 bg-zinc-900/50 p-4 rounded-xl border border-white/5 backdrop-blur-sm">
-            <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
-            <Input 
-                placeholder="Search sequences..." 
-                value={searchQuery} 
-                onChange={(e) => {
-                  setSearchQuery(e.target.value)
-                  setPageIndex(0)
-                }}
-                className="pl-10 bg-zinc-950 border-white/10 text-white placeholder:text-zinc-600 focus-visible:ring-indigo-500"
-            />
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent className="bg-zinc-950 border-white/10 text-zinc-100">
+          <DialogHeader>
+            <DialogTitle>Create New Sequence</DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Start a new automated outreach campaign.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="name">Name</Label>
+              <Input 
+                id="name" 
+                value={newSequenceName} 
+                onChange={(e) => setNewSequenceName(e.target.value)} 
+                placeholder="e.g. Cold Outreach Q1"
+                className="bg-zinc-900 border-white/10"
+              />
             </div>
-        </div>
-      </div>
+            <div className="grid gap-2">
+              <Label htmlFor="desc">Description</Label>
+              <Input 
+                id="desc" 
+                value={newSequenceDesc} 
+                onChange={(e) => setNewSequenceDesc(e.target.value)} 
+                placeholder="Optional description"
+                className="bg-zinc-900 border-white/10"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsCreateOpen(false)} className="hover:bg-white/10 hover:text-white text-zinc-400">Cancel</Button>
+            <Button onClick={handleCreate} className="bg-white text-zinc-950 hover:bg-zinc-200">Create Sequence</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="flex-1 rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl overflow-hidden flex flex-col relative">
+        <div className="absolute inset-0 border border-white/5 rounded-2xl pointer-events-none bg-gradient-to-b from-white/5 to-transparent z-10" />
         <div className="flex-1 overflow-auto relative scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
             {isLoading ? (
             <div className="flex items-center justify-center h-full">
@@ -217,18 +207,18 @@ export default function SequencesPage() {
             </div>
             ) : (
             <Table>
-                <TableHeader className="sticky top-0 bg-zinc-900/95 backdrop-blur-sm z-20 shadow-sm border-b border-white/5">
-                <TableRow className="border-white/5 hover:bg-transparent">
-                    <TableHead className="text-zinc-400 w-[300px]">Name</TableHead>
-                    <TableHead className="text-zinc-400">Steps</TableHead>
-                    <TableHead className="text-zinc-400">Status</TableHead>
-                    <TableHead className="text-zinc-400">Created</TableHead>
-                    <TableHead className="text-right text-zinc-400">Actions</TableHead>
+                <TableHeader className="sticky top-0 bg-zinc-900/80 backdrop-blur-sm z-20 border-b border-white/5">
+                <TableRow className="border-none hover:bg-transparent">
+                    <TableHead className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3 w-[300px]">Name</TableHead>
+                    <TableHead className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">Steps</TableHead>
+                    <TableHead className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">Status</TableHead>
+                    <TableHead className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">Created</TableHead>
+                    <TableHead className="text-right text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">Actions</TableHead>
                 </TableRow>
                 </TableHeader>
                 <TableBody>
                 {pagedSequences.map((sequence) => (
-                    <TableRow key={sequence.id} className="border-white/5 hover:bg-white/5 transition-colors group">
+                    <TableRow key={sequence.id} className="border-white/5 hover:bg-white/[0.02] transition-colors group">
                     <TableCell className="font-medium text-zinc-200">
                         <div className="flex flex-col">
                         <span>{sequence.name}</span>
@@ -236,35 +226,58 @@ export default function SequencesPage() {
                         </div>
                     </TableCell>
                     <TableCell className="text-zinc-400">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 font-mono tabular-nums">
                         <span className="bg-white/10 px-2 py-0.5 rounded text-xs text-zinc-300 font-medium">
                             {sequence.steps?.length || 0}
                         </span>
                         <span className="text-xs">steps</span>
                         </div>
                     </TableCell>
-                    <TableCell>
-                        <div className="flex items-center gap-2">
+                    <TableCell className="py-3">
+                        <div className="flex items-center gap-3">
                         <Switch 
                             checked={sequence.status === 'active'}
                             onCheckedChange={() => handleToggleStatus(sequence)}
                             className="data-[state=checked]:bg-green-500"
                         />
-                        <span className={`text-xs font-medium ${
-                            sequence.status === 'active' ? 'text-green-400' : 
-                            sequence.status === 'draft' ? 'text-zinc-500' : 'text-zinc-400'
-                        }`}>
-                            {sequence.status ? sequence.status.charAt(0).toUpperCase() + sequence.status.slice(1) : 'Draft'}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full shadow-sm transition-all duration-500 ${
+                            sequence.status === 'active' 
+                              ? 'bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]' 
+                              : sequence.status === 'draft'
+                              ? 'bg-zinc-600 shadow-[0_0_8px_rgba(113,113,122,0.4)]'
+                              : 'bg-zinc-500'
+                          }`} />
+                          <span className={`text-xs font-mono uppercase tracking-widest ${
+                              sequence.status === 'active' ? 'text-green-400' : 
+                              sequence.status === 'draft' ? 'text-zinc-500' : 'text-zinc-400'
+                          }`}>
+                              {sequence.status ? sequence.status : 'Draft'}
+                          </span>
+                        </div>
                         </div>
                     </TableCell>
-                    <TableCell className="text-zinc-500 text-sm">
+                    <TableCell className="py-3">
                         {(() => {
                           const date = toDisplayDate(sequence.createdAt)
-                          return date ? formatDistanceToNow(date, { addSuffix: true }) : '-'
+                          if (!date) return <span className="text-zinc-600 font-mono text-xs">--</span>
+                          
+                          const threeMonthsAgo = subMonths(new Date(), 3)
+                          const isRecent = isAfter(date, threeMonthsAgo)
+                          
+                          return (
+                            <div className="flex items-center gap-2 text-zinc-500 font-mono text-xs tabular-nums">
+                              <Clock size={12} className="text-zinc-600" />
+                              <span>
+                                {isRecent 
+                                  ? formatDistanceToNow(date, { addSuffix: true })
+                                  : format(date, 'MMM d, yyyy')}
+                              </span>
+                            </div>
+                          )
                         })()}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right py-3">
                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10" onClick={() => toast.info('Builder coming soon')}>
                             <Edit className="h-4 w-4" />
@@ -294,28 +307,27 @@ export default function SequencesPage() {
             )}
         </div>
         
-        <div className="flex-none border-t border-white/10 bg-zinc-900/50 p-4 flex items-center justify-between z-10 backdrop-blur-md">
+        <div className="flex-none border-t border-white/5 bg-zinc-900/90 p-4 flex items-center justify-between backdrop-blur-sm z-10">
             <div className="flex items-center gap-4">
-                <div className="flex items-center gap-3 text-sm text-zinc-500">
-                  <span>Showing {showingStart}–{showingEnd}</span>
-                  <Badge variant="outline" className="border-white/10 bg-white/5 text-zinc-400">
-                    Total {effectiveTotalRecords}
-                  </Badge>
+                <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
+                  <span>Sync_Block {showingStart}–{showingEnd}</span>
+                  <div className="h-1 w-1 rounded-full bg-zinc-800" />
+                  <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{effectiveTotalRecords}</span></span>
                 </div>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
                   disabled={pageIndex === 0}
-                  className="border-white/10 bg-transparent text-zinc-400 hover:text-white hover:bg-white/5"
+                  className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
                   aria-label="Previous page"
                 >
-                  <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="h-3.5 w-3.5" />
                 </Button>
-                <div className="min-w-8 text-center text-sm text-zinc-400 tabular-nums">
-                  {pageIndex + 1}
+                <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
+                  {(pageIndex + 1).toString().padStart(2, '0')}
                 </div>
                 <Button
                   variant="outline"
@@ -332,10 +344,10 @@ export default function SequencesPage() {
                     setPageIndex(nextPageIndex)
                   }}
                   disabled={pageIndex + 1 >= displayTotalPages || (!hasNextPage && sequences.length < (pageIndex + 2) * PAGE_SIZE)}
-                  className="border-white/10 bg-transparent text-zinc-400 hover:text-white hover:bg-white/5"
+                  className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
                   aria-label="Next page"
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-3.5 w-3.5" />
                 </Button>
             </div>
         </div>

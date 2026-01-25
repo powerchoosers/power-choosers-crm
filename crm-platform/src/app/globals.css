@@ -36,6 +36,27 @@
   --tracking-normal: -0.02em;
 }
 
+@layer utilities {
+  /* The Nodal Glass Material */
+  .nodal-glass {
+    @apply bg-zinc-950/40 border border-white/10 shadow-2xl;
+    backdrop-filter: blur(24px) saturate(150%);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+  }
+
+  /* Extreme Glass for floating panels */
+  .glass-panel {
+    @apply bg-zinc-950/60 border border-white/10 shadow-2xl;
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+  }
+
+  /* The Hover Effect (Interactive Elements only) */
+  .nodal-glass-hover {
+    @apply hover:border-white/10 hover:bg-zinc-900/60 transition-all duration-300;
+  }
+}
+
 :root {
   /* Nodal Dark Theme - Deep Zinc & International Klein Blue */
   

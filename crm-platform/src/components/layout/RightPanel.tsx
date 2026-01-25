@@ -1,78 +1,157 @@
 'use client'
 
-import { Bell, Calendar, CheckSquare, Clock, Zap } from 'lucide-react'
+import { 
+  Clock, Zap, Activity, MapPin, Sun, Cloud, CloudRain, Wind, 
+  AlertCircle, Lock, Unlock, CheckCircle, Play, DollarSign, Mic 
+} from 'lucide-react'
+import { useParams, usePathname } from 'next/navigation'
+import { format } from 'date-fns'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useContact } from '@/hooks/useContacts'
+import { useAccount } from '@/hooks/useAccounts'
+import { useTasks } from '@/hooks/useTasks'
+import { useUIStore } from '@/store/uiStore'
+import { cn } from '@/lib/utils'
+
+// Widgets
+import TelemetryWidget from '../crm/TelemetryWidget'
+import OperationalButton from '../crm/OperationalButton'
+import SatelliteUplink from '../crm/SatelliteUplink'
+import MarketPulseWidget from '../crm/MarketPulseWidget'
+import QuickActionsGrid from '../crm/QuickActionsGrid'
+import NewsFeedWidget from '../crm/NewsFeedWidget'
+import GlobalTasksWidget from '../crm/GlobalTasksWidget'
+import ContextTasksWidget from '../crm/ContextTasksWidget'
 
 export function RightPanel() {
+  const pathname = usePathname()
+  const params = useParams()
+  const { isEditing } = useUIStore()
+  
+  // State detection
+  const isContactPage = pathname.includes('/contacts/')
+  const isAccountPage = pathname.includes('/accounts/')
+  const isActiveContext = isContactPage || isAccountPage
+  const entityId = params.id as string
+  
+  const { data: contact } = useContact(isContactPage ? entityId : '')
+  const { data: account } = useAccount(isAccountPage ? entityId : '')
+  
+  const entityLocation = (contact ? (contact.city || 'LZ_NORTH') : account?.location) || 'LZ_NORTH'
+  const entityAddress = (contact ? contact.address : account?.address) || ''
+  const entityName = contact?.name || account?.name
+
   return (
-    <aside className="fixed right-0 top-0 bottom-0 z-30 w-80 bg-zinc-950/50 backdrop-blur-xl border-l border-white/5 pt-24 pb-8 px-6 flex flex-col gap-8 overflow-y-auto hidden lg:flex np-scroll">
+    <aside className="fixed right-0 top-0 bottom-0 z-30 w-80 bg-zinc-950 border-l border-white/5 pt-9 pb-8 px-6 flex flex-col gap-6 overflow-y-auto hidden lg:flex np-scroll">
       
-      {/* Upcoming Tasks Widget */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Upcoming Tasks</h3>
-          <button className="text-xs text-signal hover:text-blue-400 transition-colors">View All</button>
+      {/* Calibration Marks (System Status Header) */}
+      <div className="flex items-center justify-between px-2 mb-2 h-6 select-none shrink-0">
+        {/* 1. THE LIVE INDICATOR */}
+        <div className="flex items-center gap-2">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#002FA7] opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#002FA7]"></span>
+          </span>
+          <span className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase">
+            {isActiveContext ? 'Active_Context' : 'Scanning_Mode'}
+          </span>
         </div>
-        <div className="space-y-3">
-          {[
-            { title: 'Contract Renewal', client: 'ABC Corp', time: '2:00 PM', urgent: true },
-            { title: 'Follow-up Call', client: 'XYZ Energy', time: '4:30 PM', urgent: false },
-            { title: 'Rate Analysis', client: 'Metro District', time: 'Tomorrow', urgent: false },
-          ].map((task, i) => (
-            <div key={i} className="group p-3 rounded-2xl bg-zinc-900/50 border border-white/5 hover:bg-zinc-800/50 hover:border-white/10 transition-all cursor-pointer">
-              <div className="flex items-start gap-3">
-                <div className={`mt-1 w-2 h-2 rounded-full ${task.urgent ? 'bg-red-500 animate-pulse' : 'bg-zinc-600'}`} />
-                <div>
-                  <div className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors">{task.title}</div>
-                  <div className="text-xs text-zinc-500 mt-0.5">{task.client}</div>
-                  <div className="flex items-center gap-1.5 mt-2 text-xs text-zinc-400">
-                    <Clock size={12} />
-                    <span>{task.time}</span>
-                  </div>
-                </div>
+
+        {/* 2. THE SYSTEM CLOCK (Forensic Detail) */}
+        <div className="text-[10px] font-mono text-zinc-600 hidden md:block tabular-nums">
+          {isActiveContext ? 'T-MINUS 14 D' : format(new Date(), 'HH:mm:ss')}
+        </div>
+
+        {/* 3. THE CONTROL (Minimize) */}
+        <button 
+          className="text-zinc-600 hover:text-white transition-colors"
+          title="Minimize Intelligence Feed"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+      </div>
+
+      <AnimatePresence mode="wait">
+        {isActiveContext ? (
+          <motion.div
+            key="active-context"
+            initial={{ y: -20, opacity: 0, filter: "blur(10px)" }}
+            animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
+            exit={{ y: 20, opacity: 0, filter: "blur(10px)" }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="flex flex-col gap-8 mt-2"
+          >
+            {/* 1. TELEMETRY (Targeting Mode) */}
+            <div className="space-y-1">
+              <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Telemetry</h3>
+              <TelemetryWidget location={entityLocation} />
+            </div>
+
+            {/* 2. OPERATIONS DECK */}
+            <div className="bg-zinc-900/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6">
+              <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-4">Operations</h3>
+              <div className="grid grid-cols-2 gap-3">
+                  <OperationalButton icon={CheckCircle} label="Add Task" />
+                  <OperationalButton icon={Play} label="Sequence" />
+                  <OperationalButton icon={DollarSign} label="Create Deal" />
+                  <OperationalButton icon={Mic} label="Log Call" />
               </div>
             </div>
-          ))}
-        </div>
-      </div>
 
-      {/* Recent Activity Widget */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Activity</h3>
-        </div>
-        <div className="relative border-l border-zinc-800 ml-3 space-y-6 pb-2">
-          {[
-            { action: 'Call completed', target: 'John Doe', time: '10m ago' },
-            { action: 'Email sent', target: 'Sarah Smith', time: '1h ago' },
-            { action: 'Contract signed', target: 'Tech Industries', time: '2h ago' },
-            { action: 'New lead', target: 'Global Logistics', time: '4h ago' },
-          ].map((activity, i) => (
-            <div key={i} className="relative pl-6">
-              <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-zinc-900 border border-zinc-700" />
-              <div className="text-sm text-zinc-300">{activity.action}</div>
-              <div className="text-xs text-zinc-500 mt-0.5">{activity.target}</div>
-              <div className="text-[10px] text-zinc-600 mt-1">{activity.time}</div>
+            {/* 3. SATELLITE UPLINK */}
+            <div className="space-y-1">
+              <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Asset Recon</h3>
+              <SatelliteUplink address={entityAddress} />
             </div>
-          ))}
-        </div>
-      </div>
 
-      {/* System Status Widget */}
-      <div className="mt-auto p-4 rounded-2xl bg-gradient-to-br from-zinc-900 to-zinc-950 border border-white/5">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="p-2 rounded-lg bg-green-500/10 text-green-500">
-            <Zap size={16} />
+            {/* 4. CONTEXT TASKS */}
+            <ContextTasksWidget entityId={entityId} entityName={entityName} />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="global-context"
+            initial={{ y: 20, opacity: 0, filter: "blur(10px)" }}
+            animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
+            exit={{ y: -20, opacity: 0, filter: "blur(10px)" }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="flex flex-col gap-8 mt-2"
+          >
+            {/* 1. TACTICAL AGENDA (Scanning Mode) */}
+            <GlobalTasksWidget />
+
+            {/* 2. MARKET PULSE (ERCOT) */}
+            <MarketPulseWidget />
+
+            {/* 3. RAPID INGESTION */}
+            <QuickActionsGrid />
+
+            {/* 4. SIGNAL FEED */}
+            <NewsFeedWidget />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* System Status (Sticky at bottom) */}
+      <div className="mt-auto pt-6">
+        <div className="p-4 rounded-2xl nodal-glass">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 rounded-lg bg-green-500/10 text-green-500">
+              <Zap size={16} />
+            </div>
+            <div>
+              <div className="text-xs font-medium text-zinc-400">System Status</div>
+              <div className="text-sm font-bold text-white">All Systems Go</div>
+            </div>
           </div>
-          <div>
-            <div className="text-xs font-medium text-zinc-400">System Status</div>
-            <div className="text-sm font-bold text-white">All Systems Go</div>
+          <div className="w-full bg-zinc-800 h-1 rounded-full overflow-hidden">
+            <div className="bg-green-500 h-full w-full" />
           </div>
-        </div>
-        <div className="w-full bg-zinc-800 h-1 rounded-full overflow-hidden">
-          <div className="bg-green-500 h-full w-full" />
         </div>
       </div>
 
     </aside>
   )
 }
+

@@ -12,7 +12,9 @@ import {
   SortingState,
   ColumnFiltersState,
 } from '@tanstack/react-table'
-import { Search, Plus, Filter, MoreHorizontal, PhoneIncoming, PhoneOutgoing, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, PhoneIncoming, PhoneOutgoing, Plus, Search, Filter, MoreHorizontal } from 'lucide-react'
+import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
+import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
 import { useCalls, Call } from '@/hooks/useCalls'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -66,7 +68,7 @@ export default function CallsPage() {
              </div>
              <div>
                 <div className="font-medium text-zinc-200">{call.contactName}</div>
-                <div className="text-xs text-zinc-500">{call.phoneNumber}</div>
+                <div className="text-xs text-zinc-500 font-mono tabular-nums">{call.phoneNumber}</div>
              </div>
           </div>
         )
@@ -79,8 +81,8 @@ export default function CallsPage() {
         const type = row.getValue('type') as string
         return (
           <div className="flex items-center gap-2 text-zinc-400">
-            {type === 'Inbound' ? <PhoneIncoming className="w-4 h-4 text-green-500" /> : <PhoneOutgoing className="w-4 h-4 text-blue-500" />}
-            <span>{type}</span>
+            {type === 'Inbound' ? <PhoneIncoming className="w-4 h-4 text-green-500" /> : <PhoneOutgoing className="w-4 h-4 text-[#002FA7]" />}
+            <span className="text-[10px] font-mono uppercase tracking-wider">{type}</span>
           </div>
         )
       },
@@ -90,27 +92,63 @@ export default function CallsPage() {
       header: 'Status',
       cell: ({ row }) => {
         const status = row.getValue('status') as string
+        const isCompleted = status === 'Completed'
+        const isMissed = status === 'Missed'
+        const isVoicemail = status === 'Voicemail'
+        
         return (
-          <span className={cn(
-            "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border",
-            status === 'Completed' && "bg-green-500/10 text-green-500 border-green-500/20",
-            status === 'Missed' && "bg-red-500/10 text-red-500 border-red-500/20",
-            status === 'Voicemail' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
-          )}>
-            {status}
-          </span>
+          <div className="flex items-center gap-2">
+            <div className={cn(
+              "w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.4)]",
+              isCompleted ? "bg-green-500 animate-pulse shadow-green-500/50" : 
+              isMissed ? "bg-red-500 shadow-red-500/50" : 
+              isVoicemail ? "bg-yellow-500 shadow-yellow-500/50" :
+              "bg-zinc-600 shadow-zinc-600/50"
+            )} />
+            <span className={cn(
+              "text-[10px] font-mono uppercase tracking-wider",
+              isCompleted ? "text-green-500/80" : 
+              isMissed ? "text-red-500/80" : 
+              isVoicemail ? "text-yellow-500/80" :
+              "text-zinc-500"
+            )}>
+              {status}
+            </span>
+          </div>
         )
       },
     },
     {
       accessorKey: 'duration',
       header: 'Duration',
-      cell: ({ row }) => <div className="text-zinc-500">{row.getValue('duration')}</div>,
+      cell: ({ row }) => <div className="text-zinc-500 font-mono tabular-nums">{row.getValue('duration')}</div>,
     },
     {
       accessorKey: 'date',
       header: 'Date/Time',
-      cell: ({ row }) => <div className="text-zinc-500">{row.getValue('date')}</div>,
+      cell: ({ row }) => {
+        const val = row.getValue('date') as string
+        if (!val) return <span className="text-zinc-600 font-mono text-xs">--</span>
+        
+        try {
+          const date = new Date(val)
+          const threeMonthsAgo = subMonths(new Date(), 3)
+          const isRecent = isAfter(date, threeMonthsAgo)
+          
+          return (
+            <div className="flex items-center gap-2 text-zinc-500 font-mono text-xs tabular-nums">
+              <Clock size={12} className="text-zinc-600" />
+              <span>
+                {isRecent 
+                  ? formatDistanceToNow(date, { addSuffix: true })
+                  : format(date, 'MMM d, yyyy')}
+              </span>
+            </div>
+          )
+        } catch (e) {
+          return <span className="text-zinc-600 font-mono text-xs">{val}</span>
+        }
+      },
     },
     {
       id: "actions",
@@ -164,44 +202,30 @@ export default function CallsPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex-none space-y-4">
-        <div className="flex items-center justify-between">
-            <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">Calls</h1>
-            <p className="text-zinc-400 mt-1">Manage and track your call history.</p>
-            </div>
-            <Button className="bg-white text-zinc-950 hover:bg-zinc-200 font-medium">
-            <Plus className="w-4 h-4 mr-2" />
-            Log Call
-            </Button>
-        </div>
-
-        <div className="flex items-center gap-4 bg-zinc-900/50 p-4 rounded-xl border border-white/5 backdrop-blur-sm">
-            <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
-            <Input 
-                placeholder="Search calls..." 
-                value={globalFilter ?? ""}
-                onChange={(event) => setGlobalFilter(event.target.value)}
-                className="pl-10 bg-zinc-950 border-white/10 text-white placeholder:text-zinc-600 focus-visible:ring-indigo-500"
-            />
-            </div>
-            <Button variant="outline" className="gap-2 bg-zinc-900 border-white/10 text-zinc-400 hover:text-white hover:bg-white/5">
-            <Filter size={16} />
-            Filter
-            </Button>
-        </div>
-      </div>
+      <CollapsiblePageHeader
+        title="Call Logs"
+        description="Monitor grid-wide communications and dialer activity."
+        globalFilter={globalFilter}
+        onSearchChange={(value) => {
+          setGlobalFilter(value)
+        }}
+        primaryAction={{
+          label: "Log Call",
+          onClick: () => {},
+          icon: <Plus size={18} className="mr-2" />
+        }}
+      />
 
       <div className="flex-1 rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl overflow-hidden flex flex-col relative">
+        <div className="absolute inset-0 border border-white/5 rounded-2xl pointer-events-none bg-gradient-to-b from-white/5 to-transparent z-10" />
         <div className="flex-1 overflow-auto relative scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
             <Table>
-            <TableHeader className="sticky top-0 bg-zinc-900/95 backdrop-blur-sm z-20 shadow-sm border-b border-white/5">
+            <TableHeader className="sticky top-0 bg-zinc-900/80 backdrop-blur-sm z-20 border-b border-white/5">
                 {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="border-white/5 hover:bg-transparent">
+                <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
                     {headerGroup.headers.map((header) => {
                     return (
-                        <TableHead key={header.id} className="text-zinc-400 font-medium">
+                        <TableHead key={header.id} className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">
                         {header.isPlaceholder
                             ? null
                             : flexRender(
@@ -220,10 +244,10 @@ export default function CallsPage() {
                     <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
-                    className="border-white/5 hover:bg-white/5 transition-colors group"
+                    className="border-white/5 hover:bg-white/[0.02] transition-colors group"
                     >
                     {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className="py-4">
+                        <TableCell key={cell.id} className="py-3">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </TableCell>
                     ))}
@@ -240,12 +264,13 @@ export default function CallsPage() {
             </Table>
         </div>
         
-        <div className="flex-none border-t border-white/10 bg-zinc-900/50 p-4 flex items-center justify-between z-10 backdrop-blur-md">
-            <div className="flex items-center gap-3 text-sm text-zinc-500">
-              <span>Showing {showingStart}–{showingEnd}</span>
-              <Badge variant="outline" className="border-white/10 bg-white/5 text-zinc-400">
-                Total {filteredRowCount}
-              </Badge>
+        <div className="flex-none border-t border-white/5 bg-zinc-900/90 p-4 flex items-center justify-between backdrop-blur-sm z-10">
+            <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
+                  <span>Sync_Block {showingStart}–{showingEnd}</span>
+                  <div className="h-1 w-1 rounded-full bg-zinc-800" />
+                  <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{filteredRowCount}</span></span>
+                </div>
             </div>
             <div className="flex items-center gap-2">
                 <Button
@@ -253,23 +278,23 @@ export default function CallsPage() {
                     size="icon"
                     onClick={() => table.previousPage()}
                     disabled={!table.getCanPreviousPage()}
-                    className="border-white/10 bg-transparent text-zinc-400 hover:text-white hover:bg-white/5"
+                    className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
                     aria-label="Previous page"
                 >
-                    <ChevronLeft className="h-4 w-4" />
+                    <ChevronLeft className="h-3.5 w-3.5" />
                 </Button>
-                <div className="min-w-8 text-center text-sm text-zinc-400 tabular-nums">
-                  {pageIndex + 1}
+                <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
+                  {(pageIndex + 1).toString().padStart(2, '0')}
                 </div>
                 <Button
                     variant="outline"
                     size="icon"
                     onClick={() => table.nextPage()}
                     disabled={!table.getCanNextPage()}
-                    className="border-white/10 bg-transparent text-zinc-400 hover:text-white hover:bg-white/5"
+                    className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
                     aria-label="Next page"
                 >
-                    <ChevronRight className="h-4 w-4" />
+                    <ChevronRight className="h-3.5 w-3.5" />
                 </Button>
             </div>
         </div>

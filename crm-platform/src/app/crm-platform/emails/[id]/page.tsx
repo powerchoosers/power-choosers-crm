@@ -58,7 +58,7 @@ export default function EmailDetailPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header Actions */}
-      <div className="flex items-center justify-between bg-zinc-900/50 p-4 rounded-xl border border-white/5 backdrop-blur-sm">
+      <div className="flex items-center justify-between nodal-glass p-4 rounded-xl">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={handleBack} className="text-zinc-400 hover:text-white hover:bg-white/5">
             <ArrowLeft className="w-5 h-5" />
@@ -82,10 +82,10 @@ export default function EmailDetailPage() {
       </div>
 
       {/* Email Content */}
-      <div className="flex-1 bg-zinc-900/50 border border-white/5 rounded-2xl overflow-hidden backdrop-blur-xl flex flex-col relative">
-        <div className="flex-none p-8 border-b border-white/5 space-y-6 bg-zinc-900/50">
+      <div className="flex-1 nodal-glass rounded-2xl overflow-hidden flex flex-col relative">
+        <div className="flex-none p-8 border-b border-white/5 space-y-6 bg-transparent">
           <div className="space-y-1">
-            <h1 className="text-2xl font-semibold text-white leading-tight">{email.subject}</h1>
+            <h1 className="text-3xl font-semibold text-white tracking-tighter leading-tight">{email.subject}</h1>
             <div className="flex items-center gap-2">
                 <span className="inline-flex items-center rounded-md bg-zinc-800 px-2 py-1 text-xs font-medium text-zinc-400 ring-1 ring-inset ring-white/10">
                     {email.type === 'sent' ? 'Sent' : 'Inbox'}

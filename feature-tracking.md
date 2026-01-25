@@ -23,6 +23,17 @@
   - [x] **Data Access**: Implemented `useContact(id)` in `src/hooks/useContacts.ts` for single-contact fetch.
   - [x] **Account Context**: Resolved linked account via contact accountId / name match and rendered energy fields when present.
   - [x] **Navigation**: Made People table rows and “View Details” open `/crm-platform/contacts/[id]`.
+  - [x] **Bug Fix**: Resolved "Unknown" name rendering by implementing legacy name construction logic (firstName + lastName) in `useContacts.ts`.
+  - [x] **Aesthetic Refinement**:
+    - [x] Removed duplicate environment widgets (Time, Weather, Volatility) from Center Column.
+    - [x] Updated Contract Maturity card with explicit Expiration Date row.
+    - [x] Brightened Terminal text color to Phosphor Green (#22c55e).
+    - [x] Grouped social icons in a Pill container in the header.
+    - [x] Added Bill History section to fill empty space.
+  - [x] **Org Intelligence**:
+    - [x] Integrated Apollo scan logic (gated).
+    - [x] Implemented "Acquire" button to import contacts directly into Supabase.
+    - [x] Added "MONITORED" status check for existing contacts.
 
 ### Twilio Integration & Voice
 - **Status**: Completed
@@ -52,6 +63,35 @@
   - [x] **Frontend**: Enhanced error handling in `bill-debugger/page.tsx` to catch non-JSON server errors.
 
 ## 🚧 Active Development (Nodal Point Migration)
+
+### Forensic Instrumentation (UI/UX Refinement)
+- **Status**: Completed
+- **Description**: Refined the platform into a "Forensic Instrument" by standardizing time, search, status, and typography.
+- **Actions**:
+  - [x] **Human Time Protocol**: Implemented `date-fns` relative time formatting (3-month threshold) across all tables (Accounts, People, Calls, Emails).
+  - [x] **Command Palette**: Transformed Global Search into a ⌘K Command Palette with "Query Database..." functionality and visual cues.
+  - [x] **Live Signals**: Standardized pulsing LED dots for status indicators, replacing generic pills.
+  - [x] **Typography Enforcement**: Applied `font-mono tabular-nums` to all numerical data (IDs, Prices, Phone Numbers, Counts) for vertical alignment.
+  - [x] **Context Sidebar**: Enhanced the Right Sidebar with context-aware widgets (Volatility Index, Local Time, Weather) and entity-specific task filtering.
+  - [x] **Forensic Terminal**: Upgraded the `ContactDossierPage` terminal with persistent notes (Supabase), click-to-type, system commands (/clear, /status), and command prompts.
+  - [x] **Obsidian & Glass**: Standardized `nodal-glass` system and `space-y-8` grid gaps across core pages (People, Accounts, Emails, Settings).
+  - [x] **Collection Standardization**: Mirrored Emails page header/footer styles (Sync_Block, Total_Nodes) across all list pages (People, Accounts, Tasks, Sequences, Calls, Energy, Scripts).
+
+### Gemini AI Assistant (CRM Copilot)
+- **Status**: Completed
+- **Description**: Integrated Gemini 1.5 Flash as a conversational CRM assistant capable of performing actions across the platform.
+- **Actions**:
+  - [x] **Core Chat**: Implemented `GeminiChat.tsx` with a forensic instrument aesthetic (Obsidian & Glass, pulsing LED).
+  - [x] **Tool Integration**: Added 10+ CRM tools for Gemini:
+    - `list_contacts`, `get_contact_details`, `update_contact`, `create_contact`.
+    - `list_accounts`.
+    - `list_tasks`, `create_task`.
+    - `send_email`: Automatic email sending via `GmailService` with threading and user profile lookup.
+    - `search_prospects`: Prospecting for new people/companies via Apollo API.
+    - `enrich_organization`: Data enrichment for companies using domain names.
+    - `get_energy_news`: Real-time Texas energy market news retrieval.
+  - [x] **UX**: Added to `TopBar.tsx` for global access.
+  - [x] **State**: Persistent chat state via `useGeminiStore`.
 
 ### 1. Data Layer Migration (Supabase)
 - **Status**: 🏗️ In Progress

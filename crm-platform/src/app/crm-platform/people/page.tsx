@@ -14,7 +14,9 @@ import {
   ColumnFiltersState,
   PaginationState,
 } from '@tanstack/react-table'
-import { Search, Plus, Filter, MoreHorizontal, Mail, Phone, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail, MoreHorizontal } from 'lucide-react'
+import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
+import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
 import { useContacts, useContactsCount, Contact } from '@/hooks/useContacts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -94,14 +96,15 @@ export default function PeoplePage() {
             .map(n => n[0])
             .join('')
             .substring(0, 2)
+            .toUpperCase()
           return (
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 border border-white/5">
+              <div className="w-9 h-9 rounded-full nodal-glass flex items-center justify-center text-[10px] font-semibold text-white/90 border border-white/10 shadow-sm group-hover:shadow-[#002FA7]/20 transition-all">
                 {initials}
               </div>
               <div>
-                <div className="font-medium text-zinc-200">{contact.name}</div>
-                <div className="text-xs text-zinc-500">{contact.email}</div>
+                <div className="font-medium text-zinc-200 group-hover:text-white transition-colors">{contact.name}</div>
+                <div className="text-xs text-zinc-500 font-mono tracking-tight">{contact.email}</div>
               </div>
             </div>
           )
@@ -114,40 +117,78 @@ export default function PeoplePage() {
           const companyName = row.getValue('company') as string
           const contact = row.original
           return (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 group/acc">
               <CompanyIcon
                 logoUrl={contact.logoUrl}
                 domain={contact.companyDomain}
                 name={companyName}
-                size={20}
-                className="w-5 h-5 rounded-sm"
+                size={32}
+                className="w-9 h-9 rounded-lg nodal-glass p-1 border border-white/10 shadow-sm group-hover/acc:border-[#002FA7]/30 transition-all"
               />
-              <span className="text-zinc-400">{companyName}</span>
+              <span className="text-zinc-400 group-hover/acc:text-white transition-colors">{companyName}</span>
             </div>
           )
         },
+      },
+      {
+        accessorKey: 'phone',
+        header: 'Phone',
+        cell: ({ row }) => <div className="text-zinc-500 text-sm font-mono tabular-nums">{row.getValue('phone')}</div>,
       },
       {
         accessorKey: 'status',
         header: 'Status',
         cell: ({ row }) => {
           const status = row.getValue('status') as string
+          const isCustomer = status === 'Customer'
+          const isLead = status === 'Lead'
+          
           return (
-            <span className={cn(
-              "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border",
-              status === 'Customer' && "bg-green-500/10 text-green-500 border-green-500/20",
-              status === 'Lead' && "bg-blue-500/10 text-blue-500 border-blue-500/20",
-              status === 'Churned' && "bg-red-500/10 text-red-500 border-red-500/20",
-            )}>
-              {status}
-            </span>
+            <div className="flex items-center gap-2">
+              <div className={cn(
+                "w-1.5 h-1.5 rounded-full",
+                isCustomer ? "bg-signal animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.5)]" : 
+                isLead ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" : 
+                "bg-zinc-600"
+              )} />
+              <span className={cn(
+                "text-[10px] font-mono uppercase tracking-wider tabular-nums",
+                isCustomer ? "text-signal" : 
+                isLead ? "text-blue-500/80" : 
+                "text-zinc-500"
+              )}>
+                {isCustomer ? 'Active' : status}
+              </span>
+            </div>
           )
         },
       },
       {
         accessorKey: 'lastContact',
         header: 'Last Contact',
-        cell: ({ row }) => <div className="text-zinc-500">{row.getValue('lastContact')}</div>,
+        cell: ({ row }) => {
+          const val = row.getValue('lastContact') as string
+          if (!val) return <span className="text-zinc-600 font-mono text-xs">--</span>
+          
+          try {
+            const date = new Date(val)
+            const threeMonthsAgo = subMonths(new Date(), 3)
+            const isRecent = isAfter(date, threeMonthsAgo)
+            
+            return (
+              <div className="flex items-center gap-2 text-zinc-500 font-mono text-xs tabular-nums">
+                <Clock size={12} className="text-zinc-600" />
+                <span>
+                  {isRecent 
+                    ? formatDistanceToNow(date, { addSuffix: true })
+                    : format(date, 'MMM d, yyyy')}
+                </span>
+              </div>
+            )
+          } catch (e) {
+            return <span className="text-zinc-600 font-mono text-xs">{val}</span>
+          }
+        },
       },
       {
         id: "actions",
@@ -217,47 +258,31 @@ export default function PeoplePage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex-none space-y-4">
-        <div className="flex items-center justify-between">
-            <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">People</h1>
-            <p className="text-zinc-400 mt-1">Manage your clients and prospects.</p>
-            </div>
-            <Button className="bg-white text-zinc-950 hover:bg-zinc-200 font-medium">
-            <Plus size={18} className="mr-2" />
-            Add Person
-            </Button>
-        </div>
-
-        <div className="flex items-center gap-4 bg-zinc-900/50 p-4 rounded-xl border border-white/5 backdrop-blur-sm">
-            <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
-            <Input 
-                placeholder="Filter current view..." 
-                value={globalFilter ?? ""}
-                onChange={(event) => {
-                  setGlobalFilter(event.target.value)
-                  setPagination((p) => ({ ...p, pageIndex: 0 }))
-                }}
-                className="pl-10 bg-zinc-950 border-white/10 text-white placeholder:text-zinc-600 focus-visible:ring-indigo-500"
-            />
-            </div>
-            <Button variant="outline" className="gap-2 bg-zinc-900 border-white/10 text-zinc-400 hover:text-white hover:bg-white/5">
-            <Filter size={16} />
-            Filter
-            </Button>
-        </div>
-      </div>
+      <CollapsiblePageHeader
+        title="People"
+        description="Manage your clients and prospects."
+        globalFilter={globalFilter}
+        onSearchChange={(value) => {
+          setGlobalFilter(value)
+          setPagination((p) => ({ ...p, pageIndex: 0 }))
+        }}
+        primaryAction={{
+          label: "Add Person",
+          onClick: () => {}, // Add your add person logic here
+          icon: <Plus size={18} className="mr-2" />
+        }}
+      />
 
       <div className="flex-1 rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl overflow-hidden flex flex-col relative">
+        <div className="absolute inset-0 border border-white/5 rounded-2xl pointer-events-none bg-gradient-to-b from-white/5 to-transparent z-10" />
         <div className="flex-1 overflow-auto relative scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
             <Table>
-            <TableHeader className="sticky top-0 bg-zinc-900/95 backdrop-blur-sm z-20 shadow-sm border-b border-white/5">
+            <TableHeader className="sticky top-0 bg-zinc-900/80 backdrop-blur-sm z-20 border-b border-white/5">
                 {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="border-white/5 hover:bg-transparent">
+                <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
                     {headerGroup.headers.map((header) => {
                     return (
-                        <TableHead key={header.id} className="text-zinc-400 font-medium">
+                        <TableHead key={header.id} className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">
                         {header.isPlaceholder
                             ? null
                             : flexRender(
@@ -273,8 +298,11 @@ export default function PeoplePage() {
             <TableBody>
                 {isLoading ? (
                 <TableRow>
-                    <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
-                        Loading people...
+                    <TableCell colSpan={columns.length} className="h-24">
+                        <div className="flex items-center justify-center gap-3 text-zinc-500">
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-800 border-t-[#002FA7]" />
+                          <span className="font-mono text-xs uppercase tracking-widest">Initialising...</span>
+                        </div>
                     </TableCell>
                 </TableRow>
                 ) : isError ? (
@@ -288,11 +316,11 @@ export default function PeoplePage() {
                     <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
-                    className="border-white/5 hover:bg-white/5 transition-colors group cursor-pointer"
+                    className="border-white/5 hover:bg-white/[0.02] transition-colors group cursor-pointer"
                     onClick={() => router.push(`/crm-platform/contacts/${row.original.id}`)}
                     >
                     {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className="py-4">
+                        <TableCell key={cell.id} className="py-3">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </TableCell>
                     ))}
@@ -309,13 +337,12 @@ export default function PeoplePage() {
             </Table>
         </div>
         
-        <div className="flex-none border-t border-white/10 bg-zinc-900/50 p-4 flex items-center justify-between z-10 backdrop-blur-md">
+        <div className="flex-none border-t border-white/5 bg-zinc-900/90 p-4 flex items-center justify-between backdrop-blur-sm z-10">
             <div className="flex items-center gap-4">
-                <div className="flex items-center gap-3 text-sm text-zinc-500">
-                  <span>Showing {showingStart}–{showingEnd}</span>
-                  <Badge variant="outline" className="border-white/10 bg-white/5 text-zinc-400">
-                    Total {effectiveTotalRecords}
-                  </Badge>
+                <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
+                  <span>Sync_Block {showingStart}–{showingEnd}</span>
+                  <div className="h-1 w-1 rounded-full bg-zinc-800" />
+                  <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{effectiveTotalRecords}</span></span>
                 </div>
             </div>
             <div className="flex items-center gap-2">
@@ -324,13 +351,12 @@ export default function PeoplePage() {
                     size="icon"
                     onClick={() => setPagination((p) => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))}
                     disabled={pagination.pageIndex === 0}
-                    className="border-white/10 bg-transparent text-zinc-400 hover:text-white hover:bg-white/5"
-                    aria-label="Previous page"
+                    className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
                 >
-                    <ChevronLeft className="h-4 w-4" />
+                    <ChevronLeft className="h-3.5 w-3.5" />
                 </Button>
-                <div className="min-w-8 text-center text-sm text-zinc-400 tabular-nums">
-                  {pagination.pageIndex + 1}
+                <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
+                  {(pagination.pageIndex + 1).toString().padStart(2, '0')}
                 </div>
                 <Button
                     variant="outline"
@@ -347,10 +373,9 @@ export default function PeoplePage() {
                       setPagination((p) => ({ ...p, pageIndex: nextPageIndex }))
                     }}
                     disabled={pagination.pageIndex + 1 >= displayTotalPages || (!hasNextPage && contacts.length < (pagination.pageIndex + 2) * PAGE_SIZE)}
-                    className="border-white/10 bg-transparent text-zinc-400 hover:text-white hover:bg-white/5"
-                    aria-label="Next page"
+                    className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
                 >
-                    <ChevronRight className="h-4 w-4" />
+                    <ChevronRight className="h-3.5 w-3.5" />
                 </Button>
             </div>
         </div>
