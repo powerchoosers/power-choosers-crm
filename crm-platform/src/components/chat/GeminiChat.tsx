@@ -14,13 +14,16 @@ interface Message {
   content: string
 }
 
-export function GeminiChatTrigger() {
+export function GeminiChatTrigger(props: { onToggle?: () => void }) {
   const isOpen = useGeminiStore((state) => state.isOpen)
   const toggleChat = useGeminiStore((state) => state.toggleChat)
 
   return (
     <Button
-      onClick={toggleChat}
+      onClick={() => {
+        props.onToggle?.()
+        toggleChat()
+      }}
       className={cn(
         "w-8 h-8 p-0 rounded-full transition-all duration-200",
         isOpen ? "bg-indigo-600 text-white shadow-lg scale-110" : "text-zinc-400 hover:text-white hover:bg-white/10"

@@ -15,14 +15,14 @@ export default async function handler(req, res) {
   }
 
   // Gmail service account validation
-  if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+  if (!String(process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '').trim()) {
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Missing Gmail service account key' }));
     return;
   }
 
   try {
-    const { to, subject, content, plainTextContent, from, fromName, _deliverability, threadId, inReplyTo, references, isHtmlEmail, userEmail, emailSettings, contactId, contactName, contactCompany } = req.body;
+    const { to, subject, content, plainTextContent, from, fromName, _deliverability, threadId, inReplyTo, references, isHtmlEmail, userEmail, emailSettings, contactId, contactName, contactCompany, dryRun } = req.body;
 
     if (!to || !subject || !content) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -102,6 +102,19 @@ export default async function handler(req, res) {
     if (!ownerEmail) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Missing user identity (userEmail or from address)' }));
+      return;
+    }
+
+    if (dryRun) {
+      const gmailService = new GmailService();
+      await gmailService.initialize(ownerEmail);
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        dryRun: true,
+        message: 'Gmail service initialized'
+      }));
       return;
     }
 
@@ -206,16 +219,16 @@ export default async function handler(req, res) {
       if (errorDetails && errorDetails.message) {
         errorMessage = errorDetails.message;
       }
-      }
+    }
 
-      // Provide specific guidance based on status code
-      if (statusCode === 413) {
+    // Provide specific guidance based on status code
+    if (statusCode === 413) {
       errorMessage = 'Payload Too Large: Email content exceeds Gmail size limits. ' + errorMessage;
-      } else if (statusCode === 400) {
+    } else if (statusCode === 400) {
       errorMessage = 'Bad Request: Check email payload structure. ' + errorMessage;
-      } else if (statusCode === 401) {
+    } else if (statusCode === 401) {
       errorMessage = 'Unauthorized: Check Gmail service account permissions. ' + errorMessage;
-      } else if (statusCode === 403) {
+    } else if (statusCode === 403) {
       errorMessage = 'Forbidden: Service account does not have Gmail send permissions. ' + errorMessage;
     }
 

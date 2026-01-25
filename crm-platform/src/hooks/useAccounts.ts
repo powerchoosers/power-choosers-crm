@@ -15,6 +15,7 @@ export interface Account {
   occupancy: string
   employees: string
   location: string
+  address?: string
   updated: string
   ownerId?: string
 }
@@ -67,6 +68,7 @@ export function useAccounts() {
             contractEnd: data.contract_end_date || '',
             employees: data.employees?.toString() || '',
             location: data.city ? `${data.city}, ${data.state || ''}` : (data.address || ''),
+            address: data.address || '',
             updated: data.updated_at || new Date().toISOString(),
             // Fields from metadata if they exist
             sqft: data.metadata?.sqft || '',
@@ -124,6 +126,7 @@ export function useAccount(id: string) {
         contractEnd: data.contract_end_date || '',
         employees: data.employees?.toString() || '',
         location: data.city ? `${data.city}, ${data.state || ''}` : (data.address || ''),
+        address: data.address || '',
         updated: data.updated_at || new Date().toISOString(),
         sqft: data.metadata?.sqft || '',
         occupancy: data.metadata?.occupancy || '',

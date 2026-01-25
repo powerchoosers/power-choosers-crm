@@ -8,20 +8,17 @@ export default function SatelliteUplink({ address }: { address: string }) {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (isActive && !apiKey) {
+    if (isActive && !apiKey && !isLoading) {
       setIsLoading(true);
       fetch('/api/maps/config')
         .then(res => res.json())
         .then(data => {
-          setApiKey(data.apiKey);
-          setIsLoading(false);
+          if (data.apiKey) setApiKey(data.apiKey)
         })
-        .catch(err => {
-          console.error('Failed to load map config:', err);
-          setIsLoading(false);
-        });
+        .catch(err => console.error('Failed to load Maps API key:', err))
+        .finally(() => setIsLoading(false));
     }
-  }, [isActive, apiKey]);
+  }, [isActive, apiKey, isLoading]);
 
   return (
     <div className="bg-zinc-900/40 backdrop-blur-xl border border-white/5 rounded-3xl overflow-hidden relative group">
