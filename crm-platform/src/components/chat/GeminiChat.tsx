@@ -41,14 +41,27 @@ export function GeminiChatPanel() {
     { role: 'assistant', content: 'Hello! I am Gemini, your CRM assistant. How can I help you today? I can search contacts, update info, and more.' }
   ])
   const [input, setInput] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  const copyDebugInfo = () => {
+    const debugInfo = `
+# Gemini Chat Error Report
+- **Error Type**: Internal Server Error (500)
+- **Root Cause**: Gemini API History Role Mismatch
+- **Details**: The Gemini model requires the first message in the history to be from the 'user'. The frontend was sending an 'assistant' greeting as the first message, which was mapped to 'model' in the backend.
+- **Action Taken**: Modified \`api/gemini/chat.js\` to filter the history and ensure it starts with a 'user' message.
+- **Context**: Next.js 15, Node.js Backend (port 3001), @google/generative-ai SDK.
+    `.trim()
+    navigator.clipboard.writeText(debugInfo)
+    alert('Debug info copied to clipboard!')
+  }
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [messages])
+  }, [messages, isLoading])
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
@@ -58,6 +71,7 @@ export function GeminiChatPanel() {
     setMessages(updatedMessages)
     setInput('')
     setIsLoading(true)
+    setError(null)
 
     try {
       const response = await fetch('/api/gemini/chat', {
@@ -67,11 +81,12 @@ export function GeminiChatPanel() {
       })
 
       const data = await response.json()
-      if (data.error) throw new Error(data.error)
+      if (data.error) throw new Error(data.message || data.error)
 
       setMessages(prev => [...prev, { role: 'assistant', content: data.content }])
-    } catch (error) {
-      console.error('Chat error:', error)
+    } catch (err: any) {
+      console.error('Chat error:', err)
+      setError(err.message || 'Internal server error')
       setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }])
     } finally {
       setIsLoading(false)
@@ -128,6 +143,22 @@ export function GeminiChatPanel() {
                   : "bg-zinc-900 text-zinc-200 border border-white/5 rounded-tl-none"
               )}>
                 {m.content}
+                {m.role === 'assistant' && i === messages.length - 1 && error && (
+                  <div className="mt-2 pt-2 border-t border-white/5 flex flex-col gap-2">
+                    <p className="text-[10px] text-red-400 font-mono leading-tight">
+                      {error}
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={copyDebugInfo}
+                      className="h-7 text-[10px] bg-zinc-950/50 border-white/10 hover:bg-white/5 text-zinc-400 hover:text-white transition-all w-fit gap-1.5"
+                    >
+                      <Sparkles size={10} />
+                      Copy Prompt for Backend Dev
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           ))}

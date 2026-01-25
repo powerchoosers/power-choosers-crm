@@ -46,13 +46,12 @@ The legacy dashboard file `c:\Users\Lap3p\OneDrive\Documents\Power Choosers CRM\
 ## 🚀 Server & Development
 The platform operates across three distinct environments/servers:
 
-1.  **New Platform (Frontend - Next.js)**: 
-    - **Local**: `http://localhost:3000`
-    - **Run Command**: `npm run dev -- --port 3000` (inside `crm-platform/`)
-2.  **Legacy Server (Backend API - Node.js)**:
-    - **Local**: `http://127.0.0.1:3001` (or `localhost:3001`)
-    - **Run Command**: `node server.js` (in root directory)
-3.  **Production Environment (Cloud Run)**:
+1.  **Local Development (Unified)**:
+    -   **URL**: `http://localhost:3000` (Frontend) & `http://localhost:3001` (Backend)
+    -   **Run Command**: `npm run dev:all` (from Root Directory)
+    -   *Note*: This single command concurrently starts both the Next.js frontend and the Node.js legacy backend.
+
+2.  **Production Environment (Cloud Run)**:
     -   **Frontend (UI)**: `https://power-choosers-crm-792458658491.us-south1.run.app`
     -   **Backend (Network/API)**: `https://nodal-point-network-792458658491.us-south1.run.app`
     -   **Role**: The "Network" service handles Twilio webhooks, heavy API processing, and legacy backend logic to prevent recursive loops within the Next.js frontend service.

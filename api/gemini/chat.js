@@ -299,11 +299,18 @@ export default async function handler(req, res) {
       tools,
     });
 
+    // Filter history to ensure it starts with a 'user' role as required by Gemini
+    const history = messages.slice(0, -1).map(m => ({
+      role: m.role === 'user' ? 'user' : 'model',
+      parts: [{ text: m.content }]
+    }));
+
+    // Find the first 'user' message index
+    const firstUserIndex = history.findIndex(m => m.role === 'user');
+    const validHistory = firstUserIndex !== -1 ? history.slice(firstUserIndex) : [];
+
     const chat = model.startChat({
-      history: messages.slice(0, -1).map(m => ({
-        role: m.role === 'user' ? 'user' : 'model',
-        parts: [{ text: m.content }]
-      })),
+      history: validHistory,
     });
 
     const lastMessage = messages[messages.length - 1].content;
