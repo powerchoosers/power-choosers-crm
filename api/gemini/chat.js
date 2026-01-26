@@ -170,6 +170,34 @@ const toolHandlers = {
   get_contact_details: async ({ contact_id }) => {
     const { data, error } = await supabaseAdmin.from('contacts').select('*, accounts(*)').eq('id', contact_id).single();
     if (error) throw error;
+
+    // Normalization Logic to match frontend and fix legacy data gaps
+    const metadata = data.metadata || {};
+    
+    // 1. Name Resolution
+    if (!data.firstName) data.firstName = metadata.firstName || metadata.first_name || metadata.general?.firstName;
+    if (!data.lastName) data.lastName = metadata.lastName || metadata.last_name || metadata.general?.lastName;
+    
+    // 2. Company/Account Resolution
+    if (!data.accounts) {
+       const companyName = metadata.company || metadata.companyName || metadata.general?.company || metadata.general?.companyName;
+       if (companyName) {
+         // Try to find account by name to fill the gap
+         const { data: account } = await supabaseAdmin.from('accounts').select('*').ilike('name', companyName).limit(1).maybeSingle();
+         if (account) {
+           data.accounts = account;
+           // We don't save back to DB here (read-only tool), but we present it as linked
+         } else {
+           // Stub account data from metadata if real account not found
+           data.accounts = {
+             name: companyName,
+             domain: metadata.domain || metadata.general?.domain,
+             description: 'Legacy Record - No linked account'
+           };
+         }
+       }
+    }
+
     return data;
   },
   update_contact: async ({ contact_id, updates }) => {

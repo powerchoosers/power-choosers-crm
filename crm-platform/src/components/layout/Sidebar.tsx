@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { LayoutDashboard, Users, Phone, Sparkles, Zap, Settings, Building2, LogOut, CheckSquare, Play, Mail } from 'lucide-react'
+import { LayoutDashboard, Users, Phone, Sparkles, Zap, Settings, Building2, LogOut, CheckSquare, Play, Mail, List } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -16,6 +16,7 @@ const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/crm-platform' },
   { icon: Users, label: 'People', href: '/crm-platform/people' },
   { icon: Building2, label: 'Accounts', href: '/crm-platform/accounts' },
+  { icon: List, label: 'Lists', href: '/crm-platform/lists' },
   { icon: CheckSquare, label: 'Tasks', href: '/crm-platform/tasks' },
   { icon: Play, label: 'Sequences', href: '/crm-platform/sequences' },
   { icon: Mail, label: 'Emails', href: '/crm-platform/emails' },

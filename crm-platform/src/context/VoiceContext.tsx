@@ -301,7 +301,8 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       const call = await device.connect({ 
         params: {
           To: toE164,
-          From: fromE164
+          From: fromE164,
+          metadata: params.metadata ? JSON.stringify(params.metadata) : undefined
         }
       })
 

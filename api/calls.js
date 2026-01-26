@@ -275,6 +275,30 @@ async function upsertCallInSupabase(payload) {
 
   const primaryId = callId;
 
+  // CRM context passthrough
+  let finalContactId = payload.contactId != null ? payload.contactId : current.contactId;
+  let finalContactName = payload.contactName != null ? payload.contactName : current.contactName;
+
+  // AUTO-LINKING: If no contact is linked, try to find one by phone number
+  if (!finalContactId && (payload.to || payload.from)) {
+     const phoneCandidates = [payload.to, payload.from].filter(p => p && p.length > 5);
+     for (const phone of phoneCandidates) {
+        const { data: match } = await supabaseAdmin
+          .from('contacts')
+          .select('id, name')
+          .or(`mobile.eq.${phone},workPhone.eq.${phone},phone.eq.${phone},otherPhone.eq.${phone}`)
+          .limit(1)
+          .maybeSingle();
+
+        if (match) {
+           finalContactId = match.id;
+           finalContactName = match.name;
+           logger.log(`[Calls API] Auto-linked call ${primaryId} to contact ${match.name} (${match.id}) via phone ${phone}`);
+           break; 
+        }
+     }
+  }
+
   const merged = {
     ...current,
     id: primaryId,
@@ -301,8 +325,8 @@ async function upsertCallInSupabase(payload) {
     // CRM context passthrough
     accountId: payload.accountId != null ? payload.accountId : current.accountId,
     accountName: payload.accountName != null ? payload.accountName : current.accountName,
-    contactId: payload.contactId != null ? payload.contactId : current.contactId,
-    contactName: payload.contactName != null ? payload.contactName : current.contactName,
+    contactId: finalContactId,
+    contactName: finalContactName,
     targetPhone: (payload.targetPhone != null ? payload.targetPhone : (current.targetPhone || context.targetPhone)) || '',
     businessPhone: (payload.businessPhone != null ? payload.businessPhone : (current.businessPhone || context.businessPhone)) || '',
     source: payload.source || current.source || 'unknown',

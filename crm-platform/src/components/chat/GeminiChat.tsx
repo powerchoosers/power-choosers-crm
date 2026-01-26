@@ -450,11 +450,36 @@ export function GeminiChatPanel() {
 
   // Contextual Intel Logic
   const contextInfo = useMemo(() => {
-    if (storeContext) return storeContext
-    if (pathname.includes('/people/')) return { type: 'contact', id: params.id, label: `CONTACT: ${String(params.id).slice(0,8)}...` }
-    if (pathname.includes('/accounts/')) return { type: 'account', id: params.id, label: `ACCOUNT: ${String(params.id).slice(0,8)}...` }
-    if (pathname.includes('/dashboard')) return { type: 'dashboard', label: 'GLOBAL_DASHBOARD' }
-    return { type: 'general', label: 'GLOBAL_SCOPE' }
+    let baseContext;
+    if (storeContext) {
+      baseContext = storeContext;
+    } else if (pathname.includes('/people/')) {
+      baseContext = { type: 'contact', id: params.id, label: `CONTACT: ${String(params.id).slice(0, 12)}` };
+    } else if (pathname.includes('/accounts/')) {
+      baseContext = { type: 'account', id: params.id, label: `ACCOUNT: ${String(params.id).slice(0, 12)}` };
+    } else if (pathname.includes('/dashboard')) {
+      baseContext = { type: 'dashboard', label: 'GLOBAL_DASHBOARD' };
+    } else {
+      baseContext = { type: 'general', label: 'GLOBAL_SCOPE' };
+    }
+
+    // Rethink: Ensure the label is clean and then add the correct prefix here
+    // This prevents double prefixing regardless of where the label comes from
+    const cleanLabel = baseContext.label
+      .replace(/^TARGET:\s*/i, '')
+      .replace(/^ACTIVE_CONTEXT:\s*/i, '')
+      .replace(/^CONTACT:\s*/i, '')
+      .replace(/^ACCOUNT:\s*/i, '')
+      .trim();
+    
+    let displayLabel;
+    if (baseContext.type === 'general' || cleanLabel === 'GLOBAL_SCOPE' || cleanLabel === 'GLOBAL_DASHBOARD') {
+      displayLabel = `ACTIVE_CONTEXT: ${cleanLabel}`;
+    } else {
+      displayLabel = `TARGET: ${cleanLabel}`;
+    }
+
+    return { ...baseContext, displayLabel };
   }, [pathname, params, storeContext])
 
   // Fetch History
@@ -488,7 +513,7 @@ export function GeminiChatPanel() {
         const { data } = await supabase.from('chat_sessions').insert({
           title: content.slice(0, 30) + (content.length > 30 ? '...' : ''),
           context_type: contextInfo.type,
-          context_id: typeof contextInfo.id === 'string' ? contextInfo.id : null,
+          context_id: ('id' in contextInfo && typeof contextInfo.id === 'string') ? contextInfo.id : null,
         }).select().single()
         
         if (data) {
@@ -594,6 +619,23 @@ export function GeminiChatPanel() {
   const [error, setError] = useState<string | null>(null)
   const [isListening, setIsListening] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-expand textarea
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+
+    // Reset height to calculate scrollHeight correctly
+    textarea.style.height = '44px' 
+    
+    // Set height based on scrollHeight, capped at ~3 lines (approx 112px)
+    // Only expand if there's content, otherwise stay at 44px
+    if (input.trim()) {
+      const newHeight = Math.min(textarea.scrollHeight, 112)
+      textarea.style.height = `${newHeight}px`
+    }
+  }, [input])
 
   const copyDebugInfo = () => {
     const debugInfo = `
@@ -707,6 +749,7 @@ export function GeminiChatPanel() {
   return (
     <motion.div
       key="gemini-panel"
+      layout
       initial={{ opacity: 0, y: 4, scaleY: 0.98 }}
       animate={{ opacity: 1, y: 0, scaleY: 1 }}
       exit={{ opacity: 0, y: 4, scaleY: 0.98, transition: { duration: 0.12 } }}
@@ -1024,18 +1067,24 @@ export function GeminiChatPanel() {
       </ScrollArea>
 
       {/* Control Module (Stacked Command Deck) */}
-      <div className="p-4 border-t border-white/10 bg-zinc-900/40 backdrop-blur-md relative z-10">
-        <form 
+      <motion.div 
+        layout
+        className="p-4 border-t border-white/10 bg-zinc-900/40 backdrop-blur-md relative z-10"
+      >
+        <motion.form 
+          layout
+          initial={false}
+          transition={{ type: "spring", bounce: 0, duration: 0.4 }}
           onSubmit={(e) => { e.preventDefault(); handleSend(); }}
           className="bg-zinc-950/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 focus-within:border-white/20 focus-within:ring-1 focus-within:ring-white/5"
         >
           {/* TIER 1: CONFIGURATION DECK (Metadata) */}
-          <div className="h-9 bg-black/40 border-b border-white/5 flex items-center justify-between px-3">
+          <motion.div layout className="h-9 bg-black/40 border-b border-white/5 flex items-center justify-between px-3">
             <div className="flex items-center gap-3">
               <Select value={selectedModel} onValueChange={setSelectedModel}>
-                <SelectTrigger className="h-6 bg-transparent border-none text-[10px] font-mono text-zinc-400 hover:text-white transition-colors uppercase tracking-wider p-0 focus:ring-0 w-auto gap-2">
-                  <Cpu className="w-3 h-3 text-[#002FA7]" />
-                  <SelectValue placeholder="Select Model" />
+                <SelectTrigger className="h-full bg-transparent border-none text-[10px] font-mono text-zinc-400 hover:text-white transition-colors uppercase tracking-wider p-0 focus:ring-0 focus:ring-offset-0 w-auto gap-2 flex items-center">
+                  <Cpu className="w-3.5 h-3.5 text-white" />
+                  <SelectValue placeholder="Select Model" className="leading-none" />
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-950 border-white/10 text-white">
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 mb-1">
@@ -1069,26 +1118,25 @@ export function GeminiChatPanel() {
                   </SelectItem>
                 </SelectContent>
               </Select>
-
-              <div className="h-3 w-[1px] bg-white/10" />
-              
-              <span className="text-[9px] font-mono text-blue-400/70 uppercase tracking-widest animate-pulse">
-                {getProvider(selectedModel)}
-              </span>
             </div>
 
-            <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[10px] font-mono text-emerald-500/80 uppercase tracking-tighter">
-                ACTIVE_CONTEXT: {contextInfo.label}
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
+              <span className="text-[10px] font-mono text-emerald-500/80 uppercase tracking-tighter leading-none">
+                {contextInfo.displayLabel}
               </span>
             </div>
-          </div>
+          </motion.div>
 
           {/* TIER 2: INPUT DECK (Action) */}
-          <div className="flex items-end gap-2 p-2 relative">
+          <motion.div 
+            layout
+            transition={{ type: "spring", bounce: 0, duration: 0.4 }}
+            className="flex items-end gap-2 p-2 relative min-h-[44px]"
+          >
             <div className="relative flex-1">
               <textarea 
+                ref={textareaRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -1097,7 +1145,8 @@ export function GeminiChatPanel() {
                     handleSend();
                   }
                 }}
-                className="w-full bg-transparent border-none focus:ring-0 text-sm text-zinc-100 placeholder:text-zinc-600 font-medium resize-none py-3 pl-2 max-h-32 min-h-[50px] custom-scrollbar"
+                className="w-full bg-transparent border-none focus:ring-0 focus:outline-none text-sm text-zinc-100 placeholder:text-zinc-600 font-medium resize-none py-3 pl-2 max-h-[112px] min-h-[44px] custom-scrollbar"
+                style={{ height: '44px' }}
                 placeholder="Input forensic command..."
                 rows={1}
               />
@@ -1124,14 +1173,13 @@ export function GeminiChatPanel() {
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
               </button>
             </div>
-          </div>
-        </form>
+          </motion.div>
+        </motion.form>
         
         <div className="text-center mt-3">
           <span className="text-[9px] text-zinc-700 font-mono uppercase tracking-[0.2em]">Nodal Point Neural Engine v1.0.4</span>
         </div>
-      </div>
-
+      </motion.div>
     </motion.div>
   )
 }

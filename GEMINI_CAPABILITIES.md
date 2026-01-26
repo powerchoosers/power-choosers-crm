@@ -37,16 +37,42 @@ The agent is currently equipped with the following "Tools" and UI protocols whic
 
 The Nodal Architect features a "Steve Jobs" inspired forensic interface designed for high-stakes energy trading:
 
+### 1. Structural Containers (Forensic HUD)
+The interface is built using a **Stacked Command Deck** architecture for maximum utility and zero visual clutter:
+
+- **Root Panel**: `bg-zinc-950/80 backdrop-blur-3xl border-white/10 shadow-2xl`
+    - A high-blur obsidian glass container that houses the entire intelligence stream.
+- **Stacked Command Deck (Footer Control Module)**:
+    - **Tier 1: Configuration Deck**: `h-9 bg-black/40 border-b border-white/5`
+        - Houses the `Cpu` model selector and the **Contextual Intel Pill**.
+        - Displays `TARGET: [NAME]` or `ACTIVE_CONTEXT: [SCOPE]` using `font-mono tabular-nums`.
+    - **Tier 2: Action Deck**: `min-h-[44px] bg-zinc-950/60 border-white/10`
+        - An auto-expanding forensic input field (`textarea`) with a `44px` baseline and `112px` ceiling.
+        - Integrates the **Klein Blue Execute Button** (`bg-[#002FA7]`).
+- **Intelligence Block (AI Transmission)**:
+    - **Neural Spine**: Left-aligned gradient spine (`from-[#002FA7] via-blue-500/20 to-transparent`).
+    - **Narrative Container**: `prose-invert prose-p:text-zinc-400` for conversational flow.
+    - **JSON_DATA Wrapper**: `bg-black/20 border-white/5 rounded-lg` for rendering forensic components.
+- **Stealth Command Block (User Input)**:
+    - `bg-zinc-900/50 border-white/10 backdrop-blur-md rounded-lg`
+    - Right-aligned with `gap-8` immersion spacing and `> COMMAND_INPUT` metadata.
+
+### 2. Forensic Visualization Components
+The Architect can inject specialized data modules directly into the chat stream:
+- **News_Ticker**: Real-time scrolling grid intelligence.
+- **Contact_Dossier**: Detailed node profile summaries.
+- **Position_Maturity**: Visualization of contract and pricing status.
+- **Forensic_Grid**: High-density tabular data for account analysis.
+- **Data_Void**: Empty state placeholders for missing intelligence.
+
+### 3. Interaction Protocols
 - **Contextual Awareness**: The agent automatically detects the user's current route (Contact, Account, Dashboard) and offers proactive insights upon opening without a single click.
-- **Neural Line Response**: Every AI transmission is anchored by a glowing vertical "Neural Line" spine in International Klein Blue, signifying a secure data uplink.
-- **Forensic HUD Buttons**: 
-    - **Dynamic Scaling**: Header icons (Bot, Dialer, Refresh) are precision-scaled to `22px-24px` for professional visibility.
-    - **Haptic Animations**: `AnimatePresence` toggle transitions between the Architect icon and the "X" Close command.
-- **Stealth User Commands**: User inputs are rendered as right-aligned `COMMAND_INPUT` blocks with increased immersion spacing (`gap-8`) to separate human intent from AI execution.
+- **Neural Line Response**: Every AI transmission is anchored by a glowing vertical "Neural Line" spine in International Klein Blue.
+- **Dynamic Scaling**: Header icons (Bot, Dialer, Refresh) are precision-scaled to `22px-24px` for professional visibility.
+- **Haptic Animations**: `framer-motion` layout orchestration with `spring` transitions (bounce: 0, duration: 0.4) for organic UI movement.
 - **Visual Status**: 
     - **Live Waveform**: A dynamic bar animation that visualizes the AI's "thinking" process.
-    - **Ambient Hum**: A subtle pulsing glow signifying active background monitoring.
-- **Forensic Aesthetic**: Backdrop-blur-3xl glass containers, monospace typography, and an **International Klein Blue (#002FA7)** Execute button with haptic glow.
+    - **LED Pulsing**: A subtle emerald glow signifying active background monitoring.
 
 ---
 
@@ -55,10 +81,14 @@ The Nodal Architect features a "Steve Jobs" inspired forensic interface designed
 The Nodal Architect is trained to align with the **Nodal Point Thesis**. It doesn't just manage data; it understands the "Source Code of the Grid."
 
 ### 1. Intelligence Stack (Multi-Model Fallback)
-The Architect utilizes a sophisticated **Model_Stack** protocol. If the primary node is overloaded or hits a quota, it autonomously falls back through a chain of 14+ high-precision models (Gemini 3.0 Pro, Flash, 2.5, 2.0) to ensure zero downtime.
+The Architect utilizes a sophisticated **Model_Stack** protocol. If the primary node is overloaded or hits a quota, it autonomously falls back through a chain of high-precision models:
+- **Primary Agent**: `gpt-oss-120b` (Deep logic and forensic reasoning).
+- **Speed Layer**: `gemini-2.0-flash` & `gemini-1.5-flash`.
+- **Reasoning Layer**: `gemini-1.5-pro`.
+- **Search Layer**: `sonar-pro` & `sonar-standard` (Perplexity).
 
 ### 2. Deep Research Protocol (Perplexity)
-In the event of a total Google Network saturation, the system initiates the **Perplexity Fallback**, leveraging real-time web-crawling intelligence for uncompromised grid research.
+In the event of a total Google Network saturation or when real-time web verification is required, the system initiates the **Perplexity Fallback** for uncompromised grid research.
 
 ### 3. Forensic Analysis
 When discussing accounts, the agent prioritizes the "Three Vectors of Cost Leakage":
@@ -80,13 +110,12 @@ We are actively expanding the Architect's "Brain" to include these forensic ener
 ---
 
 ## 🛠️ Technical Implementation
-- **Primary Model**: `gemini-3-pro-preview` (The highest precision node for complex reasoning).
-- **Intelligence Stack**: 14+ candidate models including `gemini-3-flash`, `gemini-2.5-pro`, and `gemini-2.0-flash`.
-- **Final Fallback**: `perplexity-sonar-reasoning` (Real-time web-intelligence).
-- **Backend**: Node.js Proxy on Port 3001.
+- **Primary Node**: `gpt-oss-120b` via OpenRouter.
+- **Intelligence Stack**: Gemini 2.0/1.5 (Google) & Sonar (Perplexity).
+- **Backend**: Node.js Proxy on Port 3001 with custom `chat.js` routing logic.
 - **Frontend**: Next.js 15 with Framer Motion "Obsidian & Glass" UI.
 - **Security**: All tool calls are gated by Supabase RLS and server-side validation.
 
 ---
-*Last Updated: 2026-01-25*
+*Last Updated: 2026-01-26*
 *Status: Nodal Architect v1.0 Operational*

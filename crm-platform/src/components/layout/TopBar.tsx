@@ -46,11 +46,35 @@ export function TopBar() {
 
   // Contextual Intel Logic
   const contextInfo = useMemo(() => {
-    if (storeContext) return storeContext
-    if (pathname.includes('/people/')) return { type: 'contact', id: params.id, label: `TARGET: ${String(params.id).slice(0,8)}...` }
-    if (pathname.includes('/accounts/')) return { type: 'account', id: params.id, label: `ACCOUNT: ${String(params.id).slice(0,8)}...` }
-    if (pathname.includes('/dashboard')) return { type: 'dashboard', label: 'GLOBAL_DASHBOARD' }
-    return { type: 'general', label: 'GLOBAL_SCOPE' }
+    let baseContext;
+    if (storeContext) {
+      baseContext = storeContext;
+    } else if (pathname.includes('/people/')) {
+      baseContext = { type: 'contact', id: params.id, label: `CONTACT: ${String(params.id).slice(0, 12)}` };
+    } else if (pathname.includes('/accounts/')) {
+      baseContext = { type: 'account', id: params.id, label: `ACCOUNT: ${String(params.id).slice(0, 12)}` };
+    } else if (pathname.includes('/dashboard')) {
+      baseContext = { type: 'dashboard', label: 'GLOBAL_DASHBOARD' };
+    } else {
+      baseContext = { type: 'general', label: 'GLOBAL_SCOPE' };
+    }
+
+    // Clean label for prefixing
+    const cleanLabel = baseContext.label
+      .replace(/^TARGET:\s*/i, '')
+      .replace(/^ACTIVE_CONTEXT:\s*/i, '')
+      .replace(/^CONTACT:\s*/i, '')
+      .replace(/^ACCOUNT:\s*/i, '')
+      .trim();
+    
+    let displayLabel;
+    if (baseContext.type === 'general' || cleanLabel === 'GLOBAL_SCOPE' || cleanLabel === 'GLOBAL_DASHBOARD') {
+      displayLabel = `ACTIVE_CONTEXT: ${cleanLabel}`;
+    } else {
+      displayLabel = `TARGET: ${cleanLabel}`;
+    }
+
+    return { ...baseContext, displayLabel };
   }, [pathname, params, storeContext])
 
   const [isDialerOpen, setIsDialerOpen] = useState(false)
@@ -310,7 +334,7 @@ export function TopBar() {
                                   (!contextInfo || contextInfo.type === 'general') ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-[#002FA7] shadow-[0_0_8px_#002FA7]"
                                 )} />
                                 <span className="text-[10px] font-mono text-zinc-400 tracking-wider uppercase whitespace-nowrap">
-                                  {contextInfo?.label || 'GLOBAL_SCOPE'}
+                                  {contextInfo.displayLabel}
                                 </span>
                               </div>
                             </motion.div>
