@@ -164,14 +164,23 @@ Focus on: latest news (past 12 months), leadership (CEO/CFO/Controller), operati
         }
 
         const genAI = new GoogleGenerativeAI(apiKey);
-        const preferredModel = (process.env.GEMINI_MODEL || '').trim();
-        const modelCandidates = [
-            preferredModel,
-            'gemini-2.0-flash',
-            'gemini-2.0-flash-exp',
-            'gemini-1.5-flash',
-            'gemini-1.5-pro'
-        ].filter(Boolean);
+        const envPreferredModel = (process.env.GEMINI_MODEL || '').trim();
+        const preferredModel = envPreferredModel || 'gemini-2.5-flash-lite';
+        const modelCandidates = Array.from(
+            new Set(
+                [
+                    preferredModel,
+                    'gemini-2.5-flash-lite',
+                    'gemini-2.5-flash-lite-preview',
+                    'gemini-2.5-flash',
+                    'gemini-2.5-flash-preview',
+                    'gemini-2.0-flash',
+                    'gemini-2.0-flash-exp',
+                    'gemini-1.5-flash',
+                    'gemini-1.5-pro'
+                ].filter(Boolean)
+            )
+        );
 
         const prompt = `
 You are Lewis Patterson, Lead Energy Strategist at Power Choosers. You are preparing for a cold call to a potential commercial energy client.
