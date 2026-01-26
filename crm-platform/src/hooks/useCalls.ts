@@ -1,19 +1,22 @@
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
+import { useEffect } from 'react'
 
 export interface Call {
   id: string
+  callSid?: string
   contactName: string
   phoneNumber: string
   type: 'Inbound' | 'Outbound'
-  status: 'Completed' | 'Missed' | 'Voicemail' | 'in-progress' | 'failed' | 'no-answer' | 'busy' | 'canceled' | 'queued' | 'ringing'
+  status: 'Completed' | 'Busy' | 'No-answer' | 'Failed' | 'Canceled'
   duration: string
   date: string
   note?: string
   recordingUrl?: string
-  summary?: string
+  recordingSid?: string
   transcript?: string
+  aiInsights?: any
   contactId?: string
 }
 
@@ -111,7 +114,9 @@ type CallRow = {
   created_at?: string | null
   ai_summary?: string | null
   recording_url?: string | null
+  recording_sid?: string | null
   transcript?: string | null
+  ai_insights?: any | null
   contact_id?: string | null
   from_phone?: string | null
   to_phone?: string | null
@@ -122,6 +127,33 @@ const PAGE_SIZE = 50
 
 export function useCalls(searchQuery?: string) {
   const { user, role, loading } = useAuth()
+  const queryClient = useQueryClient()
+
+  // Real-time updates for the calls list
+  useEffect(() => {
+    if (loading || !user) return
+
+    const channel = supabase
+      .channel('global-calls-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen for inserts and updates
+          schema: 'public',
+          table: 'calls',
+        },
+        (payload) => {
+          console.log('Global call update received:', payload)
+          queryClient.invalidateQueries({ queryKey: ['calls'] })
+          queryClient.invalidateQueries({ queryKey: ['calls-count'] })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user, loading, queryClient])
 
   return useInfiniteQuery({
     queryKey: ['calls', user?.email ?? 'guest', role, searchQuery],
@@ -177,7 +209,9 @@ export function useCalls(searchQuery?: string) {
           date: item.timestamp || item.created_at,
           note: item.ai_summary,
           recordingUrl: item.recording_url,
+          recordingSid: item.recording_sid,
           transcript: item.transcript,
+          aiInsights: item.ai_insights,
           contactId: item.contact_id
         }
       }) as Call[]
@@ -196,6 +230,34 @@ export function useCalls(searchQuery?: string) {
 
 export function useContactCalls(contactId: string) {
   const { user, loading } = useAuth()
+  const queryClient = useQueryClient()
+
+  // Subscribe to real-time updates for calls belonging to this contact
+  useEffect(() => {
+    if (!contactId || !user || loading) return
+
+    const channel = supabase
+      .channel(`contact-calls-${contactId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'calls',
+          filter: `contact_id=eq.${contactId}`,
+        },
+        (payload) => {
+          console.log('Real-time call update for contact:', contactId, payload)
+          // Invalidate the contact calls query to refresh the list
+          queryClient.invalidateQueries({ queryKey: ['contact-calls', contactId] })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [contactId, user, loading, queryClient])
 
   return useQuery({
     queryKey: ['contact-calls', contactId, user?.email],
@@ -207,7 +269,7 @@ export function useContactCalls(contactId: string) {
         .select('*')
         .eq('contact_id', contactId)
         .order('created_at', { ascending: false })
-        .limit(10)
+        .limit(20) // Increased from 10 to 20 for better coverage
 
       if (error) {
         console.error('Error fetching contact calls:', {
@@ -236,11 +298,15 @@ export function useContactCalls(contactId: string) {
           date: item.timestamp || item.created_at,
           note: item.ai_summary,
           recordingUrl: item.recording_url,
+          recordingSid: item.recording_sid,
           transcript: item.transcript,
+          aiInsights: item.ai_insights,
           contactId: item.contact_id
         }
       }) as Call[]
     },
     enabled: !!contactId && !loading && !!user,
+    staleTime: 1000 * 60 * 10, // 10 minutes - Rely on real-time updates for freshness
+    gcTime: 1000 * 60 * 60, // 1 hour
   })
 }

@@ -15,6 +15,7 @@ import DataIngestionCard from '@/components/dossier/DataIngestionCard'
 import OrgIntelligence from '@/components/crm/OrgIntelligence'
 import { useContact, useUpdateContact } from '@/hooks/useContacts'
 import { useContactCalls } from '@/hooks/useCalls'
+import { CallListItem } from '@/components/calls/CallListItem'
 import { useUIStore } from '@/store/uiStore'
 import { useGeminiStore } from '@/store/geminiStore'
 import { Button } from '@/components/ui/button'
@@ -773,58 +774,38 @@ export default function ContactDossierPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-4">
+                  {/* Recent Calls List */}
+                  <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
                     {isLoadingCalls ? (
-                      <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                        <div className="w-8 h-8 border-2 border-[#002FA7]/20 border-t-[#002FA7] rounded-full animate-spin" />
-                        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Scanning_Voice_Nodes...</span>
+                      <div className="flex flex-col items-center justify-center py-20 text-zinc-600">
+                        <RefreshCw className="w-8 h-8 animate-spin mb-4 opacity-20" />
+                        <p className="text-[10px] font-mono uppercase tracking-[0.2em]">Intercepting_Signals...</p>
                       </div>
                     ) : recentCalls && recentCalls.length > 0 ? (
-                      recentCalls.map((call) => (
-                        <div key={call.id} className="group p-4 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] transition-all">
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center gap-3">
-                              <div className={cn(
-                                "p-2 rounded-lg",
-                                call.type === 'Inbound' ? "bg-green-500/10 text-green-500" : "bg-[#002FA7]/10 text-[#002FA7]"
-                              )}>
-                                <Phone className="w-4 h-4" />
-                              </div>
-                              <div>
-                                <div className="text-sm font-semibold text-white flex items-center gap-2">
-                                  {call.type} Call
-                                  <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest border-l border-white/10 pl-2">
-                                    {call.duration}
-                                  </span>
-                                </div>
-                                <div className="text-[10px] font-mono text-zinc-500 uppercase mt-0.5">
-                                  {call.date && isValid(new Date(call.date)) ? format(new Date(call.date), 'MMM dd, yyyy • HH:mm') : 'Unknown Date'}
-                                </div>
-                              </div>
-                            </div>
-                            {call.recordingUrl && (
-                              <Button size="sm" variant="ghost" className="h-8 text-[10px] font-mono text-zinc-400 hover:text-white uppercase tracking-widest gap-2">
-                                <Play className="w-3 h-3" /> Play_Audio
-                              </Button>
-                            )}
+                      <>
+                        {recentCalls.map((call) => (
+                          <CallListItem key={call.id} call={call} contactId={id} />
+                        ))}
+                        
+                        {/* Sync_Block Footer */}
+                        <div className="mt-8 pt-4 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+                          <div className="flex items-center gap-4">
+                            <span className="flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              Sync_Block 01–{recentCalls.length.toString().padStart(2, '0')}
+                            </span>
+                            <span className="opacity-40">|</span>
+                            <span>Total_Nodes: {recentCalls.length}</span>
                           </div>
-                          
-                          {call.note && (
-                            <div className="mt-3 p-3 rounded-lg bg-black/40 border border-white/5 relative overflow-hidden group/insight">
-                              <div className="absolute top-0 right-0 p-2 opacity-30 group-hover/insight:opacity-100 transition-opacity">
-                                <Sparkles className="w-3 h-3 text-[#002FA7]" />
-                              </div>
-                              <div className="text-[10px] font-mono text-[#002FA7] uppercase tracking-[0.2em] mb-1">AI_SUMMARY</div>
-                              <p className="text-xs text-zinc-400 leading-relaxed font-light italic">
-                                "{call.note}"
-                              </p>
-                            </div>
-                          )}
+                          <div className="opacity-40">
+                            {format(new Date(), 'HH:mm:ss')} // SYSTEM_OK
+                          </div>
                         </div>
-                      ))
+                      </>
                     ) : (
-                      <div className="flex flex-col items-center justify-center py-12 border border-dashed border-white/5 rounded-xl">
-                        <div className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">No_Recent_Voice_Logs</div>
+                      <div className="flex flex-col items-center justify-center py-20 text-zinc-600">
+                        <History className="w-12 h-12 mb-4 opacity-10" />
+                        <p className="text-[10px] font-mono uppercase tracking-[0.2em]">No_Historical_Data_Found</p>
                       </div>
                     )}
                   </div>

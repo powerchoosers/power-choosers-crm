@@ -512,6 +512,8 @@ export function GeminiChatPanel() {
   const [messages, setMessages] = useState<Message[]>([])
   const [lastProvider, setLastProvider] = useState<string>('gemini')
   const [lastModel, setLastModel] = useState<string>('gemini-2.5-flash-lite')
+  const [diagnostics, setDiagnostics] = useState<any[] | null>(null)
+  const [showDiagnostics, setShowDiagnostics] = useState(false)
   
   // Host Google Avatar if needed
   useEffect(() => {
@@ -643,6 +645,7 @@ export function GeminiChatPanel() {
 
       // Temporary Routing Diagnostics for Trey
       if (data.diagnostics) {
+        setDiagnostics(data.diagnostics)
         console.group('%c AI_ROUTER_DIAGNOSTICS ', 'background: #002FA7; color: white; font-weight: bold; border-radius: 4px; padding: 2px 4px;')
         console.table(data.diagnostics)
         console.groupEnd()
@@ -705,13 +708,25 @@ export function GeminiChatPanel() {
           <div>
             <h3 className="text-xs font-mono font-bold text-zinc-100 tracking-widest uppercase">Nodal Architect v1.0</h3>
             <div className="flex items-center gap-2">
-              <Waveform />
-              <span className="text-[10px] text-emerald-500/80 font-mono tracking-widest uppercase font-bold">Live_Feed</span>
+              <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[10px] font-mono text-emerald-500/70 uppercase tracking-tighter">Neural Link Active</span>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-1">
+          <button 
+            onClick={() => setShowDiagnostics(!showDiagnostics)}
+            className={cn(
+              "w-8 h-8 flex items-center justify-center rounded-lg transition-all border",
+              showDiagnostics 
+                ? "bg-indigo-500/20 border-indigo-500/50 text-indigo-400" 
+                : "bg-white/5 border-white/10 text-zinc-400 hover:text-white hover:bg-white/10"
+            )}
+            title="Toggle Routing HUD"
+          >
+            <Activity size={14} />
+          </button>
           <button
             onClick={() => setIsHistoryOpen(!isHistoryOpen)}
             className={cn(
@@ -731,6 +746,65 @@ export function GeminiChatPanel() {
           </button>
         </div>
       </div>
+
+      {/* Diagnostics HUD Overlay */}
+      <AnimatePresence>
+        {showDiagnostics && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="bg-zinc-900/95 border-b border-white/10 overflow-hidden relative z-20"
+          >
+            <div className="p-3 font-mono text-[10px] space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar">
+              <div className="flex items-center justify-between border-b border-white/5 pb-1 mb-2">
+                <span className="text-indigo-400 font-bold tracking-widest">AI_ROUTER_HUD // LIVE_DIAGNOSTICS</span>
+                <span className="text-zinc-600 text-[8px] uppercase">Routing Protocol v2.1</span>
+              </div>
+              
+              {!diagnostics ? (
+                <div className="text-zinc-500 italic py-2">No active trace. Send a message to initiate neural routing...</div>
+              ) : (
+                <div className="space-y-1.5">
+                  {diagnostics.map((d, i) => (
+                    <div key={i} className={cn(
+                      "flex flex-col gap-0.5 p-1.5 rounded border",
+                      d.status === 'success' ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-400" :
+                      d.status === 'failed' ? "bg-red-500/5 border-red-500/20 text-red-400" :
+                      d.status === 'retry' ? "bg-amber-500/5 border-amber-500/20 text-amber-400" :
+                      "bg-white/5 border-white/10 text-zinc-400"
+                    )}>
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold uppercase tracking-tighter">
+                          [{d.provider || 'AI'}] {d.model}
+                        </span>
+                        <span className="text-[8px] opacity-70 uppercase font-bold">
+                          {d.status}
+                        </span>
+                      </div>
+                      {d.error && (
+                        <div className="text-[9px] opacity-80 leading-tight mt-1 border-t border-red-500/10 pt-1">
+                          ERR: {d.error}
+                        </div>
+                      )}
+                      {d.reason && (
+                        <div className="text-[9px] opacity-80 italic">
+                          REASON: {d.reason}
+                        </div>
+                      )}
+                      {d.tools && (
+                        <div className="text-[9px] opacity-80 flex items-center gap-1 mt-1">
+                          <span className="text-indigo-400">TOOLS:</span> {d.tools.join(', ')}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* History Slide-Over Panel */}
       <AnimatePresence>

@@ -74,15 +74,39 @@ async function processRecordingWithTwilio(recordingUrl, callSid) {
         // Initialize Twilio client
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
         
-        // Get recordings for this call
-        const recordings = await client.recordings.list({ callSid: callSid, limit: 1 });
+        let recordingSid = null;
         
-        if (recordings.length === 0) {
-            throw new Error('No recording found for this call');
+        // Try to extract recordingSid from recordingUrl if provided
+        if (recordingUrl && typeof recordingUrl === 'string') {
+            const match = recordingUrl.match(/RE[0-9a-f]{32}/i);
+            if (match) {
+                recordingSid = match[0];
+                logger.log('[Process Call] Extracted recordingSid from URL:', recordingSid);
+            }
         }
         
-        const recording = recordings[0];
-        logger.log('[Process Call] Found recording:', recording.sid);
+        let recording = null;
+        if (recordingSid) {
+            try {
+                recording = await client.recordings(recordingSid).fetch();
+                logger.log('[Process Call] Fetched recording by SID:', recordingSid);
+            } catch (err) {
+                logger.warn('[Process Call] Failed to fetch recording by SID, falling back to list:', err.message);
+            }
+        }
+        
+        if (!recording) {
+            // Get recordings for this call
+            const recordings = await client.recordings.list({ callSid: callSid, limit: 1 });
+            if (recordings.length > 0) {
+                recording = recordings[0];
+                logger.log('[Process Call] Found recording via list:', recording.sid);
+            }
+        }
+        
+        if (!recording) {
+            throw new Error('No recording found for this call (SID: ' + callSid + ')');
+        }
         
         // Use Twilio's native transcription service
         let transcript = '';
