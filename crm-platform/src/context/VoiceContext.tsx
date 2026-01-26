@@ -18,7 +18,7 @@ interface VoiceContextType {
   device: Device | null
   currentCall: Call | null
   isReady: boolean
-  connect: (params: { To: string; From?: string }) => Promise<void>
+  connect: (params: { To: string; From?: string; metadata?: VoiceMetadata }) => Promise<void>
   disconnect: () => void
   sendDigits: (digits: string) => void
   mute: (isMuted: boolean) => void
@@ -240,7 +240,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  const connect = async (params: { To: string; From?: string }) => {
+  const connect = async (params: { To: string; From?: string; metadata?: VoiceMetadata }) => {
     if (!device || !isReady) {
       toast.error('Voice system not ready')
       return
@@ -257,8 +257,8 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log(`[Voice] Connecting call To: ${toE164}, From: ${fromE164}`)
       
-      // Resolve metadata for outbound call
-      const meta = await resolvePhoneMeta(toE164)
+      // Resolve metadata for outbound call if not provided
+      const meta = params.metadata || await resolvePhoneMeta(toE164)
       setMetadata(meta)
 
       // Ported from legacy phone.js: Set audio devices before connecting
