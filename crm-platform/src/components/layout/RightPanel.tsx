@@ -22,6 +22,7 @@ import QuickActionsGrid from '../crm/QuickActionsGrid'
 import NewsFeedWidget from '../crm/NewsFeedWidget'
 import GlobalTasksWidget from '../crm/GlobalTasksWidget'
 import ContextTasksWidget from '../crm/ContextTasksWidget'
+import OrgIntelligence from '../crm/OrgIntelligence'
 
 export function RightPanel() {
   const pathname = usePathname()
@@ -106,7 +107,17 @@ export function RightPanel() {
               <SatelliteUplink address={entityAddress} />
             </div>
 
-            {/* 4. CONTEXT TASKS */}
+            {/* 4. ORG INTELLIGENCE */}
+            <div className="space-y-1">
+              <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Organizational Intelligence</h3>
+              <OrgIntelligence 
+                companyName={contact?.companyName || account?.name}
+                website={contact?.website || account?.domain}
+                accountId={contact?.accountId || account?.id}
+              />
+            </div>
+
+            {/* 5. CONTEXT TASKS */}
             <ContextTasksWidget entityId={entityId} entityName={entityName} />
           </motion.div>
         ) : (

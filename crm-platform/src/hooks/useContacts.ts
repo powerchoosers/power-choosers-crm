@@ -418,8 +418,26 @@ export function useContact(id: string) {
       if (error) return null
 
       const typedData = data as ContactRow
-      const account = Array.isArray(typedData.accounts) ? typedData.accounts[0] : typedData.accounts
+      let account = Array.isArray(typedData.accounts) ? typedData.accounts[0] : typedData.accounts
       const metadata = normalizeMetadata(typedData.metadata)
+
+      // Fallback: If no account linked but metadata has company name, try to find it
+      if (!account) {
+        const companyName = metadata?.company || metadata?.companyName || metadata?.general?.company || metadata?.general?.companyName
+        if (companyName) {
+           const { data: foundAccount } = await supabase
+             .from('accounts')
+             .select('name, domain, logo_url, city, state, industry, electricity_supplier, annual_usage, current_rate, contract_end_date, service_addresses, description, phone, id')
+             .ilike('name', companyName)
+             .limit(1)
+             .maybeSingle()
+           
+           if (foundAccount) {
+             account = foundAccount
+             typedData.accountId = foundAccount.id // logical link for the UI
+           }
+        }
+      }
       
       const fName = typedData.firstName
         || typedData.first_name
