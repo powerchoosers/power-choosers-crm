@@ -86,6 +86,17 @@
 
 ## 🚧 Active Development (Nodal Point Migration)
 
+### Call Processing & Background Intelligence
+- **Status**: Completed
+- **Description**: Ported legacy call processing features to the new platform, including background loading, real-time insights, and two-channel transcripts.
+- **Actions**:
+  - [x] **Background Loading**: Integrated cache-heavy loading strategy in `useCalls.ts` using TanStack Query `staleTime` and `gcTime` to reduce API overhead.
+  - [x] **Real-time Updates**: Implemented Supabase real-time listeners in `useContactCalls` and `useCallProcessor` to update call insights instantly when processing completes.
+  - [x] **Manual Processing**: Added the "Eyeball" button to `CallListItem.tsx` with a pulsing AI processing state and direct integration with Twilio Voice Intelligence (V2).
+  - [x] **Two-Channel Transcripts**: Enhanced transcript rendering with robust speaker detection (Agent vs. External) and forensic typography.
+  - [x] **Cost Optimization**: Replaced legacy polling logic with real-time push notifications, significantly reducing Cloud Run execution costs.
+  - [x] **Ungated Access**: Enabled recording playback and analysis for all call records, removing legacy feature gating.
+
 ### Forensic Instrumentation (UI/UX Refinement)
 - **Status**: Completed
 - **Description**: Refined the platform into a "Forensic Instrument" by standardizing time, search, status, and typography.
