@@ -241,7 +241,7 @@ export function TopBar() {
             <motion.div 
                 initial={false}
                 animate={{ 
-                    width: (isDialerOpen || isGeminiOpen) ? 320 : 172,
+                    width: (isDialerOpen || isGeminiOpen) ? 400 : 172,
                     borderRadius: 24,
                 }}
                 transition={{ 

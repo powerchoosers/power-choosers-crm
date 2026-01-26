@@ -22,10 +22,35 @@ export default async function analyzeBillHandler(req, res) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-3-flash-preview',
-      generationConfig: { responseMimeType: "application/json" }
-    });
+    
+    // Model Candidate Chain (Prioritizing 2.5 Flash-Lite per Nodal Point standards)
+    const modelCandidates = [
+      'gemini-2.5-flash-lite',
+      'gemini-2.5-flash-lite-preview',
+      'gemini-2.5-flash',
+      'gemini-3-flash-preview',
+      'gemini-2.0-flash'
+    ];
+
+    let lastErr = null;
+    let model = null;
+
+    for (const modelName of modelCandidates) {
+      try {
+        console.log(`[Bill Debugger] Attempting analysis with: ${modelName}`);
+        model = genAI.getGenerativeModel({
+          model: modelName,
+          generationConfig: { responseMimeType: "application/json" }
+        });
+        // We test with a dummy call or just proceed
+        break; 
+      } catch (e) {
+        lastErr = e;
+        continue;
+      }
+    }
+
+    if (!model) throw lastErr || new Error("Failed to initialize any Gemini model");
 
     const prompt = `
       Analyze this energy bill. Extract the following details in JSON format:
