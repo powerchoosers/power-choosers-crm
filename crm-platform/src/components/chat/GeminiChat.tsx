@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { Copy, Send, X, Loader2, User, Bot, Mic, Activity, AlertTriangle, ArrowRight } from 'lucide-react'
+import { Copy, Send, X, Loader2, User, Bot, Mic, Activity, AlertTriangle, ArrowRight, History, RefreshCw, Phone, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGeminiStore } from '@/store/geminiStore'
 import { usePathname, useParams } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
+import { supabase } from '@/lib/supabase'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -425,13 +426,88 @@ export function GeminiChatPanel() {
   const [hostedAvatarUrl, setHostedAvatarUrl] = useState<string | null>(null)
   const [isAvatarLoading, setIsAvatarLoading] = useState(false)
 
+  // History State from Store
+  const isHistoryOpen = useGeminiStore((state) => state.isHistoryOpen)
+  const toggleHistory = useGeminiStore((state) => state.toggleHistory)
+  const resetCounter = useGeminiStore((state) => state.resetCounter)
+  const resetSession = useGeminiStore((state) => state.resetSession)
+
+  const setIsHistoryOpen = (open: boolean) => {
+    if (open !== isHistoryOpen) toggleHistory()
+  }
+
+  // Listen for global reset
+  useEffect(() => {
+    if (resetCounter > 0) {
+      setMessages([])
+      setCurrentSessionId(null)
+    }
+  }, [resetCounter])
+  const [historySessions, setHistorySessions] = useState<any[]>([])
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
+  const storeContext = useGeminiStore((state) => state.activeContext)
+
   // Contextual Intel Logic
   const contextInfo = useMemo(() => {
-    if (pathname.includes('/people/')) return { type: 'contact', id: params.id }
-    if (pathname.includes('/accounts/')) return { type: 'account', id: params.id }
-    if (pathname.includes('/dashboard')) return { type: 'dashboard' }
-    return { type: 'general' }
-  }, [pathname, params])
+    if (storeContext) return storeContext
+    if (pathname.includes('/people/')) return { type: 'contact', id: params.id, label: `CONTACT: ${String(params.id).slice(0,8)}...` }
+    if (pathname.includes('/accounts/')) return { type: 'account', id: params.id, label: `ACCOUNT: ${String(params.id).slice(0,8)}...` }
+    if (pathname.includes('/dashboard')) return { type: 'dashboard', label: 'GLOBAL_DASHBOARD' }
+    return { type: 'general', label: 'GLOBAL_SCOPE' }
+  }, [pathname, params, storeContext])
+
+  // Fetch History
+  useEffect(() => {
+    if (isHistoryOpen) {
+      const fetchSessions = async () => {
+        const { data } = await supabase.from('chat_sessions').select('*').order('created_at', { ascending: false }).limit(20)
+        setHistorySessions(data || [])
+      }
+      fetchSessions()
+    }
+  }, [isHistoryOpen])
+
+  const loadSession = async (sessionId: string) => {
+    const { data } = await supabase.from('chat_messages').select('*').eq('session_id', sessionId).order('created_at', { ascending: true })
+    if (data) {
+      setMessages(data.map(m => ({
+        role: m.role === 'model' ? 'assistant' : m.role as 'user' | 'assistant',
+        content: m.content
+      })))
+      setCurrentSessionId(sessionId)
+      setIsHistoryOpen(false)
+    }
+  }
+
+  const saveMessageToDb = async (role: 'user' | 'model', content: string) => {
+    try {
+      let sessionId = currentSessionId
+      if (!sessionId) {
+        // Create new session
+        const { data } = await supabase.from('chat_sessions').insert({
+          title: content.slice(0, 30) + (content.length > 30 ? '...' : ''),
+          context_type: contextInfo.type,
+          context_id: typeof contextInfo.id === 'string' ? contextInfo.id : null,
+        }).select().single()
+        
+        if (data) {
+          sessionId = data.id
+          setCurrentSessionId(data.id)
+          setHistorySessions(prev => [data, ...prev])
+        }
+      }
+
+      if (sessionId) {
+        await supabase.from('chat_messages').insert({
+          session_id: sessionId,
+          role,
+          content
+        })
+      }
+    } catch (err) {
+      console.error('Failed to save message:', err)
+    }
+  }
 
   const [messages, setMessages] = useState<Message[]>([])
   const [lastProvider, setLastProvider] = useState<string>('gemini')
@@ -536,6 +612,7 @@ export function GeminiChatPanel() {
     if (!input.trim() || isLoading) return
 
     const userMessage: Message = { role: 'user', content: input }
+    saveMessageToDb('user', input)
     const updatedMessages = [...messages, userMessage]
     
     // Ensure history starts with a user message and is trimmed to last 10 for performance
@@ -568,6 +645,7 @@ export function GeminiChatPanel() {
       setLastModel(typeof data.model === 'string' ? data.model : '')
 
       setMessages(prev => [...prev, { role: 'assistant', content: data.content }])
+      saveMessageToDb('model', data.content)
     } catch (err: unknown) {
       console.error('Chat error:', err)
       const errorMessage = err instanceof Error ? err.message : 'Internal server error'
@@ -591,7 +669,7 @@ export function GeminiChatPanel() {
       exit={{ opacity: 0, y: 4, scaleY: 0.98, transition: { duration: 0.12 } }}
       transition={{ duration: 0.18, delay: 0.05 }}
       style={{ transformOrigin: 'top' }}
-      className="absolute top-12 right-2 w-[calc(100%-1rem)] max-w-[420px] flex flex-col h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl bg-zinc-950/80 backdrop-blur-3xl border border-white/10 shadow-2xl overflow-hidden z-50"
+      className="absolute top-12 right-2 mt-2 w-[calc(100%-1rem)] max-w-[420px] flex flex-col h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl bg-zinc-950/80 backdrop-blur-3xl border border-white/10 shadow-2xl overflow-hidden z-50"
     >
       {/* Nodal Point Glass Highlight */}
       <div className="absolute inset-0 bg-gradient-to-tr from-[#002FA7]/5 via-transparent to-white/5 pointer-events-none" />
@@ -614,7 +692,7 @@ export function GeminiChatPanel() {
                 repeat: Infinity,
                 ease: "easeInOut",
               }}
-              className="absolute inset-0 bg-indigo-500/20 rounded-full blur-md"
+              className="absolute inset-0 bg-[#002FA7]/20 rounded-full blur-md"
             />
           </div>
           <div>
@@ -625,7 +703,77 @@ export function GeminiChatPanel() {
             </div>
           </div>
         </div>
+
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setIsHistoryOpen(!isHistoryOpen)}
+            className={cn(
+              "w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
+              isHistoryOpen ? "text-white bg-white/10" : "text-zinc-400 hover:text-white hover:bg-white/10"
+            )}
+            title="Chat History"
+          >
+            <History size={16} />
+          </button>
+          <button
+            onClick={resetSession}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+            title="New Chat"
+          >
+            <Plus size={18} />
+          </button>
+        </div>
       </div>
+
+      {/* History Slide-Over Panel */}
+      <AnimatePresence>
+        {isHistoryOpen && (
+          <motion.div
+            initial={{ x: '-100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '-100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="absolute top-[65px] bottom-0 left-0 w-64 bg-zinc-950/95 backdrop-blur-xl border-r border-white/10 z-30 flex flex-col"
+          >
+            <div className="p-3 border-b border-white/5 bg-white/5">
+              <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">Neural Logs</span>
+            </div>
+            <ScrollArea className="flex-1">
+              <div className="p-2 space-y-1">
+                {historySessions.map((session) => (
+                  <button
+                    key={session.id}
+                    onClick={() => loadSession(session.id)}
+                    className={cn(
+                      "w-full text-left p-3 rounded-lg border border-transparent transition-all hover:bg-white/5 hover:border-white/5 group",
+                      currentSessionId === session.id ? "bg-white/5 border-white/10" : ""
+                    )}
+                  >
+                    <div className="text-xs text-zinc-200 font-medium line-clamp-2 mb-1 group-hover:text-white">
+                      {session.title || 'Untitled Session'}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">
+                        {new Date(session.created_at).toLocaleDateString()}
+                      </span>
+                      {session.context_type && session.context_type !== 'general' && (
+                        <span className="text-[9px] font-mono text-[#002FA7] bg-[#002FA7]/10 px-1.5 py-0.5 rounded border border-[#002FA7]/20">
+                          {session.context_type}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+                {historySessions.length === 0 && (
+                  <div className="p-4 text-center text-zinc-600 text-xs font-mono">
+                    NO_LOGS_FOUND
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Messages */}
       <ScrollArea className="flex-1 w-full overflow-hidden relative z-10" ref={scrollRef}>

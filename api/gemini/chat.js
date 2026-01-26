@@ -340,7 +340,9 @@ export default async function handler(req, res) {
 
         CONTEXTUAL AWARENESS:
         The user is currently viewing: ${JSON.stringify(req.body.context || { type: 'general' })}
-        Use this to offer proactive, zero-click insights.
+        - If the user's query applies to this context (e.g., "who is the decision maker?", "draft an email to him"), PRIORITY ONE is to use this context.
+        - If the user's query is unrelated (e.g., "general market trends", "new search"), IGNORE the current screen context and answer broadly.
+        - Use this to offer proactive, zero-click insights ONLY when relevant.
       `;
     };
 
@@ -544,10 +546,10 @@ export default async function handler(req, res) {
         return;
       } catch (error) {
         lastErr = error;
-        // If quota/billing error, stop trying Gemini models and fall back to Perplexity
+        // If quota/billing error, continue to next Gemini model instead of breaking
         if (isGeminiQuotaOrBillingError(error)) {
-          console.log(`[Gemini Chat] Quota/Billing error on ${modelName}: ${error.message}`);
-          break; // Exit Gemini loop to trigger Perplexity fallback
+          console.log(`[Gemini Chat] Quota/Billing error on ${modelName}: ${error.message}. Trying next candidate...`);
+          continue; // Try next Gemini model as requested by Trey
         }
         if (isModelNotFoundError(error)) {
           console.log(`[Gemini Chat] Model not found: ${modelName}, skipping...`);
