@@ -83,6 +83,10 @@
 - **Description**: Transformed the Gemini assistant into the "Nodal Architect," a contextual, high-agency intelligence layer with a forensic instrument aesthetic.
 - **Actions**:
   - [x] **UI Overhaul**: Implemented "Glass Intelligence" design (backdrop-blur-2xl, frosted glass, monospace typography).
+  - [x] **Kill the Candy**: Eliminated consumer-grade aesthetics in favor of a stealth terminal look.
+  - [x] **Stealth User Command**: Implemented dark glass message blocks with right-aligned `COMMAND_INPUT` indicators.
+  - [x] **Neural Line Response**: Added a vertical blue spine to AI responses with `NODAL_ARCHITECT // v1.0` branding.
+  - [x] **Execute Protocol**: Upgraded the message submission button to International Klein Blue (#002FA7) with a forensic glow effect.
   - [x] **Ambient Hum**: Added `Waveform` component and ambient animations for system status feedback.
   - [x] **Zero-Click Start**: Implemented contextual awareness (route-specific greetings and proactive insights for Contacts/Accounts).
   - [x] **Adaptive UI (Rich Media)**: Built `ComponentRenderer` to handle structured JSON data for `news_ticker` and `mini_profile` cards.

@@ -582,17 +582,17 @@ export function GeminiChatPanel() {
       exit={{ opacity: 0, y: 4, scaleY: 0.98, transition: { duration: 0.12 } }}
       transition={{ duration: 0.18, delay: 0.05 }}
       style={{ transformOrigin: 'top' }}
-      className="absolute top-12 right-2 w-[calc(100%-1rem)] max-w-[420px] flex flex-col h-[500px] max-h-[calc(100vh-8rem)] rounded-2xl bg-zinc-950/40 backdrop-blur-3xl border border-white/10 shadow-2xl overflow-hidden z-50"
+      className="absolute top-12 right-2 w-[calc(100%-1rem)] max-w-[420px] flex flex-col h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl bg-zinc-950/80 backdrop-blur-3xl border border-white/10 shadow-2xl overflow-hidden z-50"
     >
       {/* Nodal Point Glass Highlight */}
       <div className="absolute inset-0 bg-gradient-to-tr from-[#002FA7]/5 via-transparent to-white/5 pointer-events-none" />
       
       {/* Header */}
-      <div className="p-4 border-b border-white/5 flex items-center justify-between bg-zinc-900/10 relative z-10">
-        <div className="flex items-center gap-2">
+      <div className="p-4 border-b border-white/10 flex items-center justify-between bg-zinc-900/50 relative z-10">
+        <div className="flex items-center gap-3">
           <div className="relative">
-            <div className="w-8 h-8 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center relative z-10 overflow-hidden">
-              <Activity size={16} className="text-indigo-400" />
+            <div className="w-8 h-8 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center relative z-10 overflow-hidden">
+              <Bot size={18} className="text-[#002FA7]" />
             </div>
             {/* Ambient Hum Animation */}
             <motion.div
@@ -609,7 +609,7 @@ export function GeminiChatPanel() {
             />
           </div>
           <div>
-            <h3 className="text-xs font-mono font-bold text-zinc-100 tracking-tighter uppercase">Nodal Architect v1.0</h3>
+            <h3 className="text-xs font-mono font-bold text-zinc-100 tracking-widest uppercase">Nodal Architect v1.0</h3>
             <div className="flex items-center gap-2">
               <Waveform />
               <span className="text-[10px] text-emerald-500/80 font-mono tracking-widest uppercase font-bold">Live_Feed</span>
@@ -624,11 +624,19 @@ export function GeminiChatPanel() {
             </div>
           </div>
         </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => useGeminiStore.getState().toggleChat()}
+          className="text-zinc-500 hover:text-white hover:bg-white/10"
+        >
+          <X size={18} />
+        </Button>
       </div>
 
       {/* Messages */}
       <ScrollArea className="flex-1 w-full overflow-hidden relative z-10" ref={scrollRef}>
-        <div className="p-4 space-y-6 min-w-0 w-full max-w-full overflow-x-hidden flex flex-col">
+        <div className="p-4 space-y-8 min-w-0 w-full max-w-full overflow-x-hidden flex flex-col">
           <AnimatePresence initial={false}>
             {messages.map((m, i) => (
               <motion.div 
@@ -649,96 +657,112 @@ export function GeminiChatPanel() {
                   m.role === 'user' ? "flex-row-reverse justify-start" : "flex-row justify-start"
                 )}
               >
-                {/* Avatar Container */}
-                <div className={cn(
-                  "w-8 h-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden mt-1",
-                  m.role === 'user' ? "bg-zinc-800" : "bg-indigo-950/30 border border-indigo-500/20"
-                )}>
-                  {m.role === 'user' ? (
-                    isAvatarLoading || hostedAvatarUrl ? (
-                      <ImageWithSkeleton 
-                        src={hostedAvatarUrl} 
-                        isLoading={isAvatarLoading} 
-                        alt="User" 
-                        className="w-full h-full" 
-                      />
-                    ) : (
-                      <User size={14} />
-                    )
-                  ) : (
-                    <Bot size={14} className="text-indigo-400" />
-                  )}
-                </div>
-
-                {/* Message Bubble */}
-                <div className={cn(
-                  "min-w-0 p-4 rounded-2xl text-sm leading-relaxed relative",
-                  m.role === 'user' 
-                    ? "w-fit bg-indigo-600 text-white shadow-[0_0_20px_-5px_rgba(79,70,229,0.4)] max-w-[80%]" 
-                    : "w-full bg-zinc-900/40 text-zinc-200 border border-white/5 backdrop-blur-md max-w-[calc(100%-2.5rem)]"
-                )}>
-                  <div className={cn(
-                    "flex flex-col gap-4 w-full min-w-0 max-w-full overflow-hidden",
-                    m.role === 'assistant' && "font-light tracking-wide"
-                  )}>
-                    {m.content.split('JSON_DATA:').map((part, index) => {
-                      if (index === 0) {
-                        const text = part.trim()
-                        if (!text) return null
-                        return (
-                          <div key={index} className="whitespace-pre-wrap break-words [word-break:break-word] [overflow-wrap:anywhere] max-w-full">
-                            {text}
-                          </div>
-                        )
-                      }
-                      try {
-                        const [jsonPart, ...rest] = part.split('END_JSON')
-                        const data = JSON.parse(jsonPart)
-                        const trailingText = rest.join('END_JSON').trim()
-                        
-                        return (
-                          <div key={index} className="flex flex-col gap-4 w-full min-w-0 max-w-full overflow-hidden">
-                            <div className="w-full overflow-hidden rounded-lg border border-white/5 bg-black/20 grid grid-cols-1">
-                              <ComponentRenderer type={data.type} data={data.data} />
-                            </div>
-                            {trailingText && (
-                              <div className="whitespace-pre-wrap break-words [word-break:break-word] [overflow-wrap:anywhere] max-w-full">
-                                {trailingText}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      } catch (e) {
-                        return <div key={index} className="text-[10px] text-red-400 font-mono p-2 bg-red-500/10 rounded">[System_Error: Data_Corruption]</div>
-                      }
-                    })}
-                  </div>
-                  {m.role === 'assistant' && i === messages.length - 1 && error && (
-                    <div className="mt-2 pt-2 border-t border-white/5 flex items-center gap-2">
-                      <p className="text-[10px] text-red-400 font-mono leading-tight flex-1">
-                        {error}
-                      </p>
-                      <button 
-                        onClick={copyDebugInfo}
-                        className="w-8 h-8 inline-flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors shrink-0"
-                        title="Copy Prompt for Backend Dev"
-                      >
-                        <Copy size={16} />
-                      </button>
+                {m.role === 'user' ? (
+                  /* "Stealth" User Command */
+                  <div className="flex justify-end mb-2 group w-full">
+                    <div className="max-w-[85%] pr-4 relative">
+                      {/* The Connector Line (Visual Haptic) */}
+                      <div className="absolute right-[-10px] top-1/2 w-4 h-[1px] bg-zinc-800 group-hover:bg-[#002FA7] transition-colors" />
+                      
+                      <div className="bg-zinc-900/50 border border-white/10 backdrop-blur-md rounded-lg p-4 text-right shadow-xl">
+                        <p className="font-mono text-[10px] text-[#002FA7] mb-1 uppercase tracking-widest opacity-70">
+                          {'>'} COMMAND_INPUT
+                        </p>
+                        <p className="text-sm text-zinc-100 font-medium leading-relaxed">
+                          {m.content}
+                        </p>
+                      </div>
                     </div>
-                  )}
-                </div>
+                    {/* User Initials/Avatar */}
+                    <div className="shrink-0 h-10 w-10 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center overflow-hidden">
+                      {isAvatarLoading || hostedAvatarUrl ? (
+                        <ImageWithSkeleton 
+                          src={hostedAvatarUrl} 
+                          isLoading={isAvatarLoading} 
+                          alt="User" 
+                          className="w-full h-full" 
+                        />
+                      ) : (
+                        <span className="font-mono text-xs text-zinc-500">YOU</span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  /* "Intelligence Block" (AI Response) */
+                  <div className="flex justify-start mb-2 relative w-full group">
+                    {/* The Neural Line (The glowing spine on the left) */}
+                    <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-[#002FA7] via-blue-500/20 to-transparent group-hover:from-blue-400 transition-colors duration-500" />
+                    
+                    <div className="pl-6 w-full">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-widest font-bold">
+                          NODAL_ARCHITECT // v1.0
+                        </span>
+                        {isLoading && i === messages.length - 1 && <Waveform />}
+                      </div>
+                      
+                      <div className="flex flex-col gap-4 w-full min-w-0 max-w-full overflow-hidden">
+                        {m.content.split('JSON_DATA:').map((part, index) => {
+                          if (index === 0) {
+                            const text = part.trim()
+                            if (!text) return null
+                            return (
+                              <div key={index} className="prose prose-invert prose-p:text-zinc-400 prose-headings:font-mono prose-headings:text-zinc-200 prose-headings:tracking-tighter prose-strong:text-white prose-code:text-[#002FA7] text-sm leading-7 max-w-none break-words [word-break:break-word] [overflow-wrap:anywhere]">
+                                <p className="whitespace-pre-wrap">{text}</p>
+                              </div>
+                            )
+                          }
+                          try {
+                            const [jsonPart, ...rest] = part.split('END_JSON')
+                            const data = JSON.parse(jsonPart)
+                            const trailingText = rest.join('END_JSON').trim()
+                            
+                            return (
+                              <div key={index} className="flex flex-col gap-4 w-full min-w-0 max-w-full overflow-hidden">
+                                <div className="w-full overflow-hidden rounded-lg border border-white/5 bg-black/20 grid grid-cols-1">
+                                  <ComponentRenderer type={data.type} data={data.data} />
+                                </div>
+                                {trailingText && (
+                                  <div className="prose prose-invert prose-p:text-zinc-400 prose-headings:font-mono prose-headings:text-zinc-200 prose-headings:tracking-tighter prose-strong:text-white prose-code:text-[#002FA7] text-sm leading-7 max-w-none break-words [word-break:break-word] [overflow-wrap:anywhere]">
+                                    <p className="whitespace-pre-wrap">{trailingText}</p>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          } catch (e) {
+                            return <div key={index} className="text-[10px] text-red-400 font-mono p-2 bg-red-500/10 rounded">[System_Error: Data_Corruption]</div>
+                          }
+                        })}
+                      </div>
+                      
+                      {i === messages.length - 1 && error && (
+                        <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-2">
+                          <p className="text-[10px] text-red-400 font-mono leading-tight flex-1">
+                            {error}
+                          </p>
+                          <button 
+                            onClick={copyDebugInfo}
+                            className="w-8 h-8 inline-flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+                            title="Copy Prompt for Backend Dev"
+                          >
+                            <Copy size={16} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </motion.div>
             ))}
           </AnimatePresence>
           {isLoading && (
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-indigo-950/30 border border-indigo-500/20 flex items-center justify-center">
-                <Loader2 size={14} className="text-indigo-400 animate-spin" />
-              </div>
-              <div className="bg-zinc-900/20 text-zinc-400 p-4 rounded-2xl text-sm border border-white/5 backdrop-blur-sm font-mono italic flex flex-col gap-1">
-                <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">&gt; PARSING_INTENT... [||||||]</span>
-                <span className="text-zinc-300">Processing query against Nodal Point neural network...</span>
+            <div className="flex justify-start relative w-full">
+              <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-[#002FA7] to-transparent" />
+              <div className="pl-6 flex items-center gap-2">
+                <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-widest opacity-50 animate-pulse">
+                  {'>'} PARSING_INTENT...
+                </span>
+                <Loader2 size={12} className="text-[#002FA7] animate-spin" />
               </div>
             </div>
           )}
@@ -747,37 +771,53 @@ export function GeminiChatPanel() {
       </ScrollArea>
 
       {/* Input */}
-      <div className="p-4 border-t border-white/5 bg-zinc-950/40 relative z-10">
+      <div className="p-4 border-t border-white/10 bg-zinc-900/80 backdrop-blur-md relative z-10">
         <form 
           onSubmit={(e) => { e.preventDefault(); handleSend(); }}
-          className="relative flex items-center gap-2"
+          className="flex flex-col gap-3"
         >
-          <div className="relative flex-1">
+          <div className="relative group">
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Query System..."
-              className="bg-zinc-950/50 border-white/10 focus-visible:ring-indigo-500/50 pr-10 h-11 font-mono text-sm tracking-tight placeholder:text-zinc-600"
+              placeholder="Enter system command..."
+              className="bg-zinc-950/50 border-white/10 text-white placeholder:text-zinc-600 focus-visible:ring-[#002FA7] pr-12 font-mono text-sm h-12 rounded-xl transition-all group-hover:border-white/20"
             />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+              <Mic 
+                size={16} 
+                onMouseDown={() => setIsListening(true)}
+                onMouseUp={() => setIsListening(false)}
+                className={cn(
+                  "cursor-pointer transition-all",
+                  isListening ? "text-red-500 scale-110 shadow-[0_0_10px_red]" : "text-zinc-500 hover:text-[#002FA7]"
+                )} 
+              />
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex flex-col">
+                <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Model_Stack</span>
+                <span className="text-[10px] font-mono text-white/80">{lastModel}</span>
+              </div>
+              <div className="h-6 w-px bg-white/5" />
+              <div className="flex flex-col">
+                <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Provider</span>
+                <span className="text-[10px] font-mono text-white/80 uppercase">{lastProvider}</span>
+              </div>
+            </div>
+
             <Button 
-              type="button"
-              onMouseDown={() => setIsListening(true)}
-              onMouseUp={() => setIsListening(false)}
-              className={cn(
-                "absolute right-2 top-1.5 h-8 w-8 rounded-lg transition-all",
-                isListening ? "bg-red-500 text-white scale-110 shadow-[0_0_15px_rgba(239,68,68,0.5)]" : "text-zinc-500 hover:text-zinc-300"
-              )}
+              type="submit" 
+              disabled={isLoading || !input.trim()}
+              className="bg-[#002FA7] hover:bg-blue-600 text-white font-mono text-xs uppercase tracking-widest px-6 h-10 rounded-xl transition-all shadow-[0_0_20px_rgba(0,47,167,0.4)] hover:shadow-[0_0_30px_rgba(0,47,167,0.6)] flex items-center gap-2 active:scale-95 border border-blue-400/30"
             >
-              <Mic size={16} />
+              <span>Execute</span>
+              <ArrowRight size={14} />
             </Button>
           </div>
-          <Button 
-            type="submit" 
-            disabled={isLoading || !input.trim()}
-            className="h-11 px-4 bg-white text-zinc-950 hover:bg-zinc-200 font-bold tracking-tighter uppercase text-xs"
-          >
-            Execute
-          </Button>
         </form>
       </div>
     </motion.div>
