@@ -391,15 +391,10 @@ export function GeminiChatTrigger(props: { onToggle?: () => void }) {
         props.onToggle?.()
         toggleChat()
       }}
-      className={cn(
-        "w-8 h-8 inline-flex items-center justify-center rounded-full transition-all duration-200",
-        isOpen 
-          ? "bg-white/10 text-white shadow-lg" 
-          : "text-zinc-400 hover:text-white hover:bg-white/10"
-      )}
+      className="w-8 h-8 inline-flex items-center justify-center rounded-full transition-all duration-200 text-zinc-400 hover:text-white hover:bg-white/10"
       title={isOpen ? "Close Gemini" : "Chat with Gemini"}
     >
-      {isOpen ? <X size={18} /> : <Activity size={18} />}
+      <Bot size={18} />
     </button>
   )
 }
@@ -592,7 +587,7 @@ export function GeminiChatPanel() {
         <div className="flex items-center gap-3">
           <div className="relative">
             <div className="w-8 h-8 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center relative z-10 overflow-hidden">
-              <Bot size={18} className="text-[#002FA7]" />
+              <Bot size={18} className="text-white" />
             </div>
             {/* Ambient Hum Animation */}
             <motion.div
@@ -613,25 +608,9 @@ export function GeminiChatPanel() {
             <div className="flex items-center gap-2">
               <Waveform />
               <span className="text-[10px] text-emerald-500/80 font-mono tracking-widest uppercase font-bold">Live_Feed</span>
-              {lastModel && (
-                <span
-                  className="text-[10px] text-zinc-400/90 font-mono tabular-nums tracking-tight"
-                  title={`${lastProvider}:${lastModel}`}
-                >
-                  {lastProvider === 'gemini' ? lastModel : `${lastProvider}:${lastModel}`}
-                </span>
-              )}
             </div>
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => useGeminiStore.getState().toggleChat()}
-          className="text-zinc-500 hover:text-white hover:bg-white/10"
-        >
-          <X size={18} />
-        </Button>
       </div>
 
       {/* Messages */}
@@ -659,11 +638,8 @@ export function GeminiChatPanel() {
               >
                 {m.role === 'user' ? (
                   /* "Stealth" User Command */
-                  <div className="flex justify-end mb-2 group w-full">
-                    <div className="max-w-[85%] pr-4 relative">
-                      {/* The Connector Line (Visual Haptic) */}
-                      <div className="absolute right-[-10px] top-1/2 w-4 h-[1px] bg-zinc-800 group-hover:bg-[#002FA7] transition-colors" />
-                      
+                  <div className="flex justify-end mb-2 group w-full gap-4">
+                    <div className="max-w-[85%] relative">
                       <div className="bg-zinc-900/50 border border-white/10 backdrop-blur-md rounded-lg p-4 text-right shadow-xl">
                         <p className="font-mono text-[10px] text-[#002FA7] mb-1 uppercase tracking-widest opacity-70">
                           {'>'} COMMAND_INPUT

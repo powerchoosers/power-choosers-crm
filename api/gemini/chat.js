@@ -417,16 +417,20 @@ export default async function handler(req, res) {
 
     const genAI = new GoogleGenerativeAI(geminiApiKey);
     const envPreferredModel = (process.env.GEMINI_MODEL || '').trim();
-    const preferredModel = envPreferredModel || 'gemini-2.5-flash-lite';
+    const preferredModel = envPreferredModel || 'gemini-3-pro-preview';
     const modelCandidates = Array.from(
       new Set(
         [
           preferredModel,
-          'gemini-2.5-flash-lite',
-          'gemini-2.5-flash-lite-preview',
+          'gemini-3-pro-preview',
+          'gemini-3-flash-preview',
+          'gemini-2.5-pro',
+          'gemini-2.5-pro-tts',
           'gemini-2.5-flash',
           'gemini-2.5-flash-preview',
-          'gemini-3-flash-preview',
+          'gemini-2.5-flash-tts',
+          'gemini-2.5-flash-lite',
+          'gemini-2.5-flash-lite-preview',
           'gemini-2.0-flash',
           'gemini-2.0-flash-exp',
           'gemini-1.5-flash',
@@ -540,20 +544,22 @@ export default async function handler(req, res) {
         return;
       } catch (error) {
         lastErr = error;
-        if (isGeminiQuotaOrBillingError(error) && perplexityApiKey) {
-          const content = await callPerplexity();
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ content, provider: 'perplexity', model: perplexityModel }));
-          return;
+        // If quota/billing error, stop trying Gemini models and fall back to Perplexity
+        if (isGeminiQuotaOrBillingError(error)) {
+          console.log(`[Gemini Chat] Quota/Billing error on ${modelName}: ${error.message}`);
+          break; // Exit Gemini loop to trigger Perplexity fallback
         }
         if (isModelNotFoundError(error)) {
+          console.log(`[Gemini Chat] Model not found: ${modelName}, skipping...`);
           continue;
         }
-        throw error;
+        console.warn(`[Gemini Chat] Error with ${modelName}: ${error.message}, trying next candidate...`);
       }
     }
 
+    // Fallback to Perplexity if no Gemini model succeeded
     if (perplexityApiKey) {
+      console.log('[Gemini Chat] Falling back to Perplexity...');
       const content = await callPerplexity();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ content, provider: 'perplexity', model: perplexityModel }));
