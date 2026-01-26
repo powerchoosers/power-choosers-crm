@@ -140,7 +140,7 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
           animate={{ height: 'auto', opacity: 1 }}
           className="flex flex-col gap-3 p-4 rounded-xl bg-white/5 border border-white/10 relative overflow-hidden group w-full"
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           
           <div className="flex items-center gap-4 relative z-10">
             <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center border border-white/10 text-zinc-400 font-bold text-lg shrink-0">
@@ -153,11 +153,11 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
                 <span className={cn("w-1.5 h-1.5 rounded-full animate-pulse shrink-0", dossier.contractStatus === 'active' ? 'bg-emerald-500' : 'bg-red-500')} />
                 <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest truncate">{dossier.contractStatus}</span>
                 {dossier.energyMaturity && (
-                  <span className="text-[10px] font-mono text-indigo-400 ml-2 uppercase tracking-tighter">Maturity: {dossier.energyMaturity}</span>
+                  <span className="text-[10px] font-mono text-blue-400 ml-2 uppercase tracking-tighter">Maturity: {dossier.energyMaturity}</span>
                 )}
               </div>
             </div>
-            <Button size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-[10px] uppercase tracking-widest border border-indigo-400/30 shadow-[0_0_15px_rgba(79,70,229,0.4)] h-8">
+            <Button size="sm" className="bg-blue-600 hover:bg-blue-500 text-white font-mono text-[10px] uppercase tracking-widest border border-blue-400/30 shadow-[0_0_15px_rgba(37,99,235,0.4)] h-8">
               INITIATE
             </Button>
           </div>
@@ -363,14 +363,14 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
         <div className="grid grid-cols-1 gap-2 w-full min-w-0 overflow-hidden">
           {profiles.map((profile, i) => (
             <div key={i} className="flex items-center gap-3 p-2 sm:p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group min-w-0">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 font-bold border border-white/5 group-hover:border-indigo-500/50 transition-colors shrink-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 font-bold border border-white/5 group-hover:border-blue-500/50 transition-colors shrink-0">
                 {profile.name?.charAt(0)}
               </div>
               <div className="flex-1 min-w-0 overflow-hidden">
                 <h4 className="text-xs sm:text-sm font-semibold text-zinc-100 truncate">{profile.name}</h4>
                 <p className="text-[9px] sm:text-[10px] text-zinc-500 font-mono truncate uppercase tracking-tighter">{profile.company || profile.title}</p>
               </div>
-              <Button size="sm" className="h-7 sm:h-8 px-2 sm:px-3 bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white transition-all text-[9px] sm:text-[10px] font-bold uppercase tracking-tighter shrink-0">
+              <Button size="sm" className="h-7 sm:h-8 px-2 sm:px-3 bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600 hover:text-white transition-all text-[9px] sm:text-[10px] font-bold uppercase tracking-tighter shrink-0">
                 Inject
               </Button>
             </div>
@@ -753,7 +753,7 @@ export function GeminiChatPanel() {
             className={cn(
               "w-8 h-8 flex items-center justify-center rounded-lg transition-all border",
               showDiagnostics 
-                ? "bg-indigo-500/20 border-indigo-500/50 text-indigo-400" 
+                ? "bg-blue-500/20 border-blue-500/50 text-blue-400" 
                 : "bg-white/5 border-white/10 text-zinc-400 hover:text-white hover:bg-white/10"
             )}
             title="Toggle Routing HUD"
@@ -791,7 +791,7 @@ export function GeminiChatPanel() {
           >
             <div className="p-3 font-mono text-[10px] space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar">
               <div className="flex items-center justify-between border-b border-white/5 pb-1 mb-2">
-                <span className="text-indigo-400 font-bold tracking-widest">AI_ROUTER_HUD // LIVE_DIAGNOSTICS</span>
+                <span className="text-blue-400 font-bold tracking-widest">AI_ROUTER_HUD // LIVE_DIAGNOSTICS</span>
                 <span className="text-zinc-600 text-[8px] uppercase">Routing Protocol v2.1</span>
               </div>
               
@@ -805,7 +805,7 @@ export function GeminiChatPanel() {
                       d.status === 'success' ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-400" :
                       d.status === 'failed' ? "bg-red-500/5 border-red-500/20 text-red-400" :
                       d.status === 'retry' ? "bg-amber-500/5 border-amber-500/20 text-amber-400" :
-                      d.status === 'attempting' ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-400 animate-pulse" :
+                      d.status === 'attempting' ? "bg-blue-500/10 border-blue-500/30 text-blue-400 animate-pulse" :
                       "bg-white/5 border-white/10 text-zinc-400"
                     )}>
                       <div className="flex items-center justify-between">
@@ -828,7 +828,7 @@ export function GeminiChatPanel() {
                       )}
                       {d.tools && (
                         <div className="text-[9px] opacity-80 flex items-center gap-1 mt-1">
-                          <span className="text-indigo-400">TOOLS:</span> {d.tools.join(', ')}
+                          <span className="text-blue-400">TOOLS:</span> {d.tools.join(', ')}
                         </div>
                       )}
                     </div>
@@ -1029,86 +1029,85 @@ export function GeminiChatPanel() {
           onSubmit={(e) => { e.preventDefault(); handleSend(); }}
           className="flex flex-col gap-3"
         >
-          <div className="relative group">
-            <Input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Enter system command..."
-              className="bg-zinc-950/50 border-white/10 text-white placeholder:text-zinc-600 focus-visible:ring-[#002FA7] pr-12 font-mono text-sm h-12 rounded-xl transition-all group-hover:border-white/20"
-            />
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-              <Mic 
-                size={16} 
-                onMouseDown={() => setIsListening(true)}
-                onMouseUp={() => setIsListening(false)}
-                className={cn(
-                  "cursor-pointer transition-all",
-                  isListening ? "text-red-500 scale-110 shadow-[0_0_10px_red]" : "text-zinc-500 hover:text-[#002FA7]"
-                )} 
+          <div className="flex items-center gap-2">
+            <div className="relative group flex-1">
+              <Input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Enter system command..."
+                className="bg-zinc-950/50 border-white/10 text-white placeholder:text-zinc-600 focus-visible:ring-[#002FA7] pr-12 font-mono text-sm h-12 rounded-xl transition-all group-hover:border-white/20"
               />
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
-                    <Sparkles size={8} className="text-indigo-400" />
-                    Neural_Link
-                  </span>
-                  <div className="h-2 w-[1px] bg-white/10" />
-                  <span className="text-[9px] font-mono text-indigo-400/70 uppercase tracking-widest animate-pulse">
-                    {getProvider(selectedModel)}
-                  </span>
-                </div>
-                <Select value={selectedModel} onValueChange={setSelectedModel}>
-                  <SelectTrigger className="h-8 bg-zinc-950/50 border-white/5 text-[10px] font-mono text-white/90 hover:bg-white/5 transition-colors min-w-[180px] rounded-lg">
-                    <SelectValue placeholder="Select Model" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-zinc-950 border-white/10 text-white">
-                    <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 mb-1">
-                      Priority Agents
-                    </div>
-                    <SelectItem value="openai/gpt-oss-120b" className="text-[10px] font-mono focus:bg-indigo-500/20">
-                      GPT-OSS (120B)
-                    </SelectItem>
-                    
-                    <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
-                      Gemini Stack (Free)
-                    </div>
-                    <SelectItem value="gemini-2.0-flash" className="text-[10px] font-mono focus:bg-indigo-500/20">
-                      GEMINI-2.0-FLASH
-                    </SelectItem>
-                    <SelectItem value="gemini-1.5-flash" className="text-[10px] font-mono focus:bg-indigo-500/20">
-                      GEMINI-1.5-FLASH
-                    </SelectItem>
-                    <SelectItem value="gemini-1.5-pro" className="text-[10px] font-mono focus:bg-indigo-500/20">
-                      GEMINI-1.5-PRO
-                    </SelectItem>
-                    
-                    <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
-                      Perplexity (Paid)
-                    </div>
-                    <SelectItem value="sonar-pro" className="text-[10px] font-mono focus:bg-indigo-500/20">
-                      SONAR-PRO
-                    </SelectItem>
-                    <SelectItem value="sonar" className="text-[10px] font-mono focus:bg-indigo-500/20">
-                      SONAR-STANDARD
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                <Mic 
+                  size={16} 
+                  onMouseDown={() => setIsListening(true)}
+                  onMouseUp={() => setIsListening(false)}
+                  className={cn(
+                    "cursor-pointer transition-all",
+                    isListening ? "text-red-500 scale-110 shadow-[0_0_10px_red]" : "text-zinc-500 hover:text-[#002FA7]"
+                  )} 
+                />
               </div>
             </div>
-
             <Button 
               type="submit" 
               disabled={isLoading || !input.trim()}
-              className="bg-[#002FA7] hover:bg-blue-600 text-white font-mono text-xs uppercase tracking-widest px-6 h-10 rounded-xl transition-all shadow-[0_0_20px_rgba(0,47,167,0.4)] hover:shadow-[0_0_30px_rgba(0,47,167,0.6)] flex items-center gap-2 active:scale-95 border border-blue-400/30"
+              className="bg-[#002FA7] hover:bg-blue-600 text-white font-mono text-xs uppercase tracking-widest px-6 h-12 rounded-xl transition-all shadow-[0_0_20px_rgba(0,47,167,0.4)] hover:shadow-[0_0_30px_rgba(0,47,167,0.6)] flex items-center gap-2 active:scale-95 border border-blue-400/30 shrink-0"
             >
               <span>Execute</span>
               <ArrowRight size={14} />
             </Button>
+          </div>
+          
+          <div className="flex items-center gap-4 px-1">
+            <div className="flex items-center gap-3">
+              <Select value={selectedModel} onValueChange={setSelectedModel}>
+                <SelectTrigger className="h-7 bg-zinc-950/50 border-white/5 text-[10px] font-mono text-white/90 hover:bg-white/5 transition-colors min-w-[140px] rounded-lg">
+                  <SelectValue placeholder="Select Model" />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-950 border-white/10 text-white">
+                  <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 mb-1">
+                    Priority Agents
+                  </div>
+                  <SelectItem value="openai/gpt-oss-120b" className="text-[10px] font-mono focus:bg-blue-500/20">
+                    GPT-OSS (120B)
+                  </SelectItem>
+                  
+                  <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
+                    Gemini Stack (Free)
+                  </div>
+                  <SelectItem value="gemini-2.0-flash" className="text-[10px] font-mono focus:bg-blue-500/20">
+                    GEMINI-2.0-FLASH
+                  </SelectItem>
+                  <SelectItem value="gemini-1.5-flash" className="text-[10px] font-mono focus:bg-blue-500/20">
+                    GEMINI-1.5-FLASH
+                  </SelectItem>
+                  <SelectItem value="gemini-1.5-pro" className="text-[10px] font-mono focus:bg-blue-500/20">
+                    GEMINI-1.5-PRO
+                  </SelectItem>
+                  
+                  <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
+                    Perplexity (Paid)
+                  </div>
+                  <SelectItem value="sonar-pro" className="text-[10px] font-mono focus:bg-blue-500/20">
+                    SONAR-PRO
+                  </SelectItem>
+                  <SelectItem value="sonar" className="text-[10px] font-mono focus:bg-blue-500/20">
+                    SONAR-STANDARD
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+
+              <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-1.5 shrink-0">
+                <Sparkles size={8} className="text-blue-400" />
+                Neural_Link
+              </span>
+
+              <div className="h-3 w-[1px] bg-white/10" />
+              <span className="text-[9px] font-mono text-blue-400/70 uppercase tracking-widest animate-pulse">
+                {getProvider(selectedModel)}
+              </span>
+            </div>
           </div>
         </form>
       </div>
