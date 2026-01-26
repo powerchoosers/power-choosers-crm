@@ -418,25 +418,22 @@ export default async function handler(req, res) {
     }
 
     const genAI = new GoogleGenerativeAI(geminiApiKey);
+    const bodyModel = (req.body.model || '').trim();
     const envPreferredModel = (process.env.GEMINI_MODEL || '').trim();
-    const preferredModel = envPreferredModel || 'gemini-3-pro-preview';
+    const preferredModel = bodyModel || envPreferredModel || 'gemini-1.5-flash';
     const modelCandidates = Array.from(
       new Set(
         [
           preferredModel,
-          'gemini-3-pro-preview',
-          'gemini-3-flash-preview',
-          'gemini-2.5-pro',
-          'gemini-2.5-pro-tts',
-          'gemini-2.5-flash',
-          'gemini-2.5-flash-preview',
-          'gemini-2.5-flash-tts',
-          'gemini-2.5-flash-lite',
-          'gemini-2.5-flash-lite-preview',
-          'gemini-2.0-flash',
-          'gemini-2.0-flash-exp',
           'gemini-1.5-flash',
-          'gemini-1.5-pro'
+          'gemini-2.0-flash',
+          'gemini-1.5-pro',
+          'gemini-2.0-pro-exp',
+          'gemini-1.0-pro',
+          'gemini-2.0-flash-lite-preview',
+          'gemini-3-flash',
+          'gemini-2.5-flash-lite',
+          'gemini-1.5-flash-8b'
         ].filter(Boolean)
       )
     );
@@ -467,44 +464,6 @@ export default async function handler(req, res) {
 
     const routingDiagnostics = [];
     let lastErr = null;
-
-    if (!geminiApiKey) {
-      routingDiagnostics.push({
-        provider: 'perplexity',
-        model: perplexityModel,
-        status: 'attempting',
-        reason: 'no_gemini_key'
-      });
-      const content = await callPerplexity();
-      routingDiagnostics[0].status = 'success';
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ content, provider: 'perplexity', model: perplexityModel, diagnostics: routingDiagnostics }));
-      return;
-    }
-
-    const genAI = new GoogleGenerativeAI(geminiApiKey);
-    const envPreferredModel = (process.env.GEMINI_MODEL || '').trim();
-    const preferredModel = envPreferredModel || 'gemini-3-pro-preview';
-    const modelCandidates = Array.from(
-      new Set(
-        [
-          preferredModel,
-          'gemini-3-pro-preview',
-          'gemini-3-flash-preview',
-          'gemini-2.5-pro',
-          'gemini-2.5-pro-tts',
-          'gemini-2.5-flash',
-          'gemini-2.5-flash-preview',
-          'gemini-2.5-flash-tts',
-          'gemini-2.5-flash-lite',
-          'gemini-2.5-flash-lite-preview',
-          'gemini-2.0-flash',
-          'gemini-2.0-flash-exp',
-          'gemini-1.5-flash',
-          'gemini-1.5-pro'
-        ].filter(Boolean)
-      )
-    );
 
     for (const modelName of modelCandidates) {
       try {
@@ -660,6 +619,10 @@ export default async function handler(req, res) {
   } catch (error) {
     logger.error('[Gemini Chat] Error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error', message: error.message }));
+    res.end(JSON.stringify({ 
+      error: 'Internal server error', 
+      message: error.message,
+      diagnostics: typeof routingDiagnostics !== 'undefined' ? routingDiagnostics : []
+    }));
   }
 }

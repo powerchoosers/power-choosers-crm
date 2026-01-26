@@ -37,6 +37,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { ClickToCallButton } from '@/components/calls/ClickToCallButton'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 50
@@ -232,12 +233,17 @@ export default function AccountsPage() {
       },
       {
         id: 'actions',
-        cell: () => {
+        cell: ({ row }) => {
+          const account = row.original
           return (
             <div className="flex items-center justify-end gap-2">
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10">
-                <Phone className="h-4 w-4" />
-              </Button>
+              <ClickToCallButton 
+                phoneNumber={account.phone}
+                account={account.name}
+                logoUrl={account.logoUrl}
+                isCompany={true}
+                className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10"
+              />
               <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10">
                 <Mail className="h-4 w-4" />
               </Button>

@@ -242,7 +242,7 @@ export function useSearchContacts(queryTerm: string) {
             id: item.id,
             name: fullName,
             email: item.email || metadata?.email || metadata?.general?.email || metadata?.contact?.email || '',
-            company: account?.name || metadata?.company || metadata?.general?.company || '',
+            company: account?.name || metadata?.company || metadata?.companyName || metadata?.general?.company || metadata?.general?.companyName || '',
             logoUrl: account?.logo_url || '',
           };
         });

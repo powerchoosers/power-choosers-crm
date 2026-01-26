@@ -97,6 +97,16 @@
   - [x] **Cost Optimization**: Replaced legacy polling logic with real-time push notifications, significantly reducing Cloud Run execution costs.
   - [x] **Ungated Access**: Enabled recording playback and analysis for all call records, removing legacy feature gating.
 
+### Click-to-Call with Context
+- **Status**: Completed
+- **Description**: Implemented Twilio-powered click-to-call across the platform with automatic context detection and passing.
+- **Actions**:
+  - [x] **Store Enhancement**: Updated `useCallStore` to support cross-component call triggers and context metadata (Name, Account, Title, Logo).
+  - [x] **Header Dialer**: Modified `TopBar.tsx` to display context metadata in the dialer panel and auto-initiate calls triggered from other components.
+  - [x] **Dossier Integration**: Implemented `handleCallClick` in `UplinkCard.tsx` with logic to differentiate between Company context (for company phones) and Contact context (for personal phones).
+  - [x] **Global Availability**: Created `ClickToCallButton.tsx` and integrated it into the People and Accounts tables for consistent click-to-call behavior platform-wide.
+  - [x] **Legacy Logic**: Replicated legacy phone parsing and context handling behavior while maintaining the Nodal Point "Obsidian & Glass" aesthetic.
+
 ### Forensic Instrumentation (UI/UX Refinement)
 - **Status**: Completed
 - **Description**: Refined the platform into a "Forensic Instrument" by standardizing time, search, status, and typography.
@@ -126,6 +136,8 @@
   - [x] **API Protocol**: Standardized `JSON_DATA:END_JSON` delimiters for structured backend communication.
   - [x] **History Fix**: Resolved Gemini API role-alternation errors by implementing robust history filtering in `api/gemini/chat.js`.
   - [x] **Fallback Reliability**: Fixed the Gemini fallback system to ensure all Gemini model candidates are tried before falling back to Perplexity (Sonar). Resolved the issue where a single quota error would trigger an immediate jump to the paid provider.
+  - [x] **AI Router Diagnostics**: Added AI Router Diagnostics HUD to visualize model selection.
+  - [x] **Model Optimization**: Optimized Gemini model list and removed redundant code blocks in `api/gemini/chat.js`.
 
 ### Unified Global Search & Server-Side Search
 - **Status**: Completed
