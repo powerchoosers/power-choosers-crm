@@ -17,11 +17,22 @@ import { GeminiChatTrigger, GeminiChatPanel } from '@/components/chat/GeminiChat
 import { useGeminiStore } from '@/store/geminiStore'
 
 export function TopBar() {
-  const { isActive, status, setActive, setStatus } = useCallStore()
+  const { 
+    isActive, 
+    status, 
+    setActive, 
+    setStatus, 
+    phoneNumber, 
+    setPhoneNumber, 
+    metadata: storeMetadata,
+    setMetadata: setStoreMetadata,
+    callTriggered,
+    clearCallTrigger
+  } = useCallStore()
   const isGeminiOpen = useGeminiStore((state) => state.isOpen)
   const setIsGeminiOpen = useGeminiStore((state) => state.setIsOpen)
   const { profile } = useAuth()
-  const { connect, disconnect, mute, isMuted, metadata } = useVoice()
+  const { connect, disconnect, mute, isMuted, metadata: voiceMetadata } = useVoice()
   const pathname = usePathname()
   const params = useParams()
   
@@ -29,6 +40,9 @@ export function TopBar() {
   const toggleHistory = useGeminiStore((state) => state.toggleHistory)
   const resetSession = useGeminiStore((state) => state.resetSession)
   const storeContext = useGeminiStore((state) => state.activeContext)
+
+  // Use voiceMetadata if active, otherwise use storeMetadata if it exists (for dialer display)
+  const displayMetadata = isActive ? voiceMetadata : storeMetadata
 
   // Contextual Intel Logic
   const contextInfo = useMemo(() => {
@@ -40,7 +54,6 @@ export function TopBar() {
   }, [pathname, params, storeContext])
 
   const [isDialerOpen, setIsDialerOpen] = useState(false)
-  const [phoneNumber, setPhoneNumber] = useState('')
   const [callDuration, setCallDuration] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -49,6 +62,14 @@ export function TopBar() {
 
   const selectedNumber = profile.selectedPhoneNumber || (profile.twilioNumbers && profile.twilioNumbers.length > 0 ? profile.twilioNumbers[0].number : null)
   const selectedNumberName = profile.twilioNumbers?.find(n => n.number === selectedNumber)?.name || "Default"
+
+  // Handle cross-component call triggers
+  useEffect(() => {
+    if (callTriggered && phoneNumber) {
+      handleCall()
+      clearCallTrigger()
+    }
+  }, [callTriggered, phoneNumber])
 
   // Track call duration
   useEffect(() => {
@@ -130,16 +151,19 @@ export function TopBar() {
     const inputVal = e.target.value
     // Handle clearing
     if (inputVal === '') {
-        setPhoneNumber('')
-        return
+      setPhoneNumber('')
+      return
     }
     setPhoneNumber(formatPhoneNumber(inputVal))
   }
 
   const handleDialerKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-        e.preventDefault()
-        handleCall()
+      e.preventDefault()
+      handleCall()
+    }
+    if (e.key === 'Escape') {
+      setIsDialerOpen(false)
     }
   }
 
@@ -163,7 +187,7 @@ export function TopBar() {
     // For From, we use the selectedNumber directly if it's already in E.164 or format it
     const from = formatToE164(selectedNumber || '')
 
-    await connect({ To: to, From: from })
+    await connect({ To: to, From: from, metadata: storeMetadata || undefined })
   }
 
   const handleHangup = () => {
@@ -171,6 +195,7 @@ export function TopBar() {
     setActive(false)
     setStatus('ended')
     setPhoneNumber('')
+    setStoreMetadata(null)
   }
 
   return (
@@ -204,23 +229,23 @@ export function TopBar() {
                         <div className="w-full max-w-2xl h-[50px] nodal-glass border-signal/50 rounded-full shadow-[0_10px_30px_-10px_rgba(0,47,167,0.5)] flex items-center justify-between px-6">
                             <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center border border-white/5 overflow-hidden">
-                                    {metadata?.logoUrl ? (
-                                        <img src={metadata.logoUrl} alt={metadata.name || "Caller"} className="w-full h-full object-cover" />
+                                    {displayMetadata?.logoUrl ? (
+                                        <img src={displayMetadata.logoUrl} alt={displayMetadata.name || "Caller"} className="w-full h-full object-cover" />
                                     ) : (
                                         <span className="text-zinc-400 font-mono text-[10px]">ID</span>
                                     )}
                                 </div>
                                 <div>
-                                    <div className="text-sm font-medium text-white">{metadata?.name || phoneNumber || "Unknown Caller"}</div>
+                                    <div className="text-sm font-medium text-white">{displayMetadata?.name || phoneNumber || "Unknown Caller"}</div>
                                     <div className="text-xs text-signal font-mono uppercase tracking-tighter flex items-center gap-2">
                                         {status === 'dialing' ? 'Dialing...' : formatDuration(callDuration)}
                                         {selectedNumberName && (
                                             <span className="text-[10px] text-zinc-500 lowercase">via {selectedNumberName}</span>
                                         )}
                                     </div>
-                                    {metadata?.account && (
+                                    {displayMetadata?.account && (
                                         <div className="text-[10px] text-zinc-500 truncate max-w-[150px]">
-                                            {metadata.account}
+                                            {displayMetadata.account}
                                         </div>
                                     )}
                                 </div>
@@ -366,15 +391,29 @@ export function TopBar() {
                             
                             <div className="flex items-center justify-between px-1 relative z-10">
                                 <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest font-semibold">Uplink // Manual_Dial</span>
+                                {storeMetadata?.name && (
+                                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#002FA7]/10 border border-[#002FA7]/20">
+                                        <div className="w-1 h-1 rounded-full bg-signal animate-pulse" />
+                                        <span className="text-[9px] font-mono text-signal uppercase tracking-wider truncate max-w-[120px]">
+                                            {storeMetadata.name}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
-                            <Input 
-                                ref={inputRef}
-                                value={phoneNumber}
-                                onChange={handlePhoneChange}
-                                onKeyDown={handleDialerKeyDown}
-                                placeholder="+1 (555) 000-0000"
-                                className="bg-zinc-950/50 border-white/10 text-white placeholder:text-zinc-600 focus-visible:ring-[#002FA7] tracking-wider font-mono h-12 rounded-xl relative z-10"
-                            />
+                            <div className="flex-1 flex items-center min-w-0 bg-zinc-950/50 border border-white/10 rounded-xl relative z-10 px-3">
+                                <div className="w-8 h-8 flex items-center justify-center text-zinc-500">
+                                    <Phone size={18} />
+                                </div>
+                                <input
+                                    ref={inputRef}
+                                    type="text"
+                                    value={phoneNumber}
+                                    onChange={handlePhoneChange}
+                                    onKeyDown={handleDialerKeyDown}
+                                    placeholder="Dial external..."
+                                    className="w-full bg-transparent border-none focus:ring-0 text-white placeholder-zinc-500 text-sm font-mono tracking-wide h-12"
+                                />
+                            </div>
                             <Button 
                                 onClick={handleCall}
                                 className="w-full bg-[#002FA7] hover:bg-blue-600 text-white font-mono text-xs uppercase tracking-widest h-10 rounded-xl shadow-[0_0_20px_rgba(0,47,167,0.4)] hover:shadow-[0_0_30px_rgba(0,47,167,0.6)] border border-blue-400/30 relative z-10 transition-all active:scale-95"

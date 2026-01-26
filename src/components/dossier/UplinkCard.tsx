@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { Phone, Mail, Clock, Plus, Sparkles, Star, Building2, Smartphone, Landmark, Trash2, ArrowUpRight } from 'lucide-react'
 import { format } from 'date-fns'
 import { ContactDetail } from '@/hooks/useContacts'
+import { useCallStore } from '@/store/callStore'
 
 interface UplinkCardProps {
   contact: ContactDetail
@@ -22,10 +23,27 @@ interface PhoneEntry {
 }
 
 export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onUpdate }) => {
+  const initiateCall = useCallStore((state) => state.initiateCall)
   // Local state for editing phones
   const [phones, setPhones] = useState<PhoneEntry[]>([])
   const [primaryField, setPrimaryField] = useState<PrimaryPhoneType>(contact.primaryPhoneField || 'mobile')
   const [email, setEmail] = useState(contact.email || '')
+
+  const handleCallClick = (phone: PhoneEntry) => {
+    if (!phone.value || isEditing) return
+
+    const isCompany = phone.id === 'companyPhone'
+    const metadata = isCompany 
+      ? { name: contact.companyName || contact.company }
+      : { 
+          name: contact.name, 
+          account: contact.companyName || contact.company,
+          title: contact.title,
+          logoUrl: contact.logoUrl
+        }
+
+    initiateCall(phone.value, metadata)
+  }
 
   useEffect(() => {
     const phoneEntries: PhoneEntry[] = []
@@ -229,7 +247,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onUp
               <button
                 type="button"
                 className="w-full group flex items-center justify-between p-4 bg-[#002FA7]/90 hover:bg-[#002FA7] rounded-xl transition-all duration-300 border border-white/10 hover:border-white/20 hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)] hover:-translate-y-0.5"
-                onClick={() => window.open(`tel:${encodeURIComponent(heroPhone.value)}`)}
+                onClick={() => handleCallClick(heroPhone)}
                 disabled={!heroPhone.value}
               >
                 <div className="flex items-center gap-3 min-w-0">
@@ -267,7 +285,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onUp
                     key={phone.id}
                     type="button"
                     className="w-full group flex items-center justify-between p-3 nodal-glass nodal-glass-hover rounded-xl transition-all border border-white/5"
-                    onClick={() => window.open(`tel:${encodeURIComponent(phone.value)}`)}
+                    onClick={() => handleCallClick(phone)}
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <phone.icon className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />

@@ -1,0 +1,66 @@
+'use client'
+
+import React from 'react'
+import { Phone } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { useCallStore } from '@/store/callStore'
+import { cn } from '@/lib/utils'
+
+interface ClickToCallButtonProps {
+  phoneNumber: string | null | undefined
+  name?: string
+  account?: string
+  title?: string
+  logoUrl?: string
+  variant?: 'ghost' | 'outline' | 'default' | 'secondary'
+  size?: 'icon' | 'sm' | 'default' | 'lg'
+  className?: string
+  children?: React.ReactNode
+  isCompany?: boolean
+}
+
+export const ClickToCallButton: React.FC<ClickToCallButtonProps> = ({
+  phoneNumber,
+  name,
+  account,
+  title,
+  logoUrl,
+  variant = 'ghost',
+  size = 'icon',
+  className,
+  children,
+  isCompany = false
+}) => {
+  const initiateCall = useCallStore((state) => state.initiateCall)
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (!phoneNumber) return
+
+    const metadata = isCompany 
+      ? { name: account || name }
+      : { 
+          name, 
+          account,
+          title,
+          logoUrl
+        }
+
+    initiateCall(phoneNumber, metadata)
+  }
+
+  return (
+    <Button
+      variant={variant}
+      size={size}
+      className={cn(className)}
+      onClick={handleClick}
+      disabled={!phoneNumber}
+      title={phoneNumber ? `Call ${phoneNumber}` : 'No phone number'}
+    >
+      {children || <Phone className="h-4 w-4" />}
+    </Button>
+  )
+}
