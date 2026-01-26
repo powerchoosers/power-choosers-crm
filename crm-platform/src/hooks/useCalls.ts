@@ -34,7 +34,7 @@ export function useSearchCalls(queryTerm: string) {
          query = query.filter('contacts.ownerId', 'eq', user.email)
       }
 
-      query = query.or(`summary.ilike.%${queryTerm}%,transcript.ilike.%${queryTerm}%,contacts.name.ilike.%${queryTerm}%`)
+      query = query.or(`ai_summary.ilike.%${queryTerm}%,transcript.ilike.%${queryTerm}%,contacts.name.ilike.%${queryTerm}%`)
 
       const { data, error } = await query.limit(5)
 
@@ -48,7 +48,7 @@ export function useSearchCalls(queryTerm: string) {
         return {
           id: item.id,
           contactName: contact?.name || 'Unknown',
-          summary: item.summary,
+          summary: item.ai_summary,
           date: item.timestamp || item.created_at
         }
       })
@@ -75,7 +75,7 @@ export function useCallsCount(searchQuery?: string) {
       }
 
       if (searchQuery) {
-        query = query.or(`summary.ilike.%${searchQuery}%,transcript.ilike.%${searchQuery}%,contacts.name.ilike.%${searchQuery}%`)
+        query = query.or(`ai_summary.ilike.%${searchQuery}%,transcript.ilike.%${searchQuery}%,contacts.name.ilike.%${searchQuery}%`)
       }
 
       const { count, error } = await query
@@ -98,12 +98,12 @@ type CallRow = {
   duration?: number | null
   timestamp?: string | null
   created_at?: string | null
-  summary?: string | null
-  recordingUrl?: string | null
+  ai_summary?: string | null
+  recording_url?: string | null
   transcript?: string | null
-  contactId?: string | null
-  from?: string | null
-  to?: string | null
+  contact_id?: string | null
+  from_phone?: string | null
+  to_phone?: string | null
   contacts?: CallContact | CallContact[] | null
 }
 
@@ -129,7 +129,7 @@ export function useCalls(searchQuery?: string) {
 
       if (searchQuery) {
         // Search in contact name, summary, or transcript
-        query = query.or(`summary.ilike.%${searchQuery}%,transcript.ilike.%${searchQuery}%,contacts.name.ilike.%${searchQuery}%`)
+        query = query.or(`ai_summary.ilike.%${searchQuery}%,transcript.ilike.%${searchQuery}%,contacts.name.ilike.%${searchQuery}%`)
       }
 
       const from = pageParam * PAGE_SIZE
@@ -160,15 +160,15 @@ export function useCalls(searchQuery?: string) {
         return {
           id: item.id,
           contactName: contact?.name || 'Unknown',
-          phoneNumber: item.from === user.email ? item.to : item.from, // Rough guess
+          phoneNumber: item.from_phone === user.email ? item.to_phone : item.from_phone, // Rough guess
           type: type as Call['type'],
           status: status as Call['status'],
           duration: durationStr,
           date: item.timestamp || item.created_at,
-          note: item.summary,
-          recordingUrl: item.recordingUrl,
+          note: item.ai_summary,
+          recordingUrl: item.recording_url,
           transcript: item.transcript,
-          contactId: item.contactId
+          contactId: item.contact_id
         }
       }) as Call[]
 
@@ -181,5 +181,56 @@ export function useCalls(searchQuery?: string) {
     },
     getNextPageParam: (lastPage) => lastPage?.nextCursor ?? undefined,
     enabled: !loading && !!user,
+  })
+}
+
+export function useContactCalls(contactId: string) {
+  const { user, loading } = useAuth()
+
+  return useQuery({
+    queryKey: ['contact-calls', contactId, user?.email],
+    queryFn: async () => {
+      if (!contactId || loading || !user) return []
+
+      const { data, error } = await supabase
+        .from('calls')
+        .select('*')
+        .eq('contact_id', contactId)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      if (error) {
+        console.error('Error fetching contact calls:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        throw error
+      }
+
+      return (data as CallRow[]).map(item => {
+        const type = item.direction === 'inbound' ? 'Inbound' : 'Outbound'
+        const status = item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1) : 'Completed'
+        const minutes = Math.floor((item.duration || 0) / 60)
+        const seconds = (item.duration || 0) % 60
+        const durationStr = `${minutes}m ${seconds}s`
+
+        return {
+          id: item.id,
+          contactName: '', // Not needed for single contact view
+          phoneNumber: item.from_phone === user.email ? item.to_phone : item.from_phone,
+          type: type as Call['type'],
+          status: status as Call['status'],
+          duration: durationStr,
+          date: item.timestamp || item.created_at,
+          note: item.ai_summary,
+          recordingUrl: item.recording_url,
+          transcript: item.transcript,
+          contactId: item.contact_id
+        }
+      }) as Call[]
+    },
+    enabled: !!contactId && !loading && !!user,
   })
 }

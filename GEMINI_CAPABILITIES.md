@@ -35,16 +35,18 @@ The agent is currently equipped with the following "Tools" and UI protocols whic
 
 ## 🎨 UI/UX Protocol: "Glass Intelligence"
 
-The Nodal Architect features a "Steve Jobs" inspired forensic interface:
+The Nodal Architect features a "Steve Jobs" inspired forensic interface designed for high-stakes energy trading:
 
 - **Contextual Awareness**: The agent automatically detects the user's current route (Contact, Account, Dashboard) and offers proactive insights upon opening without a single click.
-- **Rich Media Rendering**: Instead of text walls, the agent returns structured UI components:
-    - **Market Volatility Tickers**: Live-scrolling cards for energy news with trend indicators.
-    - **Mini-Profile Cards**: Visual prospect cards with "Inject Node" action buttons.
+- **Neural Line Response**: Every AI transmission is anchored by a glowing vertical "Neural Line" spine in International Klein Blue, signifying a secure data uplink.
+- **Forensic HUD Buttons**: 
+    - **Dynamic Scaling**: Header icons (Bot, Dialer, Refresh) are precision-scaled to `22px-24px` for professional visibility.
+    - **Haptic Animations**: `AnimatePresence` toggle transitions between the Architect icon and the "X" Close command.
+- **Stealth User Commands**: User inputs are rendered as right-aligned `COMMAND_INPUT` blocks with increased immersion spacing (`gap-8`) to separate human intent from AI execution.
 - **Visual Status**: 
     - **Live Waveform**: A dynamic bar animation that visualizes the AI's "thinking" process.
     - **Ambient Hum**: A subtle pulsing glow signifying active background monitoring.
-- **Forensic Aesthetic**: Backdrop-blur-2xl glass containers, monospace typography, and a dedicated **Walkie-Talkie Mode** (Microphone) for future voice commands.
+- **Forensic Aesthetic**: Backdrop-blur-3xl glass containers, monospace typography, and an **International Klein Blue (#002FA7)** Execute button with haptic glow.
 
 ---
 
@@ -52,10 +54,13 @@ The Nodal Architect features a "Steve Jobs" inspired forensic interface:
 
 The Nodal Architect is trained to align with the **Nodal Point Thesis**. It doesn't just manage data; it understands the "Source Code of the Grid."
 
-### 1. Data Normalization
-The agent understands our Supabase schema, including the complex `metadata` mapping from legacy Firestore data. It bridges the gap between "Old CRM" and "New Platform" data structures.
+### 1. Intelligence Stack (Multi-Model Fallback)
+The Architect utilizes a sophisticated **Model_Stack** protocol. If the primary node is overloaded or hits a quota, it autonomously falls back through a chain of 14+ high-precision models (Gemini 3.0 Pro, Flash, 2.5, 2.0) to ensure zero downtime.
 
-### 2. Forensic Analysis
+### 2. Deep Research Protocol (Perplexity)
+In the event of a total Google Network saturation, the system initiates the **Perplexity Fallback**, leveraging real-time web-crawling intelligence for uncompromised grid research.
+
+### 3. Forensic Analysis
 When discussing accounts, the agent prioritizes the "Three Vectors of Cost Leakage":
 - Identifying **Demand Ratchets**.
 - Monitoring **4CP Coincident Peaks**.
@@ -72,8 +77,12 @@ We are actively expanding the Architect's "Brain" to include these forensic ener
 - **Sequence Orchestration**: The ability for Gemini to enroll contacts into automated multi-channel follow-up sequences.
 - **Voice Intelligence**: Summarizing Twilio call transcripts to extract "Commitment Events" and sentiment via the Walkie-Talkie interface.
 
+---
+
 ## 🛠️ Technical Implementation
-- **Model**: `gemini-3-flash-preview` (Next-generation intelligence for high-precision tool calling).
+- **Primary Model**: `gemini-3-pro-preview` (The highest precision node for complex reasoning).
+- **Intelligence Stack**: 14+ candidate models including `gemini-3-flash`, `gemini-2.5-pro`, and `gemini-2.0-flash`.
+- **Final Fallback**: `perplexity-sonar-reasoning` (Real-time web-intelligence).
 - **Backend**: Node.js Proxy on Port 3001.
 - **Frontend**: Next.js 15 with Framer Motion "Obsidian & Glass" UI.
 - **Security**: All tool calls are gated by Supabase RLS and server-side validation.

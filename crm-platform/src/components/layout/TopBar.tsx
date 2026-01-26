@@ -2,15 +2,15 @@
 
 import { useCallStore } from '@/store/callStore'
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion'
-import { Phone, Mic, PhoneOff, ArrowRightLeft, FileText, RefreshCw, Bell, X, ShieldCheck } from 'lucide-react'
+import { Phone, Mic, PhoneOff, ArrowRightLeft, FileText, RefreshCw, Bell, X, ShieldCheck, History, Plus } from 'lucide-react'
 import { cn, formatToE164 } from '@/lib/utils'
 import { GlobalSearch } from '@/components/search/GlobalSearch'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useVoice } from '@/context/VoiceContext'
 import { toast } from 'sonner'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useParams } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { GeminiChatTrigger, GeminiChatPanel } from '@/components/chat/GeminiChat'
@@ -23,7 +23,22 @@ export function TopBar() {
   const { profile } = useAuth()
   const { connect, disconnect, mute, isMuted, metadata } = useVoice()
   const pathname = usePathname()
+  const params = useParams()
   
+  const isHistoryOpen = useGeminiStore((state) => state.isHistoryOpen)
+  const toggleHistory = useGeminiStore((state) => state.toggleHistory)
+  const resetSession = useGeminiStore((state) => state.resetSession)
+  const storeContext = useGeminiStore((state) => state.activeContext)
+
+  // Contextual Intel Logic
+  const contextInfo = useMemo(() => {
+    if (storeContext) return storeContext
+    if (pathname.includes('/people/')) return { type: 'contact', id: params.id, label: `TARGET: ${String(params.id).slice(0,8)}...` }
+    if (pathname.includes('/accounts/')) return { type: 'account', id: params.id, label: `ACCOUNT: ${String(params.id).slice(0,8)}...` }
+    if (pathname.includes('/dashboard')) return { type: 'dashboard', label: 'GLOBAL_DASHBOARD' }
+    return { type: 'general', label: 'GLOBAL_SCOPE' }
+  }, [pathname, params, storeContext])
+
   const [isDialerOpen, setIsDialerOpen] = useState(false)
   const [phoneNumber, setPhoneNumber] = useState('')
   const [callDuration, setCallDuration] = useState(0)
@@ -161,7 +176,7 @@ export function TopBar() {
   return (
     // Updated positioning: constrained to match main content area
     <header className="fixed top-0 left-16 right-0 lg:right-80 z-40 flex items-start justify-center p-6 pointer-events-none nodal-glass !border-none !shadow-none">
-      <div className="w-full max-w-5xl flex items-start gap-4 pointer-events-auto">
+      <div className="w-full max-w-5xl flex items-center gap-4 pointer-events-auto">
           {/* Left Side: Search or Active Call */}
           <motion.div 
               className="flex-1 min-w-0"
@@ -252,34 +267,42 @@ export function TopBar() {
                 }}
                 className="glass-panel shadow-lg overflow-visible flex flex-col relative h-12"
             >
-                {/* Header Row - Absolute to prevent vertical jumps */}
-                <div 
-                    className="absolute top-0 left-0 right-0 h-12 z-20 pointer-events-none transform-gpu translate-y-0 isolate"
-                    style={{ willChange: 'transform' }}
-                >
-                    <AnimatePresence>
-                        {isDialerOpen && selectedNumber && (
-                            <motion.div 
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -10, transition: { duration: 0.1 } }}
-                                transition={{ delay: 0.15 }}
-                                className="absolute left-4 top-0 bottom-0 my-auto h-fit flex items-center gap-1.5 text-[10px] text-zinc-400 bg-white/5 px-2 py-0.5 rounded-full border border-white/5 whitespace-nowrap pointer-events-auto"
+                {/* Left Side Buttons - Absolute to prevent vertical jumps */}
+                    <div className="absolute left-2 top-0 h-12 flex items-center gap-1 pointer-events-auto leading-none">
+                        <AnimatePresence>
+                          {isGeminiOpen && (
+                            <motion.div
+                              key="gemini-header-actions"
+                              initial={{ opacity: 0, x: -20, filter: 'blur(4px)' }}
+                              animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
+                              exit={{ opacity: 0, x: -20, filter: 'blur(4px)' }}
+                              className="flex items-center ml-2"
                             >
-                                <ShieldCheck size={10} className="text-signal shrink-0" />
-                                <span>From: {selectedNumberName}</span>
+                              {/* Target Badge (Global Scope) */}
+                              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-black/20 backdrop-blur-md">
+                                <div className={cn(
+                                  "w-1.5 h-1.5 rounded-full animate-pulse",
+                                  (!contextInfo || contextInfo.type === 'general') ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-[#002FA7] shadow-[0_0_8px_#002FA7]"
+                                )} />
+                                <span className="text-[10px] font-mono text-zinc-400 tracking-wider uppercase whitespace-nowrap">
+                                  {contextInfo?.label || 'GLOBAL_SCOPE'}
+                                </span>
+                              </div>
                             </motion.div>
-                        )}
-                    </AnimatePresence>
+                          )}
+                        </AnimatePresence>
+                    </div>
 
                     {/* Right Side Buttons - Pinned Absolute */}
                     <div className="absolute right-2 top-0 h-12 flex items-center gap-1 pointer-events-auto leading-none">
+                        {/* Gemini Trigger (Bot/X icon) */}
                         <GeminiChatTrigger
                           onToggle={() => {
                             if (!isGeminiOpen) setIsDialerOpen(false)
                           }}
                         />
                         
+                        {/* Refresh Data */}
                         <button 
                             onClick={handleRefresh}
                             className="w-9 h-9 inline-flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
@@ -325,7 +348,6 @@ export function TopBar() {
                             </button>
                         )}
                     </div>
-                </div>
 
                 {/* Expanded Content: Dialer or Gemini */}
                 <AnimatePresence>
@@ -337,13 +359,13 @@ export function TopBar() {
                             exit={{ opacity: 0, y: 4, scaleY: 0.98, transition: { duration: 0.12 } }}
                             transition={{ duration: 0.18, delay: 0.05 }}
                             style={{ transformOrigin: 'top' }}
-                            className="absolute top-12 left-0 right-0 mt-2 mx-2 flex flex-col gap-3 rounded-2xl bg-zinc-900/40 backdrop-blur-xl border border-white/10 shadow-2xl p-4 overflow-hidden"
+                            className="absolute top-12 left-0 right-0 mt-2 mx-2 flex flex-col gap-4 rounded-2xl bg-zinc-950/80 backdrop-blur-3xl border border-white/10 shadow-2xl p-4 overflow-hidden"
                         >
-                            {/* Nodal Point Glass Highlight - Subtle Blue Glow */}
+                            {/* Nodal Point Glass Highlight */}
                             <div className="absolute inset-0 bg-gradient-to-tr from-[#002FA7]/5 via-transparent to-white/5 pointer-events-none" />
                             
                             <div className="flex items-center justify-between px-1 relative z-10">
-                                <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Manual Dial</span>
+                                <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest font-semibold">Uplink // Manual_Dial</span>
                             </div>
                             <Input 
                                 ref={inputRef}
@@ -351,13 +373,13 @@ export function TopBar() {
                                 onChange={handlePhoneChange}
                                 onKeyDown={handleDialerKeyDown}
                                 placeholder="+1 (555) 000-0000"
-                                className="bg-black/40 border-white/10 text-lg tracking-wider font-mono h-12 relative z-10"
+                                className="bg-zinc-950/50 border-white/10 text-white placeholder:text-zinc-600 focus-visible:ring-[#002FA7] tracking-wider font-mono h-12 rounded-xl relative z-10"
                             />
                             <Button 
                                 onClick={handleCall}
-                                className="w-full bg-white text-zinc-950 hover:bg-zinc-200 font-medium h-10 rounded-xl shadow-lg shadow-white/5 relative z-10"
+                                className="w-full bg-[#002FA7] hover:bg-blue-600 text-white font-mono text-xs uppercase tracking-widest h-10 rounded-xl shadow-[0_0_20px_rgba(0,47,167,0.4)] hover:shadow-[0_0_30px_rgba(0,47,167,0.6)] border border-blue-400/30 relative z-10 transition-all active:scale-95"
                             >
-                                Call Now
+                                Execute Call
                             </Button>
                         </motion.div>
                     )}

@@ -1,4 +1,16 @@
 
+### Dossier Intelligence & Call Insights
+- **Status**: Completed
+- **Description**: Replaced legacy Bill History with real-time Call Insights and refined the Dossier header with Forensic Log and Context Lock controls.
+- **Actions**:
+  - [x] **Bill History Removal**: Removed the static/placeholder Bill History section from `ContactDossierPage`.
+  - [x] **Call Integration**: Implemented `useContactCalls` hook to fetch real-time call logs from Supabase.
+  - [x] **Forensic Log**: Added a "Forensic Log" (History) button to the header linked to the Gemini neural history.
+  - [x] **Context Lock**: Implemented a "Context Lock" chip in the header for visual verification of target entity focus.
+  - [x] **AI Summaries**: Integrated AI-generated call summaries and voice data insights into the dossier view.
+  - [x] **Nodal Aesthetic**: Applied build.md design principles (Monolith borders, International Klein Blue accents, Monospaced data).
+  - [x] **Gemini Chat Enhancement**: Converted "Reset Session" to "Add Chat" (+) button with global state synchronization and added access to History and New Chat in both chat header and TopBar.
+
 ### Emails Page & Integration
 - **Status**: Completed
 - **Description**: Migrated legacy email features (Inbox Sync, Composition, Tracking) to the new Next.js platform.
@@ -93,6 +105,7 @@
   - [x] **Voice Command Mode**: Integrated hold-to-speak functionality with visual feedback.
   - [x] **API Protocol**: Standardized `JSON_DATA:END_JSON` delimiters for structured backend communication.
   - [x] **History Fix**: Resolved Gemini API role-alternation errors by implementing robust history filtering in `api/gemini/chat.js`.
+  - [x] **Fallback Reliability**: Fixed the Gemini fallback system to ensure all Gemini model candidates are tried before falling back to Perplexity (Sonar). Resolved the issue where a single quota error would trigger an immediate jump to the paid provider.
 
 ### Unified Global Search & Server-Side Search
 - **Status**: Completed
