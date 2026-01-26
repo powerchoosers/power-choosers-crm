@@ -208,7 +208,7 @@ export default function PeoplePage() {
           return (
             <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
               <ClickToCallButton 
-                phoneNumber={contact.phone || contact.mobile || contact.workDirectPhone}
+                phoneNumber={contact.phone}
                 name={contact.name}
                 account={contact.company}
                 logoUrl={contact.logoUrl}

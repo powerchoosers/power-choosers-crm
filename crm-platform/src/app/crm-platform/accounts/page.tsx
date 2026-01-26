@@ -238,7 +238,7 @@ export default function AccountsPage() {
           return (
             <div className="flex items-center justify-end gap-2">
               <ClickToCallButton 
-                phoneNumber={account.phone}
+                phoneNumber={account.companyPhone}
                 account={account.name}
                 logoUrl={account.logoUrl}
                 isCompany={true}
