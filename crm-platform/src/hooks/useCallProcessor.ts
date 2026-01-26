@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
-import { Call } from './useCalls'
 
 export type ProcessingStatus = 'idle' | 'processing' | 'ready' | 'error'
 
@@ -119,9 +118,10 @@ export function useCallProcessor({ callSid, recordingUrl, recordingSid, contactI
       } else {
         throw new Error(data.message || 'Failed to start processing')
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error processing call:', err)
-      setError(err.message)
+      const errorMessage = err instanceof Error ? err.message : 'Failed to start processing'
+      setError(errorMessage)
       setStatus('error')
     }
   }, [callSid, recordingUrl, recordingSid])

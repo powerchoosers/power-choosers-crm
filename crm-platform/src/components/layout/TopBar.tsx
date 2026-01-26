@@ -1,18 +1,17 @@
 'use client'
 
 import { useCallStore } from '@/store/callStore'
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion'
-import { Phone, Mic, PhoneOff, ArrowRightLeft, FileText, RefreshCw, Bell, X, ShieldCheck, History, Plus } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Phone, Mic, PhoneOff, ArrowRightLeft, RefreshCw, Bell, X } from 'lucide-react'
 import { cn, formatToE164 } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import { GlobalSearch } from '@/components/search/GlobalSearch'
-import { useEffect, useState, useRef, useMemo } from 'react'
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useVoice } from '@/context/VoiceContext'
 import { toast } from 'sonner'
-import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useParams } from 'next/navigation'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 import { GeminiChatTrigger, GeminiChatPanel } from '@/components/chat/GeminiChat'
 import { useGeminiStore } from '@/store/geminiStore'
 
@@ -36,9 +35,6 @@ export function TopBar() {
   const pathname = usePathname()
   const params = useParams()
   
-  const isHistoryOpen = useGeminiStore((state) => state.isHistoryOpen)
-  const toggleHistory = useGeminiStore((state) => state.toggleHistory)
-  const resetSession = useGeminiStore((state) => state.resetSession)
   const storeContext = useGeminiStore((state) => state.activeContext)
 
   // Use voiceMetadata if active, otherwise use storeMetadata if it exists (for dialer display)
@@ -87,13 +83,40 @@ export function TopBar() {
   const selectedNumber = profile.selectedPhoneNumber || (profile.twilioNumbers && profile.twilioNumbers.length > 0 ? profile.twilioNumbers[0].number : null)
   const selectedNumberName = profile.twilioNumbers?.find(n => n.number === selectedNumber)?.name || "Default"
 
+  const handleCall = useCallback(async () => {
+    if (phoneNumber.length < 10) {
+        toast.error("Invalid Phone Number")
+        return
+    }
+
+    if (!selectedNumber) {
+        toast.error("No Caller ID selected", {
+            description: "Please select a phone number in Settings."
+        })
+        return
+    }
+
+    setIsDialerOpen(false)
+    
+    // Normalize phone numbers for Twilio (E.164 format)
+    const to = formatToE164(phoneNumber)
+    // For From, we use the selectedNumber directly if it's already in E.164 or format it
+    const from = formatToE164(selectedNumber || '')
+
+    await connect({ To: to, From: from, metadata: storeMetadata || undefined })
+  }, [phoneNumber, selectedNumber, storeMetadata, connect])
+
   // Handle cross-component call triggers
   useEffect(() => {
     if (callTriggered && phoneNumber) {
-      handleCall()
-      clearCallTrigger()
+      // Use setTimeout to avoid synchronous state updates in effect
+      const timer = setTimeout(() => {
+        handleCall()
+        clearCallTrigger()
+      }, 0)
+      return () => clearTimeout(timer)
     }
-  }, [callTriggered, phoneNumber])
+  }, [callTriggered, phoneNumber, handleCall, clearCallTrigger])
 
   // Track call duration
   useEffect(() => {
@@ -191,29 +214,6 @@ export function TopBar() {
     }
   }
 
-  const handleCall = async () => {
-    if (phoneNumber.length < 10) {
-        toast.error("Invalid Phone Number")
-        return
-    }
-
-    if (!selectedNumber) {
-        toast.error("No Caller ID selected", {
-            description: "Please select a phone number in Settings."
-        })
-        return
-    }
-
-    setIsDialerOpen(false)
-    
-    // Normalize phone numbers for Twilio (E.164 format)
-    const to = formatToE164(phoneNumber)
-    // For From, we use the selectedNumber directly if it's already in E.164 or format it
-    const from = formatToE164(selectedNumber || '')
-
-    await connect({ To: to, From: from, metadata: storeMetadata || undefined })
-  }
-
   const handleHangup = () => {
     disconnect()
     setActive(false)
@@ -254,7 +254,13 @@ export function TopBar() {
                             <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center border border-white/5 overflow-hidden">
                                     {displayMetadata?.logoUrl ? (
-                                        <img src={displayMetadata.logoUrl} alt={displayMetadata.name || "Caller"} className="w-full h-full object-cover" />
+                                        <Image 
+                                            src={displayMetadata.logoUrl} 
+                                            alt={displayMetadata.name || "Caller"} 
+                                            width={32}
+                                            height={32}
+                                            className="w-full h-full object-cover" 
+                                        />
                                     ) : (
                                         <span className="text-zinc-400 font-mono text-[10px]">ID</span>
                                     )}

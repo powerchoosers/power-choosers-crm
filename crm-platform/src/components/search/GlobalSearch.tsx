@@ -9,6 +9,7 @@ import { useSearchTasks } from '@/hooks/useTasks'
 import { useSearchCalls } from '@/hooks/useCalls'
 import { useSearchEmails } from '@/hooks/useEmails'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 
 export function GlobalSearch() {
   const [query, setQuery] = useState('')
@@ -183,9 +184,14 @@ export function GlobalSearch() {
                             onClick={() => handleSelect(contact.id, 'people')}
                             className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors text-left group"
                             >
-                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
+                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden relative">
                                 {contact.logoUrl ? (
-                                    <img src={contact.logoUrl} alt="" className="w-full h-full object-cover" />
+                                    <Image 
+                                        src={contact.logoUrl} 
+                                        alt="" 
+                                        fill
+                                        className="object-cover" 
+                                    />
                                 ) : (
                                     contact.name.charAt(0)
                                 )}
@@ -214,9 +220,14 @@ export function GlobalSearch() {
                             onClick={() => handleSelect(account.id, 'account')}
                             className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors text-left group"
                             >
-                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
+                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden relative">
                                 {account.logoUrl ? (
-                                    <img src={account.logoUrl} alt="" className="w-full h-full object-cover" />
+                                    <Image 
+                                        src={account.logoUrl} 
+                                        alt="" 
+                                        fill
+                                        className="object-cover" 
+                                    />
                                 ) : (
                                     <Building2 size={14} />
                                 )}

@@ -1,6 +1,7 @@
 'use client'
 import { useState, useMemo } from 'react';
-import { Users, Search, Lock, ShieldCheck, Download, Plus, CheckCircle, Loader2, ChevronLeft, ChevronRight, Globe, Building2, MapPin, Linkedin, Phone, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import { Users, Search, Lock, ShieldCheck, Loader2, ChevronLeft, ChevronRight, Globe, MapPin, Linkedin, Phone, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { useCallStore } from '@/store/callStore';
 import { toast } from 'sonner';
@@ -137,7 +138,18 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       });
 
       if (!enrichResp.ok) throw new Error('Enrichment failed');
-      const enrichData = await enrichResp.json();
+      const enrichData = await enrichResp.json() as { 
+        contacts?: Array<{
+          fullName?: string;
+          firstName?: string;
+          lastName?: string;
+          jobTitle?: string;
+          email?: string;
+          linkedin?: string;
+          location?: string;
+          phones?: Array<{ number: string }>;
+        }>
+      };
       const enriched = enrichData.contacts?.[0];
 
       if (!enriched) throw new Error('No enrichment data available');
@@ -177,7 +189,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           title: enriched.jobTitle || p.title,
           linkedin: enriched.linkedin || p.linkedin,
           location: enriched.location || p.location,
-          phones: enriched.phones?.map((ph: any) => ph.number) || p.phones
+          phones: enriched.phones?.map((ph: { number: string }) => ph.number) || p.phones
         } : p
       ));
     } catch (error) {
@@ -459,7 +471,14 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                 <div className="flex items-start gap-3">
                   <div className="relative group/logo">
                     {companySummary.logoUrl ? (
-                      <img src={companySummary.logoUrl} alt={companySummary.name} className="w-10 h-10 rounded-lg bg-white/10 p-1 object-contain" />
+                      <div className="relative w-10 h-10 rounded-lg bg-white/10 p-1">
+                        <Image 
+                          src={companySummary.logoUrl} 
+                          alt={companySummary.name} 
+                          fill
+                          className="object-contain p-1"
+                        />
+                      </div>
                     ) : (
                       <div className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-500 font-mono text-xs border border-white/5">
                         {companySummary.name?.charAt(0)}

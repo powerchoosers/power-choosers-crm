@@ -13,6 +13,23 @@ import { usePathname, useParams } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 
+interface Diagnostic {
+  model: string
+  provider: string
+  status: 'attempting' | 'success' | 'failed' | 'retry'
+  reason?: string
+  error?: string
+  tools?: string[]
+}
+
+interface ChatSession {
+  id: string
+  title: string
+  context_type: string
+  context_id: string | null
+  created_at: string
+}
+
 interface Message {
   role: 'user' | 'assistant'
   content: string
@@ -268,7 +285,7 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
                 </tr>
               </thead>
               <tbody>
-                {grid.rows.map((row: any, i: number) => (
+                {grid.rows.map((row: Record<string, string | number>, i: number) => (
                   <tr key={i} className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors font-mono tabular-nums text-zinc-300">
                     {grid.columns.map((col: string, j: number) => {
                       const value = row[col]
@@ -444,13 +461,13 @@ export function GeminiChatPanel() {
       setCurrentSessionId(null)
     }
   }, [resetCounter])
-  const [historySessions, setHistorySessions] = useState<any[]>([])
+  const [historySessions, setHistorySessions] = useState<ChatSession[]>([])
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const storeContext = useGeminiStore((state) => state.activeContext)
 
   // Contextual Intel Logic
   const contextInfo = useMemo(() => {
-    let baseContext;
+    let baseContext: { type: string, id?: string | string[], label: string };
     if (storeContext) {
       baseContext = storeContext;
     } else if (pathname.includes('/people/')) {
@@ -487,7 +504,7 @@ export function GeminiChatPanel() {
     if (isHistoryOpen) {
       const fetchSessions = async () => {
         const { data } = await supabase.from('chat_sessions').select('*').order('created_at', { ascending: false }).limit(20)
-        setHistorySessions(data || [])
+        setHistorySessions((data || []) as ChatSession[])
       }
       fetchSessions()
     }
@@ -496,7 +513,7 @@ export function GeminiChatPanel() {
   const loadSession = async (sessionId: string) => {
     const { data } = await supabase.from('chat_messages').select('*').eq('session_id', sessionId).order('created_at', { ascending: true })
     if (data) {
-      setMessages(data.map(m => ({
+      setMessages(data.map((m: { role: string; content: string }) => ({
         role: m.role === 'model' ? 'assistant' : m.role as 'user' | 'assistant',
         content: m.content
       })))
@@ -517,9 +534,10 @@ export function GeminiChatPanel() {
         }).select().single()
         
         if (data) {
-          sessionId = data.id
-          setCurrentSessionId(data.id)
-          setHistorySessions(prev => [data, ...prev])
+          const newSession = data as ChatSession
+          sessionId = newSession.id
+          setCurrentSessionId(newSession.id)
+          setHistorySessions(prev => [newSession, ...prev])
         }
       }
 
@@ -539,7 +557,7 @@ export function GeminiChatPanel() {
   const [lastProvider, setLastProvider] = useState<string>('openrouter')
   const [lastModel, setLastModel] = useState<string>('openai/gpt-oss-120b')
   const [selectedModel, setSelectedModel] = useState<string>('openai/gpt-oss-120b')
-  const [diagnostics, setDiagnostics] = useState<any[] | null>(null)
+  const [diagnostics, setDiagnostics] = useState<Diagnostic[] | null>(null)
   const [showDiagnostics, setShowDiagnostics] = useState(false)
   
   // Host Google Avatar if needed
@@ -704,7 +722,7 @@ export function GeminiChatPanel() {
       
       // Temporary Routing Diagnostics for Trey
       if (data.diagnostics) {
-        setDiagnostics(data.diagnostics)
+        setDiagnostics(data.diagnostics as Diagnostic[])
         console.group('%c AI_ROUTER_DIAGNOSTICS ', 'background: #002FA7; color: white; font-weight: bold; border-radius: 4px; padding: 2px 4px;')
         console.table(data.diagnostics)
         console.groupEnd()
@@ -721,15 +739,16 @@ export function GeminiChatPanel() {
       console.error('Chat error:', err)
       
       // Try to extract diagnostics from error if available
-      if (err instanceof Error && (err as any).diagnostics) {
-        setDiagnostics((err as any).diagnostics)
+      const errorWithDiagnostics = err as { diagnostics?: Diagnostic[] };
+      if (err instanceof Error && 'diagnostics' in err) {
+        setDiagnostics((err as unknown as { diagnostics: Diagnostic[] }).diagnostics)
       } else if (typeof err === 'object' && err !== null && 'diagnostics' in err) {
-        setDiagnostics((err as any).diagnostics)
+        setDiagnostics(errorWithDiagnostics.diagnostics || null)
       } else {
         // If no diagnostics in error, mark the router attempt as failed
         setDiagnostics(prev => {
           if (!prev) return null
-          return prev.map(d => d.model === 'ROUTER' ? { ...d, status: 'failed', error: err instanceof Error ? err.message : 'Network failure' } : d)
+          return prev.map(d => d.model === 'ROUTER' ? { ...d, status: 'failed' as const, error: err instanceof Error ? err.message : 'Network failure' } : d)
         })
       }
 

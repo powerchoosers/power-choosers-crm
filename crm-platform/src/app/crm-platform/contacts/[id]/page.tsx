@@ -762,7 +762,7 @@ export default function ContactDossierPage() {
                   <div className="flex items-center justify-between mb-6">
                     <div>
                       <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                        <Mic className="w-5 h-5 text-[#002FA7]" /> Recent Calls & AI Insights
+                        <Mic className="w-5 h-5 text-[#002FA7]" /> Transmission Log
                       </h3>
                       <p className="text-xs text-zinc-500 mt-1 uppercase tracking-widest font-mono">Forensic Voice Data</p>
                     </div>

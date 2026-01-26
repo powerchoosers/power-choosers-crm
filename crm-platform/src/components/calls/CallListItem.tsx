@@ -50,7 +50,7 @@ export function CallListItem({ call, contactId }: CallListItemProps) {
       isExpanded ? "bg-white/[0.05] border-white/10 shadow-2xl" : "bg-white/[0.02] border-white/5 hover:bg-white/[0.04] hover:border-white/10"
     )}>
       <div className="flex items-start justify-between">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-1">
           <div className={cn(
             "p-3 rounded-xl transition-colors duration-300",
             call.type === 'Inbound' 
@@ -59,17 +59,19 @@ export function CallListItem({ call, contactId }: CallListItemProps) {
           )}>
             <Phone className="w-5 h-5" />
           </div>
-          <div>
-            <div className="text-sm font-semibold text-white flex items-center gap-3">
-              {call.type} Call
-              <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest border-l border-white/10 pl-3">
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold text-white flex items-center justify-between gap-4 w-full">
+              <div className="flex items-center gap-3">
+                {call.type} Call
+                {isProcessed && (
+                  <span className="px-2 py-0.5 rounded border border-white/10 text-[9px] font-mono text-zinc-500 uppercase tracking-widest bg-transparent">
+                    [ STATUS: DECRYPTED ]
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest tabular-nums ml-auto">
                 {call.duration}
               </span>
-              {isProcessed && (
-                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-mono text-emerald-500 uppercase tracking-tighter">
-                  <Check className="w-2.5 h-2.5" /> Analyzed
-                </span>
-              )}
             </div>
             <div className="text-[10px] font-mono text-zinc-500 uppercase mt-1">
               {call.date && isValid(new Date(call.date)) 

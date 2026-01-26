@@ -6,7 +6,7 @@ export interface List {
   assignedTo?: string
   createdBy?: string
   createdAt: string
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
   count?: number // Computed property
 }
 

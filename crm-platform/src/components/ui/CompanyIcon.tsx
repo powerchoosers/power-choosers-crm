@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Building2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import Image from 'next/image'
 
 interface CompanyIconProps {
   logoUrl?: string
@@ -46,12 +47,12 @@ export function CompanyIcon({ logoUrl, domain, name, size = 32, className }: Com
       style={{ width: size, height: size }}
       title={name}
     >
-      <img
+      <Image
         src={currentSrc}
         alt={`${name} logo`}
-        className="w-full h-full object-cover rounded-md"
+        fill
+        className="object-cover rounded-md"
         onError={handleError}
-        loading="lazy"
       />
     </div>
   )
