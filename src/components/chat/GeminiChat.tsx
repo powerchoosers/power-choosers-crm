@@ -626,6 +626,14 @@ export function GeminiChatPanel() {
     setInput('')
     setIsLoading(true)
     setError(null)
+    
+    // Set initial routing state for Trey
+    setDiagnostics([{ 
+      model: 'ROUTER', 
+      provider: 'NETWORK', 
+      status: 'attempting', 
+      reason: 'INITIATING_NEURAL_ROUTING' 
+    }])
 
     try {
       const response = await fetch('/api/gemini/chat', {
@@ -658,6 +666,20 @@ export function GeminiChatPanel() {
       saveMessageToDb('model', data.content)
     } catch (err: unknown) {
       console.error('Chat error:', err)
+      
+      // Try to extract diagnostics from error if available
+      if (err instanceof Error && (err as any).diagnostics) {
+        setDiagnostics((err as any).diagnostics)
+      } else if (typeof err === 'object' && err !== null && 'diagnostics' in err) {
+        setDiagnostics((err as any).diagnostics)
+      } else {
+        // If no diagnostics in error, mark the router attempt as failed
+        setDiagnostics(prev => {
+          if (!prev) return null
+          return prev.map(d => d.model === 'ROUTER' ? { ...d, status: 'failed', error: err instanceof Error ? err.message : 'Network failure' } : d)
+        })
+      }
+
       const errorMessage = err instanceof Error ? err.message : 'Internal server error'
       setError(errorMessage)
       
@@ -768,10 +790,11 @@ export function GeminiChatPanel() {
                 <div className="space-y-1.5">
                   {diagnostics.map((d, i) => (
                     <div key={i} className={cn(
-                      "flex flex-col gap-0.5 p-1.5 rounded border",
+                      "flex flex-col gap-0.5 p-1.5 rounded border transition-all duration-300",
                       d.status === 'success' ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-400" :
                       d.status === 'failed' ? "bg-red-500/5 border-red-500/20 text-red-400" :
                       d.status === 'retry' ? "bg-amber-500/5 border-amber-500/20 text-amber-400" :
+                      d.status === 'attempting' ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-400 animate-pulse" :
                       "bg-white/5 border-white/10 text-zinc-400"
                     )}>
                       <div className="flex items-center justify-between">
