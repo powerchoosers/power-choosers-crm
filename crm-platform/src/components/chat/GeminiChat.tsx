@@ -582,6 +582,13 @@ export function GeminiChatPanel() {
     }
   }, [isOpen, contextInfo, params.id, profile?.firstName])
 
+  const getProvider = (model: string) => {
+    if (model.startsWith('openai/') || model.startsWith('anthropic/')) return 'OpenRouter'
+    if (model.startsWith('gemini-')) return 'Google'
+    if (model.startsWith('sonar')) return 'Perplexity'
+    return 'AI_NODE'
+  }
+
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -1045,12 +1052,18 @@ export function GeminiChatPanel() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex flex-col">
-                <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                  <Sparkles size={8} className="text-indigo-400" />
-                  Neural_Link
-                </span>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
+                    <Sparkles size={8} className="text-indigo-400" />
+                    Neural_Link
+                  </span>
+                  <div className="h-2 w-[1px] bg-white/10" />
+                  <span className="text-[9px] font-mono text-indigo-400/70 uppercase tracking-widest animate-pulse">
+                    {getProvider(selectedModel)}
+                  </span>
+                </div>
                 <Select value={selectedModel} onValueChange={setSelectedModel}>
-                  <SelectTrigger className="h-8 bg-zinc-950/50 border-white/5 text-[10px] font-mono text-white/90 hover:bg-white/5 transition-colors min-w-[160px] rounded-lg">
+                  <SelectTrigger className="h-8 bg-zinc-950/50 border-white/5 text-[10px] font-mono text-white/90 hover:bg-white/5 transition-colors min-w-[180px] rounded-lg">
                     <SelectValue placeholder="Select Model" />
                   </SelectTrigger>
                   <SelectContent className="bg-zinc-950 border-white/10 text-white">
@@ -1085,17 +1098,6 @@ export function GeminiChatPanel() {
                     </SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="h-8 w-px bg-white/10 mx-1 self-end mb-1" />
-
-              <div className="flex flex-col">
-                <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-1.5">Last_Node</span>
-                <div className="flex items-center gap-2 h-8 px-3 rounded-lg bg-white/5 border border-white/5">
-                  <span className="text-[10px] font-mono text-white/80 truncate max-w-[100px]">{lastModel}</span>
-                  <div className="w-1 h-1 rounded-full bg-indigo-500 animate-pulse" />
-                  <span className="text-[10px] font-mono text-zinc-500 uppercase">{lastProvider}</span>
-                </div>
               </div>
             </div>
 
