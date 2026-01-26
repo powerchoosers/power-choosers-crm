@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { Copy, Send, X, Loader2, User, Bot, Mic, Activity, AlertTriangle, ArrowRight, History, RefreshCw, Phone, Plus } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Copy, Send, X, Loader2, User, Bot, Mic, Activity, AlertTriangle, ArrowRight, History, RefreshCw, Phone, Plus, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -510,8 +511,9 @@ export function GeminiChatPanel() {
   }
 
   const [messages, setMessages] = useState<Message[]>([])
-  const [lastProvider, setLastProvider] = useState<string>('gemini')
-  const [lastModel, setLastModel] = useState<string>('gemini-2.5-flash-lite')
+  const [lastProvider, setLastProvider] = useState<string>('openrouter')
+  const [lastModel, setLastModel] = useState<string>('openai/gpt-oss-120b')
+  const [selectedModel, setSelectedModel] = useState<string>('openai/gpt-oss-120b')
   const [diagnostics, setDiagnostics] = useState<any[] | null>(null)
   const [showDiagnostics, setShowDiagnostics] = useState(false)
   
@@ -642,6 +644,7 @@ export function GeminiChatPanel() {
         body: JSON.stringify({ 
           messages: messagesForApi,
           context: contextInfo,
+          model: selectedModel,
           userProfile: {
             firstName: profile?.firstName || 'Trey'
           }
@@ -1040,15 +1043,59 @@ export function GeminiChatPanel() {
           </div>
           
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <div className="flex flex-col">
-                <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Model_Stack</span>
-                <span className="text-[10px] font-mono text-white/80">{lastModel}</span>
+                <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                  <Sparkles size={8} className="text-indigo-400" />
+                  Neural_Link
+                </span>
+                <Select value={selectedModel} onValueChange={setSelectedModel}>
+                  <SelectTrigger className="h-8 bg-zinc-950/50 border-white/5 text-[10px] font-mono text-white/90 hover:bg-white/5 transition-colors min-w-[160px] rounded-lg">
+                    <SelectValue placeholder="Select Model" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-zinc-950 border-white/10 text-white">
+                    <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 mb-1">
+                      Priority Agents
+                    </div>
+                    <SelectItem value="openai/gpt-oss-120b" className="text-[10px] font-mono focus:bg-indigo-500/20">
+                      GPT-OSS (120B)
+                    </SelectItem>
+                    
+                    <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
+                      Gemini Stack (Free)
+                    </div>
+                    <SelectItem value="gemini-2.0-flash" className="text-[10px] font-mono focus:bg-indigo-500/20">
+                      GEMINI-2.0-FLASH
+                    </SelectItem>
+                    <SelectItem value="gemini-1.5-flash" className="text-[10px] font-mono focus:bg-indigo-500/20">
+                      GEMINI-1.5-FLASH
+                    </SelectItem>
+                    <SelectItem value="gemini-1.5-pro" className="text-[10px] font-mono focus:bg-indigo-500/20">
+                      GEMINI-1.5-PRO
+                    </SelectItem>
+                    
+                    <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
+                      Perplexity (Paid)
+                    </div>
+                    <SelectItem value="sonar-pro" className="text-[10px] font-mono focus:bg-indigo-500/20">
+                      SONAR-PRO
+                    </SelectItem>
+                    <SelectItem value="sonar" className="text-[10px] font-mono focus:bg-indigo-500/20">
+                      SONAR-STANDARD
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="h-6 w-px bg-white/5" />
+
+              <div className="h-8 w-px bg-white/10 mx-1 self-end mb-1" />
+
               <div className="flex flex-col">
-                <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Provider</span>
-                <span className="text-[10px] font-mono text-white/80 uppercase">{lastProvider}</span>
+                <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-1.5">Last_Node</span>
+                <div className="flex items-center gap-2 h-8 px-3 rounded-lg bg-white/5 border border-white/5">
+                  <span className="text-[10px] font-mono text-white/80 truncate max-w-[100px]">{lastModel}</span>
+                  <div className="w-1 h-1 rounded-full bg-indigo-500 animate-pulse" />
+                  <span className="text-[10px] font-mono text-zinc-500 uppercase">{lastProvider}</span>
+                </div>
               </div>
             </div>
 
