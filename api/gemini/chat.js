@@ -469,22 +469,99 @@ export default async function handler(req, res) {
 
     const routingDiagnostics = [];
     let lastErr = null;
+    const bodyModel = (req.body.model || '').trim();
 
-    // 1. Try OpenRouter first as the default agent (if configured)
-    if (process.env.OPEN_ROUTER_API_KEY) {
+    // 1. Check if the user requested a specific non-Gemini model
+    if (bodyModel.startsWith('openai/') || bodyModel.startsWith('anthropic/') || bodyModel.startsWith('google/') && !bodyModel.includes('gemini')) {
+      if (process.env.OPEN_ROUTER_API_KEY) {
+        try {
+          routingDiagnostics.push({
+            model: bodyModel,
+            provider: 'openrouter',
+            status: 'attempting',
+            timestamp: new Date().toISOString()
+          });
+
+          // callOpenRouter needs to use the bodyModel
+          const callOpenRouterWithModel = async (modelName) => {
+            const apiKey = process.env.OPEN_ROUTER_API_KEY;
+            const normalized = cleanedMessages.slice(-12).map((m) => ({
+              role: m.role === 'user' ? 'user' : 'assistant',
+              content: m.content,
+            }));
+            const lastRole = normalized.length > 0 ? normalized[normalized.length - 1].role : 'assistant';
+            const openRouterMessages = [{ role: 'system', content: buildSystemPrompt().trim() }, ...normalized];
+            if (lastRole !== 'user') openRouterMessages.push({ role: 'user', content: prompt });
+
+            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                'HTTP-Referer': 'https://nodalpoint.io',
+                'X-Title': 'Nodal Point CRM',
+              },
+              body: JSON.stringify({
+                model: modelName,
+                messages: openRouterMessages,
+                temperature: 0.7,
+                max_tokens: 2048,
+              }),
+            });
+
+            if (!response.ok) {
+              const errText = await response.text().catch(() => '');
+              throw new Error(`OpenRouter error: ${response.status} ${response.statusText}${errText ? ` - ${errText}` : ''}`);
+            }
+            const data = await response.json();
+            return data?.choices?.[0]?.message?.content;
+          };
+
+          const content = await callOpenRouterWithModel(bodyModel);
+          routingDiagnostics.push({
+            model: bodyModel,
+            provider: 'openrouter',
+            status: 'success',
+            timestamp: new Date().toISOString()
+          });
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            content,
+            provider: 'openrouter',
+            model: bodyModel,
+            diagnostics: routingDiagnostics
+          }));
+          return;
+        } catch (error) {
+          console.error('[OpenRouter Chat] Error:', error);
+          routingDiagnostics.push({
+            model: bodyModel,
+            provider: 'openrouter',
+            status: 'failed',
+            error: error.message,
+            timestamp: new Date().toISOString()
+          });
+          lastErr = error;
+          // Continue to fallback if OpenRouter fails
+        }
+      }
+    }
+
+    // 2. Try Perplexity if requested
+    if (bodyModel.startsWith('sonar')) {
       try {
-        const orModel = 'openai/gpt-oss-120b';
         routingDiagnostics.push({
-          model: orModel,
-          provider: 'openrouter',
+          model: bodyModel,
+          provider: 'perplexity',
           status: 'attempting',
           timestamp: new Date().toISOString()
         });
 
-        const content = await callOpenRouter();
+        const content = await callPerplexity(); // This uses perplexityModel which defaults to sonar-pro
         routingDiagnostics.push({
-          model: orModel,
-          provider: 'openrouter',
+          model: bodyModel,
+          provider: 'perplexity',
           status: 'success',
           timestamp: new Date().toISOString()
         });
@@ -492,22 +569,47 @@ export default async function handler(req, res) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           content,
-          provider: 'openrouter',
-          model: orModel,
+          provider: 'perplexity',
+          model: bodyModel,
           diagnostics: routingDiagnostics
         }));
         return;
       } catch (error) {
-        console.error('[OpenRouter Chat] Error:', error);
+        console.error('[Perplexity Chat] Error:', error);
         routingDiagnostics.push({
-          model: 'openai/gpt-oss-120b',
-          provider: 'openrouter',
+          model: bodyModel,
+          provider: 'perplexity',
           status: 'failed',
           error: error.message,
           timestamp: new Date().toISOString()
         });
         lastErr = error;
       }
+    }
+
+    // 3. Default legacy fallback loop if no specific model was requested or if it failed
+    // If no bodyModel or it's a gemini model, we proceed to the gemini loop
+    if (!bodyModel || bodyModel.includes('gemini')) {
+      // (This part already exists in the code below)
+    } else if (process.env.OPEN_ROUTER_API_KEY && !routingDiagnostics.some(d => d.model === 'openai/gpt-oss-120b')) {
+       // If a non-gemini model was requested but failed, try the default OpenRouter model as a fallback
+       try {
+         const orModel = 'openai/gpt-oss-120b';
+         routingDiagnostics.push({
+           model: orModel,
+           provider: 'openrouter',
+           status: 'attempting',
+           reason: 'FALLBACK_TO_DEFAULT',
+           timestamp: new Date().toISOString()
+         });
+         const content = await callOpenRouter();
+         routingDiagnostics.push({ model: orModel, provider: 'openrouter', status: 'success', timestamp: new Date().toISOString() });
+         res.writeHead(200, { 'Content-Type': 'application/json' });
+         res.end(JSON.stringify({ content, provider: 'openrouter', model: orModel, diagnostics: routingDiagnostics }));
+         return;
+       } catch (e) {
+         routingDiagnostics.push({ model: 'openai/gpt-oss-120b', provider: 'openrouter', status: 'failed', error: e.message });
+       }
     }
 
     if (!geminiApiKey) {
