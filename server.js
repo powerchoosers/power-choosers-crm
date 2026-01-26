@@ -180,6 +180,8 @@ if (process.env.NODE_ENV !== 'production') {
     hasGeminiApiKey: !!process.env.GEMINI_API_KEY,
     hasSupabaseServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     hasFreeGeminiKey: !!process.env.FREE_GEMINI_KEY,
+    hasOpenRouterApiKey: !!process.env.OPEN_ROUTER_API_KEY,
+    openRouterEndpoint: 'https://openrouter.ai/api/v1/chat/completions',
     nodeEnv: process.env.NODE_ENV || 'development',
     port: process.env.PORT || 3000
   });

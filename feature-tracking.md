@@ -86,6 +86,15 @@
 
 ## 🚧 Active Development (Nodal Point Migration)
 
+### AI Router & OpenRouter Integration
+- **Status**: Ongoing
+- **Description**: Enhancing the AI fallback system with OpenRouter and real-time routing diagnostics.
+- **Actions**:
+  - [x] **Fallback Fix**: Resolved issue in `chat.js` where Gemini quota errors would skip remaining free models. Replaced `break` with `continue` in the model loop.
+  - [x] **Diagnostics HUD**: Implemented real-time "Neural Trace" in `GeminiChat.tsx` to visualize model selection, latency, and error states.
+  - [x] **OpenRouter E2E**: Integrated `OPEN_ROUTER_API_KEY` across `.env.local`, `cloudbuild.yaml`, and `server.js` for production-ready access to diverse LLM providers.
+  - [ ] **Model Implementation**: Configure specific OpenRouter models in `chat.js` and `analyze-bill.js` (Pending user selection).
+
 ### Call Processing & Background Intelligence
 - **Status**: Completed
 - **Description**: Ported legacy call processing features to the new platform, including background loading, real-time insights, and two-channel transcripts.

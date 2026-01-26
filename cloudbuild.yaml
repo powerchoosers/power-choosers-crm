@@ -128,6 +128,8 @@ steps:
     - 'GMAIL_SENDER_NAME=${_GMAIL_SENDER_NAME}'
     - '--set-env-vars'
     - 'FREE_GEMINI_KEY=${_FREE_GEMINI_KEY}'
+    - '--set-env-vars'
+    - 'OPEN_ROUTER_API_KEY=${_OPEN_ROUTER_API_KEY}'
 
 # Store images in Google Container Registry
 images:
