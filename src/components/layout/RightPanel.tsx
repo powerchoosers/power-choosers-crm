@@ -1,17 +1,14 @@
 'use client'
 
 import { 
-  Clock, Zap, Activity, MapPin, Sun, Cloud, CloudRain, Wind, 
-  AlertCircle, Lock, Unlock, CheckCircle, Play, DollarSign, Mic 
+  Zap, CheckCircle, Play, DollarSign, Mic 
 } from 'lucide-react'
 import { useParams, usePathname } from 'next/navigation'
 import { format } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useContact } from '@/hooks/useContacts'
 import { useAccount } from '@/hooks/useAccounts'
-import { useTasks } from '@/hooks/useTasks'
 import { useUIStore } from '@/store/uiStore'
-import { cn } from '@/lib/utils'
 
 // Widgets
 import TelemetryWidget from '../crm/TelemetryWidget'
@@ -27,7 +24,6 @@ import OrgIntelligence from '../crm/OrgIntelligence'
 export function RightPanel() {
   const pathname = usePathname()
   const params = useParams()
-  const { isEditing } = useUIStore()
   
   // State detection
   const isContactPage = pathname.includes('/contacts/')

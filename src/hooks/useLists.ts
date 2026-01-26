@@ -13,7 +13,7 @@ export function useLists() {
       if (error) throw error
       
       // Transform data to include count
-      return data.map((list: any) => ({
+      return (data as (List & { list_members: { count: number }[] })[]).map((list) => ({
         ...list,
         count: list.list_members?.[0]?.count || 0
       })) as List[]

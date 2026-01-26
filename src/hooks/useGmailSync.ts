@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { collection, addDoc, query, where, getDocs, serverTimestamp, doc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import { GoogleAuthProvider, signInWithPopup, User } from 'firebase/auth';
 import { toast } from 'sonner';
 
@@ -31,21 +31,19 @@ interface GmailMessage {
 const MAX_MESSAGES_PER_SYNC = 50;
 const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
+const decodeBase64Url = (data: string) => {
+  try {
+    return atob(data.replace(/-/g, '+').replace(/_/g, '/'));
+  } catch {
+    return '';
+  }
+};
+
 export function useGmailSync() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string>('');
 
-  // Get Access Token
-  const getAccessToken = async (user: User) => {
-    // Check session storage first
-    const cachedToken = sessionStorage.getItem('gmail_oauth_token');
-    if (cachedToken) return cachedToken;
-    
-    // Fallback: Re-auth to get new token
-    return await reauthenticateWithGmailScope();
-  };
-
-  const reauthenticateWithGmailScope = async () => {
+  const reauthenticateWithGmailScope = useCallback(async () => {
     try {
       const provider = new GoogleAuthProvider();
       provider.addScope('https://www.googleapis.com/auth/gmail.readonly');
@@ -68,10 +66,20 @@ export function useGmailSync() {
       toast.error('Failed to connect to Gmail. Please try again.');
       return null;
     }
-  };
+  }, []);
+
+  // Get Access Token
+  const getAccessToken = useCallback(async () => {
+    // Check session storage first
+    const cachedToken = sessionStorage.getItem('gmail_oauth_token');
+    if (cachedToken) return cachedToken;
+    
+    // Fallback: Re-auth to get new token
+    return await reauthenticateWithGmailScope();
+  }, [reauthenticateWithGmailScope]);
 
   // Parse Gmail Message (Ported from legacy script)
-  const parseGmailMessage = (message: GmailMessage, userEmail: string) => {
+  const parseGmailMessage = useCallback((message: GmailMessage, userEmail: string) => {
     const headers = message.payload?.headers ?? [];
     const getHeader = (name: string) => headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? '';
 
@@ -132,15 +140,7 @@ export function useGmailSync() {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
-  };
-
-  const decodeBase64Url = (data: string) => {
-    try {
-      return atob(data.replace(/-/g, '+').replace(/_/g, '/'));
-    } catch (e) {
-      return '';
-    }
-  };
+  }, []);
 
   const syncGmail = useCallback(async (user: User) => {
     if (isSyncing) return;
@@ -148,7 +148,7 @@ export function useGmailSync() {
     setSyncStatus('Starting sync...');
 
     try {
-      let accessToken = await getAccessToken(user);
+      let accessToken = await getAccessToken();
       if (!accessToken) {
         accessToken = await reauthenticateWithGmailScope();
         if (!accessToken) throw new Error('Could not get access token');
@@ -218,7 +218,7 @@ export function useGmailSync() {
       setIsSyncing(false);
       setTimeout(() => setSyncStatus(''), 3000);
     }
-  }, [isSyncing]);
+  }, [isSyncing, getAccessToken, reauthenticateWithGmailScope, parseGmailMessage]);
 
   return { syncGmail, isSyncing, syncStatus };
 }
