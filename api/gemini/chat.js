@@ -362,6 +362,56 @@ export default async function handler(req, res) {
 
     const perplexityModel = (process.env.PERPLEXITY_MODEL || '').trim() || 'sonar-pro';
 
+    const callOpenRouter = async () => {
+      const apiKey = process.env.OPEN_ROUTER_API_KEY;
+      if (!apiKey) throw new Error('OpenRouter API key not configured');
+
+      const model = 'openai/gpt-oss-120b';
+      const normalized = cleanedMessages
+        .slice(-12)
+        .map((m) => ({
+          role: m.role === 'user' ? 'user' : 'assistant',
+          content: m.content,
+        }));
+
+      const lastRole = normalized.length > 0 ? normalized[normalized.length - 1].role : 'assistant';
+      const openRouterMessages = [
+        { role: 'system', content: buildSystemPrompt().trim() },
+        ...normalized,
+      ];
+      if (lastRole !== 'user') {
+        openRouterMessages.push({ role: 'user', content: prompt });
+      }
+
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://nodalpoint.io',
+          'X-Title': 'Nodal Point CRM',
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: openRouterMessages,
+          temperature: 0.7,
+          max_tokens: 2048,
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '');
+        throw new Error(`OpenRouter error: ${response.status} ${response.statusText}${errText ? ` - ${errText}` : ''}`);
+      }
+
+      const data = await response.json();
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content !== 'string' || !content.trim()) {
+        throw new Error('OpenRouter returned an empty response');
+      }
+      return content;
+    };
+
     const callPerplexity = async () => {
       if (!perplexityApiKey) {
         throw new Error('Perplexity API key not configured');
@@ -410,10 +460,53 @@ export default async function handler(req, res) {
       return content;
     };
 
+    const routingDiagnostics = [];
+    let lastErr = null;
+
+    // 1. Try OpenRouter first as the default agent (if configured)
+    if (process.env.OPEN_ROUTER_API_KEY) {
+      try {
+        const orModel = 'openai/gpt-oss-120b';
+        routingDiagnostics.push({
+          model: orModel,
+          provider: 'openrouter',
+          status: 'attempting',
+          timestamp: new Date().toISOString()
+        });
+
+        const content = await callOpenRouter();
+        routingDiagnostics.push({
+          model: orModel,
+          provider: 'openrouter',
+          status: 'success',
+          timestamp: new Date().toISOString()
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          content,
+          provider: 'openrouter',
+          model: orModel,
+          diagnostics: routingDiagnostics
+        }));
+        return;
+      } catch (error) {
+        console.error('[OpenRouter Chat] Error:', error);
+        routingDiagnostics.push({
+          model: 'openai/gpt-oss-120b',
+          provider: 'openrouter',
+          status: 'failed',
+          error: error.message,
+          timestamp: new Date().toISOString()
+        });
+        lastErr = error;
+      }
+    }
+
     if (!geminiApiKey) {
       const content = await callPerplexity();
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ content, provider: 'perplexity', model: perplexityModel }));
+      res.end(JSON.stringify({ content, provider: 'perplexity', model: perplexityModel, diagnostics: routingDiagnostics }));
       return;
     }
 
@@ -461,9 +554,6 @@ export default async function handler(req, res) {
       });
       nextExpectedRole = nextExpectedRole === 'user' ? 'model' : 'user';
     }
-
-    const routingDiagnostics = [];
-    let lastErr = null;
 
     for (const modelName of modelCandidates) {
       try {
