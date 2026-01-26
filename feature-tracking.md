@@ -1,4 +1,13 @@
 
+### Call Data & Schema Migration
+- **Status**: Completed
+- **Description**: Synchronized call data fetching with the new snake_case Supabase schema and resolved search-related join errors.
+- **Actions**:
+  - [x] **Schema Sync**: Updated `useCalls.ts` and `useContactCalls` hooks to use snake_case columns (`contact_id`, `owner_id`, `ai_summary`, etc.) matching the production database.
+  - [x] **Search Fix**: Resolved "Search calls error: {}" by switching to direct `owner_id` filtering on the `calls` table and removing strict inner join requirements in `GlobalSearch`.
+  - [x] **Error Handling**: Enhanced logging in search hooks to capture structured Supabase error details (message, hint, code) for faster debugging.
+  - [x] **Reliability**: Updated `useCallsCount` and infinite query hooks to ensure data consistency across the platform.
+
 ### Dossier Intelligence & Call Insights
 - **Status**: Completed
 - **Description**: Replaced legacy Bill History with real-time Call Insights and refined the Dossier header with Forensic Log and Context Lock controls.

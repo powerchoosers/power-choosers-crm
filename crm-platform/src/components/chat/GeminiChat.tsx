@@ -641,6 +641,13 @@ export function GeminiChatPanel() {
       const data = await response.json()
       if (data.error) throw new Error(data.message || data.error)
 
+      // Temporary Routing Diagnostics for Trey
+      if (data.diagnostics) {
+        console.group('%c AI_ROUTER_DIAGNOSTICS ', 'background: #002FA7; color: white; font-weight: bold; border-radius: 4px; padding: 2px 4px;')
+        console.table(data.diagnostics)
+        console.groupEnd()
+      }
+
       setLastProvider(typeof data.provider === 'string' ? data.provider : 'gemini')
       setLastModel(typeof data.model === 'string' ? data.model : '')
 
