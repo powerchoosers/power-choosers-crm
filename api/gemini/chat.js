@@ -465,9 +465,17 @@ export default async function handler(req, res) {
       nextExpectedRole = nextExpectedRole === 'user' ? 'model' : 'user';
     }
 
+    const routingDiagnostics = [];
     let lastErr = null;
     for (const modelName of modelCandidates) {
       try {
+        routingDiagnostics.push({
+          model: modelName,
+          provider: 'gemini',
+          status: 'attempting',
+          timestamp: new Date().toISOString()
+        });
+
         console.log(`[Gemini Chat] Attempting request with model: ${modelName}`);
         const model = genAI.getGenerativeModel({
           model: modelName,
@@ -493,6 +501,12 @@ export default async function handler(req, res) {
               if (error.message?.includes('503') || error.message?.includes('overloaded')) {
                 const delay = Math.pow(2, i) * 1000;
                 logger.warn(`[Gemini Chat] Model overloaded, retrying in ${delay}ms... (Attempt ${i + 1}/${maxRetries})`);
+                routingDiagnostics.push({
+                  model: modelName,
+                  status: 'retry',
+                  reason: 'overloaded',
+                  attempt: i + 1
+                });
                 await new Promise(resolve => setTimeout(resolve, delay));
                 continue;
               }
@@ -507,6 +521,12 @@ export default async function handler(req, res) {
 
         while (response.functionCalls()) {
           const calls = response.functionCalls();
+          routingDiagnostics.push({
+            model: modelName,
+            status: 'tool_call',
+            tools: calls.map(c => c.name)
+          });
+
           const toolResponses = await Promise.all(calls.map(async (call) => {
             const handler = toolHandlers[call.name];
             if (handler) {
@@ -541,11 +561,29 @@ export default async function handler(req, res) {
         }
 
         const text = response.text();
+        const currentDiagnostic = routingDiagnostics.find(d => d.model === modelName && d.status === 'attempting');
+        if (currentDiagnostic) currentDiagnostic.status = 'success';
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ content: text, provider: 'gemini', model: modelName }));
+        res.end(JSON.stringify({ 
+          content: text, 
+          provider: 'gemini', 
+          model: modelName,
+          diagnostics: routingDiagnostics
+        }));
         return;
       } catch (error) {
         lastErr = error;
+        const errorType = isGeminiQuotaOrBillingError(error) ? 'quota_billing' : 
+                         isModelNotFoundError(error) ? 'not_found' : 'general_error';
+        
+        const currentDiagnostic = routingDiagnostics.find(d => d.model === modelName && d.status === 'attempting');
+        if (currentDiagnostic) {
+          currentDiagnostic.status = 'failed';
+          currentDiagnostic.error = error.message;
+          currentDiagnostic.errorType = errorType;
+        }
+
         // If quota/billing error, continue to next Gemini model instead of breaking
         if (isGeminiQuotaOrBillingError(error)) {
           console.log(`[Gemini Chat] Quota/Billing error on ${modelName}: ${error.message}. Trying next candidate...`);
@@ -561,10 +599,21 @@ export default async function handler(req, res) {
 
     // Fallback to Perplexity if no Gemini model succeeded
     if (perplexityApiKey) {
+      routingDiagnostics.push({
+        provider: 'perplexity',
+        model: perplexityModel,
+        status: 'attempting',
+        reason: 'gemini_exhausted'
+      });
       console.log('[Gemini Chat] Falling back to Perplexity...');
       const content = await callPerplexity();
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ content, provider: 'perplexity', model: perplexityModel }));
+      res.end(JSON.stringify({ 
+        content, 
+        provider: 'perplexity', 
+        model: perplexityModel,
+        diagnostics: routingDiagnostics
+      }));
       return;
     }
     throw lastErr || new Error('No Gemini model candidates succeeded');

@@ -26,20 +26,28 @@ export function useSearchCalls(queryTerm: string) {
       if (!queryTerm || queryTerm.length < 2) return []
       if (loading || !user) return []
 
+      // Use owner_id from calls table directly for better performance and reliability
       let query = supabase
         .from('calls')
-        .select('*, contacts!inner(name, ownerId)')
+        .select('*, contacts(name, ownerId)')
     
       if (role !== 'admin' && user.email) {
-         query = query.filter('contacts.ownerId', 'eq', user.email)
+         query = query.eq('owner_id', user.email)
       }
 
+      // Search in summary, transcript, or contact name
       query = query.or(`ai_summary.ilike.%${queryTerm}%,transcript.ilike.%${queryTerm}%,contacts.name.ilike.%${queryTerm}%`)
 
       const { data, error } = await query.limit(5)
 
       if (error) {
-        console.error('Search calls error:', error)
+        console.error('Search calls error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          query: { queryTerm, role, email: user.email }
+        })
         return []
       }
 
@@ -68,10 +76,10 @@ export function useCallsCount(searchQuery?: string) {
 
       let query = supabase
         .from('calls')
-        .select('*, contacts!inner(name, ownerId)', { count: 'exact', head: true })
+        .select('*, contacts(name, ownerId)', { count: 'exact', head: true })
 
       if (role !== 'admin' && user.email) {
-        query = query.filter('contacts.ownerId', 'eq', user.email)
+        query = query.eq('owner_id', user.email)
       }
 
       if (searchQuery) {
@@ -79,7 +87,10 @@ export function useCallsCount(searchQuery?: string) {
       }
 
       const { count, error } = await query
-      if (error) throw error
+      if (error) {
+        console.error('Calls count error:', error)
+        return 0
+      }
       return count || 0
     },
     enabled: !loading && !!user,
@@ -116,15 +127,14 @@ export function useCalls(searchQuery?: string) {
     queryKey: ['calls', user?.email ?? 'guest', role, searchQuery],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
-      if (loading) return { calls: [], nextCursor: null }
-      if (!user) return { calls: [], nextCursor: null }
+      if (loading || !user) return { calls: [], nextCursor: null }
 
       let query = supabase
         .from('calls')
-        .select('*, contacts!inner(name, ownerId)', { count: 'exact' })
+        .select('*, contacts(name, ownerId)', { count: 'exact' })
       
       if (role !== 'admin' && user.email) {
-         query = query.filter('contacts.ownerId', 'eq', user.email)
+         query = query.eq('owner_id', user.email)
       }
 
       if (searchQuery) {
