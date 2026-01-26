@@ -391,10 +391,24 @@ export function GeminiChatTrigger(props: { onToggle?: () => void }) {
         props.onToggle?.()
         toggleChat()
       }}
-      className="w-8 h-8 inline-flex items-center justify-center rounded-full transition-all duration-200 text-zinc-400 hover:text-white hover:bg-white/10"
+      className={cn(
+        "w-9 h-9 inline-flex items-center justify-center rounded-full transition-all duration-200 text-zinc-400 hover:text-white hover:bg-white/10 relative overflow-hidden",
+        isOpen && "bg-white/10 text-white"
+      )}
       title={isOpen ? "Close Gemini" : "Chat with Gemini"}
     >
-      <Bot size={18} />
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={isOpen ? "close" : "bot"}
+          initial={{ opacity: 0, scale: 0.5, rotate: isOpen ? -90 : 90 }}
+          animate={{ opacity: 1, scale: 1, rotate: 0 }}
+          exit={{ opacity: 0, scale: 0.5, rotate: isOpen ? 90 : -90 }}
+          transition={{ duration: 0.2, ease: "easeInOut" }}
+          className="flex items-center justify-center"
+        >
+          {isOpen ? <X size={24} /> : <Bot size={24} />}
+        </motion.div>
+      </AnimatePresence>
     </button>
   )
 }
@@ -587,7 +601,7 @@ export function GeminiChatPanel() {
         <div className="flex items-center gap-3">
           <div className="relative">
             <div className="w-8 h-8 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center relative z-10 overflow-hidden">
-              <Bot size={18} className="text-white" />
+              <Bot size={20} className="text-white" />
             </div>
             {/* Ambient Hum Animation */}
             <motion.div
@@ -638,7 +652,7 @@ export function GeminiChatPanel() {
               >
                 {m.role === 'user' ? (
                   /* "Stealth" User Command */
-                  <div className="flex justify-end mb-2 group w-full gap-4">
+                  <div className="flex justify-end mb-2 group w-full gap-8">
                     <div className="max-w-[85%] relative">
                       <div className="bg-zinc-900/50 border border-white/10 backdrop-blur-md rounded-lg p-4 text-right shadow-xl">
                         <p className="font-mono text-[10px] text-[#002FA7] mb-1 uppercase tracking-widest opacity-70">
