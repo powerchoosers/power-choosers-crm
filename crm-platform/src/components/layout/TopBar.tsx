@@ -282,18 +282,18 @@ export function TopBar() {
                         
                         <button 
                             onClick={handleRefresh}
-                            className="w-8 h-8 inline-flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                            className="w-9 h-9 inline-flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
                             title="Refresh Data"
                         >
-                            <RefreshCw size={18} />
+                            <RefreshCw size={22} />
                         </button>
 
                         <button 
-                            className="w-8 h-8 inline-flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors relative"
+                            className="w-9 h-9 inline-flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors relative"
                             title="Notifications"
                         >
-                            <Bell size={18} />
-                            <span className="absolute top-2 right-2 w-2 h-2 bg-signal rounded-full border border-zinc-900" />
+                            <Bell size={22} />
+                            <span className="absolute top-2 right-2.5 w-2 h-2 bg-signal rounded-full border border-zinc-900" />
                         </button>
                         
                         {/* Manual Dialer Trigger */}
@@ -305,14 +305,23 @@ export function TopBar() {
                                   setIsDialerOpen(nextOpen)
                                 }}
                                 className={cn(
-                                    "w-8 h-8 inline-flex items-center justify-center rounded-full transition-colors duration-200",
+                                    "w-9 h-9 inline-flex items-center justify-center rounded-full transition-colors duration-200 relative overflow-hidden",
                                     isDialerOpen ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white hover:bg-white/10"
                                 )}
                                 title={isDialerOpen ? "Close Dialer" : "Open Dialer"}
                             >
-                                <span className="w-5 h-5 flex items-center justify-center">
-                                    {isDialerOpen ? <X size={18} /> : <Phone size={18} />}
-                                </span>
+                                <AnimatePresence mode="wait">
+                                    <motion.div
+                                        key={isDialerOpen ? "close" : "phone"}
+                                        initial={{ opacity: 0, scale: 0.5, rotate: isDialerOpen ? -90 : 90 }}
+                                        animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                                        exit={{ opacity: 0, scale: 0.5, rotate: isDialerOpen ? 90 : -90 }}
+                                        transition={{ duration: 0.2, ease: "easeInOut" }}
+                                        className="flex items-center justify-center"
+                                    >
+                                        {isDialerOpen ? <X size={22} /> : <Phone size={22} />}
+                                    </motion.div>
+                                </AnimatePresence>
                             </button>
                         )}
                     </div>
