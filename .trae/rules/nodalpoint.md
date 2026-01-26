@@ -146,6 +146,36 @@ The platform uses **Firebase Authentication**.
   - **Haptic Buttons**: Primary action buttons should use a "Bloom" effect on hover (`hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)]`).
   - **Sync_Block Protocol**: All collection pages MUST feature a `Sync_Block` footer displaying the current range (e.g., `Sync_Block 01–50`) and `Total_Nodes` count.
   - **LED Status**: Use pulsing LED dots for status indicators (Active, Operational) instead of generic pills.
+
+### 🤖 Nodal Architect (Gemini Chat)
+The cognitive core of the platform, featuring a **Stacked Command Deck** UI:
+- **Tier 1: Configuration Deck**: Houses the model selector and **Contextual Intel Pill**.
+  - Displays `TARGET: [NAME]` for contacts/accounts or `ACTIVE_CONTEXT: GLOBAL_SCOPE`.
+- **Tier 2: Action Deck**: Auto-expanding `textarea` (44px min, 112px max) with a Klein Blue Execute button.
+- **Forensic HUD Components**:
+  - `News_Ticker`: Real-time market volatility feed.
+  - `Contact_Dossier`: Detailed node profiles with contract status.
+  - `Position_Maturity`: Interactive contract expiration and revenue visualization.
+  - `Forensic_Grid`: High-density tabular data for deep analysis.
+- **Model Stack Fallback**: Autonomously routes through `gpt-oss-120b`, Gemini 2.0/1.5, and Perplexity (Sonar) for zero-downtime intelligence.
+
+### 📞 Voice & Twilio Integration
+The platform includes a native forensic dialer:
+- **Dialer HUD**: Integrated into the `TopBar`, supporting manual entry and contact-linked dialing.
+- **Active Call HUD**: Real-time duration tracking, mute, and hangup controls.
+- **State Management**: Managed via `useCallStore` (Zustand) and `VoiceContext` (SDK integration).
+
+### 📧 Email & Communication
+- **Gmail Sync**: `useGmailSync.ts` handles real-time sync with Gmail API and Firestore deduplication.
+- **Tracking**: Integrated Open/Click tracking statistics directly in the forensic list views.
+- **Compose**: `ComposeModal` for secure, branded communication.
+
+### 🔍 Forensic Dossier Features
+- **Call Insights**: Replaces legacy Bill History with real-time AI-summarized call logs.
+- **Forensic Log**: Direct access to neural history for specific contacts.
+- **Context Lock**: Visual indicator in the header ensuring the agent is focused on the correct node.
+- **Bill Debugger**: A standalone forensic tool (`/bill-debugger`) for analyzing energy invoices via Gemini.
+
 - **AI Integration**: Use the "Sparkles" icon (`lucide-react/Sparkles`) for all AI-powered features.
 - **Contact Avatars**: **STRICT RULE**: Use letter glyphs (initials) instead of company logos for contact avatars.
   - **Styles**: `rounded-full`, `bg-zinc-800`, `text-zinc-400`, `border-white/5`.
@@ -155,6 +185,7 @@ The platform uses **Firebase Authentication**.
   - **Page Entry**: Public pages use a standard "Blur In" effect (`filter: blur(10px)` → `blur(0px)`) combined with opacity fade.
   - **Staggered Elements**: Lists and grids should use staggered entry delays.
   - **Enter Transitions**: `animate-in fade-in slide-in-from-bottom-4 duration-500`.
+  - **Haptic Transitions**: Use `framer-motion` `layout` and `spring` transitions (bounce: 0, duration: 0.4) for all UI expansions.
 
 ### 🔡 Typography & Branding Consistency
 - **Public Pages (Landing, Philosophy, etc.)**:
@@ -166,7 +197,7 @@ The platform uses **Firebase Authentication**.
 
 ## 📐 Standardized Page Layout
 
-All main application pages (Accounts, People, Sequences, etc.) must follow this standardized layout structure to ensure a consistent UX:
+All main application pages (Accounts, People, Sequences, Lists, etc.) must follow this standardized layout structure to ensure a consistent UX:
 
 1.  **Container**: Fixed height with entry animation.
     ```tsx
@@ -191,6 +222,16 @@ All main application pages (Accounts, People, Sequences, etc.) must follow this 
 6.  **Table Rows**: Hover effects and click-to-navigate.
     ```tsx
     <TableRow className="border-white/5 hover:bg-white/5 transition-colors group cursor-pointer">
+    ```
+7.  **Footer (Sync_Block)**:
+    ```tsx
+    <div className="p-4 border-t border-white/5 bg-black/20 flex justify-between items-center text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+      <div>Sync_Block 01–50</div>
+      <div className="flex items-center gap-2">
+        <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+        Total_Nodes: {count}
+      </div>
+    </div>
     ```
 
 ## 📚 Documentation Maintenance

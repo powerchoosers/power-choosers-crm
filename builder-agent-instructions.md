@@ -109,6 +109,19 @@ To ensure the frontend can communicate with the backend regardless of environmen
     -   Focus ring: `focus-visible:ring-indigo-500`
 7.  **Page Entry Animation**:
     -   Standard: `initial={{ opacity: 0, filter: "blur(10px)" }}` → `animate={{ opacity: 1, filter: "blur(0px)" }}`.
+8.  **Haptic Transitions**:
+    -   ALWAYS use `framer-motion` `layout` props and `spring` transitions (`bounce: 0, duration: 0.4`) for expanding/collapsing UI elements to prevent "jumping".
+
+### 🧠 Intelligence & State Standards
+- **Nodal Architect Implementation**:
+  - AI-related footers MUST use the **Stacked Command Deck** architecture (Tier 1 for config/context, Tier 2 for input).
+  - Use `TARGET:` and `ACTIVE_CONTEXT:` labeling for clarity.
+- **State Management**:
+  - **Zustand**: Use for transient, global UI state (e.g., dialer status, chat panel visibility).
+  - **TanStack Query**: Use for all server-side data fetching and synchronization.
+- **Data Integrity**:
+  - Synchronize with the **snake_case** Supabase schema (`contact_id`, `owner_id`, etc.).
+  - Use normalization layers in hooks to handle legacy Firestore metadata.
 
 ## ⚠️ Migration Rules
 1.  **No Regression**: The new feature must perform at least as well as the legacy one.
@@ -116,11 +129,13 @@ To ensure the frontend can communicate with the backend regardless of environmen
 3.  **Component Modularity**: Break down monolithic legacy scripts into small, reusable React components.
 4.  **Error Handling**: Implement Error Boundaries and fallback UIs (no white screens).
 5.  **Route Gating**: Ensure all platform pages are protected by `AuthContext` and Middleware.
+6.  **Forensic Aesthetic**: Prioritize `font-mono tabular-nums` for all numeric and ID fields.
 
 ## 🧪 Verification
 - **Compare**: Open Legacy (`/crm-dashboard.html`) and New Platform side-by-side.
 - **Functionality**: Verify actions (e.g., clicking "Call") trigger the expected behavior.
 - **Console**: Check for clean console logs (no errors/warnings).
+- **Animation**: Verify that all layout changes are smooth and non-bouncy.
 
 ## 📝 Troubleshooting
 - **Routing Issues**: If `/crm-platform` opens the wrong page, check `server.js` mappings or `next.config.ts` rewrites.

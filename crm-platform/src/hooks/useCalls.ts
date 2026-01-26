@@ -16,7 +16,7 @@ export interface Call {
   recordingUrl?: string
   recordingSid?: string
   transcript?: string
-  aiInsights?: any
+  aiInsights?: Record<string, unknown> | null
   contactId?: string
 }
 
@@ -116,7 +116,7 @@ type CallRow = {
   recording_url?: string | null
   recording_sid?: string | null
   transcript?: string | null
-  ai_insights?: any | null
+  ai_insights?: Record<string, unknown> | null
   contact_id?: string | null
   from_phone?: string | null
   to_phone?: string | null
@@ -194,10 +194,11 @@ export function useCalls(searchQuery?: string) {
         // Capitalize status
         const status = item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1) : 'Completed'
         
-        // Format duration (seconds to mm:ss)
-        const minutes = Math.floor((item.duration || 0) / 60)
+        // Format duration (seconds to HH:MM:SS)
+        const hours = Math.floor((item.duration || 0) / 3600)
+        const minutes = Math.floor(((item.duration || 0) % 3600) / 60)
         const seconds = (item.duration || 0) % 60
-        const durationStr = `${minutes}m ${seconds}s`
+        const durationStr = [hours, minutes, seconds].map(v => String(v).padStart(2, '0')).join(':')
 
         return {
           id: item.id,
@@ -284,9 +285,10 @@ export function useContactCalls(contactId: string) {
       return (data as CallRow[]).map(item => {
         const type = item.direction === 'inbound' ? 'Inbound' : 'Outbound'
         const status = item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1) : 'Completed'
-        const minutes = Math.floor((item.duration || 0) / 60)
+        const hours = Math.floor((item.duration || 0) / 3600)
+        const minutes = Math.floor(((item.duration || 0) % 3600) / 60)
         const seconds = (item.duration || 0) % 60
-        const durationStr = `${minutes}m ${seconds}s`
+        const durationStr = [hours, minutes, seconds].map(v => String(v).padStart(2, '0')).join(':')
 
         return {
           id: item.id,

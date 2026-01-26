@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react'
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react'
 import { Device, Call } from '@twilio/voice-sdk'
 import { useCallStore } from '@/store/callStore'
 import { toast } from 'sonner'
@@ -38,7 +38,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   const { setStatus, setActive } = useCallStore()
   const tokenRefreshTimer = useRef<NodeJS.Timeout | null>(null)
 
-  const resolvePhoneMeta = async (phoneNumber: string) => {
+  const resolvePhoneMeta = useCallback(async (phoneNumber: string) => {
     try {
       const response = await fetch(`/api/search?phone=${encodeURIComponent(phoneNumber)}`)
       if (response.ok) {
@@ -61,9 +61,9 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       console.warn('[Voice] Metadata resolution failed:', error)
     }
     return null
-  }
+  }, [])
 
-  const initDevice = async () => {
+  const initDevice = useCallback(async () => {
     // Only initialize on the client side
     if (typeof window === 'undefined') return
 
@@ -227,7 +227,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         description: 'Could not connect to Twilio service.' 
       })
     }
-  }
+  }, [resolvePhoneMeta, setActive, setStatus])
 
   useEffect(() => {
     initDevice()
@@ -238,9 +238,9 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         device.destroy()
       }
     }
-  }, [])
+  }, [initDevice, device])
 
-  const connect = async (params: { To: string; From?: string; metadata?: VoiceMetadata }) => {
+  const connect = useCallback(async (params: { To: string; From?: string; metadata?: VoiceMetadata }) => {
     if (!device || !isReady) {
       toast.error('Voice system not ready')
       return
@@ -298,66 +298,71 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      const connectParams: Record<string, string> = {
+        To: toE164,
+        From: fromE164,
+      }
+
+      if (params.metadata) {
+        connectParams.metadata = JSON.stringify(params.metadata)
+      } else if (meta) {
+        connectParams.metadata = JSON.stringify(meta)
+      }
+
       const call = await device.connect({ 
-        params: {
-          To: toE164,
-          From: fromE164,
-          metadata: params.metadata ? JSON.stringify(params.metadata) : undefined
-        }
+        params: connectParams
       })
 
-      setCurrentCall(call)
-      setStatus('dialing')
-      setActive(true)
-
       call.on('accept', () => {
+        setCurrentCall(call)
         setStatus('connected')
-        toast.success('Call Connected')
+        setActive(true)
       })
 
       call.on('disconnect', () => {
         setCurrentCall(null)
         setStatus('ended')
         setActive(false)
-        setIsMuted(false)
-        toast.info('Call Ended')
+        setMetadata(null)
       })
 
       call.on('error', (error) => {
         console.error('[Voice] Call error:', error)
-        toast.error('Call Error', { description: error.message })
+        toast.error('Call failed', { description: error.message })
         setCurrentCall(null)
-        setStatus('ended')
+        setStatus('error')
         setActive(false)
       })
 
     } catch (error) {
       console.error('[Voice] Connect failed:', error)
-      toast.error('Failed to place call')
+      toast.error('Could not initiate call')
+      setStatus('error')
     }
-  }
+  }, [device, isReady, resolvePhoneMeta, setActive, setStatus])
 
-  const disconnect = () => {
+  const disconnect = useCallback(() => {
     if (currentCall) {
       currentCall.disconnect()
-    } else if (device) {
-      // Sometimes device.disconnectAll() is safer
-      // device.disconnectAll();
+      setCurrentCall(null)
+      setStatus('ended')
+      setActive(false)
+      setMetadata(null)
     }
-  }
+  }, [currentCall, setActive, setStatus])
 
-  const sendDigits = (digits: string) => {
+  const sendDigits = useCallback((digits: string) => {
     if (currentCall) {
       currentCall.sendDigits(digits)
     }
-  }
+  }, [currentCall])
 
-  const mute = (muted: boolean) => {
+  const mute = useCallback((isMuted: boolean) => {
     if (currentCall) {
-      currentCall.mute(muted)
-      setIsMuted(muted)
+      currentCall.mute(isMuted)
+      setIsMuted(isMuted)
     }
-  }
+  }, [currentCall])
 
   return (
     <VoiceContext.Provider value={{ 

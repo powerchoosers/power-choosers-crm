@@ -20,7 +20,6 @@ export interface Account {
   ownerId?: string
 }
 
-const COLLECTION_NAME = 'accounts'
 const PAGE_SIZE = 50
 
 export function useSearchAccounts(queryTerm: string) {

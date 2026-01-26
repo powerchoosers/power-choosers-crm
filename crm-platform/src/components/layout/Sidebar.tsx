@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { LayoutDashboard, Users, Phone, Sparkles, Zap, Settings, Building2, LogOut, CheckSquare, Play, Mail, List } from 'lucide-react'
+import { LayoutDashboard, Users, Phone, Sparkles, Zap, Settings, Building2, LogOut, CheckSquare, Play, Mail, List, Bell } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -168,7 +168,13 @@ export function Sidebar() {
         <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-zinc-800 border border-white/10 flex-shrink-0 flex items-center justify-center overflow-hidden">
                 {user?.photoURL ? (
-                    <img src={user.photoURL} alt="User" className="w-full h-full object-cover" />
+                    <Image 
+                        src={user.photoURL} 
+                        alt="User" 
+                        width={32}
+                        height={32}
+                        className="w-full h-full object-cover" 
+                    />
                 ) : (
                     <span className="text-xs font-bold text-zinc-400">
                         {user?.email ? user.email[0].toUpperCase() : 'U'}

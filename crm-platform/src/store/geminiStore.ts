@@ -5,9 +5,9 @@ interface GeminiState {
     type: string
     id: string
     label: string
-    data?: any
+    data?: Record<string, unknown>
   } | null
-  setContext: (context: { type: string; id: string; label: string; data?: any } | null) => void
+  setContext: (context: { type: string; id: string; label: string; data?: Record<string, unknown> } | null) => void
   isOpen: boolean
   isHistoryOpen: boolean
   setIsOpen: (open: boolean) => void
