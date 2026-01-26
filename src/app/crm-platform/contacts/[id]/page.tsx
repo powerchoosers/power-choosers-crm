@@ -8,11 +8,10 @@ import {
   AlertTriangle, ArrowLeft, Clock, Globe, Linkedin, Mail, MapPin, Phone, 
   Lock, Unlock, Check, Sparkles, Plus, Star, Trash2,
   Building2, CheckCircle, Play, DollarSign, Mic, History, RefreshCw, X,
-  ArrowRightLeft
+  ArrowRightLeft, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { UplinkCard } from '@/components/dossier/UplinkCard'
 import DataIngestionCard from '@/components/dossier/DataIngestionCard'
-import OrgIntelligence from '@/components/crm/OrgIntelligence'
 import { useContact, useUpdateContact } from '@/hooks/useContacts'
 import { useContactCalls } from '@/hooks/useCalls'
 import { CallListItem } from '@/components/calls/CallListItem'
@@ -60,6 +59,8 @@ export default function ContactDossierPage() {
 
   const [isSaving, setIsSaving] = useState(false)
   const [showSynced, setShowSynced] = useState(false)
+  const [currentCallPage, setCurrentCallPage] = useState(1)
+  const CALLS_PER_PAGE = 4
   const prevIsEditing = useRef(isEditing)
 
   // Local Field States for Editing
@@ -80,6 +81,11 @@ export default function ContactDossierPage() {
   const [editOther, setEditOther] = useState('')
   const [editCompanyPhone, setEditCompanyPhone] = useState('')
   const [editPrimaryField, setEditPrimaryField] = useState<'mobile' | 'workDirectPhone' | 'otherPhone'>('mobile')
+
+  // Reset pagination when contact changes
+  useEffect(() => {
+    setCurrentCallPage(1)
+  }, [id])
 
   // Sync local state when contact data arrives
   useEffect(() => {
@@ -121,7 +127,7 @@ export default function ContactDossierPage() {
       setContext({
         type: 'contact',
         id: contact.id,
-        label: `TARGET: ${contact.name?.toUpperCase().slice(0, 15) || 'UNKNOWN'}`,
+        label: `${contact.name?.toUpperCase().slice(0, 20) || 'UNKNOWN'}`,
         data: contact
       })
     }
@@ -752,7 +758,7 @@ export default function ContactDossierPage() {
                 </div>
 
                 {/* RECENT CALLS & AI INSIGHTS */}
-                <div className="rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl p-8 shadow-xl">
+                <div className="rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl pt-8 px-8 pb-0 shadow-xl">
                   <div className="flex items-center justify-between mb-6">
                     <div>
                       <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -783,22 +789,47 @@ export default function ContactDossierPage() {
                       </div>
                     ) : recentCalls && recentCalls.length > 0 ? (
                       <>
-                        {recentCalls.map((call) => (
-                          <CallListItem key={call.id} call={call} contactId={id} />
-                        ))}
+                        <div className="space-y-4 min-h-[320px]">
+                          {recentCalls
+                            .slice((currentCallPage - 1) * CALLS_PER_PAGE, currentCallPage * CALLS_PER_PAGE)
+                            .map((call) => (
+                              <CallListItem key={call.id} call={call} contactId={id} />
+                            ))}
+                        </div>
                         
-                        {/* Sync_Block Footer */}
-                        <div className="mt-8 pt-4 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+                        {/* Sync_Block Footer with Integrated Pagination */}
+                        <div className="mt-4 pt-4 pb-6 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
                           <div className="flex items-center gap-4">
                             <span className="flex items-center gap-2">
                               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                              Sync_Block 01–{recentCalls.length.toString().padStart(2, '0')}
+                              Sync_Block {((currentCallPage - 1) * CALLS_PER_PAGE + 1).toString().padStart(2, '0')}–{Math.min(currentCallPage * CALLS_PER_PAGE, recentCalls.length).toString().padStart(2, '0')}
                             </span>
                             <span className="opacity-40">|</span>
                             <span>Total_Nodes: {recentCalls.length}</span>
                           </div>
-                          <div className="opacity-40">
-                            {format(new Date(), 'HH:mm:ss')} // SYSTEM_OK
+                          
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => setCurrentCallPage(prev => Math.max(1, prev - 1))}
+                              disabled={currentCallPage === 1}
+                              className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
+                            >
+                              <ChevronLeft className="h-3.5 w-3.5" />
+                            </Button>
+                            <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
+                              {currentCallPage.toString().padStart(2, '0')}
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => setCurrentCallPage(prev => prev + 1)}
+                              disabled={currentCallPage >= Math.ceil(recentCalls.length / CALLS_PER_PAGE)}
+                              className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
+                            >
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            </Button>
                           </div>
                         </div>
                       </>
@@ -809,15 +840,6 @@ export default function ContactDossierPage() {
                       </div>
                     )}
                   </div>
-                </div>
-
-                {/* ORG INTELLIGENCE SECTION */}
-                <div>
-                  <OrgIntelligence 
-                    companyName={companyName}
-                    website={contact?.website || ''}
-                    accountId={contact?.accountId}
-                  />
                 </div>
               </div>
             </div>
