@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Copy, Send, X, Loader2, User, Bot, Mic, Activity, AlertTriangle, ArrowRight, History, RefreshCw, Phone, Plus, Sparkles } from 'lucide-react'
+import { Copy, Send, X, Loader2, User, Bot, Mic, Activity, AlertTriangle, ArrowRight, History, RefreshCw, Phone, Plus, Sparkles, Cpu } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -1023,46 +1023,18 @@ export function GeminiChatPanel() {
         </div>
       </ScrollArea>
 
-      {/* Input */}
-      <div className="p-4 border-t border-white/10 bg-zinc-900/80 backdrop-blur-md relative z-10">
+      {/* Control Module (Stacked Command Deck) */}
+      <div className="p-4 border-t border-white/10 bg-zinc-900/40 backdrop-blur-md relative z-10">
         <form 
           onSubmit={(e) => { e.preventDefault(); handleSend(); }}
-          className="flex flex-col gap-3"
+          className="bg-zinc-950/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 focus-within:border-white/20 focus-within:ring-1 focus-within:ring-white/5"
         >
-          <div className="flex items-center gap-2">
-            <div className="relative group flex-1">
-              <Input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Enter system command..."
-                className="bg-zinc-950/50 border-white/10 text-white placeholder:text-zinc-600 focus-visible:ring-[#002FA7] pr-12 font-mono text-sm h-12 rounded-xl transition-all group-hover:border-white/20"
-              />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                <Mic 
-                  size={16} 
-                  onMouseDown={() => setIsListening(true)}
-                  onMouseUp={() => setIsListening(false)}
-                  className={cn(
-                    "cursor-pointer transition-all",
-                    isListening ? "text-red-500 scale-110 shadow-[0_0_10px_red]" : "text-zinc-500 hover:text-[#002FA7]"
-                  )} 
-                />
-              </div>
-            </div>
-            <Button 
-              type="submit" 
-              disabled={isLoading || !input.trim()}
-              className="bg-[#002FA7] hover:bg-blue-600 text-white font-mono text-xs uppercase tracking-widest px-6 h-12 rounded-xl transition-all shadow-[0_0_20px_rgba(0,47,167,0.4)] hover:shadow-[0_0_30px_rgba(0,47,167,0.6)] flex items-center gap-2 active:scale-95 border border-blue-400/30 shrink-0"
-            >
-              <span>Execute</span>
-              <ArrowRight size={14} />
-            </Button>
-          </div>
-          
-          <div className="flex items-center gap-4 px-1">
+          {/* TIER 1: CONFIGURATION DECK (Metadata) */}
+          <div className="h-9 bg-black/40 border-b border-white/5 flex items-center justify-between px-3">
             <div className="flex items-center gap-3">
               <Select value={selectedModel} onValueChange={setSelectedModel}>
-                <SelectTrigger className="h-7 bg-zinc-950/50 border-white/5 text-[10px] font-mono text-white/90 hover:bg-white/5 transition-colors min-w-[140px] rounded-lg">
+                <SelectTrigger className="h-6 bg-transparent border-none text-[10px] font-mono text-zinc-400 hover:text-white transition-colors uppercase tracking-wider p-0 focus:ring-0 w-auto gap-2">
+                  <Cpu className="w-3 h-3 text-[#002FA7]" />
                   <SelectValue placeholder="Select Model" />
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-950 border-white/10 text-white">
@@ -1098,19 +1070,68 @@ export function GeminiChatPanel() {
                 </SelectContent>
               </Select>
 
-              <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-1.5 shrink-0">
-                <Sparkles size={8} className="text-blue-400" />
-                Neural_Link
-              </span>
-
               <div className="h-3 w-[1px] bg-white/10" />
+              
               <span className="text-[9px] font-mono text-blue-400/70 uppercase tracking-widest animate-pulse">
                 {getProvider(selectedModel)}
               </span>
             </div>
+
+            <div className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[10px] font-mono text-emerald-500/80 uppercase tracking-tighter">
+                ACTIVE_CONTEXT: {contextInfo.label}
+              </span>
+            </div>
+          </div>
+
+          {/* TIER 2: INPUT DECK (Action) */}
+          <div className="flex items-end gap-2 p-2 relative">
+            <div className="relative flex-1">
+              <textarea 
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                className="w-full bg-transparent border-none focus:ring-0 text-sm text-zinc-100 placeholder:text-zinc-600 font-medium resize-none py-3 pl-2 max-h-32 min-h-[50px] custom-scrollbar"
+                placeholder="Input forensic command..."
+                rows={1}
+              />
+            </div>
+            
+            <div className="flex items-center gap-1 pb-1.5 pr-1">
+              <button 
+                type="button"
+                onMouseDown={() => setIsListening(true)}
+                onMouseUp={() => setIsListening(false)}
+                className={cn(
+                  "p-2 rounded-lg transition-all",
+                  isListening ? "text-red-500 bg-red-500/10 shadow-[0_0_10px_rgba(239,68,68,0.3)]" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/10"
+                )}
+              >
+                <Mic className="w-4 h-4" />
+              </button>
+
+              <button 
+                type="submit"
+                disabled={isLoading || !input.trim()}
+                className="bg-[#002FA7] hover:bg-blue-600 text-white p-2.5 rounded-xl shadow-[0_0_15px_-3px_rgba(0,47,167,0.5)] transition-all active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed border border-blue-400/30"
+              >
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            </div>
           </div>
         </form>
+        
+        <div className="text-center mt-3">
+          <span className="text-[9px] text-zinc-700 font-mono uppercase tracking-[0.2em]">Nodal Point Neural Engine v1.0.4</span>
+        </div>
       </div>
+
     </motion.div>
   )
 }
