@@ -7,13 +7,16 @@ import { differenceInCalendarDays, format, isValid, parseISO } from 'date-fns'
 import { 
   AlertTriangle, ArrowLeft, Clock, Globe, Linkedin, Mail, MapPin, Phone, 
   Lock, Unlock, Check, Sparkles, Plus, Star, Trash2,
-  Building2, CheckCircle, Play, DollarSign, Mic
+  Building2, CheckCircle, Play, DollarSign, Mic, History, RefreshCw, X,
+  ArrowRightLeft
 } from 'lucide-react'
 import { UplinkCard } from '@/components/dossier/UplinkCard'
 import DataIngestionCard from '@/components/dossier/DataIngestionCard'
 import OrgIntelligence from '@/components/crm/OrgIntelligence'
 import { useContact, useUpdateContact } from '@/hooks/useContacts'
+import { useContactCalls } from '@/hooks/useCalls'
 import { useUIStore } from '@/store/uiStore'
+import { useGeminiStore } from '@/store/geminiStore'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -48,8 +51,11 @@ export default function ContactDossierPage() {
   const id = (params?.id as string) || ''
 
   const { data: contact, isLoading } = useContact(id)
+  const { data: recentCalls, isLoading: isLoadingCalls } = useContactCalls(id)
   const updateContact = useUpdateContact()
   const { isEditing, setIsEditing, toggleEditing } = useUIStore()
+  const setContext = useGeminiStore((state) => state.setContext)
+  const toggleHistory = useGeminiStore((state) => state.toggleHistory)
 
   const [isSaving, setIsSaving] = useState(false)
   const [showSynced, setShowSynced] = useState(false)
@@ -107,6 +113,19 @@ export default function ContactDossierPage() {
       )
     }
   }, [contact, isEditing])
+
+  // Set Gemini Context
+  useEffect(() => {
+    if (contact) {
+      setContext({
+        type: 'contact',
+        id: contact.id,
+        label: `TARGET: ${contact.name?.toUpperCase().slice(0, 15) || 'UNKNOWN'}`,
+        data: contact
+      })
+    }
+    return () => setContext(null)
+  }, [contact, setContext])
 
   // Watch for global edit toggle to trigger save
   useEffect(() => {
@@ -302,7 +321,7 @@ export default function ContactDossierPage() {
         <div className="absolute top-0 right-0 w-64 h-64 bg-[#002FA7]/10 blur-[120px] rounded-full pointer-events-none" />
 
         <div className="flex-none p-6 md:p-8 border-b border-white/5 bg-zinc-900/80 backdrop-blur-sm relative z-10">
-          <div className="flex items-start justify-between gap-6">
+          <div className="flex items-center justify-between gap-6">
             <div className="flex items-center gap-4">
               <Button
                 variant="ghost"
@@ -416,6 +435,8 @@ export default function ContactDossierPage() {
                 </div>
               </div>
             </div>
+
+
 
             <div className="text-right">
               <div className="flex flex-col items-end gap-2">
@@ -729,51 +750,83 @@ export default function ContactDossierPage() {
                   </div>
                 </div>
 
-                {/* BILL HISTORY SECTION */}
+                {/* RECENT CALLS & AI INSIGHTS */}
                 <div className="rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl p-8 shadow-xl">
                   <div className="flex items-center justify-between mb-6">
                     <div>
                       <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                        <DollarSign className="w-5 h-5 text-green-500" /> Bill History
+                        <Mic className="w-5 h-5 text-[#002FA7]" /> Recent Calls & AI Insights
                       </h3>
-                      <p className="text-xs text-zinc-500 mt-1 uppercase tracking-widest font-mono">Historical Fiscal Data</p>
+                      <p className="text-xs text-zinc-500 mt-1 uppercase tracking-widest font-mono">Forensic Voice Data</p>
                     </div>
-                    <button className="text-[10px] border border-white/10 hover:border-[#002FA7]/50 hover:bg-[#002FA7]/10 text-zinc-500 hover:text-white px-3 py-1.5 rounded-lg transition-all uppercase tracking-widest">
-                      Export CSV
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#002FA7]/10 border border-[#002FA7]/20">
+                        <Sparkles className="w-3 h-3 text-[#002FA7]" />
+                        <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-tighter">AI_ENABLED</span>
+                      </div>
+                      <button 
+                        className="text-zinc-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5"
+                        onClick={() => router.push('/crm-platform/calls')}
+                      >
+                        <ArrowRightLeft className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                      <thead>
-                        <tr className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] border-b border-white/5">
-                          <th className="pb-3 font-medium">Period</th>
-                          <th className="pb-3 font-medium">Usage (kWh)</th>
-                          <th className="pb-3 font-medium">Amount</th>
-                          <th className="pb-3 font-medium">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="font-mono text-xs">
-                        {[
-                          { period: 'Dec 2025', usage: '42,150', amount: '$4,130.70', status: 'Paid' },
-                          { period: 'Nov 2025', usage: '38,920', amount: '$3,814.16', status: 'Paid' },
-                          { period: 'Oct 2025', usage: '45,600', amount: '$4,468.80', status: 'Paid' },
-                          { period: 'Sep 2025', usage: '52,300', amount: '$5,125.40', status: 'Paid' },
-                        ].map((bill, i) => (
-                          <tr key={i} className="group hover:bg-white/5 transition-colors border-b border-white/5 last:border-0">
-                            <td className="py-4 text-zinc-300">{bill.period}</td>
-                            <td className="py-4 text-white tabular-nums">{bill.usage}</td>
-                            <td className="py-4 text-[#002FA7] font-bold tabular-nums">{bill.amount}</td>
-                            <td className="py-4">
-                              <span className="flex items-center gap-1.5 text-green-500/80">
-                                <CheckCircle className="w-3 h-3" />
-                                {bill.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="space-y-4">
+                    {isLoadingCalls ? (
+                      <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                        <div className="w-8 h-8 border-2 border-[#002FA7]/20 border-t-[#002FA7] rounded-full animate-spin" />
+                        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Scanning_Voice_Nodes...</span>
+                      </div>
+                    ) : recentCalls && recentCalls.length > 0 ? (
+                      recentCalls.map((call) => (
+                        <div key={call.id} className="group p-4 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] transition-all">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className={cn(
+                                "p-2 rounded-lg",
+                                call.type === 'Inbound' ? "bg-green-500/10 text-green-500" : "bg-[#002FA7]/10 text-[#002FA7]"
+                              )}>
+                                <Phone className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <div className="text-sm font-semibold text-white flex items-center gap-2">
+                                  {call.type} Call
+                                  <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest border-l border-white/10 pl-2">
+                                    {call.duration}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] font-mono text-zinc-500 uppercase mt-0.5">
+                                  {call.date && isValid(new Date(call.date)) ? format(new Date(call.date), 'MMM dd, yyyy • HH:mm') : 'Unknown Date'}
+                                </div>
+                              </div>
+                            </div>
+                            {call.recordingUrl && (
+                              <Button size="sm" variant="ghost" className="h-8 text-[10px] font-mono text-zinc-400 hover:text-white uppercase tracking-widest gap-2">
+                                <Play className="w-3 h-3" /> Play_Audio
+                              </Button>
+                            )}
+                          </div>
+                          
+                          {call.note && (
+                            <div className="mt-3 p-3 rounded-lg bg-black/40 border border-white/5 relative overflow-hidden group/insight">
+                              <div className="absolute top-0 right-0 p-2 opacity-30 group-hover/insight:opacity-100 transition-opacity">
+                                <Sparkles className="w-3 h-3 text-[#002FA7]" />
+                              </div>
+                              <div className="text-[10px] font-mono text-[#002FA7] uppercase tracking-[0.2em] mb-1">AI_SUMMARY</div>
+                              <p className="text-xs text-zinc-400 leading-relaxed font-light italic">
+                                "{call.note}"
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12 border border-dashed border-white/5 rounded-xl">
+                        <div className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">No_Recent_Voice_Logs</div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
