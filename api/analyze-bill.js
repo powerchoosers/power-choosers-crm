@@ -10,8 +10,8 @@ export default async function analyzeBillHandler(req, res) {
       return;
     }
 
-    const openRouterApiKey = process.env.OPEN_ROUTER_API_KEY;
     const geminiApiKey = process.env.FREE_GEMINI_KEY || process.env.GEMINI_API_KEY;
+    const perplexityApiKey = process.env.PERPLEXITY_API_KEY;
 
     const prompt = `
       Analyze this energy bill. Extract the following details in JSON format:
@@ -32,41 +32,74 @@ export default async function analyzeBillHandler(req, res) {
       Ensure the output is strictly valid JSON.
     `;
 
-    // 1. Try OpenRouter first as requested by Trey
-    if (openRouterApiKey) {
+    // 1. Try Gemini Models first (Free tier)
+    if (geminiApiKey) {
+      const genAI = new GoogleGenerativeAI(geminiApiKey);
+      const modelCandidates = [
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
+        'gemini-1.5-pro',
+        'gemini-2.0-pro-exp'
+      ];
+
+      for (const modelName of modelCandidates) {
+        try {
+          console.log(`[Bill Debugger] Attempting Gemini analysis with: ${modelName}`);
+          const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: { responseMimeType: "application/json" }
+          });
+          
+          const result = await model.generateContent([
+            prompt,
+            {
+              inlineData: {
+                data: fileData,
+                mimeType: mimeType || 'application/pdf'
+              }
+            }
+          ]);
+
+          const response = await result.response;
+          const text = response.text();
+          const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+          
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(jsonStr);
+          return;
+        } catch (e) {
+          const msg = e.message.toLowerCase();
+          if (msg.includes('quota') || msg.includes('429') || msg.includes('limit')) {
+            console.warn(`[Bill Debugger] Gemini ${modelName} quota exceeded, trying next...`);
+            continue;
+          }
+          console.error(`[Bill Debugger] Gemini ${modelName} fatal error:`, e.message);
+          break; // Stop if it's not a quota error
+        }
+      }
+    }
+
+    // 2. Fallback to Perplexity (Sonar) if Gemini fails or is exhausted
+    if (perplexityApiKey) {
       try {
-        const orModel = 'openai/gpt-oss-120b';
-        console.log(`[Bill Debugger] Attempting OpenRouter analysis with: ${orModel}`);
+        console.log(`[Bill Debugger] Falling back to Perplexity (Sonar)`);
+        // Perplexity doesn't support file uploads directly in the API yet, 
+        // but we can try to send the prompt. 
+        // NOTE: Since Sonar can't see the PDF/Image either, we log a warning.
+        console.warn(`[Bill Debugger] Sonar fallback initiated, but Sonar lacks vision/PDF support. Analysis may be limited.`);
         
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        const response = await fetch('https://api.perplexity.ai/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${openRouterApiKey}`,
-            'HTTP-Referer': 'https://nodalpoint.io',
-            'X-Title': 'Nodal Point CRM',
+            'Authorization': `Bearer ${perplexityApiKey}`,
           },
           body: JSON.stringify({
-            model: orModel,
+            model: 'sonar-pro',
             messages: [
-                  {
-                    role: 'system',
-                    content: 'You are a forensic bill analyst. Provide a brief (1-2 sentence) summary of your findings in plain text, followed by the JSON data object. Example: "I have extracted the usage and rate data from the MidAmerican Energy bill. { \"success\": true, ... }"'
-                  },
-                  {
-                    role: 'user',
-                    content: [
-                  { type: 'text', text: prompt },
-                  {
-                    type: 'image_url',
-                    image_url: {
-                      url: `data:${mimeType || 'application/pdf'};base64,${fileData}`
-                    }
-                  }
-                ]
-              }
+              { role: 'system', content: 'You are a forensic bill analyst.' },
+              { role: 'user', content: prompt }
             ],
-            temperature: 0.1,
             response_format: { type: 'json_object' }
           }),
         });
@@ -74,77 +107,20 @@ export default async function analyzeBillHandler(req, res) {
         if (response.ok) {
           const data = await response.json();
           const content = data?.choices?.[0]?.message?.content;
-          if (content) {
-            console.log(`[Bill Debugger] OpenRouter success with ${orModel}`);
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(content);
-            return;
-          }
-        } else {
-          const errText = await response.text();
-          console.warn(`[Bill Debugger] OpenRouter failed (${response.status}): ${errText}`);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(content);
+          return;
         }
       } catch (error) {
-        console.error('[Bill Debugger] OpenRouter error:', error);
+        console.error('[Bill Debugger] Perplexity fallback failed:', error);
       }
     }
 
-    // 2. Fallback to Gemini if OpenRouter fails or is not configured
-    if (!geminiApiKey) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
-        error: 'API Key Missing', 
-        message: 'No AI provider (OpenRouter or Gemini) is available for analysis.' 
-      }));
-      return;
-    }
-
-    const genAI = new GoogleGenerativeAI(geminiApiKey);
-    
-    // Model Candidate Chain
-    const modelCandidates = [
-      'gemini-2.0-flash',
-      'gemini-1.5-flash',
-      'gemini-1.5-pro',
-      'gemini-2.0-pro-exp'
-    ];
-
-    let lastErr = null;
-    let model = null;
-
-    for (const modelName of modelCandidates) {
-      try {
-        console.log(`[Bill Debugger] Attempting Gemini fallback analysis with: ${modelName}`);
-        model = genAI.getGenerativeModel({
-          model: modelName,
-          generationConfig: { responseMimeType: "application/json" }
-        });
-        
-        const result = await model.generateContent([
-          prompt,
-          {
-            inlineData: {
-              data: fileData,
-              mimeType: mimeType || 'application/pdf'
-            }
-          }
-        ]);
-
-        const response = await result.response;
-        const text = response.text();
-        const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(jsonStr);
-        return;
-      } catch (e) {
-        console.warn(`[Bill Debugger] Gemini ${modelName} failed: ${e.message}`);
-        lastErr = e;
-        continue;
-      }
-    }
-
-    throw lastErr || new Error("Failed to analyze bill with any available model");
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      error: 'Analysis failed', 
+      message: 'Exhausted all available models (Gemini & Sonar).' 
+    }));
 
   } catch (error) {
     console.error('[Bill Analysis Error]:', error);
