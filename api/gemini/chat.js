@@ -323,10 +323,12 @@ export default async function handler(req, res) {
 
         HYBRID_RESPONSE_MODE:
         - You are capable of providing BOTH narrative analysis AND forensic components in a single response.
-        - ALWAYS start with a concise, high-agency narrative analysis or greeting (2-3 sentences).
-        - FOLLOW with the appropriate JSON_DATA block if technical details or UI components are required.
-        - DO NOT provide the JSON_DATA block alone unless specifically asked for a raw data export.
-        - Example: "Trey, I've analyzed the current market volatility. We're seeing a spike in LZ_HOUSTON due to generation outages. JSON_DATA:{...}END_JSON"
+        - MANDATORY: Every response MUST begin with a concise, high-agency narrative (2-4 sentences) addressing ${firstName} directly.
+        - DO NOT skip the narrative. DO NOT start with JSON.
+        - FOLLOW the narrative with a single JSON_DATA block if technical details or UI components are required.
+        - FORMAT: "[Narrative text...] JSON_DATA:{...}END_JSON"
+        - Example: "Trey, I've analyzed the current market volatility. We're seeing a spike in LZ_HOUSTON due to generation outages. JSON_DATA:{\"type\": \"news_ticker\", \"data\": {...}}END_JSON"
+        - If the user asks a simple question, still provide a brief narrative before any data.
 
         RICH MEDIA PROTOCOL:
         - The user interface is a "Forensic HUD". Do NOT return Markdown tables.
@@ -369,11 +371,11 @@ export default async function handler(req, res) {
 
     const perplexityModel = (process.env.PERPLEXITY_MODEL || '').trim() || 'sonar-pro';
 
-    const callOpenRouter = async () => {
+    const callOpenRouter = async (modelName) => {
       const apiKey = process.env.OPEN_ROUTER_API_KEY;
       if (!apiKey) throw new Error('OpenRouter API key not configured');
 
-      const model = 'openai/gpt-oss-120b';
+      const model = modelName || 'openai/gpt-oss-120b';
       const normalized = cleanedMessages
         .slice(-12)
         .map((m) => ({
@@ -389,6 +391,8 @@ export default async function handler(req, res) {
       if (lastRole !== 'user') {
         openRouterMessages.push({ role: 'user', content: prompt });
       }
+
+      console.log(`[AI Router] Calling OpenRouter with model: ${model}`);
 
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
@@ -419,11 +423,12 @@ export default async function handler(req, res) {
       return content;
     };
 
-    const callPerplexity = async () => {
+    const callPerplexity = async (modelName) => {
       if (!perplexityApiKey) {
         throw new Error('Perplexity API key not configured');
       }
 
+      const model = modelName || perplexityModel;
       const normalized = cleanedMessages
         .slice(-12)
         .map((m) => ({
@@ -440,6 +445,8 @@ export default async function handler(req, res) {
         perplexityMessages.push({ role: 'user', content: prompt });
       }
 
+      console.log(`[AI Router] Calling Perplexity with model: ${model}`);
+
       const response = await fetch('https://api.perplexity.ai/chat/completions', {
         method: 'POST',
         headers: {
@@ -447,7 +454,7 @@ export default async function handler(req, res) {
           Authorization: `Bearer ${perplexityApiKey}`,
         },
         body: JSON.stringify({
-          model: perplexityModel,
+          model: model,
           messages: perplexityMessages,
           temperature: 0.7,
           max_tokens: 2048,
@@ -470,56 +477,37 @@ export default async function handler(req, res) {
     const routingDiagnostics = [];
     let lastErr = null;
     const bodyModel = (req.body.model || '').trim();
+    console.log(`[AI Router] Incoming request - bodyModel: "${bodyModel}"`);
 
-    // 1. Check if the user requested a specific non-Gemini model
-    if (bodyModel.startsWith('openai/') || bodyModel.startsWith('anthropic/') || bodyModel.startsWith('google/') && !bodyModel.includes('gemini')) {
+    // 1. Determine target model and provider
+    let targetModel = bodyModel;
+    let provider = 'gemini'; // Default fallback
+
+    if (!bodyModel || bodyModel === 'default') {
+      targetModel = 'openai/gpt-oss-120b';
+      provider = 'openrouter';
+    } else if (bodyModel.startsWith('sonar')) {
+      provider = 'perplexity';
+    } else if (bodyModel.startsWith('openai/') || bodyModel.startsWith('anthropic/') || bodyModel.startsWith('google/') || bodyModel.startsWith('meta-llama/') || bodyModel.startsWith('mistralai/') || bodyModel.startsWith('perplexity/')) {
+      provider = 'openrouter';
+    }
+
+    console.log(`[AI Router] Routing decision - targetModel: ${targetModel}, provider: ${provider}`);
+
+    // 2. Execute Routing
+    if (provider === 'openrouter') {
       if (process.env.OPEN_ROUTER_API_KEY) {
         try {
           routingDiagnostics.push({
-            model: bodyModel,
+            model: targetModel,
             provider: 'openrouter',
             status: 'attempting',
             timestamp: new Date().toISOString()
           });
 
-          // callOpenRouter needs to use the bodyModel
-          const callOpenRouterWithModel = async (modelName) => {
-            const apiKey = process.env.OPEN_ROUTER_API_KEY;
-            const normalized = cleanedMessages.slice(-12).map((m) => ({
-              role: m.role === 'user' ? 'user' : 'assistant',
-              content: m.content,
-            }));
-            const lastRole = normalized.length > 0 ? normalized[normalized.length - 1].role : 'assistant';
-            const openRouterMessages = [{ role: 'system', content: buildSystemPrompt().trim() }, ...normalized];
-            if (lastRole !== 'user') openRouterMessages.push({ role: 'user', content: prompt });
-
-            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                'HTTP-Referer': 'https://nodalpoint.io',
-                'X-Title': 'Nodal Point CRM',
-              },
-              body: JSON.stringify({
-                model: modelName,
-                messages: openRouterMessages,
-                temperature: 0.7,
-                max_tokens: 2048,
-              }),
-            });
-
-            if (!response.ok) {
-              const errText = await response.text().catch(() => '');
-              throw new Error(`OpenRouter error: ${response.status} ${response.statusText}${errText ? ` - ${errText}` : ''}`);
-            }
-            const data = await response.json();
-            return data?.choices?.[0]?.message?.content;
-          };
-
-          const content = await callOpenRouterWithModel(bodyModel);
+          const content = await callOpenRouter(targetModel);
           routingDiagnostics.push({
-            model: bodyModel,
+            model: targetModel,
             provider: 'openrouter',
             status: 'success',
             timestamp: new Date().toISOString()
@@ -529,14 +517,14 @@ export default async function handler(req, res) {
           res.end(JSON.stringify({
             content,
             provider: 'openrouter',
-            model: bodyModel,
+            model: targetModel,
             diagnostics: routingDiagnostics
           }));
           return;
         } catch (error) {
           console.error('[OpenRouter Chat] Error:', error);
           routingDiagnostics.push({
-            model: bodyModel,
+            model: targetModel,
             provider: 'openrouter',
             status: 'failed',
             error: error.message,
@@ -546,21 +534,18 @@ export default async function handler(req, res) {
           // Continue to fallback if OpenRouter fails
         }
       }
-    }
-
-    // 2. Try Perplexity if requested
-    if (bodyModel.startsWith('sonar')) {
+    } else if (provider === 'perplexity') {
       try {
         routingDiagnostics.push({
-          model: bodyModel,
+          model: targetModel,
           provider: 'perplexity',
           status: 'attempting',
           timestamp: new Date().toISOString()
         });
 
-        const content = await callPerplexity(); // This uses perplexityModel which defaults to sonar-pro
+        const content = await callPerplexity(targetModel);
         routingDiagnostics.push({
-          model: bodyModel,
+          model: targetModel,
           provider: 'perplexity',
           status: 'success',
           timestamp: new Date().toISOString()
@@ -570,20 +555,21 @@ export default async function handler(req, res) {
         res.end(JSON.stringify({
           content,
           provider: 'perplexity',
-          model: bodyModel,
+          model: targetModel,
           diagnostics: routingDiagnostics
         }));
         return;
       } catch (error) {
         console.error('[Perplexity Chat] Error:', error);
         routingDiagnostics.push({
-          model: bodyModel,
+          model: targetModel,
           provider: 'perplexity',
           status: 'failed',
           error: error.message,
           timestamp: new Date().toISOString()
         });
         lastErr = error;
+        // Continue to fallback if Perplexity fails
       }
     }
 
@@ -620,7 +606,6 @@ export default async function handler(req, res) {
     }
 
     const genAI = new GoogleGenerativeAI(geminiApiKey);
-    const bodyModel = (req.body.model || '').trim();
     const envPreferredModel = (process.env.GEMINI_MODEL || '').trim();
     const preferredModel = bodyModel || envPreferredModel || 'gemini-1.5-flash';
     const modelCandidates = Array.from(
