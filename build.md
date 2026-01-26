@@ -1,67 +1,90 @@
-Based on the forensic evidence in your screenshots (Source 83, 84, 86, 87, 88, 89), your current AI interface is failing the "Nodal Point" standard.
-It looks like a chatbot. It needs to look like a Command Line Interface (CLI) for the Grid.
-You are currently relying on the LLM to format text (using **bolding** and markdown tables). This is "B-minus work." It feels like a customer service bot. We need Generative UI. The AI should not send text descriptions of data; it should send the signal to render a component.
-Here is the Forensic UI Overhaul to fix the "Ugly Grid," the "Missing Data," and the "Dead Chat" feel.
+You are close. The System Architecture (the layout, the telemetry sidebar) is an A. It looks like a command center.
+But the Chat Interaction (the blue and purple bubbles) is a C-minus.
+Looking at CHAT 1 [Source 31] and CHAT 2 [Source 32], you have built a very expensive-looking wrapper around a standard text messaging app. The bright purple user bubble screams "Consumer App." It looks like iMessage or Facebook Messenger.
+Nodal Point is not a chat app. It is a Terminal.
+Here is the forensic audit of your UI and the code to fix it.
+The Critique: "Kill the Candy"
+1. The User Bubble (The Fatal Flaw): In Source 31, the user prompt "sweet generate a script" is inside a bright, rounded purple/blue pill.
+    ◦ Why it fails: It dominates the hierarchy. The user's input is secondary; the System's Output is primary. The bright color makes it look playful.
+    ◦ The Nodal Fix: The user's input should be "Stealth." It should be a dark glass block, aligned right, with monospace text. It represents a command entered into a console.
+2. The "Execute" Button: In Source 32, the button is a dull grey.
+    ◦ Why it fails: This is the trigger. It initiates the neural handshake. It should be the only thing that glows.
+    ◦ The Nodal Fix: Make it International Klein Blue (#002FA7).
+3. The Response Typography: In Source 32, the AI text is a wall of grey Sans-Serif.
+    ◦ Why it fails: It looks like a blog post.
+    ◦ The Nodal Fix: Use font-mono for headers and key data points. Add a "Data Line" to the left of the AI response to visually connect it to the system.
 
 --------------------------------------------------------------------------------
-1. Kill the "Markdown" Tables; Deploy "Intelligence Blocks"
-The Problem: In Source 88, you have a raw markdown table (| Scenario | Peak Demand...). It looks like a typewriter document. The Fix: The AI should not draw the table. It should return JSON. Your frontend renders the glass card.
-The Protocol:
-1. System Prompt Update: Tell Gemini: "Do not draw ASCII tables. Return data as a JSON object with type: 'forensic_grid'."
-2. Frontend Renderer: When the chat detects that JSON type, it renders a sleek, glass-panel grid with:
-    ◦ Monospace Data: Numbers in font-mono tabular-nums.
-    ◦ Volatility Highlights: If a number is high (like that 78% uplift), highlight it in Red or Amber.
-    ◦ Headers: Uppercase, tracking-widest, text-zinc-500.
-2. The "Tonie Steel" Dossier [Fixing Source 86, 87]
-The Problem: You asked about Tonie Steel. It gave you a biography in text. It didn't give you a button to click. It feels like a Wikipedia entry, not a CRM. The Nodal Fix: The "Dossier Card" Component.
-• Logic: If the AI identifies a Contact (get_contact_details), it should return a UI Card, not text.
-• The Card Visuals:
-    ◦ Left: Avatar (Initials JH/TS).
-    ◦ Center: Name (Bold), Title (Zinc-400), "Energy Maturity" (Calculated days).
-    ◦ Right (The Action): A glowing button: [ INITIATE PROFILE ].
-• Missing Data Protocol: You noted it didn't give contract details.
-    ◦ Do not let the AI apologize.
-    ◦ The Display: Show the "Energy Contract" row in the card with a Red Pulse and the text: DATA_VOID // REQUIRE_BILL_UPLOAD. This turns a lack of data into a call to action.
-3. The "Generic Account" Hallucination [Fixing Source 89]
-The Problem: The AI gave you a container for "Manufacturing..." but you don't know who it is. The Fix: Confidence Gating.
-• The AI likely found a "pattern" of a manufacturing client but didn't have the specific account_id linked to the context.
-• UI Change: The container must display the Source of Truth.
-    ◦ If it is a real DB record: Display ID: 100492 and the real Name.
-    ◦ If it is a theoretical scenario: Label it "SIMULATION MODEL" in Amber text. Never present a guess as a record.
+The Code: Drop this into your IDE
+We are going to "de-gamify" the chat components.
+1. The "Stealth" User Command (Replace your UserBubble component)
+Instead of a colored background, we use a dark, bordered terminal style.
+// UserMessage.tsx
+export default function UserMessage({ text }: { text: string }) {
+  return (
+    <div className="flex justify-end mb-6 group">
+      <div className="max-w-[80%] pl-10 relative">
+        {/* The Connector Line (Visual Haptic) */}
+        <div className="absolute right-[-20px] top-1/2 w-4 h-[1px] bg-zinc-800 group-hover:bg-[#002FA7] transition-colors" />
+        
+        <div className="bg-zinc-900/50 border border-white/10 backdrop-blur-md rounded-lg p-4 text-right">
+          <p className="font-mono text-xs text-[#002FA7] mb-1 uppercase tracking-widest opacity-70">
+            > COMMAND_INPUT
+          </p>
+          <p className="text-sm text-zinc-100 font-medium leading-relaxed">
+            {text}
+          </p>
+        </div>
+      </div>
+      {/* Optional: User Initials/Avatar on the right */}
+      <div className="ml-4 h-10 w-10 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center">
+        <span className="font-mono text-xs text-zinc-500">YOU</span>
+      </div>
+    </div>
+  );
+}
+2. The "Intelligence Block" (The AI Response)
+We add a "Neural Line" to the left of the AI text. This makes it look like data streaming from the system core.
+// SystemResponse.tsx
+export default function SystemResponse({ content, isTyping }: { content: string, isTyping?: boolean }) {
+  return (
+    <div className="flex justify-start mb-8 relative animate-in fade-in slide-in-from-left-4 duration-500">
+      
+      {/* The Neural Line (The glowing spine on the left) */}
+      <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-[#002FA7] via-blue-500/20 to-transparent" />
+      
+      <div className="pl-6 w-full max-w-3xl">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-widest">
+            NODAL_ARCHITECT // v1.0
+          </span>
+          {isTyping && <span className="animate-pulse w-1.5 h-1.5 bg-[#002FA7] rounded-full" />}
+        </div>
+        
+        {/* Render Markdown Content */}
+        <div className="prose prose-invert prose-p:text-zinc-400 prose-headings:font-mono prose-headings:text-zinc-200 prose-strong:text-white prose-code:text-[#002FA7] text-sm leading-7">
+           {/* Your Markdown Renderer Goes Here */}
+           <ReactMarkdown>{content}</ReactMarkdown>
+        </div>
+      </div>
+    </div>
+  );
+}
+3. The "Trigger" (The Input Area)
+Make the EXECUTE button the focal point.
+// InputArea.tsx
+<button className="bg-[#002FA7] hover:bg-blue-600 text-white font-mono text-xs uppercase tracking-widest px-6 py-3 rounded-lg transition-all shadow-[0_0_20px_rgba(0,47,167,0.4)] hover:shadow-[0_0_30px_rgba(0,47,167,0.6)] flex items-center gap-2">
+  <span>Execute</span>
+  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+</button>
 
 --------------------------------------------------------------------------------
-4. The "Living Interface": Animation & Scrolling
-To make it feel like "professional UI," we need to kill the static feeling.
-A. The "Neural Handshake" (Query Animation)
-When you type a query and hit enter:
-• Don't: Just show the text bubble immediately.
-• Do: Show a Terminal Log entry.
-    ◦ Visual: A small line of text appears above the chat input: > PARSING_INTENT... [||||||].
-    ◦ Transition: It stays for 400ms, then dissolves as the AI response streams in. This sells the idea that "calculation" is happening.
-B. The "Stream Scroll" (Auto-Scroll Logic)
-Nothing breaks immersion like having to manually scroll down to see the answer. The Code (React):
-const messagesEndRef = useRef(null);
-
-const scrollToBottom = () => {
-  messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-};
-
-// Hook to scroll whenever messages change or *while streaming*
-useEffect(() => {
-  scrollToBottom();
-}, [messages, isStreaming]); // Crucial: Scroll on every token stream
-C. The "Haptic" Entry (Chat Blobs)
-Your messages should not just "appear." They should decrypt.
-• User Message: Slides in from the right (x: 20 -> 0, opacity: 0 -> 1).
-• AI Message:
-    ◦ Do not fade it in all at once.
-    ◦ Typewriter Effect: Stream the text character by character (or word by word).
-    ◦ The "Block" Animation: If the AI returns a component (like the Market Data container), have it expand vertically (height: 0 -> auto) with a glass blur effect.
-
---------------------------------------------------------------------------------
-Summary Checklist for the Developer
-1. Implement react-markdown with Custom Renderers: Map specific Markdown patterns or JSON responses to your MarketDataWidget and ContactCard components.
-2. Add "Data_Void" State: If a contact lacks contract dates, render a visual warning in the chat stream, not a text apology.
-3. Install framer-motion: Use AnimatePresence for every message entry.
-4. Auto-Scroll Hook: Ensure the chat creates a "lock" on the bottom pixel while the AI is typing.
-Final Directive: You are building a HUD (Heads Up Display) for a market architect. If it looks like a text message, delete it. If it looks like a cockpit instrument, keep it.
+The Calibration Test: Example Prompts
+Once you implement these visual changes, run these prompts to see if the soul of the machine is correct. We are checking if it respects the Energy-Only Market logic [Source 686] and the Forensic Tone [Source 899].
+Test 1: The Physics Check (Does it understand 4CP?)
+"Analyze the load profile for [Company Name]. Are we exposed to the August coincident peak windows, and what is the estimated transmission liability?" Pass: If it calculates a dollar amount or identifies specific "Danger Zones" (e.g., 4 PM - 6 PM). Fail: If it gives a generic definition of 4CP.
+Test 2: The Tone Check (Does it sound like a Broker or an Architect?)
+"Draft an email to the CFO. Tell them their current contract includes a hidden demand ratchet that is costing them money." Pass: Short, direct. "We detected a structural flaw." "The ratchet is artificial waste." [Source 890] Fail: "I hope you are doing well. I wanted to reach out regarding savings." (This is "Power Choosers" fluff).
+Test 3: The System Integrity Check
+"System Status." Pass: It should return a "Market Pulse" card showing LZ_NORTH prices and Grid Reserves (from your RSS feed integration) [Source 893].
+Execute the UI changes first. The user bubble is the single biggest "immersion breaker" right now. Fix that, and it becomes a weapon.
