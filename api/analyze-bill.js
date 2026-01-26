@@ -49,9 +49,13 @@ export default async function analyzeBillHandler(req, res) {
           body: JSON.stringify({
             model: orModel,
             messages: [
-              {
-                role: 'user',
-                content: [
+                  {
+                    role: 'system',
+                    content: 'You are a forensic bill analyst. Provide a brief (1-2 sentence) summary of your findings in plain text, followed by the JSON data object. Example: "I have extracted the usage and rate data from the MidAmerican Energy bill. { \"success\": true, ... }"'
+                  },
+                  {
+                    role: 'user',
+                    content: [
                   { type: 'text', text: prompt },
                   {
                     type: 'image_url',

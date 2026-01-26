@@ -321,6 +321,13 @@ export default async function handler(req, res) {
         - The user's name is ${firstName}.
         - ALWAYS address them by their first name (${firstName}) in your initial greeting or when appropriate.
 
+        HYBRID_RESPONSE_MODE:
+        - You are capable of providing BOTH narrative analysis AND forensic components in a single response.
+        - ALWAYS start with a concise, high-agency narrative analysis or greeting (2-3 sentences).
+        - FOLLOW with the appropriate JSON_DATA block if technical details or UI components are required.
+        - DO NOT provide the JSON_DATA block alone unless specifically asked for a raw data export.
+        - Example: "Trey, I've analyzed the current market volatility. We're seeing a spike in LZ_HOUSTON due to generation outages. JSON_DATA:{...}END_JSON"
+
         RICH MEDIA PROTOCOL:
         - The user interface is a "Forensic HUD". Do NOT return Markdown tables.
         - When providing energy news, use:
