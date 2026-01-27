@@ -125,7 +125,10 @@ export class GmailService {
             const auth = new google.auth.JWT({
                 email: key.client_email,
                 key: key.private_key,
-                scopes: ['https://www.googleapis.com/auth/gmail.send'],
+                scopes: [
+                    'https://www.googleapis.com/auth/gmail.send',
+                    'https://www.googleapis.com/auth/gmail.settings.basic'
+                ],
                 subject: impersonateEmail || this.fromEmail // Impersonate this user
             });
             
@@ -136,6 +139,61 @@ export class GmailService {
             logger.error('[Gmail] Failed to initialize:', error);
             throw error;
         }
+    }
+
+    /**
+     * Updates the "Send mail as" display name for the user in Gmail settings
+     * @param {string} userEmail 
+     * @param {string} displayName 
+     */
+    async updateSendAsDisplayName(userEmail, displayName) {
+        if (!this.gmail) {
+            await this.initialize(userEmail);
+        }
+
+        try {
+            // First, find the alias that matches the userEmail (usually the primary one)
+            const response = await this.gmail.users.settings.sendAs.list({
+                userId: userEmail,
+            });
+
+            const aliases = response.data.sendAs || [];
+            const targetAlias = aliases.find(a => a.sendAsEmail.toLowerCase() === userEmail.toLowerCase()) || aliases[0];
+
+            if (!targetAlias) {
+                logger.warn(`[Gmail] No SendAs alias found for ${userEmail}`);
+                return null;
+            }
+
+            // Only update if it's different
+            if (targetAlias.displayName === displayName) {
+                logger.debug(`[Gmail] Display name for ${userEmail} is already correct: "${displayName}"`);
+                return targetAlias;
+            }
+
+            logger.info(`[Gmail] Updating display name for ${userEmail} from "${targetAlias.displayName}" to "${displayName}"`);
+
+            const updateResponse = await this.gmail.users.settings.sendAs.patch({
+                userId: userEmail,
+                sendAsEmail: targetAlias.sendAsEmail,
+                requestBody: {
+                    displayName: displayName,
+                },
+            });
+
+            return updateResponse.data;
+        } catch (error) {
+            logger.error(`[Gmail] Failed to update SendAs display name for ${userEmail}:`, error);
+            // Don't throw, just return null so we don't break the flow
+            return null;
+        }
+    }
+
+    /**
+     * Helper to ensure display name is correct (wrapper around updateSendAsDisplayName)
+     */
+    async ensureCorrectDisplayName(userEmail, displayName) {
+        return this.updateSendAsDisplayName(userEmail, displayName);
     }
     
     /**
@@ -160,6 +218,19 @@ export class GmailService {
         if (!this.gmail || this.lastInitializedEmail !== senderEmail) {
             await this.initialize(senderEmail);
             this.lastInitializedEmail = senderEmail; // Cache to avoid re-initializing
+        }
+
+        // AUTO-FIX: Check if the current Gmail "Send mail as" display name matches our desired name
+        // If not, update it. This ensures future emails (even outside this app) use the correct name.
+        if (senderName && senderName !== senderEmail) {
+            try {
+                // We don't await this to avoid slowing down the email send
+                this.ensureCorrectDisplayName(senderEmail, senderName).catch(err => {
+                    logger.warn('[Gmail] Background display name update failed:', err.message);
+                });
+            } catch (e) {
+                // Ignore sync errors
+            }
         }
         
         try {
