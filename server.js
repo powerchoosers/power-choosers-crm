@@ -81,7 +81,6 @@ import searchHandler from './api/search.js';
 import callsHandler from './api/calls.js';
 
 // NEW IMPORTS FOR REMAINING ENDPOINTS
-import perplexityEmailHandler from './api/perplexity-email.js';
 import twilioRecordingHandler from './api/twilio/recording.js';
 import twilioConversationalIntelligenceHandler from './api/twilio/conversational-intelligence.js';
 import twilioCiRequestHandler from './api/twilio/ci-request.js';
@@ -94,15 +93,9 @@ import twilioPollCiAnalysisHandler from './api/twilio/poll-ci-analysis.js';
 import twilioCallerLookupHandler from './api/twilio/caller-lookup.js';
 import sendgridSendHandler from './api/email/sendgrid-send.js';
 import inboundEmailHandler from './api/email/inbound-email.js';
-import generateScheduledEmailsHandler from './api/generate-scheduled-emails.js';
-import sendScheduledEmailsHandler from './api/send-scheduled-emails.js';
-import processSequenceActivationsHandler from './api/process-sequence-activations.js';
-import completeSequenceTaskHandler from './api/complete-sequence-task.js';
-// import backfillSequenceTasksHandler from './api/backfill-sequence-tasks.js';
 import createBookingHandler from './api/create-booking.js';
 
 // ADDITIONAL IMPORTS FOR REMAINING PROXY FUNCTIONS
-// import emailBackfillThreadsHandler from './api/email/backfill-threads.js';
 import emailUnsubscribeHandler from './api/email/unsubscribe.js';
 import processCallHandler from './api/process-call.js';
 import trackEmailPerformanceHandler from './api/track-email-performance.js';
@@ -171,13 +164,13 @@ logger.info('Server configuration loaded', 'Server', {
 console.log('[Server] Environment Key Check:', {
   hasTwilioAccountSid: !!process.env.TWILIO_ACCOUNT_SID,
   hasTwilioAuthToken: !!process.env.TWILIO_AUTH_TOKEN,
-  hasPerplexityApiKey: !!process.env.PERPLEXITY_API_KEY,
   hasGeminiApiKey: !!process.env.GEMINI_API_KEY,
   hasFreeGeminiKey: !!process.env.FREE_GEMINI_KEY,
   hasGoogleMapsApi: !!process.env.GOOGLE_MAPS_API,
   hasGoogleServiceAccountKey: !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
   hasSupabaseUrl: !!process.env.SUPABASE_URL,
   hasSupabaseServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+  hasPerplexityApiKey: !!process.env.PERPLEXITY_API_KEY,
   hasFirebaseProjectId: !!process.env.FIREBASE_PROJECT_ID,
   hasSendgridApiKey: !!process.env.SENDGRID_API_KEY,
   hasGmailSenderEmail: !!process.env.GMAIL_SENDER_EMAIL,
@@ -215,111 +208,6 @@ function getCorrelationId(req) {
   return req.headers['x-request-id'] ||
     req.headers['x-correlation-id'] ||
     `req-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-}
-
-// ---------------- Perplexity API endpoint for localhost development ----------------
-
-async function handleApiPerplexityEmail(req, res) {
-  if (req.method === 'OPTIONS') {
-    const origin = req.headers.origin;
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      'https://powerchoosers.com',
-      'https://www.powerchoosers.com',
-      'https://power-choosers-crm-792458658491.us-south1.run.app'
-    ];
-
-    const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
-
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin': allowedOrigin,
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-      'Access-Control-Allow-Credentials': 'true',
-      'Vary': 'Origin'
-    });
-    res.end();
-    return;
-  }
-
-  if (req.method !== 'POST') {
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Method not allowed' }));
-    return;
-  }
-
-  // Ensure body is parsed for POST requests so downstream handler receives req.body
-  try {
-    req.body = await parseRequestBody(req);
-  } catch (error) {
-    console.error('[Server] Perplexity API - Body Parse Error:', error.message);
-    res.writeHead(400, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Invalid request body' }));
-    return;
-  }
-
-  try {
-    // Import the Vercel function logic
-    const { default: perplexityHandler } = await import('./api/perplexity-email.js');
-
-    // Create a mock request/response that matches Vercel's format
-    const mockReq = {
-      method: req.method,
-      headers: req.headers,
-      body: req.body
-    };
-
-    const mockRes = {
-      writeHead: (code, headers = {}) => {
-        // Mirror headers and status to the actual response
-        try { Object.entries(headers).forEach(([k, v]) => res.setHeader(k, v)); } catch (_) { }
-        res.statusCode = code;
-      },
-      status: (code) => ({
-        json: (data) => {
-          const origin = req.headers.origin;
-          const allowedOrigins = [
-            'http://localhost:3000',
-            'http://127.0.0.1:3000',
-            'https://powerchoosers.com',
-            'https://www.powerchoosers.com',
-            'https://power-choosers-crm-792458658491.us-south1.run.app'
-          ];
-
-          const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
-
-          res.writeHead(code, {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': allowedOrigin,
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-            'Access-Control-Allow-Credentials': 'true',
-            'Vary': 'Origin'
-          });
-          res.end(JSON.stringify(data));
-        }
-      }),
-      setHeader: (key, value) => {
-        res.setHeader(key, value);
-      },
-      end: (data) => {
-        // If handler didn't set status, default to 200
-        res.end(data);
-      }
-    };
-
-    // Call the Vercel function
-    await perplexityHandler(mockReq, mockRes);
-
-  } catch (error) {
-    console.error('[Server] Perplexity API error:', error);
-    res.writeHead(500, {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*'
-    });
-    res.end(JSON.stringify({ error: 'Internal server error', message: error.message }));
-  }
 }
 
 // ---------------- Gemini API endpoints now proxied to Vercel ----------------
@@ -752,7 +640,6 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/energy-news' ||
     pathname === '/api/search' ||
     pathname === '/api/tx-price' ||
-    pathname === '/api/perplexity-email' ||
     pathname === '/api/process-call' ||
     pathname === '/api/track-email-performance' ||
     pathname === '/api/apollo/company' ||
@@ -867,9 +754,6 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/tx-price') {
     return handleApiTxPrice(req, res, parsedUrl);
   }
-  if (pathname === '/api/perplexity-email') {
-    return handleApiPerplexityEmail(req, res);
-  }
   if (pathname === '/api/analyze-bill') {
     if (req.method === 'POST') {
       try {
@@ -921,27 +805,9 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/email/stats') {
     return handleApiEmailStats(req, res, parsedUrl);
   }
-  /* if (pathname === '/api/email/backfill-threads') {
-    return handleApiEmailBackfillThreads(req, res);
-  } */
   if (pathname === '/api/email/unsubscribe') {
     return handleApiEmailUnsubscribe(req, res);
   }
-  if (pathname === '/api/generate-scheduled-emails') {
-    return handleApiGenerateScheduledEmails(req, res);
-  }
-  if (pathname === '/api/send-scheduled-emails') {
-    return handleApiSendScheduledEmails(req, res);
-  }
-  if (pathname === '/api/process-sequence-activations') {
-    return handleApiProcessSequenceActivations(req, res);
-  }
-  if (pathname === '/api/complete-sequence-task') {
-    return handleApiCompleteSequenceTask(req, res);
-  }
-  /* if (pathname === '/api/backfill-sequence-tasks') {
-    return handleApiBackfillSequenceTasks(req, res);
-  } */
   if (pathname === '/api/process-call') {
     return handleApiProcessCall(req, res);
   }
@@ -1372,53 +1238,11 @@ async function handlePostRoute(req, res, slug) {
 // ---------------- Additional API Handler Functions ----------------
 
 // Email automation handlers
-async function handleApiEmailBackfillThreads(req, res) {
-  if (req.method === 'POST') {
-    req.body = await parseRequestBody(req);
-  }
-  return await emailBackfillThreadsHandler(req, res);
-}
-
 async function handleApiEmailUnsubscribe(req, res) {
   if (req.method === 'POST') {
     req.body = await parseRequestBody(req);
   }
   return await emailUnsubscribeHandler(req, res);
-}
-
-async function handleApiGenerateScheduledEmails(req, res) {
-  if (req.method === 'POST') {
-    req.body = await parseRequestBody(req);
-  }
-  return await generateScheduledEmailsHandler(req, res);
-}
-
-async function handleApiSendScheduledEmails(req, res) {
-  if (req.method === 'POST') {
-    req.body = await parseRequestBody(req);
-  }
-  return await sendScheduledEmailsHandler(req, res);
-}
-
-async function handleApiProcessSequenceActivations(req, res) {
-  if (req.method === 'POST') {
-    req.body = await parseRequestBody(req);
-  }
-  return await processSequenceActivationsHandler(req, res);
-}
-
-async function handleApiCompleteSequenceTask(req, res) {
-  if (req.method === 'POST') {
-    req.body = await parseRequestBody(req);
-  }
-  return await completeSequenceTaskHandler(req, res);
-}
-
-async function handleApiBackfillSequenceTasks(req, res) {
-  if (req.method === 'POST') {
-    req.body = await parseRequestBody(req);
-  }
-  return await backfillSequenceTasksHandler(req, res);
 }
 
 // Process call and track email performance
@@ -1613,30 +1437,6 @@ async function handleApiDebugLog(req, res) {
     }
   }
   return await debugLogHandler(req, res);
-}
-
-async function handleApiDebugFirestore(req, res) {
-  try {
-    // Test basic Firestore access
-    const testDoc = await db.collection('debug').doc('test').get();
-
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      success: true,
-      message: 'Firestore access working',
-      timestamp: new Date().toISOString(),
-      docExists: testDoc.exists
-    }));
-  } catch (error) {
-    console.error('[Debug] Firestore error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      success: false,
-      error: error.message,
-      stack: error.stack,
-      timestamp: new Date().toISOString()
-    }));
-  }
 }
 
 // Calls contact handler
