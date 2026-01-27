@@ -354,19 +354,32 @@ const toolHandlers = {
   list_accounts: async ({ search, industry, expiration_year, limit = 10 }) => {
     let query = supabaseAdmin.from('accounts').select('*').limit(limit);
     if (industry) {
-      query = query.ilike('industry', `%${industry}%`);
+      // Use or condition to check both industry column and metadata
+      query = query.or(`industry.ilike.%${industry}%,metadata->>industry.ilike.%${industry}%`);
     }
     if (search) {
-      query = query.or(`name.ilike.%${search}%,domain.ilike.%${search}%,industry.ilike.%${search}%`);
+      query = query.or(`name.ilike.%${search}%,domain.ilike.%${search}%,industry.ilike.%${search}%,metadata->>industry.ilike.%${search}%`);
     }
     if (expiration_year) {
       const start = `${expiration_year}-01-01`;
       const end = `${expiration_year}-12-31`;
-      query = query.gte('contract_end_date', start).lte('contract_end_date', end);
+      // Check both top-level and metadata for contract expiration
+      query = query.or(`and(contract_end_date.gte.${start},contract_end_date.lte.${end}),and(metadata->>contract_end_date.gte.${start},metadata->>contract_end_date.lte.${end})`);
     }
     const { data, error } = await query;
     if (error) throw error;
-    return data;
+    
+    // Normalize results to ensure promoted fields are available
+    return data.map(record => {
+      const metadata = record.metadata || {};
+      return {
+        ...record,
+        contract_end_date: record.contract_end_date || metadata.contract_end_date,
+        industry: record.industry || metadata.industry,
+        electricity_supplier: record.electricity_supplier || metadata.electricity_supplier,
+        annual_usage: record.annual_usage || metadata.annual_usage
+      };
+    });
   },
   list_account_documents: async ({ account_id }) => {
     const { data, error } = await supabaseAdmin.from('documents').select('*').eq('account_id', account_id).order('created_at', { ascending: false });
@@ -507,6 +520,8 @@ export default async function handler(req, res) {
         USER_IDENTITY:
         - The user's name is ${firstName}.
         - ALWAYS address them by their first name (${firstName}) in your initial greeting or when appropriate.
+        - TODAY'S DATE: ${new Date().toISOString().split('T')[0]} (Year: ${new Date().getFullYear()})
+        - CURRENT CONTEXT: "This year" means ${new Date().getFullYear()}.
 
         ANTI_HALLUCINATION_PROTOCOL:
         - CRITICAL: NEVER invent names, companies, email addresses, phone numbers, or energy metrics (kWh, strike price).
@@ -528,8 +543,10 @@ export default async function handler(req, res) {
           - "Assembly"
           - "Fabrication"
         - The \`list_accounts\` tool now supports an \`industry\` parameter and checks the industry column in searches.
-        - Use \`list_accounts({ industry: "Manufacturing" })\` to find core manufacturers, but also check \`list_accounts({ search: "Building Materials" })\` etc. if needed.
-        - BETTER: Use the \`search\` parameter with broad terms like "Manufacturing" which now searches the industry column.
+        - DO NOT just call \`list_accounts({ industry: "Manufacturing" })\`. This will miss many relevant records.
+        - INSTEAD: Call \`list_accounts({ search: "Manufacturing" })\` or use multiple searches for the terms listed above to ensure you find all relevant "nodes".
+        - If the user asks "how many", perform a search and count the actual results returned by the tool.
+        - ALWAYS report the actual industry name found in the CRM record.
 
         CRM_CAPABILITIES:
         - You have direct access to the CRM database via tools.
