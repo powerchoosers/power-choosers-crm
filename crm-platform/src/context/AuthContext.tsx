@@ -112,13 +112,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Use a separate async function to handle the logic without blocking the listener
       const handleAuthStateChange = async () => {
         try {
-          const sbUser = session?.user || null
-          const currentUser = sbUser ? mapUser(sbUser) : null
+          // If no session, handle logged out state immediately
+          if (!session) {
+            if (!mounted) return
+            setUser(null)
+            if (unsubProfile) {
+              unsubProfile()
+              unsubProfile = null
+            }
+            setRole(null)
+            setProfile({ 
+              name: null, 
+              firstName: null, 
+              lastName: null,
+              bio: null,
+              twilioNumbers: null,
+              selectedPhoneNumber: null,
+              bridgeToMobile: null
+            })
+            document.cookie = 'np_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;'
+            if (mounted) setLoading(false)
+            
+            if (window.location.pathname.startsWith('/crm-platform')) {
+              router.push('/login')
+            }
+            return
+          }
+
+          const sbUser = session.user
+          const currentUser = mapUser(sbUser)
           
           if (!mounted) return
           setUser(currentUser)
 
-          if (currentUser && currentUser.email) {
+          if (currentUser.email) {
             // Set session cookie for middleware
             document.cookie = 'np_session=1; Path=/; SameSite=Lax'
 
