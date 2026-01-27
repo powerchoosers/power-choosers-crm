@@ -55,11 +55,13 @@ const tools = [
       },
       {
         name: 'list_accounts',
-        description: 'Get a list of accounts (companies) from the CRM.',
+        description: 'Get a list of accounts (companies) from the CRM. Can be filtered by search term, industry, or contract expiration year.',
         parameters: {
           type: 'OBJECT',
           properties: {
-            search: { type: 'STRING', description: 'Search term for account name' },
+            search: { type: 'STRING', description: 'Search term for account name, domain, or industry' },
+            industry: { type: 'STRING', description: 'Filter by industry (e.g. "Manufacturing", "Healthcare")' },
+            expiration_year: { type: 'NUMBER', description: 'Filter accounts by contract expiration year (e.g. 2026)' },
             limit: { type: 'NUMBER', description: 'Maximum number of accounts to return' }
           }
         }
@@ -194,6 +196,16 @@ const tools = [
           properties: {
             account_id: { type: 'STRING' },
             status: { type: 'STRING', enum: ['interested', 'proposal', 'won', 'lost', 'all'] }
+          }
+        }
+      },
+      {
+        name: 'list_all_documents',
+        description: 'Get a list of all documents (bills, contracts, etc.) across all accounts, sorted by newest first.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            limit: { type: 'NUMBER', description: 'Maximum number of documents to return (default 10)' }
           }
         }
       }
@@ -339,10 +351,18 @@ const toolHandlers = {
     if (error) throw error;
     return data;
   },
-  list_accounts: async ({ search, limit = 10 }) => {
+  list_accounts: async ({ search, industry, expiration_year, limit = 10 }) => {
     let query = supabaseAdmin.from('accounts').select('*').limit(limit);
+    if (industry) {
+      query = query.ilike('industry', `%${industry}%`);
+    }
     if (search) {
-      query = query.ilike('name', `%${search}%`);
+      query = query.or(`name.ilike.%${search}%,domain.ilike.%${search}%,industry.ilike.%${search}%`);
+    }
+    if (expiration_year) {
+      const start = `${expiration_year}-01-01`;
+      const end = `${expiration_year}-12-31`;
+      query = query.gte('contract_end_date', start).lte('contract_end_date', end);
     }
     const { data, error } = await query;
     if (error) throw error;
@@ -350,6 +370,11 @@ const toolHandlers = {
   },
   list_account_documents: async ({ account_id }) => {
     const { data, error } = await supabaseAdmin.from('documents').select('*').eq('account_id', account_id).order('created_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+  list_all_documents: async ({ limit = 10 }) => {
+    const { data, error } = await supabaseAdmin.from('documents').select('*, accounts(name)').order('created_at', { ascending: false }).limit(limit);
     if (error) throw error;
     return data;
   },
@@ -483,10 +508,40 @@ export default async function handler(req, res) {
         - The user's name is ${firstName}.
         - ALWAYS address them by their first name (${firstName}) in your initial greeting or when appropriate.
 
+        ANTI_HALLUCINATION_PROTOCOL:
+        - CRITICAL: NEVER invent names, companies, email addresses, phone numbers, or energy metrics (kWh, strike price).
+        - If a search (e.g., for "manufacturers", "expiring accounts", "outreach list") returns zero results from a tool, you MUST say: "Trey, I searched the database but found no records matching that criteria."
+        - DO NOT provide "examples" or "demonstration data" unless explicitly asked for a demo.
+        - The "Data Locker" (forensic_documents) must ONLY contain real documents returned by tools.
+        - DO NOT use names like "Pacific Energy Solutions", "Global Manufacturing Inc.", "Apex Manufacturing", "Vertex Energy", "Summit Industrial", "Horizon Power Systems", or "Pinnacle Energy Group". These are hallucinations.
+        - If the user asks for "outreach this week" and you find no data, do not create a fake list. Say: "Trey, I don't see any accounts scheduled for outreach this week in the CRM."
+        - Accuracy is the ONLY priority for CRM data. If you are 99% sure but haven't run a tool, you are 0% sure. RUN THE TOOL.
+
+        INDUSTRY_INTELLIGENCE:
+        - "Manufacturing" is a broad sector. If the user asks for "Manufacturing" or "Manufacturers", you MUST search for these related industries:
+          - "Manufacturing"
+          - "Building Materials"
+          - "Electrical"
+          - "Electronic"
+          - "Industrial"
+          - "Production"
+          - "Assembly"
+          - "Fabrication"
+        - The \`list_accounts\` tool now supports an \`industry\` parameter and checks the industry column in searches.
+        - Use \`list_accounts({ industry: "Manufacturing" })\` to find core manufacturers, but also check \`list_accounts({ search: "Building Materials" })\` etc. if needed.
+        - BETTER: Use the \`search\` parameter with broad terms like "Manufacturing" which now searches the industry column.
+
+        CRM_CAPABILITIES:
+        - You have direct access to the CRM database via tools.
+        - When asked about accounts, contacts, or deals, ALWAYS use the provided tools (list_accounts, list_contacts, etc.) instead of assuming or hallucinating data.
+        - To find accounts expiring in a specific year, use list_accounts with the expiration_year parameter.
+        - If a tool returns no results, inform the user clearly without making up data.
+
         HYBRID_RESPONSE_MODE:
         - You are capable of providing BOTH narrative analysis AND forensic components in a single response.
         - MANDATORY: Every response MUST begin with a concise, high-agency narrative (2-4 sentences) addressing ${firstName} directly.
         - DO NOT skip the narrative. DO NOT start with JSON.
+        - DO NOT use Markdown tables for CRM data. Use JSON_DATA blocks with the appropriate component type (forensic_grid, contact_dossier, etc.).
         - FOLLOW the narrative with a single JSON_DATA block if technical details or UI components are required.
         - FORMAT: "[Narrative text...] JSON_DATA:{...}END_JSON"
         - Example: "Trey, I've analyzed the current market volatility. We're seeing a spike in LZ_HOUSTON due to generation outages. JSON_DATA:{\"type\": \"news_ticker\", \"data\": {...}}END_JSON"
