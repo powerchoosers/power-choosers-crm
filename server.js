@@ -160,36 +160,30 @@ try {
   // Continue with system environment variables
 }
 
-// Essential startup logging only
+// Essential startup logging
 logger.info('Power Choosers CRM server starting', 'Server');
 logger.info('Server configuration loaded', 'Server', {
   port: process.env.PORT || 3000,
   nodeEnv: process.env.NODE_ENV || 'development'
 });
 
-// Development-only detailed logging
-if (process.env.NODE_ENV !== 'production') {
-  console.log('[Server] Environment check:', {
-    hasTwilioAccountSid: !!process.env.TWILIO_ACCOUNT_SID,
-    hasTwilioAuthToken: !!process.env.TWILIO_AUTH_TOKEN,
-    hasPerplexityApiKey: !!process.env.PERPLEXITY_API_KEY,
-    hasGeminiApiKey: !!process.env.GEMINI_API_KEY,
-    hasSupabaseServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-    hasFreeGeminiKey: !!process.env.FREE_GEMINI_KEY,
-    hasOpenRouterApiKey: !!process.env.OPEN_ROUTER_API_KEY,
-    openRouterEndpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    nodeEnv: process.env.NODE_ENV || 'development',
-    port: process.env.PORT || 3000
-  });
-  console.log('[Server] PORT environment variable:', process.env.PORT);
-  console.log('[Server] NODE_ENV:', process.env.NODE_ENV);
-  console.log('[Server] API_BASE_URL:', process.env.API_BASE_URL);
-  console.log('[Server] PUBLIC_BASE_URL:', process.env.PUBLIC_BASE_URL);
-  console.log('[Server] dotenv processing complete.');
-  console.log('[Server] Initializing Firebase connection...');
-  console.log('[Server] Setting up Twilio client...');
-  console.log('[Server] Loading API handlers...');
-}
+// Environment check (visible in production logs for troubleshooting)
+console.log('[Server] Environment Key Check:', {
+  hasTwilioAccountSid: !!process.env.TWILIO_ACCOUNT_SID,
+  hasTwilioAuthToken: !!process.env.TWILIO_AUTH_TOKEN,
+  hasPerplexityApiKey: !!process.env.PERPLEXITY_API_KEY,
+  hasGeminiApiKey: !!process.env.GEMINI_API_KEY,
+  hasFreeGeminiKey: !!process.env.FREE_GEMINI_KEY,
+  hasGoogleMapsApi: !!process.env.GOOGLE_MAPS_API,
+  hasGoogleServiceAccountKey: !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
+  hasSupabaseUrl: !!process.env.SUPABASE_URL,
+  hasSupabaseServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+  hasFirebaseProjectId: !!process.env.FIREBASE_PROJECT_ID,
+  hasSendgridApiKey: !!process.env.SENDGRID_API_KEY,
+  hasGmailSenderEmail: !!process.env.GMAIL_SENDER_EMAIL,
+  nodeEnv: process.env.NODE_ENV || 'development',
+  port: process.env.PORT || 3000
+});
 
 // MIME types for different file extensions
 const mimeTypes = {
