@@ -53,7 +53,7 @@ export default function LoginPage() {
             prompt: 'consent',
           },
           scopes: 'https://www.googleapis.com/auth/gmail.readonly',
-          redirectTo: `${window.location.origin}/crm-platform`
+          redirectTo: `${window.location.origin}/auth/callback`
         }
       })
       

@@ -109,6 +109,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return
 
+      console.log(`[AuthContext] Event: ${event}`, session?.user?.email)
+
       // Use a separate async function to handle the logic without blocking the listener
       const handleAuthStateChange = async () => {
         try {
@@ -133,7 +135,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             document.cookie = 'np_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;'
             if (mounted) setLoading(false)
             
-            if (window.location.pathname.startsWith('/crm-platform')) {
+            const publicPaths = ['/login', '/', '/philosophy', '/technical-docs', '/market-data', '/bill-debugger', '/auth/callback']
+            const currentPath = window.location.pathname
+            
+            if (!publicPaths.includes(currentPath) && currentPath.startsWith('/crm-platform')) {
               router.push('/login')
             }
             return
@@ -149,11 +154,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Set session cookie for middleware
             document.cookie = 'np_session=1; Path=/; SameSite=Lax'
 
-            // Firestore Sync Logic (Keep existing logic but prioritize Supabase metadata)
-            const userDocRef = doc(db, 'users', currentUser.email.toLowerCase())
+            // Firestore Sync Logic
             const emailLower = currentUser.email.toLowerCase().trim()
+            const userDocRef = doc(db, 'users', emailLower)
             
-            // Unsubscribe previous listener if any
             if (unsubProfile) unsubProfile()
 
             unsubProfile = onSnapshot(userDocRef, (doc) => {
@@ -199,80 +203,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   bridgeToMobile: typeof data.bridgeToMobile === 'boolean' ? data.bridgeToMobile : false
                 })
               } else {
-                // Document doesn't exist yet, use Supabase metadata
+                // If doc doesn't exist, use Supabase info
                 setRole('employee')
-                const inferred = inferNameFromString(currentUser.displayName) || inferNameFromEmail(emailLower)
-                const derivedName = inferred?.fullName || currentUser.displayName || null
+                const sbMetadata = sbUser?.user_metadata || {}
+                const sbFullName = sbMetadata.full_name || sbMetadata.name
+                const inferred = inferNameFromString(sbFullName) || inferNameFromEmail(emailLower)
                 
                 setProfile({ 
-                  name: derivedName, 
-                  firstName: inferred?.firstName || null, 
+                  name: sbFullName || currentUser.displayName || emailLower.split('@')[0],
+                  firstName: inferred?.firstName || null,
                   lastName: inferred?.lastName || null,
                   bio: null,
                   twilioNumbers: [],
                   selectedPhoneNumber: null,
                   bridgeToMobile: false
                 })
-                
-                // Create the document in Firestore if it doesn't exist (Migration)
-                 const createProfile = async () => {
-                   try {
-                     const userDoc = await getDoc(userDocRef)
-                     if (!userDoc.exists() && mounted) {
-                        await setDoc(userDocRef, {
-                          email: emailLower,
-                          role: 'employee',
-                          name: derivedName,
-                          firstName: inferred?.firstName || null,
-                          lastName: inferred?.lastName || null,
-                          photoURL: currentUser.photoURL,
-                          createdAt: new Date().toISOString(),
-                          updatedAt: new Date().toISOString(),
-                          metadataSource: 'supabase_auth'
-                        }, { merge: true })
-                     }
-                   } catch (e) {
-                     console.error("Error creating user profile:", e)
-                   }
-                 }
-                 createProfile()
               }
+              if (mounted) setLoading(false)
+            }, (error) => {
+              console.error('Firestore profile sync error:', error)
+              if (mounted) setLoading(false)
             })
-
           } else {
-            // No user
-            if (unsubProfile) {
-              unsubProfile()
-              unsubProfile = null
-            }
-            setRole(null)
-            setProfile({ 
-              name: null, 
-              firstName: null, 
-              lastName: null,
-              bio: null,
-              twilioNumbers: null,
-              selectedPhoneNumber: null,
-              bridgeToMobile: null
-            })
-            document.cookie = 'np_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;'
+            if (mounted) setLoading(false)
           }
 
-          if (mounted) setLoading(false)
-
-          const path = window.location.pathname
-          
-          // Route Protection
-          if (!currentUser && path.startsWith('/crm-platform')) {
-            router.push('/login')
-          } 
-          else if (currentUser && path === '/login') {
-            router.push('/crm-platform')
-          }
         } catch (error) {
-          // Gracefully handle any AbortErrors or other auth-related issues
+          // Silent catch for AbortError as it's common during Next.js hydration/navigation
           if (error instanceof Error && error.name === 'AbortError') {
-            console.log('Supabase Auth request was aborted - this is expected during rapid navigation or reloads.')
+            // Ignore AbortError
           } else {
             console.error('Error in AuthStateChange handler:', error)
           }
