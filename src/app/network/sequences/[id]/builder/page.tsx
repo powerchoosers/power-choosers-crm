@@ -15,6 +15,7 @@ import {
   useEdgesState,
   useReactFlow,
   ReactFlowProvider,
+  BackgroundVariant,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { 
@@ -51,7 +52,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { useContacts } from '@/hooks/useContacts';
+import { useContacts, type Contact } from '@/hooks/useContacts';
 import { toast } from 'sonner';
 
 // Mock Data for Visualization
@@ -163,10 +164,10 @@ function ProtocolArchitectInner() {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const testContact = useMemo(() => 
-    contactsData?.contacts?.find(c => c.id === testContactId),
-    [contactsData, testContactId]
-  );
+  const testContact = useMemo(() => {
+    const allContacts = contactsData?.pages?.flatMap(page => page.contacts) || [];
+    return allContacts.find((c: Contact) => c.id === testContactId);
+  }, [contactsData, testContactId]);
 
   const insertVariable = (variable: string) => {
     if (!textareaRef.current || !selectedNode) return;
@@ -413,7 +414,7 @@ function ProtocolArchitectInner() {
               className="bg-transparent"
               colorMode="dark"
             >
-              <Background color="#18181b" gap={24} size={1} variant="dots" />
+              <Background color="#18181b" gap={24} size={1} variant={BackgroundVariant.Dots} />
               <Controls className="bg-zinc-900/80 border border-white/10 text-white backdrop-blur-md rounded-xl overflow-hidden shadow-2xl !bottom-4 !left-4" />
               
               <Panel position="top-right" className="m-4">
@@ -653,7 +654,7 @@ function ProtocolArchitectInner() {
                         <SelectValue placeholder="Choose a contact..." />
                       </SelectTrigger>
                       <SelectContent className="bg-zinc-900 border-white/10">
-                        {contactsData?.contacts?.map(contact => (
+                        {contactsData?.pages?.flatMap(page => page.contacts).map((contact: Contact) => (
                           <SelectItem key={contact.id} value={contact.id}>
                             {contact.firstName} {contact.lastName} ({contact.metadata?.general?.company})
                           </SelectItem>
