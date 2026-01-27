@@ -103,6 +103,18 @@
 
 ## 🚧 Active Development (Nodal Point Migration)
 
+### Account Dossier Migration & Refinement
+- **Status**: Completed
+- **Description**: Migrated and refined the Account Dossier page with full Supabase integration, forensic styling, and fixed type safety.
+- **Actions**:
+  - [x] **Data Integration**: Implemented `useAccount`, `useUpdateAccount`, and `useAccountContacts` hooks for real-time Supabase sync.
+  - [x] **Forensic Styling**: Applied "Obsidian & Glass" aesthetic, including position maturity bars and forensic log terminals.
+  - [x] **Type Safety**:
+    - [x] Optimized `Account` interface by removing index signature and using targeted type assertions for context passing.
+    - [x] Standardized `useAccountContacts` return type to `Contact[]` with default values for required fields.
+    - [x] Fixed React attribute type errors (`rows={1}`).
+  - [x] **Dossier Header**: Integrated lock/unlock controls and status indicators (Active Load, Active Intelligence).
+
 ### AI Router & OpenRouter Integration
 - **Status**: Ongoing
 - **Description**: Enhancing the AI fallback system with OpenRouter and real-time routing diagnostics.

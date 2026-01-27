@@ -311,7 +311,7 @@ export function TopBar() {
             <motion.div 
                 initial={false}
                 animate={{ 
-                    width: (isDialerOpen || isGeminiOpen) ? 350 : 172,
+                    width: isGeminiOpen ? 480 : (isDialerOpen ? 350 : 172),
                     borderRadius: 24,
                 }}
                 transition={{ 
@@ -445,8 +445,8 @@ export function TopBar() {
                                     </div>
                                 )}
                             </div>
-                            <div className="flex-1 flex items-center min-w-0 bg-zinc-950/50 border border-white/10 rounded-xl relative z-10 px-3">
-                                <div className="w-8 h-8 flex items-center justify-center text-zinc-500">
+                            <div className="flex-1 flex items-center min-w-0 bg-zinc-950/50 border border-white/10 rounded-xl relative z-10 px-3 transition-all duration-300 group/input focus-within:border-white/20 focus-within:ring-1 focus-within:ring-white/5 shadow-2xl">
+                                <div className="w-8 h-8 flex items-center justify-center text-zinc-500 group-focus-within/input:text-emerald-500 transition-colors">
                                     <Phone size={18} />
                                 </div>
                                 <input
@@ -456,7 +456,7 @@ export function TopBar() {
                                     onChange={handlePhoneChange}
                                     onKeyDown={handleDialerKeyDown}
                                     placeholder="Dial external..."
-                                    className="w-full bg-transparent border-none focus:ring-0 text-white placeholder-zinc-500 text-sm font-mono tracking-wide h-12"
+                                    className="w-full bg-transparent border-none focus:ring-0 outline-none text-white placeholder-zinc-500 text-sm font-mono tracking-wide h-12"
                                 />
                             </div>
                             <Button 

@@ -88,6 +88,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let unsubProfile: (() => void) | null = null
     let didResolve = false
 
+    // IMMEDIATE DEV BYPASS CHECK
+    const isDev = process.env.NODE_ENV === 'development'
+    const hasSessionCookie = typeof document !== 'undefined' && document.cookie.includes('np_session=1')
+
+    if (isDev && hasSessionCookie) {
+      console.log('[Auth] Immediate Dev Bypass Check')
+      didResolve = true
+      setUser({
+        uid: 'dev-bypass-uid',
+        email: 'dev@nodalpoint.io',
+        displayName: 'Dev User',
+        emailVerified: true,
+      } as unknown as User)
+      setRole('admin')
+      setProfile({
+        email: 'dev@nodalpoint.io',
+        name: 'Dev User',
+        firstName: 'Dev',
+        lastName: 'User',
+        bio: 'System Administrator (Bypass)',
+        twilioNumbers: [],
+        selectedPhoneNumber: null,
+        bridgeToMobile: false
+      })
+      setLoading(false)
+    }
+
     const timeoutId = window.setTimeout(() => {
       if (!didResolve) {
         setUser(null)
@@ -110,6 +137,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       didResolve = true
       window.clearTimeout(timeoutId)
+
+      // DEV BYPASS LOGIC: If in dev mode and cookie exists, force mock user
+      const isDev = process.env.NODE_ENV === 'development'
+      const hasSessionCookie = document.cookie.includes('np_session=1')
+
+      if (!user && isDev && hasSessionCookie) {
+        console.log('[Auth] Dev Bypass Active')
+        const mockUser = {
+            uid: 'dev-bypass-uid',
+            email: 'dev@nodalpoint.io',
+            displayName: 'Dev User',
+            emailVerified: true,
+        } as unknown as User
+
+        setUser(mockUser)
+        setRole('admin')
+        setProfile({
+            email: 'dev@nodalpoint.io',
+            name: 'Dev User',
+            firstName: 'Dev',
+            lastName: 'User',
+            bio: 'System Administrator (Bypass)',
+            twilioNumbers: [],
+            selectedPhoneNumber: null,
+            bridgeToMobile: false
+        })
+        setLoading(false)
+        
+        // Redirect if on login page
+        if (window.location.pathname === '/login') {
+            router.push('/network')
+        }
+        return
+      }
+
       setUser(user)
       
       if (user) {

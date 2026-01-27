@@ -3,9 +3,10 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { differenceInCalendarDays, format, isValid, parseISO } from 'date-fns'
 import { 
-  AlertTriangle, ArrowLeft, Clock, Globe, Linkedin, Mail, MapPin, Phone, 
+  Activity, AlertTriangle, ArrowLeft, Clock, Globe, Linkedin, Mail, MapPin, Phone, 
   Lock, Unlock, Check, Sparkles, Plus, Star, Trash2,
   Building2, CheckCircle, Play, DollarSign, Mic, History, RefreshCw, X,
   ArrowRightLeft, ChevronLeft, ChevronRight
@@ -73,6 +74,7 @@ export default function ContactDossierPage() {
   const [editSupplier, setEditSupplier] = useState('')
   const [editStrikePrice, setEditStrikePrice] = useState('')
   const [editAnnualUsage, setEditAnnualUsage] = useState('')
+  const [editLocation, setEditLocation] = useState('')
   const [editServiceAddresses, setEditServiceAddresses] = useState<Array<{ address: string; isPrimary: boolean }>>([])
   
   // New Phone States
@@ -99,6 +101,7 @@ export default function ContactDossierPage() {
       setEditSupplier(contact.electricitySupplier || '')
       setEditStrikePrice(contact.currentRate || '')
       setEditAnnualUsage(contact.annualUsage || '')
+      setEditLocation(contact.location || '')
       
       setEditMobile(contact.mobile || '')
       setEditWorkDirect(contact.workDirectPhone || '')
@@ -157,6 +160,7 @@ export default function ContactDossierPage() {
             electricitySupplier: editSupplier,
             currentRate: editStrikePrice,
             annualUsage: editAnnualUsage,
+            location: editLocation,
             serviceAddresses: editServiceAddresses,
             mobile: editMobile,
             workDirectPhone: editWorkDirect,
@@ -327,21 +331,21 @@ export default function ContactDossierPage() {
         <div className="absolute inset-0 border border-white/5 rounded-2xl pointer-events-none bg-gradient-to-b from-white/5 to-transparent" />
         <div className="absolute top-0 right-0 w-64 h-64 bg-[#002FA7]/10 blur-[120px] rounded-full pointer-events-none" />
 
-        <div className="flex-none p-6 md:p-8 border-b border-white/5 bg-zinc-900/80 backdrop-blur-sm relative z-10">
+        <header className="flex-none px-6 py-6 md:px-8 border-b border-white/5 bg-zinc-900/80 backdrop-blur-sm relative z-10">
           <div className="flex items-center justify-between gap-6">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-6">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => router.back()}
-                className="text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+                className="text-zinc-500 hover:text-white hover:bg-white/5 -ml-2"
               >
                 <ArrowLeft className="w-5 h-5" />
               </Button>
 
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-6">
                 {/* Refined Glyph Avatar - Nodal Glass Style */}
-                <div className="h-14 w-14 rounded-full nodal-glass flex items-center justify-center text-sm font-semibold text-white/90 border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
+                <div className="h-14 w-14 rounded-2xl nodal-glass flex items-center justify-center text-sm font-semibold text-white/90 border border-white/10 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.6)] overflow-hidden">
                   {contactName
                     .split(' ')
                     .map((p) => p[0])
@@ -351,24 +355,24 @@ export default function ContactDossierPage() {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-4 group/name">
+                  <div className="flex items-center gap-3 mb-1">
                     {isEditing ? (
                       <input
                         type="text"
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
-                        className="text-3xl md:text-4xl font-semibold tracking-tighter text-white bg-transparent border-none outline-none focus:ring-1 focus:ring-[#002FA7]/50 rounded px-1 -ml-1 w-full"
+                        className="text-2xl font-semibold tracking-tighter text-white bg-transparent border-none outline-none focus:ring-1 focus:ring-[#002FA7]/50 rounded px-1 -ml-1 w-full"
                         placeholder="Contact Name"
                         autoFocus
                       />
                     ) : (
                       <>
-                        <h1 className="text-3xl md:text-4xl font-semibold tracking-tighter text-white">{editName || contactName}</h1>
+                        <h1 className="text-2xl font-semibold tracking-tighter text-white">{editName || contactName}</h1>
                         
                         {/* THE SIGNAL ARRAY */}
-                        <div className="flex items-center gap-1 bg-white/[0.02] rounded-full p-1 border border-white/5">
+                        <div className="flex items-center gap-1 bg-white/[0.02] rounded-full p-1 border border-white/5 ml-2">
                           <a 
-                            href={contact?.website || '#'} 
+                            href={contact?.website || '#'}
                             target="_blank" 
                             rel="noopener noreferrer"
                             className={cn(
@@ -381,7 +385,7 @@ export default function ContactDossierPage() {
                           </a>
                           <div className="w-px h-3 bg-white/10" />
                           <a 
-                            href={contact?.linkedinUrl || '#'} 
+                            href={contact?.linkedinUrl || '#'}
                             target="_blank" 
                             rel="noopener noreferrer"
                             className={cn(
@@ -413,37 +417,69 @@ export default function ContactDossierPage() {
                     </AnimatePresence>
                   </div>
 
-                  <div className="flex items-center gap-2 text-zinc-400 mt-1">
+                  <div className="flex items-center gap-4 text-xs text-zinc-500 font-mono mb-2 w-full">
                     {isEditing ? (
-                      <div className="flex items-center gap-2 w-full">
-                        <input
-                          type="text"
-                          value={editTitle}
-                          onChange={(e) => setEditTitle(e.target.value)}
-                          className="text-sm font-medium bg-transparent border-none outline-none focus:ring-1 focus:ring-[#002FA7]/30 rounded px-1 -ml-1 text-zinc-300 w-1/3"
-                          placeholder="Title"
-                        />
-                        <span className="text-zinc-600">at</span>
-                        <input
-                          type="text"
-                          value={editCompany}
-                          onChange={(e) => setEditCompany(e.target.value)}
-                          className="text-sm font-medium bg-transparent border-none outline-none focus:ring-1 focus:ring-[#002FA7]/30 rounded px-1 -ml-1 text-zinc-300 w-1/2"
-                          placeholder="Company"
-                        />
+                      <div className="flex items-center gap-4 w-full">
+                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                          <input
+                            type="text"
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            className="bg-transparent border-b border-white/10 text-white text-xs font-mono uppercase tracking-widest w-full focus:outline-none focus:border-[#002FA7] transition-colors placeholder:text-zinc-700"
+                            placeholder="TITLE"
+                          />
+                          <span className="text-zinc-600 lowercase">at</span>
+                          <input
+                            type="text"
+                            value={editCompany}
+                            onChange={(e) => setEditCompany(e.target.value)}
+                            className="bg-transparent border-b border-white/10 text-white text-xs font-mono uppercase tracking-widest w-full focus:outline-none focus:border-[#002FA7] transition-colors placeholder:text-zinc-700"
+                            placeholder="COMPANY"
+                          />
+                        </div>
+                        <span className="w-1 h-1 rounded-full bg-zinc-800 shrink-0" />
+                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                          <MapPin className="w-3.5 h-3.5 text-white shrink-0" />
+                          <input
+                            type="text"
+                            value={editLocation}
+                            onChange={(e) => setEditLocation(e.target.value)}
+                            className="bg-transparent border-b border-white/10 text-white text-xs font-mono uppercase tracking-widest w-full focus:outline-none focus:border-[#002FA7] transition-colors placeholder:text-zinc-700"
+                            placeholder="CITY, STATE"
+                          />
+                        </div>
                       </div>
                     ) : (
-                      <span className="font-medium">
-                        {editTitle ? `${editTitle}${editCompany ? ' at ' : ''}` : ''}
-                        {editCompany}
-                      </span>
+                      <>
+                        <span className="flex items-center gap-1.5 uppercase tracking-widest text-zinc-400">
+                          {editTitle && (
+                            <>
+                              <span>{editTitle}</span>
+                              <span className="text-zinc-600 lowercase mx-1">at</span>
+                            </>
+                          )}
+                          {contact?.linkedAccountId ? (
+                            <Link 
+                              href={`/network/accounts/${contact.linkedAccountId}`}
+                              className="hover:text-white transition-colors cursor-pointer"
+                            >
+                              {editCompany || 'Unknown Entity'}
+                            </Link>
+                          ) : (
+                            <span>{editCompany || 'Unknown Entity'}</span>
+                          )}
+                        </span>
+                        <span className="w-1 h-1 rounded-full bg-zinc-800" />
+                        <span className="flex items-center gap-1.5 text-zinc-400">
+                          <MapPin className="w-3.5 h-3.5 text-white" />
+                          {editLocation || 'Unknown Location'}
+                        </span>
+                      </>
                     )}
                   </div>
                 </div>
               </div>
             </div>
-
-
 
             <div className="text-right">
               <div className="flex flex-col items-end gap-2">
@@ -481,7 +517,7 @@ export default function ContactDossierPage() {
               </div>
             </div>
           </div>
-        </div>
+        </header>
 
         <div className="flex-1 flex overflow-hidden relative z-10 group/dossier">
           <div className="grid grid-cols-12 w-full h-full">

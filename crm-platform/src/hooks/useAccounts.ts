@@ -14,10 +14,13 @@ export interface Account {
   sqft: string
   occupancy: string
   employees: string
+  revenue?: string
   location: string
+  serviceAddresses?: any[]
   address?: string
   updated: string
   ownerId?: string
+  linkedinUrl?: string
   // Forensic/Asset Fields
   loadFactor?: number // 0-1
   loadZone?: string
@@ -32,6 +35,7 @@ export interface Account {
     rate: string
     endDate: string
   }>
+  metadata?: any
 }
 
 const PAGE_SIZE = 50
@@ -126,13 +130,16 @@ export function useAccounts(searchQuery?: string) {
             companyPhone: data.phone || '',
             contractEnd: data.contract_end_date || '',
             employees: data.employees?.toString() || '',
+            revenue: data.revenue || '',
             location: data.city ? `${data.city}, ${data.state || ''}` : (data.address || ''),
+            serviceAddresses: data.service_addresses || data.metadata?.service_addresses || [],
             address: data.address || '',
-            updated: data.updated_at || new Date().toISOString(),
+            updated: data.updatedAt || new Date().toISOString(),
             // Fields from metadata if they exist
             sqft: data.metadata?.sqft || '',
             occupancy: data.metadata?.occupancy || '',
             ownerId: data.ownerId,
+            linkedinUrl: data.linkedinUrl || data.linkedin_url || data.metadata?.linkedinUrl || data.metadata?.linkedin || '',
             // Forensic/Asset Fields
             loadFactor: data.metadata?.loadFactor ?? 0.45, // Default for visual testing
             loadZone: data.metadata?.loadZone || data.metadata?.zone || 'LZ_NORTH',
@@ -140,7 +147,8 @@ export function useAccounts(searchQuery?: string) {
             electricitySupplier: data.electricity_supplier || data.metadata?.supplier || '',
             currentRate: data.current_rate || data.metadata?.rate || '',
             status: data.status || 'PROSPECT',
-            meters: data.metadata?.meters || []
+            meters: data.metadata?.meters || [],
+            metadata: data.metadata || {}
           }
         }) as Account[];
 
@@ -188,16 +196,20 @@ export function useAccount(id: string) {
         name: data.name || 'Unknown Account',
         industry: data.industry || '',
         domain: data.domain || '',
+        description: data.description || '',
         logoUrl: data.logo_url || '',
         companyPhone: data.phone || '',
         contractEnd: data.contract_end_date || '',
         employees: data.employees?.toString() || '',
+        revenue: data.revenue || '',
         location: data.city ? `${data.city}, ${data.state || ''}` : (data.address || ''),
+        serviceAddresses: data.service_addresses || data.metadata?.service_addresses || [],
         address: data.address || '',
-        updated: data.updated_at || new Date().toISOString(),
+        updated: data.updatedAt || new Date().toISOString(),
         sqft: data.metadata?.sqft || '',
         occupancy: data.metadata?.occupancy || '',
         ownerId: data.ownerId,
+        linkedinUrl: data.linkedinUrl || data.linkedin_url || data.metadata?.linkedinUrl || data.metadata?.linkedin || '',
         // Forensic/Asset Fields
         loadFactor: data.metadata?.loadFactor ?? 0.45,
         loadZone: data.metadata?.loadZone || data.metadata?.zone || 'LZ_NORTH',
@@ -205,7 +217,8 @@ export function useAccount(id: string) {
         electricitySupplier: data.electricity_supplier || data.metadata?.supplier || '',
         currentRate: data.current_rate || data.metadata?.rate || '',
         status: data.status || 'PROSPECT',
-        meters: data.metadata?.meters || []
+        meters: data.metadata?.meters || [],
+        metadata: data.metadata || {}
       } as Account
     },
     enabled: !!id && !loading && !!user,
@@ -310,18 +323,19 @@ export function useUpdateAccount() {
       if (updates.logoUrl !== undefined) dbUpdates.logo_url = updates.logoUrl
       if (updates.companyPhone !== undefined) dbUpdates.phone = updates.companyPhone
       if (updates.contractEnd !== undefined) dbUpdates.contract_end_date = updates.contractEnd || null
-      if (updates.employees !== undefined) dbUpdates.employees = parseInt(updates.employees) || null
+      if (updates.employees !== undefined) dbUpdates.employees = updates.employees ? (parseInt(updates.employees) || null) : null
       if (updates.location !== undefined) {
-        dbUpdates.city = updates.location?.split(',')[0]?.trim()
-        dbUpdates.state = updates.location?.split(',')[1]?.trim()
+        const parts = updates.location?.split(',') || []
+        dbUpdates.city = parts[0]?.trim() || null
+        dbUpdates.state = parts[1]?.trim() || null
       }
-      if (updates.address !== undefined) dbUpdates.address = updates.address
+      if (updates.address !== undefined) dbUpdates.address = updates.address || null
 
       // Forensic fields mapping
-      if (updates.annualUsage !== undefined) dbUpdates.annual_usage = updates.annualUsage
-      if (updates.electricitySupplier !== undefined) dbUpdates.electricity_supplier = updates.electricitySupplier
-      if (updates.currentRate !== undefined) dbUpdates.current_rate = updates.currentRate
-      if (updates.status !== undefined) dbUpdates.status = updates.status
+      if (updates.annualUsage !== undefined) dbUpdates.annual_usage = updates.annualUsage || null
+      if (updates.electricitySupplier !== undefined) dbUpdates.electricity_supplier = updates.electricitySupplier || null
+      if (updates.currentRate !== undefined) dbUpdates.current_rate = updates.currentRate || null
+      if (updates.status !== undefined) dbUpdates.status = updates.status || 'PROSPECT'
 
       // Metadata updates
       const newMetadata = { ...currentMetadata }
@@ -337,7 +351,7 @@ export function useUpdateAccount() {
          dbUpdates.metadata = newMetadata
       }
 
-      dbUpdates.updated_at = new Date().toISOString()
+      dbUpdates.updatedAt = new Date().toISOString()
 
       const { error } = await supabase
         .from('accounts')

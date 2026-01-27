@@ -9,11 +9,16 @@ The agent is currently equipped with the following "Tools" and UI protocols whic
 ### 🗄️ CRM Operations (Supabase Integrated)
 - **Contact Management**:
     - `list_contacts`: Search and retrieve contact lists.
-    - `get_contact_details`: Access full dossier information for any specific contact.
+    - `get_contact_details`: Access full dossier information (including legacy metadata) for any specific contact.
     - `update_contact`: Modify contact details (email, phone, status, notes) in real-time.
     - `create_contact`: Add new nodes to the network directly from conversation.
 - **Account Intelligence**:
     - `list_accounts`: Search for companies and organizations within our database.
+    - `get_account_details`: Retrieve full firmographic data, energy metrics, and corporate hierarchy.
+    - `list_account_documents`: Access the "Data Locker" to view filenames of bills, contracts, and LOAs.
+    - `list_deals`: Monitor sales opportunities and deal stages for specific accounts.
+- **Interaction Forensics**:
+    - `search_interactions`: Deep search through historical call transcripts and email logs for specific contacts or accounts.
 - **Task Orchestration**:
     - `list_tasks`: Monitor pending actions and follow-ups.
     - `create_task`: Generate new reminders with priority levels and due dates.
@@ -64,6 +69,7 @@ The Architect can inject specialized data modules directly into the chat stream:
 - **Position_Maturity**: Visualization of contract and pricing status.
 - **Forensic_Grid**: High-density tabular data for account analysis.
 - **Data_Void**: Empty state placeholders for missing intelligence.
+- **Forensic_Documents**: Visual list of files in the Data Locker.
 
 ### 3. Interaction Protocols
 - **Contextual Awareness**: The agent automatically detects the user's current route (Contact, Account, Dashboard) and offers proactive insights upon opening without a single click.
@@ -96,6 +102,9 @@ When discussing accounts, the agent prioritizes the "Three Vectors of Cost Leaka
 - Monitoring **4CP Coincident Peaks**.
 - Predicting **Scarcity Pricing** risks.
 
+### 4. Data Locker Access
+The agent now has direct access to the `documents` vault, allowing it to verify the existence of LOAs, Bills, and Contracts before advising on strategy. It can cross-reference these files with account metadata to detect missing critical information.
+
 ---
 
 ## 🔮 Roadmap: Future Capabilities (Coming Soon)
@@ -117,5 +126,5 @@ We are actively expanding the Architect's "Brain" to include these forensic ener
 - **Security**: All tool calls are gated by Supabase RLS and server-side validation.
 
 ---
-*Last Updated: 2026-01-26*
-*Status: Nodal Architect v1.0 Operational*
+*Last Updated: 2026-01-27*
+*Status: Nodal Architect v1.2 Operational*

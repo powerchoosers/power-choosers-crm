@@ -20,7 +20,10 @@ export default function CrmLayout({
   const router = useRouter()
 
   useEffect(() => {
-    if (!loading && !user) {
+    // Only redirect if NOT loading and NO user
+    // Double check cookie for dev bypass persistence
+    const hasSessionCookie = document.cookie.includes('np_session=1')
+    if (!loading && !user && !hasSessionCookie) {
       router.replace('/login')
     }
   }, [loading, user, router])
@@ -36,6 +39,20 @@ export default function CrmLayout({
     )
   }
   if (!user) {
+    // If user is null but cookie exists in dev mode, don't show unauthorized screen
+    // Let AuthContext catch up
+    const hasSessionCookie = typeof document !== 'undefined' && document.cookie.includes('np_session=1')
+    if (process.env.NODE_ENV === 'development' && hasSessionCookie) {
+        return (
+            <div className={cn(inter.className, "bg-zinc-950 text-foreground antialiased min-h-screen flex items-center justify-center")}> 
+                <div className="flex flex-col items-center gap-4">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-800 border-t-[#002FA7]" />
+                <div className="text-sm text-zinc-500 font-mono uppercase tracking-widest">Bypassing Security Protocols...</div>
+                </div>
+            </div>
+        )
+    }
+
     return (
       <div className={cn(inter.className, "bg-zinc-950 text-foreground antialiased min-h-screen flex items-center justify-center")}> 
         <div className="flex flex-col items-center gap-4">

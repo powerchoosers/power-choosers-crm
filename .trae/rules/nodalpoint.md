@@ -53,10 +53,12 @@ The platform has transitioned from **Firebase/Firestore** to **Supabase (Postgre
 - **Relational Integrity**: We use foreign keys (e.g., `contacts.accountId` -> `accounts.id`) to maintain data consistency.
 - **Metadata JSONB**: Every migrated record includes a `metadata` column containing the **original Firestore document**. This ensures no data is lost during the transition.
 - **Unified Contacts**: The legacy `people` and `contacts` collections have been merged into a single `contacts` table in Supabase.
+- **Location Data**: `city` and `state` are now top-level columns in the `contacts` table, indexed for performance.
 
 ### 2. Data Mapping & Normalization
 Due to varying structures in legacy data, we use a normalization layer in our hooks (see `useContacts.ts`):
 - **Name Resolution**: We prioritize `firstName`/`lastName` columns, then fall back to `first_name`/`last_name` (underscore format), and finally check nested paths in `metadata` (e.g., `metadata.general.firstName`).
+- **Location Resolution**: We prioritize the specific `city`/`state` columns on the contact record. If absent, we fall back to the linked Account's location to ensure no "Unknown" gaps.
 - **Metadata Parsing**: In some cases, Supabase returns the `metadata` column as a stringified JSON string. We use `normalizeMetadata` to safely parse these values.
 - **Energy Data**: Account-level energy metrics (Strike Price, Annual Usage, etc.) are promoted to top-level columns in the `accounts` table for performance.
 
@@ -146,6 +148,7 @@ The platform uses **Firebase Authentication**.
   - **Haptic Buttons**: Primary action buttons should use a "Bloom" effect on hover (`hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)]`).
   - **Sync_Block Protocol**: All collection pages MUST feature a `Sync_Block` footer displaying the current range (e.g., `Sync_Block 01–50`) and `Total_Nodes` count.
   - **LED Status**: Use pulsing LED dots for status indicators (Active, Operational) instead of generic pills.
+  - **Iconography**: All interface icons (Lucide/SVG) must be **White** (`text-white`) on dark backgrounds. Do not use Klein Blue (`#002FA7`) for icons; reserve it for text accents and interactive states.
 
 ### 🤖 Nodal Architect (Gemini Chat)
 The cognitive core of the platform, featuring a **Stacked Command Deck** UI:
@@ -178,7 +181,8 @@ The platform includes a native forensic dialer:
 
 - **AI Integration**: Use the "Sparkles" icon (`lucide-react/Sparkles`) for all AI-powered features.
 - **Contact Avatars**: **STRICT RULE**: Use letter glyphs (initials) instead of company logos for contact avatars.
-  - **Styles**: `rounded-full`, `bg-zinc-800`, `text-zinc-400`, `border-white/5`.
+  - **Styles**: `rounded-2xl`, `nodal-glass`, `text-white/90`, `border-white/10`.
+  - **Shadows**: Must use `shadow-[0_2px_10px_-2px_rgba(0,0,0,0.6)]` to match container shape.
   - Applies to both `PeoplePage` table rows and the `ContactDossierPage` header.
 - **Layout**: Sidebar (Left), Top Bar (Header), Right Panel (Contextual Widgets).
 - **Animations**:
