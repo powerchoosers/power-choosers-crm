@@ -19,10 +19,17 @@ export default async function handler(req, res) {
       FIREBASE_CLIENT_EMAIL: has('FIREBASE_CLIENT_EMAIL'),
       FIREBASE_PRIVATE_KEY: has('FIREBASE_PRIVATE_KEY'),
       GEMINI_API_KEY: has('GEMINI_API_KEY'),
+      FREE_GEMINI_KEY: has('FREE_GEMINI_KEY'),
       TWILIO_ACCOUNT_SID: has('TWILIO_ACCOUNT_SID'),
       TWILIO_AUTH_TOKEN: has('TWILIO_AUTH_TOKEN'),
       TWILIO_PHONE_NUMBER: has('TWILIO_PHONE_NUMBER'),
-      VERCEL_URL: has('VERCEL_URL')
+      GOOGLE_SERVICE_ACCOUNT_KEY: has('GOOGLE_SERVICE_ACCOUNT_KEY'),
+      GOOGLE_MAPS_API: has('GOOGLE_MAPS_API'),
+      SENDGRID_API_KEY: has('SENDGRID_API_KEY'),
+      GMAIL_SENDER_EMAIL: has('GMAIL_SENDER_EMAIL'),
+      VERCEL_URL: has('VERCEL_URL'),
+      SUPABASE_URL: has('SUPABASE_URL'),
+      SUPABASE_SERVICE_ROLE_KEY: has('SUPABASE_SERVICE_ROLE_KEY')
     };
 
     let firestore = { enabled: false, lastCalls: [], webhooks: [], error: null };
