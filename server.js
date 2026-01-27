@@ -877,9 +877,6 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/debug/log') {
     return handleApiDebugLog(req, res);
   }
-  if (pathname === '/api/debug/firestore') {
-    return handleApiDebugFirestore(req, res);
-  }
   if (pathname.startsWith('/api/calls/contact/')) {
     return handleApiCallsContact(req, res, parsedUrl);
   }
