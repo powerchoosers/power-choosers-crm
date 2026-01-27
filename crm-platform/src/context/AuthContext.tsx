@@ -1,10 +1,19 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
-import { User, onAuthStateChanged } from 'firebase/auth'
-import { auth, db } from '@/lib/firebase'
+import { db } from '@/lib/firebase'
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore'
 import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
+import { Session, User as SupabaseUser } from '@supabase/supabase-js'
+
+// Define a compatible User type that matches what the app expects (Firebase-like)
+export interface AuthUser {
+  uid: string
+  email: string | null
+  displayName: string | null
+  photoURL: string | null
+}
 
 type UserProfile = {
   name: string | null
@@ -17,7 +26,7 @@ type UserProfile = {
 }
 
 interface AuthContextType {
-  user: User | null
+  user: AuthUser | null
   loading: boolean
   role: string | null
   profile: UserProfile
@@ -39,7 +48,7 @@ const AuthContext = createContext<AuthContextType>({
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [role, setRole] = useState<string | null>(null)
   const [profile, setProfile] = useState<UserProfile>({ 
@@ -83,131 +92,124 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     let unsubProfile: (() => void) | null = null
-    let didResolve = false
+    let mounted = true
 
-    const timeoutId = window.setTimeout(() => {
-      if (!didResolve) {
-        setUser(null)
-        setRole(null)
-        setProfile({
-          name: null,
-          firstName: null,
-          lastName: null,
-          bio: null,
-          twilioNumbers: null,
-          selectedPhoneNumber: null,
-          bridgeToMobile: null
-        })
-        document.cookie = 'np_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;'
-        setLoading(false)
+    // Function to map Supabase user to our AuthUser
+    const mapUser = (sbUser: SupabaseUser): AuthUser => {
+      const metadata = sbUser.user_metadata || {}
+      return {
+        uid: sbUser.id,
+        email: sbUser.email || null,
+        displayName: metadata.full_name || metadata.name || metadata.displayName || null,
+        photoURL: metadata.avatar_url || metadata.picture || metadata.photoURL || null
       }
-    }, 5000)
+    }
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      didResolve = true
-      window.clearTimeout(timeoutId)
-      setUser(user)
+    // Initialize Supabase Auth Listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return
+
+      const sbUser = session?.user || null
+      const currentUser = sbUser ? mapUser(sbUser) : null
       
-      if (user) {
-        // Ensure session cookie is set for middleware
+      setUser(currentUser)
+
+      if (currentUser && currentUser.email) {
+        // Set session cookie for middleware
         document.cookie = 'np_session=1; Path=/; SameSite=Lax'
 
-        if (user.email) {
-          // Listen for real-time updates to user profile
-          const userDocRef = doc(db, 'users', user.email.toLowerCase())
-          const emailLower = user.email.toLowerCase().trim()
-          
-          unsubProfile = onSnapshot(userDocRef, (doc) => {
-            if (doc.exists()) {
-              const data = doc.data() as Record<string, unknown>
-              setRole((data.role as string | undefined) || 'employee')
+        // Firestore Sync Logic (Keep existing logic but prioritize Supabase metadata)
+        const userDocRef = doc(db, 'users', currentUser.email.toLowerCase())
+        const emailLower = currentUser.email.toLowerCase().trim()
+        
+        // Unsubscribe previous listener if any
+        if (unsubProfile) unsubProfile()
 
-              const firstName = typeof data.firstName === 'string' ? data.firstName.trim() || null : null
-              const lastName = typeof data.lastName === 'string' ? data.lastName.trim() || null : null
-              const storedName = typeof data.name === 'string' ? data.name.trim() || null : null
-              const storedDisplayName = typeof data.displayName === 'string' ? data.displayName.trim() || null : null
+        unsubProfile = onSnapshot(userDocRef, (doc) => {
+          if (doc.exists()) {
+            const data = doc.data() as Record<string, unknown>
+            setRole((data.role as string | undefined) || 'employee')
 
-              const inferred =
-                inferNameFromString(storedDisplayName) ||
-                inferNameFromString(user.displayName) ||
-                inferNameFromString(storedName) ||
-                inferNameFromEmail(emailLower)
+            // Prioritize Supabase Metadata for Name/Avatar if available, else fall back to Firestore
+            const sbMetadata = sbUser?.user_metadata || {}
+            
+            // Resolve Names
+            const sbFullName = sbMetadata.full_name || sbMetadata.name
+            const sbFirstName = sbMetadata.full_name ? sbMetadata.full_name.split(' ')[0] : null
+            
+            const dbFirstName = typeof data.firstName === 'string' ? data.firstName.trim() : null
+            const dbLastName = typeof data.lastName === 'string' ? data.lastName.trim() : null
+            const dbName = typeof data.name === 'string' ? data.name.trim() : null
 
-              const resolvedFirstName = firstName || inferred?.firstName || null
-              const resolvedLastName = lastName || inferred?.lastName || null
-              const explicitFullName = resolvedFirstName ? `${resolvedFirstName} ${resolvedLastName || ''}`.trim() : null
+            const inferred = 
+              inferNameFromString(sbFullName) ||
+              inferNameFromString(currentUser.displayName) ||
+              inferNameFromString(dbName) ||
+              inferNameFromEmail(emailLower)
 
-              const derivedName =
-                explicitFullName ||
-                storedName ||
-                storedDisplayName ||
-                (user.displayName?.trim() || null)
+            const resolvedFirstName = dbFirstName || inferred?.firstName || null
+            const resolvedLastName = dbLastName || inferred?.lastName || null
+            const explicitFullName = resolvedFirstName ? `${resolvedFirstName} ${resolvedLastName || ''}`.trim() : null
 
-              if ((!firstName || !lastName) && inferred?.fullName) {
-                const nextName = inferred.fullName
-                const shouldOverrideName = !storedName || !storedName.includes(' ')
-                void setDoc(
-                  userDocRef,
-                  {
-                    ...(resolvedFirstName ? { firstName: resolvedFirstName } : {}),
-                    ...(resolvedLastName ? { lastName: resolvedLastName } : {}),
-                    ...(shouldOverrideName ? { name: nextName, displayName: nextName } : {}),
-                    updatedAt: new Date().toISOString(),
-                  },
-                  { merge: true }
-                )
-              }
+            const derivedName = 
+              explicitFullName || 
+              dbName || 
+              currentUser.displayName || 
+              (sbUser?.email?.split('@')[0]) || 
+              null
 
-              setProfile({ 
-                name: derivedName, 
-                firstName: resolvedFirstName, 
-                lastName: resolvedLastName,
-                bio: typeof data.bio === 'string' ? data.bio : null,
-                twilioNumbers: Array.isArray(data.twilioNumbers) ? data.twilioNumbers : [],
-                selectedPhoneNumber: typeof data.selectedPhoneNumber === 'string' ? data.selectedPhoneNumber : null,
-                bridgeToMobile: typeof data.bridgeToMobile === 'boolean' ? data.bridgeToMobile : false
-              })
-            } else {
-              setRole('employee')
-              const inferred = inferNameFromString(user.displayName) || inferNameFromEmail(emailLower)
-              const derivedName = inferred?.fullName || user.displayName?.trim() || null
-              setProfile({ 
-                name: derivedName, 
-                firstName: inferred?.firstName || null, 
-                lastName: inferred?.lastName || null,
-                bio: null,
-                twilioNumbers: [],
-                selectedPhoneNumber: null,
-                bridgeToMobile: false
-              })
-            }
-          })
-
-          // Initial check/setup for user document if it doesn't exist
-          try {
-            const userDoc = await getDoc(userDocRef)
-            if (!userDoc.exists()) {
-              const inferred = inferNameFromString(user.displayName) || inferNameFromEmail(emailLower)
-              const derivedName = inferred?.fullName || user.displayName?.trim() || null
-              await setDoc(
-                userDocRef,
-                {
-                  email: emailLower,
-                  role: 'employee',
-                  ...(derivedName ? { name: derivedName, displayName: derivedName } : {}),
-                  ...(inferred?.firstName ? { firstName: inferred.firstName } : {}),
-                  ...(inferred?.lastName ? { lastName: inferred.lastName } : {}),
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                },
-                { merge: true }
-              )
-            }
-          } catch (error) {
-            console.error("Error setting up user document:", error)
+            setProfile({ 
+              name: derivedName, 
+              firstName: resolvedFirstName, 
+              lastName: resolvedLastName,
+              bio: typeof data.bio === 'string' ? data.bio : null,
+              twilioNumbers: Array.isArray(data.twilioNumbers) ? data.twilioNumbers : [],
+              selectedPhoneNumber: typeof data.selectedPhoneNumber === 'string' ? data.selectedPhoneNumber : null,
+              bridgeToMobile: typeof data.bridgeToMobile === 'boolean' ? data.bridgeToMobile : false
+            })
+          } else {
+            // Document doesn't exist yet, use Supabase metadata
+            setRole('employee')
+            const inferred = inferNameFromString(currentUser.displayName) || inferNameFromEmail(emailLower)
+            const derivedName = inferred?.fullName || currentUser.displayName || null
+            
+            setProfile({ 
+              name: derivedName, 
+              firstName: inferred?.firstName || null, 
+              lastName: inferred?.lastName || null,
+              bio: null,
+              twilioNumbers: [],
+              selectedPhoneNumber: null,
+              bridgeToMobile: false
+            })
+            
+            // Create the document in Firestore if it doesn't exist (Migration)
+             const createProfile = async () => {
+               try {
+                 const userDoc = await getDoc(userDocRef)
+                 if (!userDoc.exists()) {
+                    await setDoc(userDocRef, {
+                      email: emailLower,
+                      role: 'employee',
+                      name: derivedName,
+                      firstName: inferred?.firstName || null,
+                      lastName: inferred?.lastName || null,
+                      photoURL: currentUser.photoURL,
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString(),
+                      metadataSource: 'supabase_auth'
+                    }, { merge: true })
+                 }
+               } catch (e) {
+                 console.error("Error creating user profile:", e)
+               }
+             }
+             createProfile()
           }
-        }
+        })
+
       } else {
+        // No user
         if (unsubProfile) {
           unsubProfile()
           unsubProfile = null
@@ -222,28 +224,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           selectedPhoneNumber: null,
           bridgeToMobile: null
         })
-        // Clear session cookie
         document.cookie = 'np_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;'
       }
 
       setLoading(false)
-      
+
       const path = window.location.pathname
       
-      // Only protect /crm-platform routes
-      if (!user && path.startsWith('/crm-platform')) {
+      // Route Protection
+      if (!currentUser && path.startsWith('/crm-platform')) {
         router.push('/login')
       } 
-      // Redirect logged-in users from login page to platform
-      else if (user && path === '/login') {
+      else if (currentUser && path === '/login') {
         router.push('/crm-platform')
       }
     })
 
     return () => {
-      unsubscribe()
+      mounted = false
+      subscription.unsubscribe()
       if (unsubProfile) unsubProfile()
-      window.clearTimeout(timeoutId)
     }
   }, [router])
 

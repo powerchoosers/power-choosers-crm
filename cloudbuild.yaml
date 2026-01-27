@@ -130,6 +130,10 @@ steps:
     - 'FREE_GEMINI_KEY=${_FREE_GEMINI_KEY}'
     - '--set-env-vars'
     - 'OPEN_ROUTER_API_KEY=${_OPEN_ROUTER_API_KEY}'
+    - '--set-env-vars'
+    - 'GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID}'
+    - '--set-env-vars'
+    - 'GOOGLE_CLIENT_SECRET=${_GOOGLE_CLIENT_SECRET}'
 
 # Store images in Google Container Registry
 images:
