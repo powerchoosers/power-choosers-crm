@@ -3,8 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
+import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -24,7 +23,13 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      await signInWithEmailAndPassword(auth, email, password)
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) throw error
+
       document.cookie = 'np_session=1; Path=/; SameSite=Lax'
       toast.success('Logged in successfully')
       router.push('/crm-platform')
@@ -40,16 +45,25 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     setIsGoogleLoading(true)
     try {
-      const provider = new GoogleAuthProvider()
-      await signInWithPopup(auth, provider)
-      document.cookie = 'np_session=1; Path=/; SameSite=Lax'
-      toast.success('Logged in with Google successfully')
-      router.push('/crm-platform')
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+          scopes: 'https://www.googleapis.com/auth/gmail.readonly',
+          redirectTo: `${window.location.origin}/crm-platform`
+        }
+      })
+      
+      if (error) throw error
+      
+      // Note: Redirect happens automatically, so we might not reach here
     } catch (error: unknown) {
       console.error('Google login error:', error)
       const message = error instanceof Error ? error.message : 'Failed to login with Google'
       toast.error(message)
-    } finally {
       setIsGoogleLoading(false)
     }
   }
