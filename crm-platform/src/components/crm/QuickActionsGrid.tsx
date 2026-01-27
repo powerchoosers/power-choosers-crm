@@ -5,10 +5,10 @@ import Link from 'next/link'
 
 export default function QuickActionsGrid() {
   const actions = [
-    { icon: UserPlus, label: 'Contact', href: '/crm-platform/people?action=new' },
-    { icon: Building2, label: 'Account', href: '/crm-platform/accounts?action=new' },
-    { icon: FileUp, label: 'Upload Bill', href: '/crm-platform/energy?action=upload' },
-    { icon: PlusCircle, label: 'New Deal', href: '/crm-platform/deals?action=new' },
+    { icon: UserPlus, label: 'Contact', href: '/network/people?action=new' },
+    { icon: Building2, label: 'Account', href: '/network/accounts?action=new' },
+    { icon: FileUp, label: 'Upload Bill', href: '/network/energy?action=upload' },
+    { icon: PlusCircle, label: 'New Deal', href: '/network/deals?action=new' },
   ]
 
   return (

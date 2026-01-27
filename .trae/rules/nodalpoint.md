@@ -121,7 +121,7 @@ We do not guess. We measure. Our software is designed to mitigate three specific
 
 The platform uses **Firebase Authentication**.
 - **Login**: Users must authenticate via the `/login` page.
-- **Protection**: Routes under `/crm-platform` are protected by Next.js Middleware.
+- **Protection**: Routes under `/network` are protected by Next.js Middleware.
 - **Session**: A session cookie (`np_session`) is used to persist login state across the application.
 
 ## 📝 Development Workflow

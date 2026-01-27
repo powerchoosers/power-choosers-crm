@@ -85,7 +85,7 @@ export default function EmailsPage() {
                 isLoading={isLoadingEmails} 
                 onRefresh={handleSync}
                 isSyncing={isSyncing}
-                onSelectEmail={(email) => router.push(`/crm-platform/emails/${email.id}`)}
+                onSelectEmail={(email) => router.push(`/network/emails/${email.id}`)}
                 totalEmails={totalEmails}
                 hasNextPage={hasNextPage}
                 fetchNextPage={fetchNextPage}

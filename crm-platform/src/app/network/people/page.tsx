@@ -227,7 +227,7 @@ export default function PeoplePage() {
                   <DropdownMenuLabel>Actions</DropdownMenuLabel>
                   <DropdownMenuItem
                     className="hover:bg-white/5 cursor-pointer"
-                    onClick={() => router.push(`/crm-platform/contacts/${contact.id}`)}
+                    onClick={() => router.push(`/network/contacts/${contact.id}`)}
                   >
                     View Details
                   </DropdownMenuItem>
@@ -332,7 +332,7 @@ export default function PeoplePage() {
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
                     className="border-white/5 hover:bg-white/[0.02] transition-colors group cursor-pointer"
-                    onClick={() => router.push(`/crm-platform/contacts/${row.original.id}`)}
+                    onClick={() => router.push(`/network/contacts/${row.original.id}`)}
                     >
                     {row.getVisibleCells().map((cell) => (
                         <TableCell key={cell.id} className="py-3">

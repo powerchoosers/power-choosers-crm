@@ -13,17 +13,17 @@ import { toast } from 'sonner'
 import { useGeminiStore } from '@/store/geminiStore'
 
 const navItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', href: '/crm-platform' },
-  { icon: Users, label: 'People', href: '/crm-platform/people' },
-  { icon: Building2, label: 'Accounts', href: '/crm-platform/accounts' },
-  { icon: List, label: 'Lists', href: '/crm-platform/lists' },
-  { icon: CheckSquare, label: 'Tasks', href: '/crm-platform/tasks' },
-  { icon: Play, label: 'Sequences', href: '/crm-platform/sequences' },
-  { icon: Mail, label: 'Emails', href: '/crm-platform/emails' },
-  { icon: Phone, label: 'Calls', href: '/crm-platform/calls' },
+  { icon: LayoutDashboard, label: 'Dashboard', href: '/network' },
+  { icon: Users, label: 'People', href: '/network/people' },
+  { icon: Building2, label: 'Accounts', href: '/network/accounts' },
+  { icon: List, label: 'Lists', href: '/network/lists' },
+  { icon: CheckSquare, label: 'Tasks', href: '/network/tasks' },
+  { icon: Play, label: 'Sequences', href: '/network/sequences' },
+  { icon: Mail, label: 'Emails', href: '/network/emails' },
+  { icon: Phone, label: 'Calls', href: '/network/calls' },
   { icon: Sparkles, label: 'Gemini', href: '#', isChat: true },
-  { icon: Zap, label: 'Energy', href: '/crm-platform/energy' },
-  { icon: Settings, label: 'Settings', href: '/crm-platform/settings' },
+  { icon: Zap, label: 'Energy', href: '/network/energy' },
+  { icon: Settings, label: 'Settings', href: '/network/settings' },
 ]
 
 export function Sidebar() {

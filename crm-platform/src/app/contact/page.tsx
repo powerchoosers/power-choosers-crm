@@ -33,7 +33,7 @@ export default function Contact() {
           </Link>
 
           <div className="flex items-center gap-6">
-            <Link href="/crm-platform" className="hidden md:block text-sm font-medium text-zinc-400 hover:text-white transition-colors">
+            <Link href="/network" className="hidden md:block text-sm font-medium text-zinc-400 hover:text-white transition-colors">
               Sign In
             </Link>
             <a href="/bill-debugger" className="hidden md:flex items-center gap-2 bg-[#002FA7] text-white px-5 py-2.5 rounded-full text-sm font-medium hover:scale-105 transition-all">
