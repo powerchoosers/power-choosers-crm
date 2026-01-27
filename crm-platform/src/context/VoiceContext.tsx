@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react'
 import { Device, Call } from '@twilio/voice-sdk'
 import { useCallStore } from '@/store/callStore'
+import { useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
 import { formatToE164 } from '@/lib/utils'
 
@@ -35,8 +36,10 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   const [isMuted, setIsMuted] = useState(false)
   const [metadata, setMetadata] = useState<VoiceMetadata | null>(null)
   
+  const { user } = useAuth()
   const { setStatus, setActive } = useCallStore()
   const tokenRefreshTimer = useRef<NodeJS.Timeout | null>(null)
+  const deviceRef = useRef<Device | null>(null)
 
   const resolvePhoneMeta = useCallback(async (phoneNumber: string) => {
     try {
@@ -64,8 +67,9 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const initDevice = useCallback(async () => {
-    // Only initialize on the client side
-    if (typeof window === 'undefined') return
+    // Only initialize on the client side and when user is authenticated
+    // Also check for session cookie to prevent pre-login API failures
+    if (typeof window === 'undefined' || !user || !document.cookie.includes('np_session=')) return
 
     try {
       const response = await fetch('/api/twilio/token?identity=agent')
@@ -76,6 +80,14 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
       if (!data.token) {
         throw new Error('No token received from server')
+      }
+
+      // Cleanup existing device before creating new one
+      if (deviceRef.current) {
+        console.log('[Voice] Cleaning up existing device...')
+        deviceRef.current.unregister()
+        deviceRef.current.destroy()
+        deviceRef.current = null
       }
 
       const newDevice = new Device(data.token, {
@@ -215,6 +227,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       })
 
       await newDevice.register()
+      deviceRef.current = newDevice
       setDevice(newDevice)
 
       // Refresh token every 50 minutes
@@ -227,18 +240,20 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         description: 'Could not connect to Twilio service.' 
       })
     }
-  }, [resolvePhoneMeta, setActive, setStatus])
+  }, [resolvePhoneMeta, setActive, setStatus, user])
 
   useEffect(() => {
     initDevice()
     return () => {
       if (tokenRefreshTimer.current) clearInterval(tokenRefreshTimer.current)
-      if (device) {
-        device.unregister()
-        device.destroy()
+      if (deviceRef.current) {
+        console.log('[Voice] Provider unmounting, destroying device')
+        deviceRef.current.unregister()
+        deviceRef.current.destroy()
+        deviceRef.current = null
       }
     }
-  }, [initDevice, device])
+  }, [initDevice])
 
   const connect = useCallback(async (params: { To: string; From?: string; metadata?: VoiceMetadata }) => {
     if (!device || !isReady) {
@@ -334,9 +349,11 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         setActive(false)
       })
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('[Voice] Connect failed:', error)
-      toast.error('Could not initiate call')
+      toast.error('Could not initiate call', {
+        description: error?.message || 'Check your internet connection and Twilio configuration.'
+      })
       setStatus('error')
     }
   }, [device, isReady, resolvePhoneMeta, setActive, setStatus])

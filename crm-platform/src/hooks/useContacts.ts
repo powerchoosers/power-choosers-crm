@@ -12,6 +12,7 @@ export interface Contact {
   logoUrl?: string
   status: 'Lead' | 'Customer' | 'Churned'
   lastContact: string
+  lastActivity?: string
   accountId?: string
 }
 
@@ -26,6 +27,7 @@ export type ContactDetail = Contact & {
   industry?: string
   linkedinUrl?: string
   website?: string
+  location?: string
   notes?: string
   linkedAccountId?: string
   // Enhanced account details for dossier
@@ -62,6 +64,7 @@ type ContactMetadata = {
   otherPhone?: string
   primaryPhoneField?: string
   email?: string
+  notes?: string
   general?: {
     firstName?: string
     lastName?: string
@@ -75,6 +78,7 @@ type ContactMetadata = {
     company?: string
     companyName?: string
     domain?: string
+    notes?: string
   }
   contact?: {
     firstName?: string
@@ -94,6 +98,7 @@ type AccountJoin = {
   logo_url?: string | null
   city?: string | null
   state?: string | null
+  address?: string | null
   industry?: string | null
   electricity_supplier?: string | null
   annual_usage?: string | null
@@ -132,8 +137,11 @@ type ContactRow = {
   status?: Contact['status'] | null
   created_at?: string | null
   lastContactedAt?: string | null
+  lastActivityAt?: string | null
   accountId?: string | null
   title?: string | null
+  city?: string | null
+  state?: string | null
   linkedinUrl?: string | null
   website?: string | null
   notes?: string | null
@@ -224,8 +232,11 @@ export function useAccountContacts(accountId: string) {
         email: row.email || '',
         phone: row.phone || '',
         title: row.title || '',
-        accountId: row.accountId
-      })) as Partial<ContactDetail>[]
+        accountId: row.accountId,
+        company: '', // Default for required field
+        status: 'Lead', // Default for required field
+        lastContact: row.lastContactedAt || '' // Default for required field
+      })) as Contact[]
     },
     enabled: !!accountId && !loading && !!user,
     staleTime: 1000 * 60 * 5,
@@ -511,6 +522,8 @@ export function useContact(id: string) {
       return {
         id: contactId,
         ...rest,
+        notes: typedData.notes || metadata?.notes || metadata?.general?.notes || '',
+        lastActivity: typedData.lastActivityAt || undefined,
         name: fullName,
         email: typedData.email || metadata?.email || metadata?.general?.email || metadata?.contact?.email || '',
         phone: typedData.phone || typedData.mobile || typedData.workPhone || typedData.otherPhone || metadata?.mobile || metadata?.workDirectPhone || metadata?.otherPhone || metadata?.general?.phone || metadata?.contact?.phone || '',
@@ -525,8 +538,9 @@ export function useContact(id: string) {
         lastName: lName,
         title: typedData.title || undefined,
         companyName: account?.name || metadata?.company || metadata?.companyName || metadata?.general?.company || metadata?.general?.companyName,
-        city: account?.city || metadata?.city,
-        state: account?.state || metadata?.state,
+        city: typedData.city || metadata?.city || account?.city,
+        state: typedData.state || metadata?.state || account?.state,
+        location: typedData.city ? `${typedData.city}, ${typedData.state || ''}` : (metadata?.city ? `${metadata.city}, ${metadata.state || ''}` : (account?.city ? `${account.city}, ${account.state || ''}` : (metadata?.address || account?.address || ''))),
         industry: account?.industry,
         linkedinUrl: typedData.linkedinUrl || undefined,
         website: account?.domain || metadata?.website,
@@ -606,6 +620,8 @@ export function useUpdateContact() {
       if (updates.workDirectPhone !== undefined) dbUpdates.workPhone = updates.workDirectPhone
       if (updates.otherPhone !== undefined) dbUpdates.otherPhone = updates.otherPhone
       if (updates.primaryPhoneField !== undefined) dbUpdates.primaryPhoneField = updates.primaryPhoneField
+      if (updates.city !== undefined) dbUpdates.city = updates.city
+      if (updates.state !== undefined) dbUpdates.state = updates.state
       
       dbUpdates.updatedAt = new Date().toISOString()
 

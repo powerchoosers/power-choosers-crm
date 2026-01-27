@@ -79,6 +79,20 @@ type ForensicGrid = {
   highlights?: string[] // Columns to check for volatility
 }
 
+type ForensicDocument = {
+  id: string
+  name: string
+  type: string
+  size?: string
+  url?: string
+  created_at: string
+}
+
+type ForensicDocuments = {
+  accountName: string
+  documents: ForensicDocument[]
+}
+
 type DataVoid = {
   field: string
   action: string
@@ -157,7 +171,7 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
           animate={{ height: 'auto', opacity: 1 }}
           className="flex flex-col gap-3 p-4 rounded-xl bg-white/5 border border-white/10 relative overflow-hidden group w-full"
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#002FA7]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           
           <div className="flex items-center gap-4 relative z-10">
             <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center border border-white/10 text-zinc-400 font-bold text-lg shrink-0">
@@ -170,11 +184,11 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
                 <span className={cn("w-1.5 h-1.5 rounded-full animate-pulse shrink-0", dossier.contractStatus === 'active' ? 'bg-emerald-500' : 'bg-red-500')} />
                 <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest truncate">{dossier.contractStatus}</span>
                 {dossier.energyMaturity && (
-                  <span className="text-[10px] font-mono text-blue-400 ml-2 uppercase tracking-tighter">Maturity: {dossier.energyMaturity}</span>
+                  <span className="text-[10px] font-mono text-[#002FA7] ml-2 uppercase tracking-tighter">Maturity: {dossier.energyMaturity}</span>
                 )}
               </div>
             </div>
-            <Button size="sm" className="bg-blue-600 hover:bg-blue-500 text-white font-mono text-[10px] uppercase tracking-widest border border-blue-400/30 shadow-[0_0_15px_rgba(37,99,235,0.4)] h-8">
+            <Button size="sm" className="bg-[#002FA7] hover:bg-blue-600 text-white font-mono text-[10px] uppercase tracking-widest border border-blue-400/30 shadow-[0_0_15px_rgba(0,47,167,0.4)] h-8">
               INITIATE
             </Button>
           </div>
@@ -304,6 +318,55 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
         </motion.div>
       )
     }
+    case 'forensic_documents': {
+      if (!isRecord(data)) return null
+      const docData = data as unknown as ForensicDocuments
+      return (
+        <motion.div 
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          className="rounded-xl border border-white/10 bg-zinc-900/40 overflow-hidden w-full"
+        >
+          <div className="px-4 py-2 border-b border-white/5 bg-white/5 flex justify-between items-center">
+            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest font-semibold">Data_Locker // {docData.accountName}</span>
+            <span className="text-[10px] font-mono text-zinc-500">{docData.documents.length} Files</span>
+          </div>
+          <div className="p-2 space-y-1">
+            {docData.documents.length > 0 ? (
+              docData.documents.map((doc, i) => (
+                <div key={i} className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-colors group">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded bg-zinc-800 flex items-center justify-center text-zinc-500 border border-white/5">
+                      <Cpu size={14} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium text-zinc-200 truncate">{doc.name}</div>
+                      <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-tighter">
+                        {doc.type} • {doc.size || 'N/A'} • {new Date(doc.created_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                  {doc.url && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-zinc-500 hover:text-white"
+                      onClick={() => window.open(doc.url, '_blank')}
+                    >
+                      <ArrowRight size={14} />
+                    </Button>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="p-4 text-center text-zinc-500 font-mono text-[10px] uppercase tracking-widest">
+                No documents found in locker
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )
+    }
     case 'data_void': {
       if (!isRecord(data)) return null
       const voidData = data as unknown as DataVoid
@@ -387,7 +450,7 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
                 <h4 className="text-xs sm:text-sm font-semibold text-zinc-100 truncate">{profile.name}</h4>
                 <p className="text-[9px] sm:text-[10px] text-zinc-500 font-mono truncate uppercase tracking-tighter">{profile.company || profile.title}</p>
               </div>
-              <Button size="sm" className="h-7 sm:h-8 px-2 sm:px-3 bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600 hover:text-white transition-all text-[9px] sm:text-[10px] font-bold uppercase tracking-tighter shrink-0">
+              <Button size="sm" className="h-7 sm:h-8 px-2 sm:px-3 bg-[#002FA7]/20 text-[#002FA7] border border-[#002FA7]/30 hover:bg-[#002FA7] hover:text-white transition-all text-[9px] sm:text-[10px] font-bold uppercase tracking-tighter shrink-0">
                 Inject
               </Button>
             </div>
@@ -779,7 +842,7 @@ export function GeminiChatPanel() {
       exit={{ opacity: 0, y: 4, scaleY: 0.98, transition: { duration: 0.12 } }}
       transition={{ duration: 0.18, delay: 0.05 }}
       style={{ transformOrigin: 'top' }}
-      className="absolute top-12 right-2 mt-2 w-[calc(100%-1rem)] max-w-[420px] flex flex-col h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl bg-zinc-950/80 backdrop-blur-3xl border border-white/10 shadow-2xl overflow-hidden z-50"
+      className="absolute top-12 right-2 mt-2 w-[calc(100%-1rem)] max-w-[480px] flex flex-col h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl bg-zinc-950/80 backdrop-blur-3xl border border-white/10 shadow-2xl overflow-hidden z-50"
     >
       {/* Nodal Point Glass Highlight */}
       <div className="absolute inset-0 bg-gradient-to-tr from-[#002FA7]/5 via-transparent to-white/5 pointer-events-none" />
@@ -788,17 +851,24 @@ export function GeminiChatPanel() {
       <div className="p-4 border-b border-white/10 flex items-center justify-between bg-zinc-900/50 relative z-10">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <div className="w-8 h-8 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center relative z-10 overflow-hidden">
+            <button
+              onClick={() => setShowDiagnostics(!showDiagnostics)}
+              className={cn(
+                "w-8 h-8 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center relative z-10 overflow-hidden transition-all",
+                showDiagnostics ? "border-[#002FA7]/50 shadow-[0_0_15px_rgba(0,47,167,0.4)]" : "hover:border-white/20"
+              )}
+              title="Toggle Routing HUD"
+            >
               <Bot size={20} className="text-white" />
-            </div>
+            </button>
             {/* Ambient Hum Animation */}
             <motion.div
               animate={{
-                scale: [1, 1.2, 1],
-                opacity: [0.3, 0.6, 0.3],
+                scale: showDiagnostics ? [1.1, 1.3, 1.1] : [1, 1.2, 1],
+                opacity: showDiagnostics ? [0.4, 0.7, 0.4] : [0.3, 0.6, 0.3],
               }}
               transition={{
-                duration: 4,
+                duration: showDiagnostics ? 2 : 4,
                 repeat: Infinity,
                 ease: "easeInOut",
               }}
@@ -808,25 +878,13 @@ export function GeminiChatPanel() {
           <div>
             <h3 className="text-xs font-mono font-bold text-zinc-100 tracking-widest uppercase">Nodal Architect v1.0</h3>
             <div className="flex items-center gap-2">
-              <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[10px] font-mono text-emerald-500/70 uppercase tracking-tighter">Neural Link Active</span>
+              <Waveform />
+              <span className="text-[10px] font-mono text-emerald-500/70 uppercase tracking-tighter font-bold">LIVE_FEED</span>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-1">
-          <button 
-            onClick={() => setShowDiagnostics(!showDiagnostics)}
-            className={cn(
-              "w-8 h-8 flex items-center justify-center rounded-lg transition-all border",
-              showDiagnostics 
-                ? "bg-blue-500/20 border-blue-500/50 text-blue-400" 
-                : "bg-white/5 border-white/10 text-zinc-400 hover:text-white hover:bg-white/10"
-            )}
-            title="Toggle Routing HUD"
-          >
-            <Activity size={14} />
-          </button>
           <button
             onClick={() => setIsHistoryOpen(!isHistoryOpen)}
             className={cn(
@@ -858,7 +916,7 @@ export function GeminiChatPanel() {
           >
             <div className="p-3 font-mono text-[10px] space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar">
               <div className="flex items-center justify-between border-b border-white/5 pb-1 mb-2">
-                <span className="text-blue-400 font-bold tracking-widest">AI_ROUTER_HUD // LIVE_DIAGNOSTICS</span>
+                <span className="text-[#002FA7] font-bold tracking-widest">AI_ROUTER_HUD // LIVE_DIAGNOSTICS</span>
                 <span className="text-zinc-600 text-[8px] uppercase">Routing Protocol v2.1</span>
               </div>
               
@@ -872,7 +930,7 @@ export function GeminiChatPanel() {
                       d.status === 'success' ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-400" :
                       d.status === 'failed' ? "bg-red-500/5 border-red-500/20 text-red-400" :
                       d.status === 'retry' ? "bg-amber-500/5 border-amber-500/20 text-amber-400" :
-                      d.status === 'attempting' ? "bg-blue-500/10 border-blue-500/30 text-blue-400 animate-pulse" :
+                      d.status === 'attempting' ? "bg-[#002FA7]/10 border-[#002FA7]/30 text-[#002FA7] animate-pulse" :
                       "bg-white/5 border-white/10 text-zinc-400"
                     )}>
                       <div className="flex items-center justify-between">
@@ -895,7 +953,7 @@ export function GeminiChatPanel() {
                       )}
                       {d.tools && (
                         <div className="text-[9px] opacity-80 flex items-center gap-1 mt-1">
-                          <span className="text-blue-400">TOOLS:</span> {d.tools.join(', ')}
+                          <span className="text-[#002FA7]">TOOLS:</span> {d.tools.join(', ')}
                         </div>
                       )}
                     </div>
@@ -1011,7 +1069,7 @@ export function GeminiChatPanel() {
                   /* "Intelligence Block" (AI Response) */
                   <div className="flex justify-start mb-2 relative w-full group">
                     {/* The Neural Line (The glowing spine on the left) */}
-                    <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-[#002FA7] via-blue-500/20 to-transparent group-hover:from-blue-400 transition-colors duration-500" />
+                    <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-[#002FA7] via-[#002FA7]/20 to-transparent group-hover:from-blue-400 transition-colors duration-500" />
                     
                     <div className="pl-6 w-full">
                       <div className="flex items-center gap-2 mb-2">
@@ -1114,30 +1172,30 @@ export function GeminiChatPanel() {
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 mb-1">
                     Priority Agents
                   </div>
-                  <SelectItem value="openai/gpt-oss-120b" className="text-[10px] font-mono focus:bg-blue-500/20">
+                  <SelectItem value="openai/gpt-oss-120b" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                     GPT-OSS (120B)
                   </SelectItem>
                   
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
                     Gemini Stack (Free)
                   </div>
-                  <SelectItem value="gemini-2.0-flash" className="text-[10px] font-mono focus:bg-blue-500/20">
+                  <SelectItem value="gemini-2.0-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                     GEMINI-2.0-FLASH
                   </SelectItem>
-                  <SelectItem value="gemini-1.5-flash" className="text-[10px] font-mono focus:bg-blue-500/20">
+                  <SelectItem value="gemini-1.5-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                     GEMINI-1.5-FLASH
                   </SelectItem>
-                  <SelectItem value="gemini-1.5-pro" className="text-[10px] font-mono focus:bg-blue-500/20">
+                  <SelectItem value="gemini-1.5-pro" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                     GEMINI-1.5-PRO
                   </SelectItem>
                   
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
                     Perplexity (Paid)
                   </div>
-                  <SelectItem value="sonar-pro" className="text-[10px] font-mono focus:bg-blue-500/20">
+                  <SelectItem value="sonar-pro" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                     SONAR-PRO
                   </SelectItem>
-                  <SelectItem value="sonar" className="text-[10px] font-mono focus:bg-blue-500/20">
+                  <SelectItem value="sonar" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                     SONAR-STANDARD
                   </SelectItem>
                 </SelectContent>
@@ -1192,7 +1250,7 @@ export function GeminiChatPanel() {
               <button 
                 type="submit"
                 disabled={isLoading || !input.trim()}
-                className="bg-[#002FA7] hover:bg-blue-600 text-white p-2.5 rounded-xl shadow-[0_0_15px_-3px_rgba(0,47,167,0.5)] transition-all active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed border border-blue-400/30"
+                className="bg-[#002FA7] hover:bg-blue-600 text-white p-2.5 rounded-xl shadow-[0_0_15px_-3px_rgba(0,47,167,0.5)] transition-all active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed border border-[#002FA7]/30"
               >
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
               </button>

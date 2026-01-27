@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { LayoutDashboard, Users, Phone, Sparkles, Zap, Settings, Building2, LogOut, CheckSquare, Play, Mail, List, Bell } from 'lucide-react'
+import { LayoutDashboard, Users, Phone, Sparkles, Zap, Settings, Building2, LogOut, CheckSquare, Target, Mail, List, Bell } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -18,7 +18,7 @@ const navItems = [
   { icon: Building2, label: 'Accounts', href: '/network/accounts' },
   { icon: List, label: 'Lists', href: '/network/lists' },
   { icon: CheckSquare, label: 'Tasks', href: '/network/tasks' },
-  { icon: Play, label: 'Sequences', href: '/network/sequences' },
+  { icon: Target, label: 'Sequences', href: '/network/sequences' },
   { icon: Mail, label: 'Emails', href: '/network/emails' },
   { icon: Phone, label: 'Calls', href: '/network/calls' },
   { icon: Sparkles, label: 'Gemini', href: '#', isChat: true },

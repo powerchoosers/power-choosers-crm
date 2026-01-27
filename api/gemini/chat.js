@@ -151,6 +151,51 @@ const tools = [
           },
           required: ['domain']
         }
+      },
+      {
+        name: 'get_account_details',
+        description: 'Get full details for a specific account (company) by ID, including energy metrics and documents.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            account_id: { type: 'STRING', description: 'The unique ID of the account' }
+          },
+          required: ['account_id']
+        }
+      },
+      {
+        name: 'list_account_documents',
+        description: 'Get a list of documents (bills, contracts, etc.) for a specific account.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            account_id: { type: 'STRING', description: 'The unique ID of the account' }
+          },
+          required: ['account_id']
+        }
+      },
+      {
+        name: 'search_interactions',
+        description: 'Search through past call transcripts and email history for a contact or account.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            contact_id: { type: 'STRING' },
+            account_id: { type: 'STRING' },
+            limit: { type: 'NUMBER', description: 'Max results (default 5)' }
+          }
+        }
+      },
+      {
+        name: 'list_deals',
+        description: 'Get a list of sales deals/opportunities.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            account_id: { type: 'STRING' },
+            status: { type: 'STRING', enum: ['interested', 'proposal', 'won', 'lost', 'all'] }
+          }
+        }
       }
     ]
   }
@@ -166,6 +211,38 @@ const toolHandlers = {
     const { data, error } = await query;
     if (error) throw error;
     return data;
+  },
+  list_deals: async ({ account_id, status = 'all' }) => {
+    let query = supabaseAdmin.from('deals').select('*, accounts(name)');
+    if (account_id) query = query.eq('accountId', account_id);
+    if (status !== 'all') query = query.eq('stage', status);
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+  },
+  search_interactions: async ({ contact_id, account_id, limit = 5 }) => {
+    const results = {
+      calls: [],
+      emails: []
+    };
+
+    if (contact_id) {
+      const [calls, emails] = await Promise.all([
+        supabaseAdmin.from('calls').select('*').eq('contactId', contact_id).order('timestamp', { ascending: false }).limit(limit),
+        supabaseAdmin.from('emails').select('*').eq('contactId', contact_id).order('timestamp', { ascending: false }).limit(limit)
+      ]);
+      results.calls = calls.data || [];
+      results.emails = emails.data || [];
+    } else if (account_id) {
+      const [calls, emails] = await Promise.all([
+        supabaseAdmin.from('calls').select('*').eq('accountId', account_id).order('timestamp', { ascending: false }).limit(limit),
+        supabaseAdmin.from('emails').select('*').eq('accountId', account_id).order('timestamp', { ascending: false }).limit(limit)
+      ]);
+      results.calls = calls.data || [];
+      results.emails = emails.data || [];
+    }
+
+    return results;
   },
   get_contact_details: async ({ contact_id }) => {
     const { data, error } = await supabaseAdmin.from('contacts').select('*, accounts(*)').eq('id', contact_id).single();
@@ -198,6 +275,58 @@ const toolHandlers = {
        }
     }
 
+    // 3. Contract Data Promotion
+    if (data.accounts) {
+      // Ensure contract_end_date is promoted for the AI to see easily
+      data.contract_end_date = data.accounts.contract_end_date || data.accounts.metadata?.contract_end_date;
+      data.electricity_supplier = data.accounts.electricity_supplier || data.accounts.metadata?.electricity_supplier;
+      data.annual_usage = data.accounts.annual_usage || data.accounts.metadata?.annual_usage;
+      data.current_rate = data.accounts.current_rate || data.accounts.metadata?.current_rate;
+      data.service_addresses = data.accounts.service_addresses || [];
+    }
+
+    // 4. Apollo/Metadata Field Promotion
+    data.title = data.title || metadata.title || metadata.general?.title;
+    data.linkedin_url = data.linkedinUrl || metadata.linkedinUrl || metadata.general?.linkedinUrl;
+    data.mobile = data.mobile || metadata.mobile || metadata.general?.mobile;
+    data.work_phone = data.workPhone || metadata.workPhone || metadata.general?.workPhone || metadata.workDirectPhone;
+
+    // 5. Activity & Location Promotion
+    data.lastActivityAt = data.lastActivityAt || metadata.lastActivityAt || metadata.last_activity_date;
+    data.lastContactedAt = data.lastContactedAt || metadata.lastContactedAt || metadata.last_contacted_date;
+    data.notes = data.notes || metadata.notes || metadata.general?.notes;
+    data.city = data.city || metadata.city || metadata.general?.city || data.accounts?.city;
+    data.state = data.state || metadata.state || metadata.general?.state || data.accounts?.state;
+
+    return data;
+  },
+  get_account_details: async ({ account_id }) => {
+    const { data, error } = await supabaseAdmin
+      .from('accounts')
+      .select('*, contacts(*)')
+      .eq('id', account_id)
+      .single();
+    
+    if (error) throw error;
+
+    // Promote energy metrics and corporate data from metadata if missing in top-level
+    const metadata = data.metadata || {};
+    data.contract_end_date = data.contract_end_date || metadata.contract_end_date;
+    data.electricity_supplier = data.electricity_supplier || metadata.electricity_supplier;
+    data.annual_usage = data.annual_usage || metadata.annual_usage;
+    data.current_rate = data.current_rate || metadata.current_rate;
+    data.revenue = data.revenue || metadata.revenue || metadata.annual_revenue;
+    data.employees = data.employees || metadata.employees || metadata.employee_count;
+    data.industry = data.industry || metadata.industry;
+    
+    // Promote location and description
+    data.description = data.description || metadata.description || metadata.general?.description;
+    data.address = data.address || metadata.address || metadata.billing_address || metadata.general?.address;
+    data.city = data.city || metadata.city || metadata.billing_city || metadata.general?.city;
+    data.state = data.state || metadata.state || metadata.billing_state || metadata.general?.state;
+    data.zip = data.zip || metadata.zip || metadata.billing_zip || metadata.general?.zip;
+    data.service_addresses = data.service_addresses || metadata.service_addresses || [];
+
     return data;
   },
   update_contact: async ({ contact_id, updates }) => {
@@ -216,6 +345,11 @@ const toolHandlers = {
       query = query.ilike('name', `%${search}%`);
     }
     const { data, error } = await query;
+    if (error) throw error;
+    return data;
+  },
+  list_account_documents: async ({ account_id }) => {
+    const { data, error } = await supabaseAdmin.from('documents').select('*').eq('account_id', account_id).order('created_at', { ascending: false });
     if (error) throw error;
     return data;
   },
@@ -368,6 +502,8 @@ export default async function handler(req, res) {
           JSON_DATA:{"type": "position_maturity", "data": {"expiration": "...", "daysRemaining": 123, "currentSupplier": "...", "strikePrice": "$0.0000", "annualUsage": "...", "estimatedRevenue": "...", "margin": "...", "isSimulation": false}}END_JSON
         - When providing lists of data (Grids), use:
           JSON_DATA:{"type": "forensic_grid", "data": {"title": "...", "columns": ["..."], "rows": [{"col1": "...", "col2": "..."}], "highlights": ["col_name_to_highlight"]}}END_JSON
+        - When providing document/bill lists (Data Locker), use:
+          JSON_DATA:{"type": "forensic_documents", "data": {"accountName": "...", "documents": [{"id": "...", "name": "...", "type": "...", "size": "...", "url": "...", "created_at": "..."}]}}END_JSON
         - If data is missing for a critical field (like contract expiration), explicitly return:
           JSON_DATA:{"type": "data_void", "data": {"field": "Contract Expiration", "action": "REQUIRE_BILL_UPLOAD"}}END_JSON
 
