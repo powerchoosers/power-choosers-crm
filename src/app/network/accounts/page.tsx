@@ -13,7 +13,7 @@ import {
   ColumnFiltersState,
   PaginationState,
 } from '@tanstack/react-table'
-import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail, MoreHorizontal } from 'lucide-react'
+import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail, MoreHorizontal, ArrowUpRight } from 'lucide-react'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
 import { useAccounts, useAccountsCount, Account } from '@/hooks/useAccounts'
@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { Badge } from '@/components/ui/badge'
+import Link from 'next/link'
 import {
   Table,
   TableBody,
@@ -101,28 +102,33 @@ export default function AccountsPage() {
         cell: ({ row }) => {
           const account = row.original
           return (
-            <div className="flex items-center gap-3 group/acc">
-              <CompanyIcon
-                logoUrl={account.logoUrl}
-                domain={account.domain}
-                name={account.name}
-                size={32}
-                className="w-9 h-9 rounded-lg nodal-glass p-1 border border-white/10 shadow-sm group-hover/acc:border-[#002FA7]/30 transition-all"
-              />
+            <Link 
+              href={`/network/accounts/${account.id}`}
+              className="flex items-center gap-3 group/acc cursor-pointer"
+            >
+              <div className="relative">
+                <CompanyIcon
+                  logoUrl={account.logoUrl}
+                  domain={account.domain}
+                  name={account.name}
+                  size={32}
+                  className="w-9 h-9 rounded-lg nodal-glass p-1 border border-white/10 shadow-sm group-hover/acc:border-[#002FA7]/50 group-hover/acc:bg-[#002FA7]/5 transition-all"
+                />
+                <div className="absolute -top-1 -right-1 opacity-0 group-hover/acc:opacity-100 transition-opacity">
+                  <ArrowUpRight className="w-3 h-3 text-[#002FA7]" />
+                </div>
+              </div>
               <div>
-                <div className="font-medium text-zinc-200 group-hover:text-white transition-colors">{account.name}</div>
+                <div className="font-medium text-zinc-200 group-hover/acc:text-[#002FA7] transition-colors flex items-center gap-1.5">
+                  {account.name}
+                </div>
                 {account.domain && (
-                  <a
-                    href={`https://${account.domain}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[10px] font-mono text-zinc-500 hover:text-signal transition-colors uppercase tracking-wider"
-                  >
+                  <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
                     {account.domain}
-                  </a>
+                  </div>
                 )}
               </div>
-            </div>
+            </Link>
           )
         },
       },

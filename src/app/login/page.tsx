@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
+import { signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +18,25 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    const checkRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth)
+        if (result) {
+          document.cookie = 'np_session=1; Path=/; SameSite=Lax'
+          toast.success('Logged in with Google successfully')
+          router.push('/network')
+        }
+      } catch (error: unknown) {
+        console.error('Redirect login error:', error)
+        const message = error instanceof Error ? error.message : 'Failed to login with Google'
+        toast.error(message)
+      }
+    }
+    
+    checkRedirect()
+  }, [router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,13 +64,39 @@ export default function LoginPage() {
       document.cookie = 'np_session=1; Path=/; SameSite=Lax'
       toast.success('Logged in with Google successfully')
       router.push('/network')
-    } catch (error: unknown) {
+    } catch (error: any) {
       console.error('Google login error:', error)
-      const message = error instanceof Error ? error.message : 'Failed to login with Google'
-      toast.error(message)
-    } finally {
+      
+      // Fallback to redirect for embedded environments (like Trae IDE) or mobile
+      if (
+        error.code === 'auth/popup-closed-by-user' || 
+        error.code === 'auth/popup-blocked' || 
+        error.code === 'auth/cancelled-popup-request' ||
+        error.message?.includes('Cross-Origin-Opener-Policy') ||
+        error.message?.includes('popup')
+      ) {
+         toast.info('Popup blocked. Switching to redirect login...')
+         try {
+             const provider = new GoogleAuthProvider()
+             await signInWithRedirect(auth, provider)
+             return 
+         } catch (redirectError) {
+             console.error('Redirect error:', redirectError)
+             toast.error('Failed to initiate redirect login')
+         }
+      } else {
+         const message = error instanceof Error ? error.message : 'Failed to login with Google'
+         toast.error(message)
+      }
       setIsGoogleLoading(false)
     }
+  }
+
+  const handleDevBypass = () => {
+    document.cookie = 'np_session=1; Path=/; SameSite=Lax'
+    toast.success('Dev Bypass Active')
+    // Use window.location.href to force a full page load and refresh AuthContext
+    window.location.href = '/network'
   }
 
   return (
@@ -133,6 +178,18 @@ export default function LoginPage() {
               Sign In with Email
             </Button>
           </form>
+
+          {process.env.NODE_ENV === 'development' && (
+            <div className="pt-2">
+                <Button 
+                    variant="ghost" 
+                    className="w-full text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 text-xs"
+                    onClick={handleDevBypass}
+                >
+                    [DEV] Bypass Login
+                </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
