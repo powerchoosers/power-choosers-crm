@@ -7,6 +7,7 @@ import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore'
 import { useRouter } from 'next/navigation'
 
 type UserProfile = {
+  email: string | null
   name: string | null
   firstName: string | null
   lastName: string | null
@@ -28,6 +29,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   role: null,
   profile: { 
+    email: null,
     name: null, 
     firstName: null, 
     lastName: null,
@@ -43,6 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [role, setRole] = useState<string | null>(null)
   const [profile, setProfile] = useState<UserProfile>({ 
+    email: null,
     name: null, 
     firstName: null, 
     lastName: null,
@@ -90,6 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null)
         setRole(null)
         setProfile({
+          email: null,
           name: null,
           firstName: null,
           lastName: null,
@@ -159,6 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               }
 
               setProfile({ 
+                email: user.email,
                 name: derivedName, 
                 firstName: resolvedFirstName, 
                 lastName: resolvedLastName,
@@ -172,6 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const inferred = inferNameFromString(user.displayName) || inferNameFromEmail(emailLower)
               const derivedName = inferred?.fullName || user.displayName?.trim() || null
               setProfile({ 
+                email: user.email,
                 name: derivedName, 
                 firstName: inferred?.firstName || null, 
                 lastName: inferred?.lastName || null,
@@ -214,6 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         setRole(null)
         setProfile({ 
+          email: null,
           name: null, 
           firstName: null, 
           lastName: null,
@@ -230,13 +237,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       const path = window.location.pathname
       
-      // Only protect /crm-platform routes
-      if (!user && path.startsWith('/crm-platform')) {
+      // Only protect /network routes
+      if (!user && path.startsWith('/network')) {
         router.push('/login')
       } 
       // Redirect logged-in users from login page to platform
       else if (user && path === '/login') {
-        router.push('/crm-platform')
+        router.push('/network')
       }
     })
 

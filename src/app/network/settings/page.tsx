@@ -8,11 +8,12 @@ import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Bell, Shield, Palette, Database, Trash2, Plus, Phone, User as UserIcon } from 'lucide-react'
+import { Bell, Shield, Palette, Database, Trash2, Plus, Phone, User as UserIcon, Lock } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
-import { db } from '@/lib/firebase'
+import { auth, db } from '@/lib/firebase'
 import { cn } from '@/lib/utils'
 import { doc, setDoc, getDoc } from 'firebase/firestore'
+import { updatePassword, EmailAuthProvider, linkWithCredential } from 'firebase/auth'
 import { toast } from 'sonner'
 
 export default function SettingsPage() {
@@ -21,6 +22,9 @@ export default function SettingsPage() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [bio, setBio] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
   const [twilioNumbers, setTwilioNumbers] = useState<Array<{ name: string; number: string }>>([])
   const [selectedPhoneNumber, setSelectedPhoneNumber] = useState<string | null>(null)
   const [bridgeToMobile, setBridgeToMobile] = useState(false)
@@ -30,8 +34,19 @@ export default function SettingsPage() {
 
   // Sync with profile and check legacy settings
   useEffect(() => {
-    setFirstName(profile.firstName || '')
-    setLastName(profile.lastName || '')
+    // Strategy: Prefer Firestore profile data, but fallback to Auth user data if profile is empty
+    // This handles the case where a user logs in via Google and wants that info to show up
+    
+    // 1. Name Resolution
+    const authDisplayName = user?.displayName || ''
+    const authNameParts = authDisplayName.split(' ')
+    const authFirstName = authNameParts[0] || ''
+    const authLastName = authNameParts.slice(1).join(' ') || ''
+
+    setFirstName(profile.firstName || authFirstName)
+    setLastName(profile.lastName || authLastName)
+    
+    // 2. Other Profile Fields
     setBio(profile.bio || '')
     setTwilioNumbers(profile.twilioNumbers || [])
     setSelectedPhoneNumber(profile.selectedPhoneNumber || null)
@@ -69,6 +84,36 @@ export default function SettingsPage() {
     const full = `${firstName} ${lastName}`.trim()
     return full || profile.name || user?.displayName || ''
   }, [firstName, lastName, profile.name, user?.displayName])
+
+  const handleUpdatePassword = async () => {
+    if (!user) return
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match')
+      return
+    }
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters')
+      return
+    }
+
+    setIsUpdatingPassword(true)
+    try {
+      await updatePassword(user, newPassword)
+      toast.success('Password updated successfully')
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch (error: unknown) {
+      console.error('Error updating password:', error)
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'auth/requires-recent-login') {
+        toast.error('Please log out and log back in to change your password')
+      } else {
+        toast.error('Failed to update password: ' + errorMessage)
+      }
+    } finally {
+      setIsUpdatingPassword(false)
+    }
+  }
 
   const handleSaveProfile = async () => {
     if (!user?.email) {
@@ -191,7 +236,7 @@ export default function SettingsPage() {
                   <Input
                     id="email"
                     type="email"
-                    value={user?.email || ''}
+                    value={profile.email || user?.email || ''}
                     readOnly
                     className="bg-transparent border-white/10 text-zinc-500 font-mono tabular-nums"
                   />
@@ -298,20 +343,38 @@ export default function SettingsPage() {
             <Card className="nodal-glass">
               <CardHeader>
                 <CardTitle className="text-zinc-100">Password</CardTitle>
-                <CardDescription className="text-zinc-500">Change your password here. After saving, you&apos;ll be logged out.</CardDescription>
+                <CardDescription className="text-zinc-500">Change your password here. You may need to re-login if you haven&apos;t recently.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="current" className="text-zinc-400">Current password</Label>
-                  <Input id="current" type="password" className="bg-transparent border-white/10 text-zinc-200 focus-visible:ring-[#002FA7]" />
+                  <Label htmlFor="new" className="text-zinc-400">New password</Label>
+                  <Input 
+                    id="new" 
+                    type="password" 
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="bg-transparent border-white/10 text-zinc-200 focus-visible:ring-[#002FA7]" 
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="new" className="text-zinc-400">New password</Label>
-                  <Input id="new" type="password" className="bg-transparent border-white/10 text-zinc-200 focus-visible:ring-[#002FA7]" />
+                  <Label htmlFor="confirm" className="text-zinc-400">Confirm password</Label>
+                  <Input 
+                    id="confirm" 
+                    type="password" 
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="bg-transparent border-white/10 text-zinc-200 focus-visible:ring-[#002FA7]" 
+                  />
                 </div>
               </CardContent>
               <CardFooter>
-                <Button className="bg-white text-zinc-950 hover:bg-zinc-200 font-medium">Change Password</Button>
+                <Button 
+                  onClick={handleUpdatePassword}
+                  disabled={isUpdatingPassword || !newPassword}
+                  className="bg-white text-zinc-950 hover:bg-zinc-200 font-medium"
+                >
+                  {isUpdatingPassword ? 'Updating...' : 'Set Password'}
+                </Button>
               </CardFooter>
             </Card>
           </TabsContent>

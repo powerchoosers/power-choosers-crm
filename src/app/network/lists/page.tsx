@@ -139,7 +139,7 @@ export default function ListOverviewPage() {
               {filteredLists.map((list) => (
                 <Link 
                   key={list.id}
-                  href={`/crm-platform/lists/${list.id}`}
+                  href={`/network/lists/${list.id}`}
                   className="group relative bg-white/[0.02] backdrop-blur-md border border-white/5 rounded-2xl p-6 hover:bg-white/[0.05] hover:border-white/10 transition-all cursor-pointer flex flex-col justify-between h-44"
                 >
                   {/* Card Header */}

@@ -72,26 +72,26 @@ export function GlobalSearch() {
     setIsOpen(false)
     setQuery('')
     if (type === 'people') {
-        router.push(`/crm-platform/contacts/${id}`)
+        router.push(`/network/contacts/${id}`)
     } else if (type === 'account') {
-        router.push(`/crm-platform/accounts/${id}`)
+        router.push(`/network/accounts/${id}`)
     } else if (type === 'sequence') {
-        router.push(`/crm-platform/sequences`)
+        router.push(`/network/sequences`)
     } else if (type === 'task') {
-        router.push(`/crm-platform/tasks`)
+        router.push(`/network/tasks`)
     } else if (type === 'call') {
-        router.push(`/crm-platform/calls`)
+        router.push(`/network/calls`)
     } else if (type === 'email') {
-        router.push(`/crm-platform/emails`)
+        router.push(`/network/emails`)
     }
   }
 
   const handleProspect = (type: 'people' | 'account') => {
     setIsOpen(false)
     if (type === 'people') {
-        router.push('/crm-platform/people?mode=prospect')
+        router.push('/network/people?mode=prospect')
     } else {
-        router.push('/crm-platform/accounts?mode=prospect')
+        router.push('/network/accounts?mode=prospect')
     }
   }
 
@@ -151,14 +151,14 @@ export function GlobalSearch() {
                     <span className="text-[10px] font-medium text-zinc-400 group-hover:text-zinc-200 uppercase tracking-wider">Accounts</span>
                 </button>
                 <button 
-                    onClick={() => { setIsOpen(false); router.push('/crm-platform/tasks?action=new') }}
+                    onClick={() => { setIsOpen(false); router.push('/network/tasks?action=new') }}
                     className="flex flex-col items-center justify-center gap-2 p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 transition-all group"
                 >
                     <Plus size={18} className="text-zinc-400 group-hover:text-signal transition-colors" />
                     <span className="text-[10px] font-medium text-zinc-400 group-hover:text-zinc-200 uppercase tracking-wider">Task</span>
                 </button>
                 <button 
-                    onClick={() => { setIsOpen(false); router.push('/crm-platform/analysis') }}
+                    onClick={() => { setIsOpen(false); router.push('/network/analysis') }}
                     className="flex flex-col items-center justify-center gap-2 p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 transition-all group"
                 >
                     <Sparkles size={18} className="text-zinc-400 group-hover:text-signal transition-colors" />

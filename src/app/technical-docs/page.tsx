@@ -67,7 +67,7 @@ export default function TechnicalDocs() {
           {/* 2. The Action Cluster */}
           <div className="flex items-center gap-6">
             {/* The "Ghost" Link */}
-            <Link href="/crm-platform"
+            <Link href="/network"
               className="hidden md:block text-sm font-medium text-zinc-500 hover:text-black transition-colors">
               Sign In
             </Link>
