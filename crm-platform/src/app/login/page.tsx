@@ -45,6 +45,14 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     setIsGoogleLoading(true)
     try {
+      // Dynamically determine the redirect URL based on the current environment
+      const origin = typeof window !== 'undefined' ? window.location.origin : ''
+      const redirectTo = origin.includes('localhost') 
+        ? `${origin}/auth/callback`
+        : `https://nodalpoint.io/auth/callback`
+
+      console.log('[Login] Redirecting to:', redirectTo)
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -53,7 +61,7 @@ export default function LoginPage() {
             prompt: 'consent',
           },
           scopes: 'https://www.googleapis.com/auth/gmail.readonly',
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo
         }
       })
       
