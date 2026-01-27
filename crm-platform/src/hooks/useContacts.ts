@@ -5,6 +5,8 @@ import { useAuth } from '@/context/AuthContext'
 export interface Contact {
   id: string
   name: string
+  firstName?: string
+  lastName?: string
   email: string
   phone: string
   company: string
@@ -14,6 +16,7 @@ export interface Contact {
   lastContact: string
   lastActivity?: string
   accountId?: string
+  metadata?: any
 }
 
 export type ContactDetail = Contact & {
@@ -379,6 +382,8 @@ export function useContacts(searchQuery?: string) {
           return {
             id: item.id,
             name: fullName,
+            firstName: fName as string,
+            lastName: lName as string,
             email: item.email || metadata?.email || metadata?.general?.email || metadata?.contact?.email || '',
             phone: item.phone || item.mobile || item.workPhone || item.otherPhone || metadata?.mobile || metadata?.workDirectPhone || metadata?.otherPhone || metadata?.general?.phone || metadata?.contact?.phone || '',
             address: getFirstServiceAddressAddress(account?.service_addresses) || metadata?.address || '',
@@ -388,7 +393,8 @@ export function useContacts(searchQuery?: string) {
             status: item.status || 'Lead',
             lastContact: item.lastContactedAt || item.created_at || new Date().toISOString(),
             accountId: item.accountId || undefined,
-            website: item.website || account?.domain || metadata?.website || undefined
+            website: item.website || account?.domain || metadata?.website || undefined,
+            metadata: metadata
           }
         }) as Contact[];
         
