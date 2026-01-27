@@ -25,22 +25,7 @@ function cors(req, res) {
   
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.end();
-return;
-return;
-return;
-return;
-return;
-return;
-return;
-return;
+    res.end();
     return true;
   }
   return false;
@@ -48,9 +33,11 @@ return;
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
-  if (req.method !== 'POST') return res.writeHead(405, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ error: 'Method not allowed' }));
-return;
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
   
   try {
     const { 
@@ -72,14 +59,14 @@ return;
     // fields: { subject_style, cta_type, opening_style, events: [{ event, timestamp }] }
     
     // Return success
-    return res.writeHead(200, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ ok: true, tracked: true }));
-return;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, tracked: true }));
+    return;
   } catch (e) {
     logger.error('[Tracking Error]', e);
-    return res.writeHead(500, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ error: 'Failed to track event' }));
-return;
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Failed to track event' }));
+    return;
   }
 }
 

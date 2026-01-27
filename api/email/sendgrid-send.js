@@ -6,16 +6,20 @@ import { injectTracking, hasTrackingPixel } from './tracking-helper.js';
 import logger from '../_logger.js';
 
 export default async function handler(req, res) {
+  logger.info(`[Gmail] Incoming request: ${req.method} ${req.url}`, 'sendgrid-send');
   if (cors(req, res)) return;
 
   if (req.method !== 'POST') {
+    logger.warn(`[Gmail] Method not allowed: ${req.method}`, 'sendgrid-send');
     res.writeHead(405, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Method not allowed' }));
     return;
   }
 
   // Gmail service account validation
-  if (!String(process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '').trim()) {
+  const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+  if (!String(serviceAccountKey || '').trim()) {
+    logger.error('[Gmail] Missing GOOGLE_SERVICE_ACCOUNT_KEY', 'sendgrid-send');
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Missing Gmail service account key' }));
     return;
@@ -23,6 +27,7 @@ export default async function handler(req, res) {
 
   try {
     const { to, subject, content, plainTextContent, from, fromName, _deliverability, threadId, inReplyTo, references, isHtmlEmail, userEmail, emailSettings, contactId, contactName, contactCompany, dryRun } = req.body;
+    logger.info(`[Gmail] Attempting to send email to: ${to}, subject: ${subject}, user: ${userEmail}`, 'sendgrid-send');
 
     if (!to || !subject || !content) {
       res.writeHead(400, { 'Content-Type': 'application/json' });

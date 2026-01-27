@@ -21,35 +21,31 @@ import dotenv from 'dotenv';
 // Load environment variables from .env file (for localhost)
 dotenv.config();
 
-// In production, silence console.info/log unless VERBOSE_LOGS is true
+// In production, keep console.log active for Cloud Run troubleshooting
 const isProduction = process.env.NODE_ENV === 'production';
-const verboseLogs = process.env.VERBOSE_LOGS === 'true';
-if (isProduction && !verboseLogs) {
-  console.log = () => { };
-  console.info = () => { };
-}
+const verboseLogs = process.env.VERBOSE_LOGS === 'true' || isProduction; 
 
-// Simple logging function for Cloud Run cost optimization
+// Simple logging function for Cloud Run
 const logLevels = { error: 0, warn: 1, info: 2, debug: 3 };
 const currentLogLevel = logLevels[process.env.LOG_LEVEL || 'info'];
 
 const logger = {
   info: (message, context, data) => {
-    if (currentLogLevel >= logLevels.info && process.env.VERBOSE_LOGS === 'true') {
-      console.log(`[${context}] ${message}`, data || '');
+    if (currentLogLevel >= logLevels.info) {
+      console.log(`[INFO][${context}] ${message}`, data || '');
     }
   },
   error: (message, context, data) => {
-    console.error(`[${context}] ${message}`, data || '');
+    console.error(`[ERROR][${context}] ${message}`, data || '');
   },
   debug: (message, context, data) => {
-    if (currentLogLevel >= logLevels.debug && process.env.VERBOSE_LOGS === 'true') {
-      console.log(`[${context}] ${message}`, data || '');
+    if (currentLogLevel >= logLevels.debug || verboseLogs) {
+      console.log(`[DEBUG][${context}] ${message}`, data || '');
     }
   },
   warn: (message, context, data) => {
     if (currentLogLevel >= logLevels.warn) {
-      console.warn(`[${context}] ${message}`, data || '');
+      console.warn(`[WARN][${context}] ${message}`, data || '');
     }
   }
 };
@@ -353,7 +349,13 @@ function readRawBody(req) {
 // Twilio Voice webhook (returns TwiML XML)
 async function handleApiTwilioVoice(req, res, parsedUrl) {
   const correlationId = getCorrelationId(req);
-  logger.debug('Processing Twilio Voice webhook', 'TwilioWebhook', { correlationId, url: req.url });
+  logger.info('Twilio Voice webhook received', 'TwilioWebhook', { 
+    correlationId, 
+    method: req.method,
+    url: req.url,
+    host: req.headers.host,
+    userAgent: req.headers['user-agent']
+  });
 
   if (req.method === 'POST') {
     try {
@@ -705,7 +707,8 @@ const server = http.createServer(async (req, res) => {
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     'https://powerchoosers.com',
-    'https://www.powerchoosers.com'
+    'https://www.powerchoosers.com',
+    'https://power-choosers-crm-792458658491.us-south1.run.app'
   ];
 
   if (allowedOrigins.includes(origin) || LOCAL_DEV_MODE) {

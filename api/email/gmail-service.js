@@ -63,9 +63,22 @@ export class GmailService {
                 const lastName = typeof userData.lastName === 'string' ? userData.lastName.trim() : '';
                 const derivedFullName = firstName ? `${firstName} ${lastName}`.trim() : '';
 
+                let finalName = derivedFullName || userData.name || userData.displayName;
+                
+                // If we still don't have a name, infer it from the email
+                if (!finalName) {
+                    const emailPrefix = emailLower.split('@')[0];
+                    if (emailPrefix.includes('.')) {
+                        finalName = emailPrefix.split('.').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+                    } else {
+                        finalName = emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
+                    }
+                    logger.info(`[Gmail] Inferred name '${finalName}' for user '${emailLower}' (missing in Firestore)`);
+                }
+
                 return {
                     email: emailLower,
-                    name: derivedFullName || userData.name || userData.displayName || emailLower.split('@')[0]
+                    name: finalName || emailLower.split('@')[0]
                 };
             }
             

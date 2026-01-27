@@ -113,11 +113,11 @@ export default async function handler(req, res) {
         const sanitizedFrom = normalizePhoneNumber(From);
         const callerIdForDial = isInboundToBusiness ? businessNumber : (sanitizedFrom || businessNumber);
         
-        // Ensure absolute base URL for Twilio callbacks (prefer headers)
+        // Ensure absolute base URL for Twilio callbacks (prefer PUBLIC_BASE_URL for stability)
+        const envBase = process.env.PUBLIC_BASE_URL || '';
         const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
         const host = req.headers['x-forwarded-host'] || req.headers.host || '';
-        const envBase = process.env.PUBLIC_BASE_URL || '';
-        const base = host ? `${proto}://${host}` : (envBase || 'https://power-choosers-crm-792458658491.us-south1.run.app');
+        const base = envBase ? envBase.replace(/\/$/, '') : (host ? `${proto}://${host}` : 'https://power-choosers-crm-792458658491.us-south1.run.app');
 
         // Extract metadata and create initial call record to ensure it appears in CRM immediately
         if (CallSid && src.metadata) {

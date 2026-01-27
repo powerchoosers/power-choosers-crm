@@ -9,7 +9,7 @@ const LOG_FILE = path.join(__dirname, '../.cursor/debug.log');
 // Shared logger for all API files
 // Respects production settings to reduce Cloud Run costs
 const isProduction = process.env.NODE_ENV === 'production';
-const verboseLogs = process.env.VERBOSE_LOGS === 'true';
+const verboseLogs = process.env.VERBOSE_LOGS === 'true' || isProduction; // Default to true in production for troubleshooting
 const logLevel = process.env.LOG_LEVEL || 'info';
 
 // Log level hierarchy
@@ -17,6 +17,9 @@ const logLevels = { error: 0, warn: 1, info: 2, debug: 3 };
 const currentLogLevel = logLevels[logLevel] ?? logLevels.info;
 
 function writeToDebugLog(type, args) {
+  // Only write to file in development
+  if (isProduction) return;
+
   try {
     const message = args.map(arg => {
       if (typeof arg === 'object') {
@@ -46,19 +49,15 @@ function writeToDebugLog(type, args) {
 
 export const logger = {
   log: (...args) => {
-    if (!isProduction || verboseLogs) {
-      if (currentLogLevel >= logLevels.info) {
-        console.log(...args);
-        writeToDebugLog('log', args);
-      }
+    if (currentLogLevel >= logLevels.info) {
+      console.log(...args);
+      writeToDebugLog('log', args);
     }
   },
   info: (...args) => {
-    if (!isProduction || verboseLogs) {
-      if (currentLogLevel >= logLevels.info) {
-        console.log(...args);
-        writeToDebugLog('info', args);
-      }
+    if (currentLogLevel >= logLevels.info) {
+      console.log(...args);
+      writeToDebugLog('info', args);
     }
   },
   warn: (...args) => {
@@ -76,12 +75,9 @@ export const logger = {
     }
   },
   debug: (...args) => {
-    // Only in development
-    if (!isProduction) {
-      if (currentLogLevel >= logLevels.debug) {
-        console.log(...args);
-        writeToDebugLog('debug', args);
-      }
+    if (currentLogLevel >= logLevels.debug || verboseLogs) {
+      console.log(...args);
+      writeToDebugLog('debug', args);
     }
   }
 };
