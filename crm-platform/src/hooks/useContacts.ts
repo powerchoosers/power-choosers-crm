@@ -16,6 +16,7 @@ export interface Contact {
 }
 
 export type ContactDetail = Contact & {
+  [key: string]: unknown
   firstName?: string
   lastName?: string
   title?: string
