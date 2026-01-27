@@ -18,6 +18,20 @@ export interface Account {
   address?: string
   updated: string
   ownerId?: string
+  // Forensic/Asset Fields
+  loadFactor?: number // 0-1
+  loadZone?: string
+  annualUsage?: string
+  electricitySupplier?: string
+  currentRate?: string
+  status?: 'ACTIVE_LOAD' | 'PROSPECT' | 'CHURNED'
+  meters?: Array<{
+    id: string
+    esiId: string
+    address: string
+    rate: string
+    endDate: string
+  }>
 }
 
 const PAGE_SIZE = 50
@@ -118,7 +132,15 @@ export function useAccounts(searchQuery?: string) {
             // Fields from metadata if they exist
             sqft: data.metadata?.sqft || '',
             occupancy: data.metadata?.occupancy || '',
-            ownerId: data.ownerId
+            ownerId: data.ownerId,
+            // Forensic/Asset Fields
+            loadFactor: data.metadata?.loadFactor ?? 0.45, // Default for visual testing
+            loadZone: data.metadata?.loadZone || data.metadata?.zone || 'LZ_NORTH',
+            annualUsage: data.annual_usage || data.metadata?.annualUsage || '',
+            electricitySupplier: data.electricity_supplier || data.metadata?.supplier || '',
+            currentRate: data.current_rate || data.metadata?.rate || '',
+            status: data.status || 'PROSPECT',
+            meters: data.metadata?.meters || []
           }
         }) as Account[];
 
@@ -175,7 +197,15 @@ export function useAccount(id: string) {
         updated: data.updated_at || new Date().toISOString(),
         sqft: data.metadata?.sqft || '',
         occupancy: data.metadata?.occupancy || '',
-        ownerId: data.ownerId
+        ownerId: data.ownerId,
+        // Forensic/Asset Fields
+        loadFactor: data.metadata?.loadFactor ?? 0.45,
+        loadZone: data.metadata?.loadZone || data.metadata?.zone || 'LZ_NORTH',
+        annualUsage: data.annual_usage || data.metadata?.annualUsage || '',
+        electricitySupplier: data.electricity_supplier || data.metadata?.supplier || '',
+        currentRate: data.current_rate || data.metadata?.rate || '',
+        status: data.status || 'PROSPECT',
+        meters: data.metadata?.meters || []
       } as Account
     },
     enabled: !!id && !loading && !!user,
@@ -258,8 +288,21 @@ export function useUpdateAccount() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Account> & { id: string }) => {
-      // Map updates to DB columns
-      const dbUpdates: Record<string, string | number | null> = {}
+      // 1. Fetch current data to get metadata
+      const { data: current, error: fetchError } = await supabase
+        .from('accounts')
+        .select('metadata')
+        .eq('id', id)
+        .single()
+      
+      if (fetchError) {
+        console.warn('Could not fetch current metadata, proceeding with empty metadata', fetchError)
+      }
+      
+      const currentMetadata = current?.metadata || {}
+
+      // 2. Map updates to DB columns
+      const dbUpdates: Record<string, string | number | null | object> = {}
       if (updates.name !== undefined) dbUpdates.name = updates.name
       if (updates.industry !== undefined) dbUpdates.industry = updates.industry
       if (updates.domain !== undefined) dbUpdates.domain = updates.domain
@@ -272,12 +315,26 @@ export function useUpdateAccount() {
         dbUpdates.city = updates.location?.split(',')[0]?.trim()
         dbUpdates.state = updates.location?.split(',')[1]?.trim()
       }
-      
-      // Handle metadata updates if needed (simplified)
-      if (updates.sqft || updates.occupancy) {
-         // This is tricky without fetching first, but for now we might skip or do a simple merge if supported
-         // Supabase doesn't deeply merge JSONB on update easily without custom function or fetch-merge-update
-         // For now, let's assume metadata is small enough to overwrite or ignore for this MVP
+      if (updates.address !== undefined) dbUpdates.address = updates.address
+
+      // Forensic fields mapping
+      if (updates.annualUsage !== undefined) dbUpdates.annual_usage = updates.annualUsage
+      if (updates.electricitySupplier !== undefined) dbUpdates.electricity_supplier = updates.electricitySupplier
+      if (updates.currentRate !== undefined) dbUpdates.current_rate = updates.currentRate
+      if (updates.status !== undefined) dbUpdates.status = updates.status
+
+      // Metadata updates
+      const newMetadata = { ...currentMetadata }
+      let hasMetadataUpdate = false
+
+      if (updates.sqft !== undefined) { newMetadata.sqft = updates.sqft; hasMetadataUpdate = true; }
+      if (updates.occupancy !== undefined) { newMetadata.occupancy = updates.occupancy; hasMetadataUpdate = true; }
+      if (updates.loadFactor !== undefined) { newMetadata.loadFactor = updates.loadFactor; hasMetadataUpdate = true; }
+      if (updates.loadZone !== undefined) { newMetadata.loadZone = updates.loadZone; hasMetadataUpdate = true; }
+      if (updates.meters !== undefined) { newMetadata.meters = updates.meters; hasMetadataUpdate = true; }
+
+      if (hasMetadataUpdate) {
+         dbUpdates.metadata = newMetadata
       }
 
       dbUpdates.updated_at = new Date().toISOString()
@@ -292,6 +349,7 @@ export function useUpdateAccount() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['account'] })
     }
   })
 }
