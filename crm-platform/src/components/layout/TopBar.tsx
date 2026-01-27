@@ -2,7 +2,7 @@
 
 import { useCallStore } from '@/store/callStore'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Phone, Mic, PhoneOff, ArrowRightLeft, RefreshCw, Bell, X } from 'lucide-react'
+import { Phone, Mic, PhoneOff, ArrowRightLeft, RefreshCw, Bell, X, Shield } from 'lucide-react'
 import { cn, formatToE164 } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { GlobalSearch } from '@/components/search/GlobalSearch'
@@ -311,7 +311,7 @@ export function TopBar() {
             <motion.div 
                 initial={false}
                 animate={{ 
-                    width: (isDialerOpen || isGeminiOpen) ? 400 : 172,
+                    width: (isDialerOpen || isGeminiOpen) ? 350 : 172,
                     borderRadius: 24,
                 }}
                 transition={{ 
@@ -320,29 +320,44 @@ export function TopBar() {
                     damping: 35,
                     mass: 0.8
                 }}
-                className="glass-panel shadow-lg overflow-visible flex flex-col relative h-12"
+                className={cn(
+                    "glass-panel shadow-lg overflow-visible flex flex-col relative h-12 transition-all",
+                    isDialerOpen && "hover:bg-white/5 hover:border-white/10 group/dialer"
+                )}
             >
                 {/* Left Side Buttons - Absolute to prevent vertical jumps */}
-                    <div className="absolute left-2 top-0 h-12 flex items-center gap-1 pointer-events-auto leading-none">
+                    <div className="absolute left-2 top-0 h-12 flex items-center gap-2 pointer-events-auto leading-none">
                         <AnimatePresence>
-                          {isGeminiOpen && (
+                          {(isDialerOpen || isGeminiOpen) && (
                             <motion.div
-                              key="gemini-header-actions"
-                              initial={{ opacity: 0, x: -20, filter: 'blur(4px)' }}
+                              key="header-left-actions"
+                              initial={{ opacity: 0, x: -10, filter: 'blur(4px)' }}
                               animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
-                              exit={{ opacity: 0, x: -20, filter: 'blur(4px)' }}
-                              className="flex items-center ml-2"
+                              exit={{ opacity: 0, x: -10, filter: 'blur(4px)' }}
+                              className="flex items-center gap-2 ml-2"
                             >
-                              {/* Target Badge (Global Scope) */}
-                              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-black/20 backdrop-blur-md">
-                                <div className={cn(
-                                  "w-1.5 h-1.5 rounded-full animate-pulse",
-                                  (!contextInfo || contextInfo.type === 'general') ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-[#002FA7] shadow-[0_0_8px_#002FA7]"
-                                )} />
-                                <span className="text-[10px] font-mono text-zinc-400 tracking-wider uppercase whitespace-nowrap">
-                                  {contextInfo.displayLabel}
-                                </span>
-                              </div>
+                              {/* From/Origin Badge (for Dialer) */}
+                              {isDialerOpen && selectedNumber && (
+                                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-black/20 backdrop-blur-md">
+                                  <Shield size={10} className="text-[#002FA7] shrink-0" />
+                                  <span className="text-[10px] font-mono text-zinc-400 tracking-wider uppercase whitespace-nowrap">
+                                    From: <span className="text-zinc-200">{selectedNumberName}</span>
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Context Badge (for Gemini) */}
+                              {isGeminiOpen && (
+                                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-black/20 backdrop-blur-md">
+                                  <div className={cn(
+                                    "w-1.5 h-1.5 rounded-full animate-pulse",
+                                    (!contextInfo || contextInfo.type === 'general') ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-[#002FA7] shadow-[0_0_8px_#002FA7]"
+                                  )} />
+                                  <span className="text-[10px] font-mono text-zinc-400 tracking-wider uppercase whitespace-nowrap">
+                                    {contextInfo.displayLabel}
+                                  </span>
+                                </div>
+                              )}
                             </motion.div>
                           )}
                         </AnimatePresence>
@@ -350,13 +365,13 @@ export function TopBar() {
 
                     {/* Right Side Buttons - Pinned Absolute */}
                     <div className="absolute right-2 top-0 h-12 flex items-center gap-1 pointer-events-auto leading-none">
-                        {/* Gemini Trigger (Bot/X icon) */}
+                        {/* Gemini Trigger (Bot/X icon) - Restored to original right-side position */}
                         <GeminiChatTrigger
                           onToggle={() => {
                             if (!isGeminiOpen) setIsDialerOpen(false)
                           }}
                         />
-                        
+
                         {/* Refresh Data */}
                         <button 
                             onClick={handleRefresh}
@@ -425,7 +440,7 @@ export function TopBar() {
                                     <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#002FA7]/10 border border-[#002FA7]/20">
                                         <div className="w-1 h-1 rounded-full bg-signal animate-pulse" />
                                         <span className="text-[9px] font-mono text-signal uppercase tracking-wider truncate max-w-[120px]">
-                                            {storeMetadata.name}
+                                            TARGET: {storeMetadata.name}
                                         </span>
                                     </div>
                                 )}

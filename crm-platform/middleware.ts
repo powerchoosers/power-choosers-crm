@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
-  if (pathname.startsWith('/crm-platform')) {
+  if (pathname.startsWith('/network')) {
     const hasSession = req.cookies.get('np_session')?.value === '1'
     if (!hasSession) {
       const url = req.nextUrl.clone()
@@ -15,5 +15,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/crm-platform/:path*']
+  matcher: ['/network/:path*']
 }

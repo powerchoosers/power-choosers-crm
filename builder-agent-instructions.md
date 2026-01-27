@@ -70,7 +70,7 @@ To ensure the frontend can communicate with the backend regardless of environmen
 ## 📂 File Locations & "Source of Truth"
 - **Landing Page**: `crm-platform/src/app/page.tsx`
 - **Bill Debugger**: `crm-platform/public/bill-debugger.html` (Accessible at `/bill-debugger.html`)
-- **Dashboard**: `crm-platform/src/app/crm-platform/page.tsx`
+- **Dashboard**: `crm-platform/src/app/network/page.tsx`
 - **Images**: `crm-platform/public/images/`
 
 ##### 🎨 Design System
@@ -138,5 +138,5 @@ To ensure the frontend can communicate with the backend regardless of environmen
 - **Animation**: Verify that all layout changes are smooth and non-bouncy.
 
 ## 📝 Troubleshooting
-- **Routing Issues**: If `/crm-platform` opens the wrong page, check `server.js` mappings or `next.config.ts` rewrites.
+- **Routing Issues**: If `/network` opens the wrong page, check `server.js` mappings or `next.config.ts` rewrites.
 - **Crashes**: If IDE/System crashes, stop the dev server, restart the legacy server (`node server.js`), and focus on code analysis/writing before attempting to run again.

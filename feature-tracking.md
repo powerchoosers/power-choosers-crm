@@ -3,7 +3,7 @@
 - **Status**: Completed
 - **Description**: Migrated the legacy segmentation features to a modern, standardized Lists page with real-time Supabase integration.
 - **Actions**:
-  - [x] **Page Creation**: Created `src/app/crm-platform/lists/page.tsx` with a standardized "Obsidian & Glass" layout.
+  - [x] **Page Creation**: Created `src/app/network/lists/page.tsx` with a standardized "Obsidian & Glass" layout.
   - [x] **Data Fetching**: Implemented `useLists.ts` hook using TanStack Query to fetch list data and member counts from Supabase.
   - [x] **Standardized Layout**:
     - [x] **Contained Container**: Implemented full-page container with `h-[calc(100vh-8rem)]`.
@@ -48,8 +48,8 @@
   - [x] **UI Implementation**:
     - Created `ComposeModal.tsx` for sending emails (replacing `email-compose-global.js`).
     - Created `EmailList.tsx` with folder filtering (Inbox/Sent) and tracking stats display.
-    - Created main `EmailsPage` (`src/app/crm-platform/emails/page.tsx`) adhering to Nodal Point design standards.
-    - Created dedicated Detail Page (`src/app/crm-platform/emails/[id]/page.tsx`) for full-view reading and replying.
+    - Created main `EmailsPage` (`src/app/network/emails/page.tsx`) adhering to Nodal Point design standards.
+    - Created dedicated Detail Page (`src/app/network/emails/[id]/page.tsx`) for full-view reading and replying.
   - [x] **Tracking**: Integrated Open/Click tracking stats display in the email list (leveraging existing backend tracking system).
   - [x] **Navigation**: Added "Emails" link to the Sidebar.
   - [x] **Sender Name**: Ensured outgoing emails use user's first/last name (Auth + Gmail service lookup) instead of email prefix.
@@ -58,10 +58,10 @@
 - **Status**: Completed
 - **Description**: Added a dedicated contact detail view (dossier) with account-linked energy context.
 - **Actions**:
-  - [x] **Detail Route**: Added `src/app/crm-platform/contacts/[id]/page.tsx` with bento-style layout and contract maturity bar.
+  - [x] **Detail Route**: Added `src/app/network/contacts/[id]/page.tsx` with bento-style layout and contract maturity bar.
   - [x] **Data Access**: Implemented `useContact(id)` in `src/hooks/useContacts.ts` for single-contact fetch.
   - [x] **Account Context**: Resolved linked account via contact accountId / name match and rendered energy fields when present.
-  - [x] **Navigation**: Made People table rows and “View Details” open `/crm-platform/contacts/[id]`.
+  - [x] **Navigation**: Made People table rows and “View Details” open `/network/contacts/[id]`.
   - [x] **Bug Fix**: Resolved "Unknown" name rendering by implementing legacy name construction logic (firstName + lastName) in `useContacts.ts`.
   - [x] **Aesthetic Refinement**:
     - [x] Removed duplicate environment widgets (Time, Weather, Volatility) from Center Column.

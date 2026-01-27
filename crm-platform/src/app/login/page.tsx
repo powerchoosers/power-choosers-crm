@@ -27,7 +27,7 @@ export default function LoginPage() {
       await signInWithEmailAndPassword(auth, email, password)
       document.cookie = 'np_session=1; Path=/; SameSite=Lax'
       toast.success('Logged in successfully')
-      router.push('/crm-platform')
+      router.push('/network')
     } catch (error: unknown) {
       console.error('Login error:', error)
       const message = error instanceof Error ? error.message : 'Failed to login'
@@ -44,7 +44,7 @@ export default function LoginPage() {
       await signInWithPopup(auth, provider)
       document.cookie = 'np_session=1; Path=/; SameSite=Lax'
       toast.success('Logged in with Google successfully')
-      router.push('/crm-platform')
+      router.push('/network')
     } catch (error: unknown) {
       console.error('Google login error:', error)
       const message = error instanceof Error ? error.message : 'Failed to login with Google'

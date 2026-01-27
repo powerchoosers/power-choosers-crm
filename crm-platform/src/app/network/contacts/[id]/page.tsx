@@ -773,7 +773,7 @@ export default function ContactDossierPage() {
                       </div>
                       <button 
                         className="text-zinc-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5"
-                        onClick={() => router.push('/crm-platform/calls')}
+                        onClick={() => router.push('/network/calls')}
                       >
                         <ArrowRightLeft className="w-4 h-4" />
                       </button>
