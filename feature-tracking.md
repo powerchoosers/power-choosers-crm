@@ -189,6 +189,18 @@
   - [x] **Ownership Filtering**: Ensured all search queries respect user roles (admin vs. non-admin) and `ownerId` metadata.
   - [x] **Performance**: Optimized API calls using `useInfiniteQuery` and range-based pagination, reducing client-side memory load.
 
+### Nodal Architect Refinements & Metadata Intelligence
+- **Status**: Completed
+- **Description**: Enhanced the Nodal Architect's precision by implementing metadata deep-scanning, temporal context awareness, and industry-specific intelligence mapping.
+- **Actions**:
+  - [x] **Temporal Context**: Hard-coded current date awareness (2026-01-27) to prevent legacy model drift.
+  - [x] **Deep Metadata Scanning**: Updated `list_accounts` tool in `chat.js` to search both top-level columns and `metadata` JSONB for expiration dates and industry tags.
+  - [x] **Normalization Layer**: Implemented on-the-fly field promotion in `chat.js` to ensure AI sees legacy data as first-class citizens.
+  - [x] **Industry Intelligence**: Mapped "Manufacturing" to broad sub-sectors (Building Materials, Electrical, Fabrication) within the AI's system prompt and search logic.
+  - [x] **Linter Stability**: Resolved template literal nesting issues by escaping backticks in system prompt strings.
+  - [x] **Forensic Transparency**: Added `list_all_documents` tool to allow full database audits of bills and contracts.
+  - [x] **Anti-Hallucination**: Reinforced system prompt with explicit bans on demo data and verification protocols for CRM records.
+
 ### 1. Data Layer Migration (Supabase)
 - **Status**: 🏗️ In Progress
 - **Priority**: Critical (Cost Reduction)
