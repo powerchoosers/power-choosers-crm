@@ -2,7 +2,7 @@ import { create } from 'zustand'
 
 interface CallState {
   isActive: boolean
-  status: 'idle' | 'dialing' | 'connected' | 'ended'
+  status: 'idle' | 'dialing' | 'connected' | 'ended' | 'error'
   phoneNumber: string
   metadata: {
     name?: string
