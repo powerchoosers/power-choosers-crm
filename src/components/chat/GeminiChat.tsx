@@ -688,8 +688,13 @@ export function GeminiChatPanel() {
     
     // Ensure history starts with a user message and is trimmed to last 10 for performance
     const firstUserIndex = updatedMessages.findIndex((m) => m.role === 'user')
-    const relevantHistory = firstUserIndex > 0 ? updatedMessages.slice(firstUserIndex) : updatedMessages
-    const messagesForApi = relevantHistory.slice(-10)
+    const relevantHistory = firstUserIndex >= 0 ? updatedMessages.slice(firstUserIndex) : updatedMessages
+    
+    // Take last 10, but verify we don't start with an assistant message after slicing
+    let messagesForApi = relevantHistory.slice(-10)
+    if (messagesForApi.length > 0 && messagesForApi[0].role === 'assistant') {
+      messagesForApi = messagesForApi.slice(1)
+    }
 
     setMessages(updatedMessages)
     setInput('')
