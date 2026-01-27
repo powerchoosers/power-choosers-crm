@@ -1,6 +1,6 @@
 'use client'
 
-import { CheckSquare, ListTodo, Circle } from 'lucide-react'
+import { CheckSquare, Circle } from 'lucide-react'
 import { useTasks } from '@/hooks/useTasks'
 import { useMemo } from 'react'
 import { cn } from '@/lib/utils'
