@@ -229,6 +229,56 @@ export function useCalls(searchQuery?: string) {
   })
 }
 
+export function useAccountCalls(accountId: string) {
+  const { user, loading } = useAuth()
+
+  return useQuery({
+    queryKey: ['account-calls', accountId, user?.email ?? 'guest'],
+    queryFn: async () => {
+      if (!accountId || loading || !user) return []
+
+      // Get all contacts for this account first
+      const { data: contacts, error: contactsError } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('accountId', accountId)
+
+      if (contactsError) throw contactsError
+      
+      const contactIds = (contacts || []).map(c => c.id)
+      if (contactIds.length === 0) return []
+
+      // Fetch calls for these contacts
+      const { data, error } = await supabase
+        .from('calls')
+        .select('*, contacts(name)')
+        .in('contact_id', contactIds)
+        .order('timestamp', { ascending: false })
+
+      if (error) throw error
+
+      return (data as any[]).map(item => ({
+        id: item.id,
+        callSid: item.call_sid,
+        contactName: item.contacts?.name || 'Unknown',
+        phoneNumber: item.phone_number,
+        type: item.type as 'Inbound' | 'Outbound',
+        status: item.status as any,
+        duration: item.duration,
+        date: item.timestamp || item.created_at,
+        note: item.note,
+        recordingUrl: item.recording_url,
+        recordingSid: item.recording_sid,
+        transcript: item.transcript,
+        aiInsights: item.ai_insights,
+        contactId: item.contact_id
+      })) as Call[]
+    },
+    enabled: !!accountId && !loading && !!user,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
 export function useContactCalls(contactId: string) {
   const { user, loading } = useAuth()
   const queryClient = useQueryClient()

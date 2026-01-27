@@ -79,6 +79,7 @@ export function useSequences(searchQuery?: string) {
         .from('sequences')
         .insert({
           ...newSequence,
+          id: crypto.randomUUID(),
           ownerId: user?.email,
           createdAt: new Date().toISOString(),
           status: newSequence.status || 'draft',

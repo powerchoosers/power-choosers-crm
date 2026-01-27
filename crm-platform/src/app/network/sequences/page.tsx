@@ -36,12 +36,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  Filter
+  Filter,
+  Layers
 } from 'lucide-react'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { toast } from 'sonner'
 import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
 import { Badge } from '@/components/ui/badge'
+import Link from 'next/link'
 
 const PAGE_SIZE = 50
 
@@ -62,7 +64,10 @@ function toDisplayDate(value: unknown): Date | null {
   return null
 }
 
+import { useRouter } from 'next/navigation'
+
 export default function SequencesPage() {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   
@@ -217,7 +222,11 @@ export default function SequencesPage() {
                 </TableHeader>
                 <TableBody>
                 {pagedSequences.map((sequence) => (
-                    <TableRow key={sequence.id} className="border-white/5 hover:bg-white/[0.02] transition-colors group">
+                    <TableRow 
+                      key={sequence.id} 
+                      className="border-white/5 hover:bg-white/[0.02] transition-colors group cursor-pointer"
+                      onClick={() => router.push(`/network/sequences/${sequence.id}/builder`)}
+                    >
                     <TableCell className="font-medium text-zinc-200">
                         <div className="flex flex-col">
                         <span>{sequence.name}</span>
@@ -276,11 +285,13 @@ export default function SequencesPage() {
                           )
                         })()}
                     </TableCell>
-                    <TableCell className="text-right py-3">
+                    <TableCell className="text-right py-3" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10" onClick={() => toast.info('Builder coming soon')}>
-                            <Edit className="h-4 w-4" />
-                        </Button>
+                        <Link href={`/network/sequences/${sequence.id}/builder`}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10">
+                              <Edit className="h-4 w-4" />
+                          </Button>
+                        </Link>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10">

@@ -195,6 +195,43 @@ function buildContactName(args: {
   return rawName || email || 'Unknown'
 }
 
+export function useAccountContacts(accountId: string) {
+  const { user, loading } = useAuth()
+
+  return useQuery({
+    queryKey: ['account-contacts', accountId, user?.email ?? 'guest'],
+    queryFn: async () => {
+      if (!accountId || loading || !user) return []
+
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('accountId', accountId)
+
+      if (error) {
+        console.error("Error fetching account contacts:", error)
+        throw error
+      }
+
+      return (data || []).map(row => ({
+        id: row.id,
+        name: buildContactName({ 
+          firstName: row.firstName || row.first_name, 
+          lastName: row.lastName || row.last_name, 
+          rawName: row.name, 
+          email: row.email 
+        }),
+        email: row.email || '',
+        phone: row.phone || '',
+        title: row.title || '',
+        accountId: row.accountId
+      })) as Partial<ContactDetail>[]
+    },
+    enabled: !!accountId && !loading && !!user,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
 export function useSearchContacts(queryTerm: string) {
   const { user, role, loading } = useAuth()
 
