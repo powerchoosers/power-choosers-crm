@@ -1,9 +1,8 @@
 import { useState, useCallback } from 'react';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { collection, query, where, getDocs, serverTimestamp, doc, setDoc } from 'firebase/firestore';
+import { GoogleAuthProvider, signInWithPopup, User } from 'firebase/auth';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase';
-import { AuthUser } from '@/context/AuthContext';
 
 // Gmail API Types
 interface GmailHeader {
@@ -44,16 +43,40 @@ export function useGmailSync() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string>('');
 
-  // Get Access Token from Supabase Session
-  const getAccessToken = useCallback(async () => {
+  const reauthenticateWithGmailScope = useCallback(async () => {
     try {
-      const { data } = await supabase.auth.getSession();
-      return data.session?.provider_token;
+      const provider = new GoogleAuthProvider();
+      provider.addScope('https://www.googleapis.com/auth/gmail.readonly');
+      // Force account selection to ensure we get the right user
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+      
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      const token = credential?.accessToken;
+      
+      if (token) {
+        sessionStorage.setItem('gmail_oauth_token', token);
+      }
+      
+      return token;
     } catch (error) {
-      console.error('Error getting session:', error);
+      console.error('Re-auth failed:', error);
+      toast.error('Failed to connect to Gmail. Please try again.');
       return null;
     }
   }, []);
+
+  // Get Access Token
+  const getAccessToken = useCallback(async () => {
+    // Check session storage first
+    const cachedToken = sessionStorage.getItem('gmail_oauth_token');
+    if (cachedToken) return cachedToken;
+    
+    // Fallback: Re-auth to get new token
+    return await reauthenticateWithGmailScope();
+  }, [reauthenticateWithGmailScope]);
 
   // Parse Gmail Message (Ported from legacy script)
   const parseGmailMessage = useCallback((message: GmailMessage, userEmail: string) => {
@@ -119,15 +142,16 @@ export function useGmailSync() {
     };
   }, []);
 
-  const syncGmail = useCallback(async (user: AuthUser) => {
+  const syncGmail = useCallback(async (user: User) => {
     if (isSyncing) return;
     setIsSyncing(true);
     setSyncStatus('Starting sync...');
 
     try {
-      const accessToken = await getAccessToken();
+      let accessToken = await getAccessToken();
       if (!accessToken) {
-        throw new Error('No access token available. Please log in again with Gmail permissions.');
+        accessToken = await reauthenticateWithGmailScope();
+        if (!accessToken) throw new Error('Could not get access token');
       }
 
       // Fetch messages list
@@ -137,7 +161,13 @@ export function useGmailSync() {
       });
 
       if (!listRes.ok) {
-        throw new Error(`Gmail API error: ${listRes.status}`);
+        if (listRes.status === 401) {
+             // Token expired, try once more
+             accessToken = await reauthenticateWithGmailScope();
+             if (!accessToken) throw new Error('Re-auth failed');
+        } else {
+            throw new Error(`Gmail API error: ${listRes.status}`);
+        }
       }
 
       const listData = await listRes.json();
@@ -183,12 +213,12 @@ export function useGmailSync() {
     } catch (error) {
       console.error('Sync failed:', error);
       setSyncStatus('Sync failed');
-      toast.error('Gmail sync failed: ' + (error instanceof Error ? error.message : String(error)));
+      toast.error('Gmail sync failed');
     } finally {
       setIsSyncing(false);
       setTimeout(() => setSyncStatus(''), 3000);
     }
-  }, [isSyncing, getAccessToken, parseGmailMessage]);
+  }, [isSyncing, getAccessToken, reauthenticateWithGmailScope, parseGmailMessage]);
 
   return { syncGmail, isSyncing, syncStatus };
 }

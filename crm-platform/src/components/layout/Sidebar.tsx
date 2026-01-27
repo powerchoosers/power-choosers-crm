@@ -8,7 +8,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
-import { supabase } from '@/lib/supabase'
+import { auth } from '@/lib/firebase'
 import { toast } from 'sonner'
 import { useGeminiStore } from '@/store/geminiStore'
 
@@ -35,7 +35,7 @@ export function Sidebar() {
 
   const handleLogout = async () => {
     try {
-        await supabase.auth.signOut()
+        await auth.signOut()
         document.cookie = 'np_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;'
         toast.success('Logged out successfully')
         router.push('/login')
