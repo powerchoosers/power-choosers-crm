@@ -98,6 +98,16 @@
 - **Actions**:
   - [x] **Backend Integration**: Implemented `/api/analyze-bill` with Gemini 2.5 Flash-Lite fallback chain.
   - [x] **Frontend Logic**: Built `BillDebuggerPage` with forensic console UI and real-time extraction feedback.
+
+### Nodal Architect Intelligence & Accuracy
+- **Status**: Completed
+- **Description**: Fixed contract end date hallucinations and enhanced CRM data resolution logic.
+- **Actions**:
+  - [x] **Date Resolution**: Implemented robust date resolution in `list_accounts`, `get_account_details`, and `get_contact_details` to check multiple metadata fields (`contract_end_date`, `contractEndDate`).
+  - [x] **Normalization**: Added automatic conversion of legacy date formats (MM/DD/YYYY) to ISO (YYYY-MM-DD) within tool handlers.
+  - [x] **Anti-Hallucination**: Strengthened `ANTI_HALLUCINATION_PROTOCOL` with explicit rules against inventing contract dates or changing existing dates to match queries.
+  - [x] **Query Optimization**: Enhanced Supabase queries to filter by expiration year across both top-level columns and nested metadata strings using year-suffix matching (`ilike %/2026`).
+  - [x] **Context Awareness**: Verified frontend `GeminiChat.tsx` correctly transmits page context (account/contact IDs) for zero-click intelligence.
   - [x] **Reliability**: Updated `next.config.ts` proxying and enhanced server-side error handling to ensure consistent JSON responses.
   - [x] **Design**: Applied Nodal Point "Obsidian & Glass" aesthetic to the analysis interface.
 
