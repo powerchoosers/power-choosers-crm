@@ -36,6 +36,12 @@ The agent is currently equipped with the following "Tools" and UI protocols whic
 - **Real-time Awareness**:
     - `get_energy_news`: Fetches the latest Texas energy market and ERCOT news via RSS, providing the agent with current context on grid volatility.
 
+### 🧠 Advanced Intelligence & Accuracy (New)
+- **Robust Date Resolution**: Automatically cross-references multiple metadata fields (`contract_end_date`, `contractEndDate`, `general.contractEndDate`) to find expiration data.
+- **Date Normalization Engine**: Real-time conversion of legacy formats (e.g., `MM/DD/YYYY`) to forensic ISO standards (`YYYY-MM-DD`) during data retrieval.
+- **Enhanced Industry Logic**: Intelligent search expansion for "Manufacturing" and other broad sectors to ensure complete node discovery across related sub-industries.
+- **Expiration Year Filtering**: High-precision filtering using both date-range logic and year-suffix pattern matching (`ilike %/YYYY`) for inconsistent legacy records.
+
 ---
 
 ## 🎨 UI/UX Protocol: "Glass Intelligence"
@@ -73,6 +79,7 @@ The Architect can inject specialized data modules directly into the chat stream:
 
 ### 3. Interaction Protocols
 - **Contextual Awareness**: The agent automatically detects the user's current route (Contact, Account, Dashboard) and offers proactive insights upon opening without a single click.
+- **Anti-Hallucination Protocol (v2)**: Strict enforcement against inventing names, metrics, or dates. If data is not in the CRM, the agent is hard-coded to report it as "Unknown" or "Data Void".
 - **Neural Line Response**: Every AI transmission is anchored by a glowing vertical "Neural Line" spine in International Klein Blue.
 - **Dynamic Scaling**: Header icons (Bot, Dialer, Refresh) are precision-scaled to `22px-24px` for professional visibility.
 - **Haptic Animations**: `framer-motion` layout orchestration with `spring` transitions (bounce: 0, duration: 0.4) for organic UI movement.
@@ -127,4 +134,4 @@ We are actively expanding the Architect's "Brain" to include these forensic ener
 
 ---
 *Last Updated: 2026-01-27*
-*Status: Nodal Architect v1.2 Operational*
+*Status: Nodal Architect v1.3 Operational*
