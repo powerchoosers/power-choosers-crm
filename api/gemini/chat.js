@@ -607,56 +607,122 @@ export default async function handler(req, res) {
 
     const perplexityModel = (process.env.PERPLEXITY_MODEL || '').trim() || 'sonar-pro';
 
+    const convertToolsToOpenAI = (geminiTools) => {
+      return geminiTools.flatMap(t => t.functionDeclarations).map(fn => ({
+        type: 'function',
+        function: {
+          name: fn.name,
+          description: fn.description,
+          parameters: fn.parameters
+        }
+      }));
+    };
+
     const callOpenRouter = async (modelName) => {
       const apiKey = process.env.OPEN_ROUTER_API_KEY;
       if (!apiKey) throw new Error('OpenRouter API key not configured');
 
       const model = modelName || 'openai/gpt-oss-120b';
-      const normalized = cleanedMessages
-        .slice(-12)
-        .map((m) => ({
+      const openAiTools = convertToolsToOpenAI(tools);
+      
+      let currentMessages = [
+        { role: 'system', content: buildSystemPrompt().trim() },
+        ...cleanedMessages.slice(-12).map(m => ({
           role: m.role === 'user' ? 'user' : 'assistant',
           content: m.content,
-        }));
-
-      const lastRole = normalized.length > 0 ? normalized[normalized.length - 1].role : 'assistant';
-      const openRouterMessages = [
-        { role: 'system', content: buildSystemPrompt().trim() },
-        ...normalized,
+        }))
       ];
-      if (lastRole !== 'user') {
-        openRouterMessages.push({ role: 'user', content: prompt });
+      
+      // Ensure the last message is from the user if it's not already
+      if (currentMessages[currentMessages.length - 1].role !== 'user') {
+        currentMessages.push({ role: 'user', content: prompt });
       }
 
       console.log(`[AI Router] Calling OpenRouter with model: ${model}`);
 
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': 'https://nodalpoint.io',
-          'X-Title': 'Nodal Point CRM',
-        },
-        body: JSON.stringify({
-          model: model,
-          messages: openRouterMessages,
-          temperature: 0.7,
-          max_tokens: 2048,
-        }),
-      });
+      // Loop for tool calls (max 5 turns)
+      let turnCount = 0;
+      const MAX_TURNS = 5;
 
-      if (!response.ok) {
-        const errText = await response.text().catch(() => '');
-        throw new Error(`OpenRouter error: ${response.status} ${response.statusText}${errText ? ` - ${errText}` : ''}`);
-      }
+      while (turnCount < MAX_TURNS) {
+        turnCount++;
+        
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+            'HTTP-Referer': 'https://nodalpoint.io',
+            'X-Title': 'Nodal Point CRM',
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: currentMessages,
+            tools: openAiTools,
+            temperature: 0.7,
+            max_tokens: 2048,
+          }),
+        });
 
-      const data = await response.json();
-      const content = data?.choices?.[0]?.message?.content;
-      if (typeof content !== 'string' || !content.trim()) {
-        throw new Error('OpenRouter returned an empty response');
+        if (!response.ok) {
+          const errText = await response.text().catch(() => '');
+          throw new Error(`OpenRouter error: ${response.status} ${response.statusText}${errText ? ` - ${errText}` : ''}`);
+        }
+
+        const data = await response.json();
+        const message = data?.choices?.[0]?.message;
+        
+        if (!message) {
+          throw new Error('OpenRouter returned an empty response');
+        }
+
+        // Add assistant's response to history
+        currentMessages.push(message);
+
+        // Check for tool calls
+        if (message.tool_calls && message.tool_calls.length > 0) {
+          routingDiagnostics.push({
+            model: model,
+            status: 'tool_call',
+            tools: message.tool_calls.map(c => c.function.name)
+          });
+
+          for (const toolCall of message.tool_calls) {
+            const functionName = toolCall.function.name;
+            const functionArgs = JSON.parse(toolCall.function.arguments);
+            
+            console.log(`[OpenRouter Tool] Executing ${functionName} with args:`, functionArgs);
+            
+            const handler = toolHandlers[functionName];
+            let result;
+            
+            if (handler) {
+              try {
+                result = await handler(functionArgs);
+                console.log(`[OpenRouter Tool] ${functionName} returned ${Array.isArray(result) ? result.length : '1'} results`);
+              } catch (error) {
+                console.error(`[OpenRouter Tool] Error in ${functionName}:`, error);
+                result = { error: error.message };
+              }
+            } else {
+              result = { error: 'Tool not found' };
+            }
+
+            // Add tool response to history
+            currentMessages.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              content: JSON.stringify(result) // OpenAI expects string content for tool messages
+            });
+          }
+          // Continue loop to send tool results back to model
+        } else {
+          // No tool calls, return final content
+          return message.content || '';
+        }
       }
-      return content;
+      
+      throw new Error('Max tool recursion depth reached');
     };
 
     const callPerplexity = async (modelName) => {
@@ -848,15 +914,11 @@ export default async function handler(req, res) {
       new Set(
         [
           preferredModel,
-          'gemini-1.5-flash',
+          'gemini-2.5-flash',
+          'gemini-3.0-flash-preview',
+          'gemini-3.0-pro-preview',
           'gemini-2.0-flash',
-          'gemini-1.5-pro',
-          'gemini-2.0-pro-exp',
-          'gemini-1.0-pro',
-          'gemini-2.0-flash-lite-preview',
-          'gemini-3-flash',
-          'gemini-2.5-flash-lite',
-          'gemini-1.5-flash-8b'
+          'gemini-1.5-flash'
         ].filter(Boolean)
       )
     );
@@ -947,9 +1009,11 @@ export default async function handler(req, res) {
 
           const toolResponses = await Promise.all(calls.map(async (call) => {
             const handler = toolHandlers[call.name];
+            console.log(`[Gemini Tool] Executing ${call.name} with args:`, call.args);
             if (handler) {
               try {
                 const result = await handler(call.args);
+                console.log(`[Gemini Tool] ${call.name} returned ${Array.isArray(result) ? result.length : '1'} results`);
                 return {
                   functionResponse: {
                     name: call.name,
@@ -979,6 +1043,12 @@ export default async function handler(req, res) {
         }
 
         const text = response.text();
+        console.log(`[Gemini Chat] Final response text from ${modelName}:`, text);
+        
+        if (!text || text.trim().length === 0) {
+          throw new Error('Empty response from model');
+        }
+
         const currentDiagnostic = routingDiagnostics.find(d => d.model === modelName && d.status === 'attempting');
         if (currentDiagnostic) currentDiagnostic.status = 'success';
 
