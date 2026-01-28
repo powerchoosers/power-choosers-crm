@@ -289,11 +289,25 @@ const toolHandlers = {
 
     // 3. Contract Data Promotion
     if (data.accounts) {
+      const accountMetadata = data.accounts.metadata || {};
       // Ensure contract_end_date is promoted for the AI to see easily
-      data.contract_end_date = data.accounts.contract_end_date || data.accounts.metadata?.contract_end_date;
-      data.electricity_supplier = data.accounts.electricity_supplier || data.accounts.metadata?.electricity_supplier;
-      data.annual_usage = data.accounts.annual_usage || data.accounts.metadata?.annual_usage;
-      data.current_rate = data.accounts.current_rate || data.accounts.metadata?.current_rate;
+      let contract_end_date = data.accounts.contract_end_date || 
+                             accountMetadata.contract_end_date || 
+                             accountMetadata.contractEndDate || 
+                             accountMetadata.general?.contractEndDate;
+
+      // Handle common date formats like MM/DD/YYYY to YYYY-MM-DD
+      if (contract_end_date && contract_end_date.includes('/')) {
+        const parts = contract_end_date.split('/');
+        if (parts.length === 3 && parts[2].length === 4) {
+          contract_end_date = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+        }
+      }
+      
+      data.contract_end_date = contract_end_date;
+      data.electricity_supplier = data.accounts.electricity_supplier || accountMetadata.electricity_supplier;
+      data.annual_usage = data.accounts.annual_usage || accountMetadata.annual_usage;
+      data.current_rate = data.accounts.current_rate || accountMetadata.current_rate;
       data.service_addresses = data.accounts.service_addresses || [];
     }
 
@@ -323,7 +337,21 @@ const toolHandlers = {
 
     // Promote energy metrics and corporate data from metadata if missing in top-level
     const metadata = data.metadata || {};
-    data.contract_end_date = data.contract_end_date || metadata.contract_end_date;
+    
+    // Robust date resolution
+    data.contract_end_date = data.contract_end_date || 
+                            metadata.contract_end_date || 
+                            metadata.contractEndDate || 
+                            metadata.general?.contractEndDate;
+
+    // Handle common date formats like MM/DD/YYYY to YYYY-MM-DD
+    if (data.contract_end_date && data.contract_end_date.includes('/')) {
+      const parts = data.contract_end_date.split('/');
+      if (parts.length === 3 && parts[2].length === 4) {
+        data.contract_end_date = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+      }
+    }
+
     data.electricity_supplier = data.electricity_supplier || metadata.electricity_supplier;
     data.annual_usage = data.annual_usage || metadata.annual_usage;
     data.current_rate = data.current_rate || metadata.current_rate;
@@ -363,21 +391,41 @@ const toolHandlers = {
     if (expiration_year) {
       const start = `${expiration_year}-01-01`;
       const end = `${expiration_year}-12-31`;
-      // Check both top-level and metadata for contract expiration
-      query = query.or(`and(contract_end_date.gte.${start},contract_end_date.lte.${end}),and(metadata->>contract_end_date.gte.${start},metadata->>contract_end_date.lte.${end})`);
+      // Check both top-level and metadata for contract expiration (multiple formats and year suffixes)
+      query = query.or(`contract_end_date.gte.${start},contract_end_date.lte.${end},metadata->>contract_end_date.gte.${start},metadata->>contract_end_date.lte.${end},metadata->>contractEndDate.gte.${start},metadata->>contractEndDate.lte.${end},metadata->>contractEndDate.ilike.%/${expiration_year},metadata->>contract_end_date.ilike.%/${expiration_year}`);
     }
     const { data, error } = await query;
     if (error) throw error;
     
+    console.log(`[list_accounts] Found ${data?.length || 0} raw records`);
+
     // Normalize results to ensure promoted fields are available
     return data.map(record => {
       const metadata = record.metadata || {};
+      
+      // Robust date resolution
+      let contract_end_date = record.contract_end_date || 
+                             metadata.contract_end_date || 
+                             metadata.contractEndDate || 
+                             metadata.general?.contractEndDate;
+
+      // Handle common date formats like MM/DD/YYYY to YYYY-MM-DD
+      if (contract_end_date && contract_end_date.includes('/')) {
+        const parts = contract_end_date.split('/');
+        if (parts.length === 3) {
+          // Check if it's MM/DD/YYYY
+          if (parts[2].length === 4) {
+            contract_end_date = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+          }
+        }
+      }
+
       return {
         ...record,
-        contract_end_date: record.contract_end_date || metadata.contract_end_date,
-        industry: record.industry || metadata.industry,
-        electricity_supplier: record.electricity_supplier || metadata.electricity_supplier,
-        annual_usage: record.annual_usage || metadata.annual_usage
+        contract_end_date,
+        industry: record.industry || metadata.industry || metadata.general?.industry,
+        electricity_supplier: record.electricity_supplier || metadata.electricity_supplier || metadata.general?.electricity_supplier,
+        annual_usage: record.annual_usage || metadata.annual_usage || metadata.general?.annual_usage
       };
     });
   },
@@ -524,8 +572,11 @@ export default async function handler(req, res) {
         - CURRENT CONTEXT: "This year" means ${new Date().getFullYear()}.
 
         ANTI_HALLUCINATION_PROTOCOL:
-        - CRITICAL: NEVER invent names, companies, email addresses, phone numbers, or energy metrics (kWh, strike price).
+        - CRITICAL: NEVER invent names, companies, email addresses, phone numbers, or energy metrics (kWh, strike price, contract dates).
         - If a search (e.g., for "manufacturers", "expiring accounts", "outreach list") returns zero results from a tool, you MUST say: "Trey, I searched the database but found no records matching that criteria."
+        - DO NOT invent "Contract End Dates" if the tool returns null or undefined. If a date is missing, you MUST say "Unknown" or "Not in CRM".
+        - DO NOT change dates of existing accounts to match the user's query (e.g., if an account expires in 2028, do not say it expires in 2026 just because the user asked for 2026 expirations).
+        - If the user asks for "accounts expiring this year" and you find none, do not invent them.
         - DO NOT provide "examples" or "demonstration data" unless explicitly asked for a demo.
         - The "Data Locker" (forensic_documents) must ONLY contain real documents returned by tools.
         - DO NOT use names like "Pacific Energy Solutions", "Global Manufacturing Inc.", "Apex Manufacturing", "Vertex Energy", "Summit Industrial", "Horizon Power Systems", or "Pinnacle Energy Group". These are hallucinations.
@@ -551,7 +602,8 @@ export default async function handler(req, res) {
         CRM_CAPABILITIES:
         - You have direct access to the CRM database via tools.
         - When asked about accounts, contacts, or deals, ALWAYS use the provided tools (list_accounts, list_contacts, etc.) instead of assuming or hallucinating data.
-        - To find accounts expiring in a specific year, use list_accounts with the expiration_year parameter.
+        - To find accounts expiring in a specific year, use list_accounts with the expiration_year parameter (e.g., list_accounts({ expiration_year: 2026 })).
+        - DO NOT ignore the expiration_year parameter when searching for expirations. It is the most accurate way to filter.
         - If a tool returns no results, inform the user clearly without making up data.
 
         HYBRID_RESPONSE_MODE:
