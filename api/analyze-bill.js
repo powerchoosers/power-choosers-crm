@@ -36,10 +36,11 @@ export default async function analyzeBillHandler(req, res) {
     if (geminiApiKey) {
       const genAI = new GoogleGenerativeAI(geminiApiKey);
       const modelCandidates = [
+        'gemini-2.5-flash',
+        'gemini-3.0-flash-preview',
+        'gemini-3.0-pro-preview',
         'gemini-2.0-flash',
-        'gemini-1.5-flash',
-        'gemini-1.5-pro',
-        'gemini-2.0-pro-exp'
+        'gemini-1.5-flash'
       ];
 
       for (const modelName of modelCandidates) {
