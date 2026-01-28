@@ -876,7 +876,7 @@ export function GeminiChatPanel() {
             />
           </div>
           <div>
-            <h3 className="text-xs font-mono font-bold text-zinc-100 tracking-widest uppercase">Nodal Architect v1.0</h3>
+            <h3 className="text-xs font-mono font-bold text-zinc-100 tracking-widest uppercase">Nodal Architect v1.3</h3>
             <div className="flex items-center gap-2">
               <Waveform />
               <span className="text-[10px] font-mono text-emerald-500/70 uppercase tracking-tighter font-bold">LIVE_FEED</span>
@@ -917,7 +917,7 @@ export function GeminiChatPanel() {
             <div className="p-3 font-mono text-[10px] space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar">
               <div className="flex items-center justify-between border-b border-white/5 pb-1 mb-2">
                 <span className="text-[#002FA7] font-bold tracking-widest">AI_ROUTER_HUD // LIVE_DIAGNOSTICS</span>
-                <span className="text-zinc-600 text-[8px] uppercase">Routing Protocol v2.1</span>
+                <span className="text-zinc-600 text-[8px] uppercase">Routing Protocol v2.3</span>
               </div>
               
               {!diagnostics ? (
@@ -1074,7 +1074,7 @@ export function GeminiChatPanel() {
                     <div className="pl-6 w-full">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-widest font-bold">
-                          NODAL_ARCHITECT // v1.0
+                          NODAL_ARCHITECT // v1.3
                         </span>
                         {isLoading && i === messages.length - 1 && <Waveform />}
                       </div>
@@ -1177,16 +1177,16 @@ export function GeminiChatPanel() {
                   </SelectItem>
                   
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
-                    Gemini Stack (Free)
+                    Gemini Intelligence Stack
                   </div>
-                  <SelectItem value="gemini-2.5-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GEMINI-2.5-FLASH
+                  <SelectItem value="gemini-1.5-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GEMINI-1.5-FLASH
                   </SelectItem>
-                  <SelectItem value="gemini-3.0-flash-preview" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GEMINI-3.0-FLASH
+                  <SelectItem value="gemini-2.0-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GEMINI-2.0-FLASH
                   </SelectItem>
-                  <SelectItem value="gemini-3.0-pro-preview" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GEMINI-3.0-PRO
+                  <SelectItem value="gemini-1.5-pro" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GEMINI-1.5-PRO
                   </SelectItem>
                   
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
@@ -1259,7 +1259,7 @@ export function GeminiChatPanel() {
         </motion.form>
         
         <div className="text-center mt-3">
-          <span className="text-[9px] text-zinc-700 font-mono uppercase tracking-[0.2em]">Nodal Point Neural Engine v1.0.4</span>
+          <span className="text-[9px] text-zinc-700 font-mono uppercase tracking-[0.2em]">Nodal Point Neural Engine v1.3.0</span>
         </div>
       </motion.div>
     </motion.div>
