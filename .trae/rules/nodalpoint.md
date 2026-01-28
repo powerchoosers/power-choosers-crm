@@ -151,10 +151,11 @@ The platform uses **Firebase Authentication**.
   - **Iconography**: All interface icons (Lucide/SVG) must be **White** (`text-white`) on dark backgrounds. Do not use Klein Blue (`#002FA7`) for icons; reserve it for text accents and interactive states.
 
 ### 🤖 Nodal Architect (Gemini Chat)
-The cognitive core of the platform, featuring a **Stacked Command Deck** UI:
+The cognitive core of the platform, featuring a **Stacked Command Deck** UI (v1.3):
 - **Tier 1: Configuration Deck**: Houses the model selector and **Contextual Intel Pill**.
   - Displays `TARGET: [NAME]` for contacts/accounts or `ACTIVE_CONTEXT: GLOBAL_SCOPE`.
 - **Tier 2: Action Deck**: Auto-expanding `textarea` (44px min, 112px max) with a Klein Blue Execute button.
+- **Anti-Hallucination Protocol (v2)**: Strict logic ensuring zero data invention for contract dates and contact metrics.
 - **Forensic HUD Components**:
   - `News_Ticker`: Real-time market volatility feed.
   - `Contact_Dossier`: Detailed node profiles with contract status.

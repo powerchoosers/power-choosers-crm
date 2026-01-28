@@ -113,9 +113,10 @@ To ensure the frontend can communicate with the backend regardless of environmen
     -   ALWAYS use `framer-motion` `layout` props and `spring` transitions (`bounce: 0, duration: 0.4`) for expanding/collapsing UI elements to prevent "jumping".
 
 ### 🧠 Intelligence & State Standards
-- **Nodal Architect Implementation**:
+- **Nodal Architect Implementation (v1.3)**:
   - AI-related footers MUST use the **Stacked Command Deck** architecture (Tier 1 for config/context, Tier 2 for input).
   - Use `TARGET:` and `ACTIVE_CONTEXT:` labeling for clarity.
+  - **Version Control**: When updating the Architect's intelligence (e.g., adding anti-hallucination protocols), increment the version in `GeminiChat.tsx`, `GEMINI_CAPABILITIES.md`, and all documentation.
 - **State Management**:
   - **Zustand**: Use for transient, global UI state (e.g., dialer status, chat panel visibility).
   - **TanStack Query**: Use for all server-side data fetching and synchronization.
