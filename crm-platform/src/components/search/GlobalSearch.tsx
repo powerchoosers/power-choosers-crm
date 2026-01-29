@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Search, X, Building2, Users, Plus, Sparkles, Loader2, ListOrdered, CheckCircle2, Phone, Mail } from 'lucide-react'
+import { Search, X, Building2, Users, Plus, Sparkles, Loader2, GitMerge, CheckCircle2, Phone, Mail, Radar } from 'lucide-react'
 import { useSearchContacts } from '@/hooks/useContacts'
 import { useSearchAccounts } from '@/hooks/useAccounts'
-import { useSearchSequences } from '@/hooks/useSequences'
+import { useSearchProtocols } from '@/hooks/useProtocols'
 import { useSearchTasks } from '@/hooks/useTasks'
 import { useSearchCalls } from '@/hooks/useCalls'
 import { useSearchEmails } from '@/hooks/useEmails'
+import { useSearchTargets } from '@/hooks/useTargets'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 
@@ -28,12 +29,13 @@ export function GlobalSearch() {
 
   const { data: filteredContacts = [], isLoading: isSearchingContacts } = useSearchContacts(debouncedQuery)
   const { data: filteredAccounts = [], isLoading: isSearchingAccounts } = useSearchAccounts(debouncedQuery)
-  const { data: filteredSequences = [], isLoading: isSearchingSequences } = useSearchSequences(debouncedQuery)
+  const { data: filteredProtocols = [], isLoading: isSearchingProtocols } = useSearchProtocols(debouncedQuery)
+  const { data: filteredTargets = [], isLoading: isSearchingTargets } = useSearchTargets(debouncedQuery)
   const { data: filteredTasks = [], isLoading: isSearchingTasks } = useSearchTasks(debouncedQuery)
   const { data: filteredCalls = [], isLoading: isSearchingCalls } = useSearchCalls(debouncedQuery)
   const { data: filteredEmails = [], isLoading: isSearchingEmails } = useSearchEmails(debouncedQuery)
 
-  const isSearching = isSearchingContacts || isSearchingAccounts || isSearchingSequences || isSearchingTasks || isSearchingCalls || isSearchingEmails
+  const isSearching = isSearchingContacts || isSearchingAccounts || isSearchingProtocols || isSearchingTargets || isSearchingTasks || isSearchingCalls || isSearchingEmails
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -53,7 +55,8 @@ export function GlobalSearch() {
   const hasResults = 
     (filteredContacts?.length || 0) + 
     (filteredAccounts?.length || 0) + 
-    (filteredSequences?.length || 0) + 
+    (filteredProtocols?.length || 0) + 
+    (filteredTargets?.length || 0) + 
     (filteredTasks?.length || 0) +
     (filteredCalls?.length || 0) +
     (filteredEmails?.length || 0) > 0
@@ -68,15 +71,17 @@ export function GlobalSearch() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleSelect = (id: string, type: 'people' | 'account' | 'sequence' | 'task' | 'call' | 'email') => {
+  const handleSelect = (id: string, type: 'people' | 'account' | 'protocol' | 'target' | 'task' | 'call' | 'email') => {
     setIsOpen(false)
     setQuery('')
     if (type === 'people') {
         router.push(`/network/contacts/${id}`)
     } else if (type === 'account') {
         router.push(`/network/accounts/${id}`)
-    } else if (type === 'sequence') {
-        router.push(`/network/sequences`)
+    } else if (type === 'protocol') {
+        router.push(`/network/protocols`)
+    } else if (type === 'target') {
+        router.push(`/network/targets`)
     } else if (type === 'task') {
         router.push(`/network/tasks`)
     } else if (type === 'call') {
@@ -242,26 +247,53 @@ export function GlobalSearch() {
                     </div>
                     )}
 
-                    {/* Sequences Section */}
-                    {filteredSequences.length > 0 && (
+                    {/* Targets Section */}
+                    {filteredTargets.length > 0 && (
                     <div className="mb-2">
                         <div className="text-xs font-semibold text-zinc-500 px-3 py-2 uppercase tracking-wider flex justify-between">
-                        <span>Sequences</span>
-                        <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-zinc-400">{filteredSequences.length}</span>
+                        <span>Targets</span>
+                        <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-zinc-400">{filteredTargets.length}</span>
                         </div>
                         <div className="space-y-1">
-                        {filteredSequences.map(sequence => (
+                        {filteredTargets.map(target => (
                             <button
-                            key={sequence.id}
-                            onClick={() => handleSelect(sequence.id, 'sequence')}
+                            key={target.id}
+                            onClick={() => handleSelect(target.id, 'target')}
                             className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors text-left group"
                             >
                             <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
-                                <ListOrdered size={14} />
+                                <Radar size={14} />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <div className="text-sm font-medium text-zinc-200 group-hover:text-white truncate">{sequence.name}</div>
-                                <div className="text-xs text-zinc-500 truncate">{sequence.steps?.length || 0} steps</div>
+                                <div className="text-sm font-medium text-zinc-200 group-hover:text-white truncate">{target.name}</div>
+                                <div className="text-xs text-zinc-500 truncate">{target.count || 0} nodes</div>
+                            </div>
+                            </button>
+                        ))}
+                        </div>
+                    </div>
+                    )}
+
+                    {/* Protocols Section */}
+                    {filteredProtocols.length > 0 && (
+                    <div className="mb-2">
+                        <div className="text-xs font-semibold text-zinc-500 px-3 py-2 uppercase tracking-wider flex justify-between">
+                        <span>Protocols</span>
+                        <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-zinc-400">{filteredProtocols.length}</span>
+                        </div>
+                        <div className="space-y-1">
+                        {filteredProtocols.map(protocol => (
+                            <button
+                            key={protocol.id}
+                            onClick={() => handleSelect(protocol.id, 'protocol')}
+                            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors text-left group"
+                            >
+                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
+                                <GitMerge size={14} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <div className="text-sm font-medium text-zinc-200 group-hover:text-white truncate">{protocol.name}</div>
+                                <div className="text-xs text-zinc-500 truncate">{protocol.steps?.length || 0} steps</div>
                             </div>
                             </button>
                         ))}

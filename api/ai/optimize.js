@@ -12,14 +12,84 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { draft, type, context, contact } = req.body;
+  const { draft, type, context, contact, prompt, provider } = req.body;
 
-  if (!draft) {
+  if (!draft && !prompt) {
     res.writeHead(400, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Draft content is required' }));
+    res.end(JSON.stringify({ error: 'Draft content or prompt is required' }));
     return;
   }
 
+  // Handle OpenRouter (ChatGPT-OSS)
+  if (provider === 'openrouter') {
+    const openRouterKey = process.env.OPEN_ROUTER_API_KEY;
+    if (!openRouterKey) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'OpenRouter API key not configured' }));
+      return;
+    }
+
+    try {
+      const systemInstruction = `
+        You are the Nodal Architect, the cognitive core of the Nodal Point CRM.
+        Your task is to generate or optimize a sequence step (type: ${type}).
+        ${contact ? `TARGET CONTACT: ${contact.name} (${contact.company}), Load Zone: ${contact.load_zone}` : ''}
+        
+        TONE GUIDELINES:
+        - Forensic, Direct, Minimalist.
+        - Highlight financial variance, market volatility, or technical risk.
+        - Sound like a grid engineer or quantitative analyst.
+        - NO marketing fluff.
+        
+        INSTRUCTIONS:
+        - Output ONLY the email/script body.
+        - Preserve variables like {{first_name}}.
+      `;
+
+      const userContent = prompt 
+        ? `Instructions: ${prompt}\n\nDraft/Context: ${draft || '(None)'}`
+        : `Optimize this draft: ${draft}`;
+
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${openRouterKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": process.env.API_BASE_URL || "https://nodalpoint.io",
+          "X-Title": "Nodal Point CRM"
+        },
+        body: JSON.stringify({
+          "model": "openai/gpt-4o-mini", // Cost-effective, high intelligence
+          "messages": [
+            { "role": "system", "content": systemInstruction },
+            { "role": "user", "content": userContent }
+          ]
+        })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`OpenRouter API Error: ${errText}`);
+      }
+
+      const data = await response.json();
+      const generatedText = data.choices[0].message.content.trim();
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ optimized: generatedText }));
+      return;
+
+    } catch (error) {
+       logger.error('[AI Optimization] OpenRouter Error:', error);
+       // Fallback to Gemini if OpenRouter fails? Or just error out. 
+       // User explicitly asked for OpenRouter, so let's report error if it fails.
+       res.writeHead(500, { 'Content-Type': 'application/json' });
+       res.end(JSON.stringify({ error: 'Failed to generate with OpenRouter', details: error.message }));
+       return;
+    }
+  }
+
+  // Legacy Gemini Implementation
   const apiKey = process.env.FREE_GEMINI_KEY || process.env.GEMINI_API_KEY;
   if (!apiKey) {
     res.writeHead(500, { 'Content-Type': 'application/json' });

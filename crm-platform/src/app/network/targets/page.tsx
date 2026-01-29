@@ -9,23 +9,44 @@ import {
   FolderOpen, 
   Trash2, 
   Edit3,
-  ListFilter,
+  Radar,
   Loader2
 } from 'lucide-react'
-import { useLists } from '@/hooks/useLists'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useTargets } from '@/hooks/useTargets'
 import { formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
+import { Skeleton } from '@/components/ui/skeleton'
 
-export default function ListOverviewPage() {
+function TargetSkeleton() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-10">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 flex flex-col justify-between h-44 animate-pulse">
+          <Skeleton className="h-10 w-10 rounded-lg" />
+          <div className="space-y-3">
+            <Skeleton className="h-5 w-3/4" />
+            <div className="space-y-2">
+              <Skeleton className="h-3 w-1/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export default function TargetOverviewPage() {
   // STATE: Active Mode (People vs Accounts)
   const [activeMode, setActiveMode] = useState<'people' | 'account'>('people')
   const [searchQuery, setSearchQuery] = useState('')
   
   // DATA FETCHING
-  const { data: lists, isLoading, error } = useLists()
+  const { data: targets, isLoading, error } = useTargets()
 
   // Filter based on toggle and search
-  const filteredLists = lists?.filter(l => {
+  const filteredTargets = targets?.filter(l => {
     if (!l.kind) return false
     const normalizedKind = l.kind.toLowerCase()
     
@@ -47,7 +68,7 @@ export default function ListOverviewPage() {
   if (error) {
     return (
       <div className="h-full flex items-center justify-center text-red-500">
-        Error loading lists: {error.message}
+        Error loading targets: {error.message}
       </div>
     )
   }
@@ -59,15 +80,15 @@ export default function ListOverviewPage() {
       <div className="flex-none px-2">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-semibold tracking-tighter text-white">Segmentation</h1>
+            <h1 className="text-4xl font-semibold tracking-tighter text-white uppercase">Targets</h1>
             <p className="text-zinc-500 mt-1">
-              Manage your {activeMode} segmentation arrays and node clusters.
+              Manage your {activeMode} target arrays and node clusters.
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <button className="bg-white text-zinc-950 hover:bg-zinc-200 font-medium h-10 px-4 rounded-lg transition-all hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)] flex items-center gap-2">
-              <Plus className="w-4 h-4" /> Initialize Array
+              <Plus className="w-4 h-4" /> Initialize Target
             </button>
           </div>
         </div>
@@ -99,7 +120,7 @@ export default function ListOverviewPage() {
               <span className="text-emerald-500 font-semibold">{activeMode === 'people' ? 'HUMAN_INTEL' : 'ASSET_INTEL'}</span>
             </div>
 
-            {/* List Switcher */}
+            {/* Target Switcher */}
             <div className="bg-black/40 border border-white/5 rounded-lg p-1 flex items-center">
               <button 
                 onClick={() => setActiveMode('people')}
@@ -128,72 +149,80 @@ export default function ListOverviewPage() {
         {/* Scrollable Content Area */}
         <div className="flex-1 overflow-auto p-6 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll relative z-0">
           {isLoading ? (
-            <div className="h-full flex items-center justify-center">
-              <div className="flex flex-col items-center gap-4">
-                <Loader2 className="w-8 h-8 text-[#002FA7] animate-spin" />
-                <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Synchronizing_Arrays...</span>
-              </div>
-            </div>
+            <TargetSkeleton />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-10">
-              {filteredLists.map((list) => (
-                <Link 
-                  key={list.id}
-                  href={`/network/lists/${list.id}`}
-                  className="group relative bg-white/[0.02] backdrop-blur-md border border-white/5 rounded-2xl p-6 hover:bg-white/[0.05] hover:border-white/10 transition-all cursor-pointer flex flex-col justify-between h-44"
-                >
-                  {/* Card Header */}
-                  <div className="flex justify-between items-start">
-                    <div className="p-2.5 rounded-lg bg-black/40 border border-white/5 text-white">
-                      <ListFilter className="w-5 h-5" />
-                    </div>
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                      <button className="p-2 text-zinc-500 hover:text-white hover:bg-white/10 rounded-lg">
-                        <Edit3 className="w-4 h-4" />
-                      </button>
-                      <button className="p-2 text-zinc-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
+              <AnimatePresence mode="popLayout">
+                {filteredTargets.map((target, index) => (
+                  <motion.div
+                    key={target.id}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ 
+                      duration: 0.3, 
+                      delay: Math.min(index * 0.02, 0.4),
+                      ease: [0.23, 1, 0.32, 1] 
+                    }}
+                  >
+                    <Link 
+                      href={`/network/targets/${target.id}`}
+                      className="group relative bg-white/[0.02] backdrop-blur-md border border-white/5 rounded-2xl p-6 hover:bg-white/[0.05] hover:border-white/10 transition-all cursor-pointer flex flex-col justify-between h-44"
+                    >
+                      {/* Card Header */}
+                      <div className="flex justify-between items-start">
+                        <div className="p-2.5 rounded-lg bg-black/40 border border-white/5 text-white">
+                          <Radar className="w-5 h-5" />
+                        </div>
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                          <button className="p-2 text-zinc-500 hover:text-white hover:bg-white/10 rounded-lg">
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button className="p-2 text-zinc-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
 
-                  {/* Card Body */}
-                  <div>
-                    <h3 className="text-lg font-medium text-zinc-100 mb-2 group-hover:text-white truncate">
-                      {list.name}
-                    </h3>
-                    <div className="flex flex-col gap-1 text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
-                      <span className="flex items-center gap-1.5 whitespace-nowrap">
-                        <span className={`w-1.5 h-1.5 rounded-full ${(list.count || 0) > 0 ? 'bg-emerald-500' : 'bg-zinc-700'}`} />
-                        Nodes: <span className="text-zinc-300 tabular-nums">{list.count || 0}</span>
-                      </span>
-                      <span className="whitespace-nowrap">
-                        Updated: <span className="text-zinc-400">
-                          {list.createdAt ? formatDistanceToNow(new Date(list.createdAt), { addSuffix: true }) : 'Never'}
-                        </span>
-                      </span>
-                    </div>
-                  </div>
+                      {/* Card Body */}
+                      <div>
+                        <h3 className="text-lg font-medium text-zinc-100 mb-2 group-hover:text-white group-hover:scale-[1.02] transition-all origin-left truncate">
+                          {target.name}
+                        </h3>
+                        <div className="flex flex-col gap-1 text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
+                          <span className="flex items-center gap-1.5 whitespace-nowrap">
+                            <span className={`w-1.5 h-1.5 rounded-full ${(target.count || 0) > 0 ? 'bg-emerald-500' : 'bg-zinc-700'}`} />
+                            Nodes: <span className="text-zinc-300 tabular-nums">{target.count || 0}</span>
+                          </span>
+                          <span className="whitespace-nowrap">
+                            Updated: <span className="text-zinc-400">
+                              {target.createdAt ? formatDistanceToNow(new Date(target.createdAt), { addSuffix: true }) : 'Never'}
+                            </span>
+                          </span>
+                        </div>
+                      </div>
 
-                  {/* Hover Bloom Effect */}
-                  <div className="absolute bottom-0 right-0 w-8 h-8 bg-gradient-to-tl from-[#002FA7]/20 to-transparent rounded-br-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
-                </Link>
-              ))}
+                      {/* Hover Bloom Effect */}
+                      <div className="absolute bottom-0 right-0 w-8 h-8 bg-gradient-to-tl from-[#002FA7]/20 to-transparent rounded-br-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </Link>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
 
-              {/* Add New List Card */}
+              {/* Add New Target Card */}
               <button className="border border-dashed border-zinc-800 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 text-zinc-600 hover:text-zinc-400 hover:border-zinc-700 hover:bg-white/[0.02] transition-all h-44">
                 <div className="w-10 h-10 rounded-full bg-zinc-900 flex items-center justify-center">
                   <Plus className="w-5 h-5" />
                 </div>
-                <span className="text-[10px] font-mono uppercase tracking-widest">Initialize_New_Array</span>
+                <span className="text-[10px] font-mono uppercase tracking-widest">Initialize_New_Target</span>
               </button>
             </div>
           )}
 
           {/* Empty State */}
-          {!isLoading && filteredLists.length === 0 && (
+          {!isLoading && filteredTargets.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-zinc-600 font-mono text-xs uppercase tracking-widest">
-              No matching nodes found in current array.
+              No matching nodes found in current target array.
             </div>
           )}
         </div>
@@ -202,9 +231,9 @@ export default function ListOverviewPage() {
         <div className="flex-none border-t border-white/5 bg-zinc-900/90 p-4 flex items-center justify-between backdrop-blur-sm z-10">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
-              <span>Sync_Block 01–{filteredLists.length.toString().padStart(2, '0')}</span>
+              <span>Sync_Block 01–{filteredTargets.length.toString().padStart(2, '0')}</span>
               <div className="h-1 w-1 rounded-full bg-zinc-800" />
-              <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{filteredLists.length}</span></span>
+              <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{filteredTargets.length}</span></span>
             </div>
           </div>
           
@@ -214,7 +243,7 @@ export default function ListOverviewPage() {
               <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">System_Operational</span>
             </div>
             <div className="h-4 w-[1px] bg-white/5" />
-            <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">v2.0.4_SEGMENT</span>
+            <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">v2.0.4_TARGET</span>
           </div>
         </div>
       </div>

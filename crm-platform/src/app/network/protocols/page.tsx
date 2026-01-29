@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useSequences, useSequencesCount, Sequence } from '@/hooks/useSequences'
+import { useProtocols, useProtocolsCount, Protocol } from '@/hooks/useProtocols'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -31,7 +31,7 @@ import {
   Pause, 
   Edit, 
   Trash2, 
-  ListOrdered,
+  GitMerge,
   Loader2,
   ChevronLeft,
   ChevronRight,
@@ -66,7 +66,7 @@ function toDisplayDate(value: unknown): Date | null {
 
 import { useRouter } from 'next/navigation'
 
-export default function SequencesPage() {
+export default function ProtocolsPage() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -79,81 +79,81 @@ export default function SequencesPage() {
     return () => clearTimeout(timer)
   }, [searchQuery])
 
-  const { data, isLoading, addSequence, updateSequence, deleteSequence, fetchNextPage, hasNextPage, isFetchingNextPage } = useSequences(debouncedQuery)
-  const { data: totalSequences } = useSequencesCount(debouncedQuery)
+  const { data, isLoading, addProtocol, updateProtocol, deleteProtocol, fetchNextPage, hasNextPage, isFetchingNextPage } = useProtocols(debouncedQuery)
+  const { data: totalProtocols } = useProtocolsCount(debouncedQuery)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [newSequenceName, setNewSequenceName] = useState('')
-  const [newSequenceDesc, setNewSequenceDesc] = useState('')
+  const [newProtocolName, setNewProtocolName] = useState('')
+  const [newProtocolDesc, setNewProtocolDesc] = useState('')
   const [pageIndex, setPageIndex] = useState(0)
 
-  const sequences = useMemo(() => data?.pages.flatMap(page => page.sequences) || [], [data])
+  const protocols = useMemo(() => data?.pages.flatMap(page => page.protocols) || [], [data])
 
-  const effectiveTotalRecords = totalSequences ?? sequences.length
+  const effectiveTotalRecords = totalProtocols ?? protocols.length
   const totalPages = Math.max(1, Math.ceil(effectiveTotalRecords / PAGE_SIZE))
-  const displayTotalPages = totalSequences == null && hasNextPage
+  const displayTotalPages = totalProtocols == null && hasNextPage
     ? Math.max(totalPages, pageIndex + 2)
     : totalPages
 
   useEffect(() => {
     const needed = (pageIndex + 2) * PAGE_SIZE
-    if (hasNextPage && !isFetchingNextPage && sequences.length < needed) {
+    if (hasNextPage && !isFetchingNextPage && protocols.length < needed) {
       fetchNextPage()
     }
-  }, [pageIndex, sequences.length, hasNextPage, isFetchingNextPage, fetchNextPage])
+  }, [pageIndex, protocols.length, hasNextPage, isFetchingNextPage, fetchNextPage])
 
-  const pagedSequences = useMemo(() => {
+  const pagedProtocols = useMemo(() => {
     const start = pageIndex * PAGE_SIZE
-    return sequences.slice(start, start + PAGE_SIZE)
-  }, [sequences, pageIndex])
+    return protocols.slice(start, start + PAGE_SIZE)
+  }, [protocols, pageIndex])
 
-  const filteredCount = sequences.length
+  const filteredCount = protocols.length
   const showingStart = filteredCount === 0 ? 0 : Math.min(filteredCount, pageIndex * PAGE_SIZE + 1)
   const showingEnd = filteredCount === 0 ? 0 : Math.min(filteredCount, (pageIndex + 1) * PAGE_SIZE)
 
   const handleCreate = async () => {
-    if (!newSequenceName.trim()) return
+    if (!newProtocolName.trim()) return
     
     try {
-      addSequence({
-        name: newSequenceName,
-        description: newSequenceDesc,
+      addProtocol({
+        name: newProtocolName,
+        description: newProtocolDesc,
         status: 'draft',
         steps: []
       })
       setIsCreateOpen(false)
-      setNewSequenceName('')
-      setNewSequenceDesc('')
-      toast.success('Sequence created successfully')
+      setNewProtocolName('')
+      setNewProtocolDesc('')
+      toast.success('Protocol initialized successfully')
     } catch (error) {
-      toast.error('Failed to create sequence')
+      toast.error('Failed to initialize protocol')
     }
   }
 
-  const handleToggleStatus = (sequence: Sequence) => {
-    const newStatus = sequence.status === 'active' ? 'inactive' : 'active'
-    updateSequence({ id: sequence.id, status: newStatus })
-    toast.success(`Sequence ${newStatus === 'active' ? 'activated' : 'deactivated'}`)
+  const handleToggleStatus = (protocol: Protocol) => {
+    const newStatus = protocol.status === 'active' ? 'inactive' : 'active'
+    updateProtocol({ id: protocol.id, status: newStatus })
+    toast.success(`Protocol ${newStatus === 'active' ? 'activated' : 'deactivated'}`)
   }
 
   const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this sequence?')) {
-      deleteSequence(id)
-      toast.success('Sequence deleted')
+    if (confirm('Are you sure you want to delete this protocol?')) {
+      deleteProtocol(id)
+      toast.success('Protocol deleted')
     }
   }
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <CollapsiblePageHeader
-        title="Sequences"
-        description="Automate your outreach with smart multi-step sequences."
+        title="PROTOCOLS"
+        description="Execute automated multi-step communication protocols."
         globalFilter={searchQuery}
         onSearchChange={(val) => {
           setSearchQuery(val)
           setPageIndex(0)
         }}
         primaryAction={{
-          label: "Create Sequence",
+          label: "Initialize Protocol",
           onClick: () => setIsCreateOpen(true),
           icon: <Plus size={18} className="mr-2" />
         }}
@@ -162,7 +162,7 @@ export default function SequencesPage() {
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="bg-zinc-950 border-white/10 text-zinc-100">
           <DialogHeader>
-            <DialogTitle>Create New Sequence</DialogTitle>
+            <DialogTitle>Initialize New Protocol</DialogTitle>
             <DialogDescription className="text-zinc-400">
               Start a new automated outreach campaign.
             </DialogDescription>
@@ -172,8 +172,8 @@ export default function SequencesPage() {
               <Label htmlFor="name">Name</Label>
               <Input 
                 id="name" 
-                value={newSequenceName} 
-                onChange={(e) => setNewSequenceName(e.target.value)} 
+                value={newProtocolName} 
+                onChange={(e) => setNewProtocolName(e.target.value)} 
                 placeholder="e.g. Cold Outreach Q1"
                 className="bg-zinc-900 border-white/10"
               />
@@ -182,8 +182,8 @@ export default function SequencesPage() {
               <Label htmlFor="desc">Description</Label>
               <Input 
                 id="desc" 
-                value={newSequenceDesc} 
-                onChange={(e) => setNewSequenceDesc(e.target.value)} 
+                value={newProtocolDesc} 
+                onChange={(e) => setNewProtocolDesc(e.target.value)} 
                 placeholder="Optional description"
                 className="bg-zinc-900 border-white/10"
               />
@@ -191,7 +191,7 @@ export default function SequencesPage() {
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setIsCreateOpen(false)} className="hover:bg-white/10 hover:text-white text-zinc-400">Cancel</Button>
-            <Button onClick={handleCreate} className="bg-white text-zinc-950 hover:bg-zinc-200">Create Sequence</Button>
+            <Button onClick={handleCreate} className="bg-white text-zinc-950 hover:bg-zinc-200">Initialize Protocol</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -203,10 +203,10 @@ export default function SequencesPage() {
             <div className="flex items-center justify-center h-full">
                 <Loader2 className="h-8 w-8 animate-spin text-zinc-500" />
             </div>
-            ) : sequences.length === 0 ? (
+            ) : protocols.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-zinc-500">
-                <ListOrdered className="h-12 w-12 mb-4 opacity-20" />
-                <p>No sequences found</p>
+                <GitMerge className="h-12 w-12 mb-4 opacity-20" />
+                <p>No protocols found</p>
                 {searchQuery && <Button variant="link" onClick={() => setSearchQuery('')} className="text-indigo-400">Clear search</Button>}
             </div>
             ) : (
@@ -221,22 +221,22 @@ export default function SequencesPage() {
                 </TableRow>
                 </TableHeader>
                 <TableBody>
-                {pagedSequences.map((sequence) => (
+                {pagedProtocols.map((protocol) => (
                     <TableRow 
-                      key={sequence.id} 
+                      key={protocol.id} 
                       className="border-white/5 hover:bg-white/[0.02] transition-colors group cursor-pointer"
-                      onClick={() => router.push(`/network/sequences/${sequence.id}/builder`)}
+                      onClick={() => router.push(`/network/protocols/${protocol.id}/builder`)}
                     >
                     <TableCell className="font-medium text-zinc-200">
                         <div className="flex flex-col">
-                        <span>{sequence.name}</span>
-                        {sequence.description && <span className="text-xs text-zinc-500">{sequence.description}</span>}
+                        <span>{protocol.name}</span>
+                        {protocol.description && <span className="text-xs text-zinc-500">{protocol.description}</span>}
                         </div>
                     </TableCell>
                     <TableCell className="text-zinc-400">
                         <div className="flex items-center gap-1.5 font-mono tabular-nums">
                         <span className="bg-white/10 px-2 py-0.5 rounded text-xs text-zinc-300 font-medium">
-                            {sequence.steps?.length || 0}
+                            {protocol.steps?.length || 0}
                         </span>
                         <span className="text-xs">steps</span>
                         </div>
@@ -244,30 +244,30 @@ export default function SequencesPage() {
                     <TableCell className="py-3">
                         <div className="flex items-center gap-3">
                         <Switch 
-                            checked={sequence.status === 'active'}
-                            onCheckedChange={() => handleToggleStatus(sequence)}
+                            checked={protocol.status === 'active'}
+                            onCheckedChange={() => handleToggleStatus(protocol)}
                             className="data-[state=checked]:bg-green-500"
                         />
                         <div className="flex items-center gap-2">
                           <div className={`w-2 h-2 rounded-full shadow-sm transition-all duration-500 ${
-                            sequence.status === 'active' 
+                            protocol.status === 'active' 
                               ? 'bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]' 
-                              : sequence.status === 'draft'
+                              : protocol.status === 'draft'
                               ? 'bg-zinc-600 shadow-[0_0_8px_rgba(113,113,122,0.4)]'
                               : 'bg-zinc-500'
                           }`} />
                           <span className={`text-xs font-mono uppercase tracking-widest ${
-                              sequence.status === 'active' ? 'text-green-400' : 
-                              sequence.status === 'draft' ? 'text-zinc-500' : 'text-zinc-400'
+                              protocol.status === 'active' ? 'text-green-400' : 
+                              protocol.status === 'draft' ? 'text-zinc-500' : 'text-zinc-400'
                           }`}>
-                              {sequence.status ? sequence.status : 'Draft'}
+                              {protocol.status ? protocol.status : 'Draft'}
                           </span>
                         </div>
                         </div>
                     </TableCell>
                     <TableCell className="py-3">
                         {(() => {
-                          const date = toDisplayDate(sequence.createdAt)
+                          const date = toDisplayDate(protocol.createdAt)
                           if (!date) return <span className="text-zinc-600 font-mono text-xs">--</span>
                           
                           const threeMonthsAgo = subMonths(new Date(), 3)
@@ -287,7 +287,7 @@ export default function SequencesPage() {
                     </TableCell>
                     <TableCell className="text-right py-3" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Link href={`/network/sequences/${sequence.id}/builder`}>
+                        <Link href={`/network/protocols/${protocol.id}/builder`}>
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10">
                               <Edit className="h-4 w-4" />
                           </Button>
@@ -300,10 +300,10 @@ export default function SequencesPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="bg-zinc-950 border-white/10 text-zinc-300">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem className="hover:bg-white/5 cursor-pointer" onClick={() => handleToggleStatus(sequence)}>
-                                {sequence.status === 'active' ? <><Pause className="mr-2 h-4 w-4" /> Pause Sequence</> : <><Play className="mr-2 h-4 w-4" /> Activate Sequence</>}
+                            <DropdownMenuItem className="hover:bg-white/5 cursor-pointer" onClick={() => handleToggleStatus(protocol)}>
+                                {protocol.status === 'active' ? <><Pause className="mr-2 h-4 w-4" /> Pause Protocol</> : <><Play className="mr-2 h-4 w-4" /> Activate Protocol</>}
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="hover:bg-white/5 cursor-pointer text-red-400 focus:text-red-400" onClick={() => handleDelete(sequence.id)}>
+                            <DropdownMenuItem className="hover:bg-white/5 cursor-pointer text-red-400 focus:text-red-400" onClick={() => handleDelete(protocol.id)}>
                                 <Trash2 className="mr-2 h-4 w-4" /> Delete
                             </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -347,13 +347,13 @@ export default function SequencesPage() {
                     if (nextPageIndex >= displayTotalPages) return
 
                     const needed = (nextPageIndex + 1) * PAGE_SIZE
-                    if (sequences.length < needed && hasNextPage && !isFetchingNextPage) {
+                    if (protocols.length < needed && hasNextPage && !isFetchingNextPage) {
                       await fetchNextPage()
                     }
 
                     setPageIndex(nextPageIndex)
                   }}
-                  disabled={pageIndex + 1 >= displayTotalPages || (!hasNextPage && sequences.length < (pageIndex + 2) * PAGE_SIZE)}
+                  disabled={pageIndex + 1 >= displayTotalPages || (!hasNextPage && protocols.length < (pageIndex + 2) * PAGE_SIZE)}
                   className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
                   aria-label="Next page"
                 >

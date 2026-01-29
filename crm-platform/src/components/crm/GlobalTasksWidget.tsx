@@ -60,7 +60,7 @@ export default function GlobalTasksWidget() {
                       task.priority === 'High' && "text-red-500/70",
                       task.priority === 'Medium' && "text-yellow-500/70",
                       task.priority === 'Low' && "text-zinc-600",
-                      task.priority === 'Sequence' && "text-[#002FA7]/70"
+                      task.priority === 'Protocol' && "text-[#002FA7]/70"
                     )}>
                       {task.priority}
                     </span>

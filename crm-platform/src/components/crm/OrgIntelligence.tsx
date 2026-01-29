@@ -380,7 +380,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         <div className="flex items-center gap-2">
           <Users className={cn("w-3.5 h-3.5", scanStatus === 'complete' ? "text-[#002FA7]" : "text-zinc-500")} />
           <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-            {scanStatus === 'scanning' ? 'Scanning...' : `Intelligence [${filteredData.length}]`}
+            {scanStatus === 'scanning' ? 'Scanning...' : `Target_Pool [${filteredData.length}]`}
           </span>
         </div>
         <div className="flex items-center gap-2">

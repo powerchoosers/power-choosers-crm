@@ -38,6 +38,12 @@ export interface Account {
   metadata?: any
 }
 
+export interface AccountFilters {
+  industry?: string[]
+  status?: string[]
+  location?: string[]
+}
+
 const PAGE_SIZE = 50
 
 export function useSearchAccounts(queryTerm: string) {
@@ -82,11 +88,11 @@ export function useSearchAccounts(queryTerm: string) {
   });
 }
 
-export function useAccounts(searchQuery?: string) {
+export function useAccounts(searchQuery?: string, filters?: AccountFilters) {
   const { user, role, loading } = useAuth()
 
   return useInfiniteQuery({
-    queryKey: ['accounts', user?.email ?? 'guest', role ?? 'unknown', searchQuery],
+    queryKey: ['accounts', user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       try {
@@ -102,6 +108,18 @@ export function useAccounts(searchQuery?: string) {
 
         if (searchQuery) {
           query = query.or(`name.ilike.%${searchQuery}%,domain.ilike.%${searchQuery}%,industry.ilike.%${searchQuery}%`);
+        }
+
+        // Apply column filters
+        if (filters?.industry && filters.industry.length > 0) {
+          query = query.in('industry', filters.industry);
+        }
+        if (filters?.status && filters.status.length > 0) {
+          query = query.in('status', filters.status);
+        }
+        if (filters?.location && filters.location.length > 0) {
+          const locConditions = filters.location.map(loc => `city.ilike.%${loc}%,state.ilike.%${loc}%,address.ilike.%${loc}%`).join(',');
+          query = query.or(locConditions);
         }
 
         const from = pageParam * PAGE_SIZE;
@@ -226,11 +244,11 @@ export function useAccount(id: string) {
   })
 }
 
-export function useAccountsCount(searchQuery?: string) {
+export function useAccountsCount(searchQuery?: string, filters?: AccountFilters) {
   const { user, role, loading } = useAuth()
 
   return useQuery({
-    queryKey: ['accounts-count', user?.email ?? 'guest', role ?? 'unknown', searchQuery],
+    queryKey: ['accounts-count', user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters],
     queryFn: async () => {
       if (loading) return 0
       if (!user) return 0
@@ -243,6 +261,18 @@ export function useAccountsCount(searchQuery?: string) {
 
       if (searchQuery) {
         query = query.or(`name.ilike.%${searchQuery}%,domain.ilike.%${searchQuery}%,industry.ilike.%${searchQuery}%`);
+      }
+
+      // Apply column filters
+      if (filters?.industry && filters.industry.length > 0) {
+        query = query.in('industry', filters.industry);
+      }
+      if (filters?.status && filters.status.length > 0) {
+        query = query.in('status', filters.status);
+      }
+      if (filters?.location && filters.location.length > 0) {
+        const locConditions = filters.location.map(loc => `city.ilike.%${loc}%,state.ilike.%${loc}%,address.ilike.%${loc}%`).join(',');
+        query = query.or(locConditions);
       }
 
       const { count, error } = await query
