@@ -2,8 +2,8 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User, onAuthStateChanged } from 'firebase/auth'
-import { auth, db } from '@/lib/firebase'
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore'
+import { auth } from '@/lib/firebase'
+import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
 type UserProfile = {
@@ -85,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { firstName, lastName, fullName }
     }
 
-    let unsubProfile: (() => void) | null = null
+    let unsubscribeProfile: (() => void) | null = null
     let didResolve = false
 
     // IMMEDIATE DEV BYPASS CHECK
@@ -145,29 +145,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!user && isDev && hasSessionCookie) {
         console.log('[Auth] Dev Bypass Active')
         const mockUser = {
-            uid: 'dev-bypass-uid',
-            email: 'dev@nodalpoint.io',
-            displayName: 'Dev User',
-            emailVerified: true,
+          uid: 'dev-bypass-uid',
+          email: 'dev@nodalpoint.io',
+          displayName: 'Dev User',
+          emailVerified: true,
         } as unknown as User
 
         setUser(mockUser)
         setRole('admin')
         setProfile({
-            email: 'dev@nodalpoint.io',
-            name: 'Dev User',
-            firstName: 'Dev',
-            lastName: 'User',
-            bio: 'System Administrator (Bypass)',
-            twilioNumbers: [],
-            selectedPhoneNumber: null,
-            bridgeToMobile: false
+          email: 'dev@nodalpoint.io',
+          name: 'Dev User',
+          firstName: 'Dev',
+          lastName: 'User',
+          bio: 'System Administrator (Bypass)',
+          twilioNumbers: [],
+          selectedPhoneNumber: null,
+          bridgeToMobile: false
         })
         setLoading(false)
         
         // Redirect if on login page
         if (window.location.pathname === '/login') {
-            router.push('/network')
+          router.push('/network')
         }
         return
       }
@@ -179,22 +179,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         document.cookie = 'np_session=1; Path=/; SameSite=Lax'
 
         if (user.email) {
-          // Listen for real-time updates to user profile
-          const userDocRef = doc(db, 'users', user.email.toLowerCase())
           const emailLower = user.email.toLowerCase().trim()
           
-          unsubProfile = onSnapshot(userDocRef, (doc) => {
-            if (doc.exists()) {
-              const data = doc.data() as Record<string, unknown>
-              setRole((data.role as string | undefined) || 'employee')
+          const fetchProfile = async () => {
+            const { data, error } = await supabase
+              .from('users')
+              .select('*')
+              .eq('email', emailLower)
+              .maybeSingle()
 
-              const firstName = typeof data.firstName === 'string' ? data.firstName.trim() || null : null
-              const lastName = typeof data.lastName === 'string' ? data.lastName.trim() || null : null
-              const storedName = typeof data.name === 'string' ? data.name.trim() || null : null
-              const storedDisplayName = typeof data.displayName === 'string' ? data.displayName.trim() || null : null
+            if (error) {
+              console.error('[Auth] Error fetching profile:', error)
+              return
+            }
+
+            if (data) {
+              const settings = (data.settings as Record<string, any>) || {}
+              setRole(settings.role || 'employee')
+
+              const firstName = data.first_name || null
+              const lastName = data.last_name || null
+              const storedName = data.name || settings.name || null
 
               const inferred =
-                inferNameFromString(storedDisplayName) ||
                 inferNameFromString(user.displayName) ||
                 inferNameFromString(storedName) ||
                 inferNameFromEmail(emailLower)
@@ -203,41 +210,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const resolvedLastName = lastName || inferred?.lastName || null
               const explicitFullName = resolvedFirstName ? `${resolvedFirstName} ${resolvedLastName || ''}`.trim() : null
 
-              const derivedName =
-                explicitFullName ||
-                storedName ||
-                storedDisplayName ||
-                (user.displayName?.trim() || null)
-
-              if ((!firstName || !lastName) && inferred?.fullName) {
-                const nextName = inferred.fullName
-                const shouldOverrideName = !storedName || !storedName.includes(' ')
-                void setDoc(
-                  userDocRef,
-                  {
-                    ...(resolvedFirstName ? { firstName: resolvedFirstName } : {}),
-                    ...(resolvedLastName ? { lastName: resolvedLastName } : {}),
-                    ...(shouldOverrideName ? { name: nextName, displayName: nextName } : {}),
-                    updatedAt: new Date().toISOString(),
-                  },
-                  { merge: true }
-                )
-              }
+              const derivedName = explicitFullName || storedName || (user.displayName?.trim() || null)
 
               setProfile({ 
                 email: user.email,
                 name: derivedName, 
                 firstName: resolvedFirstName, 
                 lastName: resolvedLastName,
-                bio: typeof data.bio === 'string' ? data.bio : null,
-                twilioNumbers: Array.isArray(data.twilioNumbers) ? data.twilioNumbers : [],
-                selectedPhoneNumber: typeof data.selectedPhoneNumber === 'string' ? data.selectedPhoneNumber : null,
-                bridgeToMobile: typeof data.bridgeToMobile === 'boolean' ? data.bridgeToMobile : false
+                bio: data.bio || null,
+                twilioNumbers: settings.twilioNumbers || [],
+                selectedPhoneNumber: settings.selectedPhoneNumber || null,
+                bridgeToMobile: settings.bridgeToMobile || false
               })
             } else {
               setRole('employee')
               const inferred = inferNameFromString(user.displayName) || inferNameFromEmail(emailLower)
               const derivedName = inferred?.fullName || user.displayName?.trim() || null
+              
+              const newProfile = {
+                id: user.uid,
+                email: emailLower,
+                first_name: inferred?.firstName || null,
+                last_name: inferred?.lastName || null,
+                name: derivedName,
+                bio: null,
+                settings: {
+                  role: 'employee',
+                  twilioNumbers: [],
+                  selectedPhoneNumber: null,
+                  bridgeToMobile: false
+                }
+              }
+
+              await supabase.from('users').insert(newProfile)
+
               setProfile({ 
                 email: user.email,
                 name: derivedName, 
@@ -249,36 +255,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 bridgeToMobile: false
               })
             }
-          })
+          }
 
-          // Initial check/setup for user document if it doesn't exist
-          try {
-            const userDoc = await getDoc(userDocRef)
-            if (!userDoc.exists()) {
-              const inferred = inferNameFromString(user.displayName) || inferNameFromEmail(emailLower)
-              const derivedName = inferred?.fullName || user.displayName?.trim() || null
-              await setDoc(
-                userDocRef,
-                {
-                  email: emailLower,
-                  role: 'employee',
-                  ...(derivedName ? { name: derivedName, displayName: derivedName } : {}),
-                  ...(inferred?.firstName ? { firstName: inferred.firstName } : {}),
-                  ...(inferred?.lastName ? { lastName: inferred.lastName } : {}),
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                },
-                { merge: true }
-              )
-            }
-          } catch (error) {
-            console.error("Error setting up user document:", error)
+          fetchProfile()
+
+          const channel = supabase
+            .channel(`user-profile-${emailLower}`)
+            .on(
+              'postgres_changes',
+              {
+                event: '*',
+                schema: 'public',
+                table: 'users',
+                filter: `email=eq.${emailLower}`
+              },
+              () => {
+                fetchProfile()
+              }
+            )
+            .subscribe()
+
+          unsubscribeProfile = () => {
+            supabase.removeChannel(channel)
           }
         }
       } else {
-        if (unsubProfile) {
-          unsubProfile()
-          unsubProfile = null
+        if (unsubscribeProfile) {
+          unsubscribeProfile()
+          unsubscribeProfile = null
         }
         setRole(null)
         setProfile({ 
@@ -298,20 +302,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
       
       const path = window.location.pathname
-      
-      // Only protect /network routes
       if (!user && path.startsWith('/network')) {
         router.push('/login')
-      } 
-      // Redirect logged-in users from login page to platform
-      else if (user && path === '/login') {
+      } else if (user && path === '/login') {
         router.push('/network')
       }
     })
 
     return () => {
       unsubscribe()
-      if (unsubProfile) unsubProfile()
+      if (unsubscribeProfile) unsubscribeProfile()
       window.clearTimeout(timeoutId)
     }
   }, [router])

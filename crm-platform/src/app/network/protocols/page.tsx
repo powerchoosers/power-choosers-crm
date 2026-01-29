@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useProtocols, useProtocolsCount, Protocol } from '@/hooks/useProtocols'
 import { Button } from '@/components/ui/button'
+import { LoadingOrb } from '@/components/ui/LoadingOrb'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { 
@@ -201,7 +202,7 @@ export default function ProtocolsPage() {
         <div className="flex-1 overflow-auto relative scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
             {isLoading ? (
             <div className="flex items-center justify-center h-full">
-                <Loader2 className="h-8 w-8 animate-spin text-zinc-500" />
+                <LoadingOrb label="Loading Protocols..." />
             </div>
             ) : protocols.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-zinc-500">

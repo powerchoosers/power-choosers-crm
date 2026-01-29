@@ -2,7 +2,7 @@ import twilio from 'twilio';
 import { resolveToCallSid, isCallSid } from '../_twilio-ids.js';
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
-import { db } from '../_firebase.js';
+import { supabaseAdmin } from '../_supabase.js';
 import crypto from 'crypto';
 
 function normalizeBody(req) {
@@ -951,13 +951,17 @@ async function generateGeminiAIInsights(transcript) {
     const cacheKey = `gemini-insights-${transcriptHash}`;
     const CACHE_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days (transcripts don't change)
     
-    // Check Firestore cache first
-    if (db) {
+    // Check Supabase cache first
+    if (supabaseAdmin) {
         try {
-            const cacheDoc = await db.collection('aiCache').doc(cacheKey).get();
-            if (cacheDoc.exists) {
-                const cacheData = cacheDoc.data();
-                const cacheAge = Date.now() - (cacheData.cachedAt || 0);
+            const { data: cacheData, error } = await supabaseAdmin
+                .from('ai_cache')
+                .select('*')
+                .eq('key', cacheKey)
+                .single();
+
+            if (!error && cacheData) {
+                const cacheAge = Date.now() - (cacheData.cached_at || 0);
                 
                 if (cacheAge < CACHE_DURATION_MS && cacheData.insights) {
                     return cacheData.insights;
@@ -1010,15 +1014,16 @@ Provide a JSON response with:
         };
     }
     
-    // Save to Firestore cache (async, don't wait)
-    if (db) {
-        db.collection('aiCache').doc(cacheKey).set({
+    // Save to Supabase cache (async, don't wait)
+    if (supabaseAdmin) {
+        supabaseAdmin.from('ai_cache').upsert({
+            key: cacheKey,
             insights,
-            cachedAt: Date.now(),
+            cached_at: Date.now(),
             source: 'gemini',
-            transcriptLength: transcript.length
-        }).catch(err => {
-            logger.warn('[Gemini AI] Cache write error (non-critical):', err.message);
+            transcript_length: transcript.length
+        }).then(({ error }) => {
+            if (error) logger.warn('[Gemini AI] Cache write error (non-critical):', error.message);
         });
     }
     

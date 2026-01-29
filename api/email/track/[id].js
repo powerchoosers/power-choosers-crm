@@ -1,7 +1,7 @@
 // Email open tracking pixel endpoint (Cloud Run API route)
 // Returns a 1x1 transparent PNG and records an open event
 
-import { db } from '../../_firebase.js';
+import { supabaseAdmin } from '../../_supabase.js';
 import logger from '../../_logger.js';
 
 // 1x1 transparent PNG (43 bytes)
@@ -85,10 +85,10 @@ export default async function handler(req, res) {
     // Detect device type
     const deviceType = detectDeviceType(userAgent);
 
-    // Best-effort: record an open event if Firestore is available and id looks valid
+    // Best-effort: record an open event if Supabase is available and id looks valid
     try {
-      if (db && trackingId && trackingId.length > 0) {
-        // Validate tracking ID format (should start with 'gmail_' or be a valid Firestore ID)
+      if (supabaseAdmin && trackingId && trackingId.length > 0) {
+        // Validate tracking ID format (should start with 'gmail_' or be a valid ID)
         if (!trackingId.match(/^[a-zA-Z0-9_-]+$/)) {
           logger.warn('[Email Track] Invalid tracking ID format:', { trackingId: trackingId.substring(0, 50) });
           setPixelHeaders(res);
@@ -118,15 +118,18 @@ export default async function handler(req, res) {
         // Update in-memory cache first (fast path)
         trackingDedupeCache.set(dedupeKey, now);
         
-        const ref = db.collection('emails').doc(trackingId);
-        const snap = await ref.get();
+        // Fetch current email data from Supabase
+        const { data: currentData, error: fetchError } = await supabaseAdmin
+          .from('emails')
+          .select('opens, openCount')
+          .eq('id', trackingId)
+          .single();
 
-        if (snap.exists) {
+        if (!fetchError && currentData) {
           const openedAt = new Date().toISOString();
-          const currentData = snap.data() || {};
-          const existingOpens = currentData.opens || [];
+          const existingOpens = Array.isArray(currentData.opens) ? currentData.opens : [];
 
-          // Secondary deduplication: Check Firestore for recent opens from same user
+          // Secondary deduplication: Check Supabase for recent opens from same user
           // This catches cases where in-memory cache was cleared (server restart)
           const recentOpen = existingOpens.find(open => {
             const openTime = new Date(open.openedAt).getTime();
@@ -134,7 +137,7 @@ export default async function handler(req, res) {
           });
 
           if (recentOpen) {
-            logger.debug('[Email Track] Duplicate open ignored (Firestore check):', { trackingId: trackingId.substring(0, 30) });
+            logger.debug('[Email Track] Duplicate open ignored (Supabase check):', { trackingId: trackingId.substring(0, 30) });
           } else {
             // Create open event object
             const openEvent = {
@@ -146,14 +149,19 @@ export default async function handler(req, res) {
               isBotFlagged: deviceType === 'bot'
             };
 
-          await ref.update({
-            openCount: (currentData.openCount || 0) + 1,
-              opens: existingOpens.concat([openEvent]),
-            updatedAt: openedAt,
-              lastOpened: openedAt,
-              // Flag if this looks like a bot/proxy open
-              ...(deviceType === 'bot' ? { botFlagged: true } : {})
-            });
+            // Update Supabase record
+            await supabaseAdmin
+              .from('emails')
+              .update({
+                openCount: (currentData.openCount || 0) + 1,
+                opens: [...existingOpens, openEvent],
+                updatedAt: openedAt,
+                metadata: {
+                  lastOpened: openedAt,
+                  ...(deviceType === 'bot' ? { botFlagged: true } : {})
+                }
+              })
+              .eq('id', trackingId);
 
             logger.debug('[Email Track] Recorded open:', {
               trackingId: trackingId.substring(0, 30),

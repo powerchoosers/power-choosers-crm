@@ -19,6 +19,7 @@ import { CallListItem } from '@/components/calls/CallListItem'
 import { useUIStore } from '@/store/uiStore'
 import { useGeminiStore } from '@/store/geminiStore'
 import { Button } from '@/components/ui/button'
+import { LoadingOrb } from '@/components/ui/LoadingOrb'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
@@ -293,10 +294,7 @@ export default function ContactDossierPage() {
   if (isLoading) {
     return (
       <div className="flex flex-col h-[calc(100vh-8rem)] items-center justify-center space-y-4 animate-in fade-in duration-500">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-800 border-t-[#002FA7]" />
-          <div className="text-sm text-zinc-500 font-mono uppercase tracking-widest">Initialising Terminal...</div>
-        </div>
+        <LoadingOrb label="Initialising Terminal..." />
       </div>
     )
   }
@@ -820,8 +818,7 @@ export default function ContactDossierPage() {
                   <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
                     {isLoadingCalls ? (
                       <div className="flex flex-col items-center justify-center py-20 text-zinc-600">
-                        <RefreshCw className="w-8 h-8 animate-spin mb-4 opacity-20" />
-                        <p className="text-[10px] font-mono uppercase tracking-[0.2em]">Intercepting_Signals...</p>
+                        <LoadingOrb size="sm" label="Intercepting_Signals..." />
                       </div>
                     ) : recentCalls && recentCalls.length > 0 ? (
                       <>

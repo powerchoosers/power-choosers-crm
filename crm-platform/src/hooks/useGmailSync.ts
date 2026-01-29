@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { auth, db } from '@/lib/firebase';
-import { collection, query, where, getDocs, serverTimestamp, doc, setDoc } from 'firebase/firestore';
+import { auth } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import { GoogleAuthProvider, signInWithPopup, User } from 'firebase/auth';
 import { toast } from 'sonner';
 
@@ -136,9 +136,14 @@ export function useGmailSync() {
       assignedTo: userEmail.toLowerCase(),
       createdBy: userEmail.toLowerCase(),
       date: receivedDate.toISOString(),
-      timestamp: receivedDate.getTime(),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+      timestamp: receivedDate.toISOString(), // Use ISO string for Supabase
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      is_read: !labelIds.includes('UNREAD'),
+      metadata: {
+        ownerId: userEmail.toLowerCase(),
+        gmailThreadId: message.threadId
+      }
     };
   }, []);
 
@@ -177,15 +182,19 @@ export function useGmailSync() {
       let syncedCount = 0;
 
       for (const msg of messages) {
-        // Check duplication
-        const q = query(
-          collection(db, 'emails'), 
-          where('gmailMessageId', '==', msg.id),
-          where('ownerId', '==', user.email?.toLowerCase())
-        );
-        const snapshot = await getDocs(q);
+        // Check duplication in Supabase
+        const { data: existing, error: checkError } = await supabase
+          .from('emails')
+          .select('id')
+          .eq('gmailMessageId', msg.id)
+          .maybeSingle();
         
-        if (!snapshot.empty) continue;
+        if (checkError) {
+          console.error('Error checking existing email:', checkError);
+          continue;
+        }
+        
+        if (existing) continue;
 
         // Fetch full message
         const msgRes = await fetch(`${GMAIL_API_BASE}/messages/${msg.id}?format=full`, {
@@ -196,13 +205,32 @@ export function useGmailSync() {
         
         const msgData = await msgRes.json();
         
-        // Skip sent items check removed to allow full sync if needed
-        // if (msgData.labelIds?.includes('SENT')) continue;
-
         const emailData = parseGmailMessage(msgData, user.email || '');
         
-        // Save to Firestore with specific ID to prevent race conditions
-        await setDoc(doc(collection(db, 'emails')), emailData);
+        // Save to Supabase
+        const { error: insertError } = await supabase
+          .from('emails')
+          .insert({
+            subject: emailData.subject,
+            from: emailData.from,
+            to: emailData.to,
+            html: emailData.html,
+            text: emailData.text,
+            type: emailData.type,
+            status: emailData.status,
+            gmailMessageId: emailData.gmailMessageId,
+            timestamp: emailData.timestamp,
+            is_read: emailData.is_read,
+            metadata: emailData.metadata,
+            created_at: emailData.createdAt,
+            updated_at: emailData.updatedAt
+          });
+
+        if (insertError) {
+          console.error('Error inserting email into Supabase:', insertError);
+          continue;
+        }
+
         syncedCount++;
       }
 

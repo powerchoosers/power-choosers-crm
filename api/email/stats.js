@@ -1,6 +1,6 @@
 // Vercel API endpoint for email statistics
 import { cors } from '../_cors.js';
-import { admin, db } from '../_firebase.js';
+import { supabaseAdmin } from '../_supabase.js';
 import logger from '../_logger.js';
 
 export default async function handler(req, res) {
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
       }));
     }
 
-    // Fetch email stats from Firebase if available
+    // Fetch email stats from Supabase if available
     let stats = {
       trackingId,
       openCount: 0,
@@ -59,33 +59,37 @@ export default async function handler(req, res) {
       replies: []
     };
 
-    if (db) {
+    if (supabaseAdmin) {
       try {
-        const emailDoc = await db.collection('emails').doc(trackingId).get();
-        if (emailDoc.exists) {
-          const emailData = emailDoc.data();
+        const { data: emailData, error: fetchError } = await supabaseAdmin
+          .from('emails')
+          .select('*')
+          .eq('id', trackingId)
+          .single();
+
+        if (!fetchError && emailData) {
           stats = {
             trackingId,
             openCount: emailData.openCount || 0,
             replyCount: emailData.replyCount || 0,
-            lastOpened: emailData.lastOpened || null,
-            lastReplied: emailData.lastReplied || null,
+            lastOpened: emailData.metadata?.lastOpened || emailData.lastOpened || null,
+            lastReplied: emailData.metadata?.lastReplied || emailData.lastReplied || null,
             opens: emailData.opens || [],
             replies: emailData.replies || [],
             status: emailData.status || 'unknown',
-            sentAt: emailData.sentAt || null,
+            sentAt: emailData.metadata?.sentAt || emailData.sentAt || null,
             subject: emailData.subject || '',
             to: emailData.to || []
           };
         } else {
           logger.log('[Email] Email document not found:', trackingId);
         }
-      } catch (firebaseError) {
-        logger.error('[Email] Firebase fetch error:', firebaseError);
-        // Return default stats if Firebase fails
+      } catch (dbError) {
+        logger.error('[Email] Supabase fetch error:', dbError);
+        // Return default stats if DB fails
       }
     } else {
-      logger.warn('[Email] Firebase not available, returning default stats');
+      logger.warn('[Email] Supabase not available, returning default stats');
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });

@@ -1,0 +1,18 @@
+[
+  {
+    "name": "delete-old-images",
+    "action": {"type": "Delete"},
+    "condition": {
+      "tagState": "any",
+      "olderThan": "30d"
+    }
+  },
+  {
+    "name": "keep-minimum-versions",
+    "action": {"type": "Keep"},
+    "mostRecentVersions": {
+      "packageNamePrefixes": ["power-choosers-crm"],
+      "keepCount": 5
+    }
+  }
+]

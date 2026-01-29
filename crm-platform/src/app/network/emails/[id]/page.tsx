@@ -7,6 +7,7 @@ import { ArrowLeft, Reply, Trash2, MoreHorizontal, Printer, Star } from 'lucide-
 import { format } from 'date-fns'
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ComposeModal } from '@/components/emails/ComposeModal'
+import { LoadingOrb } from '@/components/ui/LoadingOrb'
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 
@@ -24,8 +25,7 @@ export default function EmailDetailPage() {
   if (isLoading) {
     return (
       <div className="flex flex-col h-[calc(100vh-8rem)] items-center justify-center space-y-4">
-        <Loader2 className="w-8 h-8 animate-spin text-zinc-500" />
-        <p className="text-zinc-500">Loading email...</p>
+        <LoadingOrb label="Loading email..." />
       </div>
     )
   }
