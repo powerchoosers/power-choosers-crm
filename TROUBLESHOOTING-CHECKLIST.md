@@ -10,7 +10,7 @@
 Test if Cloud Run itself is working:
 
 ```
-https://power-choosers-crm-792458658491.us-south1.run.app/
+https://power-choosers-crm-792458658491.us-central1.run.app/
 ```
 
 **Expected:** Should load your CRM or show a response  
@@ -40,7 +40,7 @@ https://power-choosers-crm-792458658491.us-south1.run.app/
 3. Click on it
 4. Check:
    - **Service:** Should show `power-choosers-crm`
-   - **Region:** `us-south1`
+   - **Region:** `us-central1`
    - **Status:** Should show endpoints
 
 **If no endpoints:** NEG isn't connected to Cloud Run service
@@ -71,7 +71,7 @@ curl -I http://136.110.186.2
 curl -I https://136.110.186.2 -k
 
 # Test Cloud Run directly
-curl -I https://power-choosers-crm-792458658491.us-south1.run.app/
+curl -I https://power-choosers-crm-792458658491.us-central1.run.app/
 ```
 
 ---
@@ -83,7 +83,7 @@ Make sure the NEG is pointing to the correct service:
 1. Go to **Cloud Run** → Check service name
 2. Should be: `power-choosers-crm`
 3. Go to **Network Endpoint Groups** → `powerchoosers-neg`
-4. Verify it points to: `power-choosers-crm` in `us-south1`
+4. Verify it points to: `power-choosers-crm` in `us-central1`
 
 **If names don't match:** NEG won't connect
 
@@ -157,7 +157,7 @@ nslookup powerchoosers.com
 # Should return: 136.110.186.2
 
 # Test Cloud Run directly
-curl -I https://power-choosers-crm-792458658491.us-south1.run.app/
+curl -I https://power-choosers-crm-792458658491.us-central1.run.app/
 # Should return: HTTP/2 200 or similar
 
 # Test load balancer IP (HTTP)

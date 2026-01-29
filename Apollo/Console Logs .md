@@ -11,7 +11,7 @@ account-detail.js:16 ━━━━━━━━━━━━━━━━━━━�
 account-detail.js:16 👥 TEST 2: CONTACTS SEARCH (People at Company)
 account-detail.js:16 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 account-detail.js:16   Using filters - Name: Steneral Consulting Domain: steneral.com
-account-detail.js:16   Request URL: https://power-choosers-crm-792458658491.us-south1.run.app/api/apollo/contacts
+account-detail.js:16   Request URL: https://power-choosers-crm-792458658491.us-central1.run.app/api/apollo/contacts
 account-detail.js:16   Request Body: {
   "pages": {
     "page": 0,
@@ -76,7 +76,7 @@ account-detail.js:16 ━━━━━━━━━━━━━━━━━━━�
 👥 TEST 2: CONTACTS SEARCH (People at Company)
 account-detail.js:16 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 account-detail.js:16   Using filters - Name: Sekisui Specialty Chemicals Domain: lairdplastics.com
-account-detail.js:16   Request URL: https://power-choosers-crm-792458658491.us-south1.run.app/api/apollo/contacts
+account-detail.js:16   Request URL: https://power-choosers-crm-792458658491.us-central1.run.app/api/apollo/contacts
 account-detail.js:16   Request Body: {
   "pages": {
     "page": 0,
@@ -129,7 +129,7 @@ account-detail.js:16   Company Name: BioUrja Group
 account-detail.js:16 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 account-detail.js:16 🏢 TEST 1: COMPANY SEARCH (Direct Account Data)
 account-detail.js:16 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-account-detail.js:16   Request URL: https://power-choosers-crm-792458658491.us-south1.run.app/api/apollo/company?domain=northparkcenter.com&company=BioUrja+Group
+account-detail.js:16   Request URL: https://power-choosers-crm-792458658491.us-central1.run.app/api/apollo/company?domain=northparkcenter.com&company=BioUrja+Group
 Promise {<pending>}
 account-detail.js:16   ✅ Company Search: SUCCESS
 account-detail.js:16   Status: 200
@@ -155,7 +155,7 @@ account-detail.js:16 ━━━━━━━━━━━━━━━━━━━�
 account-detail.js:16 👥 TEST 2: CONTACTS SEARCH (People at Company)
 account-detail.js:16 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 account-detail.js:16   Using filters - Name: BioUrja Group Domain: northparkcenter.com
-account-detail.js:16   Request URL: https://power-choosers-crm-792458658491.us-south1.run.app/api/apollo/contacts
+account-detail.js:16   Request URL: https://power-choosers-crm-792458658491.us-central1.run.app/api/apollo/contacts
 account-detail.js:16   Request Body: {
   "pages": {
     "page": 0,

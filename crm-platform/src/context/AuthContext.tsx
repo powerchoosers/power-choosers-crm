@@ -22,6 +22,7 @@ interface AuthContextType {
   loading: boolean
   role: string | null
   profile: UserProfile
+  refreshProfile: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -38,6 +39,7 @@ const AuthContext = createContext<AuthContextType>({
     selectedPhoneNumber: null,
     bridgeToMobile: null
   },
+  refreshProfile: async () => {},
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -56,35 +58,83 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   })
   const router = useRouter()
 
+  const titleize = (value: string) => {
+    const trimmed = value.trim()
+    if (!trimmed) return ''
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase()
+  }
+
+  const inferNameFromString = (value: string | null | undefined) => {
+    const raw = typeof value === 'string' ? value.trim() : ''
+    if (!raw) return null
+    const parts = raw.split(/\s+/).filter(Boolean)
+    if (parts.length < 2) return null
+    const firstName = titleize(parts[0])
+    const lastName = titleize(parts.slice(1).join(' '))
+    const fullName = `${firstName} ${lastName}`.trim()
+    return { firstName, lastName, fullName }
+  }
+
+  const inferNameFromEmail = (email: string) => {
+    const emailLower = String(email).toLowerCase().trim()
+    const prefix = emailLower.split('@')[0] || ''
+    const parts = prefix.split(/[._-]+/).filter(Boolean)
+    if (parts.length < 2) return null
+    const firstName = titleize(parts[0])
+    const lastName = titleize(parts.slice(1).join(' '))
+    const fullName = `${firstName} ${lastName}`.trim()
+    return { firstName, lastName, fullName }
+  }
+
+  const refreshProfile = async () => {
+    const currentUser = user || auth.currentUser
+    if (!currentUser?.email) return
+
+    const emailLower = currentUser.email.toLowerCase().trim()
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', emailLower)
+      .maybeSingle()
+
+    if (error) {
+      console.error('[Auth] Error fetching profile:', error)
+      return
+    }
+
+    if (data) {
+      const settings = (data.settings as Record<string, any>) || {}
+      setRole(settings.role || 'employee')
+
+      const firstName = data.first_name || null
+      const lastName = data.last_name || null
+      const storedName = data.name || settings.name || null
+
+      const inferred =
+        inferNameFromString(currentUser.displayName) ||
+        inferNameFromString(storedName) ||
+        inferNameFromEmail(emailLower)
+
+      const resolvedFirstName = firstName || inferred?.firstName || null
+      const resolvedLastName = lastName || inferred?.lastName || null
+      const explicitFullName = resolvedFirstName ? `${resolvedFirstName} ${resolvedLastName || ''}`.trim() : null
+
+      const derivedName = explicitFullName || storedName || (currentUser.displayName?.trim() || null)
+
+      setProfile({ 
+        email: currentUser.email,
+        name: derivedName, 
+        firstName: resolvedFirstName, 
+        lastName: resolvedLastName,
+        bio: data.bio || null,
+        twilioNumbers: settings.twilioNumbers || [],
+        selectedPhoneNumber: settings.selectedPhoneNumber || null,
+        bridgeToMobile: settings.bridgeToMobile || false
+      })
+    }
+  }
+
   useEffect(() => {
-    const titleize = (value: string) => {
-      const trimmed = value.trim()
-      if (!trimmed) return ''
-      return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase()
-    }
-
-    const inferNameFromString = (value: string | null | undefined) => {
-      const raw = typeof value === 'string' ? value.trim() : ''
-      if (!raw) return null
-      const parts = raw.split(/\s+/).filter(Boolean)
-      if (parts.length < 2) return null
-      const firstName = titleize(parts[0])
-      const lastName = titleize(parts.slice(1).join(' '))
-      const fullName = `${firstName} ${lastName}`.trim()
-      return { firstName, lastName, fullName }
-    }
-
-    const inferNameFromEmail = (email: string) => {
-      const emailLower = String(email).toLowerCase().trim()
-      const prefix = emailLower.split('@')[0] || ''
-      const parts = prefix.split(/[._-]+/).filter(Boolean)
-      if (parts.length < 2) return null
-      const firstName = titleize(parts[0])
-      const lastName = titleize(parts.slice(1).join(' '))
-      const fullName = `${firstName} ${lastName}`.trim()
-      return { firstName, lastName, fullName }
-    }
-
     let unsubscribeProfile: (() => void) | null = null
     let didResolve = false
 
@@ -317,7 +367,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [router])
 
   return (
-    <AuthContext.Provider value={{ user, loading, role, profile }}>
+    <AuthContext.Provider value={{ user, loading, role, profile, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   )

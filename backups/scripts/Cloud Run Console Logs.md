@@ -26,7 +26,7 @@ l_patterson@cloudshell:~ (power-choosers-crm)$ gcloud logging read "resource.typ
       "jobName": "projects/power-choosers-crm/locations/us-central1/jobs/process-activations-cron",
       "scheduledTime": "2025-11-11T22:30:05.511927Z",
       "targetType": "HTTP",
-      "url": "https://power-choosers-crm-792458658491.us-south1.run.app/api/process-sequence-activations"
+      "url": "https://power-choosers-crm-792458658491.us-central1.run.app/api/process-sequence-activations"
     },
     "logName": "projects/power-choosers-crm/logs/cloudscheduler.googleapis.com%2Fexecutions",
     "receiveTimestamp": "2025-11-11T22:30:12.349245033Z",
@@ -51,7 +51,7 @@ l_patterson@cloudshell:~ (power-choosers-crm)$ gcloud logging read "resource.typ
       "debugInfo": "URL_CRAWLED. Original HTTP response code number = 200",
       "jobName": "projects/power-choosers-crm/locations/us-central1/jobs/process-activations-cron",
       "targetType": "HTTP",
-      "url": "https://power-choosers-crm-792458658491.us-south1.run.app/api/process-sequence-activations"
+      "url": "https://power-choosers-crm-792458658491.us-central1.run.app/api/process-sequence-activations"
     },
     "logName": "projects/power-choosers-crm/logs/cloudscheduler.googleapis.com%2Fexecutions",
     "receiveTimestamp": "2025-11-11T22:30:12.225564098Z",
@@ -73,7 +73,7 @@ l_patterson@cloudshell:~ (power-choosers-crm)$ gcloud logging read "resource.typ
       "jobName": "projects/power-choosers-crm/locations/us-central1/jobs/process-activations-cron",
       "scheduledTime": "2025-11-11T22:00:05.52687Z",
       "targetType": "HTTP",
-      "url": "https://power-choosers-crm-792458658491.us-south1.run.app/api/process-sequence-activations"
+      "url": "https://power-choosers-crm-792458658491.us-central1.run.app/api/process-sequence-activations"
     },
     "logName": "projects/power-choosers-crm/logs/cloudscheduler.googleapis.com%2Fexecutions",
     "receiveTimestamp": "2025-11-11T22:00:11.776231181Z",
@@ -98,7 +98,7 @@ l_patterson@cloudshell:~ (power-choosers-crm)$ gcloud logging read "resource.typ
       "debugInfo": "URL_CRAWLED. Original HTTP response code number = 200",
       "jobName": "projects/power-choosers-crm/locations/us-central1/jobs/process-activations-cron",
       "targetType": "HTTP",
-      "url": "https://power-choosers-crm-792458658491.us-south1.run.app/api/process-sequence-activations"
+      "url": "https://power-choosers-crm-792458658491.us-central1.run.app/api/process-sequence-activations"
     },
     "logName": "projects/power-choosers-crm/logs/cloudscheduler.googleapis.com%2Fexecutions",
     "receiveTimestamp": "2025-11-11T22:00:11.763624979Z",
@@ -123,7 +123,7 @@ l_patterson@cloudshell:~ (power-choosers-crm)$ gcloud logging read "resource.typ
       "debugInfo": "URL_CRAWLED. Original HTTP response code number = 200",
       "jobName": "projects/power-choosers-crm/locations/us-central1/jobs/process-activations-cron",
       "targetType": "HTTP",
-      "url": "https://power-choosers-crm-792458658491.us-south1.run.app/api/process-sequence-activations"
+      "url": "https://power-choosers-crm-792458658491.us-central1.run.app/api/process-sequence-activations"
     },
     "logName": "projects/power-choosers-crm/logs/cloudscheduler.googleapis.com%2Fexecutions",
     "receiveTimestamp": "2025-11-11T21:30:11.431398219Z",
@@ -145,7 +145,7 @@ l_patterson@cloudshell:~ (power-choosers-crm)$ gcloud logging read "resource.typ
       "jobName": "projects/power-choosers-crm/locations/us-central1/jobs/process-activations-cron",
       "scheduledTime": "2025-11-11T21:30:05.57741Z",
       "targetType": "HTTP",
-      "url": "https://power-choosers-crm-792458658491.us-south1.run.app/api/process-sequence-activations"
+      "url": "https://power-choosers-crm-792458658491.us-central1.run.app/api/process-sequence-activations"
     },
     "logName": "projects/power-choosers-crm/logs/cloudscheduler.googleapis.com%2Fexecutions",
     "receiveTimestamp": "2025-11-11T21:30:11.427704946Z",
@@ -170,7 +170,7 @@ l_patterson@cloudshell:~ (power-choosers-crm)$ gcloud logging read "resource.typ
       "debugInfo": "URL_CRAWLED. Original HTTP response code number = 200",
       "jobName": "projects/power-choosers-crm/locations/us-central1/jobs/process-activations-cron",
       "targetType": "HTTP",
-      "url": "https://power-choosers-crm-792458658491.us-south1.run.app/api/process-sequence-activations"
+      "url": "https://power-choosers-crm-792458658491.us-central1.run.app/api/process-sequence-activations"
     },
     "logName": "projects/power-choosers-crm/logs/cloudscheduler.googleapis.com%2Fexecutions",
     "receiveTimestamp": "2025-11-11T21:00:11.312880890Z",
@@ -192,7 +192,7 @@ l_patterson@cloudshell:~ (power-choosers-crm)$ gcloud logging read "resource.typ
       "jobName": "projects/power-choosers-crm/locations/us-central1/jobs/process-activations-cron",
       "scheduledTime": "2025-11-11T21:00:05.028519Z",
       "targetType": "HTTP",
-      "url": "https://power-choosers-crm-792458658491.us-south1.run.app/api/process-sequence-activations"
+      "url": "https://power-choosers-crm-792458658491.us-central1.run.app/api/process-sequence-activations"
     },
     "logName": "projects/power-choosers-crm/logs/cloudscheduler.googleapis.com%2Fexecutions",
     "receiveTimestamp": "2025-11-11T21:00:11.306062335Z",
@@ -214,7 +214,7 @@ l_patterson@cloudshell:~ (power-choosers-crm)$ gcloud logging read "resource.typ
       "jobName": "projects/power-choosers-crm/locations/us-central1/jobs/process-activations-cron",
       "scheduledTime": "2025-11-11T20:30:05.554582Z",
       "targetType": "HTTP",
-      "url": "https://power-choosers-crm-792458658491.us-south1.run.app/api/process-sequence-activations"
+      "url": "https://power-choosers-crm-792458658491.us-central1.run.app/api/process-sequence-activations"
     },
     "logName": "projects/power-choosers-crm/logs/cloudscheduler.googleapis.com%2Fexecutions",
     "receiveTimestamp": "2025-11-11T20:30:08.470365940Z",
@@ -239,7 +239,7 @@ l_patterson@cloudshell:~ (power-choosers-crm)$ gcloud logging read "resource.typ
       "debugInfo": "URL_CRAWLED. Original HTTP response code number = 200",
       "jobName": "projects/power-choosers-crm/locations/us-central1/jobs/process-activations-cron",
       "targetType": "HTTP",
-      "url": "https://power-choosers-crm-792458658491.us-south1.run.app/api/process-sequence-activations"
+      "url": "https://power-choosers-crm-792458658491.us-central1.run.app/api/process-sequence-activations"
     },
     "logName": "projects/power-choosers-crm/logs/cloudscheduler.googleapis.com%2Fexecutions",
     "receiveTimestamp": "2025-11-11T20:30:07.785697388Z",
@@ -266,7 +266,7 @@ receiveTimestamp: '2025-11-11T22:58:18.363495677Z'
 resource:
   labels:
     configuration_name: power-choosers-crm
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: power-choosers-crm-00309-g5p
     service_name: power-choosers-crm
@@ -283,7 +283,7 @@ receiveTimestamp: '2025-11-11T22:30:05.799021142Z'
 resource:
   labels:
     configuration_name: power-choosers-crm
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: power-choosers-crm-00308-r6k
     service_name: power-choosers-crm
@@ -300,7 +300,7 @@ receiveTimestamp: '2025-11-11T22:00:05.797292053Z'
 resource:
   labels:
     configuration_name: power-choosers-crm
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: power-choosers-crm-00308-r6k
     service_name: power-choosers-crm
@@ -317,7 +317,7 @@ receiveTimestamp: '2025-11-11T21:30:05.766179906Z'
 resource:
   labels:
     configuration_name: power-choosers-crm
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: power-choosers-crm-00308-r6k
     service_name: power-choosers-crm
@@ -334,7 +334,7 @@ receiveTimestamp: '2025-11-11T21:00:05.154090109Z'
 resource:
   labels:
     configuration_name: power-choosers-crm
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: power-choosers-crm-00308-r6k
     service_name: power-choosers-crm
@@ -351,7 +351,7 @@ receiveTimestamp: '2025-11-11T20:30:05.785575499Z'
 resource:
   labels:
     configuration_name: power-choosers-crm
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: power-choosers-crm-00308-r6k
     service_name: power-choosers-crm
@@ -368,7 +368,7 @@ receiveTimestamp: '2025-11-11T20:00:05.884783998Z'
 resource:
   labels:
     configuration_name: power-choosers-crm
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: power-choosers-crm-00308-r6k
     service_name: power-choosers-crm
@@ -385,7 +385,7 @@ receiveTimestamp: '2025-11-11T19:30:05.958926774Z'
 resource:
   labels:
     configuration_name: power-choosers-crm
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: power-choosers-crm-00308-r6k
     service_name: power-choosers-crm
@@ -402,7 +402,7 @@ receiveTimestamp: '2025-11-11T19:00:05.879850715Z'
 resource:
   labels:
     configuration_name: power-choosers-crm
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: power-choosers-crm-00308-r6k
     service_name: power-choosers-crm
@@ -419,7 +419,7 @@ receiveTimestamp: '2025-11-11T18:30:05.950265235Z'
 resource:
   labels:
     configuration_name: power-choosers-crm
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: power-choosers-crm-00306-d64
     service_name: power-choosers-crm
@@ -436,7 +436,7 @@ receiveTimestamp: '2025-11-11T18:00:05.822632058Z'
 resource:
   labels:
     configuration_name: power-choosers-crm
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: power-choosers-crm-00306-d64
     service_name: power-choosers-crm
@@ -453,7 +453,7 @@ receiveTimestamp: '2025-11-11T17:30:06.860167213Z'
 resource:
   labels:
     configuration_name: power-choosers-crm
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: power-choosers-crm-00306-d64
     service_name: power-choosers-crm
@@ -470,7 +470,7 @@ receiveTimestamp: '2025-11-11T17:00:05.747576029Z'
 resource:
   labels:
     configuration_name: power-choosers-crm
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: power-choosers-crm-00306-d64
     service_name: power-choosers-crm
@@ -487,7 +487,7 @@ receiveTimestamp: '2025-11-11T16:30:05.146322823Z'
 resource:
   labels:
     configuration_name: power-choosers-crm
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: power-choosers-crm-00305-fg2
     service_name: power-choosers-crm
@@ -504,7 +504,7 @@ receiveTimestamp: '2025-11-11T16:00:05.609201866Z'
 resource:
   labels:
     configuration_name: power-choosers-crm
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: power-choosers-crm-00305-fg2
     service_name: power-choosers-crm
@@ -521,7 +521,7 @@ receiveTimestamp: '2025-11-11T15:30:05.876302946Z'
 resource:
   labels:
     configuration_name: power-choosers-crm
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: power-choosers-crm-00303-8pq
     service_name: power-choosers-crm
@@ -538,7 +538,7 @@ receiveTimestamp: '2025-11-11T15:00:05.797547990Z'
 resource:
   labels:
     configuration_name: power-choosers-crm
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: power-choosers-crm-00303-8pq
     service_name: power-choosers-crm
@@ -555,7 +555,7 @@ receiveTimestamp: '2025-11-11T14:30:05.596823490Z'
 resource:
   labels:
     configuration_name: power-choosers-crm
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: power-choosers-crm-00303-8pq
     service_name: power-choosers-crm
@@ -572,7 +572,7 @@ receiveTimestamp: '2025-11-11T14:00:08.251041302Z'
 resource:
   labels:
     configuration_name: power-choosers-crm
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: power-choosers-crm-00303-8pq
     service_name: power-choosers-crm
@@ -589,7 +589,7 @@ receiveTimestamp: '2025-11-11T00:27:03.841306679Z'
 resource:
   labels:
     configuration_name: power-choosers-crm
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: power-choosers-crm-00297-7xv
     service_name: power-choosers-crm
@@ -604,7 +604,7 @@ httpRequest:
   remoteIp: 54.174.71.60
   requestMethod: GET
   requestSize: '816'
-  requestUrl: https://power-choosers-crm-792458658491.us-south1.run.app/api/track-email-performance
+  requestUrl: https://power-choosers-crm-792458658491.us-central1.run.app/api/track-email-performance
   responseSize: '72'
   serverIp: 34.143.75.2
   status: 504
@@ -617,7 +617,7 @@ receiveTimestamp: '2025-11-11T22:14:30.661867202Z'
 resource:
   labels:
     configuration_name: power-choosers-crm
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: power-choosers-crm-00308-r6k
     service_name: power-choosers-crm
@@ -659,13 +659,13 @@ protoPayload:
           run.googleapis.com/invoker-iam-disabled: 'true'
           run.googleapis.com/maxScale: '10'
           run.googleapis.com/operation-id: 8e00f57b-35ea-487c-89fe-dda31b26a1d1
-          run.googleapis.com/urls: '["https://power-choosers-crm-792458658491.us-south1.run.app","https://power-choosers-crm-g6vobnfloq-vp.a.run.app"]'
+          run.googleapis.com/urls: '["https://power-choosers-crm-792458658491.us-central1.run.app","https://power-choosers-crm-g6vobnfloq-vp.a.run.app"]'
           serving.knative.dev/creator: l.patterson@powerchoosers.com
           serving.knative.dev/lastModifier: 792458658491-compute@developer.gserviceaccount.com
         creationTimestamp: '2025-10-20T19:06:39.998490Z'
         generation: 298
         labels:
-          cloud.googleapis.com/location: us-south1
+          cloud.googleapis.com/location: us-central1
           gcb-trigger-id: 59a604ce-59e6-4f5b-b781-2f628237f774
           gcb-trigger-region: global
           managed-by: gcp-cloud-build-deploy-cloud-run
@@ -732,7 +732,7 @@ protoPayload:
       time: '2025-11-10T23:38:10.709661Z'
   resourceLocation:
     currentLocations:
-    - us-south1
+    - us-central1
   resourceName: namespaces/power-choosers-crm/services/power-choosers-crm
   serviceName: run.googleapis.com
   status:
@@ -744,7 +744,7 @@ receiveTimestamp: '2025-11-10T23:38:11.484276697Z'
 resource:
   labels:
     configuration_name: ''
-    location: us-south1
+    location: us-central1
     project_id: power-choosers-crm
     revision_name: ''
     service_name: power-choosers-crm

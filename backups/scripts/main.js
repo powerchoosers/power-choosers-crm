@@ -934,7 +934,7 @@ class PowerChoosersCRM {
         try {
             if (typeof API_BASE_URL !== 'undefined' && API_BASE_URL) return String(API_BASE_URL).replace(/\/$/, '');
         } catch (_) { }
-        const cloudRun = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+        const cloudRun = 'https://power-choosers-crm-792458658491.us-central1.run.app';
         if (/^https?:\/\//i.test(cloudRun)) return cloudRun;
         try { return (window.location && window.location.origin) ? window.location.origin.replace(/\/$/, '') : cloudRun; } catch (_) { return cloudRun; }
     }
