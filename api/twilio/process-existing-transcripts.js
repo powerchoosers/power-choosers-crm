@@ -1,6 +1,6 @@
 import twilio from 'twilio';
-import { admin, db } from '../_firebase.js';
-import { resolveToCallSid, isCallSid } from '../_twilio-ids.js';
+import { supabaseAdmin } from '../_supabase.js';
+import { resolveToCallSid } from '../_twilio-ids.js';
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
 
@@ -101,7 +101,7 @@ export default async function handler(req, res) {
                         aiInsights = await generateAdvancedAIInsights(transcriptText, sentences, operatorResults);
                     }
                     
-                    // Update the call data directly in Firestore (only with a valid Call SID)
+                    // Update the call data directly in Supabase (only with a valid Call SID)
                     try {
                         // Resolve a true Call SID to avoid creating rows keyed by Recording/Transcript SIDs
                         let finalCallSid = null;
@@ -110,17 +110,22 @@ export default async function handler(req, res) {
                         } catch (_) {}
 
                         if (!finalCallSid) {
-                            logger.warn(`[Process Existing Transcripts] Skipping Firestore update for ${transcript.sid}: unresolved Call SID (sourceSid=${transcript.sourceSid})`);
+                            logger.warn(`[Process Existing Transcripts] Skipping Supabase update for ${transcript.sid}: unresolved Call SID (sourceSid=${transcript.sourceSid})`);
                             results.push({ transcriptSid: transcript.sid, sourceSid: transcript.sourceSid, status: 'skipped', error: 'Unresolved Call SID' });
-                        } else if (db) {
-                            logger.log(`[Process Existing Transcripts] Writing to Firestore: collection='calls', doc='${finalCallSid}'`);
-                            const callData = {
-                                id: finalCallSid,
-                                twilioSid: finalCallSid,
-                                callSid: finalCallSid,
+                        } else {
+                            logger.log(`[Process Existing Transcripts] Updating Supabase: table='calls', id='${finalCallSid}'`);
+                            
+                            // Check if the call exists first to avoid overwriting metadata with defaults
+                            const { data: existingCall } = await supabaseAdmin
+                                .from('calls')
+                                .select('id')
+                                .eq('id', finalCallSid)
+                                .single();
+
+                            const commonUpdates = {
                                 transcript: transcriptText,
-                                aiInsights: aiInsights,
-                                conversationalIntelligence: {
+                                ai_insights: aiInsights,
+                                conversational_intelligence: {
                                     transcriptSid: transcript.sid,
                                     status: transcript.status,
                                     sentences: sentences,
@@ -128,23 +133,46 @@ export default async function handler(req, res) {
                                     serviceSid: serviceSid,
                                     originalSourceSid: transcript.sourceSid || 'missing'
                                 },
-                                // Minimal placeholders; real to/from/duration will be merged by other webhooks
-                                to: 'Unknown',
-                                from: 'Unknown',
-                                status: 'completed',
-                                duration: 0,
-                                callTime: new Date().toISOString(),
-                                outcome: 'Connected',
-                                aiSummary: aiInsights ? aiInsights.summary : 'Transcript processed from Twilio Conversational Intelligence',
-                                timestamp: new Date().toISOString(),
-                                source: 'conversational-intelligence-processing'
+                                ai_summary: aiInsights ? aiInsights.summary : 'Transcript processed from Twilio Conversational Intelligence',
                             };
-                            await db.collection('calls').doc(finalCallSid).set(callData, { merge: true });
-                            logger.log(`[Process Existing Transcripts] Successfully updated call data for ${transcript.sid} in Firestore`);
+
+                            if (existingCall) {
+                                // Update existing record
+                                const { error: updateError } = await supabaseAdmin
+                                    .from('calls')
+                                    .update({
+                                        ...commonUpdates,
+                                        updated_at: new Date().toISOString()
+                                    })
+                                    .eq('id', finalCallSid);
+                                    
+                                if (updateError) throw updateError;
+                                logger.log(`[Process Existing Transcripts] Successfully updated existing call data for ${transcript.sid} in Supabase`);
+                            } else {
+                                // Insert new record with defaults
+                                const { error: insertError } = await supabaseAdmin
+                                    .from('calls')
+                                    .insert({
+                                        id: finalCallSid,
+                                        call_sid: finalCallSid,
+                                        twilio_sid: finalCallSid,
+                                        ...commonUpdates,
+                                        to_phone: 'Unknown',
+                                        from_phone: 'Unknown',
+                                        status: 'completed',
+                                        duration: 0,
+                                        call_time: new Date().toISOString(),
+                                        outcome: 'Connected',
+                                        source: 'conversational-intelligence-processing',
+                                        created_at: new Date().toISOString(),
+                                        updated_at: new Date().toISOString()
+                                    });
+                                    
+                                if (insertError) throw insertError;
+                                logger.log(`[Process Existing Transcripts] Successfully inserted new call data for ${transcript.sid} in Supabase`);
+                            }
+
                             results.push({ transcriptSid: transcript.sid, sourceSid: finalCallSid, transcriptLength: transcriptText.length, status: 'success' });
-                        } else {
-                            logger.error(`[Process Existing Transcripts] Firestore not available for ${transcript.sid}`);
-                            results.push({ transcriptSid: transcript.sid, sourceSid: transcript.sourceSid, status: 'failed', error: 'Firestore not available' });
                         }
                     } catch (error) {
                         logger.error(`[Process Existing Transcripts] Error updating call data for ${transcript.sid}:`, error);
@@ -206,7 +234,7 @@ export default async function handler(req, res) {
                             aiInsights = await generateAdvancedAIInsights(transcriptText, sentences, null);
                         }
                         
-                        // Update the call data directly in Firestore (only with a valid Call SID)
+                        // Update the call data directly in Supabase (only with a valid Call SID)
                         try {
                             let finalCallSid = null;
                             try {
@@ -214,17 +242,22 @@ export default async function handler(req, res) {
                             } catch (_) {}
 
                             if (!finalCallSid) {
-                                logger.warn(`[Process Existing Transcripts] Skipping Firestore update for ${transcript.sid} (alt source): unresolved Call SID (alt=${alternativeSourceId})`);
+                                logger.warn(`[Process Existing Transcripts] Skipping Supabase update for ${transcript.sid} (alt source): unresolved Call SID (alt=${alternativeSourceId})`);
                                 results.push({ transcriptSid: transcript.sid, sourceSid: alternativeSourceId, status: 'skipped', error: 'Unresolved Call SID' });
-                            } else if (db) {
-                                logger.log(`[Process Existing Transcripts] Writing to Firestore: collection='calls', doc='${finalCallSid}' (alt)`);
-                                const callData = {
-                                    id: finalCallSid,
-                                    twilioSid: finalCallSid,
-                                    callSid: finalCallSid,
+                            } else {
+                                logger.log(`[Process Existing Transcripts] Updating Supabase: table='calls', id='${finalCallSid}' (alt)`);
+                                
+                                // Check if existing
+                                const { data: existingCall } = await supabaseAdmin
+                                    .from('calls')
+                                    .select('id')
+                                    .eq('id', finalCallSid)
+                                    .single();
+
+                                const commonUpdates = {
                                     transcript: transcriptText,
-                                    aiInsights: aiInsights,
-                                    conversationalIntelligence: {
+                                    ai_insights: aiInsights,
+                                    conversational_intelligence: {
                                         transcriptSid: transcript.sid,
                                         status: transcript.status,
                                         sentences: sentences,
@@ -232,22 +265,42 @@ export default async function handler(req, res) {
                                         serviceSid: serviceSid,
                                         originalSourceSid: transcript.sourceSid || 'missing'
                                     },
-                                    to: 'Unknown',
-                                    from: 'Unknown',
-                                    status: 'completed',
-                                    duration: 0,
-                                    callTime: new Date().toISOString(),
-                                    outcome: 'Connected',
-                                    aiSummary: aiInsights ? aiInsights.summary : 'Transcript processed from Twilio Conversational Intelligence',
-                                    timestamp: new Date().toISOString(),
-                                    source: 'conversational-intelligence-processing-alternative'
+                                    ai_summary: aiInsights ? aiInsights.summary : 'Transcript processed from Twilio Conversational Intelligence',
                                 };
-                                await db.collection('calls').doc(finalCallSid).set(callData, { merge: true });
-                                logger.log(`[Process Existing Transcripts] Successfully updated call data for ${transcript.sid} in Firestore (alt)`);
+
+                                if (existingCall) {
+                                    const { error: updateError } = await supabaseAdmin
+                                        .from('calls')
+                                        .update({
+                                            ...commonUpdates,
+                                            updated_at: new Date().toISOString()
+                                        })
+                                        .eq('id', finalCallSid);
+                                    if (updateError) throw updateError;
+                                    logger.log(`[Process Existing Transcripts] Successfully updated existing call data for ${transcript.sid} in Supabase (alt)`);
+                                } else {
+                                    const { error: insertError } = await supabaseAdmin
+                                        .from('calls')
+                                        .insert({
+                                            id: finalCallSid,
+                                            call_sid: finalCallSid,
+                                            twilio_sid: finalCallSid,
+                                            ...commonUpdates,
+                                            to_phone: 'Unknown',
+                                            from_phone: 'Unknown',
+                                            status: 'completed',
+                                            duration: 0,
+                                            call_time: new Date().toISOString(),
+                                            outcome: 'Connected',
+                                            source: 'conversational-intelligence-processing-alternative',
+                                            created_at: new Date().toISOString(),
+                                            updated_at: new Date().toISOString()
+                                        });
+                                    if (insertError) throw insertError;
+                                    logger.log(`[Process Existing Transcripts] Successfully inserted new call data for ${transcript.sid} in Supabase (alt)`);
+                                }
+                                
                                 results.push({ transcriptSid: transcript.sid, sourceSid: finalCallSid, transcriptLength: transcriptText.length, status: 'success-alternative' });
-                            } else {
-                                logger.error(`[Process Existing Transcripts] Firestore not available for ${transcript.sid}`);
-                                results.push({ transcriptSid: transcript.sid, sourceSid: alternativeSourceId, status: 'failed', error: 'Firestore not available' });
                             }
                         } catch (error) {
                             logger.error(`[Process Existing Transcripts] Error updating call data for ${transcript.sid}:`, error);

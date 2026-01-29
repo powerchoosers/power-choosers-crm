@@ -1,6 +1,6 @@
 // Gmail API service for server-side sending (replaces SendGrid)
 import { google } from 'googleapis';
-import { db } from '../_firebase.js';
+import { supabaseAdmin } from '../_supabase.js';
 import logger from '../_logger.js';
 
 export class GmailService {
@@ -40,12 +40,12 @@ export class GmailService {
     }
     
     /**
-     * Look up user profile from Firestore to get sender name and email
+     * Look up user profile from Supabase to get sender name and email
      * @param {string} userEmail - User's email address (from ownerId, userEmail, etc.)
      * @returns {Promise<{email: string, name: string}>}
      */
     async lookupUserProfile(userEmail) {
-        if (!userEmail || !db) {
+        if (!userEmail || !supabaseAdmin) {
             return {
                 email: this.fromEmail,
                 name: this.fromName
@@ -54,16 +54,24 @@ export class GmailService {
         
         try {
             const emailLower = String(userEmail).toLowerCase().trim();
-            const userDoc = await db.collection('users').doc(emailLower).get();
             
-            if (userDoc.exists) {
-                const userData = userDoc.data();
-
-                const firstName = typeof userData.firstName === 'string' ? userData.firstName.trim() : '';
-                const lastName = typeof userData.lastName === 'string' ? userData.lastName.trim() : '';
+            const { data: userData, error } = await supabaseAdmin
+                .from('users')
+                .select('*')
+                .eq('email', emailLower)
+                .maybeSingle();
+            
+            if (error) {
+                logger.error('[Gmail] Error looking up user profile in Supabase:', error);
+                throw error;
+            }
+            
+            if (userData) {
+                const firstName = typeof userData.first_name === 'string' ? userData.first_name.trim() : '';
+                const lastName = typeof userData.last_name === 'string' ? userData.last_name.trim() : '';
                 const derivedFullName = firstName ? `${firstName} ${lastName}`.trim() : '';
 
-                let finalName = derivedFullName || userData.name || userData.displayName;
+                let finalName = derivedFullName || userData.name || (userData.settings && userData.settings.displayName);
                 
                 // If we still don't have a name, infer it from the email
                 if (!finalName) {
@@ -73,7 +81,7 @@ export class GmailService {
                     } else {
                         finalName = emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
                     }
-                    logger.info(`[Gmail] Inferred name '${finalName}' for user '${emailLower}' (missing in Firestore)`);
+                    logger.info(`[Gmail] Inferred name '${finalName}' for user '${emailLower}' (missing in Supabase)`);
                 }
 
                 return {
@@ -98,12 +106,11 @@ export class GmailService {
                 email: emailLower,
                 name: name
             };
-            
-        } catch (error) {
-            logger.warn('[Gmail] Failed to lookup user profile:', error);
+        } catch (err) {
+            logger.error(`[Gmail] Error looking up user profile: ${err.message}`);
             return {
-                email: this.fromEmail,
-                name: this.fromName
+                email: String(userEmail).toLowerCase().trim(),
+                name: String(userEmail).split('@')[0]
             };
         }
     }

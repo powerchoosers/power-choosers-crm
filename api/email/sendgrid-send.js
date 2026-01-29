@@ -1,6 +1,6 @@
 // API endpoint for sending emails via Gmail API
 import { cors } from '../_cors.js';
-import { db } from '../_firebase.js';
+import { supabaseAdmin } from '../_supabase.js';
 import { GmailService } from './gmail-service.js';
 import { injectTracking, hasTrackingPixel } from './tracking-helper.js';
 import logger from '../_logger.js';
@@ -35,7 +35,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    // Generate unique tracking ID (this will be the Firestore document ID)
+    // Generate unique tracking ID (this will be the Supabase record ID)
     const trackingId = `gmail_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Explicit boolean conversion - ensure it's always a boolean, never undefined
@@ -96,13 +96,13 @@ export default async function handler(req, res) {
         .trim();
     }
 
-    // Determine owner email (required for Firestore rules compliance)
+    // Determine owner email (required for Supabase filtering)
     // Use userEmail if provided, otherwise fallback to from address
     const ownerEmail = (userEmail && typeof userEmail === 'string' && userEmail.trim()) 
       ? userEmail.toLowerCase().trim() 
       : (from && typeof from === 'string' && from.includes('@'))
         ? from.toLowerCase().trim()
-        : null; // No fallback to admin - let it fail if no user identity
+        : null;
 
     if (!ownerEmail) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -123,41 +123,48 @@ export default async function handler(req, res) {
       return;
     }
 
-    // Create email record in Firestore BEFORE sending (for tracking)
-    if (db && deliverability.enableTracking) {
+    // Create email record in Supabase BEFORE sending (for tracking)
+    if (supabaseAdmin && deliverability.enableTracking) {
       try {
-        await db.collection('emails').doc(trackingId).set({
+        const emailRecord = {
           id: trackingId,
           to: Array.isArray(to) ? to : [to],
           subject,
           html: trackedContent,
           text: textContent,
           from: from || ownerEmail || 'noreply@nodalpoint.io',
-          fromName: fromName || null,
           type: 'sent',
-          emailType: 'sent',
-          isSentEmail: true,
           status: 'sending',
-          provider: 'gmail',
           contactId: contactId || null,
-          contactName: contactName || null,
-          contactCompany: contactCompany || null,
           opens: [],
           clicks: [],
-          replies: [],
           openCount: 0,
           clickCount: 0,
-          // CRITICAL: Set ownership fields for Firestore rules compliance
-          // ownerId must match authenticated user's email for non-admin access
-          ownerId: ownerEmail,
-          assignedTo: ownerEmail,
-          createdBy: ownerEmail,
+          timestamp: new Date().toISOString(),
           createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        });
-        logger.debug('[Gmail] Created email record for tracking:', { trackingId });
+          updatedAt: new Date().toISOString(),
+          metadata: {
+            fromName: fromName || null,
+            emailType: 'sent',
+            isSentEmail: true,
+            provider: 'gmail',
+            contactName: contactName || null,
+            contactCompany: contactCompany || null,
+            ownerId: ownerEmail,
+            assignedTo: ownerEmail,
+            createdBy: ownerEmail,
+            replies: []
+          }
+        };
+
+        const { error } = await supabaseAdmin
+          .from('emails')
+          .insert(emailRecord);
+
+        if (error) throw error;
+        logger.debug('[Gmail] Created email record for tracking in Supabase:', { trackingId });
       } catch (dbError) {
-        logger.warn('[Gmail] Failed to create email record (tracking may not work):', dbError.message);
+        logger.warn('[Gmail] Failed to create email record in Supabase (tracking may not work):', dbError.message);
       }
     }
 
@@ -172,7 +179,7 @@ export default async function handler(req, res) {
       subject,
       html: trackedContent, // Send HTML with tracking pixel
       text: textContent, // Plain text fallback
-      userEmail: ownerEmail, // Used to look up sender name/email from Firestore
+      userEmail: ownerEmail, // Used to look up sender name/email from Supabase
       ownerId: ownerEmail, // Alias for compatibility
       from: from, // Optional override
       fromName: fromName, // Optional override
@@ -182,68 +189,45 @@ export default async function handler(req, res) {
     });
 
     // Update email record with sent status and Gmail message ID
-    if (db && deliverability.enableTracking) {
+    if (supabaseAdmin && deliverability.enableTracking) {
       try {
-        await db.collection('emails').doc(trackingId).update({
-          status: 'sent',
-          sentAt: new Date().toISOString(),
-          date: new Date().toISOString(),
-          timestamp: new Date().toISOString(),
-          gmailMessageId: result.messageId,
-          messageId: result.messageId,
-          threadId: result.threadId || threadId || null,
-          updatedAt: new Date().toISOString()
-        });
-        logger.debug('[Gmail] Updated email record with sent status:', { trackingId, messageId: result.messageId });
+        const { error } = await supabaseAdmin
+          .from('emails')
+          .update({
+            status: 'sent',
+            updatedAt: new Date().toISOString(),
+            metadata: {
+              // Get existing metadata and merge
+              ...(await supabaseAdmin.from('emails').select('metadata').eq('id', trackingId).single().then(res => res.data?.metadata || {})),
+              sentAt: new Date().toISOString(),
+              gmailMessageId: result.messageId,
+              messageId: result.messageId,
+              threadId: result.threadId || threadId || null
+            }
+          })
+          .eq('id', trackingId);
+
+        if (error) throw error;
+        logger.debug('[Gmail] Updated email record with sent status in Supabase:', { trackingId, messageId: result.messageId });
       } catch (dbError) {
-        logger.warn('[Gmail] Failed to update email record:', dbError.message);
+        logger.warn('[Gmail] Failed to update email record in Supabase:', dbError.message);
       }
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: true,
-      trackingId: trackingId,
       messageId: result.messageId,
       threadId: result.threadId,
-      message: 'Email sent successfully via Gmail'
+      trackingId
     }));
 
   } catch (error) {
-    logger.error('[Gmail] Send error:', error);
-
-    // Extract more detailed error information
-    let errorMessage = error.message || 'Failed to send email via Gmail';
-    let errorDetails = null;
-    let statusCode = 500;
-
-    // If it's a Gmail API error, extract details
-    if (error.response && error.response.data) {
-      statusCode = error.response.status || 500;
-      errorDetails = error.response.data.error || null;
-      if (errorDetails && errorDetails.message) {
-        errorMessage = errorDetails.message;
-      }
-    }
-
-    // Provide specific guidance based on status code
-    if (statusCode === 413) {
-      errorMessage = 'Payload Too Large: Email content exceeds Gmail size limits. ' + errorMessage;
-    } else if (statusCode === 400) {
-      errorMessage = 'Bad Request: Check email payload structure. ' + errorMessage;
-    } else if (statusCode === 401) {
-      errorMessage = 'Unauthorized: Check Gmail service account permissions. ' + errorMessage;
-    } else if (statusCode === 403) {
-      errorMessage = 'Forbidden: Service account does not have Gmail send permissions. ' + errorMessage;
-    }
-
-    res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+    logger.error('[Gmail] Global error:', error, 'sendgrid-send');
+    res.writeHead(error.status || 500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
-      error: 'Failed to send email',
-      message: errorMessage,
-      details: errorDetails || null,
-      statusCode: statusCode
+      error: error.message || 'Internal server error',
+      details: error.details || null
     }));
-    return;
   }
 }

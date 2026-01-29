@@ -1,7 +1,7 @@
 // Email click tracking endpoint (Cloud Run API route)
 // Redirects to original URL after recording click event
 
-import { db } from '../../_firebase.js';
+import { supabaseAdmin } from '../../_supabase.js';
 import logger from '../../_logger.js';
 
 export default async function handler(req, res) {
@@ -35,15 +35,18 @@ export default async function handler(req, res) {
       return;
     }
 
-    // Best-effort: record click event if Firestore is available
+    // Best-effort: record click event if Supabase is available
     try {
-      if (db && trackingId && trackingId.length > 0) {
-        const ref = db.collection('emails').doc(trackingId);
-        const snap = await ref.get();
+      if (supabaseAdmin && trackingId && trackingId.length > 0) {
+        // Fetch current email data
+        const { data: currentData, error: fetchError } = await supabaseAdmin
+          .from('emails')
+          .select('clicks, clickCount')
+          .eq('id', trackingId)
+          .single();
 
-        if (snap.exists) {
+        if (!fetchError && currentData) {
           const clickedAt = new Date().toISOString();
-          const currentData = snap.data() || {};
 
           // Detect device type from user agent
           const deviceType = detectDeviceType(userAgent);
@@ -59,12 +62,20 @@ export default async function handler(req, res) {
             referer
           };
 
-          await ref.update({
-            clickCount: (currentData.clickCount || 0) + 1,
-            clicks: (currentData.clicks || []).concat([clickEvent]),
-            updatedAt: clickedAt,
-            lastClicked: clickedAt
-          });
+          const existingClicks = Array.isArray(currentData.clicks) ? currentData.clicks : [];
+
+          // Update Supabase record
+          await supabaseAdmin
+            .from('emails')
+            .update({
+              clickCount: (currentData.clickCount || 0) + 1,
+              clicks: [...existingClicks, clickEvent],
+              updatedAt: clickedAt,
+              metadata: {
+                lastClicked: clickedAt
+              }
+            })
+            .eq('id', trackingId);
 
           logger.debug('[Email Click] Recorded click:', {
             trackingId,

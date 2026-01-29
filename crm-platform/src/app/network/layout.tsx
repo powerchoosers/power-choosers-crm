@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { LoadingOrb } from "@/components/ui/LoadingOrb";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -31,10 +32,7 @@ export default function CrmLayout({
   if (loading) {
     return (
       <div className={cn(inter.className, "bg-zinc-950 text-foreground antialiased min-h-screen flex items-center justify-center")}> 
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-800 border-t-[#002FA7]" />
-          <div className="text-sm text-zinc-500 font-mono uppercase tracking-widest">Initialising Terminal...</div>
-        </div>
+        <LoadingOrb label="Initialising Terminal..." />
       </div>
     )
   }
@@ -45,10 +43,7 @@ export default function CrmLayout({
     if (process.env.NODE_ENV === 'development' && hasSessionCookie) {
         return (
             <div className={cn(inter.className, "bg-zinc-950 text-foreground antialiased min-h-screen flex items-center justify-center")}> 
-                <div className="flex flex-col items-center gap-4">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-800 border-t-[#002FA7]" />
-                <div className="text-sm text-zinc-500 font-mono uppercase tracking-widest">Bypassing Security Protocols...</div>
-                </div>
+                <LoadingOrb label="Bypassing Security Protocols..." />
             </div>
         )
     }

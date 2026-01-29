@@ -1,6 +1,6 @@
 // Vercel API endpoint for email webhooks
 import { cors } from '../_cors.js';
-import { admin, db } from '../_firebase.js';
+import { supabaseAdmin } from '../_supabase.js';
 import logger from '../_logger.js';
 
 export default async function handler(req, res) {
@@ -36,71 +36,107 @@ export default async function handler(req, res) {
       return;
     }
 
+    if (!supabaseAdmin) {
+      logger.error('[Email] Supabase client not initialized');
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Internal server error' }));
+      return;
+    }
+
+    // Fetch the email record first to get current data
+    const { data: emailRecord, error: fetchError } = await supabaseAdmin
+      .from('emails')
+      .select('*')
+      .eq('id', trackingId)
+      .single();
+
+    if (fetchError || !emailRecord) {
+      logger.warn('[Email] Email record not found for webhook:', trackingId);
+      // Return 200 to prevent webhook retries for missing records
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, message: 'Record not found' }));
+      return;
+    }
+
+    const currentMetadata = emailRecord.metadata || {};
+
     // Handle different webhook events
     switch (event) {
       case 'email_opened':
         logger.log('[Email] Email opened:', trackingId);
-        // Update database with open event if Firebase is available
-        if (db) {
-          try {
-            const emailRef = db.collection('emails').doc(trackingId);
-            await emailRef.update({
-              opens: admin.firestore.FieldValue.arrayUnion({
-                openedAt: new Date().toISOString(),
-                userAgent: data?.userAgent || '',
-                ip: data?.ip || '',
-                referer: data?.referer || ''
-              }),
-              openCount: admin.firestore.FieldValue.increment(1),
-              lastOpened: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            });
-            logger.log('[Email] Successfully updated Firebase with open event');
-          } catch (firebaseError) {
-            logger.error('[Email] Firebase update error:', firebaseError);
-          }
-        }
+        
+        const newOpen = {
+          openedAt: new Date().toISOString(),
+          userAgent: data?.userAgent || '',
+          ip: data?.ip || '',
+          referer: data?.referer || ''
+        };
+
+        const currentOpens = Array.isArray(emailRecord.opens) ? emailRecord.opens : [];
+        
+        await supabaseAdmin
+          .from('emails')
+          .update({
+            opens: [...currentOpens, newOpen],
+            openCount: (emailRecord.openCount || 0) + 1,
+            updatedAt: new Date().toISOString(),
+            metadata: {
+              ...currentMetadata,
+              lastOpened: new Date().toISOString()
+            }
+          })
+          .eq('id', trackingId);
+          
+        logger.log('[Email] Successfully updated Supabase with open event');
         break;
+
       case 'email_replied':
         logger.log('[Email] Email replied:', trackingId);
-        // Update database with reply event if Firebase is available
-        if (db) {
-          try {
-            const emailRef = db.collection('emails').doc(trackingId);
-            await emailRef.update({
-              replies: admin.firestore.FieldValue.arrayUnion({
-                repliedAt: new Date().toISOString(),
-                replyContent: data?.content || '',
-                from: data?.from || ''
-              }),
-              replyCount: admin.firestore.FieldValue.increment(1),
-              lastReplied: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            });
-            logger.log('[Email] Successfully updated Firebase with reply event');
-          } catch (firebaseError) {
-            logger.error('[Email] Firebase update error:', firebaseError);
-          }
-        }
+        
+        const newReply = {
+          repliedAt: new Date().toISOString(),
+          replyContent: data?.content || '',
+          from: data?.from || ''
+        };
+
+        const currentReplies = Array.isArray(currentMetadata.replies) ? currentMetadata.replies : [];
+        const currentReplyCount = typeof currentMetadata.replyCount === 'number' ? currentMetadata.replyCount : 0;
+
+        await supabaseAdmin
+          .from('emails')
+          .update({
+            updatedAt: new Date().toISOString(),
+            metadata: {
+              ...currentMetadata,
+              replies: [...currentReplies, newReply],
+              replyCount: currentReplyCount + 1,
+              lastReplied: new Date().toISOString()
+            }
+          })
+          .eq('id', trackingId);
+          
+        logger.log('[Email] Successfully updated Supabase with reply event');
         break;
+
       case 'email_bounced':
         logger.log('[Email] Email bounced:', trackingId);
-        // Update database with bounce event if Firebase is available
-        if (db) {
-          try {
-            const emailRef = db.collection('emails').doc(trackingId);
-            await emailRef.update({
-              status: 'bounced',
+        
+        await supabaseAdmin
+          .from('emails')
+          .update({
+            status: 'bounced',
+            updatedAt: new Date().toISOString(),
+            metadata: {
+              ...currentMetadata,
               bounceReason: data?.reason || 'Unknown',
-              bouncedAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            });
-            logger.log('[Email] Successfully updated Firebase with bounce event');
-          } catch (firebaseError) {
-            logger.error('[Email] Firebase update error:', firebaseError);
-          }
-        }
+              bouncedAt: new Date().toISOString()
+            }
+          })
+          .eq('id', trackingId);
+          
+        logger.log('[Email] Successfully updated Supabase with bounce event');
         break;
+
       default:
         logger.log('[Email] Unknown webhook event:', event);
     }

@@ -15,6 +15,7 @@ import { useAccountCalls } from '@/hooks/useCalls'
 import { useUIStore } from '@/store/uiStore'
 import { useGeminiStore } from '@/store/geminiStore'
 import { Button } from '@/components/ui/button'
+import { LoadingOrb } from '@/components/ui/LoadingOrb'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { differenceInCalendarDays, format, isValid, parseISO } from 'date-fns'
@@ -231,10 +232,7 @@ export default function AccountDossierPage() {
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 border-2 border-[#002FA7] border-t-transparent rounded-full animate-spin" />
-          <div className="font-mono text-xs text-zinc-500 animate-pulse">LOADING ASSET DATA...</div>
-        </div>
+        <LoadingOrb label="LOADING ASSET DATA..." />
       </div>
     )
   }

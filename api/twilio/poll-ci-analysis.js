@@ -433,7 +433,7 @@ export default async function handler(req, res) {
                 if (!finalCallSid) {
                     logger.warn('[Poll CI Analysis] Unable to upsert /api/calls due to missing Call SID', { transcriptSid });
                 } else {
-                    logger.log('[Poll CI Analysis] Saving to Firestore:', {
+                    logger.log('[Poll CI Analysis] Saving to Supabase:', {
                         callSid: finalCallSid,
                         transcriptLength: transcriptText.length,
                         hasAIInsights: !!(ai && Object.keys(ai).length > 0),
@@ -455,20 +455,20 @@ export default async function handler(req, res) {
                         
                         if (!updateResp.ok) {
                             const errorText = await updateResp.text().catch(() => 'Unknown error');
-                            logger.error('[Poll CI Analysis] Firestore update failed:', {
+                            logger.error('[Poll CI Analysis] Supabase update failed:', {
                                 status: updateResp.status,
                                 statusText: updateResp.statusText,
                                 error: errorText
                             });
                         } else {
                             const updateData = await updateResp.json().catch(() => ({}));
-                            logger.log('[Poll CI Analysis] Firestore update successful:', {
+                            logger.log('[Poll CI Analysis] Supabase update successful:', {
                                 callSid: finalCallSid,
                                 updated: updateData.updated || false
                             });
                         }
                     } catch (fetchError) {
-                        logger.error('[Poll CI Analysis] Firestore update error:', fetchError.message);
+                        logger.error('[Poll CI Analysis] Supabase update error:', fetchError.message);
                     }
                 }
             }

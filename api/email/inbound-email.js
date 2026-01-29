@@ -3,7 +3,7 @@
  * FIXED VERSION - Parses multipart data and saves to Firebase
  */
 
-import { admin, db } from '../_firebase.js';
+import { supabaseAdmin } from '../_supabase.js';
 import crypto from 'crypto';
 import formidable from 'formidable';
 import { simpleParser } from 'mailparser';
@@ -230,11 +230,14 @@ export default async function handler(req, res) {
 
     // Idempotency: dedupe on Message-ID when available
     if (emailData.messageId) {
-      const snap = await db.collection('emails')
-        .where('messageId', '==', emailData.messageId)
+      const { data: existing, error } = await supabaseAdmin
+        .from('emails')
+        .select('id')
+        .eq('messageId', emailData.messageId)
         .limit(1)
-        .get();
-      if (!snap.empty) {
+        .maybeSingle();
+
+      if (existing) {
         logger.log('[InboundEmail] Duplicate messageId detected, skipping save:', emailData.messageId);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, deduped: true, message: 'Duplicate Message-ID ignored' }));
@@ -288,29 +291,45 @@ export default async function handler(req, res) {
 
     // Upsert thread doc
     try {
-      const tRef = db.collection('threads').doc(threadId);
-      const existing = await tRef.get();
-      if (existing.exists) {
-        await tRef.update({
-          subjectNormalized: existing.data().subjectNormalized || subjectNorm,
-          participants: Array.from(new Set([...(existing.data().participants || []), ...participants])),
-          lastMessageAt: admin.firestore.FieldValue.serverTimestamp(),
-          lastSnippet: snippet || existing.data().lastSnippet || '',
-          lastFrom: emailData.from || existing.data().lastFrom || '',
-          messageCount: admin.firestore.FieldValue.increment(1)
-        });
+      // Check for existing thread in Supabase
+      const { data: existingThread, error: threadError } = await supabaseAdmin
+        .from('threads')
+        .select('*')
+        .eq('id', threadId)
+        .single();
+
+      if (existingThread) {
+        // Update existing thread
+        const currentParticipants = Array.isArray(existingThread.participants) ? existingThread.participants : [];
+        const mergedParticipants = Array.from(new Set([...currentParticipants, ...participants]));
+        
+        await supabaseAdmin
+          .from('threads')
+          .update({
+            subjectNormalized: existingThread.subjectNormalized || subjectNorm,
+            participants: mergedParticipants,
+            lastMessageAt: new Date().toISOString(),
+            lastSnippet: snippet || existingThread.lastSnippet || '',
+            lastFrom: emailData.from || existingThread.lastFrom || '',
+            messageCount: (existingThread.messageCount || 0) + 1,
+            updatedAt: new Date().toISOString()
+          })
+          .eq('id', threadId);
       } else {
-        await tRef.set({
-          id: threadId,
-          subjectNormalized: subjectNorm,
-          participants,
-          lastMessageAt: admin.firestore.FieldValue.serverTimestamp(),
-          lastSnippet: snippet,
-          lastFrom: emailData.from || '',
-          messageCount: 1,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
+        // Create new thread
+        await supabaseAdmin
+          .from('threads')
+          .insert({
+            id: threadId,
+            subjectNormalized: subjectNorm,
+            participants,
+            lastMessageAt: new Date().toISOString(),
+            lastSnippet: snippet,
+            lastFrom: emailData.from || '',
+            messageCount: 1,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
       }
     } catch (threadErr) {
       logger.warn('[InboundEmail] Thread upsert warning:', threadErr?.message || threadErr);
@@ -345,22 +364,30 @@ export default async function handler(req, res) {
       logger.warn('[InboundEmail] No valid recipient email found for ownership assignment:', { to: emailData.to });
     }
 
-    // Save to Firebase with proper error handling
+    // Save to Supabase with proper error handling
     try {
       const emailDoc = {
         ...emailData,
         threadId,
-        // CRITICAL: Set ownership fields for Firestore rules compliance
+        // CRITICAL: Set ownership fields for data visibility
         // ownerId must match authenticated user's email for non-admin access
         ownerId: ownerEmail || 'unassigned',
         assignedTo: ownerEmail || 'unassigned',
         createdBy: ownerEmail || 'system',
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
       
-      const docRef = await db.collection('emails').add(emailDoc);
-      logger.log('[InboundEmail] Email saved to Firebase with ID:', docRef.id);
+      const { data: insertedEmail, error: insertError } = await supabaseAdmin
+        .from('emails')
+        .insert(emailDoc)
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      const emailId = insertedEmail?.id || 'unknown';
+      logger.log('[InboundEmail] Email saved to Supabase with ID:', emailId);
 
       // Log any suspicious URLs for debugging
       const urlPattern = /(href|src)=["']([^"']*?)["']/gi;
@@ -378,17 +405,17 @@ export default async function handler(req, res) {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       success: true, 
-        emailId: docRef.id,
+      emailId: emailId,
       message: 'Email processed successfully' 
     }));
     return;
-    } catch (firebaseError) {
-      logger.error('[InboundEmail] Error saving to Firestore:', firebaseError);
+    } catch (dbError) {
+      logger.error('[InboundEmail] Error saving to Supabase:', dbError);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         success: false, 
         error: 'Failed to save email to database',
-        message: firebaseError.message 
+        message: dbError.message 
       }));
       return;
     }
