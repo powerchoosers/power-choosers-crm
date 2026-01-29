@@ -131,7 +131,7 @@ export default async function handler(req, res) {
         const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
         const host = req.headers['x-forwarded-host'] || req.headers.host || '';
         const envBase = process.env.PUBLIC_BASE_URL || process.env.API_BASE_URL || '';
-        const base = host ? `${proto}://${host}` : (envBase || 'https://power-choosers-crm-792458658491.us-south1.run.app');
+        const base = host ? `${proto}://${host}` : (envBase || 'https://nodalpoint.io');
 
         // Precompute targetPhone/businessPhone for early visibility on UI
         const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
@@ -154,7 +154,7 @@ export default async function handler(req, res) {
                 const authToken = process.env.TWILIO_AUTH_TOKEN;
                 if (!accountSid || !authToken) { logger.warn('[Status] Missing Twilio creds; cannot start recording'); return; }
                 const client = twilio(accountSid, authToken);
-                const baseUrl = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
+                const baseUrl = process.env.PUBLIC_BASE_URL || 'https://nodalpoint.io';
 
                 // Build candidate list with PSTN priority similar to /api/twilio/dial-status
                 // PSTN legs = non-client endpoints with direction outbound-dial

@@ -1,6 +1,6 @@
 /**
- * Power Choosers CRM - Dynamic Sitemap Generator
- * Generates sitemap.xml dynamically including all published blog posts
+ * Nodal Point Platform - Dynamic Sitemap Generator
+ * Generates sitemap.xml dynamically including all public pages and blog posts
  */
 
 import { db } from './_firebase.js';
@@ -8,21 +8,21 @@ import logger from './_logger.js';
 
 // Static pages that should always be in the sitemap
 const staticPages = [
-  { url: 'https://powerchoosers.com/', changefreq: 'weekly', priority: '1.0' },
-  { url: 'https://powerchoosers.com/about.html', changefreq: 'monthly', priority: '0.8' },
-  { url: 'https://powerchoosers.com/services.html', changefreq: 'monthly', priority: '0.9' },
-  { url: 'https://powerchoosers.com/resources.html', changefreq: 'weekly', priority: '0.8' },
-  { url: 'https://powerchoosers.com/schedule.html', changefreq: 'monthly', priority: '0.9' },
+  { url: 'https://nodalpoint.io/', changefreq: 'weekly', priority: '1.0' },
+  { url: 'https://nodalpoint.io/philosophy', changefreq: 'monthly', priority: '0.9' },
+  { url: 'https://nodalpoint.io/bill-debugger', changefreq: 'monthly', priority: '0.9' },
+  { url: 'https://nodalpoint.io/technical-docs', changefreq: 'monthly', priority: '0.8' },
+  { url: 'https://nodalpoint.io/market-data', changefreq: 'weekly', priority: '0.8' },
 ];
 
 // Generate sitemap XML
 function generateSitemapXML(staticPages, blogPosts) {
   const urls = [...staticPages];
   
-  // Add blog posts
+  // Add blog posts if they exist in the new structure
   blogPosts.forEach(post => {
     const slug = post.slug || post.id;
-    const url = `https://powerchoosers.com/posts/${slug}`;
+    const url = `https://nodalpoint.io/posts/${slug}`;
     
     // Get last modified date
     let lastmod = new Date().toISOString().split('T')[0]; // Default to today

@@ -53,7 +53,7 @@ The platform operates across three distinct environments/servers:
 
 2.  **Production Environment (Cloud Run)**:
     -   **Region**: `us-central1` (Optimized for cost and Custom Domain Mapping).
-    -   **Frontend (UI)**: `https://power-choosers-crm-792458658491.us-central1.run.app` (Mapped to `nodalpoint.io`)
+    -   **Frontend (UI)**: `https://power-choosers-crm-792458658491.us-central1.run.app` (Mapped to `https://nodalpoint.io`)
     -   **Backend (Network/API)**: `https://nodal-point-network-792458658491.us-central1.run.app`
     -   **Role**: The "Network" service handles Twilio webhooks, heavy API processing, and legacy backend logic to prevent recursive loops within the Next.js frontend service.
     -   **Deployment Strategy (Docker)**:
@@ -68,6 +68,12 @@ The platform operates across three distinct environments/servers:
 To ensure the frontend can communicate with the backend regardless of environment, we use **Next.js Rewrites** in `crm-platform/next.config.ts`:
 - **Local Development**: Proxies `/api/*` to `http://127.0.0.1:3001`.
 - **Production**: Proxies `/api/*` to the **Network/API** Cloud Run URL in `us-central1`.
+
+### 📞 Twilio Webhook Configuration
+When configuring Twilio phone numbers or TwiML Apps, ALWAYS use the canonical domain to ensure reliability and valid SSL verification:
+- **Voice Webhook**: `https://nodalpoint.io/api/twilio/voice`
+- **Status Callback**: `https://nodalpoint.io/api/twilio/status`
+- **Fallback URL**: `https://nodalpoint.io/api/twilio/voice` (Optional)
 
 **CRITICAL**: Always ensure that any new API endpoints are tested against both the local backend and verified for Cloud Run compatibility.
 

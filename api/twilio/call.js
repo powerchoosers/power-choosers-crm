@@ -51,7 +51,7 @@ const handler = async function handler(req, res) {
         
         // Improved call bridging approach
         // Always use production URL for webhooks to avoid preview-domain auth (401)
-        const baseUrl = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
+        const baseUrl = process.env.PUBLIC_BASE_URL || 'https://nodalpoint.io';
         
         // Build bridge URL with target and callerId (selected Twilio number)
         const bridgeUrl = `${baseUrl}/api/twilio/bridge?target=${encodeURIComponent(to)}&callerId=${encodeURIComponent(twilioPhone)}`;

@@ -9,7 +9,7 @@ function cors(req, res) {
     'http://127.0.0.1:3000',
     'https://powerchoosers.com',
     'https://www.powerchoosers.com',
-    'https://power-choosers-crm-792458658491.us-south1.run.app'
+    'https://nodalpoint.io'
   ];
   
   if (allowedOrigins.includes(origin)) {
