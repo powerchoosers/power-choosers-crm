@@ -246,7 +246,7 @@
         // Upload to Imgur
         const apiBase = window.location.hostname === 'localhost'
           ? 'http://localhost:3000'
-          : 'https://power-choosers-crm-792458658491.us-south1.run.app';
+          : 'https://power-choosers-crm-792458658491.us-central1.run.app';
 
         const response = await fetch(`${apiBase}/api/upload/signature-image`, {
           method: 'POST',
@@ -449,7 +449,7 @@
           const apiBase = window.API_BASE_URL ||
             (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
               ? 'http://localhost:3000'
-              : 'https://power-choosers-crm-792458658491.us-south1.run.app');
+              : 'https://power-choosers-crm-792458658491.us-central1.run.app');
 
           // Check if base64 is too large (warn if over 8MB)
           const base64SizeMB = (base64.length * 3) / 4 / 1024 / 1024;
@@ -799,7 +799,7 @@
           const apiBase = window.API_BASE_URL ||
             (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
               ? 'http://localhost:3000'
-              : 'https://power-choosers-crm-792458658491.us-south1.run.app');
+              : 'https://power-choosers-crm-792458658491.us-central1.run.app');
 
           const response = await fetch(`${apiBase}/api/posts/generate-static`, {
             method: 'POST',
@@ -1219,7 +1219,7 @@
       // Get API base URL
       const apiBase = window.API_BASE_URL || (window.location.hostname === 'localhost'
         ? 'http://localhost:3000'
-        : 'https://power-choosers-crm-792458658491.us-south1.run.app');
+        : 'https://power-choosers-crm-792458658491.us-central1.run.app');
 
       // Call API
       const response = await fetch(`${apiBase}/api/posts/generate-ai`, {

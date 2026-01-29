@@ -5778,7 +5778,7 @@
       } catch (_) { }
       let base = (window.crm && typeof window.crm.getApiBaseUrl === 'function')
         ? window.crm.getApiBaseUrl()
-        : (window.PUBLIC_BASE_URL || window.API_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app');
+        : (window.PUBLIC_BASE_URL || window.API_BASE_URL || 'https://power-choosers-crm-792458658491.us-central1.run.app');
       base = String(base).replace(/\/$/, '');
       const response = await fetch(`${base}/api/twilio/ci-request`, {
         method: 'POST',

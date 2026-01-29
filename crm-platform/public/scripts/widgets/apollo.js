@@ -581,7 +581,7 @@
           // No cache found and cachedOnly requested → run a minimal, unbilled prospecting search (try small sizes)
           try {
             let base = (window.API_BASE_URL || '').replace(/\/$/, '');
-            if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+            if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-central1.run.app';
 
             // Try both domain and name includes to improve match rate (still unbilled)
             const includeAttempts = [];
@@ -655,7 +655,7 @@
         } else if (options.openLiveIfUncached) {
           // Open-time flow: only run live search if we don't have company data in cache
           let base = (window.API_BASE_URL || '').replace(/\/$/, '');
-          if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+          if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-central1.run.app';
 
           // Check if we have company data in cache first
           let hasCompanyData = false;
@@ -762,7 +762,7 @@
 
       // 2) Live company + contacts search (explicit user action)
       let base = (window.API_BASE_URL || '').replace(/\/$/, '');
-      if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+      if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-central1.run.app';
 
       // Only fetch company data if we don't have it or if we're forcing live WITHOUT a name search
       // AND we have at least a domain or company name to search for
@@ -994,7 +994,7 @@
     try {
       let base = (window.API_BASE_URL || '').replace(/\/$/, '');
       if (!base || /localhost|127\.0\.0\.1/i.test(base)) {
-        base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+        base = 'https://power-choosers-crm-792458658491.us-central1.run.app';
       }
 
       // Build request body with correct Lusha API structure (10 contacts = 1 credit)
@@ -2265,7 +2265,7 @@
       } else {
         // No cached data, need to call API
         let base = (window.API_BASE_URL || '').replace(/\/$/, '');
-        if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+        if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-central1.run.app';
         const requestId = window.__lushaLastRequestId;
         const id = resolveContactId(contact);
 
@@ -2444,7 +2444,7 @@
   async function revealForContact(contact, which, container) {
     try {
       let base = (window.API_BASE_URL || '').replace(/\/$/, '');
-      if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+      if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-central1.run.app';
       const requestId = window.__lushaOpenedFromCache ? null : window.__lushaLastRequestId; // force live when opened from cache
       const id = resolveContactId(contact) || container?.getAttribute('data-id') || '';
 
@@ -4261,7 +4261,7 @@ function animateRevealContent(container, newContent) {
   };
 
   let base = (window.API_BASE_URL || '').replace(/\/$/, '');
-  if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+  if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-central1.run.app';
 
   const poll = async () => {
     const uiAlive = !!wrap && document.body.contains(wrap);
@@ -4644,7 +4644,7 @@ async function renderUsageBar() {
     } catch (_) { }
 
     let base = (window.API_BASE_URL || '').replace(/\/$/, '');
-    if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+    if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-central1.run.app';
     const resp = await fetch(`${base}/api/apollo/usage`, { method: 'GET' });
     if (!resp.ok) {
       // Fallback: show hard-coded 600 total with 0 used if API fails

@@ -80,7 +80,7 @@ LP
 Lewis Patterson
 awesome for more context this is what the logs say
 
-Request URL https://power-choosers-crm-792458658491.us-south1.run.app/api/twilio/status
+Request URL https://power-choosers-crm-792458658491.us-central1.run.app/api/twilio/status
 
 Parameters
 
@@ -144,11 +144,11 @@ Message text
 
 Show raw data Msg
 
-Got HTTP 502 response to https://power-choosers-crm-792458658491.us-south1.run.app/api/twilio/status
+Got HTTP 502 response to https://power-choosers-crm-792458658491.us-central1.run.app/api/twilio/status
 
 statusCallback
 
-https://power-choosers-crm-792458658491.us-south1.run.app/api/twilio/status
+https://power-choosers-crm-792458658491.us-central1.run.app/api/twilio/status
 
 ErrorCode
 
@@ -176,13 +176,13 @@ Timestamp
 
 Message
 
-Got HTTP 502 response to https://power-choosers-crm-792458658491.us-south1.run.app/api/twilio/voice
+Got HTTP 502 response to https://power-choosers-crm-792458658491.us-central1.run.app/api/twilio/voice
 
 Error Description We try to provide specific webhook errors whenever possible, however in this instance we are unable to identify the exact cause of the webhook delivery/response issue. To prevent 11200 errors, ensure that your webhook receiving infrastructure can quickly respond to inbound Twilio requests with a 2xx status code.
 
 Possible Solutions Double check that your TwiML URL does not return a 4xx or 5xx error Make certain that the URL does not perform a 302 redirect to an invalid URL Confirm the URL requested is not protected by HTTP Auth Make sure your web server allows HTTP POST requests to static resources (if the URL refers to .xml or .html files) Verify your web server is up and responsive Check to see that the URL host is not a private or local IP address Verify the ping times and packet loss between your web server and api.twilio.com Review firewall rules; modern web application firewalls can trigger on only a small subset of inbound connections leading to inconsistent behavior. Check logs at the very edge of your infrastructure to verify if TCP connection attempts are arriving at your edge. If you have confirmed these requests are not reaching your infrastructure, please reach out to support. Use more robust options for webhook receipt. For inbound messages and calls be sure to provide a fallback URL (ideally on separate infrastructure). Transition integrations to Event Streams which has various event sink types including webhooks with built in retries. Review your use of any webhook connection overrides. In general the defaults provide the best results, start by reconfiguring your webhook URL without any fragment overrides and see if the problem persists. If synchronously processing a webhook requires significant time, we recommend that you simply acknowledge the event by quickly responding with an empty 202 (Accepted) and then processing the message on your own timeline. Replies to inbound message events can be done at any time by making a call to the REST API. Possible Causes Web server returned a 4xx or 5xx HTTP response to Twilio Network disruptions between Twilio and your web server; these can be within your or Twilio’s infrastructure or wider disruptions to the internet at large. Firewalls (network or application level) between Twilio and your infrastructure Misconfigured Web Server No Content-Type header attached to response Content-Type doesn't match actual content, e.g. an MP3 file that is being served with Content-Type: audio/x-wav, instead of Content-Type: audio/mpeg Request Inspector URL
 
-https://power-choosers-crm-792458658491.us-south1.run.app/api/twilio/voice
+https://power-choosers-crm-792458658491.us-central1.run.app/api/twilio/voice
 
 Product
 

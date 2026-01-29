@@ -12,7 +12,7 @@
 
   function getBase() {
     let base = (window.API_BASE_URL || '').replace(/\/$/, '');
-    if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+    if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-central1.run.app';
     return base;
   }
 

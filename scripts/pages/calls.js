@@ -1397,7 +1397,7 @@ if (!document._callsRestoreBound) {
 
           // console.log('[Calls] Found', j.calls.length, 'real calls from API');
           // console.log('[Calls] Sample call data from API:', j.calls[0]);
-          const playbackBase = /localhost|127\.0\.0\.1/.test(base) ? 'https://power-choosers-crm-792458658491.us-south1.run.app' : base;
+          const playbackBase = /localhost|127\.0\.0\.1/.test(base) ? 'https://power-choosers-crm-792458658491.us-central1.run.app' : base;
           
           // ============================================================
           // PERFORMANCE OPTIMIZATION: Pre-build lookup maps ONCE (O(n))
@@ -2214,7 +2214,7 @@ if (!document._callsRestoreBound) {
     const CHUNK_SIZE = 10;
     const enrichedRows = [];
     const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
-    const playbackBase = /localhost|127\.0\.0\.1/.test(base) ? 'https://power-choosers-crm-792458658491.us-south1.run.app' : base;
+    const playbackBase = /localhost|127\.0\.0\.1/.test(base) ? 'https://power-choosers-crm-792458658491.us-central1.run.app' : base;
     
     for (let i = 0; i < rawCalls.length; i += CHUNK_SIZE) {
       const chunk = rawCalls.slice(i, i + CHUNK_SIZE);
@@ -3998,7 +3998,7 @@ if (!document._callsRestoreBound) {
     let completed = 0;
 
     // Always use production API for calls (critical data operations)
-    const base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+    const base = 'https://power-choosers-crm-792458658491.us-central1.run.app';
     const url = `${base}/api/calls`;
     console.log('[Bulk Delete] Using endpoint:', url);
     
@@ -4388,7 +4388,7 @@ if (!document._callsRestoreBound) {
     getCallsData: () => state.data,
     // Debug functions
     testApiEndpoint: async function() {
-      const base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+      const base = 'https://power-choosers-crm-792458658491.us-central1.run.app';
       console.log('Testing API endpoint:', `${base}/api/calls`);
       try {
         const response = await fetch(`${base}/api/calls`);
@@ -4401,7 +4401,7 @@ if (!document._callsRestoreBound) {
       }
     },
     deleteTestCall: async function(callId) {
-      const base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+      const base = 'https://power-choosers-crm-792458658491.us-central1.run.app';
       console.log('Testing DELETE for call:', callId);
       try {
         const response = await fetch(`${base}/api/calls`, {

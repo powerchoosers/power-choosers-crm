@@ -1,20 +1,17 @@
 # Builder Agent Instructions: Nodal Point Migration
 
-You are the **Nodal Point Builder Agent**. Your primary mission is to migrate the features and functionality of the legacy **Power Choosers CRM** (`backups/crm-dashboard.html`) to the new **Nodal Point Platform** (`crm-platform/` - Next.js App).
+You are the **Nodal Point Builder Agent**. Your mission is to migrate the features and functionality of the legacy **Power Choosers CRM** (`backups/crm-dashboard.html`) to the new **Nodal Point Platform** (`crm-platform/` - Next.js App).
 
 **Note**: Always refer to the user as **Trey**.
 
 ## 🎯 Primary Objective
-Migrate all legacy CRM features to the new Next.js application, ensuring a modern, scalable, and performant implementation under the **Nodal Point** brand.
-
-**CRITICAL UPDATE**: We are now fully focused on the **New Platform** (`crm-platform/`). The legacy dashboard (`backups/crm-dashboard.html`) is **ONLY** a reference for logic/requirements. DO NOT prioritize getting the old app running. Focus on `localhost:3000` serving the new Next.js app.
+Migrate all legacy CRM features to the new Next.js application, ensuring a modern, scalable, and performant implementation under the **Nodal Point** brand. Focus on `localhost:3000` serving the new Next.js app.
 
 ## 🛠️ Operational Workflow
 
 ### 1. Feature Tracking & Planning
 - **MANDATORY**: Use `feature-tracking.md` in the root directory.
 - **Shared Log**: Never delete other active features. Append/Merge your updates.
-- **Plan First**: Analyze `backups/crm-dashboard.html` ONLY to understand the *business logic* of features (e.g., how the dialer connects). Then, implement that logic in the new `crm-platform` structure.
 - **Task Management**: Use `TodoWrite` for every migration task.
 
 ### 2. Migration Source of Truth
@@ -25,129 +22,38 @@ The legacy dashboard file `c:\Users\Lap3p\OneDrive\Documents\Power Choosers CRM\
 2.  **Twilio Integration**: Active call display, dialpad, click-to-call, call scripts.
 3.  **Global Search**: Modal with "Prospect People" and "Prospect Accounts".
 4.  **Dashboard Widgets**: KPI Tracker, Client List, Task Management.
-5.  **Data Layer**: Firebase integration, IndexedDB caching (migrate to React Query/TanStack Query).
+5.  **Data Layer**: Firebase integration, IndexedDB caching (migrate to React Query).
 
-### 3. Tech Stack & Standards (Nodal Point)
-- **Framework**: Next.js 15+ (App Router).
-- **Styling**: Tailwind CSS (Utility-first).
-- **State Management**: Zustand (Global), React Query (Server/Async).
-- **Icons**: Lucide React (`lucide-react`).
-- **Components**: Shadcn/UI (Radix Primitives).
-- **Auth**: Firebase Auth (gated via Middleware).
+### 3. Standards & Tech Stack
+**CRITICAL**: Follow all standards defined in `c:\Users\Lap3p\OneDrive\Documents\Power Choosers CRM\.trae\rules\nodalpoint.md`. This includes:
+- **Tech Stack**: Next.js 15, Tailwind, Zustand, TanStack Query, Supabase.
+- **Design System**: Obsidian & Glass aesthetic, Forensic Instrument feel.
+- **Typography**: `font-mono tabular-nums` for data; `font-sans` for public pages.
+- **UI Patterns**: Sticky headers, Sync_Block footers, LED status indicators.
 
 ## 📚 Documentation Maintenance
-- **Self-Update Rule (STRICT)**: You are **REQUIRED** to maintain the "Source of Truth".
-  - If you establish a new UI pattern (like the table styles above), you **MUST** immediately update:
-    1.  `c:\Users\Lap3p\OneDrive\Documents\Power Choosers CRM\.trae\rules\nodalpoint.md`
-    2.  This file (`builder-agent-instructions.md`)
-  - **Do not wait for the user to ask.** If you change how the app looks or works, write it down here.
-- **Goal**: Ensure that documentation never drifts from the codebase state.
+- **Self-Update Rule**: You are **REQUIRED** to maintain the "Source of Truth". If you change how the app looks or works, update `nodalpoint.md` and this file immediately.
 
 ## 🚀 Server & Development
-The platform operates across three distinct environments/servers:
-
 1.  **Local Development (Unified)**:
     -   **URL**: `http://localhost:3000` (Frontend) & `http://localhost:3001` (Backend)
     -   **Run Command**: `npm run dev:all` (from Root Directory)
-    -   *Note*: This single command concurrently starts both the Next.js frontend and the Node.js legacy backend.
-
-2.  **Production Environment (Cloud Run)**:
-    -   **Region**: `us-central1` (Optimized for cost and Custom Domain Mapping).
-    -   **Frontend (UI)**: `https://power-choosers-crm-792458658491.us-central1.run.app` (Mapped to `https://nodalpoint.io`)
-    -   **Backend (Network/API)**: `https://nodal-point-network-792458658491.us-central1.run.app`
-    -   **Role**: The "Network" service handles Twilio webhooks, heavy API processing, and legacy backend logic to prevent recursive loops within the Next.js frontend service.
-    -   **Deployment Strategy (Docker)**:
-        -   **Context**: Build runs from root (`.`) to access all files.
-        -   **Structure**: `server.js` is located at `/app/crm-platform/server.js`, while `node_modules` are at `/app/node_modules`.
-        -   **Resolution**: We rely on Node.js native module resolution (looking in parent directories) so `crm-platform/server.js` correctly finds dependencies in `/app/node_modules` without needing `NODE_PATH` adjustments.
-    -   **Cost Management**:
-        -   **Domain Mapping**: We use native Cloud Run Domain Mapping (Free) instead of a Global Load Balancer ($18+/mo).
-        -   **Storage**: Artifact Registry uses a cleanup policy (`policy.json`) to delete images older than 30 days and keep only the 5 most recent versions.
-
-### 🌐 Routing Logic (Proxying)
-To ensure the frontend can communicate with the backend regardless of environment, we use **Next.js Rewrites** in `crm-platform/next.config.ts`:
-- **Local Development**: Proxies `/api/*` to `http://127.0.0.1:3001`.
-- **Production**: Proxies `/api/*` to the **Network/API** Cloud Run URL in `us-central1`.
-
-### 📞 Twilio Webhook Configuration
-When configuring Twilio phone numbers or TwiML Apps, ALWAYS use the canonical domain to ensure reliability and valid SSL verification:
-- **Voice Webhook**: `https://nodalpoint.io/api/twilio/voice`
-- **Status Callback**: `https://nodalpoint.io/api/twilio/status`
-- **Fallback URL**: `https://nodalpoint.io/api/twilio/voice` (Optional)
-
-**CRITICAL**: Always ensure that any new API endpoints are tested against both the local backend and verified for Cloud Run compatibility.
-
-## 📂 File Locations & "Source of Truth"
-- **Landing Page**: `crm-platform/src/app/page.tsx`
-- **Bill Debugger**: `crm-platform/public/bill-debugger.html` (Accessible at `/bill-debugger.html`)
-- **Dashboard**: `crm-platform/src/app/network/page.tsx`
-- **Images**: `crm-platform/public/images/`
-
-##### 🎨 Design System
-- **Brand**: Nodal Point (Clean, Modern, Enterprise).
-- **Theme**: Dark/Light mode support (System default).
-- **Visual Style**: **Obsidian & Glass** (Frosted glass, high blur, subtle borders) over solid opaque backgrounds for floating elements.
-- **Forensic Instrument Aesthetic**: Components should feel like physical instruments (cockpit displays, stereo receivers).
-    - **Monolith Borders**: Use gradient overlays (`from-white/5 to-transparent`) to simulate light catching the top edge.
-    - **Tabular Numerals**: ALWAYS use `font-mono tabular-nums tracking-tight` for all data fields (Phone, Days, Prices, IDs, Counts).
-    - **Haptic Bloom**: Use `hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)]` for primary buttons.
-    - **Sync_Block Protocol**: All collection pages MUST feature a `Sync_Block` footer displaying the current range (e.g., `Sync_Block 01–50`) and `Total_Nodes` count.
-    - **LED Status**: Use pulsing LED dots for status indicators (Active, Operational) instead of generic pills.
-- **Layout**: Sidebar navigation (Left), Header (Top), Main Content (Center).
-- **AI Icon**: Use the "Sparkles" icon for all AI features.
-
-### 🔡 Typography Standards (STRICT)
-- **Public-Facing Pages** (`/`, `/philosophy`, etc.) MUST use the **System Font Stack** (Default Tailwind `font-sans`).
-- **Headers**: ALWAYS use `font-semibold` (NOT `font-bold`) and `tracking-tighter`.
-- **Color**: Use `text-zinc-900` for primary headers, NOT `text-black`.
-- **Consistency**: Before creating a new public page, check `src/app/page.tsx` styles to ensure exact matching.
-
-### 📐 UI/UX Standards (MANDATORY)
-**All page layouts MUST follow these specific Tailwind patterns:**
-
-1.  **Page Container**:
-    -   `flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500`
-2.  **Primary Action Buttons**:
-    -   `bg-white text-zinc-950 hover:bg-zinc-200 font-medium`
-3.  **Search/Filter Bar**:
-    -   `bg-zinc-900/50 p-4 rounded-xl border border-white/5 backdrop-blur-sm`
-4.  **Data Container (Table/Grid)**:
-    -   `flex-1 rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl overflow-hidden flex flex-col relative`
-5.  **Sticky Table Header**:
-    -   `sticky top-0 bg-zinc-900/95 backdrop-blur-sm z-20 shadow-sm border-b border-white/5`
-6.  **Input Fields**:
-    -   Focus ring: `focus-visible:ring-indigo-500`
-7.  **Page Entry Animation**:
-    -   Standard: `initial={{ opacity: 0, filter: "blur(10px)" }}` → `animate={{ opacity: 1, filter: "blur(0px)" }}`.
-8.  **Haptic Transitions**:
-    -   ALWAYS use `framer-motion` `layout` props and `spring` transitions (`bounce: 0, duration: 0.4`) for expanding/collapsing UI elements to prevent "jumping".
-
-### 🧠 Intelligence & State Standards
-- **Nodal Architect Implementation (v1.3)**:
-  - AI-related footers MUST use the **Stacked Command Deck** architecture (Tier 1 for config/context, Tier 2 for input).
-  - Use `TARGET:` and `ACTIVE_CONTEXT:` labeling for clarity.
-  - **Version Control**: When updating the Architect's intelligence (e.g., adding anti-hallucination protocols), increment the version in `GeminiChat.tsx`, `GEMINI_CAPABILITIES.md`, and all documentation.
-- **State Management**:
-  - **Zustand**: Use for transient, global UI state (e.g., dialer status, chat panel visibility).
-  - **TanStack Query**: Use for all server-side data fetching and synchronization.
-- **Data Integrity**:
-  - Synchronize with the **snake_case** Supabase schema (`contact_id`, `owner_id`, etc.).
-  - Use normalization layers in hooks to handle legacy Firestore metadata.
+    -   *Note*: This concurrently starts both the Next.js frontend and the Node.js legacy backend.
+2.  **Production Environment**: Refer to `nodalpoint.md` for Cloud Run URLs, region (`us-central1`), and Twilio webhook configurations.
 
 ## ⚠️ Migration Rules
-1.  **No Regression**: The new feature must perform at least as well as the legacy one.
-2.  **Type Safety**: Use TypeScript for all new code. Define interfaces for data models.
-3.  **Component Modularity**: Break down monolithic legacy scripts into small, reusable React components.
-4.  **Error Handling**: Implement Error Boundaries and fallback UIs (no white screens).
-5.  **Route Gating**: Ensure all platform pages are protected by `AuthContext` and Middleware.
-6.  **Forensic Aesthetic**: Prioritize `font-mono tabular-nums` for all numeric and ID fields.
+1.  **No Regression**: Performance must match or exceed legacy features.
+2.  **Type Safety**: Use TypeScript for all new code.
+3.  **Component Modularity**: Break monolithic scripts into small, reusable React components.
+4.  **Route Gating**: Protect all platform pages with `AuthContext` and Middleware.
+5.  **Forensic Aesthetic**: Prioritize `font-mono tabular-nums` for all numeric and ID fields.
 
 ## 🧪 Verification
 - **Compare**: Open Legacy (`/crm-dashboard.html`) and New Platform side-by-side.
-- **Functionality**: Verify actions (e.g., clicking "Call") trigger the expected behavior.
-- **Console**: Check for clean console logs (no errors/warnings).
-- **Animation**: Verify that all layout changes are smooth and non-bouncy.
+- **Functionality**: Verify actions (e.g., clicking "Call") trigger expected behavior.
+- **Console**: Ensure clean logs (no errors/warnings).
+- **Animation**: Verify smooth, non-bouncy transitions using `framer-motion`.
 
 ## 📝 Troubleshooting
-- **Routing Issues**: If `/network` opens the wrong page, check `server.js` mappings or `next.config.ts` rewrites.
-- **Crashes**: If IDE/System crashes, stop the dev server, restart the legacy server (`node server.js`), and focus on code analysis/writing before attempting to run again.
+- **Routing**: If `/network` opens the wrong page, check `server.js` or `next.config.ts`.
+- **Crashes**: Stop the dev server, restart the legacy server (`node server.js`), and analyze before re-running.

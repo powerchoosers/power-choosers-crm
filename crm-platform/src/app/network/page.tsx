@@ -1,5 +1,8 @@
 import { KPIGrid } from "@/components/dashboard/KPIGrid";
 import { ActivityChart } from "@/components/dashboard/ActivityChart";
+import { SuggestedLeads } from "@/components/dashboard/SuggestedLeads";
+import { RecentAlerts } from "@/components/dashboard/RecentAlerts";
+import { TaskManagement } from "@/components/dashboard/TaskManagement";
 
 export default function Home() {
   return (
@@ -21,22 +24,17 @@ export default function Home() {
         <div className="lg:col-span-2">
            <ActivityChart />
         </div>
-        <div className="nodal-glass p-6 h-[400px] rounded-2xl">
-           <div className="mb-6">
-              <h3 className="text-lg font-medium text-white">Recent Alerts</h3>
-              <p className="text-sm text-zinc-400">System notifications and warnings</p>
-           </div>
-           <div className="space-y-2 overflow-y-auto max-h-[280px] pr-2 scrollbar-thin scrollbar-thumb-zinc-800 np-scroll">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="flex gap-4 items-start p-3 rounded-xl hover:bg-white/[0.02] transition-colors cursor-default group">
-                   <div className="w-2 h-2 mt-2 rounded-full bg-signal animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.6)] group-hover:shadow-[0_0_12px_rgba(0,47,167,0.8)] transition-all" />
-                   <div>
-                      <p className="text-sm text-zinc-200">High call volume detected in North Region.</p>
-                      <p className="text-xs text-zinc-500 mt-1 font-mono tabular-nums uppercase tracking-widest">{i * 2} minutes ago</p>
-                   </div>
-                </div>
-              ))}
-           </div>
+        <div className="h-[450px]">
+           <SuggestedLeads />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-1 h-[450px]">
+           <RecentAlerts />
+        </div>
+        <div className="lg:col-span-2 h-[450px]">
+           <TaskManagement />
         </div>
       </div>
     </div>

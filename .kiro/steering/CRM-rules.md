@@ -5,7 +5,7 @@ inclusion: manual
 
 ## Server & Deployment
 - Only stop and restart server if explicitly requested or when editing server.js file
-- Always use Cloud Run deployment as base URL for all API calls (https://power-choosers-crm-792458658491.us-south1.run.app)
+- Always use Cloud Run deployment as base URL for all API calls (https://power-choosers-crm-792458658491.us-central1.run.app)
 - Use PowerShell-compatible command syntax (semicolon instead of &&)
 - Implement proper environment variable validation on startup
 

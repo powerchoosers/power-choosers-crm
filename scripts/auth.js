@@ -639,7 +639,7 @@ class AuthManager {
                 });
 
                 // Upload to server
-                const apiBase = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+                const apiBase = 'https://power-choosers-crm-792458658491.us-central1.run.app';
                 const uploadResponse = await fetch(`${apiBase}/api/upload/signature-image`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

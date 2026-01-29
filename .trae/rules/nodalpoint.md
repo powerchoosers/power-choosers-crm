@@ -81,7 +81,19 @@ The live platform operates across two distinct Cloud Run services in the **`us-c
 - **Frontend (UI)**: `https://power-choosers-crm-792458658491.us-central1.run.app` (Mapped to `https://nodalpoint.io`)
 - **Backend (Network/API)**: `https://nodal-point-network-792458658491.us-central1.run.app`
 - **Architecture**: The Frontend service handles the UI and routing, while the Network service handles Twilio webhooks, heavy API processing, and legacy backend logic.
-- **Cost Optimization**: We use **Cloud Run Domain Mapping** instead of a Global Load Balancer to eliminate idle networking costs.
+- **Cost Optimization**:
+  - **Domain Mapping**: We use native Cloud Run Domain Mapping (Free) instead of a Global Load Balancer ($18+/mo).
+  - **Storage**: Artifact Registry uses a cleanup policy (`policy.json`) to delete images older than 30 days and keep only the 5 most recent versions.
+- **Deployment Strategy (Docker)**:
+  - **Context**: Build runs from root (`.`) to access all files.
+  - **Structure**: `server.js` is located at `/app/crm-platform/server.js`, while `node_modules` are at `/app/node_modules`.
+  - **Resolution**: Node.js native module resolution (looking in parent directories) ensures `crm-platform/server.js` finds dependencies in `/app/node_modules`.
+
+### 📞 Twilio Webhook Configuration
+When configuring Twilio phone numbers or TwiML Apps, ALWAYS use the canonical domain to ensure reliability and valid SSL verification:
+- **Voice Webhook**: `https://nodalpoint.io/api/twilio/voice`
+- **Status Callback**: `https://nodalpoint.io/api/twilio/status`
+- **Fallback URL**: `https://nodalpoint.io/api/twilio/voice` (Optional)
 
 ## 📍 Routing & Proxy Logic
 

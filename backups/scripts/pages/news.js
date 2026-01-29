@@ -456,7 +456,7 @@
       const apiBase = window.API_BASE_URL || 
         (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
           ? 'http://localhost:3000'
-          : 'https://power-choosers-crm-792458658491.us-south1.run.app');
+          : 'https://power-choosers-crm-792458658491.us-central1.run.app');
       
       if (window.crm && typeof window.crm.showToast === 'function') {
         window.crm.showToast('Regenerating static HTML...', 'info');
@@ -516,7 +516,7 @@
           const apiBase = window.API_BASE_URL || 
             (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
               ? 'http://localhost:3000'
-              : 'https://power-choosers-crm-792458658491.us-south1.run.app');
+              : 'https://power-choosers-crm-792458658491.us-central1.run.app');
           
           if (newStatus === 'published') {
             // Generate static HTML for published post
