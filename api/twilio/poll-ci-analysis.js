@@ -386,7 +386,7 @@ export default async function handler(req, res) {
             });
             
             if (transcriptText || sentences.length > 0) {
-                const base = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
+                const base = process.env.PUBLIC_BASE_URL || 'https://nodalpoint.io';
                 
                 // Use Twilio-generated summary if available, otherwise create a basic one
                 const wordCount = transcriptText.split(/\s+/).filter(Boolean).length;

@@ -117,7 +117,7 @@ export default async function handler(req, res) {
         const envBase = process.env.PUBLIC_BASE_URL || '';
         const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
         const host = req.headers['x-forwarded-host'] || req.headers.host || '';
-        const base = envBase ? envBase.replace(/\/$/, '') : (host ? `${proto}://${host}` : 'https://power-choosers-crm-792458658491.us-south1.run.app');
+        const base = envBase ? envBase.replace(/\/$/, '') : (host ? `${proto}://${host}` : 'https://nodalpoint.io');
 
         // Extract metadata and create initial call record to ensure it appears in CRM immediately
         if (CallSid && src.metadata) {

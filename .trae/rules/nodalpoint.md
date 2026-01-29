@@ -78,7 +78,7 @@ Handles API requests and legacy logic during development.
 
 ### 3. Production Environment (Cloud Run)
 The live platform operates across two distinct Cloud Run services in the **`us-central1`** region (optimized for cost and custom domain mapping):
-- **Frontend (UI)**: `https://power-choosers-crm-792458658491.us-central1.run.app` (Mapped to `nodalpoint.io`)
+- **Frontend (UI)**: `https://power-choosers-crm-792458658491.us-central1.run.app` (Mapped to `https://nodalpoint.io`)
 - **Backend (Network/API)**: `https://nodal-point-network-792458658491.us-central1.run.app`
 - **Architecture**: The Frontend service handles the UI and routing, while the Network service handles Twilio webhooks, heavy API processing, and legacy backend logic.
 - **Cost Optimization**: We use **Cloud Run Domain Mapping** instead of a Global Load Balancer to eliminate idle networking costs.

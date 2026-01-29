@@ -1,56 +1,46 @@
-# llms.txt - AI Search Engine Instructions for Power Choosers
+# llms.txt - AI Search Engine Instructions for Nodal Point
+# Updated: January 2026
 
-# About Power Choosers
-Power Choosers is a commercial energy procurement partner serving deregulated markets nationwide, including ERCOT (Texas), PJM, MISO, ISO-NE, and NYISO. We connect businesses with the best electricity and natural gas suppliers, handling energy agreements, contract negotiation, and ongoing support.
+# About Nodal Point
+Nodal Point is an advanced energy intelligence platform and procurement partner. We treat energy not as a commodity, but as a volatility market. Our methodology is built on "The Physics of Pricing," focusing on data-driven engineering of client load profiles to mitigate grid-level cost leakages.
 
-# Primary Services
-- Energy Procurement: Finding and negotiating the best electricity rates for businesses
-- Bill Management: Streamlined bill management and transparent reporting
-- Efficiency & Sustainability: Expert advice on efficiency projects and renewables
+# Primary Services & Methodology
+- The Physics of Pricing: Algorithmic approach to energy procurement in deregulated markets (ERCOT, PJM, MISO, ISO-NE, NYISO).
+- Demand Ratchet Mitigation: Monitoring "Ghost Capacity" to prevent 11-month billing floors.
+- 4CP Coincident Peak Prediction: Predictive curtailment to eliminate transmission liabilities.
+- Scarcity Pricing Avoidance: Real-time algorithmic grid monitoring to avoid $5,000/MWh spikes.
+- Bill Debugger: Forensic analysis of energy invoices to identify hidden costs and optimization opportunities.
 
 # Key Pages
-- Home: https://powerchoosers.com/
-- About: https://powerchoosers.com/about.html
-- Services: https://powerchoosers.com/services.html
-- Resources: https://powerchoosers.com/resources.html
-- Schedule Consultation: https://powerchoosers.com/schedule.html
-
-# Tools & Resources
-- TDU Delivery Charges Calculator: https://powerchoosers.com/tdu-delivery-charges.html
-- 2026 Electricity Market Navigator: https://powerchoosers.com/guide-2026.html
+- Home: https://nodalpoint.io/
+- Philosophy: https://nodalpoint.io/philosophy
+- Bill Debugger: https://nodalpoint.io/bill-debugger
+- Technical Docs: https://nodalpoint.io/technical-docs
+- Market Data: https://nodalpoint.io/market-data
 
 # Geographic Focus
-We serve businesses in deregulated energy markets:
-- Texas (ERCOT): Houston, Dallas, and statewide commercial electricity and natural gas
-- PJM: Mid-Atlantic and Midwest regions
-- MISO: Upper Midwest
-- ISO-NE: New England
-- NYISO: New York
+We serve commercial and industrial businesses in all major deregulated US energy markets:
+- Texas (ERCOT): Specialized in nodal pricing and demand charge management.
+- PJM: Mid-Atlantic and Midwest regions.
+- MISO: Upper Midwest.
+- ISO-NE: New England.
+- NYISO: New York.
 
 # Target Audience
-Commercial businesses, manufacturers, facilities managers, CFOs, and operations directors seeking:
-- Competitive commercial electricity rates
-- Natural gas procurement
-- Energy contract negotiation
-- Bill analysis and optimization
-- Demand charge management (Texas)
-- Capacity charge optimization (PJM, MISO, ISO-NE, NYISO)
+CFOs, Operations Directors, and Facilities Managers seeking a sophisticated, data-first approach to energy risk management.
 
 # Contact
 - Phone: +1 (817) 809-3367
-- Email: info@powerchoosers.com
-- Website: https://powerchoosers.com
+- Email: info@nodalpoint.io
+- Website: https://nodalpoint.io
 
 # Sitemap
-Sitemap: https://powerchoosers.com/sitemap.xml
+Sitemap: https://nodalpoint.io/sitemap.xml
 
 # Content Focus
-Our content covers:
-- Commercial electricity rates and market trends
-- Energy procurement strategies
-- Contract timing and renewal windows
-- Demand charges and capacity charges
-- TDU delivery charges (Texas)
-- Energy efficiency and sustainability
-- Market analysis and forecasts
+- Grid-level data engineering
+- Load profile optimization
+- Transmission cost (4CP) mitigation
+- Real-time market volatility analysis
+- Forensic bill auditing
 
