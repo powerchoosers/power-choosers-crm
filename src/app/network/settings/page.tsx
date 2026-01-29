@@ -17,7 +17,7 @@ import { updatePassword } from 'firebase/auth'
 import { toast } from 'sonner'
 
 export default function SettingsPage() {
-  const { user, profile, role } = useAuth()
+  const { user, profile, role, refreshProfile } = useAuth()
 
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -31,6 +31,59 @@ export default function SettingsPage() {
   const [newNumber, setNewNumber] = useState('')
   const [newNumberName, setNewNumberName] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+
+  // Phone number formatter: +1 (XXX)-XXX-XXXX
+  const formatPhoneNumber = (value: string) => {
+    if (!value) return value
+    const phoneNumber = value.replace(/[^\d]/g, '')
+    const phoneNumberLength = phoneNumber.length
+    if (phoneNumberLength < 4) return phoneNumber
+    if (phoneNumberLength < 7) {
+      return `+1 (${phoneNumber.slice(1, 4)}) ${phoneNumber.slice(4)}`
+    }
+    return `+1 (${phoneNumber.slice(1, 4)}) ${phoneNumber.slice(4, 7)}-${phoneNumber.slice(7, 11)}`
+  }
+
+  // Improved phone formatter to handle backspace and different lengths
+  const handlePhoneInput = (value: string) => {
+    const cleaned = ('' + value).replace(/\D/g, '')
+    const match = cleaned.match(/^(1|)?(\d{3})(\d{3})(\d{4})$/)
+    if (match) {
+      const intlCode = (match[1] ? '+1 ' : '')
+      return [intlCode, '(', match[2], ') ', match[3], '-', match[4]].join('')
+    }
+    return value
+  }
+
+  // Strict formatter for +1 (XXX)-XXX-XXXX
+  const strictFormat = (value: string) => {
+    const cleaned = value.replace(/\D/g, '')
+    let digits = cleaned
+    if (digits.startsWith('1')) {
+      digits = digits.substring(1)
+    }
+    digits = digits.substring(0, 10)
+    
+    if (digits.length === 0) return ''
+    
+    const areaCode = digits.substring(0, 3)
+    const middle = digits.substring(3, 6)
+    const last = digits.substring(6, 10)
+    
+    if (digits.length > 6) {
+      return `+1 (${areaCode})-${middle}-${last}`
+    } else if (digits.length > 3) {
+      return `+1 (${areaCode})-${middle}`
+    } else if (digits.length > 0) {
+      return `+1 (${areaCode}`
+    }
+    return value
+  }
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = strictFormat(e.target.value)
+    setNewNumber(formatted)
+  }
 
   // Sync with profile
   useEffect(() => {
@@ -100,7 +153,6 @@ export default function SettingsPage() {
         .update({
           first_name: firstName.trim() || null,
           last_name: lastName.trim() || null,
-          name: computedName || null,
           bio: bio.trim() || null,
           settings: {
             name: computedName || null,
@@ -115,6 +167,9 @@ export default function SettingsPage() {
 
       if (error) throw error
       
+      // Refresh the global profile state to update the UI immediately
+      await refreshProfile()
+      
       toast.success('Profile updated')
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to save profile'
@@ -126,11 +181,13 @@ export default function SettingsPage() {
 
   const handleAddNumber = () => {
     if (!newNumber || !newNumberName) return
-    const updated = [...twilioNumbers, { name: newNumberName, number: newNumber }]
+    // Ensure the number is formatted correctly before adding
+    const formatted = strictFormat(newNumber)
+    const updated = [...twilioNumbers, { name: newNumberName, number: formatted }]
     setTwilioNumbers(updated)
     // If it's the first number, select it automatically
     if (updated.length === 1) {
-      setSelectedPhoneNumber(newNumber)
+      setSelectedPhoneNumber(formatted)
     }
     setNewNumber('')
     setNewNumberName('')
@@ -285,9 +342,9 @@ export default function SettingsPage() {
                       className="bg-transparent border-white/10 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-[#002FA7]"
                     />
                     <Input
-                      placeholder="+1 (555) 000-0000"
+                      placeholder="+1 (555)-000-0000"
                       value={newNumber}
-                      onChange={(e) => setNewNumber(e.target.value)}
+                      onChange={handlePhoneChange}
                       className="bg-transparent border-white/10 text-zinc-200 font-mono tabular-nums placeholder:text-zinc-600 focus-visible:ring-[#002FA7]"
                     />
                     <Button 
