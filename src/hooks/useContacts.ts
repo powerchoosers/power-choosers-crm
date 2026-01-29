@@ -16,6 +16,8 @@ export interface Contact {
   lastContact: string
   lastActivity?: string
   accountId?: string
+  industry?: string
+  location?: string
   metadata?: any
 }
 
@@ -48,6 +50,12 @@ export type ContactDetail = Contact & {
   otherPhone?: string
   companyPhone?: string
   primaryPhoneField?: 'mobile' | 'workDirectPhone' | 'otherPhone'
+}
+
+export interface ContactFilters {
+  industry?: string[]
+  status?: string[]
+  location?: string[]
 }
 
 type ContactMetadata = {
@@ -308,11 +316,11 @@ export function useSearchContacts(queryTerm: string) {
   });
 }
 
-export function useContacts(searchQuery?: string) {
+export function useContacts(searchQuery?: string, filters?: ContactFilters) {
   const { user, role, loading } = useAuth()
 
   return useInfiniteQuery({
-    queryKey: ['contacts', CONTACTS_QUERY_BUSTER, user?.email ?? 'guest', role ?? 'unknown', searchQuery],
+    queryKey: ['contacts', CONTACTS_QUERY_BUSTER, user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       try {
@@ -321,7 +329,7 @@ export function useContacts(searchQuery?: string) {
 
         let query = supabase
           .from('contacts')
-          .select('*, accounts(name, domain, logo_url)', { count: 'exact' });
+          .select('*, accounts(name, domain, logo_url, industry, city, state)', { count: 'exact' });
 
         if (role !== 'admin' && user?.email) {
            query = query.eq('ownerId', user.email);
@@ -329,6 +337,27 @@ export function useContacts(searchQuery?: string) {
 
         if (searchQuery) {
           query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,firstName.ilike.%${searchQuery}%,lastName.ilike.%${searchQuery}%`);
+        }
+
+        // Apply column filters
+        if (filters?.status && filters.status.length > 0) {
+          query = query.in('status', filters.status);
+        }
+        
+        // Industry and Location filters are tricky for contacts because they often live on the account
+        // but some contacts might have them directly. We'll check both if possible, or focus on account join
+        if (filters?.industry && filters.industry.length > 0) {
+          // Filter by account industry
+          query = query.filter('accounts.industry', 'in', `(${filters.industry.map(i => `"${i}"`).join(',')})`);
+        }
+        
+        if (filters?.location && filters.location.length > 0) {
+          // Filter by account location (city or state)
+          const conditions = filters.location.flatMap(loc => [
+            `city.ilike.%${loc}%`,
+            `state.ilike.%${loc}%`
+          ]).join(',');
+          query = query.or(conditions, { foreignTable: 'accounts' });
         }
 
         const from = pageParam * PAGE_SIZE;
@@ -393,6 +422,8 @@ export function useContacts(searchQuery?: string) {
             status: item.status || 'Lead',
             lastContact: item.lastContactedAt || item.created_at || new Date().toISOString(),
             accountId: item.accountId || undefined,
+            industry: account?.industry || undefined,
+            location: item.city ? `${item.city}, ${item.state || ''}` : (metadata?.city ? `${metadata.city}, ${metadata.state || ''}` : (account?.city ? `${account.city}, ${account.state || ''}` : (metadata?.address || account?.address || ''))),
             website: item.website || account?.domain || metadata?.website || undefined,
             metadata: metadata
           }
@@ -416,16 +447,17 @@ export function useContacts(searchQuery?: string) {
   })
 }
 
-export function useContactsCount(searchQuery?: string) {
+export function useContactsCount(searchQuery?: string, filters?: ContactFilters) {
   const { user, role, loading } = useAuth()
 
   return useQuery({
-    queryKey: ['contacts-count', CONTACTS_QUERY_BUSTER, user?.email ?? 'guest', role ?? 'unknown', searchQuery],
+    queryKey: ['contacts-count', CONTACTS_QUERY_BUSTER, user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters],
     queryFn: async () => {
       if (loading) return 0
       if (!user) return 0
 
-      let query = supabase.from('contacts').select('*', { count: 'exact', head: true })
+      // For count with filters on joined tables, we need to select something from the joined table
+      let query = supabase.from('contacts').select('id, accounts!inner(industry, city, state)', { count: 'exact', head: true })
 
       if (role !== 'admin' && user.email) {
         query = query.eq('ownerId', user.email)
@@ -433,6 +465,23 @@ export function useContactsCount(searchQuery?: string) {
 
       if (searchQuery) {
         query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,firstName.ilike.%${searchQuery}%,lastName.ilike.%${searchQuery}%`);
+      }
+
+      // Apply column filters
+      if (filters?.status && filters.status.length > 0) {
+        query = query.in('status', filters.status);
+      }
+      
+      if (filters?.industry && filters.industry.length > 0) {
+        query = query.filter('accounts.industry', 'in', `(${filters.industry.map(i => `"${i}"`).join(',')})`);
+      }
+      
+      if (filters?.location && filters.location.length > 0) {
+        const conditions = filters.location.flatMap(loc => [
+          `city.ilike.%${loc}%`,
+          `state.ilike.%${loc}%`
+        ]).join(',');
+        query = query.or(conditions, { foreignTable: 'accounts' });
       }
 
       const { count, error } = await query

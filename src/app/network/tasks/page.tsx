@@ -14,11 +14,13 @@ import {
   PaginationState,
 } from '@tanstack/react-table'
 import { ArrowUpDown, Calendar, ChevronLeft, ChevronRight, CheckCircle2, Circle, Clock, Plus, Filter, MoreHorizontal, Search } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { useTasks, useTasksCount, Task } from '@/hooks/useTasks'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { ForensicTableSkeleton } from '@/components/network/ForensicTableSkeleton'
 import {
   Table,
   TableBody,
@@ -97,7 +99,7 @@ export default function TasksPage() {
       cell: ({ row }) => {
         const task = row.original
         return (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 group/task cursor-pointer">
              <div className={cn(
                "w-8 h-8 rounded-full flex items-center justify-center border border-white/5",
                task.priority === 'High' ? "bg-red-500/10 text-red-500" :
@@ -107,7 +109,10 @@ export default function TasksPage() {
                 {task.status === 'Completed' ? <CheckCircle2 size={16} /> : <Circle size={16} />}
              </div>
              <div>
-                <div className={cn("font-medium", task.status === 'Completed' ? "text-zinc-500 line-through" : "text-zinc-200")}>
+                <div className={cn(
+                  "font-medium group-hover/task:scale-[1.02] transition-all origin-left",
+                  task.status === 'Completed' ? "text-zinc-500 line-through" : "text-zinc-200 group-hover/task:text-white"
+                )}>
                   {task.title}
                 </div>
                 {task.description && <div className="text-xs text-zinc-500 truncate max-w-[300px]">{task.description}</div>}
@@ -127,9 +132,9 @@ export default function TasksPage() {
             priority === 'High' && "bg-red-500/10 text-red-500 border-red-500/20",
             priority === 'Medium' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
             priority === 'Low' && "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
-            priority === 'Sequence' && "bg-purple-500/10 text-purple-500 border-purple-500/20",
+            priority === 'Protocol' && "bg-[#002FA7]/10 text-[#002FA7] border-[#002FA7]/20",
           )}>
-            {priority}
+            {priority === 'Sequence' ? 'Protocol' : priority}
           </span>
         )
       },
@@ -222,6 +227,7 @@ export default function TasksPage() {
     getSortedRowModel: getSortedRowModel(),
     onColumnFiltersChange: setColumnFilters,
     onPaginationChange: setPagination,
+    autoResetPageIndex: false,
     state: {
       sorting,
       columnFilters,
@@ -278,25 +284,48 @@ export default function TasksPage() {
             </TableHeader>
             <TableBody>
                 {isLoading ? (
-                    <TableRow>
-                        <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
-                            Loading tasks...
-                        </TableCell>
-                    </TableRow>
+                  <ForensicTableSkeleton columns={columns.length} rows={12} />
+                ) : isError ? (
+                <TableRow>
+                    <TableCell colSpan={columns.length} className="h-24 text-center text-red-400">
+                        Error loading tasks. Please check your connection.
+                    </TableCell>
+                </TableRow>
                 ) : table.getRowModel().rows?.length ? (
-                table.getRowModel().rows.map((row) => (
-                    <TableRow
-                    key={row.id}
-                    data-state={row.getIsSelected() && "selected"}
-                    className="border-white/5 hover:bg-white/[0.02] transition-colors group"
-                    >
-                    {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className="py-3">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
+                  <AnimatePresence mode="popLayout">
+                    {table.getRowModel().rows.map((row, index) => (
+                      <motion.tr
+                        key={row.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.98 }}
+                        transition={{ 
+                          duration: 0.3, 
+                          delay: Math.min(index * 0.02, 0.4),
+                          ease: [0.23, 1, 0.32, 1] 
+                        }}
+                        data-state={row.getIsSelected() && "selected"}
+                        className={cn(
+                          "border-b border-white/5 transition-colors group cursor-pointer relative z-10",
+                          row.getIsSelected() 
+                            ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10" 
+                            : "hover:bg-white/[0.02]"
+                        )}
+                      >
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell key={cell.id} className="py-3">
+                            <motion.div
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ duration: 0.4, delay: 0.1 }}
+                            >
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </motion.div>
+                          </TableCell>
+                        ))}
+                      </motion.tr>
                     ))}
-                    </TableRow>
-                ))
+                  </AnimatePresence>
                 ) : (
                 <TableRow>
                     <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">

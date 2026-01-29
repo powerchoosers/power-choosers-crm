@@ -12,10 +12,12 @@ import {
   ColumnFiltersState,
 } from '@tanstack/react-table'
 import { ArrowUpDown, ChevronLeft, ChevronRight, Plus, Zap, Filter, Search, MoreHorizontal } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { useEnergyPlans, EnergyPlan } from '@/hooks/useEnergy'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ForensicTableSkeleton } from '@/components/network/ForensicTableSkeleton'
 import {
   Table,
   TableBody,
@@ -61,12 +63,16 @@ export default function EnergyPage() {
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             className="-ml-4 hover:bg-white/5 hover:text-white"
           >
+            <ArrowUpDown className="mr-2 h-4 w-4" />
             Provider
-            <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         )
       },
-      cell: ({ row }) => <div className="font-medium text-zinc-200">{row.getValue('provider')}</div>,
+      cell: ({ row }) => (
+        <div className="font-medium text-zinc-200 group-hover:text-white group-hover:scale-[1.02] transition-all origin-left cursor-pointer">
+          {row.getValue('provider')}
+        </div>
+      ),
     },
     {
       accessorKey: 'planName',
@@ -82,8 +88,8 @@ export default function EnergyPage() {
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             className="-ml-4 hover:bg-white/5 hover:text-white"
           >
+            <ArrowUpDown className="mr-2 h-4 w-4" />
             Rate (¢/kWh)
-            <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         )
       },
@@ -143,6 +149,7 @@ export default function EnergyPage() {
     getSortedRowModel: getSortedRowModel(),
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
+    autoResetPageIndex: false,
     state: {
       sorting,
       columnFilters,
@@ -198,24 +205,47 @@ export default function EnergyPage() {
               ))}
             </TableHeader>
             <TableBody>
-              {table.getRowModel().rows?.length ? (
-                table.getRowModel().rows.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    data-state={row.getIsSelected() && "selected"}
-                    className="border-white/5 hover:bg-white/[0.02] transition-colors"
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className="py-3">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
+              {isLoading ? (
+                <ForensicTableSkeleton columns={columns.length} rows={12} />
+              ) : table.getRowModel().rows?.length ? (
+                <AnimatePresence mode="popLayout">
+                  {table.getRowModel().rows.map((row, index) => (
+                    <motion.tr
+                      key={row.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.98 }}
+                      transition={{ 
+                        duration: 0.3, 
+                        delay: Math.min(index * 0.02, 0.4),
+                        ease: [0.23, 1, 0.32, 1] 
+                      }}
+                      data-state={row.getIsSelected() && "selected"}
+                      className={cn(
+                        "border-b border-white/5 transition-colors group cursor-pointer relative z-10",
+                        row.getIsSelected() 
+                          ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10" 
+                          : "hover:bg-white/[0.02]"
+                      )}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id} className="py-3">
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.4, delay: 0.1 }}
+                          >
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </motion.div>
+                        </TableCell>
+                      ))}
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
               ) : (
                 <TableRow>
                   <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
-                    {isLoading ? 'Loading plans...' : 'No plans found.'}
+                    No plans found.
                   </TableCell>
                 </TableRow>
               )}

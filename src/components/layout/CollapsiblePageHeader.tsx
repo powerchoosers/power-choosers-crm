@@ -5,6 +5,7 @@ import { Search, Plus, X, Filter } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 
 interface CollapsiblePageHeaderProps {
   title: string
@@ -23,6 +24,8 @@ interface CollapsiblePageHeaderProps {
   }
   globalFilter: string
   onSearchChange: (value: string) => void
+  onFilterToggle?: () => void
+  isFilterActive?: boolean
   placeholder?: string
 }
 
@@ -33,6 +36,8 @@ export function CollapsiblePageHeader({
   secondaryAction,
   globalFilter,
   onSearchChange,
+  onFilterToggle,
+  isFilterActive,
   placeholder = "Filter current view..."
 }: CollapsiblePageHeaderProps) {
   const [isSearchVisible, setIsSearchVisible] = useState(false)
@@ -109,8 +114,17 @@ export function CollapsiblePageHeader({
                 />
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" className="gap-2 bg-transparent border-white/10 text-zinc-500 hover:text-white hover:bg-white/5 transition-all h-9">
-                  <Filter size={16} />
+                <Button 
+                  variant="outline" 
+                  onClick={onFilterToggle}
+                  className={cn(
+                    "gap-2 transition-all h-9",
+                    isFilterActive 
+                      ? "text-white border-[#002FA7]/50 bg-[#002FA7]/5 shadow-[0_0_15px_-5px_rgba(0,47,167,0.4)]" 
+                      : "bg-input/30 border-input text-zinc-500 hover:text-white hover:bg-input/50"
+                  )}
+                >
+                  <Filter size={16} className={cn(isFilterActive ? "text-white" : "text-inherit")} />
                   Filter
                 </Button>
                 <Button 

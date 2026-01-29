@@ -3,18 +3,18 @@ import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
 
-export interface Sequence {
+export interface Protocol {
   id: string
   name: string
   description?: string
   status: 'active' | 'inactive' | 'draft'
-  steps: SequenceStep[]
+  steps: ProtocolStep[]
   createdAt: string | Date
   updatedAt?: string | Date
   ownerId?: string
 }
 
-export interface SequenceStep {
+export interface ProtocolStep {
   id: string
   type: 'email' | 'call' | 'task'
   delayDays: number
@@ -24,16 +24,16 @@ export interface SequenceStep {
 
 const PAGE_SIZE = 50
 
-export function useSequences(searchQuery?: string) {
+export function useProtocols(searchQuery?: string) {
   const { user, role, loading } = useAuth()
   const queryClient = useQueryClient()
 
-  const sequencesQuery = useInfiniteQuery({
-    queryKey: ['sequences', user?.email, role, searchQuery],
+  const protocolsQuery = useInfiniteQuery({
+    queryKey: ['protocols', user?.email, role, searchQuery],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       try {
-        if (loading || !user) return { sequences: [], nextCursor: null }
+        if (loading || !user) return { protocols: [], nextCursor: null }
 
         let query = supabase
           .from('sequences')
@@ -57,14 +57,14 @@ export function useSequences(searchQuery?: string) {
         if (error) throw error
         
         return {
-          sequences: (data || []).map(item => ({
+          protocols: (data || []).map(item => ({
             ...item,
             steps: item.steps || []
-          })) as Sequence[],
+          })) as Protocol[],
           nextCursor: count && (pageParam + 1) * PAGE_SIZE < count ? pageParam + 1 : null
         }
       } catch (error: unknown) {
-        console.error('Error fetching sequences:', error)
+        console.error('Error fetching protocols:', error)
         throw error
       }
     },
@@ -73,36 +73,36 @@ export function useSequences(searchQuery?: string) {
     staleTime: 1000 * 60 * 5,
   })
 
-  const addSequenceMutation = useMutation({
-    mutationFn: async (newSequence: Omit<Sequence, 'id' | 'createdAt'>) => {
+  const addProtocolMutation = useMutation({
+    mutationFn: async (newProtocol: Omit<Protocol, 'id' | 'createdAt'>) => {
       const { data, error } = await supabase
         .from('sequences')
         .insert({
-          ...newSequence,
+          ...newProtocol,
           id: crypto.randomUUID(),
           ownerId: user?.email,
           createdAt: new Date().toISOString(),
-          status: newSequence.status || 'draft',
-          steps: newSequence.steps || []
+          status: newProtocol.status || 'draft',
+          steps: newProtocol.steps || []
         })
         .select()
         .single()
       
       if (error) throw error
-      return data as Sequence
+      return data as Protocol
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sequences'] })
-      toast.success('Sequence created successfully')
+      queryClient.invalidateQueries({ queryKey: ['protocols'] })
+      toast.success('Protocol created successfully')
     },
     onError: (error) => {
-      console.error('Error adding sequence:', error)
-      toast.error('Failed to create sequence')
+      console.error('Error adding protocol:', error)
+      toast.error('Failed to create protocol')
     }
   })
 
-  const updateSequenceMutation = useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<Sequence> & { id: string }) => {
+  const updateProtocolMutation = useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<Protocol> & { id: string }) => {
       const { data, error } = await supabase
         .from('sequences')
         .update({
@@ -114,19 +114,19 @@ export function useSequences(searchQuery?: string) {
         .single()
       
       if (error) throw error
-      return data as Sequence
+      return data as Protocol
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sequences'] })
-      toast.success('Sequence updated successfully')
+      queryClient.invalidateQueries({ queryKey: ['protocols'] })
+      toast.success('Protocol updated successfully')
     },
     onError: (error) => {
-      console.error('Error updating sequence:', error)
-      toast.error('Failed to update sequence')
+      console.error('Error updating protocol:', error)
+      toast.error('Failed to update protocol')
     }
   })
 
-  const deleteSequenceMutation = useMutation({
+  const deleteProtocolMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('sequences')
@@ -137,33 +137,33 @@ export function useSequences(searchQuery?: string) {
       return id
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sequences'] })
-      toast.success('Sequence deleted successfully')
+      queryClient.invalidateQueries({ queryKey: ['protocols'] })
+      toast.success('Protocol deleted successfully')
     },
     onError: (error) => {
-      console.error('Error deleting sequence:', error)
-      toast.error('Failed to delete sequence')
+      console.error('Error deleting protocol:', error)
+      toast.error('Failed to delete protocol')
     }
   })
 
   return {
-    data: sequencesQuery.data,
-    isLoading: sequencesQuery.isLoading,
-    isError: sequencesQuery.isError,
-    fetchNextPage: sequencesQuery.fetchNextPage,
-    hasNextPage: sequencesQuery.hasNextPage,
-    isFetchingNextPage: sequencesQuery.isFetchingNextPage,
-    addSequence: addSequenceMutation.mutate,
-    updateSequence: updateSequenceMutation.mutate,
-    deleteSequence: deleteSequenceMutation.mutate
+    data: protocolsQuery.data,
+    isLoading: protocolsQuery.isLoading,
+    isError: protocolsQuery.isError,
+    fetchNextPage: protocolsQuery.fetchNextPage,
+    hasNextPage: protocolsQuery.hasNextPage,
+    isFetchingNextPage: protocolsQuery.isFetchingNextPage,
+    addProtocol: addProtocolMutation.mutate,
+    updateProtocol: updateProtocolMutation.mutate,
+    deleteProtocol: deleteProtocolMutation.mutate
   }
 }
 
-export function useSequencesCount(searchQuery?: string) {
+export function useProtocolsCount(searchQuery?: string) {
   const { user, role, loading } = useAuth()
 
   return useQuery({
-    queryKey: ['sequences-count', user?.email, role, searchQuery],
+    queryKey: ['protocols-count', user?.email, role, searchQuery],
     queryFn: async () => {
       if (loading || !user) return 0
 
@@ -179,7 +179,7 @@ export function useSequencesCount(searchQuery?: string) {
 
       const { count, error } = await query
       if (error) {
-        console.error("Error fetching sequences count:", error)
+        console.error("Error fetching protocols count:", error)
         return 0
       }
       return count || 0
@@ -189,11 +189,11 @@ export function useSequencesCount(searchQuery?: string) {
   })
 }
 
-export function useSearchSequences(queryTerm: string) {
+export function useSearchProtocols(queryTerm: string) {
   const { user, role, loading } = useAuth()
 
   return useQuery({
-    queryKey: ['sequences-search', queryTerm, user?.email, role],
+    queryKey: ['protocols-search', queryTerm, user?.email, role],
     queryFn: async () => {
       if (!queryTerm || queryTerm.length < 2) return []
       if (loading || !user) return []
@@ -214,7 +214,7 @@ export function useSearchSequences(queryTerm: string) {
           return []
         }
 
-        return data as Sequence[]
+        return data as Protocol[]
       } catch (err) {
         console.error("Search hook error:", err)
         return []
