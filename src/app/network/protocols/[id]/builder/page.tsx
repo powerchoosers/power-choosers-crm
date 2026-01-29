@@ -634,7 +634,7 @@ function ProtocolArchitectInner() {
       let nodeWidth = 0;
       let outcomes: any[] = [];
 
-      if (closestNode && closestNode.data.outcomes?.length > 0) {
+      if (closestNode && (closestNode.data.outcomes as any[])?.length > 0) {
         outcomes = closestNode.data.outcomes as any[];
         // Use measured width if available for accuracy, else fallback to 200 (approx visual width)
         nodeWidth = closestNode.measured?.width || 200; 
