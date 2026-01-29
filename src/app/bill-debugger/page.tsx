@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, UploadCloud, Check, AlertCircle, ArrowRight, Loader2 } from 'lucide-react'
+import { LoadingOrb } from '@/components/ui/LoadingOrb'
 
 type ExtractedData = {
   customer_name: string
@@ -329,8 +330,7 @@ function AnalyzingView() {
             exit={{ opacity: 0 }}
             className="flex flex-col items-center justify-center space-y-6"
         >
-            <Loader2 className="w-12 h-12 text-[#002FA7] animate-spin" />
-            <p className="text-zinc-500 font-mono text-sm tracking-widest">FINALIZING ANALYSIS...</p>
+            <LoadingOrb label="FINALIZING ANALYSIS..." />
         </motion.div>
     )
 }

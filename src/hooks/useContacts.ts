@@ -287,22 +287,22 @@ export function useSearchContacts(queryTerm: string) {
           const account = Array.isArray(item.accounts) ? item.accounts[0] : item.accounts;
           const metadata = normalizeMetadata(item.metadata);
           
-          const fName = item.firstName || item.first_name || item.firstname || item.FirstName || metadata?.firstName || metadata?.first_name || metadata?.general?.firstName || metadata?.general?.first_name || metadata?.contact?.firstName || metadata?.contact?.first_name;
-          const lName = item.lastName || item.last_name || item.lastname || item.LastName || metadata?.lastName || metadata?.last_name || metadata?.general?.lastName || metadata?.general?.last_name || metadata?.contact?.lastName || metadata?.contact?.last_name;
+          const fName = item.firstName || item.first_name || item.firstname || item.FirstName;
+          const lName = item.lastName || item.last_name || item.lastname || item.LastName;
 
           const fullName = buildContactName({
             firstName: fName,
             lastName: lName,
             rawName: item.name,
-            email: item.email || metadata?.email || metadata?.general?.email || metadata?.contact?.email,
-            companyCandidate: account?.name || metadata?.company || metadata?.companyName || metadata?.general?.company || metadata?.general?.companyName,
+            email: item.email,
+            companyCandidate: account?.name,
           });
 
           return {
             id: item.id,
             name: fullName,
-            email: item.email || metadata?.email || metadata?.general?.email || metadata?.contact?.email || '',
-            company: account?.name || metadata?.company || metadata?.companyName || metadata?.general?.company || metadata?.general?.companyName || '',
+            email: item.email || '',
+            company: account?.name || '',
             logoUrl: account?.logo_url || '',
           };
         });
@@ -543,47 +543,25 @@ export function useContact(id: string) {
         }
       }
       
-      const fName = typedData.firstName
-        || typedData.first_name
-        || typedData.firstname
-        || typedData.FirstName
-        || metadata?.firstName
-        || metadata?.first_name
-        || metadata?.general?.firstName
-        || metadata?.general?.first_name
-        || metadata?.contact?.firstName
-        || metadata?.contact?.first_name
-      const lName = typedData.lastName
-        || typedData.last_name
-        || typedData.lastname
-        || typedData.LastName
-        || metadata?.lastName
-        || metadata?.last_name
-        || metadata?.general?.lastName
-        || metadata?.general?.last_name
-        || metadata?.contact?.lastName
-        || metadata?.contact?.last_name
-
-      const { id: contactId, ...rest } = typedData
+      const fName = typedData.firstName || typedData.first_name || typedData.firstname || typedData.FirstName
+      const lName = typedData.lastName || typedData.last_name || typedData.lastname || typedData.LastName
 
       const fullName = buildContactName({
         firstName: fName,
         lastName: lName,
         rawName: typedData.name,
-        email: typedData.email || metadata?.email || metadata?.general?.email || metadata?.contact?.email,
-        companyCandidate: account?.name || metadata?.company || metadata?.companyName || metadata?.general?.company || metadata?.general?.companyName,
+        email: typedData.email || '',
+        companyCandidate: account?.name
       })
 
       return {
-        id: contactId,
-        ...rest,
-        notes: typedData.notes || metadata?.notes || metadata?.general?.notes || '',
-        lastActivity: typedData.lastActivityAt || undefined,
+        id: typedData.id,
         name: fullName,
-        email: typedData.email || metadata?.email || metadata?.general?.email || metadata?.contact?.email || '',
-        phone: typedData.phone || typedData.mobile || typedData.workPhone || typedData.otherPhone || metadata?.mobile || metadata?.workDirectPhone || metadata?.otherPhone || metadata?.general?.phone || metadata?.contact?.phone || '',
-        company: account?.name || metadata?.company || metadata?.companyName || metadata?.general?.company || metadata?.general?.companyName || '',
-        companyDomain: account?.domain || metadata?.domain || metadata?.general?.domain || undefined,
+        email: typedData.email || '',
+        notes: typedData.notes || '',
+        phone: typedData.phone || typedData.mobile || typedData.workPhone || typedData.otherPhone || '',
+        company: account?.name || '',
+        companyDomain: account?.domain || undefined,
         logoUrl: account?.logo_url || '',
         status: typedData.status || 'Lead',
         lastContact: typedData.lastContactedAt || new Date().toISOString(),
@@ -592,13 +570,13 @@ export function useContact(id: string) {
         firstName: fName,
         lastName: lName,
         title: typedData.title || undefined,
-        companyName: account?.name || metadata?.company || metadata?.companyName || metadata?.general?.company || metadata?.general?.companyName,
-        city: typedData.city || metadata?.city || account?.city,
-        state: typedData.state || metadata?.state || account?.state,
-        location: typedData.city ? `${typedData.city}, ${typedData.state || ''}` : (metadata?.city ? `${metadata.city}, ${metadata.state || ''}` : (account?.city ? `${account.city}, ${account.state || ''}` : (metadata?.address || account?.address || ''))),
+        companyName: account?.name,
+        city: typedData.city || account?.city,
+        state: typedData.state || account?.state,
+        location: typedData.city ? `${typedData.city}, ${typedData.state || ''}` : (account?.city ? `${account.city}, ${account.state || ''}` : (account?.address || '')),
         industry: account?.industry,
         linkedinUrl: typedData.linkedinUrl || undefined,
-        website: account?.domain || metadata?.website,
+        website: account?.domain,
         linkedAccountId: typedData.accountId || undefined,
         
         // Enhanced account details
@@ -610,12 +588,12 @@ export function useContact(id: string) {
         accountDescription: account?.description,
         
         // Location
-        address: getFirstServiceAddressAddress(account?.service_addresses) || metadata?.address || '',
+        address: getFirstServiceAddressAddress(account?.service_addresses) || '',
 
         // Phone fields
-        mobile: typedData.mobile || metadata?.mobile || metadata?.general?.phone || '',
-        workDirectPhone: typedData.workPhone || metadata?.workDirectPhone || metadata?.general?.workDirectPhone || '',
-        otherPhone: typedData.otherPhone || metadata?.otherPhone || '',
+        mobile: typedData.mobile || '',
+        workDirectPhone: typedData.workPhone || '',
+        otherPhone: typedData.otherPhone || '',
         companyPhone: account?.phone || '',
         primaryPhoneField: normalizePrimaryPhoneField(typedData.primaryPhoneField)
       } as ContactDetail

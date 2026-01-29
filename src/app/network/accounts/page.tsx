@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { 
   flexRender,
   getCoreRowModel,
@@ -50,6 +51,7 @@ import { cn } from '@/lib/utils'
 const PAGE_SIZE = 50
 
 export default function AccountsPage() {
+  const router = useRouter()
   const [globalFilter, setGlobalFilter] = useState('')
   const [debouncedFilter, setDebouncedFilter] = useState('')
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])

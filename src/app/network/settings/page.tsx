@@ -10,14 +10,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Bell, Shield, Palette, Database, Trash2, Plus, Phone, User as UserIcon, Lock } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
-import { auth, db } from '@/lib/firebase'
+import { auth } from '@/lib/firebase'
+import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
-import { doc, setDoc, getDoc } from 'firebase/firestore'
-import { updatePassword, EmailAuthProvider, linkWithCredential } from 'firebase/auth'
+import { updatePassword } from 'firebase/auth'
 import { toast } from 'sonner'
 
 export default function SettingsPage() {
-  const { user, profile } = useAuth()
+  const { user, profile, role } = useAuth()
 
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -32,11 +32,8 @@ export default function SettingsPage() {
   const [newNumberName, setNewNumberName] = useState('')
   const [isSaving, setIsSaving] = useState(false)
 
-  // Sync with profile and check legacy settings
+  // Sync with profile
   useEffect(() => {
-    // Strategy: Prefer Firestore profile data, but fallback to Auth user data if profile is empty
-    // This handles the case where a user logs in via Google and wants that info to show up
-    
     // 1. Name Resolution
     const authDisplayName = user?.displayName || ''
     const authNameParts = authDisplayName.split(' ')
@@ -51,34 +48,7 @@ export default function SettingsPage() {
     setTwilioNumbers(profile.twilioNumbers || [])
     setSelectedPhoneNumber(profile.selectedPhoneNumber || null)
     setBridgeToMobile(profile.bridgeToMobile || false)
-
-    // Legacy Data Migration Check
-    const checkLegacyData = async () => {
-      if (!user?.email) return
-      // Only check if we don't have numbers yet (avoid overwriting if user has already migrated/saved)
-      if (profile.twilioNumbers && profile.twilioNumbers.length > 0) return
-
-      try {
-        const legacyId = `user-settings-${user.email.toLowerCase()}`
-        const legacyRef = doc(db, 'settings', legacyId)
-        const legacySnap = await getDoc(legacyRef)
-
-        if (legacySnap.exists()) {
-          const data = legacySnap.data()
-          if (data.twilioNumbers && Array.isArray(data.twilioNumbers) && data.twilioNumbers.length > 0) {
-            setTwilioNumbers(data.twilioNumbers)
-            if (data.selectedPhoneNumber) setSelectedPhoneNumber(data.selectedPhoneNumber)
-            if (typeof data.bridgeToMobile === 'boolean') setBridgeToMobile(data.bridgeToMobile)
-            toast.info('Legacy phone settings detected. Click "Save Changes" to import them.')
-          }
-        }
-      } catch (err) {
-        console.warn('Failed to check legacy settings:', err)
-      }
-    }
-
-    checkLegacyData()
-  }, [profile, user?.email])
+  }, [profile, user?.displayName])
 
   const computedName = useMemo(() => {
     const full = `${firstName} ${lastName}`.trim()
@@ -123,23 +93,28 @@ export default function SettingsPage() {
 
     setIsSaving(true)
     try {
-      const ref = doc(db, 'users', user.email.toLowerCase())
-      await setDoc(
-        ref,
-        {
-          email: user.email.toLowerCase(),
-          firstName: firstName.trim() || null,
-          lastName: lastName.trim() || null,
-          name: computedName ? computedName : null,
-          displayName: computedName ? computedName : null,
+      const emailLower = user.email.toLowerCase().trim()
+      
+      const { error } = await supabase
+        .from('users')
+        .update({
+          first_name: firstName.trim() || null,
+          last_name: lastName.trim() || null,
+          name: computedName || null,
           bio: bio.trim() || null,
-          twilioNumbers: twilioNumbers,
-          selectedPhoneNumber: selectedPhoneNumber,
-          bridgeToMobile: bridgeToMobile,
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      )
+          settings: {
+            name: computedName || null,
+            twilioNumbers: twilioNumbers,
+            selectedPhoneNumber: selectedPhoneNumber,
+            bridgeToMobile: bridgeToMobile,
+            role: role || 'employee' // Preserve role
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('email', emailLower)
+
+      if (error) throw error
+      
       toast.success('Profile updated')
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to save profile'
