@@ -741,14 +741,15 @@ function ProtocolArchitectInner() {
         });
 
         if (closestNode) {
+          const targetNode = closestNode as Node;
           const outcomeId = `outcome-${crypto.randomUUID().slice(0, 8)}`;
-          const currentOutcomes = closestNode.data.outcomes as any[] || [];
+          const currentOutcomes = (targetNode.data.outcomes as any[]) || [];
           
           if (currentOutcomes.length < 3) {
-            updateNodeData(closestNode.id, { 
+            updateNodeData(targetNode.id, { 
               outcomes: [...currentOutcomes, { id: outcomeId, label }] 
             });
-            toast.success(`Added ${label} vector to ${closestNode.data.label}`);
+            toast.success(`Added ${label} vector to ${targetNode.data.label}`);
           } else {
             toast.error("Maximum 3 vectors per node");
           }
