@@ -19,8 +19,8 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: 'Nodal Point | Signal Over Noise in the Texas Energy Market',
-  description: 'The Texas grid is designed to confuse. We view complexity as a design flaw. Nodal Point is the forensic engine that decodes volatility, eliminates demand ratchets, and reveals the true cost of power.',
+  title: 'Nodal Point | Commercial Energy Forensics & Audit',
+  description: 'We do not guess; we measure. Nodal Point reverse-engineers supplier tariffs to eliminate hidden cost leakage and structural waste in your energy contract.',
   icons: {
     icon: '/images/nodalpoint-webicon.png',
     apple: '/images/nodalpoint-webicon.png',
