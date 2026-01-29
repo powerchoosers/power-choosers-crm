@@ -1,4 +1,4 @@
-export interface List {
+export interface Target {
   id: string
   name: string
   kind: 'people' | 'account'
@@ -10,9 +10,9 @@ export interface List {
   count?: number // Computed property
 }
 
-export interface ListMember {
+export interface TargetMember {
   id: string
-  listId: string
+  targetGroupId: string
   targetId: string
   targetType: string
   addedAt: string

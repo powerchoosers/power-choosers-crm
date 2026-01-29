@@ -73,8 +73,8 @@ export default function CrmLayout({
         <TopBar />
         <Sidebar />
         <RightPanel />
-        <main className="absolute top-0 bottom-0 left-16 right-0 lg:right-80 overflow-y-auto pt-24 pb-8 transition-all duration-300 scroll-smooth np-scroll">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <main className="absolute top-0 bottom-0 left-[70px] right-0 lg:right-80 overflow-y-auto pt-24 pb-8 transition-all duration-300 scroll-smooth np-scroll">
+          <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-10">
               {children}
           </div>
         </main>

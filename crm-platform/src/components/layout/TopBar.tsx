@@ -224,7 +224,7 @@ export function TopBar() {
 
   return (
     // Updated positioning: constrained to match main content area
-    <header className="fixed top-0 left-16 right-0 lg:right-80 z-40 flex items-start justify-center p-6 pointer-events-none nodal-glass !border-none !shadow-none">
+    <header className="fixed top-0 left-[70px] right-0 lg:right-80 z-40 flex items-start justify-center p-6 pointer-events-none nodal-glass !border-none !shadow-none">
       <div className="w-full max-w-5xl flex items-center gap-4 pointer-events-auto">
           {/* Left Side: Search or Active Call */}
           <motion.div 

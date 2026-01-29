@@ -65,20 +65,20 @@ export default function CallsPage() {
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             className="-ml-4 hover:bg-white/5 hover:text-white"
           >
+            <ArrowUpDown className="mr-2 h-4 w-4" />
             Contact
-            <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         )
       },
       cell: ({ row }) => {
         const call = row.original
         return (
-          <div className="flex items-center gap-3">
-             <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 border border-white/5">
+          <div className="flex items-center gap-3 group/call cursor-pointer">
+             <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 border border-white/5 transition-all">
                 {call.contactName === 'Unknown' ? '?' : call.contactName.split(' ').map(n => n[0]).join('').substring(0, 2)}
              </div>
              <div>
-                <div className="font-medium text-zinc-200">{call.contactName}</div>
+                <div className="font-medium text-zinc-200 group-hover/call:text-white group-hover/call:scale-[1.02] transition-all origin-left">{call.contactName}</div>
                 <div className="text-xs text-zinc-500 font-mono tabular-nums">{call.phoneNumber}</div>
              </div>
           </div>
@@ -92,7 +92,7 @@ export default function CallsPage() {
         const type = row.getValue('type') as string
         return (
           <div className="flex items-center gap-2 text-zinc-400">
-            {type === 'Inbound' ? <PhoneIncoming className="w-4 h-4 text-green-500" /> : <PhoneOutgoing className="w-4 h-4 text-[#002FA7]" />}
+            {type === 'Inbound' ? <PhoneIncoming className="w-4 h-4 text-emerald-500" /> : <PhoneOutgoing className="w-4 h-4 text-zinc-500" />}
             <span className="text-[10px] font-mono uppercase tracking-wider">{type}</span>
           </div>
         )
@@ -192,6 +192,7 @@ export default function CallsPage() {
     getSortedRowModel: getSortedRowModel(),
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
+    autoResetPageIndex: false,
     state: {
       sorting,
       columnFilters,

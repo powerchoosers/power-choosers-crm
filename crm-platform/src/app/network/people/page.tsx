@@ -13,8 +13,10 @@ import {
   SortingState,
   ColumnFiltersState,
   PaginationState,
+  RowSelectionState,
 } from '@tanstack/react-table'
-import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail, MoreHorizontal } from 'lucide-react'
+import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail, MoreHorizontal, ArrowUpRight, Check, Filter } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
 import { useContacts, useContactsCount, Contact } from '@/hooks/useContacts'
@@ -22,6 +24,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { Badge } from '@/components/ui/badge'
+import BulkActionDeck from '@/components/network/BulkActionDeck'
+import DestructModal from '@/components/network/DestructModal'
+import FilterCommandDeck from '@/components/network/FilterCommandDeck'
+import { ForensicTableSkeleton } from '@/components/network/ForensicTableSkeleton'
+import Link from 'next/link'
 import {
   Table,
   TableBody,
@@ -47,6 +54,7 @@ export default function PeoplePage() {
   const router = useRouter()
   const [globalFilter, setGlobalFilter] = useState('')
   const [debouncedFilter, setDebouncedFilter] = useState('')
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 
   // Debounce search query to avoid excessive API calls
   useEffect(() => {
@@ -56,12 +64,22 @@ export default function PeoplePage() {
     return () => clearTimeout(timer)
   }, [globalFilter])
 
-  const { data, isLoading: queryLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useContacts(debouncedFilter)
-  const { data: totalContacts } = useContactsCount(debouncedFilter)
+  const contactFilters = useMemo(() => {
+    return {
+      industry: (columnFilters.find(f => f.id === 'industry')?.value as string[]) || [],
+      status: (columnFilters.find(f => f.id === 'status')?.value as string[]) || [],
+      location: (columnFilters.find(f => f.id === 'location')?.value as string[]) || [],
+    };
+  }, [columnFilters]);
+
+  const { data, isLoading: queryLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useContacts(debouncedFilter, contactFilters)
+  const { data: totalContacts } = useContactsCount(debouncedFilter, contactFilters)
   const [sorting, setSorting] = useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [isMounted, setIsMounted] = useState(false)
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: PAGE_SIZE })
+  const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
 
   const contacts = useMemo(() => data?.pages.flatMap(page => page.contacts) || [], [data])
 
@@ -77,6 +95,21 @@ export default function PeoplePage() {
     ? Math.max(totalPages, pagination.pageIndex + 2)
     : totalPages
 
+  const handleFilterChange = (columnId: string, value: any) => {
+    setColumnFilters(prev => {
+      const existing = prev.find(f => f.id === columnId)
+      if (existing) {
+        if (value === undefined) {
+          return prev.filter(f => f.id !== columnId)
+        }
+        return prev.map(f => f.id === columnId ? { ...f, value } : f)
+      }
+      if (value === undefined) return prev
+      return [...prev, { id: columnId, value }]
+    })
+    setPagination(p => ({ ...p, pageIndex: 0 }))
+  }
+
   useEffect(() => {
     const needed = (pagination.pageIndex + 2) * PAGE_SIZE
     if (hasNextPage && !isFetchingNextPage && contacts.length < needed) {
@@ -84,20 +117,109 @@ export default function PeoplePage() {
     }
   }, [pagination.pageIndex, contacts.length, hasNextPage, isFetchingNextPage, fetchNextPage])
 
+  const selectedCount = Object.keys(rowSelection).length
+
+  const handleSelectCount = async (count: number) => {
+    const newSelection: RowSelectionState = {}
+    for (let i = 0; i < count; i++) {
+      newSelection[i] = true
+    }
+    setRowSelection(newSelection)
+    
+    // If the requested count is more than currently loaded, fetch more
+    if (count > contacts.length && hasNextPage && !isFetchingNextPage) {
+      const pagesToFetch = Math.ceil((count - contacts.length) / PAGE_SIZE)
+      for (let i = 0; i < pagesToFetch; i++) {
+        await fetchNextPage()
+      }
+    }
+  }
+
+  const handleBulkAction = async (action: string) => {
+    // Lazy load if selection exceeds current data
+    if (selectedCount > contacts.length && hasNextPage && !isFetchingNextPage) {
+      const pagesToFetch = Math.ceil((selectedCount - contacts.length) / PAGE_SIZE)
+      for (let i = 0; i < pagesToFetch; i++) {
+        await fetchNextPage()
+      }
+    }
+
+    if (action === 'delete') {
+      setIsDestructModalOpen(true)
+    } else {
+      console.log(`Executing ${action} for ${selectedCount} nodes`)
+      // Implement other actions as needed
+    }
+  }
+
+  const handleConfirmPurge = () => {
+    console.log(`Purging ${selectedCount} nodes`)
+    setIsDestructModalOpen(false)
+    setRowSelection({})
+    // Implement actual deletion logic here
+  }
+
   const columns = useMemo<ColumnDef<Contact>[]>(() => {
     return [
+      {
+        id: "select",
+        header: ({ table }) => (
+          <div className="flex items-center justify-center px-2">
+            <button
+              onClick={table.getToggleAllPageRowsSelectedHandler()}
+              className={cn(
+                "w-4 h-4 rounded border border-white/20 transition-all flex items-center justify-center",
+                table.getIsAllPageRowsSelected() ? "bg-[#002FA7] border-[#002FA7]" : "bg-transparent opacity-50 hover:opacity-100"
+              )}
+            >
+              {table.getIsAllPageRowsSelected() && <Check className="w-3 h-3 text-white" />}
+            </button>
+          </div>
+        ),
+        cell: ({ row, table }) => {
+          const index = row.index + 1 + pagination.pageIndex * PAGE_SIZE
+          const isSelected = row.getIsSelected()
+          return (
+            <div className="flex items-center justify-center px-2 relative group/select">
+              {/* Default State: Row Number */}
+              <span className={cn(
+                "font-mono text-[10px] text-zinc-700 transition-opacity",
+                isSelected ? "opacity-0" : "group-hover/select:opacity-0"
+              )}>
+                {index.toString().padStart(2, '0')}
+              </span>
+              
+              {/* Hover/Selected State: Ghost Checkbox */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  row.toggleSelected()
+                }}
+                className={cn(
+                  "absolute inset-0 m-auto w-4 h-4 rounded border transition-all flex items-center justify-center",
+                  isSelected 
+                    ? "bg-[#002FA7] border-[#002FA7] opacity-100" 
+                    : "bg-white/5 border-white/10 opacity-0 group-hover/select:opacity-100"
+                )}
+              >
+                {isSelected && <Check className="w-3 h-3 text-white" />}
+              </button>
+            </div>
+          )
+        }
+      },
       {
         accessorKey: 'name',
         header: ({ column }) => {
           return (
-            <Button
-              variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-              className="-ml-4 hover:bg-white/5 hover:text-white"
-            >
-              Name
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="-ml-4 hover:bg-white/5 hover:text-white"
+          >
+            Name
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
           )
         },
         cell: ({ row }) => {
@@ -109,15 +231,20 @@ export default function PeoplePage() {
             .substring(0, 2)
             .toUpperCase()
           return (
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full nodal-glass flex items-center justify-center text-[10px] font-semibold text-white/90 border border-white/10 shadow-sm group-hover:shadow-[#002FA7]/20 transition-all">
+            <Link 
+              href={`/network/people/${contact.id}`}
+              className="flex items-center gap-3 group/person"
+            >
+              <div className="w-9 h-9 rounded-full nodal-glass flex items-center justify-center text-[10px] font-semibold text-white/90 border border-white/10 shadow-sm transition-all">
                 {initials}
               </div>
               <div>
-                <div className="font-medium text-zinc-200 group-hover:text-white transition-colors">{contact.name}</div>
+                <div className="font-medium text-zinc-200 group-hover/person:text-white group-hover/person:scale-[1.02] transition-all origin-left">
+                  {contact.name}
+                </div>
                 <div className="text-xs text-zinc-500 font-mono tracking-tight">{contact.email}</div>
               </div>
-            </div>
+            </Link>
           )
         }
       },
@@ -128,16 +255,21 @@ export default function PeoplePage() {
           const companyName = row.getValue('company') as string
           const contact = row.original
           return (
-            <div className="flex items-center gap-2 group/acc">
+            <Link 
+              href={`/network/accounts/${contact.accountId}`}
+              className="flex items-center gap-2 group/acc"
+            >
               <CompanyIcon
                 logoUrl={contact.logoUrl}
                 domain={contact.companyDomain}
                 name={companyName}
                 size={32}
-                className="w-9 h-9 rounded-lg nodal-glass p-1 border border-white/10 shadow-sm group-hover/acc:border-[#002FA7]/30 transition-all"
+                className="w-9 h-9 rounded-lg nodal-glass p-1 border border-white/10 shadow-sm transition-all"
               />
-              <span className="text-zinc-400 group-hover/acc:text-white transition-colors">{companyName}</span>
-            </div>
+              <span className="text-zinc-400 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left">
+                {companyName}
+              </span>
+            </Link>
           )
         },
       },
@@ -147,8 +279,31 @@ export default function PeoplePage() {
         cell: ({ row }) => <div className="text-zinc-500 text-sm font-mono tabular-nums">{row.getValue('phone')}</div>,
       },
       {
+        accessorKey: 'location',
+        header: 'Location',
+        filterFn: (row, id, value) => {
+          if (!value || value.length === 0) return true;
+          const val = row.getValue(id) as string;
+          if (!val) return false;
+          return value.some((v: string) => val.toLowerCase().includes(v.toLowerCase()));
+        },
+        cell: ({ row }) => <div className="text-zinc-400">{row.getValue('location')}</div>,
+      },
+      {
+        accessorKey: 'industry',
+        header: 'Industry',
+        filterFn: (row, id, value) => {
+          if (!value || value.length === 0) return true;
+          const val = row.getValue(id) as string;
+          if (!val) return false;
+          return value.includes(val);
+        },
+        cell: ({ row }) => <div className="text-zinc-400">{row.getValue('industry')}</div>,
+      },
+      {
         accessorKey: 'status',
         header: 'Status',
+        filterFn: 'arrIncludesSome',
         cell: ({ row }) => {
           const status = row.getValue('status') as string
           const isCustomer = status === 'Customer'
@@ -241,7 +396,7 @@ export default function PeoplePage() {
         },
       },
     ]
-  }, [router])
+  }, [router, pagination.pageIndex])
 
   const table = useReactTable({
     data: contacts,
@@ -254,11 +409,14 @@ export default function PeoplePage() {
     getFilteredRowModel: getFilteredRowModel(),
     onGlobalFilterChange: setGlobalFilter,
     onPaginationChange: setPagination,
+    onRowSelectionChange: setRowSelection,
+    autoResetPageIndex: false,
     state: {
       sorting,
       columnFilters,
       globalFilter,
       pagination,
+      rowSelection,
     },
   })
 
@@ -281,11 +439,21 @@ export default function PeoplePage() {
           setGlobalFilter(value)
           setPagination((p) => ({ ...p, pageIndex: 0 }))
         }}
+        onFilterToggle={() => setIsFilterOpen(!isFilterOpen)}
+        isFilterActive={isFilterOpen || columnFilters.length > 0}
         primaryAction={{
           label: "Add Person",
           onClick: () => {}, // Add your add person logic here
           icon: <Plus size={18} className="mr-2" />
         }}
+      />
+
+      <FilterCommandDeck 
+        isOpen={isFilterOpen}
+        onClose={() => setIsFilterOpen(false)}
+        type="people"
+        columnFilters={columnFilters}
+        onFilterChange={handleFilterChange}
       />
 
       <div className="flex-1 rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl overflow-hidden flex flex-col relative">
@@ -312,14 +480,7 @@ export default function PeoplePage() {
             </TableHeader>
             <TableBody>
                 {isLoading ? (
-                <TableRow>
-                    <TableCell colSpan={columns.length} className="h-24">
-                        <div className="flex items-center justify-center gap-3 text-zinc-500">
-                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-800 border-t-[#002FA7]" />
-                          <span className="font-mono text-xs uppercase tracking-widest">Initialising...</span>
-                        </div>
-                    </TableCell>
-                </TableRow>
+                  <ForensicTableSkeleton columns={columns.length} rows={12} type="people" />
                 ) : isError ? (
                 <TableRow>
                     <TableCell colSpan={columns.length} className="h-24 text-center text-red-400">
@@ -327,20 +488,41 @@ export default function PeoplePage() {
                     </TableCell>
                 </TableRow>
                 ) : rows?.length ? (
-                rows.map((row) => (
-                    <TableRow
-                    key={row.id}
-                    data-state={row.getIsSelected() && "selected"}
-                    className="border-white/5 hover:bg-white/[0.02] transition-colors group cursor-pointer"
-                    onClick={() => router.push(`/network/contacts/${row.original.id}`)}
-                    >
-                    {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className="py-3">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
+                  <AnimatePresence mode="popLayout">
+                    {rows.map((row, index) => (
+                      <motion.tr
+                        key={row.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.98 }}
+                        transition={{ 
+                          duration: 0.3, 
+                          delay: Math.min(index * 0.02, 0.4),
+                          ease: [0.23, 1, 0.32, 1] 
+                        }}
+                        data-state={row.getIsSelected() && "selected"}
+                        className={cn(
+                          "border-b border-white/5 transition-colors group cursor-pointer relative z-10",
+                          row.getIsSelected() 
+                            ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10" 
+                            : "hover:bg-white/[0.02]"
+                        )}
+                        onClick={() => router.push(`/network/contacts/${row.original.id}`)}
+                      >
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell key={cell.id} className="py-3">
+                            <motion.div
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ duration: 0.4, delay: 0.1 }}
+                            >
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </motion.div>
+                          </TableCell>
+                        ))}
+                      </motion.tr>
                     ))}
-                    </TableRow>
-                ))
+                  </AnimatePresence>
                 ) : (
                 <TableRow>
                     <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
@@ -395,6 +577,21 @@ export default function PeoplePage() {
             </div>
         </div>
       </div>
+
+      <BulkActionDeck 
+        selectedCount={selectedCount}
+        totalAvailable={effectiveTotalRecords}
+        onClear={() => setRowSelection({})}
+        onAction={handleBulkAction}
+        onSelectCount={handleSelectCount}
+      />
+
+      <DestructModal 
+        isOpen={isDestructModalOpen}
+        onClose={() => setIsDestructModalOpen(false)}
+        onConfirm={handleConfirmPurge}
+        count={selectedCount}
+      />
     </div>
   )
 }

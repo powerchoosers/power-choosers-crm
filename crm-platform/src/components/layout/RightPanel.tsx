@@ -91,7 +91,7 @@ export function RightPanel() {
               <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-4">Operations</h3>
               <div className="grid grid-cols-2 gap-3">
                   <OperationalButton icon={CheckCircle} label="Add Task" />
-                  <OperationalButton icon={Play} label="Sequence" />
+                  <OperationalButton icon={Play} label="Protocol" />
                   <OperationalButton icon={DollarSign} label="Create Deal" />
                   <OperationalButton icon={Mic} label="Log Call" />
               </div>

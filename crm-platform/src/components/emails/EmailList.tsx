@@ -165,8 +165,8 @@ export function EmailList({ emails, isLoading, onRefresh, isSyncing, onSelectEma
                    <div className="absolute top-0 right-1/4 w-2 h-2 rounded-full bg-[#002FA7] animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.8)] z-10" />
                  )}
                  <div className={cn(
-                   "w-9 h-9 rounded-full nodal-glass flex items-center justify-center text-[10px] font-mono font-semibold border border-white/10 shadow-sm transition-all group-hover:shadow-[#002FA7]/20",
-                   email.type === 'sent' ? "text-zinc-500" : "text-[#002FA7]"
+                   "w-9 h-9 rounded-full nodal-glass flex items-center justify-center text-[10px] font-mono font-semibold border border-white/10 shadow-sm transition-all",
+                   email.type === 'sent' ? "text-zinc-500" : "text-white"
                  )}>
                     {email.type === 'sent' ? 'NP' : (email.from?.[0]?.toUpperCase() || '?')}
                 </div>
@@ -175,13 +175,16 @@ export function EmailList({ emails, isLoading, onRefresh, isSyncing, onSelectEma
               {/* Participant */}
               <div className="col-span-3 min-w-0">
                  <div className="flex items-center gap-2">
-                    <span className={cn("text-sm truncate font-mono tracking-tight", email.unread ? "font-semibold text-white" : "text-zinc-400 group-hover:text-zinc-200")}>
+                    <span className={cn(
+                      "text-sm truncate font-mono tracking-tight transition-all origin-left group-hover:scale-[1.02]", 
+                      email.unread ? "font-semibold text-white" : "text-zinc-400 group-hover:text-zinc-200"
+                    )}>
                         {email.type === 'sent' ? `To: ${Array.isArray(email.to) ? email.to.join(', ') : email.to}` : email.from}
                     </span>
                     {email.type === 'sent' ? (
                         <ArrowUpRight className="w-3 h-3 text-zinc-700 flex-none group-hover:text-zinc-500" />
                     ) : (
-                        <ArrowDownLeft className="w-3 h-3 text-[#002FA7]/60 flex-none group-hover:text-[#002FA7]" />
+                        <ArrowDownLeft className="w-3 h-3 text-zinc-600 flex-none group-hover:text-zinc-400" />
                     )}
                  </div>
               </div>
@@ -189,7 +192,10 @@ export function EmailList({ emails, isLoading, onRefresh, isSyncing, onSelectEma
               {/* Message Preview */}
               <div className="col-span-6 min-w-0 space-y-1">
                 <div className="flex items-center gap-2">
-                    <h4 className={cn("text-sm truncate tracking-tight", email.unread ? "font-medium text-zinc-100" : "text-zinc-500 group-hover:text-zinc-300")}>
+                    <h4 className={cn(
+                      "text-sm truncate tracking-tight transition-all origin-left group-hover:scale-[1.02]", 
+                      email.unread ? "font-medium text-zinc-100" : "text-zinc-500 group-hover:text-zinc-300"
+                    )}>
                         {email.subject}
                     </h4>
                     {/* Tracking Badges */}

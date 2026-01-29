@@ -1,20 +1,57 @@
 
-### Segmentation & Lists Page Migration
+### Sitewide Layout Consistency
 - **Status**: Completed
-- **Description**: Migrated the legacy segmentation features to a modern, standardized Lists page with real-time Supabase integration.
+- **Description**: Standardized the layout across all pages by resolving uneven padding issues caused by scrollbar reservation.
 - **Actions**:
-  - [x] **Page Creation**: Created `src/app/network/lists/page.tsx` with a standardized "Obsidian & Glass" layout.
-  - [x] **Data Fetching**: Implemented `useLists.ts` hook using TanStack Query to fetch list data and member counts from Supabase.
+  - [x] **Scrollbar Refinement**: 
+    - [x] Removed `scrollbar-gutter: stable` from the `np-scroll` class in `globals.css` to eliminate the phantom right padding.
+    - [x] Implemented hidden scrollbars while maintaining full scrolling functionality using `scrollbar-width: none` and `display: none`.
+  - [x] **Layout Balancing**: Verified that the main content container is perfectly centered and balanced across all forensic dashboard views.
+  - [x] **Consistency**: Applied the fix globally via the shared `np-scroll` utility class used in `layout.tsx`.
+
+### Bulk Selection & Tactical Actions
+- **Status**: Completed
+- **Description**: Implemented a "Ghost Protocol" bulk selection system with a levitating command deck for tactical operations on People and Accounts pages.
+- **Actions**:
+  - [x] **Ghost Selection Logic**:
+    - [x] Implemented row numbers that fade out on hover/selection in the People and Accounts tables.
+    - [x] Created "Ghost Checkboxes" (glass style) that appear on hover and lock in when selected.
+    - [x] Applied International Klein Blue (#002FA7) highlight and background to selected rows.
+    - [x] Refined "Select All" toggle in table headers to explicitly target the **Whole Page** (50 nodes) using `getToggleAllPageRowsSelectedHandler`.
+  - [x] **Levitating Command Deck**:
+    - [x] Built `BulkActionDeck.tsx` component that levitates from the bottom when nodes are selected.
+    - [x] Integrated real-time node counter (`[ X NODES SELECTED ]`) with one-line layout.
+    - [x] Added click-to-edit count functionality for custom selection amounts.
+    - [x] Standardized typography: Changed counter and AI (Enrich) icon colors to white.
+    - [x] Refined counter interaction: Added `framer-motion` scale animation (zoom-in) and maintained white color on hover to signify clickability.
+    - [x] Synced Icons: Updated `ADD_TO_TARGET` to use the `Radar` icon and `INITIATE_PROTOCOL` to use the `GitMerge` icon to match the sidebar.
+    - [x] Added tactical action buttons: `ADD_TO_TARGET`, `INITIATE_PROTOCOL` (Play), and `ENRICH_DATA` (Sparkles).
+    - [x] Implemented a distinct "Nuclear Option" (Trash icon) with red glow hover state.
+  - [x] **Lazy Loading Selection**:
+    - [x] Implemented logic to automatically fetch missing records when a custom count exceeds currently loaded data.
+    - [x] Added "Execute-time" lazy loading to ensure all selected nodes are loaded before bulk actions are processed.
+  - [x] **Nuclear Protocol (Purge)**:
+    - [x] Built `DestructModal.tsx` for high-stakes deletion confirmation.
+    - [x] Implemented a "Hold to Execute" mechanism requiring a 1.5-second hold to authorize the purge, preventing accidental deletions.
+    - [x] Applied forensic "Obsidian" styling to the destruction interface.
+  - [x] **Integration**: Fully integrated the selection system into `PeoplePage` and `AccountsPage` with TanStack Table state synchronization.
+
+### Segmentation & Targets Page Migration
+- **Status**: Completed
+- **Description**: Migrated the legacy segmentation features to a modern, standardized Targets page with real-time Supabase integration.
+- **Actions**:
+  - [x] **Page Creation**: Created `src/app/network/targets/page.tsx` with a standardized "Obsidian & Glass" layout.
+  - [x] **Data Fetching**: Implemented `useTargets.ts` hook using TanStack Query to fetch target data and member counts from Supabase.
   - [x] **Standardized Layout**:
     - [x] **Contained Container**: Implemented full-page container with `h-[calc(100vh-8rem)]`.
     - [x] **Header Integration**: Moved search input and mode switcher (People/Accounts) into a unified page header.
-    - [x] **Scrollable Grid**: Created a scrollable card area for list entities with custom forensic styling.
+    - [x] **Scrollable Grid**: Created a scrollable card area for target entities with custom forensic styling.
     - [x] **Footer (Sync_Block)**: Added a standardized footer with `Total_Nodes` count and system status.
   - [x] **UI/UX Refinement**:
     - [x] Applied `font-mono tabular-nums` to node counts.
     - [x] Fixed "Updated" date positioning and formatting.
     - [x] Standardized card header icons (white color, consistent spacing).
-  - [x] **Navigation**: Added "Lists" button to the Sidebar below "Accounts".
+  - [x] **Navigation**: Added "Targets" button to the Sidebar below "Accounts".
 
 ### Call Data & Schema Migration
 - **Status**: Completed
@@ -166,7 +203,7 @@
   - [x] **Context Sidebar**: Enhanced the Right Sidebar with context-aware widgets (Volatility Index, Local Time, Weather) and entity-specific task filtering.
   - [x] **Forensic Terminal**: Upgraded the `ContactDossierPage` terminal with persistent notes (Supabase), click-to-type, system commands (/clear, /status), and command prompts.
   - [x] **Obsidian & Glass**: Standardized `nodal-glass` system and `space-y-8` grid gaps across core pages (People, Accounts, Emails, Settings).
-  - [x] **Collection Standardization**: Mirrored Emails page header/footer styles (Sync_Block, Total_Nodes) across all list pages (People, Accounts, Tasks, Sequences, Calls, Energy, Scripts).
+  - [x] **Collection Standardization**: Mirrored Emails page header/footer styles (Sync_Block, Total_Nodes) across all list pages (People, Accounts, Tasks, Protocols, Calls, Energy, Scripts).
 
 ### Nodal Architect (Glass Intelligence Overhaul)
 - **Status**: Completed
@@ -187,14 +224,32 @@
   - [x] **AI Router Diagnostics**: Added AI Router Diagnostics HUD to visualize model selection.
   - [x] **Model Optimization**: Optimized Gemini model list and removed redundant code blocks in `api/gemini/chat.js`.
 
+### Nodal Point Directive Implementation
+- **Status**: Completed
+- **Description**: Aligned the platform with the mission-focused "Nodal Point" philosophy by updating terminology, icons, and navigation logic.
+- **Actions**:
+  - [x] **Terminology Migration**:
+    - [x] Renamed "Lists" to "Targets" (Passive Admin -> Active Mission).
+    - [x] Renamed "Sequences" to "Protocols" (Linear Task -> Weaponized Workflow).
+    - [x] Updated task priorities from "Sequence" to "Protocol".
+    - [x] Updated organizational scanning to "Target_Pool".
+  - [x] **Navigation & Logic Refactoring**:
+    - [x] Refactored `useLists` hook to `useTargets` and `useSequences` to `useProtocols`.
+    - [x] Updated Sidebar icons to `Radar` (Targets) and `GitMerge` (Protocols).
+    - [x] Aligned all route directories and internal links (`/network/targets`, `/network/protocols`).
+    - [x] Updated Global Search (⌘K) to include Targets and Protocols with mission-focused identifiers.
+  - [x] **Type Safety**:
+    - [x] Created `src/types/targets.ts` and updated all references to use the `Target` interface.
+    - [x] Purged legacy `lists.ts` and `useLists.ts` files.
+
 ### Unified Global Search & Server-Side Search
 - **Status**: Completed
 - **Description**: Implemented high-performance, server-side search across all platform entities (Supabase) and a centralized Command Palette (⌘K).
 - **Actions**:
-  - [x] **Global Search Modal (⌘K)**: Updated `GlobalSearch.tsx` to search across Contacts, Accounts, Sequences, Tasks, Calls, and Emails using Supabase server-side queries.
-  - [x] **Page-Specific Search**: Migrated all page-level search functions (People, Accounts, Sequences, Tasks, Calls, Emails, Scripts, Energy) from client-side filtering to 400ms debounced server-side Supabase `ilike` queries.
+  - [x] **Global Search Modal (⌘K)**: Updated `GlobalSearch.tsx` to search across Contacts, Accounts, Protocols, Tasks, Calls, and Emails using Supabase server-side queries.
+  - [x] **Page-Specific Search**: Migrated all page-level search functions (People, Accounts, Protocols, Tasks, Calls, Emails, Scripts, Energy) from client-side filtering to 400ms debounced server-side Supabase `ilike` queries.
   - [x] **Supabase Integration**:
-    - Implemented `useSearchContacts`, `useSearchAccounts`, `useSearchSequences`, `useSearchTasks`, `useSearchCalls`, and `useSearchEmails` hooks.
+    - Implemented `useSearchContacts`, `useSearchAccounts`, `useSearchProtocols`, `useSearchTasks`, `useSearchCalls`, and `useSearchEmails` hooks.
     - Added total record counting (`useTasksCount`, `useCallsCount`, etc.) for accurate pagination during search.
   - [x] **Ownership Filtering**: Ensured all search queries respect user roles (admin vs. non-admin) and `ownerId` metadata.
   - [x] **Performance**: Optimized API calls using `useInfiniteQuery` and range-based pagination, reducing client-side memory load.
