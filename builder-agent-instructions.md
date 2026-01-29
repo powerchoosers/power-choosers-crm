@@ -52,18 +52,22 @@ The platform operates across three distinct environments/servers:
     -   *Note*: This single command concurrently starts both the Next.js frontend and the Node.js legacy backend.
 
 2.  **Production Environment (Cloud Run)**:
-    -   **Frontend (UI)**: `https://power-choosers-crm-792458658491.us-south1.run.app`
-    -   **Backend (Network/API)**: `https://nodal-point-network-792458658491.us-south1.run.app`
+    -   **Region**: `us-central1` (Optimized for cost and Custom Domain Mapping).
+    -   **Frontend (UI)**: `https://power-choosers-crm-792458658491.us-central1.run.app` (Mapped to `nodalpoint.io`)
+    -   **Backend (Network/API)**: `https://nodal-point-network-792458658491.us-central1.run.app`
     -   **Role**: The "Network" service handles Twilio webhooks, heavy API processing, and legacy backend logic to prevent recursive loops within the Next.js frontend service.
     -   **Deployment Strategy (Docker)**:
         -   **Context**: Build runs from root (`.`) to access all files.
         -   **Structure**: `server.js` is located at `/app/crm-platform/server.js`, while `node_modules` are at `/app/node_modules`.
         -   **Resolution**: We rely on Node.js native module resolution (looking in parent directories) so `crm-platform/server.js` correctly finds dependencies in `/app/node_modules` without needing `NODE_PATH` adjustments.
+    -   **Cost Management**:
+        -   **Domain Mapping**: We use native Cloud Run Domain Mapping (Free) instead of a Global Load Balancer ($18+/mo).
+        -   **Storage**: Artifact Registry uses a cleanup policy (`policy.json`) to delete images older than 30 days and keep only the 5 most recent versions.
 
 ### 🌐 Routing Logic (Proxying)
 To ensure the frontend can communicate with the backend regardless of environment, we use **Next.js Rewrites** in `crm-platform/next.config.ts`:
 - **Local Development**: Proxies `/api/*` to `http://127.0.0.1:3001`.
-- **Production**: Proxies `/api/*` to the **Network/API** Cloud Run URL (`nodal-point-network`).
+- **Production**: Proxies `/api/*` to the **Network/API** Cloud Run URL in `us-central1`.
 
 **CRITICAL**: Always ensure that any new API endpoints are tested against both the local backend and verified for Cloud Run compatibility.
 

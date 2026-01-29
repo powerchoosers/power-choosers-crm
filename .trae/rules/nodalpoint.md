@@ -77,17 +77,18 @@ Handles API requests and legacy logic during development.
 - **Command**: `node server.js` (Root Directory)
 
 ### 3. Production Environment (Cloud Run)
-The live platform operates across two distinct Cloud Run services to prevent recursive loops:
-- **Frontend (UI)**: `https://power-choosers-crm-792458658491.us-south1.run.app`
-- **Backend (Network/API)**: `https://nodal-point-network-792458658491.us-south1.run.app`
+The live platform operates across two distinct Cloud Run services in the **`us-central1`** region (optimized for cost and custom domain mapping):
+- **Frontend (UI)**: `https://power-choosers-crm-792458658491.us-central1.run.app` (Mapped to `nodalpoint.io`)
+- **Backend (Network/API)**: `https://nodal-point-network-792458658491.us-central1.run.app`
 - **Architecture**: The Frontend service handles the UI and routing, while the Network service handles Twilio webhooks, heavy API processing, and legacy backend logic.
+- **Cost Optimization**: We use **Cloud Run Domain Mapping** instead of a Global Load Balancer to eliminate idle networking costs.
 
 ## 📍 Routing & Proxy Logic
 
 We use **Next.js Rewrites** (`next.config.ts`) to handle seamless communication between the frontend and the correct backend:
 
 - **In Development**: All `/api/*` requests are proxied to the **Local Backend** (`127.0.0.1:3001`).
-- **In Production**: All `/api/*` requests are proxied to the **Network/API Service** (`nodal-point-network`).
+- **In Production**: All `/api/*` requests are proxied to the **Network/API Service** in `us-central1`.
 
 This ensures that code remains environment-agnostic while maintaining full functionality across `localhost` and `nodalpoint.io`.
 
