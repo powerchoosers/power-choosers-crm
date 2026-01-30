@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { differenceInCalendarDays, format, isValid, parseISO } from 'date-fns'
+import { differenceInCalendarDays, format, isValid, parseISO, formatDistanceToNow } from 'date-fns'
 import { 
   Activity, AlertTriangle, ArrowLeft, Clock, Globe, Linkedin, Mail, MapPin, Phone, 
   Lock, Unlock, Check, Sparkles, Plus, Star, Trash2,
@@ -19,6 +19,7 @@ import { CallListItem } from '@/components/calls/CallListItem'
 import { useUIStore } from '@/store/uiStore'
 import { useGeminiStore } from '@/store/geminiStore'
 import { Button } from '@/components/ui/button'
+import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -62,6 +63,7 @@ export default function ContactDossierPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [showSynced, setShowSynced] = useState(false)
   const [currentCallPage, setCurrentCallPage] = useState(1)
+  const [activeEditField, setActiveEditField] = useState<'logo' | 'website' | 'linkedin' | null>(null)
   const CALLS_PER_PAGE = 4
   const prevIsEditing = useRef(isEditing)
 
@@ -76,6 +78,9 @@ export default function ContactDossierPage() {
   const [editStrikePrice, setEditStrikePrice] = useState('')
   const [editAnnualUsage, setEditAnnualUsage] = useState('')
   const [editLocation, setEditLocation] = useState('')
+  const [editLogoUrl, setEditLogoUrl] = useState('')
+  const [editWebsite, setEditWebsite] = useState('')
+  const [editLinkedinUrl, setEditLinkedinUrl] = useState('')
   const [editServiceAddresses, setEditServiceAddresses] = useState<Array<{ address: string; isPrimary: boolean }>>([])
   
   // New Phone States
@@ -103,6 +108,9 @@ export default function ContactDossierPage() {
       setEditStrikePrice(contact.currentRate || '')
       setEditAnnualUsage(contact.annualUsage || '')
       setEditLocation(contact.location || '')
+      setEditLogoUrl((contact.logoUrl || contact.avatarUrl || '') as string)
+      setEditWebsite(contact.website || '')
+      setEditLinkedinUrl(contact.linkedinUrl || '')
       
       setEditMobile(contact.mobile || '')
       setEditWorkDirect(contact.workDirectPhone || '')
@@ -162,6 +170,9 @@ export default function ContactDossierPage() {
             currentRate: editStrikePrice,
             annualUsage: editAnnualUsage,
             location: editLocation,
+            logoUrl: editLogoUrl,
+            website: editWebsite,
+            linkedinUrl: editLinkedinUrl,
             serviceAddresses: editServiceAddresses,
             mobile: editMobile,
             workDirectPhone: editWorkDirect,
@@ -181,7 +192,7 @@ export default function ContactDossierPage() {
       }
       triggerSave()
     }
-  }, [isEditing, id, editName, editTitle, editCompany, editPhone, editEmail, editNotes, editSupplier, editStrikePrice, editAnnualUsage, editServiceAddresses, editMobile, editWorkDirect, editOther, editCompanyPhone, editPrimaryField, updateContact])
+  }, [isEditing, id, editName, editTitle, editCompany, editPhone, editEmail, editNotes, editSupplier, editStrikePrice, editAnnualUsage, editServiceAddresses, editMobile, editWorkDirect, editOther, editCompanyPhone, editPrimaryField, editLogoUrl, editWebsite, editLinkedinUrl, updateContact])
 
   const contactName = contact?.name || 'Unknown Contact'
   const contactTitle = contact?.title || ''
@@ -331,29 +342,55 @@ export default function ContactDossierPage() {
 
         <header className="flex-none px-6 py-6 md:px-8 border-b border-white/5 bg-zinc-900/80 backdrop-blur-sm relative z-10">
           <div className="flex items-center justify-between gap-6">
-            <div className="flex items-center gap-6">
-              <Button
-                variant="ghost"
-                size="icon"
+            <div className="flex items-center gap-3">
+              <button
                 onClick={() => router.back()}
-                className="text-zinc-500 hover:text-white hover:bg-white/5 -ml-2"
+                className="icon-button-forensic w-10 h-10 flex items-center justify-center -ml-2"
               >
                 <ArrowLeft className="w-5 h-5" />
-              </Button>
+              </button>
 
-              <div className="flex items-center gap-6">
-                {/* Refined Glyph Avatar - Nodal Glass Style */}
-                <div className="h-14 w-14 rounded-2xl nodal-glass flex items-center justify-center text-sm font-semibold text-white/90 border border-white/10 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.6)] overflow-hidden">
-                  {contactName
-                    .split(' ')
-                    .map((p) => p[0])
-                    .join('')
-                    .slice(0, 2)
-                    .toUpperCase()}
+              <div className="flex items-center gap-3 relative group/avatar">
+                <div onClick={() => isEditing && setActiveEditField(activeEditField === 'logo' ? null : 'logo')}>
+                  <ContactAvatar 
+                    name={contactName} 
+                    logoUrl={editLogoUrl || (contact.logoUrl as string) || (contact.avatarUrl as string)}
+                    size={56} 
+                    className={cn(
+                      "w-14 h-14 transition-all",
+                      isEditing && "cursor-pointer hover:border-[#002FA7]/50 hover:shadow-[0_0_20px_rgba(0,47,167,0.2)]"
+                    )}
+                  />
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 mb-1">
+                <AnimatePresence>
+                  {isEditing && activeEditField === 'logo' && (
+                    <motion.div
+                      initial={{ width: 0, opacity: 0, x: -10 }}
+                      animate={{ width: "auto", opacity: 1, x: 0 }}
+                      exit={{ width: 0, opacity: 0, x: -10 }}
+                      className="absolute left-full ml-3 top-1/2 -translate-y-1/2 flex items-center z-50"
+                    >
+                      <div className="bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-lg p-2 shadow-2xl flex items-center gap-2 min-w-[320px]">
+                        <div className="p-1.5 bg-white/5 rounded border border-white/10 text-zinc-500">
+                          <Activity className="w-3.5 h-3.5" />
+                        </div>
+                        <input
+                          type="text"
+                          value={editLogoUrl}
+                          onChange={(e) => setEditLogoUrl(e.target.value)}
+                          placeholder="PASTE AVATAR/LOGO URL..."
+                          className="bg-transparent border-none focus:ring-0 text-[10px] font-mono text-white w-full placeholder:text-zinc-700 uppercase tracking-widest"
+                          autoFocus
+                          onKeyDown={(e) => e.key === 'Enter' && setActiveEditField(null)}
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-3 mb-0.5">
                     {isEditing ? (
                       <input
                         type="text"
@@ -368,32 +405,123 @@ export default function ContactDossierPage() {
                         <h1 className="text-2xl font-semibold tracking-tighter text-white">{editName || contactName}</h1>
                         
                         {/* THE SIGNAL ARRAY */}
-                        <div className="flex items-center gap-1 bg-white/[0.02] rounded-full p-1 border border-white/5 ml-2">
-                          <a 
-                            href={contact?.website || '#'}
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className={cn(
-                              "p-1.5 rounded-full transition-colors",
-                              contact?.website ? "hover:bg-zinc-700 text-white" : "text-zinc-600 cursor-not-allowed"
-                            )} 
-                            title="Visit Website"
-                          >
-                            <Globe className="w-3.5 h-3.5" />
-                          </a>
+                        <div className="flex items-center gap-1 bg-white/[0.02] rounded-full p-1 border border-white/5 ml-2 relative group/links">
+                          <div className="flex items-center">
+                            <button 
+                              onClick={() => {
+                                if (isEditing) {
+                                  setActiveEditField(activeEditField === 'website' ? null : 'website')
+                                } else {
+                                  const url = editWebsite || contact?.website
+                                  if (url) window.open(url.startsWith('http') ? url : `https://${url}`, '_blank')
+                                }
+                              }}
+                              className={cn(
+                                "icon-button-forensic p-1.5",
+                                !editWebsite && !contact?.website && "opacity-50 cursor-not-allowed",
+                                isEditing && activeEditField === 'website' && "bg-[#002FA7]/20 text-white",
+                                isEditing && "hover:bg-[#002FA7]/20 transition-colors"
+                              )} 
+                              title={isEditing ? "Edit Website" : "Visit Website"}
+                            >
+                              <Globe className="w-3.5 h-3.5" />
+                            </button>
+                            
+                            <AnimatePresence>
+                              {isEditing && activeEditField === 'website' && (
+                                <motion.div
+                                  initial={{ width: 0, opacity: 0 }}
+                                  animate={{ width: "auto", opacity: 1 }}
+                                  exit={{ width: 0, opacity: 0 }}
+                                  className="flex items-center overflow-hidden"
+                                >
+                                  <input
+                                    type="text"
+                                    value={editWebsite}
+                                    onChange={(e) => setEditWebsite(e.target.value)}
+                                    placeholder="WEBSITE URL"
+                                    className="bg-transparent border-none focus:ring-0 text-[9px] font-mono text-white w-24 placeholder:text-zinc-700 uppercase tracking-widest h-6"
+                                    autoFocus
+                                    onKeyDown={(e) => e.key === 'Enter' && setActiveEditField(null)}
+                                  />
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+
                           <div className="w-px h-3 bg-white/10" />
-                          <a 
-                            href={contact?.linkedinUrl || '#'}
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className={cn(
-                              "p-1.5 rounded-full transition-colors",
-                              contact?.linkedinUrl ? "hover:bg-[#0077b5] text-white" : "text-zinc-600 cursor-not-allowed"
-                            )} 
-                            title="View LinkedIn"
-                          >
-                            <Linkedin className="w-3.5 h-3.5" />
-                          </a>
+
+                          <div className="flex items-center">
+                            <button 
+                              onClick={() => {
+                                if (isEditing) {
+                                  setActiveEditField(activeEditField === 'linkedin' ? null : 'linkedin')
+                                } else {
+                                  const url = editLinkedinUrl || contact?.linkedinUrl
+                                  if (url) window.open(url.startsWith('http') ? url : `https://${url}`, '_blank')
+                                }
+                              }}
+                              className={cn(
+                                "icon-button-forensic p-1.5",
+                                !editLinkedinUrl && !contact?.linkedinUrl && "opacity-50 cursor-not-allowed",
+                                isEditing && activeEditField === 'linkedin' && "bg-[#002FA7]/20 text-white",
+                                isEditing && "hover:bg-[#002FA7]/20 transition-colors"
+                              )} 
+                              title={isEditing ? "Edit LinkedIn" : "View LinkedIn"}
+                            >
+                              <Linkedin className="w-3.5 h-3.5" />
+                            </button>
+
+                            <AnimatePresence>
+                              {isEditing && activeEditField === 'linkedin' && (
+                                <motion.div
+                                  initial={{ width: 0, opacity: 0 }}
+                                  animate={{ width: "auto", opacity: 1 }}
+                                  exit={{ width: 0, opacity: 0 }}
+                                  className="flex items-center overflow-hidden"
+                                >
+                                  <input
+                                    type="text"
+                                    value={editLinkedinUrl}
+                                    onChange={(e) => setEditLinkedinUrl(e.target.value)}
+                                    placeholder="LINKEDIN URL"
+                                    className="bg-transparent border-none focus:ring-0 text-[9px] font-mono text-white w-24 placeholder:text-zinc-700 uppercase tracking-widest h-6"
+                                    autoFocus
+                                    onKeyDown={(e) => e.key === 'Enter' && setActiveEditField(null)}
+                                  />
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        </div>
+
+                        {/* Status/Sync Indicators */}
+                        <div className="flex items-center gap-2 ml-2">
+                          {/* List Membership Badge (Swapped to first position) */}
+                          {contact.listName && (
+                            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 backdrop-blur-sm">
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                              <span className="text-[10px] font-mono uppercase tracking-widest font-medium text-emerald-500">
+                                {contact.listName}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Last Sync */}
+                          {contact.lastContact && (
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-zinc-900/30 border border-white/5">
+                              <Clock className="w-2.5 h-2.5 text-zinc-600" />
+                              <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
+                                Last_Sync: {(() => {
+                                  try {
+                                    return formatDistanceToNow(new Date(contact.lastContact), { addSuffix: true }).toUpperCase()
+                                  } catch (e) {
+                                    return 'UNKNOWN'
+                                  }
+                                })()}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </>
                     )}
@@ -480,26 +608,26 @@ export default function ContactDossierPage() {
             </div>
 
             <div className="text-right">
-              <div className="flex flex-col items-end gap-2">
+              <div className="flex flex-col items-end gap-0.5">
                 <div className="flex items-center gap-2">
-                  <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Dossier Status</div>
-                  <button
-                    onClick={toggleEditing}
-                    className={cn(
-                      "p-1 rounded-md transition-all duration-300",
-                      isEditing 
-                        ? "text-blue-400 bg-blue-500/10 hover:bg-blue-500/20" 
-                        : "text-zinc-500 hover:text-white hover:bg-white/5"
-                    )}
-                    title={isEditing ? "Lock Dossier" : "Unlock Dossier"}
-                  >
-                    {isEditing ? (
-                      <Unlock className="w-3.5 h-3.5" />
-                    ) : (
-                      <Lock className="w-3.5 h-3.5" />
-                    )}
-                  </button>
-                </div>
+                    <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Dossier Status</div>
+                    <button
+                      onClick={toggleEditing}
+                      className={cn(
+                        "w-7 h-7 flex items-center justify-center transition-all duration-300",
+                        isEditing 
+                          ? "text-blue-400 bg-blue-400/10 border border-blue-400/30 rounded-lg shadow-[0_0_15px_rgba(59,130,246,0.2)] scale-110" 
+                          : "text-zinc-500 hover:text-white bg-transparent border border-transparent"
+                      )}
+                      title={isEditing ? "Lock Dossier" : "Unlock Dossier"}
+                    >
+                      {isEditing ? (
+                        <Unlock className="w-4 h-4" />
+                      ) : (
+                        <Lock className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
                 <div className="flex items-center gap-2">
                   <div className={cn(
                     "h-2 w-2 rounded-full animate-pulse",
@@ -658,11 +786,11 @@ export default function ContactDossierPage() {
               </div>
             </div>
 
-            <div className="col-span-12 lg:col-span-8 h-full overflow-y-auto p-6 md:p-8 scrollbar-thin scrollbar-thumb-zinc-700/50 hover:scrollbar-thumb-[#002FA7]/50 scrollbar-track-transparent transition-all duration-300 np-scroll">
-              <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-1000 delay-300">
+            <div className="col-span-12 lg:col-span-8 h-full overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-zinc-700/50 hover:scrollbar-thumb-[#002FA7]/50 scrollbar-track-transparent transition-all duration-300 np-scroll">
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-1000 delay-300">
                 {/* FORENSIC NOTES TERMINAL */}
                 <div 
-                  className={`rounded-2xl border transition-all duration-500 bg-zinc-950/80 backdrop-blur-xl p-8 min-h-[500px] relative overflow-hidden shadow-2xl group flex flex-col font-mono ${isEditing ? 'border-[#002FA7]/50 ring-1 ring-[#002FA7]/20 cursor-text' : 'border-white/10'}`}
+                  className={`rounded-2xl border transition-all duration-500 bg-zinc-950/80 backdrop-blur-xl p-6 min-h-[500px] relative overflow-hidden shadow-2xl group flex flex-col font-mono ${isEditing ? 'border-[#002FA7]/50 ring-1 ring-[#002FA7]/20 cursor-text' : 'border-white/10'}`}
                   onClick={() => {
                     if (!isEditing) handleTerminalClick()
                   }}
@@ -792,18 +920,18 @@ export default function ContactDossierPage() {
                 </div>
 
                 {/* RECENT CALLS & AI INSIGHTS */}
-                <div className="rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl pt-8 px-8 pb-0 shadow-xl">
+                <div className="rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl p-6 shadow-xl">
                   <div className="flex items-center justify-between mb-6">
                     <div>
                       <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                        <Mic className="w-5 h-5 text-[#002FA7]" /> Transmission Log
+                        <Mic className="w-5 h-5 text-white" /> Transmission Log
                       </h3>
                       <p className="text-xs text-zinc-500 mt-1 uppercase tracking-widest font-mono">Forensic Voice Data</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#002FA7]/10 border border-[#002FA7]/20">
+                      <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#002FA7]/20 border border-[#002FA7]/30">
                         <Sparkles className="w-3 h-3 text-[#002FA7]" />
-                        <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-tighter">AI_ENABLED</span>
+                        <span className="text-[10px] font-mono text-white uppercase tracking-tighter">AI_ENABLED</span>
                       </div>
                       <button 
                         className="text-zinc-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5"

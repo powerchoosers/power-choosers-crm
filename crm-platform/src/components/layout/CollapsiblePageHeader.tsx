@@ -1,15 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, Plus, X, Filter } from 'lucide-react'
+import { Search, Plus, X, Filter, ChevronLeft } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import Link from 'next/link'
 
 interface CollapsiblePageHeaderProps {
-  title: string
-  description: string
+  title: string | React.ReactNode
+  description?: string | React.ReactNode
+  backHref?: string
+  hideTitle?: boolean
   primaryAction?: {
     label: string
     onClick: () => void
@@ -32,6 +35,8 @@ interface CollapsiblePageHeaderProps {
 export function CollapsiblePageHeader({
   title,
   description,
+  backHref,
+  hideTitle = false,
   primaryAction,
   secondaryAction,
   globalFilter,
@@ -44,12 +49,34 @@ export function CollapsiblePageHeader({
 
   return (
     <div className="flex-none space-y-2">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-4xl font-semibold tracking-tighter text-white">{title}</h1>
-          <p className="text-zinc-500 mt-1">{description}</p>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4 min-w-0">
+          {backHref && (
+            <Link 
+              href={backHref} 
+              className="icon-button-forensic flex items-center justify-center w-8 h-8"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </Link>
+          )}
+          {!hideTitle && (
+            <div className="min-w-0">
+              {typeof title === 'string' ? (
+                <h1 className="text-4xl font-semibold tracking-tighter text-white truncate">{title}</h1>
+              ) : (
+                title
+              )}
+              {description && (
+                typeof description === 'string' ? (
+                  <p className="text-zinc-500 mt-1 truncate">{description}</p>
+                ) : (
+                  description
+                )
+              )}
+            </div>
+          )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className={cn("flex items-center gap-3 shrink-0", hideTitle && "w-full justify-end")}>
           <AnimatePresence mode="wait">
             {!isSearchVisible && (
               <motion.div
@@ -59,14 +86,12 @@ export function CollapsiblePageHeader({
                 exit={{ opacity: 0, x: 20, scale: 0.8 }}
                 transition={{ duration: 0.2 }}
               >
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <button 
                   onClick={() => setIsSearchVisible(true)}
-                  className="text-zinc-400 hover:text-white hover:bg-white/10 rounded-full h-10 w-10"
+                  className="icon-button-forensic h-10 w-10"
                 >
                   <Search size={20} />
-                </Button>
+                </button>
               </motion.div>
             )}
           </AnimatePresence>
@@ -75,7 +100,7 @@ export function CollapsiblePageHeader({
               variant="outline"
               onClick={secondaryAction.onClick}
               disabled={secondaryAction.disabled}
-              className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5 nodal-glass h-10 px-4"
+              className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5 nodal-glass h-10 px-4 rounded-xl flex items-center gap-2 transition-all"
             >
               {secondaryAction.icon}
               {secondaryAction.label}
@@ -85,9 +110,9 @@ export function CollapsiblePageHeader({
             <Button 
               onClick={primaryAction.onClick}
               disabled={primaryAction.disabled}
-              className="bg-white text-zinc-950 hover:bg-zinc-200 font-medium h-10 px-4 transition-all hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)]"
+              className="bg-white text-zinc-950 hover:bg-zinc-200 font-medium h-10 px-4 rounded-xl transition-all hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)] flex items-center gap-2"
             >
-              {primaryAction.icon || <Plus size={18} className="mr-2" />}
+              {primaryAction.icon || <Plus size={18} />}
               {primaryAction.label}
             </Button>
           )}
@@ -115,26 +140,24 @@ export function CollapsiblePageHeader({
               </div>
               <div className="flex items-center gap-2">
                 <Button 
-                  variant="outline" 
+                  variant="outline"
                   onClick={onFilterToggle}
                   className={cn(
-                    "gap-2 transition-all h-9",
+                    "gap-2 transition-all h-9 px-3 rounded-lg flex items-center border",
                     isFilterActive 
                       ? "text-white border-[#002FA7]/50 bg-[#002FA7]/5 shadow-[0_0_15px_-5px_rgba(0,47,167,0.4)]" 
-                      : "bg-input/30 border-input text-zinc-500 hover:text-white hover:bg-input/50"
+                      : "bg-white/5 border-white/10 text-zinc-500 hover:text-white hover:bg-white/10"
                   )}
                 >
                   <Filter size={16} className={cn(isFilterActive ? "text-white" : "text-inherit")} />
-                  Filter
+                  <span className="text-sm font-medium">Filter</span>
                 </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <button 
                   onClick={() => setIsSearchVisible(false)}
-                  className="h-9 w-9 text-zinc-500 hover:text-white hover:bg-white/5"
+                  className="icon-button-forensic h-9 w-9"
                 >
                   <X size={18} />
-                </Button>
+                </button>
               </div>
             </div>
           </motion.div>

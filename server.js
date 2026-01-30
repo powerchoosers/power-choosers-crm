@@ -134,6 +134,7 @@ import geminiChatHandler from './api/gemini/chat.js';
 import logoHandler from './api/logo.js';
 import twilioBridgeHandler from './api/twilio/bridge.js';
 import twilioOperatorWebhookHandler from './api/twilio/operator-webhook.js';
+import aiOptimizeHandler from './api/ai/optimize.js';
 import twilio from 'twilio';
 import { admin } from './api/_firebase.js';
 
@@ -507,6 +508,20 @@ async function handleApiTwilioAIInsights(req, res) {
   return await twilioAiInsightsHandler(req, res);
 }
 
+async function handleApiAiOptimize(req, res) {
+  if (req.method === 'POST') {
+    try {
+      req.body = await parseRequestBody(req);
+    } catch (error) {
+      console.error('[Server] AI Optimize API - Body Parse Error:', error.message);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid request body' }));
+      return;
+    }
+  }
+  return await aiOptimizeHandler(req, res);
+}
+
 async function handleApiCalls(req, res) {
   // Parse body for POST requests
   if (req.method === 'POST') {
@@ -704,9 +719,12 @@ const server = http.createServer(async (req, res) => {
     return handleApiTwilioConversationalIntelligenceWebhook(req, res);
   }
   if (pathname === '/api/twilio/poll-ci-analysis') {
-    return handleApiTwilioPollCIAnalysis(req, res);
-  }
-  if (pathname === '/api/twilio/recording') {
+      return handleApiTwilioPollCIAnalysis(req, res);
+    }
+    if (pathname === '/api/ai/optimize') {
+      return handleApiAiOptimize(req, res);
+    }
+    if (pathname === '/api/twilio/recording') {
     return handleApiTwilioRecording(req, res);
   }
   if (pathname === '/api/twilio/ai-insights') {

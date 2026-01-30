@@ -88,18 +88,39 @@ export function useSearchAccounts(queryTerm: string) {
   });
 }
 
-export function useAccounts(searchQuery?: string, filters?: AccountFilters) {
+export function useAccounts(searchQuery?: string, filters?: AccountFilters, listId?: string, enabled = true) {
   const { user, role, loading } = useAuth()
 
   return useInfiniteQuery({
-    queryKey: ['accounts', user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters],
+    queryKey: ['accounts', user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters, listId],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       try {
-        if (loading) return { accounts: [], nextCursor: null };
+        if (!enabled || loading) return { accounts: [], nextCursor: null };
         if (!user && !loading) return { accounts: [], nextCursor: null };
 
         let query = supabase.from('accounts').select('*', { count: 'exact' });
+
+        if (listId) {
+          // Fetch targetIds from list_members first due to lack of FK for inner join
+          const { data: memberData, error: memberError } = await supabase
+            .from('list_members')
+            .select('targetId')
+            .eq('listId', listId)
+            .in('targetType', ['accounts', 'account', 'companies', 'company']);
+
+          if (memberError) {
+            console.error("Error fetching list members:", memberError);
+            return { accounts: [], nextCursor: null };
+          }
+
+          const targetIds = memberData?.map(m => m.targetId).filter(Boolean) || [];
+          if (targetIds.length === 0) {
+            return { accounts: [], nextCursor: null };
+          }
+
+          query = query.in('id', targetIds);
+        }
 
         // Apply ownership filter for non-admin users
         if (role !== 'admin' && user?.email) {
@@ -130,6 +151,10 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters) {
           .order('name', { ascending: true });
 
         if (error) {
+          // Suppress logging for aborted requests
+          if (error.message?.includes('Abort')) {
+            throw error;
+          }
           console.error("Supabase error:", error);
           throw error;
         }
@@ -181,7 +206,7 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters) {
       }
     },
     getNextPageParam: (lastPage) => lastPage?.nextCursor ?? undefined,
-    enabled: !loading && !!user, // Only run query when user is loaded
+    enabled: enabled && !loading && !!user, // Only run query when user is loaded
     staleTime: 1000 * 60 * 5, // 5 minutes
     gcTime: 1000 * 60 * 60 * 24,   // 24 hours
   })
@@ -243,16 +268,35 @@ export function useAccount(id: string) {
   })
 }
 
-export function useAccountsCount(searchQuery?: string, filters?: AccountFilters) {
+export function useAccountsCount(searchQuery?: string, filters?: AccountFilters, listId?: string, enabled = true) {
   const { user, role, loading } = useAuth()
 
   return useQuery({
-    queryKey: ['accounts-count', user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters],
+    queryKey: ['accounts-count', user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters, listId],
     queryFn: async () => {
-      if (loading) return 0
+      if (!enabled || loading) return 0
       if (!user) return 0
 
-      let query = supabase.from('accounts').select('*', { count: 'exact', head: true })
+      let query = supabase.from('accounts').select('id', { count: 'exact', head: true })
+
+      if (listId) {
+        // Fetch targetIds from list_members first
+        const { data: memberData, error: memberError } = await supabase
+          .from('list_members')
+          .select('targetId')
+          .eq('listId', listId)
+          .in('targetType', ['accounts', 'account', 'companies', 'company']);
+
+        if (memberError) {
+          console.error("Error fetching list members for count:", memberError);
+          return 0;
+        }
+
+        const targetIds = memberData?.map(m => m.targetId).filter(Boolean) || [];
+        if (targetIds.length === 0) return 0;
+
+        query = query.in('id', targetIds);
+      }
 
       if (role !== 'admin' && user.email) {
         query = query.eq('ownerId', user.email)
@@ -283,7 +327,7 @@ export function useAccountsCount(searchQuery?: string, filters?: AccountFilters)
 
       return count || 0
     },
-    enabled: !loading && !!user,
+    enabled: enabled && !loading && !!user,
     staleTime: 1000 * 60 * 5,
   })
 }

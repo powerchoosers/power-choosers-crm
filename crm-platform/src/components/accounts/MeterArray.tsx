@@ -19,24 +19,27 @@ interface MeterArrayProps {
 
 export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], onAddMeter }) => {
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xs font-mono text-zinc-500 uppercase tracking-[0.2em]">Grid Connection Points (ESI-IDs)</h3>
+    <div className="rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl overflow-hidden flex flex-col">
+      <div className="flex justify-between items-center p-4 border-b border-white/5 bg-white/[0.02]">
+        <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+          Grid_Connection_Points <span className="text-zinc-700">[{meters.length}]</span>
+        </h3>
         <button 
           onClick={onAddMeter}
-          className="text-[10px] text-[#002FA7] hover:text-[#002FA7]/80 font-mono flex items-center gap-1 uppercase tracking-widest transition-colors"
+          className="text-[10px] text-zinc-500 hover:text-zinc-400 font-mono flex items-center gap-1 uppercase tracking-widest transition-colors"
         >
-          <Plus className="w-3 h-3" /> Add Meter
+          <Plus className="w-3 h-3 text-zinc-500" /> Add Meter
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {meters.length > 0 ? (
-          meters.map((meter) => (
-            <div 
-              key={meter.id} 
-              className="group relative nodal-glass p-4 rounded-xl border border-white/5 hover:border-[#002FA7]/30 transition-all duration-300"
-            >
+      <div className="p-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {meters.length > 0 ? (
+            meters.map((meter) => (
+              <div 
+                key={meter.id} 
+                className="group relative bg-black/40 p-4 rounded-xl border border-white/5 hover:border-[#002FA7]/30 transition-all duration-300"
+              >
               <div className="flex justify-between items-start mb-2">
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded-lg bg-[#002FA7]/10 border border-[#002FA7]/20">
@@ -74,5 +77,6 @@ export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], onAddMeter 
         )}
       </div>
     </div>
+  </div>
   )
 }

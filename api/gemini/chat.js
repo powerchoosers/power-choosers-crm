@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { generateEmbedding } from '../utils/embeddings.js';
 import { supabaseAdmin } from '../_supabase.js';
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
@@ -123,6 +124,18 @@ const tools = [
         }
       },
       {
+        name: 'search_emails',
+        description: 'Search across ALL emails in the CRM by keyword (subject, content, sender). Use this to find emails when you do not know the specific contact.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            query: { type: 'STRING', description: 'Search term for subject, body, or sender' },
+            limit: { type: 'NUMBER', description: 'Max results (default 10)' }
+          },
+          required: ['query']
+        }
+      },
+      {
         name: 'search_prospects',
         description: 'Search for new prospects (people) using Apollo API.',
         parameters: {
@@ -178,13 +191,14 @@ const tools = [
       },
       {
         name: 'search_interactions',
-        description: 'Search through past call transcripts and email history for a contact or account.',
+        description: 'Global Semantic Search. Search through past call transcripts, email history, accounts, and contacts. Use this to find ANY information across the entire CRM by keyword or topic.',
         parameters: {
           type: 'OBJECT',
           properties: {
-            contact_id: { type: 'STRING' },
-            account_id: { type: 'STRING' },
-            limit: { type: 'NUMBER', description: 'Max results (default 5)' }
+            query: { type: 'STRING', description: 'Keyword or topic to search for (e.g. "pricing", "contract renewal")' },
+            contact_id: { type: 'STRING', description: 'Optional: filter by contact ID' },
+            account_id: { type: 'STRING', description: 'Optional: filter by account ID' },
+            limit: { type: 'NUMBER', description: 'Max results per type (default 5)' }
           }
         }
       },
@@ -216,12 +230,37 @@ const tools = [
 // Tool implementation handlers
 const toolHandlers = {
   list_contacts: async ({ search, limit = 10 }) => {
-    let query = supabaseAdmin.from('contacts').select('*').limit(limit);
+    let data = [];
+    let usedVector = false;
+
     if (search) {
-      query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+      try {
+        const embedding = await generateEmbedding(search);
+        if (embedding) {
+          const { data: vectorResults, error } = await supabaseAdmin.rpc('match_contacts', {
+            query_embedding: embedding,
+            match_threshold: 0.3,
+            match_count: limit
+          });
+          if (!error && vectorResults) {
+            data = vectorResults;
+            usedVector = true;
+          }
+        }
+      } catch (e) {
+        console.error('[list_contacts] Vector error:', e);
+      }
     }
-    const { data, error } = await query;
-    if (error) throw error;
+
+    if (!usedVector) {
+      let query = supabaseAdmin.from('contacts').select('*').limit(limit);
+      if (search) {
+        query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+      }
+      const { data: keywordData, error } = await query;
+      if (error) throw error;
+      data = keywordData;
+    }
     return data;
   },
   list_deals: async ({ account_id, status = 'all' }) => {
@@ -232,17 +271,126 @@ const toolHandlers = {
     if (error) throw error;
     return data;
   },
-  search_interactions: async ({ contact_id, account_id, limit = 5 }) => {
+  search_interactions: async ({ query, contact_id, account_id, limit = 5 }) => {
     const results = {
       calls: [],
       emails: []
     };
 
+    // If we have a query, try vector search first
+    if (query) {
+      try {
+        const embedding = await generateEmbedding(query);
+        if (embedding) {
+          // 1. Search Calls
+          const { data: callResults } = await supabaseAdmin.rpc('match_calls', {
+            query_embedding: embedding,
+            match_threshold: 0.3,
+            match_count: limit
+          });
+          
+          if (callResults && callResults.length > 0) {
+             const callIds = callResults.map(c => c.id);
+             const { data: fullCalls } = await supabaseAdmin
+                .from('calls')
+                .select('*, contacts(first_name, last_name, email), accounts(name)')
+                .in('id', callIds);
+             
+             if (fullCalls) {
+                results.calls = fullCalls;
+             }
+          }
+
+          // 1.1 Search Call Details (Transcripts)
+          const { data: detailResults } = await supabaseAdmin.rpc('match_call_details', {
+            query_embedding: embedding,
+            match_threshold: 0.3,
+            match_count: limit
+          });
+
+          if (detailResults && detailResults.length > 0) {
+            const detailIds = detailResults.map(d => d.id);
+            const { data: fullDetails } = await supabaseAdmin
+                .from('call_details')
+                .select('*, calls(*, contacts(first_name, last_name, email), accounts(name))')
+                .in('id', detailIds);
+
+            if (fullDetails) {
+              results.transcripts = fullDetails;
+            }
+          }
+
+          // 1.2 Search Accounts (Semantic)
+          const { data: accountResults } = await supabaseAdmin.rpc('match_accounts', {
+            query_embedding: embedding,
+            match_threshold: 0.3,
+            match_count: limit
+          });
+          if (accountResults && accountResults.length > 0) {
+            results.accounts = accountResults;
+          }
+
+          // 1.3 Search Contacts (Semantic)
+          const { data: contactResults } = await supabaseAdmin.rpc('match_contacts', {
+            query_embedding: embedding,
+            match_threshold: 0.3,
+            match_count: limit
+          });
+          if (contactResults && contactResults.length > 0) {
+            results.contacts = contactResults;
+          }
+
+          // 2. Search Emails
+          const { data: emailResults } = await supabaseAdmin.rpc('match_emails', {
+            query_embedding: embedding,
+            match_threshold: 0.3,
+            match_count: limit
+          });
+
+          if (emailResults) {
+            results.emails = emailResults;
+          }
+          
+          // If we have filters, apply them to the vector results
+          if (contact_id) {
+            results.calls = results.calls.filter(c => c.contactId === contact_id);
+            results.emails = results.emails.filter(e => e.contactId === contact_id);
+            if (results.transcripts) {
+              results.transcripts = results.transcripts.filter(t => t.calls?.contactId === contact_id);
+            }
+            if (results.contacts) {
+              results.contacts = results.contacts.filter(c => c.id === contact_id);
+            }
+          } else if (account_id) {
+            results.calls = results.calls.filter(c => c.accountId === account_id);
+            results.emails = results.emails.filter(e => e.accountId === account_id);
+            if (results.transcripts) {
+              results.transcripts = results.transcripts.filter(t => t.calls?.accountId === account_id);
+            }
+            if (results.accounts) {
+              results.accounts = results.accounts.filter(a => a.id === account_id);
+            }
+          }
+
+          // If we have enough results after filtering, return them
+          if (results.calls.length > 0 || results.emails.length > 0 || (results.transcripts && results.transcripts.length > 0) || results.accounts?.length > 0 || results.contacts?.length > 0) {
+            return results;
+          }
+        }
+      } catch (e) {
+        console.error('[search_interactions] Vector error:', e);
+      }
+    }
+
+    // Fallback: If vector search found nothing or filters were too restrictive, do keyword/ID search
     if (contact_id) {
       const [calls, emails] = await Promise.all([
         supabaseAdmin.from('calls').select('*').eq('contactId', contact_id).order('timestamp', { ascending: false }).limit(limit),
         supabaseAdmin.from('emails').select('*').eq('contactId', contact_id).order('timestamp', { ascending: false }).limit(limit)
       ]);
+      
+      // If we already had vector results, we might want to merge or prioritize? 
+      // For simplicity, if IDs are provided, we prioritize those records.
       results.calls = calls.data || [];
       results.emails = emails.data || [];
     } else if (account_id) {
@@ -380,24 +528,74 @@ const toolHandlers = {
     return data;
   },
   list_accounts: async ({ search, industry, expiration_year, limit = 10 }) => {
-    let query = supabaseAdmin.from('accounts').select('*').limit(limit);
-    if (industry) {
-      // Use or condition to check both industry column and metadata
-      query = query.or(`industry.ilike.%${industry}%,metadata->>industry.ilike.%${industry}%`);
-    }
+    let data = [];
+    let usedVector = false;
+
+    // Try Vector Search first if search term is present
     if (search) {
-      query = query.or(`name.ilike.%${search}%,domain.ilike.%${search}%,industry.ilike.%${search}%,metadata->>industry.ilike.%${search}%`);
+      try {
+        const embedding = await generateEmbedding(search);
+        if (embedding) {
+          console.log(`[list_accounts] Using vector search for: "${search}"`);
+          const { data: vectorResults, error } = await supabaseAdmin.rpc('match_accounts', {
+            query_embedding: embedding,
+            match_threshold: 0.3, // Lower threshold to ensure results, then rank
+            match_count: limit * 2 // Fetch more to filter
+          });
+          
+          if (!error && vectorResults) {
+            data = vectorResults;
+            usedVector = true;
+          } else if (error) {
+            console.error('[list_accounts] Vector search error:', error);
+          }
+        }
+      } catch (e) {
+        console.error('[list_accounts] Vector generation error:', e);
+      }
     }
-    if (expiration_year) {
-      const start = `${expiration_year}-01-01`;
-      const end = `${expiration_year}-12-31`;
-      // Check both top-level and metadata for contract expiration (multiple formats and year suffixes)
-      query = query.or(`contract_end_date.gte.${start},contract_end_date.lte.${end},metadata->>contract_end_date.gte.${start},metadata->>contract_end_date.lte.${end},metadata->>contractEndDate.gte.${start},metadata->>contractEndDate.lte.${end},metadata->>contractEndDate.ilike.%/${expiration_year},metadata->>contract_end_date.ilike.%/${expiration_year}`);
+
+    // Fallback to Keyword Search if Vector failed or wasn't used
+    if (!usedVector) {
+        let query = supabaseAdmin.from('accounts').select('*').limit(limit);
+        if (industry) {
+          query = query.or(`industry.ilike.%${industry}%,metadata->>industry.ilike.%${industry}%`);
+        }
+        if (search) {
+          query = query.or(`name.ilike.%${search}%,domain.ilike.%${search}%,industry.ilike.%${search}%,metadata->>industry.ilike.%${search}%`);
+        }
+        if (expiration_year) {
+           const start = `${expiration_year}-01-01`;
+           const end = `${expiration_year}-12-31`;
+           query = query.or(`contract_end_date.gte.${start},contract_end_date.lte.${end},metadata->>contract_end_date.gte.${start},metadata->>contract_end_date.lte.${end},metadata->>contractEndDate.gte.${start},metadata->>contractEndDate.lte.${end},metadata->>contractEndDate.ilike.%/${expiration_year},metadata->>contract_end_date.ilike.%/${expiration_year}`);
+        }
+        const { data: keywordData, error } = await query;
+        if (error) throw error;
+        data = keywordData || [];
     }
-    const { data, error } = await query;
-    if (error) throw error;
     
-    console.log(`[list_accounts] Found ${data?.length || 0} raw records`);
+    // Apply filters in-memory if vector search was used (since RPC didn't filter by industry/year)
+    if (usedVector) {
+        if (industry) {
+            const indLower = industry.toLowerCase();
+            data = data.filter(r => 
+                (r.industry && r.industry.toLowerCase().includes(indLower)) || 
+                (r.metadata?.industry && r.metadata.industry.toLowerCase().includes(indLower))
+            );
+        }
+        if (expiration_year) {
+             // Simplified check
+             const yearStr = String(expiration_year);
+             data = data.filter(r => {
+                 const d = r.contract_end_date || r.metadata?.contract_end_date || r.metadata?.contractEndDate;
+                 return d && (String(d).includes(yearStr) || String(d).includes(yearStr.slice(2))); // 2026 or /26
+             });
+        }
+        // Slice to limit
+        data = data.slice(0, limit);
+    }
+    
+    console.log(`[list_accounts] Found ${data?.length || 0} raw records (Vector: ${usedVector})`);
 
     // Normalize results to ensure promoted fields are available
     return data.map(record => {
@@ -462,6 +660,59 @@ const toolHandlers = {
       userEmail
     });
     return result;
+  },
+  search_emails: async ({ query, limit = 10 }) => {
+    // Global email search with Vector Support
+    let data = [];
+    let usedVector = false;
+
+    if (query) {
+      try {
+        const embedding = await generateEmbedding(query);
+        if (embedding) {
+          const { data: vectorResults, error } = await supabaseAdmin.rpc('match_emails', {
+            query_embedding: embedding,
+            match_threshold: 0.3,
+            match_count: limit
+          });
+          
+          if (!error && vectorResults) {
+            // Need to join contacts/accounts manually since RPC only returns emails table
+            const emailIds = vectorResults.map(e => e.id);
+            if (emailIds.length > 0) {
+                 const { data: fullData, error: joinError } = await supabaseAdmin
+                    .from('emails')
+                    .select('*, contacts(first_name, last_name, email), accounts(name)')
+                    .in('id', emailIds);
+                 
+                 if (!joinError) {
+                     // Sort by similarity order (which is lost in the IN query, so we might lose relevance sorting)
+                     // Or just return fullData sorted by date?
+                     // Let's sort by date for now as standard email search expectation, but filter by relevance
+                     data = fullData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                     usedVector = true;
+                 }
+            }
+          }
+        }
+      } catch (e) {
+         console.error('[search_emails] Vector error:', e);
+      }
+    }
+
+    if (!usedVector) {
+        const { data: keywordData, error } = await supabaseAdmin
+        .from('emails')
+        .select('*, contacts(first_name, last_name, email), accounts(name)')
+        .or(`subject.ilike.%${query}%,text.ilike.%${query}%,from.ilike.%${query}%`)
+        .order('timestamp', { ascending: false })
+        .limit(limit);
+        
+        if (error) throw error;
+        data = keywordData;
+    }
+
+    return data;
   },
   search_prospects: async ({ q_keywords, person_locations, q_organization_name, limit = 10 }) => {
     const apiKey = getApiKey();

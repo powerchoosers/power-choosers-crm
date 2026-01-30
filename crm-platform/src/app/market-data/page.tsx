@@ -84,7 +84,7 @@ export default function MarketData() {
             The Signal.
           </h1>
           <p className="text-xl text-zinc-400 max-w-2xl">
-            We do not trade on history. We trade on physics. <br/>
+            We do not sell energy. We audit inefficiency. <br/>
             Real-time telemetry from the ERCOT Nodal Market.
           </p>
         </motion.div>

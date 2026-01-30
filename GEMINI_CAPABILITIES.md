@@ -8,17 +8,18 @@ The agent is currently equipped with the following "Tools" and UI protocols whic
 
 ### 🗄️ CRM Operations (Supabase Integrated)
 - **Contact Management**:
-    - `list_contacts`: Search and retrieve contact lists.
+    - `list_contacts`: Semantic & Keyword search to retrieve contact lists. 100% vector coverage.
     - `get_contact_details`: Access full dossier information (including legacy metadata) for any specific contact.
     - `update_contact`: Modify contact details (email, phone, status, notes) in real-time.
     - `create_contact`: Add new nodes to the network directly from conversation.
 - **Account Intelligence**:
-    - `list_accounts`: Search for companies and organizations within our database.
+    - `list_accounts`: Semantic & Keyword search for companies and organizations. 100% vector coverage.
     - `get_account_details`: Retrieve full firmographic data, energy metrics, and corporate hierarchy.
     - `list_account_documents`: Access the "Data Locker" to view filenames of bills, contracts, and LOAs.
     - `list_deals`: Monitor sales opportunities and deal stages for specific accounts.
-- **Interaction Forensics**:
-    - `search_interactions`: Deep search through historical call transcripts and email logs for specific contacts or accounts.
+- **Interaction Forensics (Deep Search)**:
+    - `search_interactions`: Semantic search across ALL history. Scans call summaries, raw transcripts (call_details), and email content. 100% vector coverage.
+    - `search_emails`: Dedicated semantic search for email history with contact/account joining.
 - **Task Orchestration**:
     - `list_tasks`: Monitor pending actions and follow-ups.
     - `create_task`: Generate new reminders with priority levels and due dates.
@@ -36,7 +37,9 @@ The agent is currently equipped with the following "Tools" and UI protocols whic
 - **Real-time Awareness**:
     - `get_energy_news`: Fetches the latest Texas energy market and ERCOT news via RSS, providing the agent with current context on grid volatility.
 
-### 🧠 Advanced Intelligence & Accuracy (New)
+### 🧠 Advanced Intelligence & Accuracy (Updated)
+- **100% Semantic Coverage**: Every Account, Contact, Email, Call, and Transcript in the database is indexed with 768-dimensional vectors for semantic search.
+- **Deep Transcript Retrieval**: The agent scans raw call transcripts (`call_details`) to find specific commitment events or technical details mentioned in calls.
 - **Robust Date Resolution**: Automatically cross-references multiple metadata fields (`contract_end_date`, `contractEndDate`, `general.contractEndDate`) to find expiration data.
 - **Date Normalization Engine**: Real-time conversion of legacy formats (e.g., `MM/DD/YYYY`) to forensic ISO standards (`YYYY-MM-DD`) during data retrieval.
 - **Enhanced Industry Logic**: Intelligent search expansion for "Manufacturing" and other broad sectors to ensure complete node discovery across related sub-industries.
@@ -133,5 +136,5 @@ We are actively expanding the Architect's "Brain" to include these forensic ener
 - **Security**: All tool calls are gated by Supabase RLS and server-side validation.
 
 ---
-*Last Updated: 2026-01-27*
-*Status: Nodal Architect v1.3 Operational*
+*Last Updated: 2026-01-29*
+*Status: Nodal Architect v1.4 Operational (Full Semantic Sync)*

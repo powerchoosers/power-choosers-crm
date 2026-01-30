@@ -7,7 +7,7 @@ import {
   Building2, MapPin, Globe, Phone, FileText, Activity, 
   Zap, Server, Users, ArrowLeft, MoreHorizontal,
   LayoutDashboard, Database, Terminal, Shield, Sparkles, Clock, Mic,
-  Lock, Unlock, Linkedin
+  Lock, Unlock, Linkedin, Check
 } from 'lucide-react'
 import { useAccount, useUpdateAccount } from '@/hooks/useAccounts'
 import { useAccountContacts, Contact } from '@/hooks/useContacts'
@@ -15,10 +15,11 @@ import { useAccountCalls } from '@/hooks/useCalls'
 import { useUIStore } from '@/store/uiStore'
 import { useGeminiStore } from '@/store/geminiStore'
 import { Button } from '@/components/ui/button'
+import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { differenceInCalendarDays, format, isValid, parseISO } from 'date-fns'
+import { differenceInCalendarDays, format, isValid, parseISO, formatDistanceToNow } from 'date-fns'
 
 // Components
 import { AccountUplinkCard } from '@/components/accounts/AccountUplinkCard'
@@ -67,6 +68,7 @@ export default function AccountDossierPage() {
 
   const [isSaving, setIsSaving] = useState(false)
   const [showSynced, setShowSynced] = useState(false)
+  const [activeEditField, setActiveEditField] = useState<'logo' | 'domain' | 'linkedin' | null>(null)
   const prevIsEditing = useRef(isEditing)
 
   // Terminal State
@@ -77,6 +79,9 @@ export default function AccountDossierPage() {
   const [editStrikePrice, setEditStrikePrice] = useState('')
   const [editIndustry, setEditIndustry] = useState('')
   const [editLocation, setEditLocation] = useState('')
+  const [editLogoUrl, setEditLogoUrl] = useState('')
+  const [editDomain, setEditDomain] = useState('')
+  const [editLinkedinUrl, setEditLinkedinUrl] = useState('')
 
   // Set Gemini Context
   useEffect(() => {
@@ -105,6 +110,9 @@ export default function AccountDossierPage() {
       setEditStrikePrice(account.currentRate || '')
       setEditIndustry(account.industry || '')
       setEditLocation(account.location || '')
+      setEditLogoUrl(account.logoUrl || '')
+      setEditDomain(account.domain || '')
+      setEditLinkedinUrl(account.linkedinUrl || '')
     }
     return () => setContext(null)
   }, [account, setContext])
@@ -127,7 +135,10 @@ export default function AccountDossierPage() {
             annualUsage: cleanedUsage.toString(), // Send as string to match interface
             currentRate: editStrikePrice,
             industry: editIndustry,
-            location: editLocation
+            location: editLocation,
+            logoUrl: editLogoUrl,
+            domain: editDomain,
+            linkedinUrl: editLinkedinUrl
           })
           setShowSynced(true)
           setTimeout(() => setShowSynced(false), 3000)
@@ -253,25 +264,56 @@ export default function AccountDossierPage() {
         <div className="absolute top-0 right-0 w-64 h-64 bg-[#002FA7]/10 blur-[120px] rounded-full pointer-events-none" />
 
         {/* 1. Corporate Entity Header */}
-        <header className="flex-none px-6 py-6 md:px-8 border-b border-white/5 bg-zinc-900/80 backdrop-blur-sm z-20 relative">
-          <div className="flex items-center justify-between max-w-[1600px] mx-auto w-full">
-            <div className="flex items-center gap-6">
-              <Button 
-                variant="ghost" 
-                size="icon" 
+        <header className="flex-none px-6 py-6 md:px-8 border-b border-white/5 bg-zinc-900/80 backdrop-blur-sm relative z-10">
+           <div className="flex items-center justify-between gap-6">
+             <div className="flex items-center gap-3">
+              <button
                 onClick={() => router.push('/network/accounts')}
-                className="text-zinc-500 hover:text-white hover:bg-white/5 -ml-2"
+                className="icon-button-forensic w-10 h-10 flex items-center justify-center -ml-2"
               >
                 <ArrowLeft className="w-5 h-5" />
-              </Button>
+              </button>
               
               {/* Logo/Icon */}
-              <div className="w-14 h-14 rounded-2xl bg-zinc-800 border border-white/10 flex items-center justify-center relative overflow-hidden shadow-[0_2px_10px_-2px_rgba(0,0,0,0.6)]">
-                {account.logoUrl ? (
-                  <img src={account.logoUrl} alt={account.name} className="w-full h-full object-cover" />
-                ) : (
-                  <Building2 className="w-7 h-7 text-zinc-600 transition-colors" />
-                )}
+              <div className="relative group/logo">
+                <div onClick={() => isEditing && setActiveEditField(activeEditField === 'logo' ? null : 'logo')}>
+                  <CompanyIcon
+                    logoUrl={editLogoUrl || account.logoUrl}
+                    domain={editDomain || account.domain}
+                    name={account.name}
+                    size={56}
+                    className={cn(
+                      "w-14 h-14 rounded-2xl nodal-glass p-1 border border-white/10 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.6)] transition-all",
+                      isEditing && "cursor-pointer hover:border-[#002FA7]/50 hover:shadow-[0_0_20px_rgba(0,47,167,0.2)]"
+                    )}
+                  />
+                </div>
+                
+                <AnimatePresence>
+                  {isEditing && activeEditField === 'logo' && (
+                    <motion.div
+                      initial={{ width: 0, opacity: 0, x: -10 }}
+                      animate={{ width: "auto", opacity: 1, x: 0 }}
+                      exit={{ width: 0, opacity: 0, x: -10 }}
+                      className="absolute left-full ml-3 top-1/2 -translate-y-1/2 flex items-center z-50"
+                    >
+                      <div className="bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-lg p-2 shadow-2xl flex items-center gap-2 min-w-[320px]">
+                        <div className="p-1.5 bg-white/5 rounded border border-white/10 text-zinc-500">
+                          <Activity className="w-3.5 h-3.5" />
+                        </div>
+                        <input
+                          type="text"
+                          value={editLogoUrl}
+                          onChange={(e) => setEditLogoUrl(e.target.value)}
+                          placeholder="PASTE LOGO URL..."
+                          className="bg-transparent border-none focus:ring-0 text-[10px] font-mono text-white w-full placeholder:text-zinc-700 uppercase tracking-widest"
+                          autoFocus
+                          onKeyDown={(e) => e.key === 'Enter' && setActiveEditField(null)}
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               <div>
@@ -279,40 +321,158 @@ export default function AccountDossierPage() {
                   <h1 className="text-2xl font-semibold tracking-tighter text-white">
                     {account.name}
                   </h1>
-                  {account.status === 'ACTIVE_LOAD' && (
-                    <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
-                      <span className="text-[10px] font-mono text-emerald-500 uppercase tracking-widest font-medium">Active Load</span>
-                    </div>
-                  )}
 
                   {/* External Links */}
-                  <div className="flex items-center gap-1 bg-white/[0.02] rounded-full p-1 border border-white/5 ml-2">
-                    <a 
-                      href={account.domain ? (account.domain.startsWith('http') ? account.domain : `https://${account.domain}`) : '#'} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className={cn(
-                        "p-1.5 rounded-full transition-colors",
-                        account.domain ? "hover:bg-zinc-700 text-white" : "text-zinc-600 cursor-not-allowed"
-                      )} 
-                      title="Visit Website"
-                    >
-                      <Globe className="w-3.5 h-3.5" />
-                    </a>
+                  <div className="flex items-center gap-1 bg-white/[0.02] rounded-full p-1 border border-white/5 relative group/links">
+                    <div className="flex items-center">
+                      <button 
+                        onClick={() => {
+                          if (isEditing) {
+                            setActiveEditField(activeEditField === 'domain' ? null : 'domain')
+                          } else {
+                            const url = editDomain ? (editDomain.startsWith('http') ? editDomain : `https://${editDomain}`) : (account.domain ? (account.domain.startsWith('http') ? account.domain : `https://${account.domain}`) : null)
+                            if (url) window.open(url, '_blank')
+                          }
+                        }}
+                        className={cn(
+                          "icon-button-forensic p-1.5",
+                          !editDomain && !account.domain && "opacity-50 cursor-not-allowed",
+                          isEditing && activeEditField === 'domain' && "bg-[#002FA7]/20 text-white",
+                          isEditing && "hover:bg-[#002FA7]/20 transition-colors"
+                        )} 
+                        title={isEditing ? "Edit Domain" : "Visit Website"}
+                      >
+                        <Globe className="w-3.5 h-3.5" />
+                      </button>
+                      
+                      <AnimatePresence>
+                        {isEditing && activeEditField === 'domain' && (
+                          <motion.div
+                            initial={{ width: 0, opacity: 0 }}
+                            animate={{ width: "auto", opacity: 1 }}
+                            exit={{ width: 0, opacity: 0 }}
+                            className="flex items-center overflow-hidden"
+                          >
+                            <input
+                              type="text"
+                              value={editDomain}
+                              onChange={(e) => setEditDomain(e.target.value)}
+                              placeholder="DOMAIN.COM"
+                              className="bg-transparent border-none focus:ring-0 text-[9px] font-mono text-white w-24 placeholder:text-zinc-700 uppercase tracking-widest h-6"
+                              autoFocus
+                              onKeyDown={(e) => e.key === 'Enter' && setActiveEditField(null)}
+                            />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
                     <div className="w-px h-3 bg-white/10" />
-                    <a 
-                      href={account.linkedinUrl || '#'} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className={cn(
-                        "p-1.5 rounded-full transition-colors",
-                        account.linkedinUrl ? "hover:bg-[#0077b5] text-white" : "text-zinc-600 cursor-not-allowed"
-                      )} 
-                      title="View LinkedIn"
-                    >
-                      <Linkedin className="w-3.5 h-3.5" />
-                    </a>
+
+                    <div className="flex items-center">
+                      <button 
+                        onClick={() => {
+                          if (isEditing) {
+                            setActiveEditField(activeEditField === 'linkedin' ? null : 'linkedin')
+                          } else {
+                            const url = editLinkedinUrl || account.linkedinUrl
+                            if (url) window.open(url, '_blank')
+                          }
+                        }}
+                        className={cn(
+                          "icon-button-forensic p-1.5",
+                          !editLinkedinUrl && !account.linkedinUrl && "opacity-50 cursor-not-allowed",
+                          isEditing && activeEditField === 'linkedin' && "bg-[#002FA7]/20 text-white",
+                          isEditing && "hover:bg-[#002FA7]/20 transition-colors"
+                        )} 
+                        title={isEditing ? "Edit LinkedIn" : "View LinkedIn"}
+                      >
+                        <Linkedin className="w-3.5 h-3.5" />
+                      </button>
+
+                      <AnimatePresence>
+                        {isEditing && activeEditField === 'linkedin' && (
+                          <motion.div
+                            initial={{ width: 0, opacity: 0 }}
+                            animate={{ width: "auto", opacity: 1 }}
+                            exit={{ width: 0, opacity: 0 }}
+                            className="flex items-center overflow-hidden"
+                          >
+                            <input
+                              type="text"
+                              value={editLinkedinUrl}
+                              onChange={(e) => setEditLinkedinUrl(e.target.value)}
+                              placeholder="LINKEDIN URL"
+                              className="bg-transparent border-none focus:ring-0 text-[9px] font-mono text-white w-24 placeholder:text-zinc-700 uppercase tracking-widest h-6"
+                              autoFocus
+                              onKeyDown={(e) => e.key === 'Enter' && setActiveEditField(null)}
+                            />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+
+                  {/* Status/Sync Indicators (Mirrored from Contact Dossier) */}
+                  <div className="flex items-center gap-2">
+                    {/* Status Badge */}
+                    {(() => {
+                      const hasContract = !!account.contractEnd
+                      const contractEnd = parseContractEndDate(account.contractEnd)
+                      const isExpired = hasContract && contractEnd && contractEnd < new Date()
+                      const isActive = (hasContract && !isExpired) || account.status === 'ACTIVE_LOAD'
+
+                      return (
+                        <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-900/50 border border-white/5 backdrop-blur-sm">
+                          <div className={cn(
+                            "w-1.5 h-1.5 rounded-full",
+                            isActive ? "bg-signal animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.5)]" : 
+                            isExpired ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" : 
+                            "bg-zinc-600"
+                          )} />
+                          <span className={cn(
+                            "text-[10px] font-mono uppercase tracking-widest font-medium",
+                            isActive ? "text-signal" : 
+                            isExpired ? "text-red-500/80" : 
+                            "text-zinc-500"
+                          )}>
+                             {isActive ? 'Active Load' : isExpired ? 'Expired' : 'No Contract'}
+                           </span>
+                         </div>
+                       )
+                    })()}
+
+                    {/* Last Sync Indicator */}
+                    {account.updated && (
+                      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-zinc-900/30 border border-white/5">
+                        <Clock className="w-2.5 h-2.5 text-zinc-600" />
+                        <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
+                          Last_Sync: {(() => {
+                            try {
+                              return formatDistanceToNow(new Date(account.updated), { addSuffix: true }).toUpperCase()
+                            } catch (e) {
+                              return 'UNKNOWN'
+                            }
+                          })()}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Synced indicator with exit animation */}
+                    <AnimatePresence>
+                      {showSynced && (
+                        <motion.div 
+                          initial={{ opacity: 0, scale: 0.9, filter: "blur(4px)" }}
+                          animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                          exit={{ opacity: 0, scale: 0.9, filter: "blur(4px)" }}
+                          transition={{ duration: 0.3 }}
+                          className="flex items-center gap-1 text-[10px] font-mono text-green-500 ml-2"
+                        >
+                          <Check className="w-3 h-3" />
+                          <span className="uppercase tracking-widest">Synced</span>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 text-xs text-zinc-500 font-mono mb-2 w-full">
@@ -359,26 +519,26 @@ export default function AccountDossierPage() {
 
             <div className="flex items-center gap-6">
               <div className="text-right">
-                <div className="flex flex-col items-end gap-2">
+                <div className="flex flex-col items-end gap-0.5">
                   <div className="flex items-center gap-2">
-                    <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Dossier Status</div>
-                    <button
-                      onClick={toggleEditing}
-                      className={cn(
-                        "p-1 rounded-md transition-all duration-300",
-                        isEditing 
-                          ? "text-blue-400 bg-blue-500/10 hover:bg-blue-500/20" 
-                          : "text-zinc-500 hover:text-white hover:bg-white/5"
-                      )}
-                      title={isEditing ? "Lock Dossier" : "Unlock Dossier"}
-                    >
-                      {isEditing ? (
-                        <Unlock className="w-3.5 h-3.5" />
-                      ) : (
-                        <Lock className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                  </div>
+                      <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Dossier Status</div>
+                      <button
+                        onClick={toggleEditing}
+                        className={cn(
+                           "w-7 h-7 flex items-center justify-center transition-all duration-300",
+                           isEditing 
+                             ? "text-blue-400 bg-blue-400/10 border border-blue-400/30 rounded-lg shadow-[0_0_15px_rgba(59,130,246,0.2)] scale-110" 
+                             : "text-zinc-500 hover:text-white bg-transparent border border-transparent"
+                         )}
+                        title={isEditing ? "Lock Dossier" : "Unlock Dossier"}
+                      >
+                        {isEditing ? (
+                          <Unlock className="w-4 h-4" />
+                        ) : (
+                          <Lock className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
                   <div className="flex items-center gap-2">
                     <div className={cn(
                       "h-2 w-2 rounded-full animate-pulse",
@@ -505,18 +665,12 @@ export default function AccountDossierPage() {
 
             {/* Column B: Infrastructure (6 cols) */}
             <div className="col-span-6 h-full overflow-y-auto p-6 border-r border-white/5 np-scroll scrollbar-thin scrollbar-thumb-zinc-700/50 hover:scrollbar-thumb-[#002FA7]/50 scrollbar-track-transparent transition-all duration-300">
-              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
-                <div className="flex items-center justify-between">
-                  <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em]">02 // Infrastructure</div>
-                  <div className="flex gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#002FA7] shadow-[0_0_8px_#002FA7]" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#002FA7]/50" />
-                  </div>
-                </div>
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
+                <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em] mb-4">02 // Infrastructure</div>
 
                 {/* Forensic Log Stream (Ported) */}
                 <div 
-                  className={`rounded-2xl border transition-all duration-500 bg-zinc-950/80 backdrop-blur-xl p-8 min-h-[500px] relative overflow-hidden shadow-2xl group flex flex-col font-mono ${isEditing ? 'border-[#002FA7]/50 ring-1 ring-[#002FA7]/20 cursor-text' : 'border-white/10'}`}
+                  className={`rounded-2xl border transition-all duration-500 bg-zinc-950/80 backdrop-blur-xl p-6 min-h-[500px] relative overflow-hidden shadow-2xl group flex flex-col font-mono ${isEditing ? 'border-[#002FA7]/50 ring-1 ring-[#002FA7]/20 cursor-text' : 'border-white/10'}`}
                   onClick={() => {
                     if (!isEditing) handleTerminalClick()
                   }}
@@ -649,22 +803,13 @@ export default function AccountDossierPage() {
                 <MeterArray meters={account.meters} />
                 
                 {/* Data Locker */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-[11px] font-mono text-zinc-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                      <Database className="w-3.5 h-3.5 text-[#002FA7]" /> Data Locker
-                    </h3>
-                  </div>
-                  <div className="rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
-                    <DataIngestionCard accountId={account.id} />
-                  </div>
-                </div>
+                <DataIngestionCard accountId={account.id} />
               </div>
             </div>
 
             {/* Column C: Network (3 cols) */}
-            <div className="col-span-3 h-full overflow-y-auto p-6 np-scroll scrollbar-thin scrollbar-thumb-zinc-800/0 hover:scrollbar-thumb-zinc-800/50 scrollbar-track-transparent transition-all duration-300 bg-black/10">
-              <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-700">
+            <div className="col-span-3 h-full overflow-y-auto p-6 np-scroll scrollbar-thin scrollbar-thumb-zinc-700/50 hover:scrollbar-thumb-[#002FA7]/50 scrollbar-track-transparent transition-all duration-300">
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-700">
                 <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em] mb-4">03 // Network</div>
                 
                 {/* Stakeholder Map */}
@@ -695,8 +840,8 @@ export default function AccountDossierPage() {
                     ) : (
                       <div className="p-8 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] flex flex-col items-center justify-center gap-3 group/empty">
                         <div className="p-4 rounded-full bg-zinc-900/50 border border-white/5 group-hover/empty:border-[#002FA7]/30 transition-colors duration-500">
-                          <Phone className="w-6 h-6 text-zinc-700" />
-                        </div>
+                          <Phone className="w-6 h-6 text-[#002FA7]" />
+                    </div>
                         <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-[0.3em]">No signals detected</p>
                       </div>
                     )}

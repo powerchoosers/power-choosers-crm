@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { 
   Users, 
   Building2, 
@@ -17,6 +18,8 @@ import { useTargets } from '@/hooks/useTargets'
 import { formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 function TargetSkeleton() {
   return (
@@ -38,9 +41,30 @@ function TargetSkeleton() {
 }
 
 export default function TargetOverviewPage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
   // STATE: Active Mode (People vs Accounts)
-  const [activeMode, setActiveMode] = useState<'people' | 'account'>('people')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [activeMode, setActiveMode] = useState<'people' | 'account'>((searchParams.get('mode') as 'people' | 'account') || 'people')
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '')
+
+  // Update URL when state changes
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (activeMode !== 'people') params.set('mode', activeMode)
+    else params.delete('mode')
+    
+    if (searchQuery) params.set('q', searchQuery)
+    else params.delete('q')
+
+    const newString = params.toString()
+    const oldString = searchParams.toString()
+
+    if (newString !== oldString) {
+      router.replace(`${pathname}?${newString}`, { scroll: false })
+    }
+  }, [activeMode, searchQuery, pathname, router, searchParams])
   
   // DATA FETCHING
   const { data: targets, isLoading, error } = useTargets()
@@ -87,9 +111,11 @@ export default function TargetOverviewPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <button className="bg-white text-zinc-950 hover:bg-zinc-200 font-medium h-10 px-4 rounded-lg transition-all hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)] flex items-center gap-2">
+            <Button 
+              className="h-10 px-4 rounded-xl flex items-center gap-2 bg-white text-zinc-950 hover:bg-zinc-200 transition-all hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)] font-medium"
+            >
               <Plus className="w-4 h-4" /> Initialize Target
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -124,21 +150,25 @@ export default function TargetOverviewPage() {
             <div className="bg-black/40 border border-white/5 rounded-lg p-1 flex items-center">
               <button 
                 onClick={() => setActiveMode('people')}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-wider transition-all ${
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-wider transition-all gap-2 flex items-center",
                   activeMode === 'people' 
-                  ? 'bg-zinc-800 text-white shadow-lg' 
-                  : 'text-zinc-600 hover:text-zinc-400'
-                }`}
+                  ? "bg-white/10 text-white brightness-125 scale-105" 
+                  : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                )}
+                title="Human Intel Layer"
               >
                 <Users className="w-3 h-3" /> People
               </button>
               <button 
                 onClick={() => setActiveMode('account')}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-wider transition-all ${
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-wider transition-all gap-2 flex items-center",
                   activeMode === 'account' 
-                  ? 'bg-zinc-800 text-white shadow-lg' 
-                  : 'text-zinc-600 hover:text-zinc-400'
-                }`}
+                  ? "bg-white/10 text-white brightness-125 scale-105" 
+                  : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                )}
+                title="Asset Intel Layer"
               >
                 <Building2 className="w-3 h-3" /> Accounts
               </button>
@@ -175,10 +205,10 @@ export default function TargetOverviewPage() {
                           <Radar className="w-5 h-5" />
                         </div>
                         <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                          <button className="p-2 text-zinc-500 hover:text-white hover:bg-white/10 rounded-lg">
+                          <button className="icon-button-forensic h-8 w-8 flex items-center justify-center text-zinc-500">
                             <Edit3 className="w-4 h-4" />
                           </button>
-                          <button className="p-2 text-zinc-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg">
+                          <button className="icon-button-forensic h-8 w-8 flex items-center justify-center text-zinc-500 hover:text-red-500">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -211,7 +241,7 @@ export default function TargetOverviewPage() {
 
               {/* Add New Target Card */}
               <button className="border border-dashed border-zinc-800 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 text-zinc-600 hover:text-zinc-400 hover:border-zinc-700 hover:bg-white/[0.02] transition-all h-44">
-                <div className="w-10 h-10 rounded-full bg-zinc-900 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-zinc-900 flex items-center justify-center">
                   <Plus className="w-5 h-5" />
                 </div>
                 <span className="text-[10px] font-mono uppercase tracking-widest">Initialize_New_Target</span>

@@ -18,11 +18,30 @@ interface EmailListProps {
   hasNextPage?: boolean
   fetchNextPage?: () => void
   isFetchingNextPage?: boolean
+  currentPage?: number
+  onPageChange?: (page: number) => void
 }
 
-export function EmailList({ emails, isLoading, onRefresh, isSyncing, onSelectEmail, selectedEmailId, totalEmails, hasNextPage, fetchNextPage, isFetchingNextPage }: EmailListProps) {
+export function EmailList({ 
+  emails, 
+  isLoading, 
+  onRefresh, 
+  isSyncing, 
+  onSelectEmail, 
+  selectedEmailId, 
+  totalEmails, 
+  hasNextPage, 
+  fetchNextPage, 
+  isFetchingNextPage,
+  currentPage: externalPage,
+  onPageChange: externalOnPageChange
+}: EmailListProps) {
   const [filter, setFilter] = useState<'all' | 'received' | 'sent'>('all')
-  const [currentPage, setCurrentPage] = useState(1)
+  const [internalPage, setInternalPage] = useState(1)
+  
+  const currentPage = externalPage || internalPage
+  const setCurrentPage = externalOnPageChange || setInternalPage
+
   const itemsPerPage = 15
 
   const filteredEmails = emails.filter(email => {
@@ -67,7 +86,8 @@ export function EmailList({ emails, isLoading, onRefresh, isSyncing, onSelectEma
         <button 
           onClick={onRefresh}
           disabled={isSyncing}
-          className="text-[10px] font-mono uppercase tracking-widest border border-white/10 hover:border-signal/50 hover:bg-signal/10 text-zinc-500 hover:text-white px-4 py-2 rounded-lg transition-all flex items-center gap-2 group"
+          className="icon-button-forensic text-[10px] font-mono uppercase tracking-widest !text-zinc-500 hover:!text-white px-4 py-2 flex items-center gap-2 group"
+          title="Initialize Sync"
         >
           {isSyncing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3 group-hover:rotate-180 transition-transform duration-500" />}
           Initialize_Sync
@@ -108,27 +128,30 @@ export function EmailList({ emails, isLoading, onRefresh, isSyncing, onSelectEma
             <button
             onClick={() => { setFilter('all'); setCurrentPage(1); }}
             className={cn(
-                "px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all",
-                filter === 'all' ? "bg-white/10 text-white shadow-[0_0_15px_-3px_rgba(255,255,255,0.1)]" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                "icon-button-forensic px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all",
+                filter === 'all' ? "text-white brightness-125 scale-105" : "text-zinc-500"
             )}
+            title="All Nodes"
             >
             All_Nodes
             </button>
             <button
             onClick={() => { setFilter('received'); setCurrentPage(1); }}
             className={cn(
-                "px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all",
-                filter === 'received' ? "bg-white/10 text-white shadow-[0_0_15px_-3px_rgba(255,255,255,0.1)]" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                "icon-button-forensic px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all",
+                filter === 'received' ? "text-white brightness-125 scale-105" : "text-zinc-500"
             )}
+            title="Uplink In"
             >
             Uplink_In
             </button>
             <button
             onClick={() => { setFilter('sent'); setCurrentPage(1); }}
             className={cn(
-                "px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all",
-                filter === 'sent' ? "bg-white/10 text-white shadow-[0_0_15px_-3px_rgba(255,255,255,0.1)]" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                "icon-button-forensic px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all",
+                filter === 'sent' ? "text-white brightness-125 scale-105" : "text-zinc-500"
             )}
+            title="Uplink Out"
             >
             Uplink_Out
             </button>
@@ -234,22 +257,18 @@ export function EmailList({ emails, isLoading, onRefresh, isSyncing, onSelectEma
             </div>
         </div>
         <div className="flex items-center gap-2">
-            <Button 
-                variant="outline" 
-                size="icon" 
+            <button 
                 onClick={() => handlePageChange(Math.max(1, currentPage - 1))} 
                 disabled={currentPage === 1}
-                className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
+                className="icon-button-forensic w-8 h-8 disabled:opacity-30 disabled:cursor-not-allowed"
                 aria-label="Previous page"
             >
-                <ChevronLeft className="h-3.5 w-3.5" />
-            </Button>
+                <ChevronLeft className="h-4 w-4" />
+            </button>
             <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
               {currentPage.toString().padStart(2, '0')}
             </div>
-            <Button 
-                variant="outline" 
-                size="icon" 
+            <button 
                 onClick={async () => {
                   const nextPage = currentPage + 1
                   const needed = nextPage * itemsPerPage
@@ -268,11 +287,11 @@ export function EmailList({ emails, isLoading, onRefresh, isSyncing, onSelectEma
                   }
                 }}
                 disabled={(!hasNextPage && currentPage >= totalPages) || isFetchingNextPage}
-                className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
+                className="icon-button-forensic w-8 h-8 disabled:opacity-30 disabled:cursor-not-allowed"
                 aria-label="Next page"
             >
-                <ChevronRight className="h-3.5 w-3.5" />
-            </Button>
+                <ChevronRight className="h-4 w-4" />
+            </button>
         </div>
       </div>
     </div>

@@ -58,14 +58,13 @@ export default function EnergyPage() {
       accessorKey: 'provider',
       header: ({ column }) => {
         return (
-          <Button
-            variant="ghost"
+          <button
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="-ml-4 hover:bg-white/5 hover:text-white"
+            className="icon-button-forensic -ml-4 flex items-center px-4 py-2 transition-all"
           >
             <ArrowUpDown className="mr-2 h-4 w-4" />
             Provider
-          </Button>
+          </button>
         )
       },
       cell: ({ row }) => (
@@ -83,14 +82,13 @@ export default function EnergyPage() {
       accessorKey: 'rate',
       header: ({ column }) => {
         return (
-          <Button
-            variant="ghost"
+          <button
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="-ml-4 hover:bg-white/5 hover:text-white"
+            className="icon-button-forensic -ml-4 flex items-center px-4 py-2 transition-all"
           >
             <ArrowUpDown className="mr-2 h-4 w-4" />
             Rate (¢/kWh)
-          </Button>
+          </button>
         )
       },
       cell: ({ row }) => <div className="text-zinc-200 font-mono tabular-nums">{row.getValue<number>('rate').toFixed(1)}¢</div>,
@@ -124,10 +122,10 @@ export default function EnergyPage() {
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-white/10 hover:text-white">
+              <button className="icon-button-forensic h-8 w-8 flex items-center justify-center">
                 <span className="sr-only">Open menu</span>
                 <MoreHorizontal className="h-4 w-4" />
-              </Button>
+              </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-zinc-950 border-white/10 text-zinc-400">
               <DropdownMenuLabel className="text-zinc-200">Actions</DropdownMenuLabel>
@@ -262,29 +260,25 @@ export default function EnergyPage() {
               </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
+            <button
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
-              className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
+              className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
               aria-label="Previous page"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
-            </Button>
+            </button>
             <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
               {(pageIndex + 1).toString().padStart(2, '0')}
             </div>
-            <Button
-              variant="outline"
-              size="icon"
+            <button
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
-              className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
+              className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
               aria-label="Next page"
             >
               <ChevronRight className="h-3.5 w-3.5" />
-            </Button>
+            </button>
           </div>
         </div>
       </div>

@@ -59,7 +59,7 @@ export function TaskManagement() {
           <h3 className="text-lg font-medium text-white tracking-tight">Task Management</h3>
           <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono">Operational Directives</p>
         </div>
-        <button className="h-8 w-8 rounded-full bg-zinc-900/50 border border-white/5 flex items-center justify-center hover:bg-[#002FA7]/20 hover:border-[#002FA7]/50 transition-all text-zinc-400 hover:text-white">
+        <button className="icon-button-forensic h-8 w-8 flex items-center justify-center text-zinc-400">
           <Plus className="w-4 h-4" />
         </button>
       </div>

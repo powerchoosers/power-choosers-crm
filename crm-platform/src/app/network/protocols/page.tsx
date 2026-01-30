@@ -45,6 +45,8 @@ import { toast } from 'sonner'
 import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useTableState } from '@/hooks/useTableState'
 
 const PAGE_SIZE = 50
 
@@ -65,27 +67,26 @@ function toDisplayDate(value: unknown): Date | null {
   return null
 }
 
-import { useRouter } from 'next/navigation'
-
 export default function ProtocolsPage() {
   const router = useRouter()
-  const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const { pageIndex, setPage, searchQuery, setSearch, pagination } = useTableState({ pageSize: PAGE_SIZE })
+  const [globalFilter, setGlobalFilter] = useState(searchQuery)
+  const [debouncedFilter, setDebouncedFilter] = useState(searchQuery)
   
-  // Debounce search query
+  // Debounce search query and sync to URL
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedQuery(searchQuery)
+      setDebouncedFilter(globalFilter)
+      setSearch(globalFilter)
     }, 400)
     return () => clearTimeout(timer)
-  }, [searchQuery])
+  }, [globalFilter, setSearch])
 
-  const { data, isLoading, addProtocol, updateProtocol, deleteProtocol, fetchNextPage, hasNextPage, isFetchingNextPage } = useProtocols(debouncedQuery)
-  const { data: totalProtocols } = useProtocolsCount(debouncedQuery)
+  const { data, isLoading, addProtocol, updateProtocol, deleteProtocol, fetchNextPage, hasNextPage, isFetchingNextPage } = useProtocols(debouncedFilter)
+  const { data: totalProtocols } = useProtocolsCount(debouncedFilter)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [newProtocolName, setNewProtocolName] = useState('')
   const [newProtocolDesc, setNewProtocolDesc] = useState('')
-  const [pageIndex, setPageIndex] = useState(0)
 
   const protocols = useMemo(() => data?.pages.flatMap(page => page.protocols) || [], [data])
 
@@ -148,10 +149,10 @@ export default function ProtocolsPage() {
       <CollapsiblePageHeader
         title="PROTOCOLS"
         description="Execute automated multi-step communication protocols."
-        globalFilter={searchQuery}
+        globalFilter={globalFilter}
         onSearchChange={(val) => {
-          setSearchQuery(val)
-          setPageIndex(0)
+          setGlobalFilter(val)
+          setPage(0)
         }}
         primaryAction={{
           label: "Initialize Protocol",
@@ -208,7 +209,7 @@ export default function ProtocolsPage() {
             <div className="flex flex-col items-center justify-center h-full text-zinc-500">
                 <GitMerge className="h-12 w-12 mb-4 opacity-20" />
                 <p>No protocols found</p>
-                {searchQuery && <Button variant="link" onClick={() => setSearchQuery('')} className="text-indigo-400">Clear search</Button>}
+                {globalFilter && <Button variant="link" onClick={() => setGlobalFilter('')} className="text-indigo-400">Clear search</Button>}
             </div>
             ) : (
             <Table>
@@ -289,15 +290,15 @@ export default function ProtocolsPage() {
                     <TableCell className="text-right py-3" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Link href={`/network/protocols/${protocol.id}/builder`}>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10">
+                          <button className="icon-button-forensic h-8 w-8">
                               <Edit className="h-4 w-4" />
-                          </Button>
+                          </button>
                         </Link>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10">
+                            <button className="icon-button-forensic h-8 w-8">
                                 <MoreHorizontal className="h-4 w-4" />
-                            </Button>
+                            </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="bg-zinc-950 border-white/10 text-zinc-300">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
@@ -327,22 +328,18 @@ export default function ProtocolsPage() {
                 </div>
             </div>
             <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
+                <button
+                  onClick={() => setPage(Math.max(0, pageIndex - 1))}
                   disabled={pageIndex === 0}
-                  className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
+                  className="icon-button-forensic w-8 h-8 disabled:opacity-30 disabled:cursor-not-allowed"
                   aria-label="Previous page"
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
-                </Button>
+                </button>
                 <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
                   {(pageIndex + 1).toString().padStart(2, '0')}
                 </div>
-                <Button
-                  variant="outline"
-                  size="icon"
+                <button
                   onClick={async () => {
                     const nextPageIndex = pageIndex + 1
                     if (nextPageIndex >= displayTotalPages) return
@@ -352,14 +349,14 @@ export default function ProtocolsPage() {
                       await fetchNextPage()
                     }
 
-                    setPageIndex(nextPageIndex)
+                    setPage(nextPageIndex)
                   }}
                   disabled={pageIndex + 1 >= displayTotalPages || (!hasNextPage && protocols.length < (pageIndex + 2) * PAGE_SIZE)}
-                  className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
+                  className="icon-button-forensic w-8 h-8 disabled:opacity-30 disabled:cursor-not-allowed"
                   aria-label="Next page"
                 >
                   <ChevronRight className="h-3.5 w-3.5" />
-                </Button>
+                </button>
             </div>
         </div>
       </div>

@@ -39,27 +39,30 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { cn } from '@/lib/utils'
 import { format, formatDistanceToNow, subMonths, isAfter } from 'date-fns'
+import { useRouter } from 'next/navigation'
+import { useTableState } from '@/hooks/useTableState'
 
 const PAGE_SIZE = 50
 
 export default function TasksPage() {
-  const [globalFilter, setGlobalFilter] = useState('')
-  const [debouncedFilter, setDebouncedFilter] = useState('')
+  const { pageIndex, setPage, searchQuery, setSearch, pagination } = useTableState({ pageSize: PAGE_SIZE })
+  const [globalFilter, setGlobalFilter] = useState(searchQuery)
+  const [debouncedFilter, setDebouncedFilter] = useState(searchQuery)
 
   // Debounce search query
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedFilter(globalFilter)
+      setSearch(globalFilter)
     }, 400)
     return () => clearTimeout(timer)
-  }, [globalFilter])
+  }, [globalFilter, setSearch])
 
   const { data, isLoading: queryLoading, isError, updateTask, deleteTask, fetchNextPage, hasNextPage, isFetchingNextPage } = useTasks(debouncedFilter)
   const { data: totalTasks } = useTasksCount(debouncedFilter)
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [isMounted, setIsMounted] = useState(false)
-  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: PAGE_SIZE })
 
   useEffect(() => {
     setIsMounted(true)
@@ -71,29 +74,28 @@ export default function TasksPage() {
   const effectiveTotalRecords = totalTasks ?? tasks.length
   const totalPages = Math.max(1, Math.ceil(effectiveTotalRecords / PAGE_SIZE))
   const displayTotalPages = totalTasks == null && hasNextPage
-    ? Math.max(totalPages, pagination.pageIndex + 2)
+    ? Math.max(totalPages, pageIndex + 2)
     : totalPages
 
   useEffect(() => {
-    const needed = (pagination.pageIndex + 2) * PAGE_SIZE
+    const needed = (pageIndex + 2) * PAGE_SIZE
     if (hasNextPage && !isFetchingNextPage && tasks.length < needed) {
       fetchNextPage()
     }
-  }, [pagination.pageIndex, tasks.length, hasNextPage, isFetchingNextPage, fetchNextPage])
+  }, [pageIndex, tasks.length, hasNextPage, isFetchingNextPage, fetchNextPage])
 
   const columns: ColumnDef<Task>[] = [
     {
       accessorKey: 'title',
       header: ({ column }) => {
         return (
-          <Button
-            variant="ghost"
+          <button
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="-ml-4 hover:bg-white/5 hover:text-white"
+            className="icon-button-forensic -ml-4 flex items-center px-4 py-2 transition-all"
           >
             Task
             <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
+          </button>
         )
       },
       cell: ({ row }) => {
@@ -101,7 +103,7 @@ export default function TasksPage() {
         return (
           <div className="flex items-center gap-3 group/task cursor-pointer">
              <div className={cn(
-               "w-8 h-8 rounded-full flex items-center justify-center border border-white/5",
+               "w-8 h-8 rounded-lg flex items-center justify-center border border-white/5",
                task.priority === 'High' ? "bg-red-500/10 text-red-500" :
                task.priority === 'Medium' ? "bg-yellow-500/10 text-yellow-500" :
                "bg-zinc-800 text-zinc-400"
@@ -128,7 +130,7 @@ export default function TasksPage() {
         const priority = row.getValue('priority') as string
         return (
           <span className={cn(
-            "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border",
+            "inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-mono uppercase tracking-wider border",
             priority === 'High' && "bg-red-500/10 text-red-500 border-red-500/20",
             priority === 'Medium' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
             priority === 'Low' && "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
@@ -180,19 +182,17 @@ export default function TasksPage() {
         const task = row.original
         return (
           <div className="flex items-center justify-end gap-2">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className={cn("h-8 w-8 hover:text-white hover:bg-white/10", task.status === 'Completed' ? "text-green-500" : "text-zinc-400")}
+            <button 
+              className={cn("icon-button-forensic h-8 w-8 flex items-center justify-center", task.status === 'Completed' ? "text-green-500" : "text-zinc-400")}
               onClick={() => updateTask({ id: task.id, status: task.status === 'Completed' ? 'Pending' : 'Completed' })}
             >
               <CheckCircle2 className="h-4 w-4" />
-            </Button>
+            </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10">
+                <button className="icon-button-forensic h-8 w-8 flex items-center justify-center text-zinc-400">
                   <MoreHorizontal className="h-4 w-4" />
-                </Button>
+                </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-zinc-950 border-white/10 text-zinc-300">
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
@@ -219,29 +219,30 @@ export default function TasksPage() {
   ]
 
   const table = useReactTable({
-    data: tasks,
+    data: tasks || [],
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    onSortingChange: setSorting,
     getSortedRowModel: getSortedRowModel(),
+    onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
-    onPaginationChange: setPagination,
     autoResetPageIndex: false,
     state: {
       sorting,
       columnFilters,
-      pagination,
+      pagination: {
+        pageIndex,
+        pageSize: PAGE_SIZE,
+      },
     },
   })
 
-  const totalRowCount = tasks.length
-  const showingStart = totalRowCount === 0
+  const showingStart = effectiveTotalRecords === 0
     ? 0
-    : Math.min(totalRowCount, pagination.pageIndex * PAGE_SIZE + 1)
-  const showingEnd = totalRowCount === 0
+    : Math.min(effectiveTotalRecords, pageIndex * PAGE_SIZE + 1)
+  const showingEnd = effectiveTotalRecords === 0
     ? 0
-    : Math.min(totalRowCount, (pagination.pageIndex + 1) * PAGE_SIZE)
+    : Math.min(effectiveTotalRecords, (pageIndex + 1) * PAGE_SIZE)
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -249,10 +250,7 @@ export default function TasksPage() {
         title="Tasks"
         description="Stay on top of your daily workflow."
         globalFilter={globalFilter}
-        onSearchChange={(value) => {
-          setGlobalFilter(value)
-          setPagination((p) => ({ ...p, pageIndex: 0 }))
-        }}
+        onSearchChange={setGlobalFilter}
         primaryAction={{
           label: "Add Task",
           onClick: () => {},
@@ -346,24 +344,20 @@ export default function TasksPage() {
                 </div>
             </div>
             <div className="flex items-center gap-2">
-                <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setPagination((p) => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))}
-                    disabled={pagination.pageIndex === 0}
-                    className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
+                <button
+                    onClick={() => setPage(Math.max(0, pageIndex - 1))}
+                    disabled={pageIndex === 0}
+                    className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
                     aria-label="Previous page"
                 >
                     <ChevronLeft className="h-3.5 w-3.5" />
-                </Button>
+                </button>
                 <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
-                  {(pagination.pageIndex + 1).toString().padStart(2, '0')}
+                  {(pageIndex + 1).toString().padStart(2, '0')}
                 </div>
-                <Button
-                    variant="outline"
-                    size="icon"
+                <button
                     onClick={async () => {
-                      const nextPageIndex = pagination.pageIndex + 1
+                      const nextPageIndex = pageIndex + 1
                       if (nextPageIndex >= displayTotalPages) return
 
                       const needed = (nextPageIndex + 1) * PAGE_SIZE
@@ -371,14 +365,14 @@ export default function TasksPage() {
                         await fetchNextPage()
                       }
 
-                      setPagination((p) => ({ ...p, pageIndex: nextPageIndex }))
+                      setPage(nextPageIndex)
                     }}
-                    disabled={pagination.pageIndex + 1 >= displayTotalPages || (!hasNextPage && tasks.length < (pagination.pageIndex + 2) * PAGE_SIZE)}
-                    className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
+                    disabled={pageIndex + 1 >= displayTotalPages || (!hasNextPage && tasks.length < (pageIndex + 2) * PAGE_SIZE)}
+                    className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
                     aria-label="Next page"
                 >
                     <ChevronRight className="h-3.5 w-3.5" />
-                </Button>
+                </button>
             </div>
         </div>
       </div>

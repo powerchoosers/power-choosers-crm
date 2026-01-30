@@ -398,8 +398,9 @@ function ProtocolArchitectInner() {
   };
 
   const optimizeWithGemini = async () => {
-    if (!selectedNode?.data.body && !selectedNode?.data.prompt) {
-      toast.error("Add some draft text or a prompt first");
+    if (!selectedNode?.data.prompt) {
+      toast.error("Write a prompt for the Nodal Architect first");
+      setEmailViewMode('ai');
       return;
     }
 
@@ -409,25 +410,24 @@ function ProtocolArchitectInner() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          draft: selectedNode.data.body,
           prompt: selectedNode.data.prompt,
-          provider: 'openrouter', // Force OpenRouter/ChatGPT-OSS as requested
+          provider: 'openrouter',
           type: selectedNode.data.type,
-          context: 'sequence_step',
-          contact: testContact ? {
-            name: `${testContact.firstName} ${testContact.lastName}`,
-            company: testContact.metadata?.general?.company,
-            load_zone: testContact.metadata?.energy?.loadZone,
-          } : null
+          mode: 'optimize_prompt', // New mode to optimize the prompt itself
+          context: 'sequence_step'
         })
       });
 
       if (!response.ok) throw new Error('Failed to optimize');
       
       const data = await response.json();
-      updateNodeData(selectedNode.id, { body: data.optimized });
-      toast.success("Protocol optimized by Nodal Architect (OSS)");
-      setEmailViewMode('payload'); // Switch back to payload view to see result
+      updateNodeData(selectedNode.id, { prompt: data.optimized });
+      toast.success("Prompt optimized by Nodal Architect");
+      
+      // If we have a test contact, auto-generate the preview
+      if (testContact) {
+        generateEmailPreview(data.optimized);
+      }
     } catch (error) {
       console.error(error);
       toast.error("Optimization failed");
@@ -435,6 +435,48 @@ function ProtocolArchitectInner() {
       setIsOptimizing(false);
     }
   };
+
+  const generateEmailPreview = async (promptOverride?: string) => {
+    const activePrompt = promptOverride || selectedNode?.data.prompt;
+    if (!activePrompt || !testContact || !selectedNode) return;
+
+    setIsOptimizing(true);
+    try {
+      const response = await fetch('/api/ai/optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: activePrompt,
+          provider: 'openrouter',
+          type: selectedNode.data.type,
+          mode: 'generate_email',
+          contact: {
+            name: `${testContact.firstName} ${testContact.lastName}`,
+            company: testContact.metadata?.general?.company,
+            load_zone: testContact.metadata?.energy?.loadZone,
+          }
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to generate preview');
+      
+      const data = await response.json();
+      updateNodeData(selectedNode.id, { body: data.optimized });
+      toast.success("Preview generated for " + testContact.firstName);
+    } catch (error) {
+      console.error(error);
+      toast.error("Preview generation failed");
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
+  // Auto-generate preview when contact changes
+  useEffect(() => {
+    if (testContact && selectedNode?.data.prompt && selectedNode?.data.type === 'email') {
+      generateEmailPreview();
+    }
+  }, [testContact?.id, selectedNode?.id]);
 
   const previewBody = useMemo(() => {
     let body = selectedNode?.data.body as string || '';
@@ -886,9 +928,9 @@ function ProtocolArchitectInner() {
       <div className="flex items-center justify-between px-2">
         <div className="flex items-center gap-4">
           <Link href="/network/protocols">
-            <Button variant="ghost" size="icon" className="w-9 h-9 rounded-xl border border-white/5 hover:bg-white/5 text-zinc-400 hover:text-white">
+            <button className="icon-button-forensic w-9 h-9 flex items-center justify-center rounded-xl border border-white/5 bg-transparent text-zinc-400">
               <ChevronLeft className="w-5 h-5" />
-            </Button>
+            </button>
           </Link>
           <div className="flex items-center gap-3">
             <div>
@@ -904,22 +946,25 @@ function ProtocolArchitectInner() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button 
-            variant="ghost" 
+          <button 
             onClick={() => setDebugMode((v) => !v)}
             className={cn(
-              "border border-white/5 font-mono text-[10px] uppercase tracking-wider h-9 px-4 rounded-xl",
-              debugMode ? "bg-white/10 text-white" : "bg-white/5 text-white hover:bg-white/10"
+              "icon-button-forensic font-mono text-[10px] uppercase tracking-wider h-9 px-4 rounded-xl flex items-center transition-all",
+              debugMode ? "text-white scale-110 brightness-125" : "text-zinc-400"
             )}
+            title={debugMode ? 'Disable Debug' : 'Enable Debug'}
           >
             <Bug className="w-3.5 h-3.5 mr-2" /> {debugMode ? 'Debug_On' : 'Debug_Off'}
-          </Button>
-          <Button variant="ghost" className="bg-white/5 border border-white/5 text-white font-mono text-[10px] uppercase tracking-wider hover:bg-white/10 h-9 px-4 rounded-xl">
+          </button>
+          <button className="icon-button-forensic text-zinc-400 font-mono text-[10px] uppercase tracking-wider h-9 px-4 rounded-xl flex items-center transition-all" title="Save Draft">
             <Save className="w-3.5 h-3.5 mr-2" /> Save_Draft
-          </Button>
-          <Button className="bg-white text-zinc-950 hover:bg-zinc-200 font-mono text-[10px] uppercase tracking-widest font-bold h-9 px-5 rounded-xl shadow-[0_0_30px_-5px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)]">
+          </button>
+          <button 
+            className="bg-white text-zinc-950 hover:bg-zinc-200 font-mono text-[10px] uppercase tracking-widest font-bold h-9 px-5 rounded-xl shadow-[0_0_30px_-5px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)] transition-all"
+            title="Deploy Protocol"
+          >
             Deploy_Protocol
-          </Button>
+          </button>
         </div>
       </div>
 
@@ -1082,22 +1127,20 @@ function ProtocolArchitectInner() {
                     </span>
                   </div>
                   <div className="flex gap-2">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
+                    <button 
                       onClick={() => selectedNode && duplicateNode(selectedNode)}
-                      className="h-8 w-8 rounded-lg bg-zinc-800/50 border border-white/5 hover:border-white/20 text-zinc-400 hover:text-white transition-all"
+                      className="icon-button-forensic h-8 w-8 flex items-center justify-center rounded-lg bg-zinc-800/50 border border-white/5 text-zinc-400"
+                      title="Duplicate Node"
                     >
                       <Copy className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
+                    </button>
+                    <button 
                       onClick={() => selectedNode && deleteNode(selectedNode.id)}
-                      className="h-8 w-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all"
+                      className="icon-button-forensic h-8 w-8 flex items-center justify-center rounded-lg bg-red-500/10 border border-red-500/20 text-red-400"
+                      title="Delete Node"
                     >
                       <Trash2 className="w-4 h-4" />
-                    </Button>
+                    </button>
                   </div>
                 </div>
 
@@ -1159,14 +1202,13 @@ function ProtocolArchitectInner() {
                                 />
                               </div>
                               {(selectedNode?.data.outcomes as any[]).length > 1 && (
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <button 
                                   onClick={() => removeOutcome(selectedNode!.id, outcome.id)}
-                                  className="h-10 w-10 rounded-xl bg-red-500/5 border border-red-500/10 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 transition-all"
+                                  className="icon-button-forensic h-10 w-10 flex items-center justify-center rounded-xl bg-red-500/5 border border-red-500/10 text-red-500/50"
+                                  title="Remove Branch"
                                 >
                                   <Trash2 className="w-4 h-4" />
-                                </Button>
+                                </button>
                               )}
                             </div>
                           </div>
@@ -1296,22 +1338,20 @@ function ProtocolArchitectInner() {
                       
                       {selectedNode?.data.type === 'email' && (
                         <div className="flex items-center gap-1 bg-black/40 border border-white/5 rounded-lg p-0.5">
-                          <Button
-                            variant="ghost"
-                            size="icon"
+                          <button
                             onClick={() => setEmailViewMode('payload')}
-                            className={cn("w-6 h-6 rounded-md transition-all", emailViewMode === 'payload' ? "bg-white/10 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300")}
+                            className={cn("icon-button-forensic w-6 h-6 flex items-center justify-center rounded-md transition-all", emailViewMode === 'payload' ? "bg-white/10 text-white shadow-sm" : "text-zinc-500")}
+                            title="Payload View"
                           >
                             <FileText className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
+                          </button>
+                          <button
                             onClick={() => setEmailViewMode('ai')}
-                            className={cn("w-6 h-6 rounded-md transition-all", emailViewMode === 'ai' ? "bg-white/10 text-emerald-400 shadow-sm" : "text-zinc-500 hover:text-zinc-300")}
+                            className={cn("icon-button-forensic w-6 h-6 flex items-center justify-center rounded-md transition-all", emailViewMode === 'ai' ? "bg-white/10 text-emerald-400 shadow-sm" : "text-zinc-500")}
+                            title="AI View"
                           >
                             <Sparkles className="w-3.5 h-3.5" />
-                          </Button>
+                          </button>
                         </div>
                       )}
                     </div>

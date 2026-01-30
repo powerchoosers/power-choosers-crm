@@ -47,22 +47,26 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { ClickToCallButton } from '@/components/calls/ClickToCallButton'
 import { cn } from '@/lib/utils'
+import { useTableState } from '@/hooks/useTableState'
 
 const PAGE_SIZE = 50
 
 export default function AccountsPage() {
   const router = useRouter()
-  const [globalFilter, setGlobalFilter] = useState('')
-  const [debouncedFilter, setDebouncedFilter] = useState('')
+  const { pageIndex, setPage, searchQuery, setSearch, pagination } = useTableState({ pageSize: PAGE_SIZE })
+  
+  const [globalFilter, setGlobalFilter] = useState(searchQuery)
+  const [debouncedFilter, setDebouncedFilter] = useState(searchQuery)
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 
   // Debounce search query to avoid excessive API calls
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedFilter(globalFilter)
+      setSearch(globalFilter)
     }, 400)
     return () => clearTimeout(timer)
-  }, [globalFilter])
+  }, [globalFilter, setSearch])
 
   const accountFilters = useMemo(() => {
     return {
@@ -77,7 +81,6 @@ export default function AccountsPage() {
   const [sorting, setSorting] = useState<SortingState>([])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [isMounted, setIsMounted] = useState(false)
-  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: PAGE_SIZE })
   const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
 
@@ -107,7 +110,7 @@ export default function AccountsPage() {
       if (value === undefined) return prev
       return [...prev, { id: columnId, value }]
     })
-    setPagination(p => ({ ...p, pageIndex: 0 }))
+    setPage(0)
   }
 
   useEffect(() => {
@@ -212,14 +215,13 @@ export default function AccountsPage() {
         accessorKey: 'name',
         header: ({ column }) => {
           return (
-            <Button
-              variant="ghost"
+            <button
               onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-              className="-ml-4 hover:bg-white/5 hover:text-white"
+              className="icon-button-forensic flex items-center -ml-1 text-sm font-medium"
             >
-              <ArrowUpDown className="mr-2 h-4 w-4" />
               Account Name
-            </Button>
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </button>
           )
         },
         cell: ({ row }) => {
@@ -234,8 +236,8 @@ export default function AccountsPage() {
                   logoUrl={account.logoUrl}
                   domain={account.domain}
                   name={account.name}
-                  size={32}
-                  className="w-9 h-9 rounded-lg nodal-glass p-1 border border-white/10 shadow-sm transition-all"
+                  size={36}
+                  className="w-9 h-9 rounded-2xl nodal-glass p-1 border border-white/10 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.6)] transition-all"
                 />
               </div>
               <div>
@@ -382,16 +384,16 @@ export default function AccountsPage() {
                 account={account.name}
                 logoUrl={account.logoUrl}
                 isCompany={true}
-                className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10"
+                className="h-8 w-8 icon-button-forensic"
               />
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10">
+              <button className="h-8 w-8 icon-button-forensic flex items-center justify-center">
                 <Mail className="h-4 w-4" />
-              </Button>
+              </button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10">
+                  <button className="h-8 w-8 icon-button-forensic flex items-center justify-center">
                     <MoreHorizontal className="h-4 w-4" />
-                  </Button>
+                  </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="bg-zinc-950 border-white/10 text-zinc-300">
                   <DropdownMenuLabel>Actions</DropdownMenuLabel>
@@ -406,7 +408,7 @@ export default function AccountsPage() {
         },
       },
     ]
-  }, [pagination.pageIndex])
+  }, [pageIndex])
 
   const table = useReactTable({
     data: accounts,
@@ -418,7 +420,14 @@ export default function AccountsPage() {
     onColumnFiltersChange: setColumnFilters,
     getFilteredRowModel: getFilteredRowModel(),
     onGlobalFilterChange: setGlobalFilter,
-    onPaginationChange: setPagination,
+    onPaginationChange: (updater) => {
+      if (typeof updater === 'function') {
+        const nextPagination = updater(pagination)
+        setPage(nextPagination.pageIndex)
+      } else {
+        setPage(updater.pageIndex)
+      }
+    },
     onRowSelectionChange: setRowSelection,
     autoResetPageIndex: false,
     state: {
@@ -446,7 +455,7 @@ export default function AccountsPage() {
         globalFilter={globalFilter}
         onSearchChange={(value) => {
           setGlobalFilter(value)
-          setPagination((p) => ({ ...p, pageIndex: 0 }))
+          setPage(0)
         }}
         onFilterToggle={() => setIsFilterOpen(!isFilterOpen)}
         isFilterActive={isFilterOpen || columnFilters.length > 0}
@@ -546,22 +555,19 @@ export default function AccountsPage() {
                 </div>
             </div>
             <div className="flex items-center gap-2">
-                <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setPagination((p) => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))}
+                <button
+                    onClick={() => setPage(Math.max(0, pagination.pageIndex - 1))}
                     disabled={pagination.pageIndex === 0}
-                    className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
+                    className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
                     aria-label="Previous page"
+                    title="Previous Page"
                 >
-                    <ChevronLeft className="h-3.5 w-3.5" />
-                </Button>
+                    <ChevronLeft className="h-4 w-4" />
+                </button>
                 <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
                   {(pagination.pageIndex + 1).toString().padStart(2, '0')}
                 </div>
-                <Button
-                    variant="outline"
-                    size="icon"
+                <button
                     onClick={async () => {
                       const nextPageIndex = pagination.pageIndex + 1
                       if (nextPageIndex >= displayTotalPages) return
@@ -571,14 +577,15 @@ export default function AccountsPage() {
                         await fetchNextPage()
                       }
 
-                      setPagination((p) => ({ ...p, pageIndex: nextPageIndex }))
+                      setPage(nextPageIndex)
                     }}
                     disabled={pagination.pageIndex + 1 >= displayTotalPages || (!hasNextPage && accounts.length < (pagination.pageIndex + 2) * PAGE_SIZE)}
-                    className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
+                    className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
                     aria-label="Next page"
+                    title="Next Page"
                 >
-                    <ChevronRight className="h-3.5 w-3.5" />
-                </Button>
+                    <ChevronRight className="h-4 w-4" />
+                </button>
             </div>
         </div>
       </div>

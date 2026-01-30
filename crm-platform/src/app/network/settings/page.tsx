@@ -22,6 +22,8 @@ export default function SettingsPage() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [bio, setBio] = useState('')
+  const [jobTitle, setJobTitle] = useState('')
+  const [linkedinUrl, setLinkedinUrl] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
@@ -98,6 +100,8 @@ export default function SettingsPage() {
     
     // 2. Other Profile Fields
     setBio(profile.bio || '')
+    setJobTitle(profile.jobTitle || '')
+    setLinkedinUrl(profile.linkedinUrl || '')
     setTwilioNumbers(profile.twilioNumbers || [])
     setSelectedPhoneNumber(profile.selectedPhoneNumber || null)
     setBridgeToMobile(profile.bridgeToMobile || false)
@@ -154,6 +158,8 @@ export default function SettingsPage() {
           first_name: firstName.trim() || null,
           last_name: lastName.trim() || null,
           bio: bio.trim() || null,
+          job_title: jobTitle.trim() || null,
+          linkedin_url: linkedinUrl.trim() || null,
           settings: {
             name: computedName || null,
             twilioNumbers: twilioNumbers,
@@ -280,9 +286,32 @@ export default function SettingsPage() {
                     placeholder="Sales Representative"
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
-                  className="bg-transparent border-white/10 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-[#002FA7]"
-                />
-              </div>
+                    className="bg-transparent border-white/10 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-[#002FA7]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-2">
+                    <Label htmlFor="jobTitle" className="text-zinc-400">Job Title</Label>
+                    <Input
+                      id="jobTitle"
+                      placeholder="Principal Market Architect"
+                      value={jobTitle}
+                      onChange={(e) => setJobTitle(e.target.value)}
+                      className="bg-transparent border-white/10 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-[#002FA7]"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="linkedinUrl" className="text-zinc-400">LinkedIn URL</Label>
+                    <Input
+                      id="linkedinUrl"
+                      placeholder="https://linkedin.com/in/username"
+                      value={linkedinUrl}
+                      onChange={(e) => setLinkedinUrl(e.target.value)}
+                      className="bg-transparent border-white/10 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-[#002FA7]"
+                    />
+                  </div>
+                </div>
 
               <Separator className="bg-white/5 my-6" />
 
@@ -323,14 +352,12 @@ export default function SettingsPage() {
                           <p className="text-xs text-zinc-500 font-mono tabular-nums tracking-tight">{num.number}</p>
                         </div>
                       </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
+                      <button 
                         onClick={() => handleDeleteNumber(idx)}
-                        className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 transition-all"
+                        className="icon-button-forensic opacity-0 group-hover:opacity-100 h-8 w-8 flex items-center justify-center text-zinc-500 hover:text-red-400 transition-all"
                       >
                         <Trash2 className="w-4 h-4" />
-                      </Button>
+                      </button>
                     </div>
                   ))}
 

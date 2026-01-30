@@ -2,6 +2,7 @@
 import { useState, useMemo } from 'react';
 import { Users, Search, Lock, ShieldCheck, Loader2, ChevronLeft, ChevronRight, Globe, MapPin, Linkedin, Phone, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 import Image from 'next/image';
+import { CompanyIcon } from '@/components/ui/CompanyIcon';
 import { supabase } from '@/lib/supabase';
 import { useCallStore } from '@/store/callStore';
 import { toast } from 'sonner';
@@ -470,20 +471,13 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
               <div className="px-3 py-3 border-b border-white/5 bg-white/5 rounded-xl mx-1 mt-1 space-y-3">
                 <div className="flex items-start gap-3">
                   <div className="relative group/logo">
-                    {companySummary.logoUrl ? (
-                      <div className="relative w-10 h-10 rounded-lg bg-white/10 p-1">
-                        <Image 
-                          src={companySummary.logoUrl} 
-                          alt={companySummary.name} 
-                          fill
-                          className="object-contain p-1"
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-500 font-mono text-xs border border-white/5">
-                        {companySummary.name?.charAt(0)}
-                      </div>
-                    )}
+                    <CompanyIcon
+                      logoUrl={companySummary.logoUrl}
+                      domain={companySummary.domain}
+                      name={companySummary.name}
+                      size={40}
+                      className="w-10 h-10 rounded-2xl nodal-glass p-1 border border-white/10 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.6)] transition-all"
+                    />
                     {companySummary.domain && (
                       <a 
                         href={`https://${companySummary.domain}`} 
@@ -503,7 +497,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                           href={companySummary.linkedin} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-zinc-500 hover:text-[#0077B5] transition-colors"
+                          className="icon-button-forensic w-6 h-6 flex items-center justify-center"
                         >
                           <Linkedin className="w-3 h-3" />
                         </a>
@@ -586,7 +580,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                 href={person.linkedin} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                className="p-1.5 rounded-md bg-zinc-800/50 text-zinc-500 hover:text-[#0077B5] transition-colors border border-white/5"
+                                className="icon-button-forensic w-7 h-7 flex items-center justify-center"
                               >
                                 <Linkedin className="w-2.5 h-2.5" />
                               </a>
@@ -688,24 +682,22 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           </div>
 
           <div className="flex items-center gap-1.5">
-            <Button
-              variant="outline"
-              size="icon"
+            <button
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={currentPage === 1}
-              className="w-6 h-6 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 disabled:opacity-30 p-0"
+              className="icon-button-forensic w-6 h-6 flex items-center justify-center disabled:opacity-30"
+              aria-label="Previous page"
             >
               <ChevronLeft className="h-3 w-3" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
+            </button>
+            <button
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={currentPage >= totalPages}
-              className="w-6 h-6 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 disabled:opacity-30 p-0"
+              disabled={currentPage === totalPages}
+              className="icon-button-forensic w-6 h-6 flex items-center justify-center disabled:opacity-30"
+              aria-label="Next page"
             >
               <ChevronRight className="h-3 w-3" />
-            </Button>
+            </button>
           </div>
         </div>
       )}

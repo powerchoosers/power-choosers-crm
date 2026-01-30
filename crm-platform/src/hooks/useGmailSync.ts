@@ -3,6 +3,7 @@ import { auth } from '@/lib/firebase';
 import { supabase } from '@/lib/supabase';
 import { GoogleAuthProvider, signInWithPopup, User } from 'firebase/auth';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 // Gmail API Types
 interface GmailHeader {
@@ -42,15 +43,19 @@ const decodeBase64Url = (data: string) => {
 export function useGmailSync() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string>('');
+  const queryClient = useQueryClient();
 
-  const reauthenticateWithGmailScope = useCallback(async () => {
+  const reauthenticateWithGmailScope = useCallback(async (silent = false) => {
     try {
       const provider = new GoogleAuthProvider();
       provider.addScope('https://www.googleapis.com/auth/gmail.readonly');
-      // Force account selection to ensure we get the right user
-      provider.setCustomParameters({
-        prompt: 'select_account'
-      });
+      
+      if (!silent) {
+        // Force account selection only if not silent
+        provider.setCustomParameters({
+          prompt: 'select_account'
+        });
+      }
       
       const result = await signInWithPopup(auth, provider);
       const credential = GoogleAuthProvider.credentialFromResult(result);
@@ -62,8 +67,10 @@ export function useGmailSync() {
       
       return token;
     } catch (error) {
-      console.error('Re-auth failed:', error);
-      toast.error('Failed to connect to Gmail. Please try again.');
+      if (!silent) {
+        console.error('Re-auth failed:', error);
+        toast.error('Failed to connect to Gmail. Please try again.');
+      }
       return null;
     }
   }, []);
@@ -74,8 +81,8 @@ export function useGmailSync() {
     const cachedToken = sessionStorage.getItem('gmail_oauth_token');
     if (cachedToken) return cachedToken;
     
-    // Fallback: Re-auth to get new token
-    return await reauthenticateWithGmailScope();
+    // Fallback: Re-auth silently first
+    return await reauthenticateWithGmailScope(true);
   }, [reauthenticateWithGmailScope]);
 
   // Parse Gmail Message (Ported from legacy script)
@@ -142,33 +149,49 @@ export function useGmailSync() {
       is_read: !labelIds.includes('UNREAD'),
       metadata: {
         ownerId: userEmail.toLowerCase(),
-        gmailThreadId: message.threadId
+        gmailThreadId: message.threadId,
+        gmailMessageId: message.id
       }
     };
   }, []);
 
-  const syncGmail = useCallback(async (user: User) => {
+  const syncGmail = useCallback(async (user: User, options: { silent?: boolean } = {}) => {
     if (isSyncing) return;
+    
+    // For background/silent sync, only proceed if we already have a token
+    if (options.silent) {
+        const cachedToken = sessionStorage.getItem('gmail_oauth_token');
+        if (!cachedToken) return; // Skip background sync if no token
+    }
+
     setIsSyncing(true);
-    setSyncStatus('Starting sync...');
+    if (!options.silent) setSyncStatus('Starting sync...');
 
     try {
       let accessToken = await getAccessToken();
       if (!accessToken) {
+        if (options.silent) return; // Don't trigger popup in silent mode
         accessToken = await reauthenticateWithGmailScope();
         if (!accessToken) throw new Error('Could not get access token');
       }
 
       // Fetch messages list
-      setSyncStatus('Fetching messages...');
-      const listRes = await fetch(`${GMAIL_API_BASE}/messages?q=in:inbox&maxResults=${MAX_MESSAGES_PER_SYNC}`, {
+      if (!options.silent) setSyncStatus('Fetching messages...');
+      // Sync both inbox and sent messages
+      const query = 'in:inbox OR in:sent';
+      const listRes = await fetch(`${GMAIL_API_BASE}/messages?q=${encodeURIComponent(query)}&maxResults=${MAX_MESSAGES_PER_SYNC}`, {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
 
       if (!listRes.ok) {
         if (listRes.status === 401) {
-             // Token expired, try once more
-             accessToken = await reauthenticateWithGmailScope();
+             // Token expired
+             if (options.silent) {
+                 sessionStorage.removeItem('gmail_oauth_token');
+                 return; // Don't trigger popup in silent mode
+             }
+             // Token expired, try once more (non-silent)
+             accessToken = await reauthenticateWithGmailScope(false);
              if (!accessToken) throw new Error('Re-auth failed');
         } else {
             throw new Error(`Gmail API error: ${listRes.status}`);
@@ -178,19 +201,19 @@ export function useGmailSync() {
       const listData = await listRes.json();
       const messages = listData.messages || [];
 
-      setSyncStatus(`Processing ${messages.length} messages...`);
+      if (!options.silent) setSyncStatus(`Processing ${messages.length} messages...`);
       let syncedCount = 0;
 
       for (const msg of messages) {
-        // Check duplication in Supabase
+        // Check duplication in Supabase using the Gmail ID as the primary key
         const { data: existing, error: checkError } = await supabase
           .from('emails')
           .select('id')
-          .eq('gmailMessageId', msg.id)
+          .eq('id', msg.id)
           .maybeSingle();
         
         if (checkError) {
-          console.error('Error checking existing email:', checkError);
+          if (!options.silent) console.error('Error checking existing email:', checkError);
           continue;
         }
         
@@ -207,46 +230,80 @@ export function useGmailSync() {
         
         const emailData = parseGmailMessage(msgData, user.email || '');
         
-        // Save to Supabase
+        // 1. Ensure the thread exists first to satisfy Foreign Key constraint
+        if (emailData.gmailThreadId) {
+            const { error: threadError } = await supabase
+                .from('threads')
+                .upsert({
+                    id: emailData.gmailThreadId,
+                    "subjectNormalized": emailData.subject,
+                    "lastSnippet": emailData.snippet,
+                    "lastFrom": emailData.from,
+                    "lastMessageAt": emailData.timestamp,
+                    "updatedAt": new Date().toISOString(),
+                    metadata: {
+                        ownerId: user.email?.toLowerCase()
+                    }
+                }, { onConflict: 'id' });
+
+            if (threadError) {
+                console.error('THREAD_UPSERT_FAILURE:', threadError);
+                // We continue anyway, but the email insert will likely fail if FK is enforced
+            }
+        }
+        
+        // 2. Save to Supabase using upsert to handle potential duplicates safely
         const { error: insertError } = await supabase
           .from('emails')
-          .insert({
+          .upsert({
+            id: emailData.gmailMessageId,
             subject: emailData.subject,
             from: emailData.from,
-            to: emailData.to,
+            to: [emailData.to],
+            "threadId": emailData.gmailThreadId,
             html: emailData.html,
             text: emailData.text,
             type: emailData.type,
             status: emailData.status,
-            gmailMessageId: emailData.gmailMessageId,
             timestamp: emailData.timestamp,
             is_read: emailData.is_read,
-            metadata: emailData.metadata,
-            created_at: emailData.createdAt,
-            updated_at: emailData.updatedAt
+            metadata: emailData.metadata
+          }, { 
+            onConflict: 'id' 
           });
 
         if (insertError) {
-          console.error('Error inserting email into Supabase:', insertError);
+          console.error('SUPABASE_UPSERT_FAILURE:', insertError);
+          console.error('ERROR_CODE:', insertError.code);
+          console.error('ERROR_MESSAGE:', insertError.message);
           continue;
         }
 
         syncedCount++;
       }
 
-      setSyncStatus(`Synced ${syncedCount} new emails`);
+      if (!options.silent) setSyncStatus(`Synced ${syncedCount} new emails`);
       if (syncedCount > 0) {
-        toast.success(`Synced ${syncedCount} new emails`);
+        if (!options.silent) toast.success(`Synced ${syncedCount} new emails`);
+        // Invalidate emails query to refresh the list
+        queryClient.invalidateQueries({ queryKey: ['emails'] });
       }
-    } catch (error) {
-      console.error('Sync failed:', error);
-      setSyncStatus('Sync failed');
-      toast.error('Gmail sync failed');
+    } catch (error: any) {
+      // Ignore abort errors
+      if (error?.name === 'AbortError' || error?.message?.includes('aborted')) {
+        return;
+      }
+      
+      if (!options.silent) {
+        console.error('Sync failed:', error);
+        setSyncStatus('Sync failed');
+        toast.error('Gmail sync failed');
+      }
     } finally {
       setIsSyncing(false);
-      setTimeout(() => setSyncStatus(''), 3000);
+      if (!options.silent) setTimeout(() => setSyncStatus(''), 3000);
     }
-  }, [isSyncing, getAccessToken, reauthenticateWithGmailScope, parseGmailMessage]);
+  }, [isSyncing, getAccessToken, reauthenticateWithGmailScope, parseGmailMessage, queryClient]);
 
   return { syncGmail, isSyncing, syncStatus };
 }

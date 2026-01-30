@@ -2,6 +2,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
+import { generateNodalSignature } from '@/lib/signature'
 
 export interface Email {
   id: string
@@ -42,7 +43,7 @@ export function useEmails(searchQuery?: string) {
           .select('*', { count: 'exact' })
         
         if (role !== 'admin') {
-           query = query.eq('metadata->>ownerId', user.email)
+           query = query.eq('metadata->>ownerId', user.email.toLowerCase())
         }
 
         if (searchQuery) {
@@ -54,27 +55,45 @@ export function useEmails(searchQuery?: string) {
 
         const { data, error, count } = await query
           .range(from, to)
-          .order('timestamp', { ascending: false })
+          .order('timestamp', { ascending: false, nullsFirst: false })
 
         if (error) throw error
 
-        const emails = data.map(item => ({
-          id: item.id,
-          subject: item.subject,
-          from: item.from,
-          to: item.to, // JSONB
-          html: item.html,
-          text: item.text,
-          snippet: item.text?.slice(0, 100),
-          date: item.timestamp || item.created_at,
-          timestamp: new Date(item.timestamp || item.created_at).getTime(),
-          unread: !item.is_read,
-          type: (['received', 'sent', 'scheduled', 'draft'].includes(item.type) ? item.type : 'received') as Email['type'],
-          status: item.status,
-          ownerId: item.metadata?.ownerId || user.email,
-          openCount: item.openCount,
-          clickCount: item.clickCount
-        })) as Email[]
+        const emails = data.map(item => {
+          // Normalize type from legacy or current formats
+          let type: Email['type'] = 'received'
+          const rawType = String(item.type || '').toLowerCase()
+          
+          if (rawType === 'sent' || rawType === 'uplink_out') {
+            type = 'sent'
+          } else if (rawType === 'scheduled') {
+            type = 'scheduled'
+          } else if (rawType === 'draft') {
+            type = 'draft'
+          } else {
+            type = 'received' // default for 'received', 'uplink_in', or anything else
+          }
+
+          const date = item.timestamp || item.createdAt || item.created_at
+          
+          return {
+            id: item.id,
+            subject: item.subject,
+            from: item.from,
+            to: item.to,
+            html: item.html,
+            text: item.text,
+            snippet: item.text?.slice(0, 100) || item.snippet,
+            date: date,
+            timestamp: date ? new Date(date).getTime() : Date.now(),
+            unread: !item.is_read,
+            type,
+            status: item.status,
+            ownerId: item.metadata?.ownerId || user.email,
+            openCount: item.openCount,
+            clickCount: item.clickCount
+          }
+        }) as Email[]
 
         const hasNextPage = count ? from + PAGE_SIZE < count : false
 
@@ -82,7 +101,11 @@ export function useEmails(searchQuery?: string) {
           emails,
           nextCursor: hasNextPage ? pageParam + 1 : null
         }
-      } catch (error) {
+      } catch (error: any) {
+        // Suppress logging for aborted requests (intentional cancellations by React Query)
+        if (error?.name === 'AbortError' || error?.message === 'Fetch is aborted') {
+          throw error
+        }
         console.error("Error fetching emails:", error)
         throw error
       }
@@ -163,7 +186,7 @@ export function useSearchEmails(queryTerm: string) {
           .select('*')
         
         if (role !== 'admin') {
-           query = query.eq('metadata->>ownerId', user.email)
+           query = query.eq('metadata->>ownerId', user.email.toLowerCase())
         }
 
         query = query.or(`subject.ilike.%${queryTerm}%,from.ilike.%${queryTerm}%,text.ilike.%${queryTerm}%`)
@@ -201,8 +224,8 @@ export function useEmailsCount(searchQuery?: string) {
           .from('emails')
           .select('*', { count: 'exact', head: true })
         
-        if (role !== 'admin') {
-           query = query.eq('metadata->>ownerId', user.email)
+        if (role !== 'admin' && user.email) {
+           query = query.eq('metadata->>ownerId', user.email.toLowerCase())
         }
 
         if (searchQuery) {

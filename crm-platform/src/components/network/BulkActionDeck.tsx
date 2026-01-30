@@ -98,9 +98,9 @@ export default function BulkActionDeck({ selectedCount, totalAvailable, onClear,
           
           <button 
             onClick={() => onAction('delete')}
-            className="group p-2 rounded-lg hover:bg-red-500/10 transition-colors relative"
+            className="group p-2 icon-button-forensic relative"
           >
-            <Trash2 className="w-5 h-5 text-zinc-500 group-hover:text-red-500 transition-colors" />
+            <Trash2 className="w-5 h-5 group-hover:text-red-500 transition-colors" />
             <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-[9px] font-mono text-red-500 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
               PURGE_PROTOCOL
             </span>
@@ -116,7 +116,7 @@ function ActionButton({ icon, label, onClick, isAi }: { icon: React.ReactNode, l
   return (
     <button 
       onClick={onClick}
-      className="group relative p-2.5 rounded-xl hover:bg-white/10 transition-all text-zinc-400 hover:text-white flex items-center justify-center"
+      className="group relative p-2.5 icon-button-forensic flex items-center justify-center"
     >
       <div className="w-5 h-5 flex items-center justify-center">
         {icon}

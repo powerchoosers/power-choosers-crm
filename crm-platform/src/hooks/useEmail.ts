@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { Email } from './useEmails'
 
@@ -41,5 +41,26 @@ export function useEmail(id: string) {
       return null
     },
     enabled: !!id
+  })
+}
+
+export function useMarkEmailAsRead() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('emails')
+        .update({ is_read: true })
+        .eq('id', id)
+
+      if (error) throw error
+      return id
+    },
+    onSuccess: (id) => {
+      // Invalidate both the individual email and the list
+      queryClient.invalidateQueries({ queryKey: ['email', id] })
+      queryClient.invalidateQueries({ queryKey: ['emails'] })
+    }
   })
 }
