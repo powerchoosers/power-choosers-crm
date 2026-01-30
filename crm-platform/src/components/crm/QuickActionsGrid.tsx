@@ -19,10 +19,11 @@ export default function QuickActionsGrid() {
           <Link
             key={action.label}
             href={action.href}
-            className="group flex flex-col items-center justify-center p-4 rounded-2xl bg-zinc-900/40 border border-white/5 backdrop-blur-xl hover:bg-white/5 transition-all duration-300"
+            className="icon-button-forensic group flex flex-col items-center justify-center p-4 rounded-2xl transition-all duration-300"
+            title={action.label}
           >
-            <action.icon size={20} className="text-zinc-500 group-hover:text-white group-hover:scale-110 transition-all duration-300 mb-2" />
-            <span className="text-[10px] font-mono text-zinc-500 group-hover:text-zinc-300 uppercase tracking-widest">{action.label}</span>
+            <action.icon size={20} className="mb-2 transition-all duration-300" />
+            <span className="text-[10px] font-mono text-zinc-500 group-hover:text-white uppercase tracking-widest transition-colors duration-300">{action.label}</span>
           </Link>
         ))}
       </div>

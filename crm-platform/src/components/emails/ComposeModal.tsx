@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useEmails } from '@/hooks/useEmails'
+import { useAuth } from '@/context/AuthContext'
+import { generateNodalSignature } from '@/lib/signature'
 import { Loader2, X, Paperclip, Sparkles, Minus, Maximize2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -28,7 +30,10 @@ function ComposePanel({
   const [subject, setSubject] = useState(initialSubject)
   const [content, setContent] = useState('')
   const [isMinimized, setIsMinimized] = useState(false)
+  const { user, profile } = useAuth()
   const { sendEmail, isSending } = useEmails()
+
+  const signatureHtml = profile ? generateNodalSignature(profile, user, true) : ''
 
   const handleSend = () => {
     if (!to || !subject || !content) {
@@ -63,38 +68,34 @@ function ComposePanel({
       >
         <h3 className="text-lg font-semibold text-white">New Message</h3>
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-zinc-400 hover:text-white"
+          <button
+            className="icon-button-forensic h-8 w-8 flex items-center justify-center"
             onClick={(e) => {
               e.stopPropagation()
               setIsMinimized(!isMinimized)
             }}
           >
             {isMinimized ? <Maximize2 className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-red-500/20 hover:text-red-400"
+          </button>
+          <button
+            className="icon-button-forensic h-8 w-8 flex items-center justify-center hover:text-red-400"
             onClick={(e) => {
               e.stopPropagation()
               onClose()
             }}
           >
             <X className="w-4 h-4" />
-          </Button>
+          </button>
         </div>
       </div>
 
       <div
         className={cn(
-          "flex flex-col flex-1 bg-zinc-950 transition-all duration-300",
+          "flex flex-col h-[calc(100%-60px)] bg-zinc-950 transition-all duration-300",
           isMinimized ? "opacity-0 invisible" : "opacity-100 visible"
         )}
       >
-        <div className="p-6 space-y-4 flex-1 overflow-y-auto np-scroll">
+        <div className="flex-1 overflow-y-auto np-scroll px-6 py-4 space-y-4">
           <div className="space-y-2">
             <Input
               placeholder="To"
@@ -113,24 +114,33 @@ function ComposePanel({
             />
           </div>
 
-          <div className="min-h-[150px] flex-1">
+          <div className="flex flex-col">
             <textarea
               placeholder="Write your message..."
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              className="w-full h-full min-h-[150px] bg-transparent border-0 resize-none focus:outline-none text-zinc-300 placeholder:text-zinc-600 font-sans leading-relaxed"
+              className="w-full min-h-[150px] bg-transparent border-0 resize-none focus:outline-none text-zinc-300 placeholder:text-zinc-600 font-sans leading-relaxed"
             />
+            
+            {signatureHtml && (
+              <div className="mt-4 pt-4 border-t border-white/5 opacity-90">
+                <div 
+                  className="rounded-lg overflow-hidden"
+                  dangerouslySetInnerHTML={{ __html: signatureHtml }} 
+                />
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-white/5 bg-zinc-900/50 flex items-center justify-between">
+        <div className="flex-none px-6 py-4 border-t border-white/5 bg-zinc-900/50 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-white hover:bg-white/5">
+            <button className="icon-button-forensic h-8 w-8 flex items-center justify-center">
               <Paperclip className="w-4 h-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="text-purple-400 hover:text-purple-300 hover:bg-purple-500/10">
+            </button>
+            <button className="icon-button-forensic h-8 w-8 flex items-center justify-center text-purple-400">
               <Sparkles className="w-4 h-4" />
-            </Button>
+            </button>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={onClose} className="text-zinc-400 hover:text-white hover:bg-white/5">

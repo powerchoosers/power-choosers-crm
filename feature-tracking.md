@@ -36,22 +36,22 @@
     - [x] Applied forensic "Obsidian" styling to the destruction interface.
   - [x] **Integration**: Fully integrated the selection system into `PeoplePage` and `AccountsPage` with TanStack Table state synchronization.
 
-### Segmentation & Targets Page Migration
+### Target Array Detail & List Filtering
 - **Status**: Completed
-- **Description**: Migrated the legacy segmentation features to a modern, standardized Targets page with real-time Supabase integration.
+- **Description**: Implemented dedicated detail views for target lists with automated filtering for People and Accounts.
 - **Actions**:
-  - [x] **Page Creation**: Created `src/app/network/targets/page.tsx` with a standardized "Obsidian & Glass" layout.
-  - [x] **Data Fetching**: Implemented `useTargets.ts` hook using TanStack Query to fetch target data and member counts from Supabase.
-  - [x] **Standardized Layout**:
-    - [x] **Contained Container**: Implemented full-page container with `h-[calc(100vh-8rem)]`.
-    - [x] **Header Integration**: Moved search input and mode switcher (People/Accounts) into a unified page header.
-    - [x] **Scrollable Grid**: Created a scrollable card area for target entities with custom forensic styling.
-    - [x] **Footer (Sync_Block)**: Added a standardized footer with `Total_Nodes` count and system status.
+  - [x] **Data Layer Enhancement**: 
+    - [x] Modified `useContacts.ts` and `useAccounts.ts` to support optional `listId` filtering using a two-step `list_members` lookup (resolving polymorphic join limitations).
+    - [x] Added `useTarget(id)` hook to `useTargets.ts` for single-list intelligence fetching.
+  - [x] **Target Detail View**:
+    - [x] Created `src/app/network/targets/[id]/page.tsx` with robust conditional rendering for `Human_Intel` (People) and `Asset_Intel` (Accounts).
+    - [x] Optimized query execution to prevent invalid requests before target metadata is resolved.
+    - [x] Integrated `ForensicTableSkeleton` and `FilterCommandDeck` for consistent UX.
+    - [x] Implemented standardized `Sync_Block` footer and navigation controls.
   - [x] **UI/UX Refinement**:
-    - [x] Applied `font-mono tabular-nums` to node counts.
-    - [x] Fixed "Updated" date positioning and formatting.
-    - [x] Standardized card header icons (white color, consistent spacing).
-  - [x] **Navigation**: Added "Targets" button to the Sidebar below "Accounts".
+    - [x] Applied `font-mono tabular-nums` to all ID and count fields.
+    - [x] Integrated `ClickToCallButton` and action menus within list rows.
+    - [x] Verified navigation flow from main Targets grid to specific list sectors.
 
 ### Call Data & Schema Migration
 - **Status**: Completed

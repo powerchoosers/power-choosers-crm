@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { draft, type, context, contact, prompt, provider } = req.body;
+  const { draft, type, context, contact, prompt, provider, mode = 'generate_email' } = req.body;
 
   if (!draft && !prompt) {
     res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -30,25 +30,62 @@ export default async function handler(req, res) {
     }
 
     try {
-      const systemInstruction = `
-        You are the Nodal Architect, the cognitive core of the Nodal Point CRM.
-        Your task is to generate or optimize a sequence step (type: ${type}).
-        ${contact ? `TARGET CONTACT: ${contact.name} (${contact.company}), Load Zone: ${contact.load_zone}` : ''}
-        
-        TONE GUIDELINES:
-        - Forensic, Direct, Minimalist.
-        - Highlight financial variance, market volatility, or technical risk.
-        - Sound like a grid engineer or quantitative analyst.
-        - NO marketing fluff.
-        
-        INSTRUCTIONS:
-        - Output ONLY the email/script body.
-        - Preserve variables like {{first_name}}.
-      `;
+      let systemInstruction = '';
+      let userContent = '';
 
-      const userContent = prompt 
-        ? `Instructions: ${prompt}\n\nDraft/Context: ${draft || '(None)'}`
-        : `Optimize this draft: ${draft}`;
+      if (mode === 'optimize_prompt') {
+        systemInstruction = `
+          You are the Nodal Architect, the cognitive core of the Nodal Point CRM.
+          Your task is to optimize an AI prompt that will be used to generate sequence emails.
+          
+          PROMPT GUIDELINES:
+          - Make the prompt more specific, forensic, and aligned with Nodal Point philosophy.
+          - Ensure it focuses on financial variance, market volatility, and technical grid risk.
+          - Use engineering/quantitative terminology.
+          - The optimized prompt should result in emails that are direct and minimalist.
+          - Preserve all existing technical requirements in the prompt while making them more "Forensic".
+          
+          INSTRUCTIONS:
+          - Output ONLY the optimized prompt text.
+        `;
+        userContent = `Optimize this prompt for an email node: ${prompt}`;
+      } else if (mode === 'generate_email') {
+        systemInstruction = `
+          You are the Nodal Architect, the cognitive core of the Nodal Point CRM.
+          Your task is to generate a sequence step (type: ${type}) based on specific instructions.
+          ${contact ? `TARGET CONTACT: ${contact.name} (${contact.company}), Load Zone: ${contact.load_zone}` : ''}
+          
+          TONE GUIDELINES:
+          - Forensic, Direct, Minimalist.
+          - Highlight financial variance, market volatility, or technical risk.
+          - Sound like a grid engineer or quantitative analyst.
+          - NO marketing fluff.
+          
+          INSTRUCTIONS:
+          - Output ONLY the email/script body.
+          - Use HTML for formatting (paragraphs, line breaks).
+          - Preserve variables like {{first_name}}.
+        `;
+        userContent = `Instructions: ${prompt}\n\nDraft/Context: ${draft || '(None)'}`;
+      } else {
+        systemInstruction = `
+          You are the Nodal Architect, the cognitive core of the Nodal Point CRM.
+          Your task is to optimize a sequence step draft (type: ${type}).
+          ${contact ? `TARGET CONTACT: ${contact.name} (${contact.company}), Load Zone: ${contact.load_zone}` : ''}
+          
+          TONE GUIDELINES:
+          - Forensic, Direct, Minimalist.
+          - Highlight financial variance, market volatility, or technical risk.
+          - Sound like a grid engineer or quantitative analyst.
+          - NO marketing fluff.
+          
+          INSTRUCTIONS:
+          - Output ONLY the optimized email/script body.
+          - Use HTML for formatting (paragraphs, line breaks).
+          - Preserve variables like {{first_name}}.
+        `;
+        userContent = `Optimize this draft: ${draft}`;
+      }
 
       const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",

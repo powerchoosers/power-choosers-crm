@@ -2,7 +2,6 @@
 
 import React from 'react'
 import { Phone } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { useCallStore } from '@/store/callStore'
 import { cn } from '@/lib/utils'
 
@@ -52,15 +51,17 @@ export const ClickToCallButton: React.FC<ClickToCallButtonProps> = ({
   }
 
   return (
-    <Button
-      variant={variant}
-      size={size}
-      className={cn(className)}
+    <button
+      className={cn(
+        "icon-button-forensic flex items-center justify-center",
+        size === 'icon' ? "w-8 h-8" : "px-3 py-1.5 rounded-lg text-sm",
+        className
+      )}
       onClick={handleClick}
       disabled={!phoneNumber}
       title={phoneNumber ? `Call ${phoneNumber}` : 'No phone number'}
     >
       {children || <Phone className="h-4 w-4" />}
-    </Button>
+    </button>
   )
 }

@@ -347,14 +347,12 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
                     </div>
                   </div>
                   {doc.url && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-zinc-500 hover:text-white"
+                    <button 
+                      className="icon-button-forensic h-8 w-8 flex items-center justify-center text-zinc-500"
                       onClick={() => window.open(doc.url, '_blank')}
                     >
                       <ArrowRight size={14} />
-                    </Button>
+                    </button>
                   )}
                 </div>
               ))
@@ -474,8 +472,8 @@ export function GeminiChatTrigger(props: { onToggle?: () => void }) {
         toggleChat()
       }}
       className={cn(
-        "w-9 h-9 inline-flex items-center justify-center rounded-full transition-all duration-200 text-zinc-400 hover:text-white hover:bg-white/10 relative overflow-hidden",
-        isOpen && "bg-white/10 text-white"
+        "icon-button-forensic w-9 h-9 relative overflow-hidden",
+        isOpen && "text-white scale-110"
       )}
       title={isOpen ? "Close Gemini" : "Chat with Gemini"}
     >
@@ -888,8 +886,8 @@ export function GeminiChatPanel() {
           <button
             onClick={() => setIsHistoryOpen(!isHistoryOpen)}
             className={cn(
-              "w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
-              isHistoryOpen ? "text-white bg-white/10" : "text-zinc-400 hover:text-white hover:bg-white/10"
+              "icon-button-forensic w-8 h-8 flex items-center justify-center",
+              isHistoryOpen && "text-white scale-110"
             )}
             title="Chat History"
           >
@@ -897,7 +895,7 @@ export function GeminiChatPanel() {
           </button>
           <button
             onClick={resetSession}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="icon-button-forensic w-8 h-8 flex items-center justify-center"
             title="New Chat"
           >
             <Plus size={18} />
@@ -1120,7 +1118,7 @@ export function GeminiChatPanel() {
                           </p>
                           <button 
                             onClick={copyDebugInfo}
-                            className="w-8 h-8 inline-flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+                            className="icon-button-forensic w-8 h-8 shrink-0 flex items-center justify-center"
                             title="Copy Prompt for Backend Dev"
                           >
                             <Copy size={16} />
@@ -1240,8 +1238,8 @@ export function GeminiChatPanel() {
                 onMouseDown={() => setIsListening(true)}
                 onMouseUp={() => setIsListening(false)}
                 className={cn(
-                  "p-2 rounded-lg transition-all",
-                  isListening ? "text-red-500 bg-red-500/10 shadow-[0_0_10px_rgba(239,68,68,0.3)]" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/10"
+                  "icon-button-forensic p-2 flex items-center justify-center",
+                  isListening ? "text-red-500 scale-110 shadow-[0_0_10px_rgba(239,68,68,0.3)]" : ""
                 )}
               >
                 <Mic className="w-4 h-4" />

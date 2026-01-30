@@ -4,6 +4,7 @@ import React from 'react'
 import { useRouter } from 'next/navigation'
 import { Contact } from '@/hooks/useContacts'
 import { User, ArrowUpRight } from 'lucide-react'
+import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { cn } from '@/lib/utils'
 
 interface StakeholderMapProps {
@@ -30,9 +31,12 @@ export const StakeholderMap: React.FC<StakeholderMapProps> = ({ contacts = [], c
             className="group flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 border border-transparent hover:border-white/5 transition-all cursor-pointer"
           >
             {/* Avatar */}
-            <div className="h-8 w-8 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white group-hover:bg-[#002FA7] group-hover:border-[#002FA7]/50 transition-colors">
-              {contact.name?.slice(0, 2).toUpperCase()}
-            </div>
+            <ContactAvatar 
+              name={contact.name || ''} 
+              size={32} 
+              className="w-8 h-8 rounded-lg"
+              textClassName="text-[10px]"
+            />
             
             <div className="flex-1 min-w-0">
               <div className="text-xs font-medium text-zinc-300 group-hover:text-white truncate">

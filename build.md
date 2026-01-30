@@ -1,127 +1,310 @@
-In the Nodal Point philosophy, we do not "filter lists." We isolate variables. A standard dropdown menu is administrative; we need a "Query Deck" that slides out like a weapon rack to refine your targeting vectors.
-Here is the architectural blueprint to implement the Filter mechanism for both People and Accounts, maintaining the "Obsidian & Glass" aesthetic.
-1. The Interaction: "The Tactic Slide"
-Do not use a modal or a sidebar. Use a Collapsible Command Drawer that pushes the table down when activated.
-• Trigger: The "Filter" button [Source 188].
-• Action: A glass panel slides down between the Header and the Table.
-• The "X" Button: You mentioned an "X" button. This is your "Collapse Vector." It should physically retract the drawer, clearing the visual field for the data.
-2. The Interface: "Toggle Arrays" (Not Dropdowns)
-Standard select dropdowns require two clicks (Open -> Select). They are slow. We will use "Toggle Arrays"—rows of pill-shaped buttons that you can click to activate/deactivate instantly. This feels like flipping switches on a console.
-3. Implementation: FilterCommandDeck.tsx
-Create this component to be used on both pages. It accepts a type prop to render specific filters for Human Intelligence (People) vs. Asset Intelligence (Accounts).
-'use client'
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check } from 'lucide-react';
+## Error Type
+Build Error
 
-interface FilterDeckProps {
-  isOpen: boolean;
-  onClose: () => void;
-  type: 'people' | 'account';
-}
+## Error Message
+Parsing ecmascript source code failed
 
-export default function FilterCommandDeck({ isOpen, onClose, type }: FilterDeckProps) {
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
-          className="overflow-hidden border-b border-white/5 bg-zinc-900/30 backdrop-blur-xl"
-        >
-          <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-8">
-            
-            {/* COLUMN 1: STATUS VECTORS */}
-            <div className="space-y-3">
-              <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                {type === 'people' ? 'RELATIONSHIP_STATE' : 'CONTRACT_STATUS'}
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                <FilterChip label="Active Node" active />
-                <FilterChip label="Prospect" />
-                <FilterChip label="Dormant" />
-                <FilterChip label="Risk Alert" color="red" />
-              </div>
-            </div>
+## Build Output
+./crm-platform/src/components/emails/EmailContent.tsx:126:13
+Parsing ecmascript source code failed
+  124 |     `
+  125 |
+> 126 |     return \`
+      |             ^
+> 127 |       <!DOCTYPE html>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 128 |       <html>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 129 |         <head>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 130 |           <meta charset="utf-8">
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 131 |           <meta name="viewport" content="width=device-width, initial-scale=1">
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 132 |           <style>\${baseStyles}</style>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 133 |           <base target="_blank">
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 134 |         </head>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 135 |         <body>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 136 |           <div class="email-wrapper">
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 137 |             \${sanitizedHtml}
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 138 |           </div>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 139 |           <script>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 140 |             function updateHeight() {
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 141 |               const body = document.body;
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 142 |               const html = document.documentElement;
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 143 |               const height = Math.max(
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 144 |                 body.scrollHeight, body.offsetHeight, 
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 145 |                 html.clientHeight, html.scrollHeight, html.offsetHeight
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 146 |               );
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 147 |               window.parent.postMessage({ type: 'setHeight', height: height }, '*');
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 148 |             }
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 149 |             window.addEventListener('load', () => {
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 150 |               // Wait for images to load
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 151 |               const images = document.getElementsByTagName('img');
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 152 |               let loadedImages = 0;
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 153 |               if (images.length === 0) updateHeight();
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 154 |               for (let img of images) {
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 155 |                 if (img.complete) {
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 156 |                   loadedImages++;
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 157 |                   if (loadedImages === images.length) updateHeight();
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 158 |                 } else {
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 159 |                   img.addEventListener('load', () => {
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 160 |                     loadedImages++;
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 161 |                     if (loadedImages === images.length) updateHeight();
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 162 |                   });
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 163 |                   img.addEventListener('error', () => {
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 164 |                     loadedImages++;
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 165 |                     if (loadedImages === images.length) updateHeight();
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 166 |                   });
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 167 |                 }
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 168 |               }
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 169 |               updateHeight();
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 170 |             });
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 171 |             window.addEventListener('resize', updateHeight);
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 172 |             // Periodic check for dynamic content
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 173 |             setInterval(updateHeight, 1500);
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 174 |           </script>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 175 |         </body>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 176 |       </html>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 177 |     \`
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 178 |   }
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 179 | 
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 180 |   useEffect(() => {
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 181 |     const handleMessage = (event: MessageEvent) => {
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 182 |       if (event.data.type === 'setHeight' && typeof event.data.height === 'number') {
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 183 |         // Add a bit of buffer
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 184 |         setIframeHeight(\`\${event.data.height + 20}px\`)
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 185 |       }
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 186 |     }
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 187 | 
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 188 |     window.addEventListener('message', handleMessage)
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 189 |     return () => window.removeEventListener('message', handleMessage)
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 190 |   }, [])
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 191 | 
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 192 |   // Force re-render of iframe content when key dependencies change
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 193 |   const iframeKey = React.useMemo(() => \`\${isLightMode}-\${html?.length}\`, [isLightMode, html])
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 194 | 
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 195 |   return (
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 196 |     <div className={cn("relative group flex flex-col h-full", className)}>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 197 |       {/* Controls */}
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 198 |       <div className="absolute top-4 right-4 z-10 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 199 |         <Button
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 200 |           variant="secondary"
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 201 |           size="sm"
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 202 |           className="h-8 w-8 p-0 bg-zinc-900/80 backdrop-blur border border-white/10 hover:bg-zinc-800"
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 203 |           onClick={handlePrint}
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 204 |           title="Print Email"
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 205 |         >
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 206 |           <Printer className="w-4 h-4 text-zinc-400" />
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 207 |         </Button>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 208 |         <Button
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 209 |           variant="secondary"
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 210 |           size="sm"
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 211 |           className="h-8 w-8 p-0 bg-zinc-900/80 backdrop-blur border border-white/10 hover:bg-zinc-800"
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 212 |           onClick={handleOpenNewWindow}
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 213 |           title="Open in New Window"
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 214 |         >
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 215 |           <ExternalLink className="w-4 h-4 text-zinc-400" />
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 216 |         </Button>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 217 |         <Button
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 218 |           variant="secondary"
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 219 |           size="sm"
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 220 |           className="h-8 w-8 p-0 bg-zinc-900/80 backdrop-blur border border-white/10 hover:bg-zinc-800"
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 221 |           onClick={() => setIsLightMode(!isLightMode)}
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 222 |           title={isLightMode ? "Switch to Dark Mode" : "Switch to Light Mode"}
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 223 |         >
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 224 |           {isLightMode ? <Moon className="w-4 h-4 text-zinc-400" /> : <Sun className="w-4 h-4 text-zinc-400" />}
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 225 |         </Button>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 226 |         <Button
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 227 |           variant="secondary"
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 228 |           size="sm"
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 229 |           className="h-8 w-8 p-0 bg-zinc-900/80 backdrop-blur border border-white/10 hover:bg-zinc-800"
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 230 |           onClick={() => setIsExpanded(!isExpanded)}
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 231 |           title={isExpanded ? "Collapse" : "Expand"}
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 232 |         >
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 233 |           {isExpanded ? <Minimize2 className="w-4 h-4 text-zinc-400" /> : <Maximize2 className="w-4 h-4 text-zinc-400" />}
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 234 |         </Button>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 235 |       </div>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 236 | 
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 237 |       <div className={cn(
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 238 |         "flex-1 overflow-hidden transition-all duration-300 ease-in-out",
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 239 |         isExpanded ? "fixed inset-4 z-50 bg-zinc-950 rounded-2xl border border-white/10 shadow-2xl p-4" : "relative"
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 240 |       )}>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 241 |         {isExpanded && (
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 242 |           <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-4">
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 243 |             <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-widest font-mono">Forensic_Email_View</h3>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 244 |             <Button variant="ghost" size="sm" onClick={() => setIsExpanded(false)} className="text-zinc-400">
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 245 |               <Minimize2 className="w-4 h-4 mr-2" />
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 246 |               Close
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 247 |             </Button>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 248 |           </div>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 249 |         )}
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 250 |         
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 251 |         <iframe
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 252 |           key={iframeKey}
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 253 |           ref={iframeRef}
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 254 |           srcDoc={getIframeContent()}
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 255 |           className={cn(
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 256 |             "w-full border-none transition-all duration-300",
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 257 |             isExpanded ? "h-[calc(100%-4rem)]" : "min-h-[400px]"
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 258 |           )}
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 259 |           style={{ height: isExpanded ? '100%' : iframeHeight }}
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 260 |           sandbox="allow-popups allow-popups-to-escape-sandbox allow-scripts"
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 261 |           title="Email Content"
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 262 |         />
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 263 |       </div>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 264 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 265 |   )
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 266 | }
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 267 | 
+      | ^
 
-            {/* COLUMN 2: GEOSPATIAL / ROLE */}
-            <div className="space-y-3">
-              <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                {type === 'people' ? 'OPERATIONAL_ROLE' : 'GRID_ZONE'}
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {type === 'people' ? (
-                  <>
-                    <FilterChip label="C-Suite" />
-                    <FilterChip label="Facility Mgr" />
-                    <FilterChip label="Procurement" />
-                  </>
-                ) : (
-                  <>
-                    <FilterChip label="LZ_NORTH" />
-                    <FilterChip label="LZ_HOUSTON" />
-                    <FilterChip label="LZ_WEST" />
-                  </>
-                )}
-              </div>
-            </div>
+Unterminated template
 
-            {/* COLUMN 3: TIME HORIZON */}
-            <div className="space-y-3">
-              <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                {type === 'people' ? 'LAST_INTERACTION' : 'LIABILITY_WINDOW (EXP)'}
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                <FilterChip label="< 30 Days" />
-                <FilterChip label="Q3 2026" />
-                <FilterChip label="Q4 2026" />
-              </div>
-            </div>
+Import traces:
+  Client Component Browser:
+    ./crm-platform/src/components/emails/EmailContent.tsx [Client Component Browser]
+    ./crm-platform/src/app/network/emails/[id]/page.tsx [Client Component Browser]
+    ./crm-platform/src/app/network/emails/[id]/page.tsx [Server Component]
 
-          </div>
+  Client Component SSR:
+    ./crm-platform/src/components/emails/EmailContent.tsx [Client Component SSR]
+    ./crm-platform/src/app/network/emails/[id]/page.tsx [Client Component SSR]
+    ./crm-platform/src/app/network/emails/[id]/page.tsx [Server Component]
 
-          {/* FOOTER ACTIONS */}
-          <div className="px-6 pb-4 flex justify-between items-center">
-            <button 
-              onClick={onClose}
-              className="text-xs text-zinc-500 hover:text-white font-mono flex items-center gap-2"
-            >
-              <X className="w-3 h-3" /> CLOSE_DECK
-            </button>
-            <button className="text-xs text-[#002FA7] hover:text-blue-400 font-mono uppercase tracking-wider">
-              CLEAR_VECTORS
-            </button>
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
-
-// Helper Component for the "Pill" Switches
-function FilterChip({ label, active, color }: any) {
-  return (
-    <button className={`
-      px-3 py-1.5 rounded-lg text-[10px] font-mono border transition-all flex items-center gap-2
-      ${active 
-        ? 'bg-[#002FA7]/10 border-[#002FA7] text-white shadow-[0_0_10px_-2px_rgba(0,47,167,0.5)]' 
-        : 'bg-zinc-900/50 border-white/5 text-zinc-500 hover:border-white/20 hover:text-zinc-300'}
-    `}>
-      {active && <Check className="w-2 h-2" />}
-      {label}
-    </button>
-  );
-}
-4. Integration Logic
-Place this component directly underneath your existing Header bar (where the Search and Filter buttons live), but above the Table component.
-For the Accounts Page (Asset Recon): Focus the filters on Physics:
-• Grid Zone: (Houston, North, West) - Critical for congestion risk.
-• Load Factor: (<40% vs >60%) - To isolate Demand Ratchet targets.
-• Contract End: Focus on the "cliff dates" (e.g., expiring in 6 months).
-For the People Page (Human Intel): Focus the filters on Hierarchy:
-• Role: Isolating "CFOs" vs "Facility Managers" requires different scripts.
-• Sequence Status: "Enrolled in Protocol" vs "Un-touched."
-The "Nodal" Difference
-• No Scrolling: The deck reveals all options at once. You scan, click, and execute.
-• Visual Confirmation: Active filters glow Blue. You instantly know what variables are isolated.
-• Zero Clutter: When you hit the "X", the entire thing vanishes, returning your view to the raw data stream.
+Next.js version: 16.1.4 (Turbopack)

@@ -1,14 +1,15 @@
 'use client'
 
 import { useParams, useRouter } from 'next/navigation'
-import { useEmail } from '@/hooks/useEmail'
+import { useEmail, useMarkEmailAsRead } from '@/hooks/useEmail'
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Reply, Trash2, MoreHorizontal, Printer, Star } from 'lucide-react'
 import { format } from 'date-fns'
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ComposeModal } from '@/components/emails/ComposeModal'
+import { EmailContent } from '@/components/emails/EmailContent'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Loader2 } from 'lucide-react'
 
 export default function EmailDetailPage() {
@@ -16,10 +17,25 @@ export default function EmailDetailPage() {
   const router = useRouter()
   const id = params?.id as string
   const { data: email, isLoading } = useEmail(id)
+  const { mutate: markAsRead } = useMarkEmailAsRead()
   const [isComposeOpen, setIsComposeOpen] = useState(false)
+  const [isPrintRequested, setIsPrintRequested] = useState(false)
+
+  // Mark as read when the email is loaded
+  useEffect(() => {
+    if (email && email.unread) {
+      markAsRead(id)
+    }
+  }, [email, id, markAsRead])
 
   const handleBack = () => {
     router.back()
+  }
+
+  const handlePrint = () => {
+    setIsPrintRequested(true)
+    // Reset after a short delay
+    setTimeout(() => setIsPrintRequested(false), 100)
   }
 
   if (isLoading) {
@@ -60,30 +76,30 @@ export default function EmailDetailPage() {
       {/* Header Actions */}
       <div className="flex items-center justify-between nodal-glass p-4 rounded-xl">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={handleBack} className="text-zinc-400 hover:text-white hover:bg-white/5">
+          <button onClick={handleBack} className="icon-button-forensic w-9 h-9">
             <ArrowLeft className="w-5 h-5" />
-          </Button>
+          </button>
           <div className="h-6 w-px bg-white/10 mx-2" />
-          <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-white hover:bg-white/5">
+          <button className="icon-button-forensic w-9 h-9">
             <Trash2 className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-white hover:bg-white/5">
+          </button>
+          <button className="icon-button-forensic w-9 h-9">
             <Star className="w-4 h-4" />
-          </Button>
+          </button>
         </div>
         <div className="flex items-center gap-2">
-           <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-white hover:bg-white/5">
+          <button onClick={handlePrint} className="icon-button-forensic w-9 h-9">
             <Printer className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-white hover:bg-white/5">
+          </button>
+          <button className="icon-button-forensic w-9 h-9">
             <MoreHorizontal className="w-4 h-4" />
-          </Button>
+          </button>
         </div>
       </div>
 
       {/* Email Content */}
-      <div className="flex-1 nodal-glass rounded-2xl overflow-hidden flex flex-col relative">
-        <div className="flex-none p-8 border-b border-white/5 space-y-6 bg-transparent">
+      <div className="flex-1 bg-zinc-950 border border-white/10 rounded-2xl overflow-hidden flex flex-col relative shadow-2xl">
+        <div className="flex-none p-8 border-b border-white/5 space-y-6 bg-zinc-900/30">
           <div className="space-y-1">
             <h1 className="text-3xl font-semibold text-white tracking-tighter leading-tight">{email.subject}</h1>
             <div className="flex items-center gap-2">
@@ -107,8 +123,8 @@ export default function EmailDetailPage() {
                       <span className="text-sm text-zinc-500">&lt;{displayFromAddress}&gt;</span>
                     ) : null}
                 </div>
-                <div className="text-sm text-zinc-400">
-                  To: <span className="text-zinc-300">{Array.isArray(email.to) ? email.to.join(', ') : email.to}</span>
+                <div className="text-sm text-zinc-300">
+                  To: <span className="text-white font-medium">{Array.isArray(email.to) ? email.to.join(', ') : email.to}</span>
                 </div>
               </div>
             </div>
@@ -123,27 +139,25 @@ export default function EmailDetailPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 bg-white/0 np-scroll">
-          {email.html ? (
-            <div 
-              className="prose prose-invert max-w-none text-zinc-300 prose-headings:text-zinc-100 prose-a:text-indigo-400 prose-strong:text-zinc-100 prose-code:text-indigo-300"
-              dangerouslySetInnerHTML={{ __html: email.html }}
-            />
-          ) : (
-            <div className="whitespace-pre-wrap text-zinc-300 leading-relaxed">
-              {email.text || email.snippet || 'No content'}
-            </div>
-          )}
-        </div>
+        <div className="flex-1 overflow-y-auto bg-white/0 np-scroll">
+           <EmailContent 
+             html={email.html} 
+             text={email.text || email.snippet} 
+             subject={email.subject}
+             printTrigger={isPrintRequested}
+             className="p-4"
+           />
+          </div>
 
         <div className="p-4 border-t border-white/5 bg-zinc-900/80 backdrop-blur-sm">
-            <Button 
-                onClick={() => setIsComposeOpen(true)}
-                className="bg-white text-zinc-950 hover:bg-zinc-200 font-medium"
-            >
-                <Reply className="w-4 h-4 mr-2" />
-                Reply
-            </Button>
+            <button 
+          onClick={() => setIsComposeOpen(true)}
+          className="icon-button-forensic bg-white !text-zinc-950 hover:!bg-zinc-200 font-medium h-9 px-4 rounded-xl flex items-center gap-2 transition-all shadow-[0_0_30px_-5px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.4)]"
+          title="Reply to Email"
+        >
+          <Reply className="w-4 h-4" />
+          Reply
+        </button>
         </div>
       </div>
 

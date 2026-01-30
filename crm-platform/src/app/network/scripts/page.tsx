@@ -130,25 +130,21 @@ export default function ScriptsPage() {
                 </div>
             </div>
             <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
+                <button
                   disabled
-                  className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all opacity-50"
+                  className="icon-button-forensic w-8 h-8 flex items-center justify-center opacity-30 cursor-not-allowed"
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
-                </Button>
+                </button>
                 <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
                   01
                 </div>
-                <Button
-                  variant="outline"
-                  size="icon"
+                <button
                   disabled
-                  className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all opacity-50"
+                  className="icon-button-forensic w-8 h-8 flex items-center justify-center opacity-30 cursor-not-allowed"
                 >
                   <ChevronRight className="h-3.5 w-3.5" />
-                </Button>
+                </button>
             </div>
         </div>
       </div>

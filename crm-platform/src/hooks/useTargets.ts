@@ -22,6 +22,30 @@ export function useTargets() {
   })
 }
 
+export function useTarget(id: string) {
+  return useQuery({
+    queryKey: ['target', id],
+    queryFn: async () => {
+      if (!id) return null
+      
+      const { data, error } = await supabase
+        .from('lists')
+        .select('*, list_members(count)')
+        .eq('id', id)
+        .single()
+      
+      if (error) throw error
+      
+      const target = data as (Target & { list_members: { count: number }[] })
+      return {
+        ...target,
+        count: target.list_members?.[0]?.count || 0
+      } as Target
+    },
+    enabled: !!id
+  })
+}
+
 export function useSearchTargets(queryTerm: string) {
   const { user, role, loading } = useAuth()
 
