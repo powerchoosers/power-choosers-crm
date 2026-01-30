@@ -946,9 +946,9 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // Default to index.html for root requests (public landing page)
+  // Default to index-legacy.html for root requests (public landing page)
   if (pathname === '/') {
-    pathname = '/index.html';
+    pathname = '/index-legacy.html';
   }
 
   // Map /login to legacy dashboard for now (until login page static export is fixed)
