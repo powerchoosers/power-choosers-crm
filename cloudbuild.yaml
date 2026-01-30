@@ -120,6 +120,8 @@ steps:
     - '--set-env-vars'
     - 'PUBLIC_BASE_URL=https://nodalpoint.io'
     - '--set-env-vars'
+    - 'UI_BASE_URL=https://power-choosers-crm-792458658491.us-central1.run.app'
+    - '--set-env-vars'
     - 'NEXT_PUBLIC_FIREBASE_API_KEY=${_NEXT_PUBLIC_FIREBASE_API_KEY}'
     - '--set-env-vars'
     - 'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${_NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}'
