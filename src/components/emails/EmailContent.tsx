@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import DOMPurify from 'dompurify'
 import { Maximize2, Minimize2, Sun, Moon, Printer, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -20,17 +20,15 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
   const [isLightMode, setIsLightMode] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
 
+  const handlePrint = useCallback(() => {
+    iframeRef.current?.contentWindow?.print()
+  }, [])
+
   useEffect(() => {
     if (printTrigger && iframeRef.current) {
       handlePrint()
     }
-  }, [printTrigger])
-
-  const handlePrint = () => {
-    if (iframeRef.current) {
-      iframeRef.current.contentWindow?.print()
-    }
-  }
+  }, [handlePrint, printTrigger])
 
   const handleOpenNewWindow = () => {
     const win = window.open('', '_blank')
@@ -45,7 +43,7 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
     if (!html) return ''
     
     // Preliminary cleanup for common layout breakers
-    let processedHtml = html
+    const processedHtml = html
       .replace(/position:\s*fixed/gi, 'position: static')
       .replace(/position:\s*absolute/gi, 'position: static')
       .replace(/width:\s*\d+vw/gi, 'width: 100%')
