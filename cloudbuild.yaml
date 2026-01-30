@@ -25,11 +25,11 @@ steps:
     - 'NEXT_PUBLIC_SUPABASE_ANON_KEY=${_NEXT_PUBLIC_SUPABASE_ANON_KEY}'
     - '.'
   
-  # Push the container image to Container Registry
+  # Push the Frontend container image
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/power-choosers-crm:$COMMIT_SHA']
   
-  # Deploy container image to Cloud Run
+  # Deploy Frontend to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -77,13 +77,72 @@ steps:
     - '--set-env-vars'
     - 'PUBLIC_BASE_URL=https://nodalpoint.io'
 
+  # Build Backend (nodal-point-network)
+  - name: 'gcr.io/cloud-builders/docker'
+    args: 
+    - 'build'
+    - '-t'
+    - 'gcr.io/$PROJECT_ID/nodal-point-network:$COMMIT_SHA'
+    - '-f'
+    - 'Dockerfile'
+    - '.'
+
+  # Push Backend container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/nodal-point-network:$COMMIT_SHA']
+
+  # Deploy Backend to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+    - 'run'
+    - 'deploy'
+    - 'nodal-point-network'
+    - '--image'
+    - 'gcr.io/$PROJECT_ID/nodal-point-network:$COMMIT_SHA'
+    - '--region'
+    - 'us-central1'
+    - '--platform'
+    - 'managed'
+    - '--allow-unauthenticated'
+    - '--port'
+    - '8080'
+    - '--memory'
+    - '512Mi'
+    - '--cpu'
+    - '1'
+    - '--min-instances'
+    - '0'
+    - '--max-instances'
+    - '10'
+    - '--set-env-vars'
+    - 'NODE_ENV=production'
+    - '--set-env-vars'
+    - 'PUBLIC_BASE_URL=https://nodalpoint.io'
+    - '--set-env-vars'
+    - 'NEXT_PUBLIC_FIREBASE_API_KEY=${_NEXT_PUBLIC_FIREBASE_API_KEY}'
+    - '--set-env-vars'
+    - 'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${_NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}'
+    - '--set-env-vars'
+    - 'NEXT_PUBLIC_FIREBASE_PROJECT_ID=${_FIREBASE_PROJECT_ID}'
+    - '--set-env-vars'
+    - 'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${_NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}'
+    - '--set-env-vars'
+    - 'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${_NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}'
+    - '--set-env-vars'
+    - 'NEXT_PUBLIC_FIREBASE_APP_ID=${_NEXT_PUBLIC_FIREBASE_APP_ID}'
+    - '--set-env-vars'
+    - 'NEXT_PUBLIC_SUPABASE_URL=${_NEXT_PUBLIC_SUPABASE_URL}'
+    - '--set-env-vars'
+    - 'NEXT_PUBLIC_SUPABASE_ANON_KEY=${_NEXT_PUBLIC_SUPABASE_ANON_KEY}'
+    - '--set-env-vars'
+    - 'FIREBASE_PROJECT_ID=${_FIREBASE_PROJECT_ID}'
+
 # Store images in Google Container Registry
 images:
   - 'gcr.io/$PROJECT_ID/power-choosers-crm:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/nodal-point-network:$COMMIT_SHA'
 
 # Build options
 options:
   logging: CLOUD_LOGGING_ONLY
-  # machineType removed - using Cloud Build default (e2-medium) to avoid enum parsing issues
-  # Default machine type is cost-effective and sufficient for most builds
-
