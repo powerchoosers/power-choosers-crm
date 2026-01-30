@@ -6,7 +6,7 @@ import { auth } from '@/lib/firebase'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
-type UserProfile = {
+export type UserProfile = {
   email: string | null
   name: string | null
   firstName: string | null

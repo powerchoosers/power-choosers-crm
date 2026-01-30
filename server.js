@@ -951,23 +951,6 @@ const server = http.createServer(async (req, res) => {
     pathname = '/index.html';
   }
 
-  // Map Next.js static app assets
-  if (pathname.startsWith('/_next/')) {
-    pathname = '/crm-platform/out' + pathname;
-  }
-
-  // Map /crm-platform routes to static export
-  if (pathname === '/crm-platform' || pathname === '/crm-platform/') {
-    console.log('[Server] Mapping /crm-platform to static export');
-    pathname = '/crm-platform/out/crm-platform.html';
-  } else if (pathname.startsWith('/crm-platform/') && !pathname.startsWith('/crm-platform/out/')) {
-    console.log('[Server] Mapping /crm-platform sub-route to static export');
-    // Map subpages: /crm-platform/accounts -> /crm-platform/out/crm-platform/accounts
-    // The file server logic below will add .html if needed
-    const relativePath = pathname.replace('/crm-platform', '');
-    pathname = '/crm-platform/out/crm-platform' + relativePath;
-  }
-
   // Map /login to legacy dashboard for now (until login page static export is fixed)
   if (pathname === '/login' || pathname === '/login/') {
     pathname = '/crm-dashboard.html';

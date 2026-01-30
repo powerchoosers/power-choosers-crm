@@ -84,7 +84,7 @@ export default function TargetDetailPage() {
 
   // Conditional data fetching based on target kind
   const isPeopleList = target?.kind === 'people'
-  const isAccountList = target?.kind === 'accounts' || target?.kind === 'companies'
+  const isAccountList = target?.kind === 'account'
   
   const contactQuery = useContacts(debouncedFilter, filters, isPeopleList ? id : undefined, isPeopleList)
   const contactCount = useContactsCount(debouncedFilter, filters, isPeopleList ? id : undefined, isPeopleList)
@@ -100,7 +100,7 @@ export default function TargetDetailPage() {
 
   const isLoading = targetLoading || (isPeopleList ? contactQuery.isLoading : isAccountList ? accountQuery.isLoading : false) || !isMounted
   const isError = isPeopleList ? contactQuery.isError : isAccountList ? accountQuery.isError : false
-  const totalRecords = isPeopleList ? contactCount.data : isAccountList ? accountCount.data : 0
+  const totalRecords = (isPeopleList ? contactCount.data : isAccountList ? accountCount.data : 0) || 0
 
   useEffect(() => {
     setIsMounted(true)
