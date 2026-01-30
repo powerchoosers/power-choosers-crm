@@ -479,7 +479,7 @@ function ProtocolArchitectInner() {
   }, [testContact?.id, selectedNode?.id]);
 
   const previewBody = useMemo(() => {
-    let body = selectedNode?.data.body as string || '';
+    const body = selectedNode?.data.body as string || '';
     if (!testContact) return body;
 
     return body
@@ -597,7 +597,7 @@ function ProtocolArchitectInner() {
       // Ensure unique ID for every edge to allow multiple connections
       const edgeId = `e-${params.source}-${params.sourceHandle || 'default'}-${params.target}-${params.targetHandle || 'default'}-${crypto.randomUUID().slice(0, 4)}`;
       
-      let edgeParams: any = { 
+      const edgeParams: any = { 
         ...params,
         id: edgeId
       };
@@ -751,8 +751,8 @@ function ProtocolArchitectInner() {
       });
 
       // Capture state-based source before clearing
-      let activeSourceHandleId = activeHandleId;
-      let activeTargetNodeId = hoveredNodeId;
+      const activeSourceHandleId = activeHandleId;
+      const activeTargetNodeId = hoveredNodeId;
 
       // Clear highlight
       setHoveredNodeId(null);
@@ -820,7 +820,7 @@ function ProtocolArchitectInner() {
 
       // 3. Determine Source Handle & Alignment
       let sourceHandle: string | null = null;
-      let finalPosition = { x: rawPosition.x - 90, y: rawPosition.y }; // Default: Center on mouse
+      const finalPosition = { x: rawPosition.x - 90, y: rawPosition.y }; // Default: Center on mouse
 
       const connectNode = activeTargetNodeId ? nodes.find(n => n.id === activeTargetNodeId) : closestNode;
       if (connectNode) {
