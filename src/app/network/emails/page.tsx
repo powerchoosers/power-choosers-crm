@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useEmails, useEmailsCount, Email } from '@/hooks/useEmails'
 import { useGmailSync } from '@/hooks/useGmailSync'
 import { useAuth } from '@/context/AuthContext'
@@ -14,19 +14,23 @@ import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
+import { useTableState } from '@/hooks/useTableState'
 
 export default function EmailsPage() {
   const { user } = useAuth()
-  const [searchTerm, setSearchTerm] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const { pageIndex, setPage, searchQuery, setSearch } = useTableState({ pageSize: 15 })
+  
+  const [searchTerm, setSearchTerm] = useState(searchQuery)
+  const [debouncedSearch, setDebouncedSearch] = useState(searchQuery)
 
   // Debounce search query
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm)
+      setSearch(searchTerm)
     }, 400)
     return () => clearTimeout(timer)
-  }, [searchTerm])
+  }, [searchTerm, setSearch])
 
   const { data, isLoading: isLoadingEmails, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useEmails(debouncedSearch)
   const { data: totalEmails } = useEmailsCount(debouncedSearch)
@@ -37,17 +41,9 @@ export default function EmailsPage() {
 
   const emails = data?.pages.flatMap(page => page.emails) || []
 
-  // Auto-sync on mount if user is logged in
-  useEffect(() => {
-    if (user && !isLoadingEmails && (!emails || emails.length === 0)) {
-       // Optional: Auto-sync on first load if empty
-       // syncGmail(user)
-    }
-  }, [user, isLoadingEmails, emails, syncGmail])
-
   const handleSync = () => {
     if (!user) return
-    syncGmail(user)
+    syncGmail(user, { silent: false })
   }
 
   return (
@@ -90,6 +86,8 @@ export default function EmailsPage() {
                 hasNextPage={hasNextPage}
                 fetchNextPage={fetchNextPage}
                 isFetchingNextPage={isFetchingNextPage}
+                currentPage={pageIndex + 1}
+                onPageChange={(p) => setPage(p - 1)}
             />
       </div>
 

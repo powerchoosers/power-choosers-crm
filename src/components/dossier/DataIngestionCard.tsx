@@ -182,14 +182,18 @@ export default function DataIngestionCard({ accountId }: DataIngestionCardProps)
 
   if (!accountId) {
     return (
-        <div className="p-6 rounded-3xl border border-white/5 bg-zinc-900/40 backdrop-blur-xl opacity-50 cursor-not-allowed">
-            <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                Data_Locker [Offline]
-            </div>
-            <div className="mt-2 text-xs text-zinc-600">
-                Account link missing.
-            </div>
+      <div className="rounded-2xl border border-white/5 bg-zinc-900/40 backdrop-blur-xl overflow-hidden flex flex-col opacity-50 cursor-not-allowed">
+        <div className="flex justify-between items-center p-4 border-b border-white/5 bg-white/[0.02]">
+          <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+            Data_Locker <span className="text-zinc-700">[OFFLINE]</span>
+          </h3>
         </div>
+        <div className="p-6">
+          <div className="text-xs text-zinc-600 font-mono uppercase tracking-widest">
+            Account link missing.
+          </div>
+        </div>
+      </div>
     )
   }
 
@@ -199,16 +203,15 @@ export default function DataIngestionCard({ accountId }: DataIngestionCardProps)
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={`
-        relative overflow-hidden rounded-3xl transition-all duration-300
+        relative overflow-hidden rounded-2xl transition-all duration-300
         ${isDragging 
           ? 'bg-[#002FA7]/10 border-[#002FA7] shadow-[0_0_30px_-10px_rgba(0,47,167,0.5)]' 
           : 'bg-zinc-900/40 border-white/5 backdrop-blur-xl'}
-        border
+        border flex flex-col
       `}
     >
-      
-      {/* HEADER */}
-      <div className="p-6 pb-2 flex justify-between items-center">
+      {/* HEADER - NOW INSIDE CONTAINER */}
+      <div className="flex justify-between items-center p-4 border-b border-white/5 bg-white/[0.02]">
         <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
           {uploading ? (
             <span className="text-[#002FA7] animate-pulse">● INGESTING...</span>
@@ -217,88 +220,84 @@ export default function DataIngestionCard({ accountId }: DataIngestionCardProps)
           )}
         </h3>
         <label className="text-zinc-600 hover:text-white transition-colors cursor-pointer">
-            <UploadCloud className="w-4 h-4" />
-            <input 
-                type="file" 
-                className="hidden" 
-                multiple 
-                onChange={(e) => {
-                    // Manually trigger drop handler logic for click-to-upload
-                    // Need to mock the event or extract logic. 
-                    // For brevity, just duplicating simple logic or implementing separate handler
-                    if (e.target.files && e.target.files.length > 0) {
-                        const fakeEvent = {
-                            preventDefault: () => {},
-                            dataTransfer: { files: e.target.files }
-                        } as unknown as React.DragEvent;
-                        handleDrop(fakeEvent);
-                    }
-                }}
-            />
+          <UploadCloud className="w-4 h-4" />
+          <input 
+            type="file" 
+            className="hidden" 
+            multiple 
+            onChange={(e) => {
+              if (e.target.files && e.target.files.length > 0) {
+                const fakeEvent = {
+                  preventDefault: () => {},
+                  dataTransfer: { files: e.target.files }
+                } as unknown as React.DragEvent;
+                handleDrop(fakeEvent);
+              }
+            }}
+          />
         </label>
       </div>
 
       {/* FILE LIST (The Evidence) */}
-      <div className="p-2 space-y-1">
-        {loading && files.length === 0 ? (
+      <div className="p-2 space-y-1 flex-1">
+          {loading && files.length === 0 ? (
             <div className="flex justify-center py-4">
-                <Loader2 className="w-4 h-4 animate-spin text-zinc-700" />
+              <Loader2 className="w-4 h-4 animate-spin text-zinc-700" />
             </div>
-        ) : files.length === 0 ? (
+          ) : files.length === 0 ? (
             <div className="py-8 text-center">
-                <p className="text-[10px] text-zinc-700 font-mono uppercase tracking-widest">
-                    No Evidence Found
-                </p>
+              <p className="text-[10px] text-zinc-700 font-mono uppercase tracking-widest">
+                No Evidence Found
+              </p>
             </div>
-        ) : (
+          ) : (
             files.map((file) => (
-            <div key={file.id} className="group flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer border border-transparent hover:border-white/5">
+              <div key={file.id} className="group flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer border border-transparent hover:border-white/5">
                 <div 
-                    className="flex items-center gap-3 overflow-hidden flex-1"
-                    onClick={() => handleDownload(file)}
+                  className="flex items-center gap-3 overflow-hidden flex-1"
+                  onClick={() => handleDownload(file)}
                 >
-                <div className="p-2 rounded-lg bg-black/40 border border-white/5 text-zinc-400 group-hover:text-[#002FA7] transition-colors">
+                  <div className="p-2 rounded-lg bg-black/40 border border-white/5 text-zinc-400 group-hover:text-[#002FA7] transition-colors">
                     <FileText className="w-4 h-4" />
-                </div>
-                <div className="flex flex-col min-w-0">
+                  </div>
+                  <div className="flex flex-col min-w-0">
                     <span className="text-sm text-zinc-300 font-mono truncate">{file.name}</span>
                     <span className="text-[10px] text-zinc-600 font-mono flex gap-2">
-                    {file.size} • {formatDistanceToNow(new Date(file.created_at), { addSuffix: true })}
+                      {file.size} • {formatDistanceToNow(new Date(file.created_at), { addSuffix: true })}
                     </span>
-                </div>
+                  </div>
                 </div>
                 {/* Hover Action */}
                 <button 
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(file);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-red-400 transition-all"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(file);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-red-400 transition-all"
                 >
-                <X className="w-3 h-3" />
+                  <X className="w-3 h-3" />
                 </button>
-            </div>
+              </div>
             ))
+          )}
+        </div>
+
+        {/* DROP ZONE OVERLAY (Only visible when dragging) */}
+        {isDragging && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950/90 backdrop-blur-sm pointer-events-none">
+            <div className="w-16 h-16 rounded-full bg-[#002FA7]/20 flex items-center justify-center mb-4 animate-bounce">
+              <UploadCloud className="w-8 h-8 text-[#002FA7]" />
+            </div>
+            <p className="text-[#002FA7] font-mono text-sm tracking-widest">RELEASE TO INGEST</p>
+          </div>
+        )}
+
+        {/* UPLOADING STATE (Terminal Effect) */}
+        {uploading && (
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-800">
+            <div className="h-full bg-[#002FA7] animate-progress w-full origin-left" />
+          </div>
         )}
       </div>
-
-      {/* DROP ZONE OVERLAY (Only visible when dragging) */}
-      {isDragging && (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950/90 backdrop-blur-sm pointer-events-none">
-          <div className="w-16 h-16 rounded-full bg-[#002FA7]/20 flex items-center justify-center mb-4 animate-bounce">
-            <UploadCloud className="w-8 h-8 text-[#002FA7]" />
-          </div>
-          <p className="text-[#002FA7] font-mono text-sm tracking-widest">RELEASE TO INGEST</p>
-        </div>
-      )}
-
-      {/* UPLOADING STATE (Terminal Effect) */}
-      {uploading && (
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-800">
-          <div className="h-full bg-[#002FA7] animate-progress w-full origin-left" />
-        </div>
-      )}
-
-    </div>
-  );
+    );
 }

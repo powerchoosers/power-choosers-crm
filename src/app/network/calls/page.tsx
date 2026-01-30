@@ -36,18 +36,23 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useRouter } from 'next/navigation'
+import { useTableState } from '@/hooks/useTableState'
+
+const PAGE_SIZE = 50
 
 export default function CallsPage() {
-  const [globalFilter, setGlobalFilter] = useState('')
-  const [debouncedFilter, setDebouncedFilter] = useState('')
+  const { pageIndex, setPage, searchQuery, setSearch, pagination } = useTableState({ pageSize: PAGE_SIZE })
+  const [globalFilter, setGlobalFilter] = useState(searchQuery)
+  const [debouncedFilter, setDebouncedFilter] = useState(searchQuery)
 
   // Debounce search query
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedFilter(globalFilter)
+      setSearch(globalFilter)
     }, 400)
     return () => clearTimeout(timer)
-  }, [globalFilter])
+  }, [globalFilter, setSearch])
 
   const { data, isLoading: queryLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useCalls(debouncedFilter)
   const { data: totalCallsCount } = useCallsCount(debouncedFilter)
@@ -55,19 +60,25 @@ export default function CallsPage() {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 
+  useEffect(() => {
+    const needed = (pageIndex + 2) * PAGE_SIZE
+    if (hasNextPage && !isFetchingNextPage && calls.length < needed) {
+      fetchNextPage()
+    }
+  }, [pageIndex, calls.length, hasNextPage, isFetchingNextPage, fetchNextPage])
+
   const columns: ColumnDef<Call>[] = [
     {
       accessorKey: 'contactName',
       header: ({ column }) => {
         return (
-          <Button
-            variant="ghost"
+          <button
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="-ml-4 hover:bg-white/5 hover:text-white"
+            className="icon-button-forensic -ml-4 flex items-center px-4 py-2 transition-all"
           >
             <ArrowUpDown className="mr-2 h-4 w-4" />
             Contact
-          </Button>
+          </button>
         )
       },
       cell: ({ row }) => {
@@ -167,10 +178,10 @@ export default function CallsPage() {
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-white/10 hover:text-white">
+              <button className="icon-button-forensic h-8 w-8 flex items-center justify-center">
                 <span className="sr-only">Open menu</span>
                 <MoreHorizontal className="h-4 w-4" />
-              </Button>
+              </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-zinc-950 border-white/10 text-zinc-400">
               <DropdownMenuLabel className="text-zinc-200">Actions</DropdownMenuLabel>
@@ -196,18 +207,25 @@ export default function CallsPage() {
     state: {
       sorting,
       columnFilters,
+      pagination: {
+        pageIndex,
+        pageSize: PAGE_SIZE,
+      },
     },
   })
 
-  const pageIndex = table.getState().pagination.pageIndex
-  const pageSize = table.getState().pagination.pageSize
   const totalRecords = totalCallsCount || 0
+  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
+  const displayTotalPages = totalCallsCount == null && hasNextPage
+    ? Math.max(totalPages, pageIndex + 2)
+    : totalPages
+
   const showingStart = totalRecords === 0
     ? 0
-    : Math.min(totalRecords, pageIndex * pageSize + 1)
+    : Math.min(totalRecords, pageIndex * PAGE_SIZE + 1)
   const showingEnd = totalRecords === 0
     ? 0
-    : Math.min(totalRecords, (pageIndex + 1) * pageSize)
+    : Math.min(totalRecords, (pageIndex + 1) * PAGE_SIZE)
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -282,29 +300,35 @@ export default function CallsPage() {
                 </div>
             </div>
             <div className="flex items-center gap-2">
-                <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => table.previousPage()}
-                    disabled={!table.getCanPreviousPage()}
-                    className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
+                <button
+                    onClick={() => setPage(Math.max(0, pageIndex - 1))}
+                    disabled={pageIndex === 0}
+                    className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
                     aria-label="Previous page"
                 >
                     <ChevronLeft className="h-3.5 w-3.5" />
-                </Button>
+                </button>
                 <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
                   {(pageIndex + 1).toString().padStart(2, '0')}
                 </div>
-                <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => table.nextPage()}
-                    disabled={!table.getCanNextPage()}
-                    className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
+                <button
+                    onClick={async () => {
+                      const nextPageIndex = pageIndex + 1
+                      if (nextPageIndex >= displayTotalPages) return
+
+                      const needed = (nextPageIndex + 1) * PAGE_SIZE
+                      if (calls.length < needed && hasNextPage && !isFetchingNextPage) {
+                        await fetchNextPage()
+                      }
+
+                      setPage(nextPageIndex)
+                    }}
+                    disabled={pageIndex + 1 >= displayTotalPages || (!hasNextPage && calls.length < (pageIndex + 2) * PAGE_SIZE)}
+                    className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
                     aria-label="Next page"
                 >
                     <ChevronRight className="h-3.5 w-3.5" />
-                </Button>
+                </button>
             </div>
         </div>
       </div>

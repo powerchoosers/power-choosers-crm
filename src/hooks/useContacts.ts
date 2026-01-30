@@ -18,6 +18,7 @@ export interface Contact {
   accountId?: string
   industry?: string
   location?: string
+  avatarUrl?: string
   metadata?: any
 }
 
@@ -44,6 +45,8 @@ export type ContactDetail = Contact & {
   accountDescription?: string
   // Location
   address?: string
+  // List Membership
+  listName?: string
   // Phone fields
   mobile?: string
   workDirectPhone?: string
@@ -56,6 +59,7 @@ export interface ContactFilters {
   industry?: string[]
   status?: string[]
   location?: string[]
+  title?: string[]
 }
 
 type ContactMetadata = {
@@ -150,6 +154,7 @@ type ContactRow = {
   lastContactedAt?: string | null
   lastActivityAt?: string | null
   accountId?: string | null
+  account_id?: string | null
   title?: string | null
   city?: string | null
   state?: string | null
@@ -316,20 +321,41 @@ export function useSearchContacts(queryTerm: string) {
   });
 }
 
-export function useContacts(searchQuery?: string, filters?: ContactFilters) {
+export function useContacts(searchQuery?: string, filters?: ContactFilters, listId?: string, enabled = true) {
   const { user, role, loading } = useAuth()
 
   return useInfiniteQuery({
-    queryKey: ['contacts', CONTACTS_QUERY_BUSTER, user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters],
+    queryKey: ['contacts', CONTACTS_QUERY_BUSTER, user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters, listId],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       try {
-        if (loading) return { contacts: [], nextCursor: null };
+        if (!enabled || loading) return { contacts: [], nextCursor: null };
         if (!user && !loading) return { contacts: [], nextCursor: null };
 
         let query = supabase
           .from('contacts')
           .select('*, accounts(name, domain, logo_url, industry, city, state)', { count: 'exact' });
+
+        if (listId) {
+          // Fetch targetIds from list_members first due to lack of FK for inner join
+          const { data: memberData, error: memberError } = await supabase
+            .from('list_members')
+            .select('targetId')
+            .eq('listId', listId)
+            .in('targetType', ['people', 'contact', 'contacts']);
+
+          if (memberError) {
+            console.error("Error fetching list members:", memberError);
+            return { contacts: [], nextCursor: null };
+          }
+
+          const targetIds = memberData?.map(m => m.targetId).filter(Boolean) || [];
+          if (targetIds.length === 0) {
+            return { contacts: [], nextCursor: null };
+          }
+
+          query = query.in('id', targetIds);
+        }
 
         if (role !== 'admin' && user?.email) {
            query = query.eq('ownerId', user.email);
@@ -342,6 +368,10 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters) {
         // Apply column filters
         if (filters?.status && filters.status.length > 0) {
           query = query.in('status', filters.status);
+        }
+
+        if (filters?.title && filters.title.length > 0) {
+          query = query.in('title', filters.title);
         }
         
         // Industry and Location filters are tricky for contacts because they often live on the account
@@ -370,6 +400,10 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters) {
           .order('createdAt', { ascending: false });
 
         if (error) {
+          // Suppress logging for aborted requests
+          if (error.code === 'PGRST116' || error.message?.includes('Abort')) {
+            throw error;
+          }
           console.error("Supabase error:", error);
           throw error;
         }
@@ -423,6 +457,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters) {
             lastContact: item.lastContactedAt || item.created_at || new Date().toISOString(),
             accountId: item.accountId || undefined,
             industry: account?.industry || undefined,
+            title: item.title || (metadata as any)?.title || (metadata as any)?.jobTitle || (metadata as any)?.general?.title || '',
             location: item.city ? `${item.city}, ${item.state || ''}` : (metadata?.city ? `${metadata.city}, ${metadata.state || ''}` : (account?.city ? `${account.city}, ${account.state || ''}` : (metadata?.address || account?.address || ''))),
             website: item.website || account?.domain || metadata?.website || undefined,
             metadata: metadata
@@ -441,23 +476,42 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters) {
       }
     },
     getNextPageParam: (lastPage) => lastPage?.nextCursor ?? undefined,
-    enabled: !loading && !!user,
+    enabled: enabled && !loading && !!user,
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 60 * 24,
   })
 }
 
-export function useContactsCount(searchQuery?: string, filters?: ContactFilters) {
+export function useContactsCount(searchQuery?: string, filters?: ContactFilters, listId?: string, enabled = true) {
   const { user, role, loading } = useAuth()
 
   return useQuery({
-    queryKey: ['contacts-count', CONTACTS_QUERY_BUSTER, user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters],
+    queryKey: ['contacts-count', CONTACTS_QUERY_BUSTER, user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters, listId],
     queryFn: async () => {
-      if (loading) return 0
+      if (!enabled || loading) return 0
       if (!user) return 0
 
       // For count with filters on joined tables, we need to select something from the joined table
       let query = supabase.from('contacts').select('id, accounts!inner(industry, city, state)', { count: 'exact', head: true })
+
+      if (listId) {
+        // Fetch targetIds from list_members first
+        const { data: memberData, error: memberError } = await supabase
+          .from('list_members')
+          .select('targetId')
+          .eq('listId', listId)
+          .in('targetType', ['people', 'contact', 'contacts']);
+
+        if (memberError) {
+          console.error("Error fetching list members for count:", memberError);
+          return 0;
+        }
+
+        const targetIds = memberData?.map(m => m.targetId).filter(Boolean) || [];
+        if (targetIds.length === 0) return 0;
+
+        query = query.in('id', targetIds);
+      }
 
       if (role !== 'admin' && user.email) {
         query = query.eq('ownerId', user.email)
@@ -470,6 +524,10 @@ export function useContactsCount(searchQuery?: string, filters?: ContactFilters)
       // Apply column filters
       if (filters?.status && filters.status.length > 0) {
         query = query.in('status', filters.status);
+      }
+
+      if (filters?.title && filters.title.length > 0) {
+        query = query.in('title', filters.title);
       }
       
       if (filters?.industry && filters.industry.length > 0) {
@@ -491,7 +549,7 @@ export function useContactsCount(searchQuery?: string, filters?: ContactFilters)
       }
       return count || 0
     },
-    enabled: !loading && !!user,
+    enabled: enabled && !loading && !!user,
     staleTime: 1000 * 60 * 5,
   })
 }
@@ -522,6 +580,22 @@ export function useContact(id: string) {
       if (error) return null
 
       const typedData = data as ContactRow
+      
+      // Fetch list membership separately to avoid join errors
+      const { data: listMembership } = await supabase
+        .from('list_members')
+        .select(`
+          listId,
+          lists (
+            name
+          )
+        `)
+        .eq('targetId', id)
+        .in('targetType', ['people', 'contact', 'contacts'])
+        .maybeSingle()
+
+      const listName = (listMembership as any)?.lists?.name || undefined
+
       let account = Array.isArray(typedData.accounts) ? typedData.accounts[0] : typedData.accounts
       const metadata = normalizeMetadata(typedData.metadata)
 
@@ -577,6 +651,7 @@ export function useContact(id: string) {
         industry: account?.industry,
         linkedinUrl: typedData.linkedinUrl || undefined,
         website: account?.domain,
+        accountId: typedData.accountId || undefined,
         linkedAccountId: typedData.accountId || undefined,
         
         // Enhanced account details
@@ -589,6 +664,9 @@ export function useContact(id: string) {
         
         // Location
         address: getFirstServiceAddressAddress(account?.service_addresses) || '',
+
+        // List Membership
+        listName: listName,
 
         // Phone fields
         mobile: typedData.mobile || '',

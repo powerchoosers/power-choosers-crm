@@ -26,7 +26,7 @@ export default function ContextTasksWidget({ entityId, entityName }: ContextTask
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Context Tasks</h3>
-        <button className="p-1 hover:bg-white/10 rounded-md transition-colors text-zinc-500 hover:text-white">
+        <button className="icon-button-forensic p-1 flex items-center justify-center">
           <Plus size={14} />
         </button>
       </div>

@@ -12,6 +12,8 @@ type UserProfile = {
   firstName: string | null
   lastName: string | null
   bio: string | null
+  jobTitle: string | null
+  linkedinUrl: string | null
   twilioNumbers: Array<{ name: string; number: string }> | null
   selectedPhoneNumber: string | null
   bridgeToMobile: boolean | null
@@ -35,6 +37,8 @@ const AuthContext = createContext<AuthContextType>({
     firstName: null, 
     lastName: null,
     bio: null,
+    jobTitle: null,
+    linkedinUrl: null,
     twilioNumbers: null,
     selectedPhoneNumber: null,
     bridgeToMobile: null
@@ -52,6 +56,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     firstName: null, 
     lastName: null,
     bio: null,
+    jobTitle: null,
+    linkedinUrl: null,
     twilioNumbers: null,
     selectedPhoneNumber: null,
     bridgeToMobile: null
@@ -127,6 +133,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         firstName: resolvedFirstName, 
         lastName: resolvedLastName,
         bio: data.bio || null,
+        jobTitle: data.job_title || null,
+        linkedinUrl: data.linkedin_url || null,
         twilioNumbers: settings.twilioNumbers || [],
         selectedPhoneNumber: settings.selectedPhoneNumber || null,
         bridgeToMobile: settings.bridgeToMobile || false
@@ -158,6 +166,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         firstName: 'Dev',
         lastName: 'User',
         bio: 'System Administrator (Bypass)',
+        jobTitle: 'Principal Market Architect',
+        linkedinUrl: 'https://linkedin.com/in/nodalpoint',
         twilioNumbers: [],
         selectedPhoneNumber: null,
         bridgeToMobile: false
@@ -175,6 +185,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           firstName: null,
           lastName: null,
           bio: null,
+          jobTitle: null,
+          linkedinUrl: null,
           twilioNumbers: null,
           selectedPhoneNumber: null,
           bridgeToMobile: null
@@ -209,6 +221,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           firstName: 'Dev',
           lastName: 'User',
           bio: 'System Administrator (Bypass)',
+          jobTitle: 'Principal Market Architect',
+          linkedinUrl: 'https://linkedin.com/in/nodalpoint',
           twilioNumbers: [],
           selectedPhoneNumber: null,
           bridgeToMobile: false
@@ -268,6 +282,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 firstName: resolvedFirstName, 
                 lastName: resolvedLastName,
                 bio: data.bio || null,
+                jobTitle: data.job_title || null,
+                linkedinUrl: data.linkedin_url || null,
                 twilioNumbers: settings.twilioNumbers || [],
                 selectedPhoneNumber: settings.selectedPhoneNumber || null,
                 bridgeToMobile: settings.bridgeToMobile || false
@@ -300,6 +316,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 firstName: inferred?.firstName || null, 
                 lastName: inferred?.lastName || null,
                 bio: null,
+                jobTitle: null,
+                linkedinUrl: null,
                 twilioNumbers: [],
                 selectedPhoneNumber: null,
                 bridgeToMobile: false
@@ -341,6 +359,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           firstName: null, 
           lastName: null,
           bio: null,
+          jobTitle: null,
+          linkedinUrl: null,
           twilioNumbers: null,
           selectedPhoneNumber: null,
           bridgeToMobile: null

@@ -18,7 +18,7 @@ export function CompanyIcon({ logoUrl, domain, name, size = 32, className }: Com
   const [failedSrc, setFailedSrc] = useState<string | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
   
-  const faviconSrc = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=${size * 2}` : null
+  const faviconSrc = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=128` : null
   const currentSrc = (logoUrl && failedSrc !== logoUrl)
     ? logoUrl
     : (faviconSrc && failedSrc !== faviconSrc)
@@ -40,7 +40,7 @@ export function CompanyIcon({ logoUrl, domain, name, size = 32, className }: Com
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         className={cn(
-          "rounded-md bg-zinc-800 flex items-center justify-center text-zinc-400 border border-white/5 shrink-0", 
+          "rounded-2xl nodal-glass flex items-center justify-center text-zinc-400 border border-white/10 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.6)] shrink-0", 
           className
         )}
         style={{ width: size, height: size }}
@@ -53,7 +53,7 @@ export function CompanyIcon({ logoUrl, domain, name, size = 32, className }: Com
 
   return (
     <div 
-      className={cn("relative shrink-0", className)} 
+      className={cn("relative shrink-0 overflow-hidden rounded-2xl nodal-glass border border-white/10 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.6)]", className)} 
       style={{ width: size, height: size }}
       title={name}
     >
@@ -64,7 +64,7 @@ export function CompanyIcon({ logoUrl, domain, name, size = 32, className }: Com
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-white/5 animate-pulse rounded-md"
+            className="absolute inset-0 bg-white/5 animate-pulse"
           />
         )}
       </AnimatePresence>
@@ -72,14 +72,16 @@ export function CompanyIcon({ logoUrl, domain, name, size = 32, className }: Com
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: isLoaded ? 1 : 0, scale: isLoaded ? 1 : 0.95 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
+        className="w-full h-full"
       >
         <Image
           src={currentSrc}
           alt={`${name} logo`}
           fill
-          className="object-cover rounded-md"
+          className="object-cover"
           onError={handleError}
           onLoad={() => setIsLoaded(true)}
+          unoptimized={currentSrc.includes('google.com')} // Don't re-optimize favicon service images
         />
       </motion.div>
     </div>

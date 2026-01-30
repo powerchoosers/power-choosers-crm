@@ -285,18 +285,18 @@ export function TopBar() {
                                 <button 
                                     onClick={() => mute(!isMuted)}
                                     className={cn(
-                                        "p-1.5 rounded-full transition-colors",
-                                        isMuted ? "bg-red-500/20 text-red-500" : "hover:bg-zinc-800 text-zinc-400 hover:text-white"
+                                        "icon-button-forensic p-1.5",
+                                        isMuted ? "text-red-500 hover:text-red-400" : ""
                                     )}
                                 >
                                     <Mic size={16} />
                                 </button>
-                                <button className="p-1.5 rounded-full hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors">
+                                <button className="icon-button-forensic p-1.5">
                                     <ArrowRightLeft size={16} />
                                 </button>
                                 <button 
                                     onClick={handleHangup}
-                                    className="p-1.5 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+                                    className="icon-button-forensic p-1.5 text-red-500 hover:text-red-400"
                                 >
                                     <PhoneOff size={16} />
                                 </button>
@@ -375,14 +375,14 @@ export function TopBar() {
                         {/* Refresh Data */}
                         <button 
                             onClick={handleRefresh}
-                            className="w-9 h-9 inline-flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                            className="icon-button-forensic w-9 h-9"
                             title="Refresh Data"
                         >
                             <RefreshCw size={22} />
                         </button>
 
                         <button 
-                            className="w-9 h-9 inline-flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors relative"
+                            className="icon-button-forensic w-9 h-9 relative"
                             title="Notifications"
                         >
                             <Bell size={22} />
@@ -398,8 +398,8 @@ export function TopBar() {
                                   setIsDialerOpen(nextOpen)
                                 }}
                                 className={cn(
-                                    "w-9 h-9 inline-flex items-center justify-center rounded-full transition-colors duration-200 relative overflow-hidden",
-                                    isDialerOpen ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white hover:bg-white/10"
+                                    "icon-button-forensic w-9 h-9 relative overflow-hidden",
+                                    isDialerOpen && "text-white scale-110"
                                 )}
                                 title={isDialerOpen ? "Close Dialer" : "Open Dialer"}
                             >

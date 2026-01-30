@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { Badge } from '@/components/ui/badge'
+import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
 import DestructModal from '@/components/network/DestructModal'
 import FilterCommandDeck from '@/components/network/FilterCommandDeck'
@@ -47,22 +48,26 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { ClickToCallButton } from '@/components/calls/ClickToCallButton'
 import { cn } from '@/lib/utils'
+import { useTableState } from '@/hooks/useTableState'
 
 const PAGE_SIZE = 50
 
 export default function PeoplePage() {
   const router = useRouter()
-  const [globalFilter, setGlobalFilter] = useState('')
-  const [debouncedFilter, setDebouncedFilter] = useState('')
+  const { pageIndex, setPage, searchQuery, setSearch, pagination } = useTableState({ pageSize: PAGE_SIZE })
+  
+  const [globalFilter, setGlobalFilter] = useState(searchQuery)
+  const [debouncedFilter, setDebouncedFilter] = useState(searchQuery)
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 
   // Debounce search query to avoid excessive API calls
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedFilter(globalFilter)
+      setSearch(globalFilter)
     }, 400)
     return () => clearTimeout(timer)
-  }, [globalFilter])
+  }, [globalFilter, setSearch])
 
   const contactFilters = useMemo(() => {
     return {
@@ -77,7 +82,6 @@ export default function PeoplePage() {
   const [sorting, setSorting] = useState<SortingState>([])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [isMounted, setIsMounted] = useState(false)
-  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: PAGE_SIZE })
   const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
 
@@ -107,7 +111,7 @@ export default function PeoplePage() {
       if (value === undefined) return prev
       return [...prev, { id: columnId, value }]
     })
-    setPagination(p => ({ ...p, pageIndex: 0 }))
+    setPage(0)
   }
 
   useEffect(() => {
@@ -212,32 +216,27 @@ export default function PeoplePage() {
         accessorKey: 'name',
         header: ({ column }) => {
           return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="-ml-4 hover:bg-white/5 hover:text-white"
-          >
-            Name
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
+            <button
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="icon-button-forensic flex items-center -ml-1 text-sm font-medium"
+            >
+              Name
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </button>
           )
         },
         cell: ({ row }) => {
           const contact = row.original
-          const initials = contact.name
-            .split(' ')
-            .map(n => n[0])
-            .join('')
-            .substring(0, 2)
-            .toUpperCase()
           return (
             <Link 
-              href={`/network/people/${contact.id}`}
+              href={`/network/contacts/${contact.id}`}
               className="flex items-center gap-3 group/person"
             >
-              <div className="w-9 h-9 rounded-full nodal-glass flex items-center justify-center text-[10px] font-semibold text-white/90 border border-white/10 shadow-sm transition-all">
-                {initials}
-              </div>
+              <ContactAvatar 
+                name={contact.name} 
+                size={36} 
+                className="w-9 h-9 rounded-2xl"
+              />
               <div>
                 <div className="font-medium text-zinc-200 group-hover/person:text-white group-hover/person:scale-[1.02] transition-all origin-left">
                   {contact.name}
@@ -263,8 +262,8 @@ export default function PeoplePage() {
                 logoUrl={contact.logoUrl}
                 domain={contact.companyDomain}
                 name={companyName}
-                size={32}
-                className="w-9 h-9 rounded-lg nodal-glass p-1 border border-white/10 shadow-sm transition-all"
+                size={36}
+                className="w-9 h-9 rounded-2xl nodal-glass p-1 border border-white/10 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.6)] transition-all"
               />
               <span className="text-zinc-400 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left">
                 {companyName}
@@ -367,16 +366,16 @@ export default function PeoplePage() {
                 name={contact.name}
                 account={contact.company}
                 logoUrl={contact.logoUrl}
-                className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10"
+                className="h-8 w-8 icon-button-forensic"
               />
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10">
+              <button className="h-8 w-8 icon-button-forensic flex items-center justify-center">
                 <Mail className="h-4 w-4" />
-              </Button>
+              </button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10">
+                  <button className="h-8 w-8 icon-button-forensic flex items-center justify-center">
                     <MoreHorizontal className="h-4 w-4" />
-                  </Button>
+                  </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="bg-zinc-950 border-white/10 text-zinc-300">
                   <DropdownMenuLabel>Actions</DropdownMenuLabel>
@@ -396,7 +395,7 @@ export default function PeoplePage() {
         },
       },
     ]
-  }, [router, pagination.pageIndex])
+  }, [router, pageIndex])
 
   const table = useReactTable({
     data: contacts,
@@ -408,7 +407,14 @@ export default function PeoplePage() {
     onColumnFiltersChange: setColumnFilters,
     getFilteredRowModel: getFilteredRowModel(),
     onGlobalFilterChange: setGlobalFilter,
-    onPaginationChange: setPagination,
+    onPaginationChange: (updater) => {
+      if (typeof updater === 'function') {
+        const nextPagination = updater(pagination)
+        setPage(nextPagination.pageIndex)
+      } else {
+        setPage(updater.pageIndex)
+      }
+    },
     onRowSelectionChange: setRowSelection,
     autoResetPageIndex: false,
     state: {
@@ -437,7 +443,7 @@ export default function PeoplePage() {
         globalFilter={globalFilter}
         onSearchChange={(value) => {
           setGlobalFilter(value)
-          setPagination((p) => ({ ...p, pageIndex: 0 }))
+          setPage(0)
         }}
         onFilterToggle={() => setIsFilterOpen(!isFilterOpen)}
         isFilterActive={isFilterOpen || columnFilters.length > 0}
@@ -543,21 +549,18 @@ export default function PeoplePage() {
                 </div>
             </div>
             <div className="flex items-center gap-2">
-                <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setPagination((p) => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))}
+                <button
+                    onClick={() => setPage(Math.max(0, pagination.pageIndex - 1))}
                     disabled={pagination.pageIndex === 0}
-                    className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
+                    className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
+                    title="Previous Page"
                 >
-                    <ChevronLeft className="h-3.5 w-3.5" />
-                </Button>
+                    <ChevronLeft className="h-4 w-4" />
+                </button>
                 <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
                   {(pagination.pageIndex + 1).toString().padStart(2, '0')}
                 </div>
-                <Button
-                    variant="outline"
-                    size="icon"
+                <button
                     onClick={async () => {
                       const nextPageIndex = pagination.pageIndex + 1
                       if (nextPageIndex >= displayTotalPages) return
@@ -567,13 +570,14 @@ export default function PeoplePage() {
                         await fetchNextPage()
                       }
 
-                      setPagination((p) => ({ ...p, pageIndex: nextPageIndex }))
+                      setPage(nextPageIndex)
                     }}
                     disabled={pagination.pageIndex + 1 >= displayTotalPages || (!hasNextPage && contacts.length < (pagination.pageIndex + 2) * PAGE_SIZE)}
-                    className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
+                    className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
+                    title="Next Page"
                 >
-                    <ChevronRight className="h-3.5 w-3.5" />
-                </Button>
+                    <ChevronRight className="h-4 w-4" />
+                </button>
             </div>
         </div>
       </div>

@@ -55,6 +55,25 @@
   .nodal-glass-hover {
     @apply hover:border-white/10 hover:bg-zinc-900/60 transition-all duration-300;
   }
+
+  /* Forensic Icon Button - No container, zoom on hover, brighten */
+  .icon-button-forensic {
+    @apply flex items-center justify-center outline-none cursor-pointer p-0;
+    color: oklch(0.551 0.027 264.364); /* zinc-400 approx */
+    transition: all 0.3s ease;
+  }
+  
+  .icon-button-forensic:hover {
+    color: white;
+  }
+  
+  .icon-button-forensic svg {
+    transition: transform 0.3s ease;
+  }
+  
+  .icon-button-forensic:hover svg {
+    transform: scale(1.15);
+  }
 }
 
 :root {

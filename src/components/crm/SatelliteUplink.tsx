@@ -72,7 +72,8 @@ export default function SatelliteUplink({ address }: { address: string }) {
               </div>
               <button 
                 onClick={establishUplink}
-                className="text-xs font-mono text-[#002FA7] border border-[#002FA7]/30 bg-[#002FA7]/5 px-4 py-2 rounded hover:bg-[#002FA7] hover:text-white transition-all uppercase tracking-wider flex items-center gap-2"
+                className="icon-button-forensic text-xs font-mono !text-[#002FA7] border border-[#002FA7]/30 bg-[#002FA7]/5 px-4 py-2 rounded-xl hover:!bg-[#002FA7] hover:!text-white transition-all uppercase tracking-wider flex items-center gap-2 hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)]"
+                title="Establish Uplink"
               >
                 <Wifi className="w-3 h-3" /> Establish Uplink
               </button>

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { INDUSTRY_VECTORS, getIndustryFilters } from '@/lib/industry-mapping';
+import { TITLE_VECTORS, getTitleFilters } from '@/lib/title-mapping';
 
 interface FilterDeckProps {
   isOpen: boolean;
@@ -24,12 +25,10 @@ export default function FilterCommandDeck({
     const filter = columnFilters.find(f => f.id === columnId);
     if (!filter) return false;
     
-    // Special handling for Industry Vector Logic
-    if (columnId === 'industry') {
-      const activeIndustries = Array.isArray(filter.value) ? filter.value : [filter.value];
-      // A vector is active if its key (e.g. "Manufacturing") is in the active filters
-      // This works because we always add the vector key to the filter list when selecting
-      return activeIndustries.includes(value);
+    // Special handling for Industry/Title Vector Logic
+    if (columnId === 'industry' || columnId === 'title') {
+      const activeValues = Array.isArray(filter.value) ? filter.value : [filter.value];
+      return activeValues.includes(value);
     }
 
     if (Array.isArray(filter.value)) {
@@ -43,21 +42,20 @@ export default function FilterCommandDeck({
     const filter = columnFilters.find(f => f.id === columnId);
     let newValue;
     
-    // Special handling for Industry Vector Logic
-    if (columnId === 'industry') {
-      const vectorIndustries = INDUSTRY_VECTORS[value] || [value];
+    // Special handling for Industry/Title Vector Logic
+    if (columnId === 'industry' || columnId === 'title') {
+      const vectorMapping = columnId === 'industry' ? INDUSTRY_VECTORS : TITLE_VECTORS;
+      const vectorItems = vectorMapping[value] || [value];
       const currentValues = filter ? (Array.isArray(filter.value) ? filter.value : [filter.value]) : [];
       
-      // Check if this vector is already active (by checking the key value)
       const isVectorActive = currentValues.includes(value);
 
       if (isVectorActive) {
-        // Remove all industries associated with this vector
-        newValue = currentValues.filter((v: string) => !vectorIndustries.includes(v));
+        // Remove all items associated with this vector, including the vector key itself
+        newValue = currentValues.filter((v: string) => !vectorItems.includes(v) && v !== value);
       } else {
-        // Add all industries associated with this vector
-        // Use Set to prevent duplicates if industries overlap across vectors (though they shouldn't in this map)
-        newValue = [...new Set([...currentValues, ...vectorIndustries])];
+        // Add all items associated with this vector, plus the vector key itself
+        newValue = [...new Set([...currentValues, ...vectorItems, value])];
       }
       
       if (newValue.length === 0) newValue = undefined;
@@ -83,6 +81,7 @@ export default function FilterCommandDeck({
     onFilterChange('status', undefined);
     onFilterChange('industry', undefined);
     onFilterChange('location', undefined);
+    onFilterChange('title', undefined);
   };
 
   const statusOptions = type === 'people' 
@@ -90,6 +89,7 @@ export default function FilterCommandDeck({
     : ['ACTIVE_LOAD', 'PROSPECT', 'CHURNED'];
 
   const industryOptions = Object.keys(INDUSTRY_VECTORS);
+  const titleOptions = Object.keys(TITLE_VECTORS);
 
   const locationOptions = [
     'Houston',
@@ -109,7 +109,10 @@ export default function FilterCommandDeck({
           transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
           className="overflow-hidden rounded-xl border border-white/5 bg-zinc-900/30 backdrop-blur-xl relative z-30 mb-6"
         >
-          <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className={cn(
+            "p-6 grid gap-8",
+            type === 'people' ? "grid-cols-1 md:grid-cols-4" : "grid-cols-1 md:grid-cols-3"
+          )}>
             
             {/* COLUMN 1: STATUS VECTORS */}
             <div className="space-y-3">
@@ -145,7 +148,26 @@ export default function FilterCommandDeck({
               </div>
             </div>
 
-            {/* COLUMN 3: GEOSPATIAL_VECTOR */}
+            {/* COLUMN 3: TITLE VECTOR (PEOPLE ONLY) */}
+            {type === 'people' && (
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+                  TITLE_VECTOR
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {titleOptions.map(title => (
+                    <FilterChip 
+                      key={title}
+                      label={title}
+                      active={isActive('title', title)}
+                      onClick={() => toggleFilter('title', title)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* COLUMN 4: GEOSPATIAL_VECTOR */}
             <div className="space-y-3">
               <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
                 GEOSPATIAL_VECTOR
