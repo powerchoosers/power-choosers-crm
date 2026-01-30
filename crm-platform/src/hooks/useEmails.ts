@@ -43,6 +43,7 @@ export function useEmails(searchQuery?: string) {
           .select('*', { count: 'exact' })
         
         if (role !== 'admin') {
+           if (!user.email) return { emails: [], nextCursor: null }
            query = query.eq('metadata->>ownerId', user.email.toLowerCase())
         }
 
@@ -186,6 +187,7 @@ export function useSearchEmails(queryTerm: string) {
           .select('*')
         
         if (role !== 'admin') {
+           if (!user.email) return []
            query = query.eq('metadata->>ownerId', user.email.toLowerCase())
         }
 

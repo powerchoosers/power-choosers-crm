@@ -1,586 +1,541 @@
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nodal Point | Signal Over Noise in the Texas Energy Market</title>
-    <meta name="description" content="The Texas grid is designed to confuse. We view complexity as a design flaw. Nodal Point is the forensic engine that decodes volatility, eliminates demand ratchets, and reveals the true cost of power.">
-    <link rel="icon" type="image/png" href="/favicon.png">
-
-    <!-- Fonts: Inter -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'pc-blue': '#002FA7', // International Klein Blue - The Signal
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                        mono: ['Fira Code', 'monospace'],
-                    },
-                    letterSpacing: {
-                        tighter: '-0.03em', // Updated to -0.03em per design system
-                        tight: '-0.02em',
-                    },
-                    borderRadius: {
-                        '2xl': '1rem',
-                        '3xl': '1.5rem',
-                    }
-                }
-            }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>window.PC_DEBUG = true;</script>
+  <script src="scripts/debug-bridge.js"></script>
+  <title>Commercial Electricity Rates Texas 2025 | Power Choosers Energy Broker</title>
+  <meta name="description"
+    content="Get competitive commercial electricity rates in Texas. We broker the best business energy contracts from 100+ suppliers in ERCOT, PJM, MISO markets. Free quote.">
+  <link rel="canonical" href="https://powerchoosers.com/">
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="32x32"
+    href="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png">
+  <link rel="icon" type="image/png" sizes="16x16"
+    href="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png">
+  <link rel="apple-touch-icon" sizes="180x180"
+    href="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png">
+  <link rel="shortcut icon"
+    href="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png">
+  <meta name="theme-color" content="#0b1b45">
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://powerchoosers.com/">
+  <meta property="og:title" content="Commercial Electricity Rates Texas 2025 | Power Choosers Energy Broker">
+  <meta property="og:description"
+    content="Get competitive commercial electricity rates in Texas. We broker the best business energy contracts from 100+ suppliers in ERCOT, PJM, MISO markets. Free quote.">
+  <meta property="og:image"
+    content="https://raw.githubusercontent.com/powerchoosers/power-choosers-crm/main/Images/City%20Choosers.png">
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://powerchoosers.com/">
+  <meta property="twitter:title" content="Commercial Electricity Rates Texas 2025 | Power Choosers Energy Broker">
+  <meta property="twitter:description"
+    content="Get competitive commercial electricity rates in Texas. We broker the best business energy contracts from 100+ suppliers in ERCOT, PJM, MISO markets. Free quote.">
+  <meta property="twitter:image"
+    content="https://raw.githubusercontent.com/powerchoosers/power-choosers-crm/main/Images/City%20Choosers.png">
+  <!-- Google Search Console Verification (Get your verification code from https://search.google.com/search-console) -->
+  <!-- <meta name="google-site-verification" content="YOUR_VERIFICATION_CODE_HERE" /> -->
+  <!-- Structured Data (Schema.org) for Business Verification -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Power Choosers",
+      "url": "https://powerchoosers.com",
+      "logo": "https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png",
+      "description": "Commercial energy broker connecting businesses with competitive electricity and natural gas rates from 100+ suppliers in ERCOT, PJM, MISO, ISO-NE, and NYISO markets.",
+      "foundingDate": "2020",
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "US",
+        "addressRegion": "TX"
+      },
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "Customer Service",
+        "email": "info@powerchoosers.com",
+        "telephone": "+1-817-809-3367",
+        "availableLanguage": "English"
+      },
+      "sameAs": [
+        "https://www.linkedin.com/company/power-choosers"
+      ],
+      "areaServed": [
+        {
+          "@type": "State",
+          "name": "Texas"
+        },
+        {
+          "@type": "State",
+          "name": "Pennsylvania"
+        },
+        {
+          "@type": "State",
+          "name": "New York"
+        },
+        {
+          "@type": "State",
+          "name": "Massachusetts"
+        },
+        {
+          "@type": "State",
+          "name": "Illinois"
         }
+      ],
+      "serviceType": "Energy Procurement",
+      "knowsAbout": ["Energy Procurement", "Electricity", "Natural Gas", "Energy Contracts", "Energy Consulting", "Commercial Electricity Rates", "Business Energy Broker", "ERCOT", "Demand Charges", "Capacity Charges"]
+    }
     </script>
-
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-
-    <style>
-        /* Custom Utilities for Animations */
-        .reveal-on-scroll {
-            opacity: 0;
-            transform: translateY(30px);
-            transition: all 1s cubic-bezier(0.16, 1, 0.3, 1);
-            /* Apple-like ease */
+  <!-- Website Structured Data for Site Links -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Power Choosers",
+      "url": "https://powerchoosers.com",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://powerchoosers.com/?s={search_term_string}",
+        "query-input": "required name=search_term_string"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "Power Choosers",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png"
         }
-
-        .reveal-on-scroll.is-visible {
-            opacity: 1;
-            transform: translateY(0);
+      }
+    }
+    </script>
+  <!-- Site Navigation Structured Data -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SiteNavigationElement",
+      "name": "Main Navigation",
+      "url": "https://powerchoosers.com",
+      "hasPart": [
+        {
+          "@type": "WebPage",
+          "name": "About",
+          "url": "https://powerchoosers.com/about.html"
+        },
+        {
+          "@type": "WebPage",
+          "name": "Services",
+          "url": "https://powerchoosers.com/services.html"
+        },
+        {
+          "@type": "WebPage",
+          "name": "Resources",
+          "url": "https://powerchoosers.com/resources.html"
+        },
+        {
+          "@type": "WebPage",
+          "name": "Schedule",
+          "url": "https://powerchoosers.com/schedule.html"
         }
-
-        .delay-100 {
-            transition-delay: 100ms;
-        }
-
-        .delay-200 {
-            transition-delay: 200ms;
-        }
-
-        .delay-300 {
-            transition-delay: 300ms;
-        }
-
-        .delay-500 {
-            transition-delay: 500ms;
-        }
-
-        /* Chart Animation */
-        .chart-path {
-            stroke-dasharray: 1000;
-            stroke-dashoffset: 1000;
-            transition: stroke-dashoffset 2s cubic-bezier(0.22, 1, 0.36, 1);
-            filter: drop-shadow(0 4px 6px rgba(0, 47, 167, 0.4));
-            /* Glow effect */
-        }
-
-        .chart-path.animate {
-            stroke-dashoffset: 0;
-        }
-
-        /* Glassmorphism - The Lens */
-        .glass-card {
-            background: linear-gradient(145deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.05) 100%);
-            backdrop-filter: blur(40px);
-            -webkit-backdrop-filter: blur(40px);
-            border: 1px solid rgba(255, 255, 255, 0.5);
-            border-top: 1px solid rgba(255, 255, 255, 0.5);
-            border-left: 1px solid rgba(255, 255, 255, 0.5);
-            box-shadow:
-                0 20px 40px -5px rgba(0, 0, 0, 0.05),
-                0 8px 10px -6px rgba(0, 0, 0, 0.05),
-                inset 0 1px 2px rgba(255, 255, 255, 0.4),
-                0 0 0 1px rgba(0, 0, 0, 0.05);
-            transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
-        }
-
-        .glass-card:hover {
-            transform: translateY(-5px);
-            /* The Lift */
-            box-shadow:
-                0 25px 50px -12px rgba(0, 0, 0, 0.15),
-                inset 0 1px 2px rgba(255, 255, 255, 0.4);
-        }
-
-        /* Button Pulse */
-        @keyframes subtle-pulse {
-
-            0%,
-            100% {
-                box-shadow: 0 0 0 0 rgba(0, 47, 167, 0.2);
+      ]
+    }
+    </script>
+  <!-- Service Schema for Rich Snippets -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Service",
+      "serviceType": "Commercial Energy Procurement",
+      "provider": {
+        "@type": "Organization",
+        "name": "Power Choosers",
+        "url": "https://powerchoosers.com"
+      },
+      "areaServed": {
+        "@type": "Country",
+        "name": "United States"
+      },
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Energy Services",
+        "itemListElement": [
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Commercial Electricity Procurement",
+              "description": "Competitive electricity rate sourcing and contract negotiation for businesses"
             }
-
-            50% {
-                box-shadow: 0 0 0 12px rgba(0, 47, 167, 0);
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Natural Gas Procurement",
+              "description": "Natural gas supply contracts and rate optimization for commercial customers"
             }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Energy Bill Management",
+              "description": "Bill analysis, reporting, and optimization services"
+            }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Energy Efficiency Consulting",
+              "description": "Efficiency project advice and sustainability consulting"
+            }
+          }
+        ]
+      }
+    }
+    </script>
+  <!-- FAQ Schema -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What commercial electricity rates can I get in Texas?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Commercial electricity rates in Texas vary by usage, load profile, and contract terms. We source competitive rates from 100+ suppliers in ERCOT. Typical rates range from $0.08-$0.12 per kWh for fixed contracts, plus TDU delivery charges. Contact us for a free quote based on your specific usage."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I find the best business energy broker?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The best business energy broker offers competitive rates from multiple suppliers, handles contract negotiations, and provides ongoing support. Power Choosers partners with 100+ electricity and natural gas suppliers across ERCOT, PJM, MISO, ISO-NE, and NYISO markets. We handle the entire procurement process from sourcing to contract execution."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What are demand charges in Texas commercial electricity?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Demand charges in Texas are fees based on your peak electricity usage in 15-minute intervals, typically $4-$7 per kW. These charges can represent 30-50% of your total bill. We help businesses optimize load profiles to reduce demand charges and lower overall energy costs."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Do you serve businesses outside of Texas?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, we serve businesses in all deregulated energy markets including ERCOT (Texas), PJM (Mid-Atlantic/Midwest), MISO (Upper Midwest), ISO-NE (New England), and NYISO (New York). We help commercial customers in Houston, Dallas, Chicago, Boston, and other major markets."
+          }
         }
+      ]
+    }
+    </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-        .animate-subtle-pulse {
-            animation: subtle-pulse 3s infinite;
-        }
-    </style>
+  <!-- Shared Public Styles - Enhanced buttons, blur effects, and shadows -->
+  <link rel="stylesheet" href="styles/public.css">
+
+  <!-- Apollo Tracking Script -->
+  <script>function initApollo() { var n = Math.random().toString(36).substring(7), o = document.createElement("script"); o.src = "https://assets.apollo.io/micro/website-tracker/tracker.iife.js?nocache=" + n, o.async = !0, o.defer = !0, o.onload = function () { window.trackingFunctions.onLoad({ appId: "691c89270f724f000d121b65" }) }, document.head.appendChild(o) } initApollo();</script>
 </head>
 
-<body class="bg-zinc-50 text-zinc-600 antialiased selection:bg-pc-blue selection:text-white">
+<body>
+  <!-- Header -->
+  <header class="site-header">
+    <nav class="nav">
+      <a href="/" class="brand">
+        <img
+          src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png"
+          alt="Power Choosers" />
+        <span class="brand-name">Power Choosers</span>
+      </a>
+      <button class="menu-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
+      <div class="nav-links">
+        <a href="/about" class="btn btn-outline">About</a>
+        <a href="/services" class="btn btn-outline">Services</a>
+        <a href="/resources" class="btn btn-outline">Resources</a>
+        <a href="/schedule" class="btn btn-outline">Schedule</a>
+        <button class="btn btn-primary" id="open-modal">Contact</button>
+      </div>
+    </nav>
+  </header>
 
-    <!-- HEADER (Heads-Up Display) -->
-    <header id="main-header" class="fixed top-0 left-0 right-0 z-40 transition-all duration-500 bg-transparent h-24">
-        <div class="w-full px-8 h-full flex items-center justify-between">
-
-            <!-- 1. Identity -->
-            <div class="z-50 flex items-center gap-2 cursor-pointer">
-                <img src="images/nodalpoint.png" alt="Nodal Point Logo" class="h-10 w-auto">
-                <span class="font-bold text-xl tracking-tighter text-black">
-                    Nodal <span class="text-pc-blue">Point</span>
-                </span>
-            </div>
-
-            <!-- 2. The Action Cluster -->
-            <div class="flex items-center gap-6">
-
-                <!-- The "Ghost" Link -->
-                <a href="/crm-platform"
-                    class="hidden md:block text-sm font-medium text-zinc-500 hover:text-black transition-colors">
-                    Sign In
-                </a>
-
-                <!-- The Primary Trigger -->
-                <a href="bill-debugger.html"
-                    class="hidden md:flex items-center gap-2 bg-pc-blue text-white px-5 py-2.5 rounded-full text-sm font-medium hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40">
-                    <i data-lucide="activity" class="w-4 h-4"></i>
-                    <span>Run Analysis</span>
-                </a>
-
-                <!-- The Hamburger -->
-                <button id="menu-open-btn" class="p-2 hover:bg-black/5 rounded-full transition-colors">
-                    <i data-lucide="menu" class="w-6 h-6 text-black stroke-[1.5]"></i>
-                </button>
-            </div>
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-grid"></div>
+    <div class="hero-inner">
+      <div class="hero-image">
+        <img src="/images/choose.png" alt="Choose Wisely - Power Your Savings" loading="eager" />
+      </div>
+      <div>
+        <h1>Smart Energy Choices. Real Savings.</h1>
+        <p>The Deregulated Energy Market is Designed to Confuse. We Redesigned the Solution.</p>
+        <p style="color:#475569;margin-top:10px;font-size:14px;max-width:640px">
+          No noise. No hidden algorithms. Just the energy you need, purely simple.
+        </p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="/bill-debugger">Fix The Flaw</a>
         </div>
-    </header>
-
-    <!-- 3. The Full Screen Menu Overlay -->
-    <div id="menu-overlay"
-        class="fixed inset-0 z-50 bg-white/95 backdrop-blur-3xl flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300">
-        <!-- Close Button -->
-        <button id="menu-close-btn" class="absolute top-8 right-8 p-2 hover:bg-black/5 rounded-full">
-            <i data-lucide="x" class="w-8 h-8 text-black stroke-[1.5]"></i>
-        </button>
-
-        <!-- Menu Content -->
-        <div class="flex flex-col gap-8 text-center">
-            <a href="#"
-                class="menu-item text-4xl md:text-5xl font-light tracking-tight text-black hover:text-pc-blue transition-colors opacity-0 translate-y-5 transition-all duration-500 delay-100">The
-                Philosophy</a>
-            <a href="#"
-                class="menu-item text-4xl md:text-5xl font-light tracking-tight text-black hover:text-pc-blue transition-colors opacity-0 translate-y-5 transition-all duration-500 delay-200">The
-                Methodology</a>
-            <a href="#"
-                class="menu-item text-4xl md:text-5xl font-light tracking-tight text-black hover:text-pc-blue transition-colors opacity-0 translate-y-5 transition-all duration-500 delay-300">Market
-                Data</a>
-            <a href="#"
-                class="menu-item text-4xl md:text-5xl font-light tracking-tight text-black hover:text-pc-blue transition-colors opacity-0 translate-y-5 transition-all duration-500 delay-400">Contact</a>
-
-            <!-- Mobile CTA inside menu -->
-            <div class="mt-8 md:hidden opacity-0 translate-y-5 transition-all duration-500 delay-500 menu-item">
-                <a href="bill-debugger.html"
-                    class="bg-pc-blue text-white px-8 py-4 rounded-full text-lg font-medium inline-block">
-                    Fix My Rate
-                </a>
-            </div>
-        </div>
+      </div>
     </div>
+  </section>
 
-    <!-- ACT 1: THE HERO (The Hook) -->
-    <section class="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden">
-        <div class="max-w-5xl mx-auto text-center z-10">
-            <h1
-                class="text-6xl md:text-8xl font-semibold tracking-tighter leading-tight mb-8 reveal-on-scroll text-zinc-900">
-                The Texas Grid is<br>
-                Designed to Confuse.
-            </h1>
-            <p
-                class="text-xl md:text-2xl text-zinc-600 font-light tracking-tight mb-12 max-w-2xl mx-auto reveal-on-scroll delay-200">
-                We view complexity as a design flaw. We fixed it.
-            </p>
-            <div class="reveal-on-scroll delay-300">
-                <a href="bill-debugger.html"
-                    class="animate-subtle-pulse inline-flex items-center gap-2 px-8 py-4 bg-pc-blue text-white rounded-full text-lg font-medium hover:scale-105 hover:bg-blue-800 transition-all duration-300 shadow-lg shadow-blue-900/20 group">
-                    <span>[ Debug My Bill ]</span>
-                    <i data-lucide="arrow-right" class="w-5 h-5 group-hover:translate-x-1 transition-transform"></i>
-                </a>
-            </div>
+  <!-- Services -->
+  <section id="services" style="background: linear-gradient(180deg, #ffffff, #fafbfc);">
+    <h2 class="section-title">Our Energy Solutions</h2>
+    <p class="section-sub">From procurement to management, we handle the complexities of commercial energy so you don’t
+      have to.</p>
+    <div class="cards">
+      <div class="card">
+        <div class="icon-wrap">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" />
+          </svg>
         </div>
-
-        <!-- Subtle Grid Background -->
-        <div class="absolute inset-0 z-0 opacity-40"
-            style="background-image: radial-gradient(#d4d4d8 1.5px, transparent 1.5px); background-size: 24px 24px;">
+        <h3>Energy Procurement</h3>
+        <p>We find and negotiate the best electricity rates for your business, ensuring a reliable, cost‑effective plan.
+        </p>
+      </div>
+      <div class="card">
+        <div class="icon-wrap">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="14" rx="2" />
+            <path d="M3 10h18" />
+            <path d="M7 15h2" />
+            <path d="M11 15h2" />
+          </svg>
         </div>
-    </section>
-
-    <!-- ACT 2: THE REALITY (The Problem) -->
-    <section class="bg-[#F5F5F7] flex items-center justify-center px-6 py-20">
-        <div class="max-w-6xl w-full grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
-
-            <!-- Text Content -->
-            <div class="order-2 md:order-1">
-                <h2 class="text-4xl md:text-5xl font-semibold tracking-tighter mb-6 reveal-on-scroll text-zinc-900">
-                    Complexity is a Tax.
-                </h2>
-                <p class="text-lg text-zinc-700 leading-relaxed mb-8 reveal-on-scroll delay-100">
-                    ERCOT scarcity adders, 4CP peaks, and volatility are features of the market design, not bugs.
-                    Suppliers bury these in "pass-through" fees.
-                </p>
-                <p class="text-xl font-medium text-zinc-900 reveal-on-scroll delay-200 border-l-2 border-pc-blue pl-4">
-                    You are paying for the noise.
-                </p>
-            </div>
-
-            <!-- Visual: Volatility Chart -->
-            <div class="order-1 md:order-2 reveal-on-scroll delay-300">
-                <div
-                    class="bg-white p-8 rounded-3xl shadow-xl border border-zinc-200/50 aspect-video relative flex items-center justify-center overflow-hidden">
-                    <svg viewBox="0 0 400 225" class="w-full h-full text-pc-blue">
-                        <!-- Grid Lines -->
-                        <line x1="0" y1="190" x2="400" y2="190" stroke="#e4e4e7" stroke-width="1" />
-                        <line x1="0" y1="100" x2="400" y2="100" stroke="#e4e4e7" stroke-width="1"
-                            stroke-dasharray="4 4" />
-
-                        <!-- The "Spike" Line -->
-                        <path id="volatilityPath" class="chart-path"
-                            d="M0,190 L30,190 C60,190 100,20 120,20 C140,20 150,190 180,190 C200,190 220,100 240,100 C260,100 270,190 300,190 L400,190"
-                            fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
-                            stroke-linejoin="round" />
-
-                        <!-- Labels -->
-                        <text x="390" y="175" text-anchor="end"
-                            class="text-[10px] fill-zinc-400 font-mono tracking-widest uppercase">Stability</text>
-                        <text x="120" y="15" text-anchor="middle"
-                            class="text-[10px] fill-red-500 font-mono tracking-widest uppercase">Volatility Spike</text>
-                    </svg>
-                </div>
-            </div>
+        <h3>Bill Management</h3>
+        <p>Simplify accounting with streamlined bill management and transparent, easy‑to‑read reporting.</p>
+      </div>
+      <div class="card">
+        <div class="icon-wrap">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22c4.97 0 9-4.03 9-9S12 2 12 2 3 8.03 3 13s4.03 9 9 9z" />
+            <path d="M9 14c1-2 3-3 5-3 2 0 3 1 4 2" />
+          </svg>
         </div>
-    </section>
+        <h3>Efficiency & Sustainability</h3>
+        <p>Lower your footprint and your costs with expert advice on efficiency projects and renewables.</p>
+      </div>
+    </div>
+  </section>
 
-    <!-- ACT 3: THE PHILOSOPHY (The Code) -->
-    <section class="flex items-center justify-center px-6 py-24 bg-white">
-        <div class="max-w-7xl mx-auto w-full">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
+  <!-- Why Choose Us -->
+  <section class="why" id="why">
+    <h2 class="section-title">Your Trusted Partner in Energy Management</h2>
+    <div class="why-grid">
+      <div class="why-card">
+        <div class="icon-wrap"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg></div>
+        <h3>Expertise</h3>
+        <p class="section-sub">Decades of experience navigating complex energy markets.</p>
+      </div>
+      <div class="why-card">
+        <div class="icon-wrap"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12h18" />
+            <path d="M3 6h18" />
+            <path d="M3 18h18" />
+          </svg></div>
+        <h3>Simplicity</h3>
+        <p class="section-sub">Switch providers and manage contracts in just a few clicks.</p>
+      </div>
+      <div class="why-card">
+        <div class="icon-wrap"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg></div>
+        <h3>Customer‑Centric</h3>
+        <p class="section-sub">Personalized support and transparent, honest advice.</p>
+      </div>
+      <div class="why-card">
+        <div class="icon-wrap"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1v22" />
+            <path d="M17 5H9a4 4 0 0 0 0 8h8a4 4 0 1 1 0 8H6" />
+          </svg></div>
+        <h3>Savings</h3>
+        <p class="section-sub">Our mission is to maximize savings and minimize spend.</p>
+      </div>
+    </div>
+  </section>
 
-                <!-- Value 1 -->
-                <div class="reveal-on-scroll group">
-                    <div
-                        class="w-12 h-12 bg-zinc-100 rounded-xl flex items-center justify-center mb-6 text-zinc-900 group-hover:bg-pc-blue group-hover:text-white transition-colors duration-300">
-                        <i data-lucide="activity" class="w-6 h-6"></i>
-                    </div>
-                    <h3 class="text-2xl font-semibold tracking-tight mb-4 text-zinc-900">Signal Over Noise</h3>
-                    <p class="text-zinc-500 leading-relaxed">
-                        We reject 99% of contracts to find the one true signal. We filter out the market hysteria to
-                        find the mathematical optimum.
-                    </p>
-                </div>
+  <!-- How it works -->
+  <section id="how" class="bg-white">
+    <h2 class="section-title">How it works</h2>
+    <div class="how-steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>Upload Bill</h3>
+        <p>Share recent bills and usage data. We analyze demand profiles and timing to understand your needs.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>We Filter the Noise</h3>
+        <p>We run a competitive event across 100+ electricity and natural gas suppliers in your market.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>You Save</h3>
+        <p>Compare options apples-to-apples and execute the best-fit agreement—with our team handling the details.</p>
+      </div>
+    </div>
+  </section>
 
-                <!-- Value 2 -->
-                <div class="reveal-on-scroll delay-100 group">
-                    <div
-                        class="w-12 h-12 bg-zinc-100 rounded-xl flex items-center justify-center mb-6 text-zinc-900 group-hover:bg-pc-blue group-hover:text-white transition-colors duration-300">
-                        <i data-lucide="layers" class="w-6 h-6"></i>
-                    </div>
-                    <h3 class="text-2xl font-semibold tracking-tight mb-4 text-zinc-900">Deep Simplicity</h3>
-                    <p class="text-zinc-500 leading-relaxed">
-                        We engineer the complexity out of the grid so you don't feel it. Your bill becomes a dashboard,
-                        not a puzzle.
-                    </p>
-                </div>
+  <!-- Partners -->
+  <section id="partners" style="background: linear-gradient(180deg, #f8fafc, #ffffff);">
+    <h2 class="section-title">Supplier network</h2>
+    <p class="section-sub">We competitively source from 100+ electricity and natural gas suppliers to give you leverage
+      and choice.</p>
+    <div class="partners">
+      <div class="chip">Electricity suppliers</div>
+      <div class="chip">Natural gas suppliers</div>
+      <div class="chip">Renewables</div>
+      <div class="chip">Multi-site specialists</div>
+      <div class="chip">SMB to Enterprise</div>
+      <div class="chip">Fixed & Indexed</div>
+    </div>
+  </section>
 
-                <!-- Value 3 -->
-                <div class="reveal-on-scroll delay-200 group">
-                    <div
-                        class="w-12 h-12 bg-zinc-100 rounded-xl flex items-center justify-center mb-6 text-zinc-900 group-hover:bg-pc-blue group-hover:text-white transition-colors duration-300">
-                        <i data-lucide="users" class="w-6 h-6"></i>
-                    </div>
-                    <h3 class="text-2xl font-semibold tracking-tight mb-4 text-zinc-900">Human Intersection</h3>
-                    <p class="text-zinc-500 leading-relaxed">
-                        Technology alone is not enough. We provide experts leading experts. Algorithms find the price;
-                        humans define the strategy.
-                    </p>
-                </div>
-
-            </div>
+  <!-- Tools & Guides -->
+  <!-- Resource tools -->
+  <section id="tools" style="background: #ffffff;">
+    <h2 class="section-title">Tools & Guides</h2>
+    <p class="section-sub">Current and upcoming resources to help you plan, price, and renew with confidence.</p>
+    <div class="resource-grid">
+      <a class="resource-card" href="/tdu-delivery-charges.html">
+        <div class="resource-meta">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+          Live tool
         </div>
-    </section>
-
-    <!-- ACT 4: THE PRODUCTS (The Tools) -->
-    <section class="bg-[#F5F5F7] flex flex-col px-6 py-20 md:py-24 relative overflow-hidden">
-
-        <!-- Background Blobs for Glass Effect -->
-        <div
-            class="absolute top-1/2 left-1/4 w-[800px] h-[800px] bg-pc-blue/15 rounded-full blur-[120px] -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+        <h4>TDU Delivery Charges Calculator</h4>
+        <p>Estimate delivery charges by utility and usage so you know your all‑in cost.</p>
+      </a>
+      <a class="resource-card" href="/guide-2026.html">
+        <div class="resource-meta">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16v16H4z"></path><path d="M9 9h6v6H9z"></path>
+          </svg>
+          Live guide
         </div>
-        <div
-            class="absolute bottom-0 right-0 w-[600px] h-[600px] bg-blue-400/20 rounded-full blur-[100px] translate-x-1/3 translate-y-1/3 pointer-events-none">
+        <h4>2026 Electricity Market Navigator</h4>
+        <p>Capacity cliff, reserve margins, and the 6–24 month renewal windows most teams miss.</p>
+      </a>
+      <div class="resource-card">
+        <div class="resource-meta">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle><path d="M12 8v4l2.5 2.5"></path>
+          </svg>
+          Coming soon
         </div>
-
-        <div class="max-w-7xl mx-auto w-full z-10 relative">
-            <h2
-                class="text-4xl md:text-5xl font-semibold tracking-tighter mb-20 text-center reveal-on-scroll text-zinc-900">
-                The Product Suite.
-            </h2>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-
-                <!-- Card 1 -->
-                <div
-                    class="glass-card p-10 rounded-3xl reveal-on-scroll hover:shadow-2xl transition-shadow duration-300">
-                    <div class="text-xs font-mono text-pc-blue mb-4 tracking-widest uppercase">Diagnostic Tool</div>
-                    <h3 class="text-3xl font-semibold tracking-tight mb-4 text-zinc-900">True Cost Revealer</h3>
-                    <p class="text-zinc-500 mb-8">
-                        Exposing hidden TDU charges and "pass-through" leaks. We simulate your bill against 100+
-                        supplier tariffs.
-                    </p>
-                    <div class="w-full aspect-[4/3] mb-8 overflow-hidden rounded-xl border border-white/50">
-                        <img src="images/prism.jpg" alt="True Cost Revealer Visualization"
-                            class="w-full h-full object-cover">
-                    </div>
-                </div>
-
-                <!-- Card 2 -->
-                <div
-                    class="glass-card p-10 rounded-3xl reveal-on-scroll delay-100 hover:shadow-2xl transition-shadow duration-300">
-                    <div class="text-xs font-mono text-pc-blue mb-4 tracking-widest uppercase">Strategic Core</div>
-                    <h3 class="text-3xl font-semibold tracking-tight mb-4 text-zinc-900">Future-Proof Engine</h3>
-                    <p class="text-zinc-500 mb-8">
-                        The 2026 Market Navigator. We forecast capacity markets and hedge against regulatory shifts
-                        before they happen.
-                    </p>
-                    <div class="w-full aspect-[4/3] mb-8 overflow-hidden rounded-xl border border-white/50">
-                        <img src="images/future-proof-engine.png" alt="Future-Proof Engine Visualization"
-                            class="w-full h-full object-cover">
-                    </div>
-                </div>
-
-                <!-- Card 3 -->
-                <div
-                    class="glass-card p-10 rounded-3xl reveal-on-scroll delay-200 hover:shadow-2xl transition-shadow duration-300">
-                    <div class="text-xs font-mono text-pc-blue mb-4 tracking-widest uppercase">Management OS</div>
-                    <h3 class="text-3xl font-semibold tracking-tight mb-4 text-zinc-900">Energy Minimalism</h3>
-                    <p class="text-zinc-500 mb-8">
-                        Multi-site management unified into a single stream of truth. One dashboard. Zero noise.
-                    </p>
-                    <div class="w-full aspect-[4/3] mb-8 overflow-hidden rounded-xl border border-white/50">
-                        <img src="images/energy-minimalism-v2.png" alt="Energy Minimalism Visualization"
-                            class="w-full h-full object-cover">
-                    </div>
-                </div>
-
-            </div>
+        <h4>Bill Analyzer</h4>
+        <p>Upload bills for automatic rate benchmarking, demand profiling, and renewal timing insights.</p>
+      </div>
+      <div class="resource-card">
+        <div class="resource-meta">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 8v4l2.5 2.5"></path>
+          </svg>
+          Coming soon
         </div>
-    </section>
+        <h4>Peak-Hour Playbook</h4>
+        <p>Live alerts and playbooks for 4CP and local peaks so you can trim capacity tags.</p>
+      </div>
+    </div>
+  </section>
 
-    <!-- SECTION 5: THE OUTPUT (The Proof) -->
-    <section class="py-32 bg-[#F5F5F7] border-t border-black/5 relative">
-        <div class="max-w-7xl mx-auto px-6 relative z-10">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
+  <!-- CTA -->
+  <section class="cta-section">
+    <div class="cta-inner">
+      <h2>Ready to take control?</h2>
+      <p>Stop overpaying. Start optimizing. Get your free, no‑obligation quote today.</p>
+      <div class="cta-actions">
+        <button class="btn btn-primary-inverse" id="open-modal-cta">Get a Quote</button>
+        <a href="tel:+18178093367" class="btn btn-outline-inverse">Call (817) 809-3367</a>
+      </div>
+    </div>
+  </section>
 
-                <!-- Stat 1 -->
-                <div class="p-8 rounded-3xl hover:bg-white/50 transition-colors duration-500 reveal-on-scroll">
-                    <div class="text-6xl md:text-8xl font-bold tracking-tighter text-pc-blue mb-4 drop-shadow-sm">
-                        <span class="counter" data-target="3.4" data-suffix="¢">0</span>
-                    </div>
-                    <div class="text-sm font-bold text-zinc-900 uppercase tracking-widest mb-2">
-                        Avg. kWh reduction
-                    </div>
-                    <div class="text-zinc-700 font-medium">
-                        We exploit the spread.
-                    </div>
-                </div>
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-content">
+      <div class="footer-brand">
+        <img
+          src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png"
+          alt="Power Choosers" />
+        <span class="footer-name">Power Choosers</span>
+      </div>
+      <div class="footer-links">
+        <a href="/about.html">About</a>
+        <a href="/services.html">Services</a>
+        <a href="/resources.html">Resources</a>
+        <a href="/privacy.html">Privacy</a>
+        <a href="/terms.html">Terms</a>
+      </div>
+      <div class="footer-copy">
+        &copy; 2025 Power Choosers LLC. All rights reserved.<br>
+        Energy Broker PUCT #BR240166
+      </div>
+    </div>
+  </footer>
 
-                <!-- Stat 2 -->
-                <div
-                    class="p-8 rounded-3xl hover:bg-white/50 transition-colors duration-500 reveal-on-scroll delay-100">
-                    <div class="text-6xl md:text-8xl font-bold tracking-tighter text-pc-blue mb-4 drop-shadow-sm">
-                        <span class="counter" data-target="124" data-prefix="$" data-suffix="M">0</span>
-                    </div>
-                    <div class="text-sm font-bold text-zinc-900 uppercase tracking-widest mb-2">
-                        Scarcity premiums removed
-                    </div>
-                    <div class="text-zinc-700 font-medium">
-                        Volatility is optional.
-                    </div>
-                </div>
-
-                <!-- Stat 3 -->
-                <div
-                    class="p-8 rounded-3xl hover:bg-white/50 transition-colors duration-500 reveal-on-scroll delay-200">
-                    <div class="text-6xl md:text-8xl font-bold tracking-tighter text-pc-blue mb-4 drop-shadow-sm">
-                        <span class="counter" data-target="0" data-suffix="%">0.00%</span>
-                    </div>
-                    <div class="text-sm font-bold text-zinc-900 uppercase tracking-widest mb-2">
-                        Exposure to Index volatility
-                    </div>
-                    <div class="text-zinc-700 font-medium">
-                        Total insulation.
-                    </div>
-                </div>
-
-            </div>
+  <!-- Modal -->
+  <div class="modal-overlay" id="contact-modal">
+    <div class="modal">
+      <button class="modal-close" id="close-modal">&times;</button>
+      <div class="modal-header">
+        <h3>Contact Us</h3>
+        <p>Fill out the form below and we'll get back to you shortly.</p>
+      </div>
+      <form class="modal-form" id="contact-form">
+        <div class="form-group">
+          <label for="name">Name</label>
+          <input type="text" id="name" name="name" required placeholder="Your Name" />
         </div>
-    </section>
-
-    <!-- SECTION 6: FINAL CTA (The Impulse) -->
-    <section class="py-40 bg-white flex flex-col items-center justify-center text-center relative overflow-hidden">
-        <!-- Background Glow -->
-        <div
-            class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-100/50 rounded-full blur-3xl pointer-events-none">
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required placeholder="your@email.com" />
         </div>
-
-        <div class="relative z-10 max-w-2xl px-6 reveal-on-scroll">
-            <h2 class="text-5xl md:text-7xl font-bold tracking-tighter text-black mb-8 leading-[1.1]">
-                Stop paying for the noise.
-            </h2>
-            <p class="text-xl text-zinc-700 font-medium mb-10 max-w-lg mx-auto">
-                The market is complex. Your strategy should be simple.
-                Upload your bill. See the signal.
-            </p>
-
-            <a href="bill-debugger.html"
-                class="group relative inline-flex items-center gap-3 bg-pc-blue text-white px-10 py-5 rounded-full text-xl font-medium shadow-xl shadow-blue-900/20 hover:shadow-2xl hover:shadow-blue-900/30 hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300">
-                <span>[ Debug My Bill ]</span>
-                <i data-lucide="arrow-right" class="w-5 h-5 group-hover:translate-x-1 transition-transform"></i>
-            </a>
+        <div class="form-group">
+          <label for="phone">Phone</label>
+          <input type="tel" id="phone" name="phone" placeholder="(555) 555-5555" />
         </div>
-    </section>
-
-    <!-- FOOTER -->
-    <footer class="bg-zinc-900 text-zinc-400 py-20 px-6 border-t border-zinc-800">
-        <div class="max-w-7xl mx-auto flex flex-col items-center justify-center gap-8">
-            <div class="bg-white p-3 rounded-3xl">
-                <img src="images/nodalpoint.png" alt="Nodal Point Logo" class="h-12 w-auto">
-            </div>
-            <p class="font-mono text-sm tracking-widest opacity-60">&copy; 2026 Nodal Point. All Systems Nominal.</p>
+        <div class="form-group">
+          <label for="message">Message</label>
+          <textarea id="message" name="message" rows="4" required placeholder="How can we help?"></textarea>
         </div>
-    </footer>
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Send Message</button>
+      </form>
+    </div>
+  </div>
 
-    <script>
-        // Initialize Lucide Icons with "Terminal Aesthetic" stroke width
-        lucide.createIcons({
-            attrs: {
-                'stroke-width': '1.5'
-            }
-        });
-
-        // Header Scroll Effect
-        const header = document.getElementById('main-header');
-
-        window.addEventListener('scroll', () => {
-            if (window.scrollY > 50) {
-                header.className = 'fixed top-0 left-0 right-0 z-40 transition-all duration-500 bg-white/80 backdrop-blur-xl border-b border-black/5 h-16';
-            } else {
-                header.className = 'fixed top-0 left-0 right-0 z-40 transition-all duration-500 bg-transparent h-24';
-            }
-        });
-
-        // Menu Toggle Logic
-        const menuOpenBtn = document.getElementById('menu-open-btn');
-        const menuCloseBtn = document.getElementById('menu-close-btn');
-        const menuOverlay = document.getElementById('menu-overlay');
-        const menuItems = document.querySelectorAll('.menu-item');
-
-        function openMenu() {
-            menuOverlay.classList.remove('opacity-0', 'pointer-events-none');
-            menuOverlay.classList.add('opacity-100', 'pointer-events-auto');
-
-            // Animate items in
-            menuItems.forEach((item) => {
-                item.classList.remove('opacity-0', 'translate-y-5');
-            });
-        }
-
-        function closeMenu() {
-            menuOverlay.classList.remove('opacity-100', 'pointer-events-auto');
-            menuOverlay.classList.add('opacity-0', 'pointer-events-none');
-
-            // Reset items for next open
-            menuItems.forEach((item) => {
-                item.classList.add('opacity-0', 'translate-y-5');
-            });
-        }
-
-        menuOpenBtn.addEventListener('click', openMenu);
-        menuCloseBtn.addEventListener('click', closeMenu);
-
-        // Close menu when clicking a link
-        menuItems.forEach(item => {
-            item.addEventListener('click', closeMenu);
-        });
-
-        // Initialize Lucide Icons
-        lucide.createIcons();
-
-        // Intersection Observer for Scroll Reveals
-        const observerOptions = {
-            root: null,
-            rootMargin: '0px',
-            threshold: 0.1
-        };
-
-        const observer = new IntersectionObserver((entries, observer) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('is-visible');
-
-                    // Trigger Chart Animation if visible
-                    const chart = entry.target.querySelector('#volatilityPath');
-                    if (chart) {
-                        setTimeout(() => {
-                            chart.classList.add('animate');
-                        }, 500);
-                    }
-
-                    // Trigger Counter Animation if visible
-                    const counters = entry.target.querySelectorAll('.counter');
-                    counters.forEach(counter => {
-                        const target = parseFloat(counter.getAttribute('data-target'));
-                        const prefix = counter.getAttribute('data-prefix') || '';
-                        const suffix = counter.getAttribute('data-suffix') || '';
-                        const duration = 1200; // 1.2 seconds (faster)
-                        const increment = target / (duration / 16); // 60fps
-                        let current = 0;
-
-                        const updateCounter = () => {
-                            current += increment;
-                            if (current < target) {
-                                // Determine decimal places based on target value
-                                const decimals = (target >= 10) ? 0 : 1;
-                                counter.textContent = prefix + current.toFixed(decimals) + suffix;
-                                requestAnimationFrame(updateCounter);
-                            } else {
-                                const decimals = (target >= 10) ? 0 : 1;
-                                counter.textContent = prefix + target.toFixed(decimals) + suffix;
-                            }
-                        };
-
-                        setTimeout(updateCounter, 300);
-                    });
-
-                    // Stop observing once revealed (optional, keeps it cleaner)
-                    observer.unobserve(entry.target);
-                }
-            });
-        }, observerOptions);
-
-        document.querySelectorAll('.reveal-on-scroll').forEach((el) => {
-            observer.observe(el);
-        });
-    </script>
+  <script src="scripts/main.js"></script>
 </body>
 
 </html>
