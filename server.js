@@ -605,7 +605,10 @@ const server = http.createServer(async (req, res) => {
     'http://127.0.0.1:3000',
     'https://powerchoosers.com',
     'https://www.powerchoosers.com',
-    'https://power-choosers-crm-792458658491.us-central1.run.app'
+    'https://power-choosers-crm-792458658491.us-central1.run.app',
+    'https://nodalpoint.io',
+    'https://www.nodalpoint.io',
+    'https://nodal-point-network-792458658491.us-central1.run.app'
   ];
 
   if (allowedOrigins.includes(origin) || LOCAL_DEV_MODE) {
@@ -943,6 +946,16 @@ const server = http.createServer(async (req, res) => {
     // Only proceed if slug is not empty
     if (slug) {
       return await handlePostRoute(req, res, slug);
+    }
+  }
+
+  if (isProduction && !pathname.startsWith('/api/')) {
+    const uiBaseUrl = process.env.UI_BASE_URL;
+    if (uiBaseUrl) {
+      const target = new URL(req.url, uiBaseUrl);
+      res.writeHead(302, { Location: target.toString() });
+      res.end();
+      return;
     }
   }
 
