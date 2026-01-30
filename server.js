@@ -949,16 +949,6 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  if (isProduction && !pathname.startsWith('/api/')) {
-    const uiBaseUrl = process.env.UI_BASE_URL;
-    if (uiBaseUrl) {
-      const target = new URL(req.url, uiBaseUrl);
-      res.writeHead(302, { Location: target.toString() });
-      res.end();
-      return;
-    }
-  }
-
   // Default to index-legacy.html for root requests (public landing page)
   if (pathname === '/') {
     pathname = '/index-legacy.html';
