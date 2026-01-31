@@ -14,7 +14,13 @@ interface CompanyIconProps {
   className?: string
 }
 
-export function CompanyIcon({ logoUrl, domain, name, size = 32, className }: CompanyIconProps) {
+export function CompanyIcon({ 
+  logoUrl, 
+  domain, 
+  name, 
+  size = 32, 
+  className
+}: CompanyIconProps) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
   
@@ -40,7 +46,7 @@ export function CompanyIcon({ logoUrl, domain, name, size = 32, className }: Com
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         className={cn(
-          "rounded-2xl nodal-glass flex items-center justify-center text-zinc-400 border border-white/10 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.6)] shrink-0", 
+          "rounded-[14px] nodal-glass bg-zinc-900/80 flex items-center justify-center text-zinc-400 border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)] shrink-0", 
           className
         )}
         style={{ width: size, height: size }}
@@ -53,7 +59,10 @@ export function CompanyIcon({ logoUrl, domain, name, size = 32, className }: Com
 
   return (
     <div 
-      className={cn("relative shrink-0 overflow-hidden rounded-2xl nodal-glass border border-white/10 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.6)]", className)} 
+      className={cn(
+        "relative shrink-0 overflow-hidden nodal-glass bg-zinc-900/80 border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)] rounded-[14px]",
+        className
+      )} 
       style={{ width: size, height: size }}
       title={name}
     >
@@ -78,12 +87,14 @@ export function CompanyIcon({ logoUrl, domain, name, size = 32, className }: Com
           src={currentSrc}
           alt={`${name} logo`}
           fill
-          className="object-cover"
+          className="object-cover !rounded-[14px]"
           onError={handleError}
           onLoad={() => setIsLoaded(true)}
           unoptimized={currentSrc.includes('google.com')} // Don't re-optimize favicon service images
         />
       </motion.div>
+
+      <div className="absolute inset-0 pointer-events-none rounded-[14px] ring-1 ring-white/20" />
     </div>
   )
 }

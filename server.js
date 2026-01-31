@@ -1821,6 +1821,12 @@ async function handleApiTwilioOperatorWebhook(req, res) {
 // Start the server with error handling
 logger.debug('Starting server', 'Server', { port: PORT });
 console.log(`[Server] About to bind to port ${PORT}...`);
+
+// Set server timeouts to prevent socket hangups on long-running AI requests
+server.timeout = 300000; // 5 minutes
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000;
+
 try {
   server.listen(PORT, '0.0.0.0', () => {
     logger.info('Power Choosers CRM server running', 'Server', { port: PORT });

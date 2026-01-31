@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { User, onAuthStateChanged } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { supabase } from '@/lib/supabase'
@@ -64,13 +64,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   })
   const router = useRouter()
 
-  const titleize = (value: string) => {
+  const titleize = useCallback((value: string) => {
     const trimmed = value.trim()
     if (!trimmed) return ''
     return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase()
-  }
+  }, [])
 
-  const inferNameFromString = (value: string | null | undefined) => {
+  const inferNameFromString = useCallback((value: string | null | undefined) => {
     const raw = typeof value === 'string' ? value.trim() : ''
     if (!raw) return null
     const parts = raw.split(/\s+/).filter(Boolean)
@@ -79,9 +79,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const lastName = titleize(parts.slice(1).join(' '))
     const fullName = `${firstName} ${lastName}`.trim()
     return { firstName, lastName, fullName }
-  }
+  }, [titleize])
 
-  const inferNameFromEmail = (email: string) => {
+  const inferNameFromEmail = useCallback((email: string) => {
     const emailLower = String(email).toLowerCase().trim()
     const prefix = emailLower.split('@')[0] || ''
     const parts = prefix.split(/[._-]+/).filter(Boolean)
@@ -90,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const lastName = titleize(parts.slice(1).join(' '))
     const fullName = `${firstName} ${lastName}`.trim()
     return { firstName, lastName, fullName }
-  }
+  }, [titleize])
 
   const refreshProfile = async () => {
     const currentUser = user || auth.currentUser
@@ -384,7 +384,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (unsubscribeProfile) unsubscribeProfile()
       window.clearTimeout(timeoutId)
     }
-  }, [router])
+  }, [router, inferNameFromEmail, inferNameFromString])
 
   return (
     <AuthContext.Provider value={{ user, loading, role, profile, refreshProfile }}>

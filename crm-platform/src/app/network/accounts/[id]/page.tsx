@@ -156,7 +156,7 @@ export default function AccountDossierPage() {
       }
       triggerSave()
     }
-  }, [isEditing, id, editNotes, editAnnualUsage, editStrikePrice, editIndustry, editLocation, updateAccount])
+  }, [isEditing, id, editNotes, editAnnualUsage, editStrikePrice, editIndustry, editLocation, editLogoUrl, editDomain, editLinkedinUrl, updateAccount])
 
   const handleUpdate = async (updates: any) => {
     try {
@@ -252,7 +252,7 @@ export default function AccountDossierPage() {
     return (
       <div className="flex h-full items-center justify-center flex-col gap-4">
         <div className="font-mono text-zinc-500">ACCOUNT NOT FOUND</div>
-        <Button onClick={() => router.push('/network/accounts')}>Return to Grid</Button>
+        <Button onClick={() => router.back()}>Return to Grid</Button>
       </div>
     )
   }
@@ -268,7 +268,7 @@ export default function AccountDossierPage() {
            <div className="flex items-center justify-between gap-6">
              <div className="flex items-center gap-3">
               <button
-                onClick={() => router.push('/network/accounts')}
+                onClick={() => router.back()}
                 className="icon-button-forensic w-10 h-10 flex items-center justify-center -ml-2"
               >
                 <ArrowLeft className="w-5 h-5" />
@@ -283,8 +283,8 @@ export default function AccountDossierPage() {
                     name={account.name}
                     size={56}
                     className={cn(
-                      "w-14 h-14 rounded-2xl nodal-glass p-1 border border-white/10 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.6)] transition-all",
-                      isEditing && "cursor-pointer hover:border-[#002FA7]/50 hover:shadow-[0_0_20px_rgba(0,47,167,0.2)]"
+                      "w-14 h-14 transition-all",
+                      isEditing && "cursor-pointer hover:border-[#002FA7]/50 hover:shadow-[0_0_20px_rgba(0,47,167,0.3)]"
                     )}
                   />
                 </div>
@@ -839,7 +839,7 @@ export default function AccountDossierPage() {
                       </div>
                     ) : (
                       <div className="p-8 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] flex flex-col items-center justify-center gap-3 group/empty">
-                        <div className="p-4 rounded-full bg-zinc-900/50 border border-white/5 group-hover/empty:border-[#002FA7]/30 transition-colors duration-500">
+                        <div className="p-4 rounded-2xl bg-zinc-900/50 border border-white/5 group-hover/empty:border-[#002FA7]/30 transition-colors duration-500">
                           <Phone className="w-6 h-6 text-[#002FA7]" />
                     </div>
                         <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-[0.3em]">No signals detected</p>

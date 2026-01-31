@@ -18,7 +18,7 @@ export function GlobalSync() {
 
       return () => clearTimeout(timer)
     }
-  }, [user, syncGmail]) // Removed isSyncing from dependencies to only run once on mount/login
+  }, [user, syncGmail, isSyncing])
 
   // Background interval sync (every 5 minutes)
   useEffect(() => {

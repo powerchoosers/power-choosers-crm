@@ -10,7 +10,6 @@ import { useSearchCalls } from '@/hooks/useCalls'
 import { useSearchEmails } from '@/hooks/useEmails'
 import { useSearchTargets } from '@/hooks/useTargets'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 
@@ -194,7 +193,7 @@ export function GlobalSearch() {
                             <ContactAvatar 
                                 name={contact.name} 
                                 size={32} 
-                                className="w-8 h-8 rounded-lg"
+                                className="w-8 h-8 transition-all"
                             />
                             <div className="min-w-0 flex-1">
                                 <div className="text-sm font-medium text-zinc-200 group-hover:text-white truncate">{contact.name}</div>
@@ -225,7 +224,7 @@ export function GlobalSearch() {
                                 domain={account.domain}
                                 name={account.name}
                                 size={32}
-                                className="w-8 h-8 rounded-lg shadow-[0_4px_12px_-2px_rgba(0,0,0,0.6)]"
+                                className="w-8 h-8"
                             />
                             <div className="min-w-0 flex-1">
                                 <div className="text-sm font-medium text-zinc-200 group-hover:text-white truncate">{account.name}</div>
@@ -251,7 +250,7 @@ export function GlobalSearch() {
                             onClick={() => handleSelect(target.id, 'target')}
                             className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors text-left group"
                             >
-                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
+                            <div className="w-8 h-8 rounded-2xl bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
                                 <Radar size={14} />
                             </div>
                             <div className="min-w-0 flex-1">
@@ -278,7 +277,7 @@ export function GlobalSearch() {
                             onClick={() => handleSelect(protocol.id, 'protocol')}
                             className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors text-left group"
                             >
-                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
+                            <div className="w-8 h-8 rounded-2xl bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
                                 <GitMerge size={14} />
                             </div>
                             <div className="min-w-0 flex-1">
@@ -305,7 +304,7 @@ export function GlobalSearch() {
                             onClick={() => handleSelect(task.id, 'task')}
                             className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors text-left group"
                             >
-                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
+                            <div className="w-8 h-8 rounded-2xl bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
                                 <CheckCircle2 size={14} />
                             </div>
                             <div className="min-w-0 flex-1">
@@ -332,7 +331,7 @@ export function GlobalSearch() {
                             onClick={() => handleSelect(call.id, 'call')}
                             className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors text-left group"
                             >
-                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
+                            <div className="w-8 h-8 rounded-2xl bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
                                 <Phone size={14} />
                             </div>
                             <div className="min-w-0 flex-1">
@@ -344,7 +343,7 @@ export function GlobalSearch() {
                         </div>
                     </div>
                     )}
-
+                    
                     {/* Emails Section */}
                     {filteredEmails.length > 0 && (
                     <div className="mb-2">
@@ -359,7 +358,7 @@ export function GlobalSearch() {
                             onClick={() => handleSelect(email.id, 'email')}
                             className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors text-left group"
                             >
-                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
+                            <div className="w-8 h-8 rounded-2xl bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
                                 <Mail size={14} />
                             </div>
                             <div className="min-w-0 flex-1">

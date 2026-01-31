@@ -22,7 +22,7 @@ export function RecentAlerts() {
           <h3 className="text-lg font-medium text-white tracking-tight">System Alerts</h3>
           <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono">Real-time Telemetry</p>
         </div>
-        <div className="h-8 w-8 rounded-full bg-zinc-900/50 border border-white/5 flex items-center justify-center">
+        <div className="h-8 w-8 rounded-2xl bg-zinc-900/50 border border-white/5 flex items-center justify-center">
           <Bell className="w-4 h-4 text-zinc-400" />
         </div>
       </div>

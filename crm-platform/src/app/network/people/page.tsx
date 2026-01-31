@@ -231,11 +231,12 @@ export default function PeoplePage() {
             <Link 
               href={`/network/contacts/${contact.id}`}
               className="flex items-center gap-3 group/person"
+              onClick={(e) => e.stopPropagation()}
             >
               <ContactAvatar 
                 name={contact.name} 
                 size={36} 
-                className="w-9 h-9 rounded-2xl"
+                className="w-9 h-9 transition-all"
               />
               <div>
                 <div className="font-medium text-zinc-200 group-hover/person:text-white group-hover/person:scale-[1.02] transition-all origin-left">
@@ -257,13 +258,14 @@ export default function PeoplePage() {
             <Link 
               href={`/network/accounts/${contact.accountId}`}
               className="flex items-center gap-2 group/acc"
+              onClick={(e) => e.stopPropagation()}
             >
               <CompanyIcon
                 logoUrl={contact.logoUrl}
                 domain={contact.companyDomain}
                 name={companyName}
                 size={36}
-                className="w-9 h-9 rounded-2xl nodal-glass p-1 border border-white/10 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.6)] transition-all"
+                className="w-9 h-9 transition-all"
               />
               <span className="text-zinc-400 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left">
                 {companyName}
@@ -513,7 +515,13 @@ export default function PeoplePage() {
                             ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10" 
                             : "hover:bg-white/[0.02]"
                         )}
-                        onClick={() => router.push(`/network/contacts/${row.original.id}`)}
+                        onClick={(e) => {
+                          // Don't trigger row click if clicking a link or button
+                          if ((e.target as HTMLElement).closest('a') || (e.target as HTMLElement).closest('button')) {
+                            return;
+                          }
+                          router.push(`/network/contacts/${row.original.id}`)
+                        }}
                       >
                         {row.getVisibleCells().map((cell) => (
                           <TableCell key={cell.id} className="py-3">
