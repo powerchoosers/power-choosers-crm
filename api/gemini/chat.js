@@ -966,9 +966,9 @@ export default async function handler(req, res) {
 
       console.log(`[AI Router] Calling OpenRouter with model: ${model}`);
 
-      // Loop for tool calls (max 5 turns)
+      // Loop for tool calls (max 10 turns)
       let turnCount = 0;
-      const MAX_TURNS = 5;
+      const MAX_TURNS = 10;
 
       while (turnCount < MAX_TURNS) {
         turnCount++;
@@ -1046,6 +1046,7 @@ export default async function handler(req, res) {
             currentMessages.push({
               role: 'tool',
               tool_call_id: toolCall.id,
+              name: functionName,
               content: JSON.stringify(result) // OpenAI expects string content for tool messages
             });
           }
@@ -1059,13 +1060,16 @@ export default async function handler(req, res) {
       throw new Error('Max tool recursion depth reached');
     };
 
-    const callPerplexity = async (modelName) => {
+    const callPerplexity = async (modelName, diagnostics = []) => {
       if (!perplexityApiKey) {
         throw new Error('Perplexity API key not configured');
       }
 
       const model = modelName || perplexityModel;
       
+      const lastFailure = diagnostics.findLast(d => d.status === 'failed');
+      const failureContext = lastFailure ? `(Reason: Previous attempt with ${lastFailure.model} failed: ${lastFailure.error})` : '';
+
       // Perplexity is extremely strict: must alternate User/Assistant and NO tool messages
       // AND must start with a User message
       const normalized = [];
@@ -1094,11 +1098,11 @@ export default async function handler(req, res) {
       const perplexitySystemPrompt = `
         ${buildSystemPrompt().trim()}
         
-        CRITICAL_NOTICE: You are currently running in SEARCH_ONLY mode via Perplexity. 
+        CRITICAL_NOTICE: You are currently running in SEARCH_ONLY mode via Perplexity because the primary CRM model failed ${failureContext}. 
         You DO NOT have direct access to the CRM database tools (list_accounts, list_contacts, etc.) in this session.
         Do NOT attempt to use them or tell the user you have access to them.
         Instead, provide the best answer possible using your internal knowledge and web search.
-        If the user asks for CRM data, apologize and suggest they switch to a Gemini model for database access.
+        If the user asks for CRM data, explain that the primary model encountered an error and suggest they retry their request in a few moments or switch to a different Gemini model.
       `.trim();
 
       const perplexityMessages = [
@@ -1265,7 +1269,7 @@ export default async function handler(req, res) {
     }
 
     if (!geminiApiKey) {
-      const content = await callPerplexity();
+      const content = await callPerplexity(null, routingDiagnostics);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ content, provider: 'perplexity', model: perplexityModel, diagnostics: routingDiagnostics }));
       return;
@@ -1492,7 +1496,7 @@ export default async function handler(req, res) {
         reason: 'gemini_exhausted'
       });
       console.log('[Gemini Chat] Falling back to Perplexity...');
-      const content = await callPerplexity();
+      const content = await callPerplexity(null, routingDiagnostics);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         content, 
