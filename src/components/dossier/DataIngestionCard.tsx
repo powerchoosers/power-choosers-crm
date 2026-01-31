@@ -285,7 +285,7 @@ export default function DataIngestionCard({ accountId }: DataIngestionCardProps)
         {/* DROP ZONE OVERLAY (Only visible when dragging) */}
         {isDragging && (
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950/90 backdrop-blur-sm pointer-events-none">
-            <div className="w-16 h-16 rounded-full bg-[#002FA7]/20 flex items-center justify-center mb-4 animate-bounce">
+            <div className="w-16 h-16 rounded-2xl bg-[#002FA7]/20 flex items-center justify-center mb-4 animate-bounce">
               <UploadCloud className="w-8 h-8 text-[#002FA7]" />
             </div>
             <p className="text-[#002FA7] font-mono text-sm tracking-widest">RELEASE TO INGEST</p>

@@ -1,8 +1,7 @@
 'use client'
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Radar, GitMerge, Sparkles, Trash2, X, ChevronRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Radar, GitMerge, Sparkles, Trash2, X } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
 interface BulkActionDeckProps {
@@ -90,7 +89,7 @@ export default function BulkActionDeck({ selectedCount, totalAvailable, onClear,
           <div className="flex items-center gap-2">
             <ActionButton icon={<Radar className="w-4 h-4" />} label="ADD_TO_TARGET" onClick={() => onAction('list')} />
             <ActionButton icon={<GitMerge className="w-4 h-4" />} label="INITIATE_PROTOCOL" onClick={() => onAction('sequence')} />
-            <ActionButton icon={<Sparkles className="w-4 h-4" />} label="ENRICH_DATA" onClick={() => onAction('enrich')} isAi />
+            <ActionButton icon={<Sparkles className="w-4 h-4" />} label="ENRICH_DATA" onClick={() => onAction('enrich')} />
           </div>
 
           {/* 3. THE NUCLEAR OPTION */}
@@ -112,7 +111,7 @@ export default function BulkActionDeck({ selectedCount, totalAvailable, onClear,
   );
 }
 
-function ActionButton({ icon, label, onClick, isAi }: { icon: React.ReactNode, label: string, onClick: () => void, isAi?: boolean }) {
+function ActionButton({ icon, label, onClick }: { icon: React.ReactNode, label: string, onClick: () => void }) {
   return (
     <button 
       onClick={onClick}

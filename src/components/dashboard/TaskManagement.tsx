@@ -125,7 +125,7 @@ export function TaskManagement() {
         <div className="flex items-center gap-2">
           <div className="flex -space-x-1">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="w-4 h-4 rounded-full bg-zinc-800 border border-zinc-950 flex items-center justify-center text-[8px] font-bold text-zinc-500">
+              <div key={i} className="w-4 h-4 rounded-2xl bg-zinc-800 border border-zinc-950 flex items-center justify-center text-[8px] font-bold text-zinc-500">
                 {String.fromCharCode(64 + i)}
               </div>
             ))}
