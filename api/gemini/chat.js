@@ -1015,7 +1015,13 @@ export default async function handler(req, res) {
 
           for (const toolCall of message.tool_calls) {
             const functionName = toolCall.function.name;
-            const functionArgs = JSON.parse(toolCall.function.arguments);
+            let functionArgs = {};
+            try {
+              functionArgs = JSON.parse(toolCall.function.arguments);
+            } catch (e) {
+              console.warn(`[OpenRouter Tool] Failed to parse arguments for ${functionName}:`, toolCall.function.arguments);
+              // Fallback for some models that might send malformed JSON
+            }
             
             console.log(`[OpenRouter Tool] Executing ${functionName} with args:`, functionArgs);
             
@@ -1025,6 +1031,8 @@ export default async function handler(req, res) {
             if (handler) {
               try {
                 result = await handler(functionArgs);
+                // Ensure result is not undefined/null before stringifying
+                if (result === undefined) result = null;
                 console.log(`[OpenRouter Tool] ${functionName} returned ${Array.isArray(result) ? result.length : '1'} results`);
               } catch (error) {
                 console.error(`[OpenRouter Tool] Error in ${functionName}:`, error);
