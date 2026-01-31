@@ -225,7 +225,7 @@ export function TopBar() {
   return (
     // Updated positioning: constrained to match main content area
     <header className="fixed top-0 left-[70px] right-0 lg:right-80 z-40 flex items-start justify-center p-6 pointer-events-none nodal-glass !border-none !shadow-none">
-      <div className="w-full max-w-5xl flex items-center gap-4 pointer-events-auto">
+      <div className="w-full max-w-[1200px] 2xl:max-w-[1400px] flex items-center gap-4 pointer-events-auto">
           {/* Left Side: Search or Active Call */}
           <motion.div 
               className="flex-1 min-w-0"
@@ -250,9 +250,9 @@ export function TopBar() {
                         exit={{ opacity: 0, y: -20 }}
                         className="flex justify-center"
                     >
-                        <div className="w-full max-w-2xl h-[50px] nodal-glass border-signal/50 rounded-full shadow-[0_10px_30px_-10px_rgba(0,47,167,0.5)] flex items-center justify-between px-6">
+                        <div className="w-full max-w-2xl h-[50px] nodal-glass border-signal/50 rounded-2xl shadow-[0_10px_30px_-10px_rgba(0,47,167,0.5)] flex items-center justify-between px-6">
                             <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center border border-white/5 overflow-hidden">
+                                <div className="w-8 h-8 rounded-2xl bg-zinc-800 flex items-center justify-center border border-white/5 overflow-hidden">
                                     {displayMetadata?.logoUrl ? (
                                         <Image 
                                             src={displayMetadata.logoUrl} 

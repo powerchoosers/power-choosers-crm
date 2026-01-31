@@ -74,6 +74,20 @@
   - [x] **Nodal Aesthetic**: Applied build.md design principles (Monolith borders, International Klein Blue accents, Monospaced data).
   - [x] **Gemini Chat Enhancement**: Converted "Reset Session" to "Add Chat" (+) button with global state synchronization and added access to History and New Chat in both chat header and TopBar.
 
+### Editable Fields & UI Standardization
+- **Status**: Completed
+- **Description**: Implemented interactive editable fields on Dossier pages and standardized identity iconography across the platform.
+- **Actions**:
+  - [x] **Editable Dossier Fields**:
+    - [x] Added padlock-triggered editing for Logo URL, Website, and LinkedIn fields on Account and Contact Dossiers.
+    - [x] Implemented "Obsidian & Glass" slide-open input containers with Framer Motion animations.
+    - [x] Integrated CRM persistence via Supabase mutations (`useUpdateAccount`, `useUpdateContact`).
+  - [x] **Icon Standardization**:
+    - [x] Standardized all contact letter glyphs and company icons to `rounded-2xl` (Squircle) across Accounts, People, Target ID, and Global Search pages.
+    - [x] **Hardcoded Consistency**: Removed `variant` prop from `CompanyIcon` and `ContactAvatar` components, hardcoding `rounded-2xl` to prevent accidental circle overrides.
+    - [x] **Deep Audit**: Identified and replaced hardcoded `rounded-full` instances with `rounded-2xl` in `GeminiChat`, `EmailList`, `SatelliteUplink`, `BulkImportModal`, `OrgIntelligence`, `DataIngestionCard`, `TaskManagement`, and all Dossier empty/error states.
+    - [x] Preserved `rounded-full` ONLY for decorative status indicators, signal dots, and pulsing animations per forensic aesthetic requirements.
+
 ### Emails Page & Integration
 - **Status**: Completed
 - **Description**: Migrated legacy email features (Inbox Sync, Composition, Tracking) to the new Next.js platform.
@@ -84,9 +98,24 @@
     - Created `useEmails.ts` with TanStack Query for real-time email list management (ported from `emails-redesigned.js`).
   - [x] **UI Implementation**:
     - Created `ComposeModal.tsx` for sending emails (replacing `email-compose-global.js`).
-    - Created `EmailList.tsx` with folder filtering (Inbox/Sent) and tracking stats display.
-    - Created main `EmailsPage` (`src/app/network/emails/page.tsx`) adhering to Nodal Point design standards.
-    - Created dedicated Detail Page (`src/app/network/emails/[id]/page.tsx`) for full-view reading and replying.
+    - [x] Created `EmailList.tsx` with folder filtering (Inbox/Sent) and tracking stats display.
+
+### Identity Styling & Forensic Iconography
+- **Status**: Completed
+- **Description**: Refined the visual identity system for logos and avatars to align with the "Forensic Instrument" aesthetic, specifically correcting drop shadow geometry and background consistency.
+- **Actions**:
+  - [x] **Drop Shadow Correction**:
+    - [x] Corrected `CompanyIcon` to use a high-position, high-opacity circular drop shadow (`shadow-[0_0_15px_rgba(0,0,0,0.8)]`) instead of the low-positioned offset shadow.
+    - [x] Increased border opacity to `white/20` for sharper edge definition in high-blur environments.
+  - [x] **Background Standardization**:
+    - [x] Integrated `bg-zinc-900/80` directly into the `CompanyIcon` component to ensure consistent backdrop density regardless of the parent container.
+    - [x] Removed legacy `p-1` padding from icon instances to maximize logo visibility and maintain a clean `nodal-glass` edge.
+  - [x] **Component Cleanup**:
+    - [x] Stripped hardcoded styling from `CompanyIcon` instances across `AccountsPage`, `AccountDossier`, `PeoplePage`, `GlobalSearch`, `TargetDetail`, and `OrgIntelligence`.
+    - [x] Centralized identity styling within the base UI components for sitewide design consistency.
+  - [x] **Email UI Implementation**:
+    - [x] Created main `EmailsPage` (`src/app/network/emails/page.tsx`) adhering to Nodal Point design standards.
+    - [x] Created dedicated Detail Page (`src/app/network/emails/[id]/page.tsx`) for full-view reading and replying.
   - [x] **Tracking**: Integrated Open/Click tracking stats display in the email list (leveraging existing backend tracking system).
   - [x] **Navigation**: Added "Emails" link to the Sidebar.
   - [x] **Sender Name**: Ensured outgoing emails use user's first/last name (Auth + Gmail service lookup) instead of email prefix.

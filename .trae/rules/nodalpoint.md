@@ -149,6 +149,7 @@ The platform uses **Firebase Authentication**.
     - Build modular components in `src/components/`.
     - Use React Query for data fetching.
     - Verify against the legacy behavior.
+4.  **Schema Parity**: When adding new fields to Account or Contact models for future edits, you **MUST** also update the field mapping schemas in `BulkImportModal.tsx` to ensure new data can be ingested via CSV.
 
 ## 🎨 Design Guidelines
 
@@ -195,9 +196,12 @@ The platform includes a native forensic dialer:
 
 - **AI Integration**: Use the "Sparkles" icon (`lucide-react/Sparkles`) for all AI-powered features.
 - **Contact Avatars**: **STRICT RULE**: Use letter glyphs (initials) instead of company logos for contact avatars.
-  - **Styles**: `rounded-2xl`, `nodal-glass`, `text-white/90`, `border-white/10`.
-  - **Shadows**: Must use `shadow-[0_2px_10px_-2px_rgba(0,0,0,0.6)]` to match container shape.
+  - **Styles**: `rounded-2xl` or `rounded-[14px]` (Squircle), `nodal-glass`, `text-white/90`, `border-white/20`, `shadow-[0_0_10px_rgba(0,0,0,0.5)]`.
+  - **Squircle Logic**: Use `rounded-[14px]` for small sizes (e.g., 36px) to avoid circular appearance; `rounded-2xl` for larger sizes.
+  - **Shadows**: Must use `shadow-[0_0_10px_rgba(0,0,0,0.5)]` to match container shape.
   - Applies to both `PeoplePage` table rows and the `ContactDossierPage` header.
+- **Company Icons**: Standardized to `rounded-2xl` or `rounded-[14px]` (Squircle) across Accounts, People, Target ID, and Global Search pages to match the forensic instrument aesthetic.
+  - **Shadows**: Must use `shadow-[0_0_10px_rgba(0,0,0,0.5)]` (Subtle Centered Glow).
 - **Layout**: Sidebar (Left), Top Bar (Header), Right Panel (Contextual Widgets).
 - **Animations**:
   - **Page Entry**: Public pages use a standard "Blur In" effect (`filter: blur(10px)` → `blur(0px)`) combined with opacity fade.

@@ -237,7 +237,7 @@ export default function AccountsPage() {
                   domain={account.domain}
                   name={account.name}
                   size={36}
-                  className="w-9 h-9 rounded-2xl nodal-glass p-1 border border-white/10 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.6)] transition-all"
+                  className="w-9 h-9 transition-all"
                 />
               </div>
               <div>

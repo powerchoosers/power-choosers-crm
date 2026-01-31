@@ -14,7 +14,7 @@ export function ForensicTableSkeleton({ columns, rows = 10, type = 'account' }: 
   return (
     <>
       {Array.from({ length: rows }).map((_, i) => (
-        <TableRow key={i} className="border-white/5 hover:bg-transparent">
+        <TableRow key={i} className="border-white/5 hover:bg-transparent" data-type={type}>
           {Array.from({ length: columns }).map((_, j) => (
             <TableCell key={j} className="py-4">
               {j === 0 ? (
@@ -25,7 +25,7 @@ export function ForensicTableSkeleton({ columns, rows = 10, type = 'account' }: 
                 <div className="flex items-center gap-3">
                   <Skeleton className={cn(
                     "h-9 w-9",
-                    type === 'people' ? "rounded-full" : "rounded-lg"
+                    "rounded-[14px]"
                   )} />
                   <div className="space-y-2">
                     <Skeleton className="h-4 w-32" />

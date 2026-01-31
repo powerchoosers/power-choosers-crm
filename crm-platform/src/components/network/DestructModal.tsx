@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 
 interface DestructModalProps {
   isOpen: boolean;

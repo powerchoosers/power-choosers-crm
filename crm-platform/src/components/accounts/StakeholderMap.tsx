@@ -34,12 +34,12 @@ export const StakeholderMap: React.FC<StakeholderMapProps> = ({ contacts = [], c
             <ContactAvatar 
               name={contact.name || ''} 
               size={32} 
-              className="w-8 h-8 rounded-lg"
+              className="w-8 h-8 rounded-2xl"
               textClassName="text-[10px]"
             />
             
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-medium text-zinc-300 group-hover:text-white truncate">
+              <div className="text-xs font-medium text-zinc-300 group-hover:text-white group-hover:scale-[1.02] transition-all origin-left truncate">
                 {contact.name}
               </div>
               <div className="text-[10px] text-zinc-600 group-hover:text-zinc-500 truncate font-mono">

@@ -426,7 +426,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         {/* STATE 1: IDLE */}
         {scanStatus === 'idle' && (
           <div className="h-full flex flex-col items-center justify-center py-8 px-4 text-center">
-            <div className="w-10 h-10 bg-zinc-800/30 rounded-full flex items-center justify-center mb-3 text-zinc-600 border border-white/5">
+            <div className="w-10 h-10 bg-zinc-800/30 rounded-2xl flex items-center justify-center mb-3 text-zinc-600 border border-white/5">
               <Lock className="w-4 h-4" />
             </div>
             <h4 className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 mb-1">Target_Locked</h4>
@@ -476,7 +476,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                       domain={companySummary.domain}
                       name={companySummary.name}
                       size={40}
-                      className="w-10 h-10 rounded-2xl nodal-glass p-1 border border-white/10 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.6)] transition-all"
+                      className="w-10 h-10 transition-all"
                     />
                     {companySummary.domain && (
                       <a 

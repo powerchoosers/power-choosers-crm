@@ -481,7 +481,7 @@ export default function SettingsPage() {
                <CardContent className="space-y-4">
                  <div className="flex items-center justify-between p-4 rounded-lg nodal-glass nodal-glass-hover">
                    <div className="flex items-center space-x-4">
-                     <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-500">
+                     <div className="w-10 h-10 rounded-2xl bg-orange-500/20 flex items-center justify-center text-orange-500">
                        <Database className="w-5 h-5" />
                      </div>
                      <div>
@@ -494,7 +494,7 @@ export default function SettingsPage() {
                  
                   <div className="flex items-center justify-between p-4 rounded-lg nodal-glass nodal-glass-hover">
                    <div className="flex items-center space-x-4">
-                     <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center text-red-500">
+                     <div className="w-10 h-10 rounded-2xl bg-red-500/20 flex items-center justify-center text-red-500">
                        <Phone className="w-5 h-5" />
                      </div>
                      <div>
@@ -514,7 +514,7 @@ export default function SettingsPage() {
 
                  <div className="flex items-center justify-between p-4 rounded-lg bg-transparent border border-white/5">
                    <div className="flex items-center space-x-4">
-                     <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500">
+                     <div className="w-10 h-10 rounded-2xl bg-blue-500/20 flex items-center justify-center text-blue-500">
                        <Database className="w-5 h-5" />
                      </div>
                      <div>

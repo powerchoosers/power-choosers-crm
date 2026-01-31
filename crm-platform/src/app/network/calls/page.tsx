@@ -85,7 +85,7 @@ export default function CallsPage() {
         const call = row.original
         return (
           <div className="flex items-center gap-3 group/call cursor-pointer">
-             <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 border border-white/5 transition-all">
+             <div className="w-8 h-8 rounded-2xl bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 border border-white/5 transition-all">
                 {call.contactName === 'Unknown' ? '?' : call.contactName.split(' ').map(n => n[0]).join('').substring(0, 2)}
              </div>
              <div>

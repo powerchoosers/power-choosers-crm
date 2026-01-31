@@ -343,6 +343,8 @@ export function useCreateAccount() {
         domain: newAccount.domain,
         logo_url: newAccount.logoUrl,
         phone: newAccount.companyPhone,
+        linkedin_url: newAccount.linkedinUrl,
+        service_addresses: newAccount.serviceAddresses,
         contract_end_date: newAccount.contractEnd || null,
         employees: parseInt(newAccount.employees) || null,
         city: newAccount.location?.split(',')[0]?.trim(),

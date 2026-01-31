@@ -67,7 +67,7 @@ export default function SatelliteUplink({ address }: { address: string }) {
           <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-10 flex flex-col items-center justify-center">
             {/* The "Locked" State */}
             <div className="z-10 text-center">
-              <div className="mb-3 mx-auto w-12 h-12 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center text-zinc-500 group-hover:text-white group-hover:border-[#002FA7] transition-all">
+              <div className="mb-3 mx-auto w-12 h-12 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center text-zinc-500 group-hover:text-white group-hover:border-[#002FA7] transition-all">
                 <Satellite className="w-5 h-5" />
               </div>
               <button 

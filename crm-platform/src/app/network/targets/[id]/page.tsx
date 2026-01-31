@@ -22,6 +22,8 @@ import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
 import { useContacts, useContactsCount, Contact } from '@/hooks/useContacts'
 import { useAccounts, useAccountsCount, Account } from '@/hooks/useAccounts'
 import { useTarget } from '@/hooks/useTargets'
+import { useTableState } from '@/hooks/useTableState'
+import { useDebounce } from '@/hooks/useDebounce'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
@@ -53,25 +55,39 @@ const PAGE_SIZE = 50
 export default function TargetDetailPage() {
   const router = useRouter()
   const { id } = useParams() as { id: string }
-  const [globalFilter, setGlobalFilter] = useState('')
-  const [debouncedFilter, setDebouncedFilter] = useState('')
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [sorting, setSorting] = useState<SortingState>([])
-  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [isMounted, setIsMounted] = useState(false)
-  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: PAGE_SIZE })
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [globalFilter, setGlobalFilter] = useState('')
 
-  // Fetch target details
+  // Use state-preserving table state
+  const { 
+    pageIndex, 
+    pageSize, 
+    searchQuery, 
+    setPage, 
+    setSearch, 
+  } = useTableState({
+    pageSize: PAGE_SIZE
+  })
+
+  // Sync the local globalFilter state with the URL search query if needed
+  useEffect(() => {
+    if (searchQuery !== globalFilter) {
+      setGlobalFilter(searchQuery)
+    }
+  }, [searchQuery])
+
+  // Sync the search back to the URL search query
+  const debouncedSearch = useDebounce(globalFilter, 300)
+  useEffect(() => {
+    setSearch(debouncedSearch)
+  }, [debouncedSearch, setSearch])
+
   const { data: target, isLoading: targetLoading } = useTarget(id)
 
-  // Debounce search query
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedFilter(globalFilter)
-    }, 400)
-    return () => clearTimeout(timer)
-  }, [globalFilter])
+  const isPeopleList = target?.kind === 'people'
+  const isAccountList = target?.kind === 'account' || target?.kind === 'accounts'
 
   const filters = useMemo(() => {
     return {
@@ -82,25 +98,41 @@ export default function TargetDetailPage() {
     };
   }, [columnFilters]);
 
-  // Conditional data fetching based on target kind
-  const isPeopleList = target?.kind === 'people'
-  const isAccountList = target?.kind === 'account'
+  const contactQuery = useContacts(
+    searchQuery, 
+    filters,
+    isPeopleList ? id : undefined, 
+    isPeopleList && !!target
+  )
+  const contactCount = useContactsCount(searchQuery, filters, isPeopleList ? id : undefined, isPeopleList && !!target)
   
-  const contactQuery = useContacts(debouncedFilter, filters, isPeopleList ? id : undefined, isPeopleList)
-  const contactCount = useContactsCount(debouncedFilter, filters, isPeopleList ? id : undefined, isPeopleList)
-  
-  const accountQuery = useAccounts(debouncedFilter, filters, isAccountList ? id : undefined, isAccountList)
-  const accountCount = useAccountsCount(debouncedFilter, filters, isAccountList ? id : undefined, isAccountList)
+  const accountQuery = useAccounts(
+    searchQuery, 
+    filters, 
+    isAccountList ? id : undefined, 
+    isAccountList && !!target
+  )
+  const accountCount = useAccountsCount(searchQuery, filters, isAccountList ? id : undefined, isAccountList && !!target)
 
+  const query = isPeopleList ? contactQuery : accountQuery
   const data = useMemo(() => {
     if (isPeopleList) return contactQuery.data?.pages.flatMap(page => page.contacts) || []
     if (isAccountList) return accountQuery.data?.pages.flatMap(page => page.accounts) || []
     return []
   }, [isPeopleList, isAccountList, contactQuery.data, accountQuery.data])
 
+  const totalRecords = (isPeopleList ? contactCount.data : isAccountList ? accountCount.data : 0) || 0
+  const pageCount = Math.ceil(totalRecords / pageSize)
+
+  // Fetch next page when table state changes
+  useEffect(() => {
+    if (pageIndex > 0 && query.hasNextPage && data.length < (pageIndex + 1) * pageSize) {
+      query.fetchNextPage()
+    }
+  }, [pageIndex, query.hasNextPage, query.fetchNextPage, data.length, pageSize])
+
   const isLoading = targetLoading || (isPeopleList ? contactQuery.isLoading : isAccountList ? accountQuery.isLoading : false) || !isMounted
   const isError = isPeopleList ? contactQuery.isError : isAccountList ? accountQuery.isError : false
-  const totalRecords = (isPeopleList ? contactCount.data : isAccountList ? accountCount.data : 0) || 0
 
   useEffect(() => {
     setIsMounted(true)
@@ -116,7 +148,7 @@ export default function TargetDetailPage() {
       if (value === undefined) return prev
       return [...prev, { id: columnId, value }]
     })
-    setPagination(p => ({ ...p, pageIndex: 0 }))
+    setPage(0)
   }
 
   // Column definitions for People
@@ -137,7 +169,7 @@ export default function TargetDetailPage() {
         </div>
       ),
       cell: ({ row }) => {
-        const index = row.index + 1 + pagination.pageIndex * PAGE_SIZE
+        const index = row.index + 1 + pageIndex * pageSize
         const isSelected = row.getIsSelected()
         return (
           <div className="flex items-center justify-center px-2 relative group/select">
@@ -171,20 +203,24 @@ export default function TargetDetailPage() {
       cell: ({ row }) => {
         const contact = row.original
         return (
-          <div className="flex items-center gap-3 group/person whitespace-nowrap">
+          <Link 
+            href={`/network/contacts/${contact.id}`}
+            className="flex items-center gap-3 group/person whitespace-nowrap"
+            onClick={(e) => e.stopPropagation()}
+          >
             <ContactAvatar 
-              name={contact.name} 
-              size={36} 
-              className="w-9 h-9 rounded-lg"
-              textClassName="text-[10px]"
-            />
+                name={contact.name} 
+                size={36} 
+                className="w-9 h-9 transition-all"
+                textClassName="text-[10px]"
+              />
             <div>
-              <div className="font-medium text-zinc-200 group-hover/person:text-white transition-all origin-left">
+              <div className="font-medium text-zinc-200 group-hover/person:text-white group-hover/person:scale-[1.02] transition-all origin-left">
                 {contact.name}
               </div>
               <div className="text-xs text-zinc-500 font-mono tracking-tight">{contact.email}</div>
             </div>
-          </div>
+          </Link>
         )
       }
     },
@@ -200,16 +236,22 @@ export default function TargetDetailPage() {
       cell: ({ row }) => {
         const contact = row.original
         return (
-          <div className="flex items-center gap-2 whitespace-nowrap">
+          <Link 
+            href={`/network/accounts/${contact.accountId}`}
+            className="flex items-center gap-2 group/acc whitespace-nowrap"
+            onClick={(e) => e.stopPropagation()}
+          >
             <CompanyIcon
               logoUrl={contact.logoUrl}
               domain={contact.companyDomain}
               name={contact.company}
               size={36}
-              className="w-8 h-8 rounded-2xl nodal-glass p-1 border border-white/10 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.6)]"
+              className="w-8 h-8"
             />
-            <span className="text-zinc-400">{contact.company}</span>
-          </div>
+            <span className="text-zinc-400 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left">
+              {contact.company}
+            </span>
+          </Link>
         )
       }
     },
@@ -270,7 +312,7 @@ export default function TargetDetailPage() {
         )
       }
     }
-  ], [pagination.pageIndex])
+  ], [pageIndex, pageSize])
 
   // Column definitions for Accounts
   const accountColumns = useMemo<ColumnDef<Account>[]>(() => [
@@ -290,7 +332,7 @@ export default function TargetDetailPage() {
         </div>
       ),
       cell: ({ row }) => {
-        const index = row.index + 1 + pagination.pageIndex * PAGE_SIZE
+        const index = row.index + 1 + pageIndex * pageSize
         const isSelected = row.getIsSelected()
         return (
           <div className="flex items-center justify-center px-2 relative group/select">
@@ -324,21 +366,25 @@ export default function TargetDetailPage() {
       cell: ({ row }) => {
         const account = row.original
         return (
-          <div className="flex items-center gap-3 group/acc whitespace-nowrap">
+          <Link 
+            href={`/network/accounts/${account.id}`}
+            className="flex items-center gap-3 group/acc whitespace-nowrap"
+            onClick={(e) => e.stopPropagation()}
+          >
             <CompanyIcon
               logoUrl={account.logoUrl}
               domain={account.domain}
               name={account.name}
               size={36}
-              className="w-9 h-9 rounded-2xl nodal-glass p-1 border border-white/10 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.6)]"
+              className="w-9 h-9"
             />
             <div>
-              <div className="font-medium text-zinc-200 group-hover/acc:text-white transition-all origin-left">
+              <div className="font-medium text-zinc-200 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left">
                 {account.name}
               </div>
               {account.domain && <div className="text-[10px] font-mono text-zinc-500 uppercase">{account.domain}</div>}
             </div>
-          </div>
+          </Link>
         )
       }
     },
@@ -402,35 +448,38 @@ export default function TargetDetailPage() {
         )
       }
     }
-  ], [pagination.pageIndex])
+  ], [pageIndex, pageSize, router])
 
   const tableColumns = useMemo(() => isPeopleList ? peopleColumns : accountColumns, [isPeopleList, peopleColumns, accountColumns])
 
   const table = useReactTable({
     data,
     columns: tableColumns as ColumnDef<any>[],
+    state: {
+      pagination: {
+        pageIndex,
+        pageSize
+      },
+    },
+    onPaginationChange: (updater) => {
+      if (typeof updater === 'function') {
+        const newState = updater({ pageIndex, pageSize })
+        setPage(newState.pageIndex)
+      }
+    },
+    manualPagination: false,
+    pageCount,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    onSortingChange: setSorting,
-    getSortedRowModel: getSortedRowModel(),
-    onColumnFiltersChange: setColumnFilters,
-    getFilteredRowModel: getFilteredRowModel(),
-    onGlobalFilterChange: setGlobalFilter,
-    onPaginationChange: setPagination,
-    onRowSelectionChange: setRowSelection,
-    autoResetPageIndex: false,
-    manualPagination: true,
-    manualFiltering: true,
-    manualSorting: true,
-    pageCount: Math.ceil(totalRecords / PAGE_SIZE),
-    state: useMemo(() => ({
-      sorting,
-      columnFilters,
-      globalFilter,
-      pagination,
-      rowSelection,
-    }), [sorting, columnFilters, globalFilter, pagination, rowSelection]),
   })
+
+  const filteredRowCount = totalRecords || data.length
+  const showingStart = filteredRowCount === 0
+    ? 0
+    : Math.min(filteredRowCount, pageIndex * pageSize + 1)
+  const showingEnd = filteredRowCount === 0
+    ? 0
+    : Math.min(filteredRowCount, (pageIndex + 1) * pageSize)
 
   if (isError) {
     return (
@@ -463,7 +512,7 @@ export default function TargetDetailPage() {
         globalFilter={globalFilter}
         onSearchChange={(value) => {
           setGlobalFilter(value)
-          setPagination((p) => ({ ...p, pageIndex: 0 }))
+          setPage(0)
         }}
         onFilterToggle={() => setIsFilterOpen(!isFilterOpen)}
         isFilterActive={isFilterOpen || columnFilters.length > 0}
@@ -506,7 +555,13 @@ export default function TargetDetailPage() {
                 table.getRowModel().rows.map((row) => (
                   <tr
                     key={row.id}
-                    onClick={() => router.push(`/network/${isPeopleList ? 'contacts' : 'accounts'}/${row.original.id}`)}
+                    onClick={(e) => {
+                      // Don't trigger row click if clicking a link or button
+                      if ((e.target as HTMLElement).closest('a') || (e.target as HTMLElement).closest('button')) {
+                        return;
+                      }
+                      router.push(`/network/${isPeopleList ? 'contacts' : 'accounts'}/${row.original.id}`)
+                    }}
                     className="border-b border-white/5 hover:bg-white/5 transition-colors group cursor-pointer"
                   >
                     {row.getVisibleCells().map((cell) => (
@@ -534,26 +589,26 @@ export default function TargetDetailPage() {
         <div className="flex-none border-t border-white/5 bg-zinc-900/90 p-4 flex items-center justify-between backdrop-blur-sm z-10">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
-              <span>Sync_Block {(pagination.pageIndex * PAGE_SIZE + 1).toString().padStart(2, '0')}–{(pagination.pageIndex * PAGE_SIZE + data.length).toString().padStart(2, '0')}</span>
+              <span>Sync_Block {showingStart.toString().padStart(2, '0')}–{showingEnd.toString().padStart(2, '0')}</span>
               <div className="h-1 w-1 rounded-full bg-zinc-800" />
               <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{totalRecords || data.length}</span></span>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setPagination(prev => ({ ...prev, pageIndex: Math.max(0, prev.pageIndex - 1) }))}
-              disabled={pagination.pageIndex === 0}
+              onClick={() => setPage(Math.max(0, pageIndex - 1))}
+              disabled={pageIndex === 0}
               className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
               title="Previous Page"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
             <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
-              {(pagination.pageIndex + 1).toString().padStart(2, '0')}
+              {(pageIndex + 1).toString().padStart(2, '0')}
             </div>
             <button
-              onClick={() => setPagination(prev => ({ ...prev, pageIndex: prev.pageIndex + 1 }))}
-              disabled={(pagination.pageIndex + 1) * PAGE_SIZE >= totalRecords}
+              onClick={() => setPage(pageIndex + 1)}
+              disabled={(pageIndex + 1) * pageSize >= totalRecords}
               className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
               title="Next Page"
             >

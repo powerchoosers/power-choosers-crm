@@ -28,6 +28,7 @@ The legacy dashboard file `c:\Users\Lap3p\OneDrive\Documents\Power Choosers CRM\
 **CRITICAL**: Follow all standards defined in `c:\Users\Lap3p\OneDrive\Documents\Power Choosers CRM\.trae\rules\nodalpoint.md`. This includes:
 - **Tech Stack**: Next.js 15, Tailwind, Zustand, TanStack Query, Supabase.
 - **Design System**: Obsidian & Glass aesthetic, Forensic Instrument feel.
+- **Iconography**: Strict **Squircle** aesthetic (`rounded-2xl`). For small icons (≤36px), use `rounded-[14px]` to prevent them from appearing circular.
 - **Typography**: `font-mono tabular-nums` for data; `font-sans` for public pages.
 - **UI Patterns**: Sticky headers, Sync_Block footers, LED status indicators.
 
@@ -47,6 +48,13 @@ The legacy dashboard file `c:\Users\Lap3p\OneDrive\Documents\Power Choosers CRM\
 3.  **Component Modularity**: Break monolithic scripts into small, reusable React components.
 4.  **Route Gating**: Protect all platform pages with `AuthContext` and Middleware.
 5.  **Forensic Aesthetic**: Prioritize `font-mono tabular-nums` for all numeric and ID fields.
+6.  **Squircle Enforcement**: Never use `rounded-full` for contact or company icons. Always verify that small icons (36px) use `rounded-[14px]` to maintain the squircle shape.
+7.  **Schema Extensions**: When adding new fields to Accounts or Contacts for future edits, you **MUST** also add these fields to the `BulkImportModal.tsx` mapping schemas to maintain ingestion parity.
+
+## 🧹 Maintenance & Cache
+1.  **Clearing .next Cache**: If the `.next` cache is suspected to be full or causing issues, clear the file contents rather than deleting the directory:
+    -   **Command**: `Get-ChildItem -Path .next -Recurse -File | Clear-Content` (Run from `crm-platform/`)
+    -   *Rationale*: This preserves the directory structure while freeing up space and resetting the cache state.
 
 ## 🧪 Verification
 - **Compare**: Open Legacy (`/crm-dashboard.html`) and New Platform side-by-side.

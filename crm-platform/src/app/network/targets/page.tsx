@@ -26,7 +26,7 @@ function TargetSkeleton() {
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-10">
       {Array.from({ length: 8 }).map((_, i) => (
         <div key={i} className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 flex flex-col justify-between h-44 animate-pulse">
-          <Skeleton className="h-10 w-10 rounded-lg" />
+          <Skeleton className="h-10 w-10 rounded-2xl" />
           <div className="space-y-3">
             <Skeleton className="h-5 w-3/4" />
             <div className="space-y-2">
@@ -201,7 +201,7 @@ export default function TargetOverviewPage() {
                     >
                       {/* Card Header */}
                       <div className="flex justify-between items-start">
-                        <div className="p-2.5 rounded-lg bg-black/40 border border-white/5 text-white">
+                        <div className="p-2.5 rounded-2xl bg-black/40 border border-white/5 text-white">
                           <Radar className="w-5 h-5" />
                         </div>
                         <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
@@ -241,7 +241,7 @@ export default function TargetOverviewPage() {
 
               {/* Add New Target Card */}
               <button className="border border-dashed border-zinc-800 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 text-zinc-600 hover:text-zinc-400 hover:border-zinc-700 hover:bg-white/[0.02] transition-all h-44">
-                <div className="w-10 h-10 rounded-xl bg-zinc-900 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-2xl bg-zinc-900 flex items-center justify-center">
                   <Plus className="w-5 h-5" />
                 </div>
                 <span className="text-[10px] font-mono uppercase tracking-widest">Initialize_New_Target</span>

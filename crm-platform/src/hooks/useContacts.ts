@@ -19,6 +19,9 @@ export interface Contact {
   industry?: string
   location?: string
   avatarUrl?: string
+  mobile?: string
+  workPhone?: string
+  otherPhone?: string
   metadata?: any
 }
 
@@ -277,9 +280,8 @@ export function useSearchContacts(queryTerm: string) {
           query = query.eq('ownerId', user.email);
         }
 
-        // Search across multiple columns - more conservative list to avoid invalid column errors
-        // name and email are standard. firstName/lastName are used in ordering so they should exist.
-        query = query.or(`name.ilike.%${queryTerm}%,email.ilike.%${queryTerm}%,firstName.ilike.%${queryTerm}%,lastName.ilike.%${queryTerm}%`);
+        // Search across multiple columns
+        query = query.or(`name.ilike.%${queryTerm}%,email.ilike.%${queryTerm}%,firstName.ilike.%${queryTerm}%,lastName.ilike.%${queryTerm}%,phone.ilike.%${queryTerm}%,mobile.ilike.%${queryTerm}%,workPhone.ilike.%${queryTerm}%,otherPhone.ilike.%${queryTerm}%`);
 
         const { data, error } = await query.limit(10);
 
@@ -290,7 +292,6 @@ export function useSearchContacts(queryTerm: string) {
 
         return (data as ContactRow[]).map(item => {
           const account = Array.isArray(item.accounts) ? item.accounts[0] : item.accounts;
-          const metadata = normalizeMetadata(item.metadata);
           
           const fName = item.firstName || item.first_name || item.firstname || item.FirstName;
           const lName = item.lastName || item.last_name || item.lastname || item.LastName;
@@ -362,7 +363,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
         }
 
         if (searchQuery) {
-          query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,firstName.ilike.%${searchQuery}%,lastName.ilike.%${searchQuery}%`);
+          query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,firstName.ilike.%${searchQuery}%,lastName.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%,mobile.ilike.%${searchQuery}%,workPhone.ilike.%${searchQuery}%,otherPhone.ilike.%${searchQuery}%`);
         }
 
         // Apply column filters
@@ -449,6 +450,9 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
             lastName: lName as string,
             email: item.email || metadata?.email || metadata?.general?.email || metadata?.contact?.email || '',
             phone: item.phone || item.mobile || item.workPhone || item.otherPhone || metadata?.mobile || metadata?.workDirectPhone || metadata?.otherPhone || metadata?.general?.phone || metadata?.contact?.phone || '',
+            mobile: item.mobile || metadata?.mobile || '',
+            workPhone: item.workPhone || metadata?.workDirectPhone || '',
+            otherPhone: item.otherPhone || metadata?.otherPhone || '',
             address: getFirstServiceAddressAddress(account?.service_addresses) || metadata?.address || '',
             company: account?.name || metadata?.company || metadata?.general?.company || '',
             companyDomain: account?.domain || metadata?.domain || metadata?.general?.domain || '',
@@ -492,7 +496,12 @@ export function useContactsCount(searchQuery?: string, filters?: ContactFilters,
       if (!user) return 0
 
       // For count with filters on joined tables, we need to select something from the joined table
-      let query = supabase.from('contacts').select('id, accounts!inner(industry, city, state)', { count: 'exact', head: true })
+      // but only if industry or location filters are present.
+      const needsAccountJoin = (filters?.industry && filters.industry.length > 0) || (filters?.location && filters.location.length > 0);
+      
+      let query = needsAccountJoin 
+        ? supabase.from('contacts').select('id, accounts!inner(industry, city, state)', { count: 'exact', head: true })
+        : supabase.from('contacts').select('id', { count: 'exact', head: true });
 
       if (listId) {
         // Fetch targetIds from list_members first
@@ -518,7 +527,7 @@ export function useContactsCount(searchQuery?: string, filters?: ContactFilters,
       }
 
       if (searchQuery) {
-        query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,firstName.ilike.%${searchQuery}%,lastName.ilike.%${searchQuery}%`);
+        query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,firstName.ilike.%${searchQuery}%,lastName.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%,mobile.ilike.%${searchQuery}%,workPhone.ilike.%${searchQuery}%,otherPhone.ilike.%${searchQuery}%`);
       }
 
       // Apply column filters
@@ -691,6 +700,9 @@ export function useCreateContact() {
         name: newContact.name,
         email: newContact.email,
         phone: newContact.phone,
+        mobile: newContact.mobile,
+        workPhone: newContact.workPhone,
+        otherPhone: newContact.otherPhone,
         status: newContact.status,
         accountId: newContact.accountId || null,
         metadata: {

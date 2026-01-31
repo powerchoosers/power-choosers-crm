@@ -39,7 +39,7 @@
 @layer utilities {
   /* The Nodal Glass Material */
   .nodal-glass {
-    @apply bg-zinc-950/40 border border-white/10 shadow-2xl;
+    @apply bg-zinc-950/40 border border-white/10;
     backdrop-filter: blur(24px) saturate(150%);
     -webkit-backdrop-filter: blur(24px) saturate(150%);
   }
@@ -189,6 +189,22 @@
 
   .chart-path.animate {
     stroke-dashoffset: 0;
+  }
+
+  /* FORENSIC SCROLLBARS */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px; /* Critical for horizontal scrolling */
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 47, 167, 0.5); /* Klein Blue on hover */
   }
 
   .glass-card {

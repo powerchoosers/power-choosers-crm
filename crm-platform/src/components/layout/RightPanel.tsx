@@ -8,7 +8,6 @@ import { format } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useContact } from '@/hooks/useContacts'
 import { useAccount } from '@/hooks/useAccounts'
-import { useUIStore } from '@/store/uiStore'
 
 // Widgets
 import TelemetryWidget from '../crm/TelemetryWidget'
@@ -123,14 +122,14 @@ export function RightPanel() {
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
             className="flex flex-col gap-8 mt-2"
           >
-            {/* 1. TACTICAL AGENDA (Scanning Mode) */}
+            {/* 1. RAPID INGESTION */}
+            <QuickActionsGrid />
+
+            {/* 2. TACTICAL AGENDA (Scanning Mode) */}
             <GlobalTasksWidget />
 
-            {/* 2. MARKET PULSE (ERCOT) */}
+            {/* 3. MARKET PULSE (ERCOT) */}
             <MarketPulseWidget />
-
-            {/* 3. RAPID INGESTION */}
-            <QuickActionsGrid />
 
             {/* 4. SIGNAL FEED */}
             <NewsFeedWidget />

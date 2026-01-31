@@ -2,8 +2,8 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { INDUSTRY_VECTORS, getIndustryFilters } from '@/lib/industry-mapping';
-import { TITLE_VECTORS, getTitleFilters } from '@/lib/title-mapping';
+import { INDUSTRY_VECTORS } from '@/lib/industry-mapping';
+import { TITLE_VECTORS } from '@/lib/title-mapping';
 
 interface FilterDeckProps {
   isOpen: boolean;

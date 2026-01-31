@@ -314,7 +314,7 @@ export default function ContactDossierPage() {
     return (
       <div className="flex flex-col h-[calc(100vh-8rem)] items-center justify-center space-y-4 animate-in fade-in duration-500">
         <div className="nodal-glass p-8 rounded-2xl flex flex-col items-center gap-6 border-white/10 shadow-2xl">
-          <div className="p-4 bg-red-500/10 rounded-full">
+          <div className="p-4 bg-red-500/10 rounded-2xl">
             <AlertTriangle className="w-8 h-8 text-red-500" />
           </div>
           <div className="text-center">
@@ -354,7 +354,6 @@ export default function ContactDossierPage() {
                 <div onClick={() => isEditing && setActiveEditField(activeEditField === 'logo' ? null : 'logo')}>
                   <ContactAvatar 
                     name={contactName} 
-                    logoUrl={editLogoUrl || (contact.logoUrl as string) || (contact.avatarUrl as string)}
                     size={56} 
                     className={cn(
                       "w-14 h-14 transition-all",

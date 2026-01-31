@@ -4,8 +4,6 @@ import { Mail, ArrowUpRight, ArrowDownLeft, RefreshCw, Loader2, Eye, MousePointe
 import { Email } from '@/hooks/useEmails'
 import { cn } from '@/lib/utils'
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
 
 interface EmailListProps {
   emails: Email[]
@@ -76,7 +74,7 @@ export function EmailList({
   if (emails.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-4 animate-in fade-in duration-700">
-        <div className="w-16 h-16 rounded-full nodal-glass flex items-center justify-center border border-white/5 shadow-2xl">
+        <div className="w-16 h-16 rounded-2xl nodal-glass flex items-center justify-center border border-white/5 shadow-2xl">
           <Mail className="w-8 h-8 text-zinc-600" />
         </div>
         <div className="text-center space-y-1">
@@ -115,7 +113,7 @@ export function EmailList({
           </span>
         </div>
       )
-    } catch (e) {
+    } catch {
       return null;
     }
   }
@@ -188,7 +186,7 @@ export function EmailList({
                    <div className="absolute top-0 right-1/4 w-2 h-2 rounded-full bg-[#002FA7] animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.8)] z-10" />
                  )}
                  <div className={cn(
-                   "w-9 h-9 rounded-full nodal-glass flex items-center justify-center text-[10px] font-mono font-semibold border border-white/10 shadow-sm transition-all",
+                   "w-9 h-9 rounded-2xl nodal-glass flex items-center justify-center text-[10px] font-mono font-semibold border border-white/10 shadow-sm transition-all",
                    email.type === 'sent' ? "text-zinc-500" : "text-white"
                  )}>
                     {email.type === 'sent' ? 'NP' : (email.from?.[0]?.toUpperCase() || '?')}

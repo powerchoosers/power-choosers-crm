@@ -174,7 +174,7 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
           <div className="absolute inset-0 bg-gradient-to-r from-[#002FA7]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           
           <div className="flex items-center gap-4 relative z-10">
-            <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center border border-white/10 text-zinc-400 font-bold text-lg shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-zinc-800 flex items-center justify-center border border-white/10 text-zinc-400 font-bold text-lg shrink-0">
               {dossier.initials || dossier.name.charAt(0)}
             </div>
             <div className="flex-1 min-w-0">
@@ -370,7 +370,7 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
       const voidData = data as unknown as DataVoid
       return (
         <div className="p-4 rounded-xl border border-red-500/30 bg-red-950/10 flex items-center gap-4 w-full">
-          <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center text-red-500 shrink-0">
+          <div className="w-8 h-8 rounded-2xl bg-red-500/20 flex items-center justify-center text-red-500 shrink-0">
             <AlertTriangle size={16} />
           </div>
           <div className="flex-1 min-w-0">
@@ -441,7 +441,7 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
         <div className="grid grid-cols-1 gap-2 w-full min-w-0 overflow-hidden">
           {profiles.map((profile, i) => (
             <div key={i} className="flex items-center gap-3 p-2 sm:p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group min-w-0">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 font-bold border border-white/5 group-hover:border-blue-500/50 transition-colors shrink-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-2xl bg-zinc-800 flex items-center justify-center text-zinc-400 font-bold border border-white/5 group-hover:border-blue-500/50 transition-colors shrink-0">
                 {profile.name?.charAt(0)}
               </div>
               <div className="flex-1 min-w-0 overflow-hidden">
@@ -852,7 +852,7 @@ export function GeminiChatPanel() {
             <button
               onClick={() => setShowDiagnostics(!showDiagnostics)}
               className={cn(
-                "w-8 h-8 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center relative z-10 overflow-hidden transition-all",
+                "w-8 h-8 rounded-2xl bg-zinc-800 border border-white/10 flex items-center justify-center relative z-10 overflow-hidden transition-all",
                 showDiagnostics ? "border-[#002FA7]/50 shadow-[0_0_15px_rgba(0,47,167,0.4)]" : "hover:border-white/20"
               )}
               title="Toggle Routing HUD"
@@ -870,7 +870,7 @@ export function GeminiChatPanel() {
                 repeat: Infinity,
                 ease: "easeInOut",
               }}
-              className="absolute inset-0 bg-[#002FA7]/20 rounded-full blur-md"
+              className="absolute inset-0 bg-[#002FA7]/20 rounded-2xl blur-md"
             />
           </div>
           <div>
@@ -1050,7 +1050,7 @@ export function GeminiChatPanel() {
                       </div>
                     </div>
                     {/* User Initials/Avatar */}
-                    <div className="shrink-0 h-10 w-10 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center overflow-hidden">
+                    <div className="shrink-0 h-10 w-10 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center overflow-hidden">
                       {isAvatarLoading || hostedAvatarUrl ? (
                         <ImageWithSkeleton 
                           src={hostedAvatarUrl} 

@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { Target } from '@/types/targets'
 import { useAuth } from '@/context/AuthContext'
+import { toast } from 'sonner'
 
 export function useTargets() {
   return useQuery({
@@ -18,6 +19,43 @@ export function useTargets() {
         ...list,
         count: list.list_members?.[0]?.count || 0
       })) as Target[]
+    }
+  })
+}
+
+export function useCreateTarget() {
+  const queryClient = useQueryClient()
+  const { user } = useAuth()
+
+  return useMutation({
+    mutationFn: async ({ name, kind }: { name: string; kind: string }) => {
+      if (!user) throw new Error('User not authenticated')
+
+      const newList = {
+        id: crypto.randomUUID(),
+        name,
+        kind,
+        ownerId: user.email,
+        createdBy: user.email,
+        createdAt: new Date().toISOString(),
+        metadata: {}
+      }
+
+      const { data, error } = await supabase
+        .from('lists')
+        .insert(newList)
+        .select()
+        .single()
+
+      if (error) throw error
+      return data as Target
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['targets'] })
+    },
+    onError: (error) => {
+      console.error('Error creating target list:', error)
+      toast.error('Failed to create target list')
     }
   })
 }

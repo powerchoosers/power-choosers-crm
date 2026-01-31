@@ -255,7 +255,8 @@ const toolHandlers = {
     if (!usedVector) {
       let query = supabaseAdmin.from('contacts').select('*').limit(limit);
       if (search) {
-        query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+        // Broaden keyword search to include title and city
+        query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,title.ilike.%${search}%,city.ilike.%${search}%,metadata->>title.ilike.%${search}%,metadata->>city.ilike.%${search}%`);
       }
       const { data: keywordData, error } = await query;
       if (error) throw error;
@@ -531,18 +532,18 @@ const toolHandlers = {
     let data = [];
     let usedVector = false;
 
-    // Try Vector Search first if search term is present
-    if (search) {
+    // Use Vector Search if we have a search term OR an expiration year (semantic search for dates)
+    if (search || expiration_year) {
       try {
-        const embedding = await generateEmbedding(search);
+        const query = search ? search : `accounts expiring in ${expiration_year}`;
+        const embedding = await generateEmbedding(query);
         if (embedding) {
-          console.log(`[list_accounts] Using vector search for: "${search}"`);
+          console.log(`[list_accounts] Using vector search for: "${query}"`);
           const { data: vectorResults, error } = await supabaseAdmin.rpc('match_accounts', {
             query_embedding: embedding,
-            match_threshold: 0.3, // Lower threshold to ensure results, then rank
-            match_count: limit * 2 // Fetch more to filter
+            match_threshold: search ? 0.3 : 0.1, // Lower threshold for year-only semantic search
+            match_count: limit * 5 // Fetch more to filter precisely
           });
-          
           if (!error && vectorResults) {
             data = vectorResults;
             usedVector = true;
@@ -557,45 +558,48 @@ const toolHandlers = {
 
     // Fallback to Keyword Search if Vector failed or wasn't used
     if (!usedVector) {
-        let query = supabaseAdmin.from('accounts').select('*').limit(limit);
+        // Fetch a larger set for in-memory precision filtering
+        let query = supabaseAdmin.from('accounts').select('*').limit(500); 
+        
         if (industry) {
           query = query.or(`industry.ilike.%${industry}%,metadata->>industry.ilike.%${industry}%`);
         }
         if (search) {
           query = query.or(`name.ilike.%${search}%,domain.ilike.%${search}%,industry.ilike.%${search}%,metadata->>industry.ilike.%${search}%`);
         }
-        if (expiration_year) {
-           const start = `${expiration_year}-01-01`;
-           const end = `${expiration_year}-12-31`;
-           query = query.or(`contract_end_date.gte.${start},contract_end_date.lte.${end},metadata->>contract_end_date.gte.${start},metadata->>contract_end_date.lte.${end},metadata->>contractEndDate.gte.${start},metadata->>contractEndDate.lte.${end},metadata->>contractEndDate.ilike.%/${expiration_year},metadata->>contract_end_date.ilike.%/${expiration_year}`);
-        }
+        
         const { data: keywordData, error } = await query;
         if (error) throw error;
         data = keywordData || [];
     }
     
-    // Apply filters in-memory if vector search was used (since RPC didn't filter by industry/year)
-    if (usedVector) {
-        if (industry) {
-            const indLower = industry.toLowerCase();
-            data = data.filter(r => 
-                (r.industry && r.industry.toLowerCase().includes(indLower)) || 
-                (r.metadata?.industry && r.metadata.industry.toLowerCase().includes(indLower))
-            );
-        }
-        if (expiration_year) {
-             // Simplified check
-             const yearStr = String(expiration_year);
-             data = data.filter(r => {
-                 const d = r.contract_end_date || r.metadata?.contract_end_date || r.metadata?.contractEndDate;
-                 return d && (String(d).includes(yearStr) || String(d).includes(yearStr.slice(2))); // 2026 or /26
-             });
-        }
-        // Slice to limit
-        data = data.slice(0, limit);
+    // ALWAYS apply filters in-memory for precision, especially for expiration_year
+    if (industry) {
+        const indLower = industry.toLowerCase();
+        data = data.filter(r => 
+            (r.industry && r.industry.toLowerCase().includes(indLower)) || 
+            (r.metadata?.industry && r.metadata.industry.toLowerCase().includes(indLower))
+        );
     }
+    if (expiration_year) {
+        const yearStr = String(expiration_year);
+        data = data.filter(r => {
+            const metadata = r.metadata || {};
+            const d = r.contract_end_date || 
+                      metadata.contract_end_date || 
+                      metadata.contractEndDate || 
+                      metadata.general?.contractEndDate;
+            if (!d) return false;
+            const dateStr = String(d);
+            // Match 2026 or /26
+            return dateStr.includes(yearStr) || dateStr.includes(yearStr.slice(2));
+        });
+    }
+
+    // Final slice to limit
+    data = data.slice(0, limit);
     
-    console.log(`[list_accounts] Found ${data?.length || 0} raw records (Vector: ${usedVector})`);
+    console.log(`[list_accounts] Found ${data?.length || 0} precision records (Vector: ${usedVector}, Search: "${search}", Year: ${expiration_year})`);
 
     // Normalize results to ensure promoted fields are available
     return data.map(record => {
@@ -1034,20 +1038,39 @@ export default async function handler(req, res) {
       }
 
       const model = modelName || perplexityModel;
-      const normalized = cleanedMessages
-        .slice(-12)
-        .map((m) => ({
-          role: m.role === 'user' ? 'user' : 'assistant',
-          content: m.content,
-        }));
+      
+      // Perplexity is extremely strict: must alternate User/Assistant and NO tool messages
+      // AND must start with a User message
+      const normalized = [];
+      let lastRole = null;
 
-      const lastRole = normalized.length > 0 ? normalized[normalized.length - 1].role : 'assistant';
+      // Slice the last 10 messages but ensure we don't break mid-conversation if possible
+      const candidates = cleanedMessages.slice(-10);
+      
+      for (const m of candidates) {
+        const role = m.role === 'user' ? 'user' : 'assistant';
+        
+        // Skip if it's the same role as last one (Perplexity requires alternation)
+        if (role === lastRole) continue;
+        
+        // Skip if first message is not user (Perplexity requires starting with user)
+        if (normalized.length === 0 && role !== 'user') continue;
+
+        normalized.push({
+          role: role,
+          content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
+        });
+        lastRole = role;
+      }
+
       const perplexityMessages = [
         { role: 'system', content: buildSystemPrompt().trim() },
         ...normalized,
       ];
-      if (lastRole !== 'user') {
-        perplexityMessages.push({ role: 'user', content: prompt });
+
+      // Ensure last message is from user
+      if (perplexityMessages.length === 0 || perplexityMessages[perplexityMessages.length - 1].role !== 'user') {
+        perplexityMessages.push({ role: 'user', content: prompt || 'Continue' });
       }
 
       console.log(`[AI Router] Calling Perplexity with model: ${model}`);
