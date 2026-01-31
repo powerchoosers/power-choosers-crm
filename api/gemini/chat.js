@@ -1154,11 +1154,11 @@ export default async function handler(req, res) {
     let provider = 'gemini'; // Default fallback
 
     if (!bodyModel || bodyModel === 'default') {
-      targetModel = 'openai/gpt-oss-120b';
+      targetModel = 'openai/gpt-oss-120b:free';
       provider = 'openrouter';
     } else if (bodyModel.startsWith('sonar')) {
       provider = 'perplexity';
-    } else if (bodyModel.startsWith('openai/') || bodyModel.startsWith('anthropic/') || bodyModel.startsWith('google/') || bodyModel.startsWith('meta-llama/') || bodyModel.startsWith('mistralai/') || bodyModel.startsWith('perplexity/')) {
+    } else if (bodyModel.startsWith('openai/') || bodyModel.startsWith('anthropic/') || bodyModel.startsWith('google/') || bodyModel.startsWith('meta-llama/') || bodyModel.startsWith('mistralai/') || bodyModel.startsWith('perplexity/') || bodyModel.startsWith('nvidia/')) {
       provider = 'openrouter';
     }
 
