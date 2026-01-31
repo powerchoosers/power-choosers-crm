@@ -86,8 +86,8 @@ export default function TargetDetailPage() {
 
   const { data: target, isLoading: targetLoading } = useTarget(id)
 
-  const isPeopleList = target?.kind === 'people'
-  const isAccountList = target?.kind === 'account' || target?.kind === 'accounts'
+  const isPeopleList = target?.kind === 'people' || target?.kind === 'person' || target?.kind === 'contact' || target?.kind === 'contacts'
+  const isAccountList = target?.kind === 'account' || target?.kind === 'accounts' || target?.kind === 'company' || target?.kind === 'companies'
 
   const filters = useMemo(() => {
     return {

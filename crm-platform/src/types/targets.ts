@@ -1,7 +1,7 @@
 export interface Target {
   id: string
   name: string
-  kind: 'people' | 'account'
+  kind: 'people' | 'person' | 'contact' | 'contacts' | 'account' | 'accounts' | 'company' | 'companies'
   ownerId?: string
   assignedTo?: string
   createdBy?: string
