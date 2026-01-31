@@ -1,0 +1,11 @@
+[
+  {
+    "name": "keep-last-5-versions",
+    "action": {
+      "type": "Keep"
+    },
+    "mostRecentVersions": {
+      "keepCount": 5
+    }
+  }
+]
