@@ -51,6 +51,11 @@ The legacy dashboard file `c:\Users\Lap3p\OneDrive\Documents\Power Choosers CRM\
 6.  **Squircle Enforcement**: Never use `rounded-full` for contact or company icons. Always verify that small icons (36px) use `rounded-[14px]` to maintain the squircle shape.
 7.  **Schema Extensions**: When adding new fields to Accounts or Contacts for future edits, you **MUST** also add these fields to the `BulkImportModal.tsx` mapping schemas to maintain ingestion parity.
 
+## 🔐 Google Cloud Authentication
+1.  **Browser-Based Login**: When the user needs to log into `gcloud`, ALWAYS use the browser-based flow to avoid terminal password prompts.
+    -   **Command**: `gcloud auth login`
+    -   *Rationale*: This opens the default browser for a secure, interactive login which is required for the user's environment.
+
 ## 🧹 Maintenance & Cache
 1.  **Clearing .next Cache**: If the `.next` cache is suspected to be full or causing issues, clear the file contents rather than deleting the directory:
     -   **Command**: `Get-ChildItem -Path .next -Recurse -File | Clear-Content` (Run from `crm-platform/`)
