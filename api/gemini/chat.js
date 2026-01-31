@@ -950,7 +950,7 @@ export default async function handler(req, res) {
         ...cleanedMessages.slice(-15).map(m => {
           const msg = {
             role: m.role === 'tool' ? 'tool' : (m.role === 'user' ? 'user' : 'assistant'),
-            content: m.content || '',
+            content: m.content || null,
           };
           if (m.tool_calls) msg.tool_calls = m.tool_calls;
           if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
@@ -1273,17 +1273,15 @@ export default async function handler(req, res) {
 
     const genAI = new GoogleGenerativeAI(geminiApiKey);
     const envPreferredModel = (process.env.GEMINI_MODEL || '').trim();
-    const preferredModel = bodyModel || envPreferredModel || 'gemini-1.5-flash';
+    const preferredModel = (bodyModel && !bodyModel.includes('/') && !bodyModel.startsWith('sonar')) ? bodyModel : (envPreferredModel || 'gemini-1.5-flash');
     const modelCandidates = Array.from(
       new Set(
         [
           preferredModel,
-          'gemini-2.5-flash',
-          'gemini-3.0-flash-preview',
-          'gemini-3.0-pro-preview',
           'gemini-2.0-flash',
-          'gemini-1.5-flash'
-        ].filter(Boolean)
+          'gemini-1.5-flash',
+          'gemini-1.5-pro'
+        ].filter(m => m && typeof m === 'string' && (m.startsWith('gemini-') || m.includes('flash') || m.includes('pro')))
       )
     );
 
