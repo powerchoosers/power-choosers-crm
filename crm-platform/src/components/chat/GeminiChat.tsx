@@ -1168,11 +1168,14 @@ export function GeminiChatPanel() {
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-950 border-white/10 text-white">
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 mb-1">
-                    Priority Agents
-                  </div>
-                  <SelectItem value="openai/gpt-oss-120b" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GPT-OSS (120B)
-                  </SelectItem>
+                Priority Agents (Free)
+              </div>
+              <SelectItem value="openai/gpt-oss-120b:free" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                GPT-OSS (120B)
+              </SelectItem>
+              <SelectItem value="nvidia/nemotron-3-nano-30b-a3b:free" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                NEMOTRON-30B
+              </SelectItem>
                   
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
                     Gemini Intelligence Stack
