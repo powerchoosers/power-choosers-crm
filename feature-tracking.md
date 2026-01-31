@@ -179,6 +179,16 @@
 
 ## 🚧 Active Development (Nodal Point Migration)
 
+### AI Context Mode & Precision Filtering
+- **Status**: Completed
+- **Description**: Resolved global scope AI ineffectiveness and fixed 2026 account/contact search failures by implementing direct Supabase queries and enhancing context propagation.
+- **Actions**:
+  - [x] **Context Mode Propagation**: Verified and enhanced `GeminiChat.tsx` and `chat.js` to ensure context modes (global/dashboard/account/contact) are correctly propagated to tool handlers.
+  - [x] **Precision Filtering**: Added direct Supabase query logic for expiration years in `list_accounts` to bypass vector search limitations for specific years (e.g., 2026).
+  - [x] **Anti-Hallucination**: Updated the system prompt to prohibit web search fallback for internal CRM data and prevent citations from external sites like researchallofus.org.
+  - [x] **Error Handling**: Implemented robust error handling in `chat.js` to prevent JSON parse errors and ensure valid responses even on backend failures.
+  - [x] **Search Parity**: Enhanced `list_accounts` and `list_contacts` to better handle non-standard date formats and linked entity lookups.
+
 ### Account Dossier Migration & Refinement
 - **Status**: Completed
 - **Description**: Migrated and refined the Account Dossier page with full Supabase integration, forensic styling, and fixed type safety.

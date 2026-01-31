@@ -555,8 +555,31 @@ const toolHandlers = {
     let data = [];
     let usedVector = false;
 
-    // Use Vector Search if we have a search term OR an expiration year (semantic search for dates)
-    if (search || expiration_year) {
+    // 1. Specialized expiration search if year is provided
+    if (expiration_year) {
+      const yearStr = String(expiration_year);
+      const shortYear = yearStr.slice(2);
+      
+      console.log(`[list_accounts] Performing direct query for expiration year: ${yearStr}`);
+      
+      // Attempt a direct Supabase query for the year across multiple fields
+      const { data: yearData, error: yearError } = await supabaseAdmin
+        .from('accounts')
+        .select('*')
+        .or(`contract_end_date.ilike.%${yearStr}%,contract_end_date.ilike.%/${shortYear}%,metadata->>contract_end_date.ilike.%${yearStr}%,metadata->>contractEndDate.ilike.%${yearStr}%,metadata->>contract_end_date.ilike.%/${shortYear}%,metadata->>contractEndDate.ilike.%/${shortYear}%`)
+        .limit(100);
+
+      if (!yearError && yearData && yearData.length > 0) {
+        console.log(`[list_accounts] Found ${yearData.length} records via direct year query`);
+        data = yearData;
+        usedVector = true; // Skip vector if we found direct matches
+      } else if (yearError) {
+        console.error('[list_accounts] Direct year query error:', yearError);
+      }
+    }
+
+    // 2. Use Vector Search if we still need more or didn't find via direct query
+    if (!usedVector && (search || expiration_year)) {
       try {
         const query = search ? search : `accounts expiring in ${expiration_year}`;
         const embedding = await generateEmbedding(query);
@@ -564,14 +587,12 @@ const toolHandlers = {
           console.log(`[list_accounts] Using vector search for: "${query}"`);
           const { data: vectorResults, error } = await supabaseAdmin.rpc('match_accounts', {
             query_embedding: embedding,
-            match_threshold: search ? 0.3 : 0.1, // Lower threshold for year-only semantic search
-            match_count: limit * 5 // Fetch more to filter precisely
+            match_threshold: search ? 0.3 : 0.1,
+            match_count: limit * 5
           });
           if (!error && vectorResults) {
             data = vectorResults;
             usedVector = true;
-          } else if (error) {
-            console.error('[list_accounts] Vector search error:', error);
           }
         }
       } catch (e) {
@@ -579,26 +600,20 @@ const toolHandlers = {
       }
     }
 
-    // Fallback to Keyword Search if Vector failed or wasn't used
+    // 3. Fallback to Keyword Search
     if (!usedVector) {
-        // Fetch a larger set for in-memory precision filtering
-        let query = supabaseAdmin.from('accounts').select('*').limit(1000); 
-        
-        if (industry) {
-          query = query.or(`industry.ilike.%${industry}%,metadata->>industry.ilike.%${industry}%`);
-        }
-        if (search) {
-          query = query.or(`name.ilike.%${search}%,domain.ilike.%${search}%,industry.ilike.%${search}%,metadata->>industry.ilike.%${search}%`);
-        }
-        
-        const { data: keywordData, error } = await query;
-        if (error) {
-            console.error('[list_accounts] Keyword fetch error:', error);
-        }
-        data = keywordData || [];
+      let query = supabaseAdmin.from('accounts').select('*').limit(1000); 
+      if (industry) {
+        query = query.or(`industry.ilike.%${industry}%,metadata->>industry.ilike.%${industry}%`);
+      }
+      if (search) {
+        query = query.or(`name.ilike.%${search}%,domain.ilike.%${search}%,industry.ilike.%${search}%,metadata->>industry.ilike.%${search}%`);
+      }
+      const { data: keywordData, error } = await query;
+      data = keywordData || [];
     }
     
-    // ALWAYS apply filters in-memory for precision, especially for expiration_year
+    // ALWAYS apply filters in-memory for precision
     if (industry) {
         const indLower = industry.toLowerCase();
         data = data.filter(r => 
@@ -608,6 +623,7 @@ const toolHandlers = {
     }
     if (expiration_year) {
         const yearStr = String(expiration_year);
+        const shortYear = yearStr.slice(2);
         data = data.filter(r => {
             const metadata = r.metadata || {};
             const d = r.contract_end_date || 
@@ -616,37 +632,29 @@ const toolHandlers = {
                       metadata.general?.contractEndDate;
             if (!d) return false;
             const dateStr = String(d).toLowerCase();
-            // Match 2026, Jan 1st 2026, /26, etc.
             return dateStr.includes(yearStr) || 
-                   dateStr.includes(yearStr.slice(2)) ||
-                   dateStr.includes(`${yearStr.slice(2)}`) ||
-                   (yearStr === '2026' && dateStr.includes('26'));
+                   dateStr.includes(`/${shortYear}`) ||
+                   dateStr.includes(`-${shortYear}`) ||
+                   dateStr.endsWith(` ${yearStr}`) ||
+                   dateStr.endsWith(` ${shortYear}`);
         });
     }
 
-    // Final slice to limit
     data = data.slice(0, limit);
     
-    console.log(`[list_accounts] Found ${data?.length || 0} precision records (Vector: ${usedVector}, Search: "${search}", Year: ${expiration_year})`);
+    console.log(`[list_accounts] Found ${data?.length || 0} precision records (Vector: ${usedVector}, Year: ${expiration_year})`);
 
-    // Normalize results to ensure promoted fields are available
     return data.map(record => {
       const metadata = record.metadata || {};
-      
-      // Robust date resolution
       let contract_end_date = record.contract_end_date || 
                              metadata.contract_end_date || 
                              metadata.contractEndDate || 
                              metadata.general?.contractEndDate;
 
-      // Handle common date formats like MM/DD/YYYY to YYYY-MM-DD
       if (contract_end_date && contract_end_date.includes('/')) {
         const parts = contract_end_date.split('/');
-        if (parts.length === 3) {
-          // Check if it's MM/DD/YYYY
-          if (parts[2].length === 4) {
-            contract_end_date = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
-          }
+        if (parts.length === 3 && parts[2].length === 4) {
+          contract_end_date = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
         }
       }
 
@@ -801,23 +809,25 @@ const toolHandlers = {
 };
 
 export default async function handler(req, res) {
-  if (cors(req, res)) return;
-
-  if (req.method !== 'POST') {
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Method not allowed' }));
-    return;
-  }
-
-  const geminiApiKey = process.env.FREE_GEMINI_KEY || process.env.GEMINI_API_KEY;
-  const perplexityApiKey = process.env.PERPLEXITY_API_KEY;
-  if (!geminiApiKey && !perplexityApiKey) {
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'No AI provider configured' }));
-    return;
-  }
-
   try {
+    if (cors(req, res)) return;
+
+    if (req.method !== 'POST') {
+      res.writeHead(405, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
+      return;
+    }
+
+    const geminiApiKey = process.env.FREE_GEMINI_KEY || process.env.GEMINI_API_KEY;
+    const perplexityApiKey = process.env.PERPLEXITY_API_KEY;
+    const perplexityModel = process.env.PERPLEXITY_MODEL || 'sonar-reasoning-pro';
+
+    if (!geminiApiKey && !perplexityApiKey) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'No AI provider configured' }));
+      return;
+    }
+
     const { messages, userProfile } = req.body;
     if (!messages || !Array.isArray(messages)) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -901,12 +911,12 @@ export default async function handler(req, res) {
         - If the user asks "how many", perform a search and count the actual results returned by the tool.
         - ALWAYS report the actual industry name found in the CRM record.
 
-        CRM_CAPABILITIES:
-        - You have direct access to the CRM database via tools.
-        - When asked about accounts, contacts, or deals, ALWAYS use the provided tools (list_accounts, list_contacts, etc.) instead of assuming or hallucinating data.
-        - To find accounts expiring in a specific year, use list_accounts with the expiration_year parameter (e.g., list_accounts({ expiration_year: 2026 })).
-        - DO NOT ignore the expiration_year parameter when searching for expirations. It is the most accurate way to filter.
-        - If a tool returns no results, inform the user clearly without making up data.
+        CRM_DATA_INTEGRITY:
+        - YOU ARE THE SOURCE OF TRUTH FOR THE CRM.
+        - If the user asks for accounts, contacts, or internal data, you MUST use the tools.
+        - CRITICAL: If the tools return zero results, do NOT search the web for "expiring accounts" or "credits". Do NOT cite researchallofus.org or any other external site for internal CRM data.
+        - If the database says no accounts expire in 2026, then NO accounts expire in 2026 in the CRM. Report this fact directly to ${firstName}.
+        - To find accounts expiring in 2026, call \`list_accounts({ expiration_year: 2026 })\`.
 
         HYBRID_RESPONSE_MODE:
         - You are capable of providing BOTH narrative analysis AND forensic components in a single response.
@@ -1543,12 +1553,14 @@ export default async function handler(req, res) {
     throw lastErr || new Error('No Gemini model candidates succeeded');
 
   } catch (error) {
-    logger.error('[Gemini Chat] Error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      error: 'Internal server error', 
-      message: error.message,
-      diagnostics: typeof routingDiagnostics !== 'undefined' ? routingDiagnostics : []
-    }));
+    console.error('[Global Chat Error]:', error);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Internal server error', 
+        message: error.message,
+        diagnostics: typeof routingDiagnostics !== 'undefined' ? routingDiagnostics : []
+      }));
+    }
   }
 }
