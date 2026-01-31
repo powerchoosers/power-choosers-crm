@@ -12,11 +12,13 @@ const tools = [
     functionDeclarations: [
       {
         name: 'list_contacts',
-        description: 'Get a list of contacts from the CRM. Can be filtered by search term.',
+        description: 'Get a list of contacts from the CRM. Can be filtered by search term, account ID, or job title.',
         parameters: {
           type: 'OBJECT',
           properties: {
             search: { type: 'STRING', description: 'Search term for name or email' },
+            accountId: { type: 'STRING', description: 'Filter by account ID' },
+            title: { type: 'STRING', description: 'Filter by job title (e.g. "Facilities Manager", "CEO")' },
             limit: { type: 'NUMBER', description: 'Maximum number of contacts to return (default 10)' }
           }
         }
@@ -229,13 +231,14 @@ const tools = [
 
 // Tool implementation handlers
 const toolHandlers = {
-  list_contacts: async ({ search, limit = 10 }) => {
+  list_contacts: async ({ search, accountId, title, limit = 10 }) => {
     let data = [];
     let usedVector = false;
 
-    if (search) {
+    if (search || title) {
       try {
-        const embedding = await generateEmbedding(search);
+        const query = search || title;
+        const embedding = await generateEmbedding(query);
         if (embedding) {
           const { data: vectorResults, error } = await supabaseAdmin.rpc('match_contacts', {
             query_embedding: embedding,
@@ -254,14 +257,34 @@ const toolHandlers = {
 
     if (!usedVector) {
       let query = supabaseAdmin.from('contacts').select('*').limit(limit);
-      if (search) {
-        // Broaden keyword search to include title and city
-        query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,title.ilike.%${search}%,city.ilike.%${search}%,metadata->>title.ilike.%${search}%,metadata->>city.ilike.%${search}%`);
+      
+      if (accountId) {
+        query = query.eq('accountId', accountId);
       }
+
+      if (search || title) {
+        const term = search || title;
+        // Broaden keyword search to include title and city
+        query = query.or(`name.ilike.%${term}%,email.ilike.%${term}%,title.ilike.%${term}%,city.ilike.%${term}%,metadata->>title.ilike.%${term}%,metadata->>city.ilike.%${term}%`);
+      }
+      
       const { data: keywordData, error } = await query;
       if (error) throw error;
       data = keywordData;
     }
+
+    // Apply strict filters in-memory if requested
+    if (accountId) {
+      data = data.filter(c => c.accountId === accountId);
+    }
+    if (title) {
+      const titleLower = title.toLowerCase();
+      data = data.filter(c => 
+        (c.title && c.title.toLowerCase().includes(titleLower)) || 
+        (c.metadata?.title && c.metadata.title.toLowerCase().includes(titleLower))
+      );
+    }
+
     return data;
   },
   list_deals: async ({ account_id, status = 'all' }) => {
@@ -843,6 +866,12 @@ export default async function handler(req, res) {
         - ALWAYS address them by their first name (${firstName}) in your initial greeting or when appropriate.
         - TODAY'S DATE: ${new Date().toISOString().split('T')[0]} (Year: ${new Date().getFullYear()})
         - CURRENT CONTEXT: "This year" means ${new Date().getFullYear()}.
+
+        GLOBAL_SEARCH_STRATEGY:
+        - When in "GLOBAL_SCOPE" or "GLOBAL_DASHBOARD", you are the master of the entire CRM.
+        - If the user asks for "accounts expiring in 2026", you MUST call \`list_accounts({ expiration_year: 2026 })\`.
+        - If the user asks for "contacts with accounts expiring in 2026", you MUST first call \`list_accounts({ expiration_year: 2026 })\` to get the account IDs, and then call \`list_contacts\` or query the details for those accounts to find the associated people.
+        - DO NOT wait for the user to specify a company or contact if you are in GLOBAL_SCOPE. RUN THE SEARCH ACROSS ALL NODES.
 
         ANTI_HALLUCINATION_PROTOCOL:
         - CRITICAL: NEVER invent names, companies, email addresses, phone numbers, or energy metrics (kWh, strike price, contract dates).

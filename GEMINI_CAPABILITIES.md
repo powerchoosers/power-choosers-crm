@@ -43,7 +43,8 @@ The agent is currently equipped with the following "Tools" and UI protocols whic
 - **Robust Date Resolution**: Automatically cross-references multiple metadata fields (`contract_end_date`, `contractEndDate`, `general.contractEndDate`) to find expiration data.
 - **Date Normalization Engine**: Real-time conversion of legacy formats (e.g., `MM/DD/YYYY`) to forensic ISO standards (`YYYY-MM-DD`) during data retrieval.
 - **Enhanced Industry Logic**: Intelligent search expansion for "Manufacturing" and other broad sectors to ensure complete node discovery across related sub-industries.
-- **Expiration Year Filtering**: High-precision filtering using both date-range logic and year-suffix pattern matching (`ilike %/YYYY`) for inconsistent legacy records.
+- **Expiration Year Filtering (v1.5)**: High-precision filtering using an expanded 1,000-node in-memory scan. Handles standard ISO dates, human-readable legacy strings (e.g., "Jan 1st 2026"), and short-hand year notations (`/26`).
+- **Reliable Model Routing**: Strict pipeline separation between OpenRouter and Gemini providers to eliminate `404` errors and ensure seamless fallback.
 
 ---
 
@@ -98,7 +99,8 @@ The Nodal Architect is trained to align with the **Nodal Point Thesis**. It does
 
 ### 1. Intelligence Stack (Multi-Model Fallback)
 The Architect utilizes a sophisticated **Model_Stack** protocol. If the primary node is overloaded or hits a quota, it autonomously falls back through a chain of high-precision models:
-- **Primary Agent**: `gpt-oss-120b` (Deep logic and forensic reasoning).
+- **Primary Agent**: `gpt-oss-120b:free` (Deep logic and forensic reasoning).
+- **Secondary Node**: `nemotron-30b:free` (High-speed free intelligence layer).
 - **Speed Layer**: `gemini-2.0-flash` & `gemini-1.5-flash`.
 - **Reasoning Layer**: `gemini-1.5-pro`.
 - **Search Layer**: `sonar-pro` & `sonar-standard` (Perplexity).
@@ -129,12 +131,12 @@ We are actively expanding the Architect's "Brain" to include these forensic ener
 ---
 
 ## 🛠️ Technical Implementation
-- **Primary Node**: `gpt-oss-120b` via OpenRouter.
-- **Intelligence Stack**: Gemini 2.0/1.5 (Google) & Sonar (Perplexity).
+- **Primary Node**: `gpt-oss-120b:free` via OpenRouter.
+- **Intelligence Stack**: Gemini 2.0/1.5 (Google), Nemotron-30b (NVIDIA), & Sonar (Perplexity).
 - **Backend**: Node.js Proxy on Port 3001 with custom `chat.js` routing logic.
 - **Frontend**: Next.js 15 with Framer Motion "Obsidian & Glass" UI.
 - **Security**: All tool calls are gated by Supabase RLS and server-side validation.
 
 ---
-*Last Updated: 2026-01-29*
-*Status: Nodal Architect v1.4 Operational (Full Semantic Sync)*
+*Last Updated: 2026-01-31*
+*Status: Nodal Architect v1.5 Operational (Enhanced Precision & Free Model Stack)*
