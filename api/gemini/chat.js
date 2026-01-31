@@ -797,10 +797,23 @@ export default async function handler(req, res) {
       return;
     }
 
+    // Enhanced message cleaning to preserve tool calls and handle non-string content
     const cleanedMessages = messages
-      .filter((m) => m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant' || m.role === 'model'))
-      .map((m) => ({ role: m.role, content: m.content.trim() }))
-      .filter((m) => m.content.length > 0);
+      .filter((m) => m && (m.role === 'user' || m.role === 'assistant' || m.role === 'model' || m.role === 'tool' || m.role === 'system'))
+      .map((m) => {
+        let content = m.content;
+        if (content && typeof content !== 'string') {
+          content = JSON.stringify(content);
+        }
+        return { 
+          role: m.role === 'model' ? 'assistant' : m.role, // Normalize model to assistant for internal consistency
+          content: (content || '').trim(),
+          tool_calls: m.tool_calls,
+          tool_call_id: m.tool_call_id,
+          name: m.name
+        };
+      })
+      .filter((m) => (m.content && m.content.length > 0) || m.tool_calls || m.role === 'tool');
 
     const lastUserIndex = cleanedMessages.map((m) => m.role).lastIndexOf('user');
     if (lastUserIndex === -1) {
@@ -934,10 +947,16 @@ export default async function handler(req, res) {
       
       let currentMessages = [
         { role: 'system', content: buildSystemPrompt().trim() },
-        ...cleanedMessages.slice(-12).map(m => ({
-          role: m.role === 'user' ? 'user' : 'assistant',
-          content: m.content,
-        }))
+        ...cleanedMessages.slice(-15).map(m => {
+          const msg = {
+            role: m.role === 'tool' ? 'tool' : (m.role === 'user' ? 'user' : 'assistant'),
+            content: m.content || '',
+          };
+          if (m.tool_calls) msg.tool_calls = m.tool_calls;
+          if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
+          if (m.name) msg.name = m.name;
+          return msg;
+        })
       ];
       
       // Ensure the last message is from the user if it's not already
@@ -1063,8 +1082,19 @@ export default async function handler(req, res) {
         lastRole = role;
       }
 
+      // Clearer system prompt for Perplexity to prevent tool hallucinations
+      const perplexitySystemPrompt = `
+        ${buildSystemPrompt().trim()}
+        
+        CRITICAL_NOTICE: You are currently running in SEARCH_ONLY mode via Perplexity. 
+        You DO NOT have direct access to the CRM database tools (list_accounts, list_contacts, etc.) in this session.
+        Do NOT attempt to use them or tell the user you have access to them.
+        Instead, provide the best answer possible using your internal knowledge and web search.
+        If the user asks for CRM data, apologize and suggest they switch to a Gemini model for database access.
+      `.trim();
+
       const perplexityMessages = [
-        { role: 'system', content: buildSystemPrompt().trim() },
+        { role: 'system', content: perplexitySystemPrompt },
         ...normalized,
       ];
 
@@ -1254,6 +1284,7 @@ export default async function handler(req, res) {
       return msg.includes('not found for api version') || (msg.includes('models/') && msg.includes('404'));
     };
 
+    // Build Gemini-specific history with proper role alternation and tool support
     const validHistory = [];
     let nextExpectedRole = 'user';
 
@@ -1263,13 +1294,48 @@ export default async function handler(req, res) {
     if (firstUserInHistory > 0) startIndex = firstUserInHistory;
 
     for (const m of historyToProcess.slice(startIndex)) {
+      // Gemini roles are 'user' and 'model'
       const role = m.role === 'user' ? 'user' : 'model';
-      if (role !== nextExpectedRole) continue;
+      
+      // Basic role alternation check for non-tool messages
+      if (m.role !== 'tool' && role !== nextExpectedRole) continue;
 
-      validHistory.push({
-        role,
-        parts: [{ text: m.content }],
-      });
+      const parts = [];
+      if (m.content) {
+        parts.push({ text: m.content });
+      }
+
+      // Handle tool calls in history (if any)
+      if (m.tool_calls && Array.isArray(m.tool_calls)) {
+        for (const call of m.tool_calls) {
+          parts.push({
+            functionCall: {
+              name: call.function.name,
+              args: JSON.parse(call.function.arguments)
+            }
+          });
+        }
+      }
+
+      // Handle tool responses in history
+      if (m.role === 'tool') {
+        validHistory.push({
+          role: 'model', // Tool responses are part of the model's side of the conversation in some SDK versions, 
+                         // but Gemini actually uses a separate role usually. 
+                         // However, Node SDK startChat history often requires alternation.
+          parts: [{
+            functionResponse: {
+              name: m.name,
+              response: { content: m.content }
+            }
+          }]
+        });
+        // After a tool response, we still expect the model to finish its thought (another 'model' role)
+        // or the user to respond. This is tricky. 
+        continue; 
+      }
+
+      validHistory.push({ role, parts });
       nextExpectedRole = nextExpectedRole === 'user' ? 'model' : 'user';
     }
 
