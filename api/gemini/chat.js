@@ -559,7 +559,7 @@ const toolHandlers = {
     // Fallback to Keyword Search if Vector failed or wasn't used
     if (!usedVector) {
         // Fetch a larger set for in-memory precision filtering
-        let query = supabaseAdmin.from('accounts').select('*').limit(500); 
+        let query = supabaseAdmin.from('accounts').select('*').limit(1000); 
         
         if (industry) {
           query = query.or(`industry.ilike.%${industry}%,metadata->>industry.ilike.%${industry}%`);
@@ -569,7 +569,9 @@ const toolHandlers = {
         }
         
         const { data: keywordData, error } = await query;
-        if (error) throw error;
+        if (error) {
+            console.error('[list_accounts] Keyword fetch error:', error);
+        }
         data = keywordData || [];
     }
     
@@ -590,9 +592,12 @@ const toolHandlers = {
                       metadata.contractEndDate || 
                       metadata.general?.contractEndDate;
             if (!d) return false;
-            const dateStr = String(d);
-            // Match 2026 or /26
-            return dateStr.includes(yearStr) || dateStr.includes(yearStr.slice(2));
+            const dateStr = String(d).toLowerCase();
+            // Match 2026, Jan 1st 2026, /26, etc.
+            return dateStr.includes(yearStr) || 
+                   dateStr.includes(yearStr.slice(2)) ||
+                   dateStr.includes(`${yearStr.slice(2)}`) ||
+                   (yearStr === '2026' && dateStr.includes('26'));
         });
     }
 
