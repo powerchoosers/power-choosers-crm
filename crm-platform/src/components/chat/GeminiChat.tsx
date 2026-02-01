@@ -336,7 +336,7 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
               docData.documents.map((doc, i) => (
                 <div key={i} className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-colors group">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded bg-zinc-800 flex items-center justify-center text-zinc-500 border border-white/5">
+                    <div className="w-8 h-8 rounded-[14px] bg-zinc-800 flex items-center justify-center text-zinc-500 border border-white/5">
                       <Cpu size={14} />
                     </div>
                     <div className="min-w-0">
@@ -369,15 +369,25 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
       if (!isRecord(data)) return null
       const voidData = data as unknown as DataVoid
       return (
-        <div className="p-4 rounded-xl border border-red-500/30 bg-red-950/10 flex items-center gap-4 w-full">
-          <div className="w-8 h-8 rounded-2xl bg-red-500/20 flex items-center justify-center text-red-500 shrink-0">
-            <AlertTriangle size={16} />
+        <motion.div
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          className="rounded-2xl border border-red-500/30 bg-red-950/10 backdrop-blur-xl overflow-hidden w-full"
+        >
+          <div className="px-4 py-2 border-b border-red-500/20 bg-red-500/5 flex items-center justify-between">
+            <span className="text-[10px] font-mono text-red-300/80 uppercase tracking-widest font-semibold">DATA_VOID</span>
+            <span className="text-[10px] font-mono text-red-300/60 uppercase tracking-widest truncate">{voidData.field}</span>
           </div>
-          <div className="flex-1 min-w-0">
-            <h4 className="text-red-400 font-mono text-xs uppercase tracking-widest truncate">DATA_VOID // {voidData.field}</h4>
-            <p className="text-red-300/60 text-[10px] font-mono mt-1 truncate">{voidData.action}</p>
+          <div className="p-4 flex items-center gap-4">
+            <div className="w-8 h-8 rounded-[14px] bg-red-500/20 flex items-center justify-center text-red-400 shrink-0 border border-red-500/30">
+              <AlertTriangle size={16} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-red-200/90 text-[10px] font-mono uppercase tracking-widest truncate">ACTION</div>
+              <div className="text-red-300/70 text-[10px] font-mono mt-1 uppercase tracking-widest truncate">{voidData.action}</div>
+            </div>
           </div>
-        </div>
+        </motion.div>
       )
     }
     case 'news_ticker':
@@ -441,7 +451,7 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
         <div className="grid grid-cols-1 gap-2 w-full min-w-0 overflow-hidden">
           {profiles.map((profile, i) => (
             <div key={i} className="flex items-center gap-3 p-2 sm:p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group min-w-0">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-2xl bg-zinc-800 flex items-center justify-center text-zinc-400 font-bold border border-white/5 group-hover:border-blue-500/50 transition-colors shrink-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-[14px] sm:rounded-2xl bg-zinc-800 flex items-center justify-center text-zinc-400 font-bold border border-white/5 group-hover:border-blue-500/50 transition-colors shrink-0">
                 {profile.name?.charAt(0)}
               </div>
               <div className="flex-1 min-w-0 overflow-hidden">
