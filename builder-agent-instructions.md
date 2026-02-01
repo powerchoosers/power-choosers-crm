@@ -51,10 +51,18 @@ The legacy dashboard file `c:\Users\Lap3p\OneDrive\Documents\Power Choosers CRM\
 6.  **Squircle Enforcement**: Never use `rounded-full` for contact or company icons. Always verify that small icons (36px) use `rounded-[14px]` to maintain the squircle shape.
 7.  **Schema Extensions**: When adding new fields to Accounts or Contacts for future edits, you **MUST** also add these fields to the `BulkImportModal.tsx` mapping schemas to maintain ingestion parity.
 
-## 🔐 Google Cloud Authentication
-1.  **Browser-Based Login**: When the user needs to log into `gcloud`, ALWAYS use the browser-based flow to avoid terminal password prompts.
+## 🔐 Cloud & CLI Authentication
+
+1.  **Google Cloud (Browser-Based Login)**: When the user needs to log into `gcloud`, ALWAYS use the browser-based flow to avoid terminal password prompts.
     -   **Command**: `gcloud auth login`
-    -   *Rationale*: This opens the default browser for a secure, interactive login which is required for the user's environment.
+    -   *Rationale*: This opens the default browser for a secure, interactive login.
+
+2.  **Supabase CLI (Unified Access)**:
+    -   **Execution**: ALWAYS prefix commands with `npx` to ensure the local version is used: `npx supabase [command]`.
+    -   **Authentication**: Use `npx supabase login` to authenticate via access token.
+    -   **Linking**: Use `npx supabase link --project-ref gfitvnkaevozbcyostez` to connect the directory to the remote project.
+    -   **Secrets**: Manage remote environment variables using `npx supabase secrets set KEY=VALUE`.
+    -   **Functions**: Deploy edge functions with `npx supabase functions deploy [name] --no-verify-jwt`.
 
 ## 🧹 Maintenance & Cache
 1.  **Clearing .next Cache**: If the `.next` cache is suspected to be full or causing issues, clear the file contents rather than deleting the directory:

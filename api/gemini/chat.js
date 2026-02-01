@@ -12,11 +12,11 @@ const tools = [
     functionDeclarations: [
       {
         name: 'list_contacts',
-        description: 'Get a list of contacts from the CRM. Can be filtered by search term, account ID, or job title.',
+        description: 'MANDATORY for finding people/contacts in the CRM. Search by first name, last name, full name, or email. ALWAYS call this first if a user mentions a person.',
         parameters: {
           type: 'OBJECT',
           properties: {
-            search: { type: 'STRING', description: 'Search term for name or email' },
+            search: { type: 'STRING', description: 'Name, first name, last name, or email to search for' },
             accountId: { type: 'STRING', description: 'Filter by account ID' },
             title: { type: 'STRING', description: 'Filter by job title (e.g. "Facilities Manager", "CEO")' },
             limit: { type: 'NUMBER', description: 'Maximum number of contacts to return (default 10)' }
@@ -58,11 +58,11 @@ const tools = [
       },
       {
         name: 'list_accounts',
-        description: 'Get a list of accounts (companies) from the CRM. Can be filtered by search term, industry, or contract expiration year.',
+        description: 'MANDATORY for finding companies/accounts in the CRM. Search by name, domain, or industry. ALWAYS call this first if a user mentions a company.',
         parameters: {
           type: 'OBJECT',
           properties: {
-            search: { type: 'STRING', description: 'Search term for account name, domain, or industry' },
+            search: { type: 'STRING', description: 'Account name, domain, or industry keyword' },
             industry: { type: 'STRING', description: 'Filter by industry (e.g. "Manufacturing", "Healthcare")' },
             expiration_year: { type: 'NUMBER', description: 'Filter accounts by contract expiration year (e.g. 2026)' },
             limit: { type: 'NUMBER', description: 'Maximum number of accounts to return' }
@@ -240,10 +240,14 @@ const toolHandlers = {
         const query = search || title;
         const embedding = await generateEmbedding(query);
         if (embedding) {
-          const { data: vectorResults, error } = await supabaseAdmin.rpc('match_contacts', {
+          console.log(`[list_contacts] Using hybrid search for: "${query}"`);
+          const { data: vectorResults, error } = await supabaseAdmin.rpc('hybrid_search_contacts', {
+            query_text: query,
             query_embedding: embedding,
-            match_threshold: 0.3,
-            match_count: limit
+            match_count: limit,
+            full_text_weight: 1.0,
+            semantic_weight: 1.0,
+            rrf_k: 50
           });
           if (!error && vectorResults) {
             data = vectorResults;
@@ -251,7 +255,7 @@ const toolHandlers = {
           }
         }
       } catch (e) {
-        console.error('[list_contacts] Vector error:', e);
+        console.error('[list_contacts] Hybrid/Vector error:', e);
       }
     }
 
@@ -264,8 +268,8 @@ const toolHandlers = {
 
       if (search || title) {
         const term = search || title;
-        // Broaden keyword search to include title and city
-        query = query.or(`name.ilike.%${term}%,email.ilike.%${term}%,title.ilike.%${term}%,city.ilike.%${term}%,metadata->>title.ilike.%${term}%,metadata->>city.ilike.%${term}%`);
+        // Broaden keyword search to include firstName, lastName, title and city
+        query = query.or(`name.ilike.%${term}%,firstName.ilike.%${term}%,lastName.ilike.%${term}%,email.ilike.%${term}%,title.ilike.%${term}%,city.ilike.%${term}%,metadata->>title.ilike.%${term}%,metadata->>city.ilike.%${term}%`);
       }
       
       const { data: keywordData, error } = await query;
@@ -578,17 +582,20 @@ const toolHandlers = {
       }
     }
 
-    // 2. Use Vector Search if we still need more or didn't find via direct query
+    // 2. Use Hybrid Search (replacing Vector Search)
     if (!usedVector && (search || expiration_year)) {
       try {
         const query = search ? search : `accounts expiring in ${expiration_year}`;
         const embedding = await generateEmbedding(query);
         if (embedding) {
-          console.log(`[list_accounts] Using vector search for: "${query}"`);
-          const { data: vectorResults, error } = await supabaseAdmin.rpc('match_accounts', {
+          console.log(`[list_accounts] Using hybrid search for: "${query}"`);
+          const { data: vectorResults, error } = await supabaseAdmin.rpc('hybrid_search_accounts', {
+            query_text: query,
             query_embedding: embedding,
-            match_threshold: search ? 0.3 : 0.1,
-            match_count: limit * 5
+            match_count: limit * 5,
+            full_text_weight: 1.0,
+            semantic_weight: 1.0,
+            rrf_k: 50
           });
           if (!error && vectorResults) {
             data = vectorResults;
@@ -596,20 +603,26 @@ const toolHandlers = {
           }
         }
       } catch (e) {
-        console.error('[list_accounts] Vector generation error:', e);
+        console.error('[list_accounts] Hybrid generation error:', e);
       }
     }
 
     // 3. Fallback to Keyword Search
     if (!usedVector) {
-      let query = supabaseAdmin.from('accounts').select('*').limit(1000); 
-      if (industry) {
+      let query = supabaseAdmin.from('accounts').select('*');
+      
+      if (expiration_year) {
+        const yearStr = String(expiration_year);
+        const shortYear = yearStr.slice(2);
+        // Direct query for year in contract_end_date or metadata
+        query = query.or(`contract_end_date.ilike.%${yearStr}%,contract_end_date.ilike.%/${shortYear}%,metadata->>contract_end_date.ilike.%${yearStr}%,metadata->>contractEndDate.ilike.%${yearStr}%,metadata->>contract_end_date.ilike.%/${shortYear}%,metadata->>contractEndDate.ilike.%/${shortYear}%`);
+      } else if (industry) {
         query = query.or(`industry.ilike.%${industry}%,metadata->>industry.ilike.%${industry}%`);
-      }
-      if (search) {
+      } else if (search) {
         query = query.or(`name.ilike.%${search}%,domain.ilike.%${search}%,industry.ilike.%${search}%,metadata->>industry.ilike.%${search}%`);
       }
-      const { data: keywordData, error } = await query;
+      
+      const { data: keywordData, error } = await query.limit(100);
       data = keywordData || [];
     }
     
@@ -911,6 +924,33 @@ export default async function handler(req, res) {
         - If the user asks "how many", perform a search and count the actual results returned by the tool.
         - ALWAYS report the actual industry name found in the CRM record.
 
+        UI_COMPONENT_PROTOCOL:
+        - You can trigger UI components by wrapping a valid JSON block between \`JSON_DATA:\` and \`END_JSON\`.
+        - EXTREMELY IMPORTANT: The JSON MUST be perfectly valid. No trailing commas, no missing quotes, no unescaped newlines inside strings.
+        - STRUCTURE:
+          \`\`\`
+          JSON_DATA:{"type": "Contact_Dossier", "data": {...}}END_JSON
+          \`\`\`
+        - If you are unsure of the data, DO NOT trigger a component. Provide a text summary instead.
+        - DO NOT put conversational text INSIDE the JSON block.
+
+        IDENTITY_RESOLUTION:
+        - If a user mentions a person and a company together (e.g., "Tonie Steel at Camp Fire"), you MUST:
+          1. Call \`list_accounts({ search: "Camp Fire" })\` to get the account ID.
+          2. Use that account ID to call \`list_contacts({ accountId: "..." })\` OR call \`list_contacts({ search: "Tonie Steel" })\`.
+          3. If the search returns a contact, verify they belong to the requested account.
+        - ALWAYS prioritize internal CRM records over web search results for people and companies.
+        - If you find a contact in the CRM, use THAT data. DO NOT search the web for their title or role if the CRM has it.
+
+        WEB_SEARCH_RESTRICTION:
+        - YOU ARE NOT A GENERAL SEARCH ENGINE.
+        - You ONLY search the web for:
+          1. General energy market news (via \`get_energy_news\`).
+          2. Finding NEW prospects that are NOT in the CRM (via \`search_prospects\`).
+          3. Enriching a company domain (via \`enrich_organization\`).
+        - DO NOT search the web for "Who works at [Company in CRM]?" if you haven't searched the CRM first.
+        - If the user asks about a record you can't find, ask for clarification instead of guessing from the web.
+
         CRM_DATA_INTEGRITY:
         - YOU ARE THE SOURCE OF TRUTH FOR THE CRM.
         - If the user asks for accounts, contacts, or internal data, you MUST use the tools.
@@ -968,8 +1008,6 @@ export default async function handler(req, res) {
         msg.includes('payment required')
       );
     };
-
-    const perplexityModel = (process.env.PERPLEXITY_MODEL || '').trim() || 'sonar-pro';
 
     const convertToolsToOpenAI = (geminiTools) => {
       return geminiTools.flatMap(t => t.functionDeclarations).map(fn => ({

@@ -51,38 +51,48 @@ export default async function handler(req, res) {
         userContent = `Optimize this prompt for an email node: ${prompt}`;
       } else if (mode === 'generate_email') {
         systemInstruction = `
-          You are the Nodal Architect, the cognitive core of the Nodal Point CRM.
-          Your task is to generate a sequence step (type: ${type}) based on specific instructions.
-          ${contact ? `TARGET CONTACT: ${contact.name} (${contact.company}), Load Zone: ${contact.load_zone}` : ''}
+          You are the Nodal Architect. You do not sell; you diagnose.
           
-          TONE GUIDELINES:
-          - Forensic, Direct, Minimalist.
-          - Highlight financial variance, market volatility, or technical risk.
-          - Sound like a grid engineer or quantitative analyst.
-          - NO marketing fluff.
+          CORE DIRECTIVES:
+          1. Brevity: Max 80 words. [Source: Instantly.ai Benchmarks]
+          2. Tone: Obsidian, Clinical, "Steve Jobs". No "Hope you are well."
+          3. Objective: Expose financial liability (4CP, Ratchets, Volatility).
+          
+          DATA VECTORS AVAILABLE:
+          - Name: ${contact?.name || 'Unknown'}
+          - Company: ${contact?.company || 'Unknown'}
+          - Industry: ${contact?.industry || 'Unknown'}
+          - Load Zone: ${contact?.load_zone || 'Unknown'}
+          - Calc_Load_Factor: ${contact?.metadata?.loadFactor || 'Unknown'}
+          - Contract_Exp: ${contact?.contractEndDate || 'Unknown'}
           
           INSTRUCTIONS:
-          - Output ONLY the email/script body.
-          - Use HTML for formatting (paragraphs, line breaks).
-          - Preserve variables like {{first_name}}.
+          - You must generate a sequence step (type: ${type}) based on the STRATEGY provided.
+          - Output MUST be a valid JSON object with the following keys:
+            {
+              "subject_line": "Forensic and direct subject",
+              "body_html": "Email body with <p> and <br> tags. Use {{first_name}} for personalization.",
+              "logic_reasoning": "A concise explanation of the AI's decision-making (e.g., 'Detected 4CP risk signal in metadata -> Triggered Volatility Protocol')."
+            }
         `;
-        userContent = `Instructions: ${prompt}\n\nDraft/Context: ${draft || '(None)'}`;
+        userContent = `STRATEGY: ${prompt}\n\nDraft/Context: ${draft || '(None)'}`;
       } else {
         systemInstruction = `
-          You are the Nodal Architect, the cognitive core of the Nodal Point CRM.
-          Your task is to optimize a sequence step draft (type: ${type}).
-          ${contact ? `TARGET CONTACT: ${contact.name} (${contact.company}), Load Zone: ${contact.load_zone}` : ''}
+          You are the Nodal Architect. You do not sell; you diagnose.
           
-          TONE GUIDELINES:
-          - Forensic, Direct, Minimalist.
-          - Highlight financial variance, market volatility, or technical risk.
-          - Sound like a grid engineer or quantitative analyst.
-          - NO marketing fluff.
+          CORE DIRECTIVES:
+          1. Brevity: Max 80 words.
+          2. Tone: Obsidian, Clinical, "Steve Jobs".
+          3. Objective: Expose financial liability.
           
           INSTRUCTIONS:
-          - Output ONLY the optimized email/script body.
-          - Use HTML for formatting (paragraphs, line breaks).
-          - Preserve variables like {{first_name}}.
+          - Optimize the provided draft (type: ${type}).
+          - Output MUST be a valid JSON object:
+            {
+              "subject_line": "Forensic and direct subject",
+              "body_html": "Optimized body with HTML tags.",
+              "logic_reasoning": "Explanation of optimization choices."
+            }
         `;
         userContent = `Optimize this draft: ${draft}`;
       }
@@ -96,7 +106,8 @@ export default async function handler(req, res) {
           "X-Title": "Nodal Point CRM"
         },
         body: JSON.stringify({
-          "model": "openai/gpt-4o-mini", // Cost-effective, high intelligence
+          "model": "openai/gpt-4o-mini",
+          "response_format": { "type": "json_object" },
           "messages": [
             { "role": "system", "content": systemInstruction },
             { "role": "user", "content": userContent }
@@ -110,10 +121,27 @@ export default async function handler(req, res) {
       }
 
       const data = await response.json();
-      const generatedText = data.choices[0].message.content.trim();
+      const generatedContent = data.choices[0].message.content.trim();
+      
+      let finalResult;
+      if (mode === 'optimize_prompt') {
+        finalResult = { optimized: generatedContent };
+      } else {
+        try {
+          const parsed = JSON.parse(generatedContent);
+          finalResult = { 
+            optimized: parsed.body_html,
+            subject: parsed.subject_line,
+            logic: parsed.logic_reasoning
+          };
+        } catch (e) {
+          // Fallback if AI didn't return valid JSON despite instructions
+          finalResult = { optimized: generatedContent };
+        }
+      }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ optimized: generatedText }));
+      res.end(JSON.stringify(finalResult));
       return;
 
     } catch (error) {
