@@ -716,6 +716,48 @@ export function GeminiChatPanel() {
     }
   }, [input])
 
+  const copySupabaseAIPrompt = () => {
+    const prompt = `
+I am troubleshooting a Hybrid Search implementation in a Supabase (PostgreSQL) database. 
+
+### CONTEXT:
+- **Project**: Nodal Point CRM (Next.js 15)
+- **Database**: Supabase with pgvector
+- **Search Logic**: Hybrid Search using Reciprocal Rank Fusion (RRF).
+- **Current Issue**: Searching for exact names (e.g., "Camp Fire First Texas" or "Integrated Circuit Solutions USA") is not consistently returning the correct record at rank #1, or the AI agent is failing to find them via the \`list_accounts\` tool.
+
+### SCHEMA & SEARCH FUNCTION:
+We use a custom PostgreSQL function \`hybrid_search_accounts\`:
+\`\`\`sql
+CREATE OR REPLACE FUNCTION hybrid_search_accounts(
+  query_text TEXT,
+  query_embedding VECTOR(768),
+  match_count INT,
+  full_text_weight FLOAT DEFAULT 4.0,
+  semantic_weight FLOAT DEFAULT 0.5,
+  rrf_k INT DEFAULT 50
+)
+RETURNS TABLE (...)
+LANGUAGE plpgsql
+AS $$
+-- Tiered Ranking:
+-- 1. Exact Name Match (Priority)
+-- 2. Starts With Name
+-- 3. FTS (websearch_to_tsquery)
+-- 4. Semantic (Vector Similarity)
+-- Combined using RRF
+$$;
+\`\`\`
+
+### THE QUESTION:
+1. Why might an exact match for "Camp Fire First Texas" fail to rank #1 if the weights are 4.0 (FTS) vs 0.5 (Semantic)?
+2. How can I modify the SQL function to ensure that if \`name ILIKE query_text\`, it is GUARANTEED to be the first result regardless of RRF?
+3. Is there a better way to handle multi-word entity names in \`websearch_to_tsquery\`?
+    `.trim()
+    navigator.clipboard.writeText(prompt)
+    alert('Troubleshooting prompt for Supabase AI copied!')
+  }
+
   const copySupabasePrompt = () => {
     const prompt = `
 -- HYBRID SEARCH DEBUG COMMAND
@@ -933,6 +975,14 @@ SELECT * FROM hybrid_search_accounts(
               <div className="flex items-center justify-between border-b border-white/5 pb-1 mb-2">
                 <div className="flex items-center gap-2">
                   <span className="text-[#002FA7] font-bold tracking-widest">AI_ROUTER_HUD // LIVE_DIAGNOSTICS</span>
+                  <button 
+                    onClick={copySupabaseAIPrompt}
+                    className="p-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500 hover:text-white transition-all flex items-center gap-1 group"
+                    title="Copy AI Troubleshooting Prompt"
+                  >
+                    <Bot size={10} className="group-hover:scale-110 transition-transform" />
+                    <span className="text-[8px] font-bold uppercase tracking-tighter">AI_PROMPT</span>
+                  </button>
                   <button 
                     onClick={copySupabasePrompt}
                     className="p-1 rounded bg-[#002FA7]/10 border border-[#002FA7]/20 text-[#002FA7] hover:bg-[#002FA7] hover:text-white transition-all flex items-center gap-1 group"
