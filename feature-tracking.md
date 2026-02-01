@@ -105,3 +105,10 @@
 - **Actions**:
   - [x] **Logic Gate Repair**: Updated `list_contacts`, `list_accounts`, and `search_emails` in `api/gemini/chat.js` to strictly check for `vectorResults.length > 0` before declaring vector search successful.
   - [x] **Schema Alignment**: Corrected `firstName`/`lastName` (camelCase) to `first_name`/`last_name` (snake_case) in the `list_contacts` fallback SQL query to prevent "Column does not exist" crashes.
+
+### Nodal Architect ID Generation
+- **Status**: Completed
+- **Description**: Implemented proactive UUID v4 generation for new Contacts and Tasks created via AI tools to support Supabase text-based primary keys.
+- **Actions**:
+  - [x] **ID Generation**: Updated `create_contact` and `create_task` in `api/gemini/chat.js` to assign `crypto.randomUUID()` if no ID is provided by the LLM.
+  - [x] **Searchability Verification**: Confirmed existence of `embed_contacts_on_insert` triggers in `20260201_automatic_embeddings.sql`, ensuring new records are automatically indexed for vector search.
