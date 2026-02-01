@@ -112,3 +112,11 @@
 - **Actions**:
   - [x] **ID Generation**: Updated `create_contact` and `create_task` in `api/gemini/chat.js` to assign `crypto.randomUUID()` if no ID is provided by the LLM.
   - [x] **Searchability Verification**: Confirmed existence of `embed_contacts_on_insert` triggers in `20260201_automatic_embeddings.sql`, ensuring new records are automatically indexed for vector search.
+
+### Nodal Architect Anti-Hallucination Guard
+- **Status**: Completed
+- **Description**: Eliminated fabricated CRM responses by grounding account search and contract queries directly in Supabase.
+- **Actions**:
+  - [x] **Grounded Routing**: Added a deterministic CRM path in `api/gemini/chat.js` that intercepts account lookups, expiration-year queries, and contract detail requests.
+  - [x] **Context Inference**: Implemented last-account inference from prior `forensic_grid` JSON blocks to support follow-up questions like "contract details".
+  - [x] **No Fabrication**: Returns `Unknown` / `Data_Void` when key contract fields are missing instead of inventing values.

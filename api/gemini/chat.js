@@ -900,8 +900,375 @@ export default async function handler(req, res) {
     const prompt = cleanedMessages[lastUserIndex].content;
     const historyCandidates = cleanedMessages.slice(0, lastUserIndex);
 
+    const firstName = userProfile?.firstName || 'Trey';
+
+    const extractJsonBlocks = (text) => {
+      if (typeof text !== 'string' || !text.includes('JSON_DATA:')) return [];
+      const blocks = [];
+      let cursor = 0;
+      while (cursor < text.length) {
+        const start = text.indexOf('JSON_DATA:', cursor);
+        if (start === -1) break;
+        const end = text.indexOf('END_JSON', start);
+        if (end === -1) break;
+        const raw = text.slice(start + 'JSON_DATA:'.length, end).trim();
+        try {
+          const parsed = JSON.parse(raw);
+          blocks.push(parsed);
+        } catch {
+        }
+        cursor = end + 'END_JSON'.length;
+      }
+      return blocks;
+    };
+
+    const buildJsonBlock = (type, data) => {
+      return `JSON_DATA:${JSON.stringify({ type, data })}END_JSON`;
+    };
+
+    const parseYear = (text) => {
+      const m = String(text || '').match(/\b(19|20)\d{2}\b/);
+      if (!m) return null;
+      const year = Number(m[0]);
+      return Number.isFinite(year) ? year : null;
+    };
+
+    const stripSearchPreamble = (text) => {
+      let q = String(text || '').trim();
+      q = q.replace(/^\s*(can you\s+)?(please\s+)?(find|search( for)?|look up|do you see|do we have|is there|check( for)?)\s+/i, '');
+      q = q.replace(/^\s*(in\s+my\s+crm|in\s+the\s+crm|in\s+my\s+database|in\s+the\s+database)\s*/i, '');
+      q = q.replace(/[?!.]+\s*$/g, '').trim();
+      return q;
+    };
+
+    const inferLastAccountFromHistory = () => {
+      for (let i = cleanedMessages.length - 1; i >= 0; i--) {
+        const m = cleanedMessages[i];
+        if (m.role !== 'assistant') continue;
+        const blocks = extractJsonBlocks(m.content);
+        for (const b of blocks) {
+          if (!b || typeof b !== 'object') continue;
+          if (b.type !== 'forensic_grid') continue;
+          const rows = Array.isArray(b.data?.rows) ? b.data.rows : [];
+          if (rows.length === 1 && rows[0] && rows[0].id) {
+            return { id: String(rows[0].id), name: rows[0].name ? String(rows[0].name) : null };
+          }
+        }
+      }
+      return null;
+    };
+
+    const daysUntil = (dateStr) => {
+      const d = new Date(dateStr);
+      if (Number.isNaN(d.getTime())) return null;
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const end = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const diffMs = end.getTime() - start.getTime();
+      return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    };
+
+    const formatUsdRate = (rate) => {
+      if (rate === null || rate === undefined) return null;
+      const n = typeof rate === 'number' ? rate : Number(String(rate).replace(/[^0-9.\-]/g, ''));
+      if (!Number.isFinite(n)) return String(rate);
+      return `$${n.toFixed(4)}`;
+    };
+
+    const formatKwh = (usage) => {
+      if (usage === null || usage === undefined) return null;
+      const n = typeof usage === 'number' ? usage : Number(String(usage).replace(/[^0-9.\-]/g, ''));
+      if (!Number.isFinite(n)) return String(usage);
+      return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n)} kWh`;
+    };
+
+    const respondGrounded = (content, diagnostics) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          content,
+          provider: 'grounded',
+          model: 'supabase',
+          diagnostics,
+        })
+      );
+    };
+
+    const maybeHandleGroundedCrmRequest = async () => {
+      const p = String(prompt || '').trim();
+      if (!p) return false;
+
+      const lower = p.toLowerCase();
+      const isExpirationQuery = /(expir|expire|expires|expiration)\b/.test(lower) && !!parseYear(p);
+      const isContractQuery = /(contract|position maturity|strike price|annual usage|supplier|current supplier|current rate)\b/.test(lower);
+      const looksLikeDirectNameQuery = /^[a-z0-9][a-z0-9\s&.'-]{1,80}\??$/i.test(p) && !/(\bwho\b|\bwhat\b|\bwhy\b|\bhow\b|\bwhen\b)/i.test(p);
+      const isInstructionLike = /(\breturn\b|\bonly\b|\bsummarize\b|\bexplain\b|\bdraft\b|\bwrite\b|\bcompose\b|\bgenerate\b|\btranslate\b|\bdefine\b|\bcalculate\b|\bsolve\b)/.test(lower);
+      const hasSearchVerb = /(\bfind\b|\bsearch\b|\blook up\b|\bdo you see\b|\bcheck\b)/.test(lower);
+      const isSearchQuery = hasSearchVerb || (looksLikeDirectNameQuery && !isInstructionLike);
+
+      if (!isExpirationQuery && !isContractQuery && !isSearchQuery) return false;
+
+      const diagnostics = [
+        {
+          model: 'supabase',
+          provider: 'grounded',
+          status: 'attempting',
+          reason: 'CRM_GROUNDED_QUERY',
+        },
+      ];
+
+      const inferredAccount = inferLastAccountFromHistory();
+      const isContractFollowUp = isContractQuery && /\b(them|it|this|that)\b/.test(lower) && !!inferredAccount?.id;
+
+      if (isExpirationQuery) {
+        const year = parseYear(p);
+        const records = await toolHandlers.list_accounts({ expiration_year: year, limit: 50 });
+        diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+
+        const rows = (records || []).map((r) => ({
+          id: r.id,
+          name: r.name,
+          expiration: r.contract_end_date || 'Unknown',
+        }));
+
+        const narrative = `${firstName}, I pulled accounts with contract expirations in ${year} directly from your CRM. If an expiration is missing in the record, it is labeled Unknown.`;
+        const grid = buildJsonBlock('forensic_grid', {
+          title: `Accounts Expiring in ${year}`,
+          columns: ['id', 'name', 'expiration'],
+          rows,
+        });
+
+        respondGrounded(`${narrative} ${grid}`, diagnostics);
+        return true;
+      }
+
+      if (isContractFollowUp) {
+        const account = await toolHandlers.get_account_details({ account_id: String(inferredAccount.id) });
+        diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+
+        const expiration = account?.contract_end_date ? String(account.contract_end_date) : null;
+        if (!expiration) {
+          const narrative = `${firstName}, I found ${account?.name || 'the account'}, but there is no contract expiration date stored on the record right now.`;
+          const dv = buildJsonBlock('data_void', { field: 'Contract Expiration', action: 'REQUIRE_BILL_UPLOAD' });
+          respondGrounded(`${narrative} ${dv}`, diagnostics);
+          return true;
+        }
+
+        const daysRemaining = daysUntil(expiration);
+        const supplier = account?.electricity_supplier ? String(account.electricity_supplier) : 'Unknown';
+        const strike = formatUsdRate(account?.current_rate) || 'Unknown';
+        const usage = formatKwh(account?.annual_usage) || 'Unknown';
+        const narrative = `${firstName}, I pulled the energy contract fields directly from the CRM record for ${account?.name || 'this account'}. Anything not present in the database is labeled Unknown.`;
+        const pm = buildJsonBlock('position_maturity', {
+          expiration,
+          daysRemaining: typeof daysRemaining === 'number' ? daysRemaining : 0,
+          currentSupplier: supplier,
+          strikePrice: strike,
+          annualUsage: usage,
+          estimatedRevenue: 'Unknown',
+          margin: 'N/A',
+          isSimulation: false,
+        });
+        respondGrounded(`${narrative} ${pm}`, diagnostics);
+        return true;
+      }
+
+      if (isSearchQuery && isContractQuery) {
+        if (/\b(them|it|this|that)\b/.test(lower) && inferredAccount?.id) {
+          const account = await toolHandlers.get_account_details({ account_id: String(inferredAccount.id) });
+          diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+
+          const expiration = account?.contract_end_date ? String(account.contract_end_date) : null;
+          if (!expiration) {
+            const narrative = `${firstName}, I found ${account?.name || 'the account'}, but there is no contract expiration date stored on the record right now.`;
+            const dv = buildJsonBlock('data_void', { field: 'Contract Expiration', action: 'REQUIRE_BILL_UPLOAD' });
+            respondGrounded(`${narrative} ${dv}`, diagnostics);
+            return true;
+          }
+
+          const daysRemaining = daysUntil(expiration);
+          const supplier = account?.electricity_supplier ? String(account.electricity_supplier) : 'Unknown';
+          const strike = formatUsdRate(account?.current_rate) || 'Unknown';
+          const usage = formatKwh(account?.annual_usage) || 'Unknown';
+          const narrative = `${firstName}, I pulled the energy contract fields directly from the CRM record for ${account?.name || 'this account'}. Anything not present in the database is labeled Unknown.`;
+          const pm = buildJsonBlock('position_maturity', {
+            expiration,
+            daysRemaining: typeof daysRemaining === 'number' ? daysRemaining : 0,
+            currentSupplier: supplier,
+            strikePrice: strike,
+            annualUsage: usage,
+            estimatedRevenue: 'Unknown',
+            margin: 'N/A',
+            isSimulation: false,
+          });
+          respondGrounded(`${narrative} ${pm}`, diagnostics);
+          return true;
+        }
+
+        const q0 = stripSearchPreamble(p);
+        const tokens = q0.split(/\s+/).filter(Boolean);
+        const variations = [];
+        if (q0) variations.push(q0);
+        if (tokens.length > 2) variations.push(tokens.slice(0, 2).join(' '));
+        if (tokens.length > 3) variations.push(tokens.slice(0, 3).join(' '));
+
+        let records = [];
+        let usedQuery = q0;
+        for (const q of variations) {
+          const r = await toolHandlers.list_accounts({ search: q, limit: 10 });
+          if (Array.isArray(r) && r.length > 0) {
+            records = r;
+            usedQuery = q;
+            break;
+          }
+        }
+
+        if (!Array.isArray(records) || records.length === 0) {
+          diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+          const narrative = `${firstName}, I ran a grounded CRM search for "${usedQuery}", and I found zero matching account records.`;
+          const grid = buildJsonBlock('forensic_grid', {
+            title: `Accounts Matching "${usedQuery}"`,
+            columns: ['id', 'name'],
+            rows: [],
+          });
+          respondGrounded(`${narrative} ${grid}`, diagnostics);
+          return true;
+        }
+
+        if (records.length === 1) {
+          const account = await toolHandlers.get_account_details({ account_id: String(records[0].id) });
+          diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+
+          const expiration = account?.contract_end_date ? String(account.contract_end_date) : null;
+          if (!expiration) {
+            const narrative = `${firstName}, I found ${account?.name || 'the account'}, but there is no contract expiration date stored on the record right now.`;
+            const dv = buildJsonBlock('data_void', { field: 'Contract Expiration', action: 'REQUIRE_BILL_UPLOAD' });
+            respondGrounded(`${narrative} ${dv}`, diagnostics);
+            return true;
+          }
+
+          const daysRemaining = daysUntil(expiration);
+          const supplier = account?.electricity_supplier ? String(account.electricity_supplier) : 'Unknown';
+          const strike = formatUsdRate(account?.current_rate) || 'Unknown';
+          const usage = formatKwh(account?.annual_usage) || 'Unknown';
+          const narrative = `${firstName}, I resolved "${usedQuery}" to a single CRM account and pulled the energy contract fields directly from the database. Anything not present in the record is labeled Unknown.`;
+          const pm = buildJsonBlock('position_maturity', {
+            expiration,
+            daysRemaining: typeof daysRemaining === 'number' ? daysRemaining : 0,
+            currentSupplier: supplier,
+            strikePrice: strike,
+            annualUsage: usage,
+            estimatedRevenue: 'Unknown',
+            margin: 'N/A',
+            isSimulation: false,
+          });
+          respondGrounded(`${narrative} ${pm}`, diagnostics);
+          return true;
+        }
+
+        diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+        const rows = records.map((r) => ({ id: r.id, name: r.name }));
+        const narrative = `${firstName}, I ran a grounded account search in your CRM for "${usedQuery}". Multiple accounts match; select one and ask for contract details.`;
+        const grid = buildJsonBlock('forensic_grid', {
+          title: `Accounts Matching "${usedQuery}"`,
+          columns: ['id', 'name'],
+          rows,
+        });
+        respondGrounded(`${narrative} ${grid}`, diagnostics);
+        return true;
+      }
+
+      if (isContractQuery && !isSearchQuery) {
+        const inferred = inferLastAccountFromHistory();
+        let accountId = inferred?.id || null;
+
+        if (!accountId) {
+          const q = stripSearchPreamble(p);
+          const candidates = await toolHandlers.list_accounts({ search: q, limit: 3 });
+          if (Array.isArray(candidates) && candidates.length === 1) {
+            accountId = String(candidates[0].id);
+          }
+        }
+
+        if (!accountId) {
+          diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'failed', error: 'NO_ACCOUNT_CONTEXT' });
+          const narrative = `${firstName}, I can only return contract details if I can resolve a specific account record. I don’t have a grounded account selection in the current context.`;
+          respondGrounded(narrative, diagnostics);
+          return true;
+        }
+
+        const account = await toolHandlers.get_account_details({ account_id: accountId });
+        diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+
+        const expiration = account?.contract_end_date ? String(account.contract_end_date) : null;
+        if (!expiration) {
+          const narrative = `${firstName}, I found the account record, but there is no contract expiration date stored on it right now.`;
+          const dv = buildJsonBlock('data_void', { field: 'Contract Expiration', action: 'REQUIRE_BILL_UPLOAD' });
+          respondGrounded(`${narrative} ${dv}`, diagnostics);
+          return true;
+        }
+
+        const daysRemaining = daysUntil(expiration);
+        const supplier = account?.electricity_supplier ? String(account.electricity_supplier) : 'Unknown';
+        const strike = formatUsdRate(account?.current_rate) || 'Unknown';
+        const usage = formatKwh(account?.annual_usage) || 'Unknown';
+        const narrative = `${firstName}, I pulled the energy contract fields directly from the CRM record for ${account?.name || 'this account'}. Anything not present in the database is labeled Unknown.`;
+        const pm = buildJsonBlock('position_maturity', {
+          expiration,
+          daysRemaining: typeof daysRemaining === 'number' ? daysRemaining : 0,
+          currentSupplier: supplier,
+          strikePrice: strike,
+          annualUsage: usage,
+          estimatedRevenue: 'Unknown',
+          margin: 'N/A',
+          isSimulation: false,
+        });
+        respondGrounded(`${narrative} ${pm}`, diagnostics);
+        return true;
+      }
+
+      if (isSearchQuery) {
+        const q0 = stripSearchPreamble(p);
+        const tokens = q0.split(/\s+/).filter(Boolean);
+        const variations = [];
+        if (q0) variations.push(q0);
+        if (tokens.length > 2) variations.push(tokens.slice(0, 2).join(' '));
+        if (tokens.length > 3) variations.push(tokens.slice(0, 3).join(' '));
+
+        let records = [];
+        let usedQuery = q0;
+        for (const q of variations) {
+          const r = await toolHandlers.list_accounts({ search: q, limit: 10 });
+          if (Array.isArray(r) && r.length > 0) {
+            records = r;
+            usedQuery = q;
+            break;
+          }
+        }
+
+        diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+
+        const rows = (records || []).map((r) => ({
+          id: r.id,
+          name: r.name,
+        }));
+
+        const narrative = `${firstName}, I ran a grounded account search in your CRM for "${usedQuery}". These are the matching account records.`;
+        const grid = buildJsonBlock('forensic_grid', {
+          title: `Accounts Matching "${usedQuery}"`,
+          columns: ['id', 'name'],
+          rows,
+        });
+        respondGrounded(`${narrative} ${grid}`, diagnostics);
+        return true;
+      }
+
+      return false;
+    };
+
+    if (await maybeHandleGroundedCrmRequest()) return;
+
     const buildSystemPrompt = () => {
-      const firstName = userProfile?.firstName || 'Trey';
       return `
         You are the Nodal Architect, the cognitive core of the Nodal Point CRM.
         Your tone is professional, technical, and high-agency.

@@ -1603,7 +1603,7 @@ function ProtocolArchitectInner() {
                             <span className="text-[10px] font-mono text-emerald-500 uppercase tracking-widest">Neural_Logic // Rationale</span>
                           </div>
                           <p className="text-[11px] text-emerald-400/80 font-mono leading-relaxed italic">
-                            "{aiLogic}"
+                            {`"${aiLogic}"`}
                           </p>
                         </div>
                       )}
