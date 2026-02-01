@@ -616,8 +616,8 @@ export function GeminiChatPanel() {
 
   const [messages, setMessages] = useState<Message[]>([])
   const [lastProvider, setLastProvider] = useState<string>('openrouter')
-  const [lastModel, setLastModel] = useState<string>('openai/gpt-oss-120b')
-  const [selectedModel, setSelectedModel] = useState<string>('openai/gpt-oss-120b')
+  const [lastModel, setLastModel] = useState<string>('openai/gpt-oss-120b:free')
+  const [selectedModel, setSelectedModel] = useState<string>('openai/gpt-oss-120b:free')
   const [diagnostics, setDiagnostics] = useState<Diagnostic[] | null>(null)
   const [showDiagnostics, setShowDiagnostics] = useState(false)
   
@@ -1171,7 +1171,7 @@ export function GeminiChatPanel() {
                 Priority Agents (Free)
               </div>
               <SelectItem value="openai/gpt-oss-120b:free" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                GPT-OSS (120B)
+                GPT-OSS-120B (FREE)
               </SelectItem>
               <SelectItem value="nvidia/nemotron-3-nano-30b-a3b:free" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                 NEMOTRON-30B
@@ -1180,14 +1180,14 @@ export function GeminiChatPanel() {
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
                     Gemini Intelligence Stack
                   </div>
-                  <SelectItem value="gemini-1.5-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GEMINI-1.5-FLASH
+                  <SelectItem value="gemini-2.5-flash-lite" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GEMINI-2.5-FLASH-LITE
                   </SelectItem>
-                  <SelectItem value="gemini-2.0-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GEMINI-2.0-FLASH
+                  <SelectItem value="gemini-3.0-flash-preview" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GEMINI-3.0-FLASH-PREVIEW
                   </SelectItem>
-                  <SelectItem value="gemini-1.5-pro" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GEMINI-1.5-PRO
+                  <SelectItem value="gemini-3.0-pro-preview" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GEMINI-3.0-PRO-IMAGE-PREVIEW
                   </SelectItem>
                   
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
