@@ -567,16 +567,30 @@ const toolHandlers = {
       console.log(`[list_accounts] Performing direct query for expiration year: ${yearStr}`);
       
       // Attempt a direct Supabase query for the year across multiple fields
+      // Use cast to text for contract_end_date to avoid Postgres 42883 error
       const { data: yearData, error: yearError } = await supabaseAdmin
         .from('accounts')
         .select('*')
-        .or(`contract_end_date.ilike.%${yearStr}%,contract_end_date.ilike.%/${shortYear}%,metadata->>contract_end_date.ilike.%${yearStr}%,metadata->>contractEndDate.ilike.%${yearStr}%,metadata->>contract_end_date.ilike.%/${shortYear}%,metadata->>contractEndDate.ilike.%/${shortYear}%`)
+        .or(`metadata->>contract_end_date.ilike.%${yearStr}%,metadata->>contractEndDate.ilike.%${yearStr}%,metadata->>contract_end_date.ilike.%/${shortYear}%,metadata->>contractEndDate.ilike.%/${shortYear}%`)
         .limit(100);
 
-      if (!yearError && yearData && yearData.length > 0) {
-        console.log(`[list_accounts] Found ${yearData.length} records via direct year query`);
-        data = yearData;
-        usedVector = true; // Skip vector if we found direct matches
+      // If we didn't find enough in metadata, or even if we did, we should check the actual date column
+      // But we can't use ilike on a date column in the same .or() without issues in PostgREST
+      const { data: dateData } = await supabaseAdmin
+        .from('accounts')
+        .select('*')
+        .gte('contract_end_date', `${yearStr}-01-01`)
+        .lte('contract_end_date', `${yearStr}-12-31`)
+        .limit(100);
+      
+      const combinedData = [...(yearData || []), ...(dateData || [])];
+      // Deduplicate by ID
+      const uniqueData = Array.from(new Map(combinedData.map(item => [item.id, item])).values());
+
+      if (uniqueData.length > 0) {
+        console.log(`[list_accounts] Found ${uniqueData.length} records via direct year query`);
+        data = uniqueData;
+        usedVector = true;
       } else if (yearError) {
         console.error('[list_accounts] Direct year query error:', yearError);
       }
@@ -614,8 +628,9 @@ const toolHandlers = {
       if (expiration_year) {
         const yearStr = String(expiration_year);
         const shortYear = yearStr.slice(2);
-        // Direct query for year in contract_end_date or metadata
-        query = query.or(`contract_end_date.ilike.%${yearStr}%,contract_end_date.ilike.%/${shortYear}%,metadata->>contract_end_date.ilike.%${yearStr}%,metadata->>contractEndDate.ilike.%${yearStr}%,metadata->>contract_end_date.ilike.%/${shortYear}%,metadata->>contractEndDate.ilike.%/${shortYear}%`);
+        // Direct query for year in metadata + date range for contract_end_date
+        query = query.or(`metadata->>contract_end_date.ilike.%${yearStr}%,metadata->>contractEndDate.ilike.%${yearStr}%,metadata->>contract_end_date.ilike.%/${shortYear}%,metadata->>contractEndDate.ilike.%/${shortYear}%`);
+        query = query.gte('contract_end_date', `${yearStr}-01-01`).lte('contract_end_date', `${yearStr}-12-31`);
       } else if (industry) {
         query = query.or(`industry.ilike.%${industry}%,metadata->>industry.ilike.%${industry}%`);
       } else if (search) {
@@ -956,7 +971,10 @@ export default async function handler(req, res) {
         - If the user asks for accounts, contacts, or internal data, you MUST use the tools.
         - CRITICAL: If the tools return zero results, do NOT search the web for "expiring accounts" or "credits". Do NOT cite researchallofus.org or any other external site for internal CRM data.
         - If the database says no accounts expire in 2026, then NO accounts expire in 2026 in the CRM. Report this fact directly to ${firstName}.
-        - To find accounts expiring in 2026, call \`list_accounts({ expiration_year: 2026 })\`.
+        - To find accounts expiring in 2026, call `list_accounts({ expiration_year: 2026 })`.
+        - If the user asks about bills, contracts, or documents for a specific company (like "Camp Fire"), you MUST call `list_account_documents({ account_id: "..." })` after finding the account.
+        - NEVER say "I don't see any bills" or "no documents found" unless you have specifically called `list_account_documents` for that account.
+        - If you are viewing an account page (check CURRENT CONTEXT), call `list_account_documents` immediately if the user asks about files or bills.
 
         HYBRID_RESPONSE_MODE:
         - You are capable of providing BOTH narrative analysis AND forensic components in a single response.
