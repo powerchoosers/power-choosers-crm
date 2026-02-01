@@ -249,7 +249,7 @@ const toolHandlers = {
             semantic_weight: 1.0,
             rrf_k: 50
           });
-          if (!error && vectorResults) {
+          if (!error && vectorResults && vectorResults.length > 0) {
             data = vectorResults;
             usedVector = true;
           }
@@ -268,8 +268,8 @@ const toolHandlers = {
 
       if (search || title) {
         const term = search || title;
-        // Broaden keyword search to include firstName, lastName, title and city
-        query = query.or(`name.ilike.%${term}%,firstName.ilike.%${term}%,lastName.ilike.%${term}%,email.ilike.%${term}%,title.ilike.%${term}%,city.ilike.%${term}%,metadata->>title.ilike.%${term}%,metadata->>city.ilike.%${term}%`);
+        // Broaden keyword search to include first_name, last_name, title and city
+        query = query.or(`name.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%,title.ilike.%${term}%,city.ilike.%${term}%,metadata->>title.ilike.%${term}%,metadata->>city.ilike.%${term}%`);
       }
       
       const { data: keywordData, error } = await query;
@@ -611,7 +611,7 @@ const toolHandlers = {
             semantic_weight: 1.0,
             rrf_k: 50
           });
-          if (!error && vectorResults) {
+          if (!error && vectorResults && vectorResults.length > 0) {
             data = vectorResults;
             usedVector = true;
           }
@@ -744,7 +744,7 @@ const toolHandlers = {
             match_count: limit
           });
           
-          if (!error && vectorResults) {
+          if (!error && vectorResults && vectorResults.length > 0) {
             // Need to join contacts/accounts manually since RPC only returns emails table
             const emailIds = vectorResults.map(e => e.id);
             if (emailIds.length > 0) {
