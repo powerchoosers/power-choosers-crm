@@ -1273,7 +1273,7 @@ export default async function handler(req, res) {
       provider = 'openrouter';
     } else if (bodyModel.startsWith('sonar')) {
       provider = 'perplexity';
-    } else if (bodyModel.startsWith('openai/') || bodyModel.startsWith('anthropic/') || bodyModel.startsWith('google/') || bodyModel.startsWith('meta-llama/') || bodyModel.startsWith('mistralai/') || bodyModel.startsWith('perplexity/') || bodyModel.startsWith('nvidia/')) {
+    } else if (bodyModel.startsWith('openai/gpt-oss') || bodyModel.startsWith('nvidia/')) {
       provider = 'openrouter';
     }
 
@@ -1392,18 +1392,16 @@ export default async function handler(req, res) {
 
     const genAI = new GoogleGenerativeAI(geminiApiKey);
     const envPreferredModel = (process.env.GEMINI_MODEL || '').trim();
-    const preferredModel = (bodyModel && !bodyModel.includes('/') && !bodyModel.startsWith('sonar')) ? bodyModel : (envPreferredModel || 'gemini-1.5-flash');
+    const preferredModel = (bodyModel && !bodyModel.includes('/') && !bodyModel.startsWith('sonar')) ? bodyModel : (envPreferredModel || 'gemini-2.0-flash');
     const modelCandidates = Array.from(
       new Set(
         [
           preferredModel,
-          'gemini-3.0-pro-preview',
-          'gemini-3.0-flash-preview',
-          'gemini-2.5-flash-lite',
           'gemini-2.0-flash',
-          'gemini-1.5-flash',
-          'gemini-1.5-pro'
-        ].filter(m => m && typeof m === 'string' && (m.startsWith('gemini-') || m.includes('flash') || m.includes('pro')))
+          'gemini-2.0-flash-thinking-exp-01-21',
+          'gemini-2.0-pro-exp-02-05',
+          'gemini-2.0-flash-exp'
+        ].filter(m => m && typeof m === 'string' && (m.startsWith('gemini-2.')))
       )
     );
 
