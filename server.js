@@ -130,6 +130,7 @@ import twilioTranscribeHandler from './api/twilio/transcribe.js';
 import twilioDialCompleteHandler from './api/twilio/dial-complete.js';
 import twilioProcessExistingTranscriptsHandler from './api/twilio/process-existing-transcripts.js';
 import energyNewsHandler from './api/energy-news.js';
+import eiaHandler from './api/market/eia.js';
 import geminiChatHandler from './api/gemini/chat.js';
 import logoHandler from './api/logo.js';
 import twilioBridgeHandler from './api/twilio/bridge.js';
@@ -169,9 +170,10 @@ console.log('[Server] Environment Key Check:', {
   hasFreeGeminiKey: !!process.env.FREE_GEMINI_KEY,
   hasGoogleMapsApi: !!process.env.GOOGLE_MAPS_API,
   hasGoogleServiceAccountKey: !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
-  hasSupabaseUrl: !!process.env.SUPABASE_URL,
+  hasSupabaseUrl: !!(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL),
   hasSupabaseServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
   hasPerplexityApiKey: !!process.env.PERPLEXITY_API_KEY,
+  hasEiaApiKey: !!process.env.EIA_API_KEY,
   hasFirebaseProjectId: !!process.env.FIREBASE_PROJECT_ID,
   hasSendgridApiKey: !!process.env.SENDGRID_API_KEY,
   hasGmailSenderEmail: !!process.env.GMAIL_SENDER_EMAIL,
@@ -579,6 +581,11 @@ async function handleApiTxPrice(req, res, parsedUrl) {
   return await txPriceHandler(req, res);
 }
 
+async function handleApiMarketEia(req, res, parsedUrl) {
+  req.query = { ...parsedUrl.query };
+  return await eiaHandler(req, res);
+}
+
 // Twilio Poll CI Analysis (background analyzer)
 async function handleApiTwilioPollCIAnalysis(req, res) {
   if (req.method === 'POST') {
@@ -656,6 +663,7 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/twilio/recording' ||
     pathname === '/api/twilio/ai-insights' ||
     pathname === '/api/energy-news' ||
+    pathname === '/api/market/eia' ||
     pathname === '/api/search' ||
     pathname === '/api/tx-price' ||
     pathname === '/api/process-call' ||
@@ -747,6 +755,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/energy-news') {
     return handleApiEnergyNews(req, res);
+  }
+  if (pathname === '/api/market/eia') {
+    return handleApiMarketEia(req, res, parsedUrl);
   }
   if (pathname === '/api/search') {
     return handleApiSearch(req, res, parsedUrl);
