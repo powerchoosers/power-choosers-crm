@@ -131,6 +131,7 @@ import twilioDialCompleteHandler from './api/twilio/dial-complete.js';
 import twilioProcessExistingTranscriptsHandler from './api/twilio/process-existing-transcripts.js';
 import energyNewsHandler from './api/energy-news.js';
 import eiaHandler from './api/market/eia.js';
+import ercotHandler from './api/market/ercot.js';
 import geminiChatHandler from './api/gemini/chat.js';
 import logoHandler from './api/logo.js';
 import twilioBridgeHandler from './api/twilio/bridge.js';
@@ -174,6 +175,8 @@ console.log('[Server] Environment Key Check:', {
   hasSupabaseServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
   hasPerplexityApiKey: !!process.env.PERPLEXITY_API_KEY,
   hasEiaApiKey: !!process.env.EIA_API_KEY,
+  hasErcotApiKey: !!process.env.ERCOT_API_KEY,
+  hasErcotPublicApiKey: !!process.env.ERCOT_PUBLIC_API_KEY,
   hasFirebaseProjectId: !!process.env.FIREBASE_PROJECT_ID,
   hasSendgridApiKey: !!process.env.SENDGRID_API_KEY,
   hasGmailSenderEmail: !!process.env.GMAIL_SENDER_EMAIL,
@@ -586,6 +589,11 @@ async function handleApiMarketEia(req, res, parsedUrl) {
   return await eiaHandler(req, res);
 }
 
+async function handleApiMarketErcot(req, res, parsedUrl) {
+  req.query = { ...parsedUrl.query };
+  return await ercotHandler(req, res);
+}
+
 // Twilio Poll CI Analysis (background analyzer)
 async function handleApiTwilioPollCIAnalysis(req, res) {
   if (req.method === 'POST') {
@@ -758,6 +766,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/market/eia') {
     return handleApiMarketEia(req, res, parsedUrl);
+  }
+  if (pathname === '/api/market/ercot') {
+    return handleApiMarketErcot(req, res, parsedUrl);
   }
   if (pathname === '/api/search') {
     return handleApiSearch(req, res, parsedUrl);

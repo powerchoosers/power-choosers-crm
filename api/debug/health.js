@@ -28,7 +28,8 @@ export default async function handler(req, res) {
       SENDGRID_API_KEY: has('SENDGRID_API_KEY'),
       GMAIL_SENDER_EMAIL: has('GMAIL_SENDER_EMAIL'),
       VERCEL_URL: has('VERCEL_URL'),
-      SUPABASE_URL: has('SUPABASE_URL'),
+      SUPABASE_URL: has('SUPABASE_URL') || has('NEXT_PUBLIC_SUPABASE_URL'),
+      NEXT_PUBLIC_SUPABASE_URL: has('NEXT_PUBLIC_SUPABASE_URL'),
       SUPABASE_SERVICE_ROLE_KEY: has('SUPABASE_SERVICE_ROLE_KEY')
     };
 

@@ -7,18 +7,52 @@ export default function MarketPulseWidget() {
   const [prices, setPrices] = useState({
     houston: 24.50,
     north: 21.20,
-    reserves: 3450
+    reserves: 3450,
+    scarcity: 4.2
   })
+  const [loading, setLoading] = useState(true)
 
-  // Simulate price movement
   useEffect(() => {
-    const interval = setInterval(() => {
-      setPrices(prev => ({
-        houston: +(prev.houston + (Math.random() - 0.5)).toFixed(2),
-        north: +(prev.north + (Math.random() - 0.5)).toFixed(2),
-        reserves: Math.floor(prev.reserves + (Math.random() - 0.5) * 100)
-      }))
-    }, 5000)
+    async function fetchMarketData() {
+      try {
+        // Fetch prices from ERCOT scraper
+        const priceRes = await fetch('/api/market/ercot?type=prices')
+        const priceData = await priceRes.json()
+
+        // Fetch grid conditions for reserves
+        const gridRes = await fetch('/api/market/ercot?type=grid')
+        const gridData = await gridRes.json()
+
+        if (priceData.prices) {
+          setPrices(prev => ({
+            ...prev,
+            houston: priceData.prices.houston || prev.houston,
+            north: priceData.prices.north || prev.north,
+          }))
+        }
+
+        if (gridData.metrics) {
+          // Calculate a simulated "reserves" based on actual vs forecast or other metrics
+          // For now, let's just use a reasonable number if we don't have direct reserves
+          const load = gridData.metrics.actual_load
+          const forecast = gridData.metrics.forecast_load
+          const diff = forecast - load
+          
+          setPrices(prev => ({
+            ...prev,
+            reserves: Math.floor(load / 10), // Placeholder logic for visual pulse
+            scarcity: +(Math.abs(diff / 1000)).toFixed(1)
+          }))
+        }
+        
+        setLoading(false)
+      } catch (error) {
+        console.error('Failed to fetch market data:', error)
+      }
+    }
+
+    fetchMarketData()
+    const interval = setInterval(fetchMarketData, 30000) // Update every 30 seconds
     return () => clearInterval(interval)
   }, [])
 
@@ -67,7 +101,7 @@ export default function MarketPulseWidget() {
 
         <div className="flex items-center gap-2 pt-1">
           <AlertTriangle size={12} className="text-yellow-500/50" />
-          <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-tighter">Scarcity Probability: 4.2%</span>
+          <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-tighter">Scarcity Probability: {prices.scarcity}%</span>
         </div>
       </div>
     </div>
