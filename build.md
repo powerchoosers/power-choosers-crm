@@ -1,186 +1,109 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { cors } from '../_cors.js';
-import logger from '../_logger.js';
+. The Diagnosis (Critical Failures)
+A. Visual Noise in the Preview (The HTML Glitch) In TEST_PROTOCOL.png [Source 1154], the output displays raw HTML tags (<p>, </p>).
+• The Verdict: This is unacceptable. It breaks the "Obsidian & Glass" immersion. It forces the user to mentally parse code instead of judging the tone of the message.
+• The Fix: You must implement a Render Engine in the preview window that parses the HTML string into a visual email client simulation. The user should see the email exactly as the prospect will see it on an iPhone 15 [Source 1235].
+B. The "Black Box" Prompting In Screenshot 2026-01-31 [Source 1142], your prompt is generic: "Generate a concise and direct email..."
+• The Verdict: This relies too heavily on the AI guessing the context. In 2026, high-converting emails rely on Hyper-Personalization based on specific data signals (Funding, Load Factor, 4CP) [Source 1237].
+• The Fix: The Calibration screen needs "Data Injection Toggles." You must explicitly tell the AI which data vectors to use (e.g., [x] Include 4CP Risk, [ ] Include Contract Expiry).
+C. Lack of "Why" (Forensic Explainability) When the email is generated, the user sees the text but not the reasoning.
+• The Verdict: An Architect needs to know why the AI chose to mention "Relocation." Was it a random hallucination? Or did it pull a "Move Event" signal from the contact's dossier?
+• The Fix: The Test Protocol screen needs a "Neural Logic Sidebar" that explains the AI's decision-making (e.g., "Detected 'New Office' signal in Apollo data -> Triggered Relocation Protocol").
 
-export default async function handler(req, res) {
-  // Handle CORS
-  if (cors(req, res)) return;
+--------------------------------------------------------------------------------
+2. The Architectural Upgrade (The New Flow)
+We will restructure the flow to move from "Writing" to "Architecting."
+Phase 1: Calibration (The Strategy Layer)
+Current State: A text box for a prompt. New State: The Context Matrix.
+Do not just ask the user for a prompt. Force the user to define the Physics of the Message.
+1. The Prompt Builder: Instead of one big text box, split it into three distinct fields [Source 1231]:
+    ◦ Role (The Architect): "Act as a Forensic Energy Auditor..."
+    ◦ Objective (The Liability): "Expose the structural variance in their 4CP charges."
+    ◦ Constraints (The 80-Word Rule): "Keep under 80 words. No sales fluff. Use 'No-Oriented' questions." [Source 420].
+2. Vector Selection: Add checkboxes below the prompt area:
+    ◦ [ ] Inject Firmographics (Industry, Revenue)
+    ◦ [ ] Inject Energy Metrics (Load Zone, Usage)
+    ◦ [ ] Inject Recent News (Apollo/Coresignal)
+Phase 2: Test Protocol (The Simulation Layer)
+Current State: A drop-down to pick a contact and a text dump. New State: The Flight Simulator.
+When the user selects "Billy Ragland" and clicks "Simulate," the screen splits into three panes:
+Pane A: The Output (Rendered)
+• Displays the email visually (no HTML tags).
+• Mobile Mode: A toggle to see how it looks on a phone screen (critical, as 80% of B2B emails are opened on mobile) [Source 1234].
+Pane B: The Neural Logic (Side Panel)
+• The AI outputs a meta-commentary:
+Pane C: The Spam/Deliverability Audit
+• Before the user approves the prompt, run a client-side check for "Spam Trigger Words" (e.g., "Guarantee", "Save Money") [Source 587].
+• If found, highlight them in Red and suggest clinical alternatives (e.g., change "Save" to "Mitigate Liability").
 
-  if (req.method !== 'POST') {
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Method not allowed' }));
-    return;
-  }
+--------------------------------------------------------------------------------
+3. Implementation Code (The Update)
+You need to update your build.md handler and your frontend Compose logic.
+Update build.md (Backend Handler): Modify the prompt construction to enforce the "Nodal Voice" and inject data structure.
+// Inside your handler function
+const { draft, context, contact, mode } = req.body;
 
-  const { draft, type, context, contact, prompt, provider, mode = 'generate_email' } = req.body;
+// 1. Construct the "System Instruction" based on Nodal Philosophy
+const systemPrompt = `
+  You are the Nodal Architect. You do not sell; you diagnose.
+  
+  CORE DIRECTIVES:
+  1. Brevity: Max 80 words. [Source: Instantly.ai Benchmarks]
+  2. Tone: Obsidian, Clinical, "Steve Jobs". No "Hope you are well."
+  3. Objective: Expose financial liability (4CP, Ratchets, Volatility).
+  
+  DATA VECTORS AVAILABLE:
+  - Name: ${contact.name}
+  - Company: ${contact.company}
+  - Industry: ${contact.industry}
+  - Calc_Load_Factor: ${contact.metadata?.loadFactor || 'Unknown'}
+  - Contract_Exp: ${contact.contractEndDate || 'Unknown'}
+`;
 
-  if (!draft && !prompt) {
-    res.writeHead(400, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Draft content or prompt is required' }));
-    return;
-  }
+// 2. The User's specific strategic intent
+const userStrategy = prompt || "Analyze the contact's industry for inherent grid risks.";
 
-  // Handle OpenRouter (ChatGPT-OSS)
-  if (provider === 'openrouter') {
-    const openRouterKey = process.env.OPEN_ROUTER_API_KEY;
-    if (!openRouterKey) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'OpenRouter API key not configured' }));
-      return;
-    }
+// 3. The Execution Command
+const finalPrompt = `
+  ${systemPrompt}
+  
+  STRATEGY: ${userStrategy}
+  
+  TASK: Write a cold email to ${contact.name}. 
+  OUTPUT FORMAT: JSON with keys: { "subject_line": string, "body_html": string, "logic_reasoning": string }
+`;
+Update Frontend (Rendering): In your TestProtocol component, stop dumping raw text.
+// Instead of <div>{response.text}</div>
+// Use a sanitized HTML renderer and a Logic Sidebar
 
-    try {
-      let systemInstruction = '';
-      let userContent = '';
+<div className="grid grid-cols-3 gap-4 h-full">
+  
+  {/* PANE A: The Email Preview */}
+  <div className="col-span-2 bg-white text-black p-6 rounded-lg shadow-inner font-sans">
+    <div className="border-b mb-4 pb-2">
+      <span className="text-gray-500 text-xs">SUBJECT:</span> 
+      <span className="font-bold ml-2">{aiResponse.subject_line}</span>
+    </div>
+    <div 
+      className="prose prose-sm max-w-none"
+      dangerouslySetInnerHTML={{ __html: aiResponse.body_html }} 
+    />
+  </div>
 
-      if (mode === 'optimize_prompt') {
-        systemInstruction = `
-          You are the Nodal Architect, the cognitive core of the Nodal Point CRM.
-          Your task is to optimize an AI prompt that will be used to generate sequence emails.
-          
-          PROMPT GUIDELINES:
-          - Make the prompt more specific, forensic, and aligned with Nodal Point philosophy.
-          - Ensure it focuses on financial variance, market volatility, and technical grid risk.
-          - Use engineering/quantitative terminology.
-          - The optimized prompt should result in emails that are direct and minimalist.
-          - Preserve all existing technical requirements in the prompt while making them more "Forensic".
-          
-          INSTRUCTIONS:
-          - Output ONLY the optimized prompt text.
-        `;
-        userContent = `Optimize this prompt for an email node: ${prompt}`;
-      } else if (mode === 'generate_email') {
-        systemInstruction = `
-          You are the Nodal Architect, the cognitive core of the Nodal Point CRM.
-          Your task is to generate a sequence step (type: ${type}) based on specific instructions.
-          ${contact ? `TARGET CONTACT: ${contact.name} (${contact.company}), Load Zone: ${contact.load_zone}` : ''}
-          
-          TONE GUIDELINES:
-          - Forensic, Direct, Minimalist.
-          - Highlight financial variance, market volatility, or technical risk.
-          - Sound like a grid engineer or quantitative analyst.
-          - NO marketing fluff.
-          
-          INSTRUCTIONS:
-          - Output ONLY the email/script body.
-          - Use HTML for formatting (paragraphs, line breaks).
-          - Preserve variables like {{first_name}}.
-        `;
-        userContent = `Instructions: ${prompt}\n\nDraft/Context: ${draft || '(None)'}`;
-      } else {
-        systemInstruction = `
-          You are the Nodal Architect, the cognitive core of the Nodal Point CRM.
-          Your task is to optimize a sequence step draft (type: ${type}).
-          ${contact ? `TARGET CONTACT: ${contact.name} (${contact.company}), Load Zone: ${contact.load_zone}` : ''}
-          
-          TONE GUIDELINES:
-          - Forensic, Direct, Minimalist.
-          - Highlight financial variance, market volatility, or technical risk.
-          - Sound like a grid engineer or quantitative analyst.
-          - NO marketing fluff.
-          
-          INSTRUCTIONS:
-          - Output ONLY the optimized email/script body.
-          - Use HTML for formatting (paragraphs, line breaks).
-          - Preserve variables like {{first_name}}.
-        `;
-        userContent = `Optimize this draft: ${draft}`;
-      }
-
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${openRouterKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": process.env.API_BASE_URL || "https://nodalpoint.io",
-          "X-Title": "Nodal Point CRM"
-        },
-        body: JSON.stringify({
-          "model": "openai/gpt-4o-mini", // Cost-effective, high intelligence
-          "messages": [
-            { "role": "system", "content": systemInstruction },
-            { "role": "user", "content": userContent }
-          ]
-        })
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`OpenRouter API Error: ${errText}`);
-      }
-
-      const data = await response.json();
-      const generatedText = data.choices[0].message.content.trim();
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ optimized: generatedText }));
-      return;
-
-    } catch (error) {
-       logger.error('[AI Optimization] OpenRouter Error:', error);
-       // Fallback to Gemini if OpenRouter fails? Or just error out. 
-       // User explicitly asked for OpenRouter, so let's report error if it fails.
-       res.writeHead(500, { 'Content-Type': 'application/json' });
-       res.end(JSON.stringify({ error: 'Failed to generate with OpenRouter', details: error.message }));
-       return;
-    }
-  }
-
-  // Legacy Gemini Implementation
-  const apiKey = process.env.FREE_GEMINI_KEY || process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Gemini API key not configured' }));
-    return;
-  }
-
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    const contactContext = contact ? `
-      TARGET CONTACT:
-      - Name: ${contact.name}
-      - Company: ${contact.company}
-      - Load Zone: ${contact.load_zone}
-    ` : '';
-
-    const systemPrompt = `
-      You are the Nodal Architect, the cognitive core of the Nodal Point CRM.
-      Your task is to optimize a rough draft for a sequence step (type: ${type}).
-      ${contactContext}
-      
-      TONE GUIDELINES:
-      - Forensic, Direct, Minimalist.
-      - No marketing fluff, no "hope you're doing well", no "I'd love to chat".
-      - Highlight the financial variance, market volatility, or technical risk.
-      - Sound like a grid engineer or a quantitative analyst, not a salesperson.
-      
-      INSTRUCTIONS:
-      - Rewrite the draft to be more impactful and aligned with the Nodal Point philosophy.
-      - Preserve any dynamic variables in {{double_braces}} like {{first_name}} or {{company_name}}.
-      - Output ONLY the optimized text. No preamble, no explanation.
-      
-      CONTEXT: ${context || 'sequence_step_optimization'}
-    `;
-
-    const result = await model.generateContent([
-      { text: systemPrompt },
-      { text: `Draft to optimize: ${draft}` }
-    ]);
-
-    const response = await result.response;
-    const optimizedText = response.text().trim();
-
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ optimized: optimizedText }));
-
-  } catch (error) {
-    logger.error('[AI Optimization] Error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      error: 'Failed to optimize draft',
-      details: error.message 
-    }));
-  }
-}
+  {/* PANE B: The Neural Logic Sidebar */}
+  <div className="col-span-1 bg-zinc-900/50 border-l border-white/10 p-4 font-mono text-xs text-green-400">
+    <div className="mb-2 uppercase tracking-widest text-zinc-500">Neural Reasoning</div>
+    <p>{aiResponse.logic_reasoning}</p>
+    
+    <div className="mt-6 uppercase tracking-widest text-zinc-500">Deliverability Scan</div>
+    <div className="flex items-center gap-2 mt-2">
+      <div className="w-2 h-2 rounded-full bg-emerald-500" />
+      <span>Spam Score: Low</span>
+    </div>
+  </div>
+</div>
+Summary of Directive
+1. Kill the HTML tags in the view. Render the email.
+2. Force the AI to explain itself. Return a logic_reasoning field alongside the email content.
+3. Inject the Philosophy. Hardcode the "80-word limit" and "Forensic Tone" into the system prompt so you don't have to type it every time.
+4. Simulate the Receiver. Show the user what "Billy Ragland" will actually see on his phone.
+This turns your tool from a Text Generator into a Volatility Weapon.
