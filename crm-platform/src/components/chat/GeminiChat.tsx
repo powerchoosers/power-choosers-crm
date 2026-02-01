@@ -716,6 +716,23 @@ export function GeminiChatPanel() {
     }
   }, [input])
 
+  const copySupabasePrompt = () => {
+    const prompt = `
+-- HYBRID SEARCH DEBUG COMMAND
+-- Use this in Supabase SQL Editor to verify what the AI sees
+SELECT * FROM hybrid_search_accounts(
+  'Camp Fire First Texas', -- Replace with your search query
+  NULL, -- embedding (optional for manual SQL test)
+  10, -- limit
+  4.0, -- full_text_weight
+  0.5, -- semantic_weight
+  50 -- rrf_k
+);
+    `.trim()
+    navigator.clipboard.writeText(prompt)
+    alert('Supabase debug prompt copied to clipboard!')
+  }
+
   const copyDebugInfo = () => {
     const debugInfo = `
 # Gemini Chat Error Report
@@ -914,7 +931,17 @@ export function GeminiChatPanel() {
           >
             <div className="p-3 font-mono text-[10px] space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar">
               <div className="flex items-center justify-between border-b border-white/5 pb-1 mb-2">
-                <span className="text-[#002FA7] font-bold tracking-widest">AI_ROUTER_HUD // LIVE_DIAGNOSTICS</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[#002FA7] font-bold tracking-widest">AI_ROUTER_HUD // LIVE_DIAGNOSTICS</span>
+                  <button 
+                    onClick={copySupabasePrompt}
+                    className="p-1 rounded bg-[#002FA7]/10 border border-[#002FA7]/20 text-[#002FA7] hover:bg-[#002FA7] hover:text-white transition-all flex items-center gap-1 group"
+                    title="Copy Supabase Debug Prompt"
+                  >
+                    <Cpu size={10} className="group-hover:scale-110 transition-transform" />
+                    <span className="text-[8px] font-bold uppercase tracking-tighter">SQL_DEBUG</span>
+                  </button>
+                </div>
                 <span className="text-zinc-600 text-[8px] uppercase">Routing Protocol v2.3</span>
               </div>
               
@@ -1116,6 +1143,13 @@ export function GeminiChatPanel() {
                           <p className="text-[10px] text-red-400 font-mono leading-tight flex-1">
                             {error}
                           </p>
+                          <button 
+                            onClick={copySupabasePrompt}
+                            className="icon-button-forensic w-8 h-8 shrink-0 flex items-center justify-center text-emerald-500 hover:text-emerald-400"
+                            title="Copy Supabase Debug Prompt"
+                          >
+                            <Cpu size={16} />
+                          </button>
                           <button 
                             onClick={copyDebugInfo}
                             className="icon-button-forensic w-8 h-8 shrink-0 flex items-center justify-center"
