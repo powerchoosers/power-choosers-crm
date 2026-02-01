@@ -1,113 +1,196 @@
 -- Improve Hybrid Search with Exact Match Prioritization
 
--- 1. Updated Accounts Search
+create extension if not exists pg_trgm;
+
+create index if not exists accounts_name_trgm_idx
+on public.accounts using gin (name gin_trgm_ops);
+
+create index if not exists accounts_domain_trgm_idx
+on public.accounts using gin (domain gin_trgm_ops);
+
+create index if not exists contacts_name_trgm_idx
+on public.contacts using gin (name gin_trgm_ops);
+
+create index if not exists contacts_email_trgm_idx
+on public.contacts using gin (email gin_trgm_ops);
+
 create or replace function hybrid_search_accounts(
   query_text text,
   query_embedding vector(768),
   match_count int,
-  full_text_weight float = 1,
-  semantic_weight float = 1,
+  full_text_weight float = 4.0,
+  semantic_weight float = 0.5,
   rrf_k int = 50
 )
 returns setof accounts
 language sql
 as $$
-with full_text as (
+with norm as (
   select
-    id,
+    trim(
+      regexp_replace(
+        regexp_replace(coalesce(query_text, ''), '^\\s*["“”''`]+|["“”''`]+\\s*$', '', 'g'),
+        '\\s+',
+        ' ',
+        'g'
+      )
+    ) as q
+),
+exact_ids as (
+  select
+    a.id
+  from
+    public.accounts a
+    cross join norm n
+  where
+    n.q <> ''
+    and lower(a.name) = lower(n.q)
+  limit least(match_count, 30)
+),
+full_text as (
+  select
+    a.id,
     row_number() over(
-      order by 
-        -- Priority 1: Exact Name Match
-        (case when name ilike query_text then 1 else 0 end) desc,
-        -- Priority 2: Starts With Name
-        (case when name ilike query_text || '%' then 1 else 0 end) desc,
-        -- Priority 3: FTS Rank
-        ts_rank_cd(fts, websearch_to_tsquery(query_text)) desc
+      order by
+        (case when lower(a.name) = lower(n.q) then 1 else 0 end) desc,
+        (case when lower(a.name) like lower(n.q) || '%' then 1 else 0 end) desc,
+        (case when a.name ilike '%' || n.q || '%' then 1 else 0 end) desc,
+        similarity(a.name, n.q) desc,
+        greatest(
+          ts_rank_cd(a.fts, plainto_tsquery('english', n.q)),
+          ts_rank_cd(a.fts, websearch_to_tsquery('english', n.q))
+        ) desc,
+        a.name asc
     ) as rank_ix
   from
-    accounts
+    public.accounts a
+    cross join norm n
   where
-    fts @@ websearch_to_tsquery(query_text)
-    OR name ilike '%' || query_text || '%'
-  limit least(match_count, 30) * 2
+    n.q <> ''
+    and (
+      lower(a.name) = lower(n.q)
+      or lower(a.name) like lower(n.q) || '%'
+      or a.name ilike '%' || n.q || '%'
+      or a.fts @@ plainto_tsquery('english', n.q)
+      or a.fts @@ websearch_to_tsquery('english', n.q)
+      or a.name % n.q
+    )
+  limit least(match_count, 30) * 4
 ),
 semantic as (
   select
-    id,
-    row_number() over (order by embedding <=> query_embedding) as rank_ix
+    a.id,
+    row_number() over (order by a.embedding <=> query_embedding) as rank_ix
   from
-    accounts
-  where embedding is not null
-  order by rank_ix
-  limit least(match_count, 30) * 2
+    public.accounts a
+  where
+    query_embedding is not null
+    and a.embedding is not null
+  order by
+    a.embedding <=> query_embedding
+  limit least(match_count, 30) * 4
+),
+candidates as (
+  select id from exact_ids
+  union
+  select id from full_text
+  union
+  select id from semantic
 )
 select
-  accounts.*
+  a.*
 from
-  full_text
-  full outer join semantic
-    on full_text.id = semantic.id
-  join accounts
-    on coalesce(full_text.id, semantic.id) = accounts.id
+  candidates c
+  join public.accounts a on a.id = c.id
+  left join exact_ids ex on ex.id = a.id
+  left join full_text ft on ft.id = a.id
+  left join semantic se on se.id = a.id
 order by
-  coalesce(1.0 / (rrf_k + full_text.rank_ix), 0.0) * full_text_weight +
-  coalesce(1.0 / (rrf_k + semantic.rank_ix), 0.0) * semantic_weight
+  (case when ex.id is not null then 1 else 0 end) desc,
+  coalesce(1.0 / (rrf_k + ft.rank_ix), 0.0) * full_text_weight +
+  coalesce(1.0 / (rrf_k + se.rank_ix), 0.0) * semantic_weight
   desc
 limit
   least(match_count, 30);
 $$;
 
--- 2. Updated Contacts Search
 create or replace function hybrid_search_contacts(
   query_text text,
   query_embedding vector(768),
   match_count int,
-  full_text_weight float = 1,
-  semantic_weight float = 1,
+  full_text_weight float = 4.0,
+  semantic_weight float = 0.5,
   rrf_k int = 50
 )
 returns setof contacts
 language sql
 as $$
-with full_text as (
+with norm as (
   select
-    id,
+    trim(
+      regexp_replace(
+        regexp_replace(coalesce(query_text, ''), '^\\s*["“”''`]+|["“”''`]+\\s*$', '', 'g'),
+        '\\s+',
+        ' ',
+        'g'
+      )
+    ) as q
+),
+full_text as (
+  select
+    c.id,
     row_number() over(
-      order by 
-        -- Priority 1: Exact Full Name or Email Match
-        (case when "firstName" || ' ' || "lastName" ilike query_text then 1 else 0 end) desc,
-        (case when email ilike query_text then 1 else 0 end) desc,
-        -- Priority 2: Starts With Name
-        (case when "firstName" ilike query_text || '%' then 1 else 0 end) desc,
-        -- Priority 3: FTS Rank
-        ts_rank_cd(fts, websearch_to_tsquery(query_text)) desc
+      order by
+        (case when lower(coalesce(c.name, concat_ws(' ', c."firstName", c."lastName"))) = lower(n.q) then 1 else 0 end) desc,
+        (case when lower(c.email) = lower(n.q) then 1 else 0 end) desc,
+        (case when lower(coalesce(c.name, concat_ws(' ', c."firstName", c."lastName"))) like lower(n.q) || '%' then 1 else 0 end) desc,
+        (case when c.email ilike n.q || '%' then 1 else 0 end) desc,
+        (case when coalesce(c.name, concat_ws(' ', c."firstName", c."lastName")) ilike '%' || n.q || '%' then 1 else 0 end) desc,
+        greatest(
+          similarity(coalesce(c.name, concat_ws(' ', c."firstName", c."lastName")), n.q),
+          similarity(c.email, n.q)
+        ) desc,
+        greatest(
+          ts_rank_cd(c.fts, plainto_tsquery('english', n.q)),
+          ts_rank_cd(c.fts, websearch_to_tsquery('english', n.q))
+        ) desc
     ) as rank_ix
   from
-    contacts
+    public.contacts c
+    cross join norm n
   where
-    fts @@ websearch_to_tsquery(query_text)
-    OR email ilike query_text
-    OR "firstName" || ' ' || "lastName" ilike '%' || query_text || '%'
-  limit least(match_count, 30) * 2
+    n.q <> ''
+    and (
+      c.email ilike n.q
+      or coalesce(c.name, concat_ws(' ', c."firstName", c."lastName")) ilike n.q
+      or c.email ilike '%' || n.q || '%'
+      or coalesce(c.name, concat_ws(' ', c."firstName", c."lastName")) ilike '%' || n.q || '%'
+      or c.fts @@ plainto_tsquery('english', n.q)
+      or c.fts @@ websearch_to_tsquery('english', n.q)
+      or coalesce(c.name, concat_ws(' ', c."firstName", c."lastName")) % n.q
+      or c.email % n.q
+    )
+  limit least(match_count, 30) * 4
 ),
 semantic as (
   select
-    id,
-    row_number() over (order by embedding <=> query_embedding) as rank_ix
+    c.id,
+    row_number() over (order by c.embedding <=> query_embedding) as rank_ix
   from
-    contacts
-  where embedding is not null
-  order by rank_ix
-  limit least(match_count, 30) * 2
+    public.contacts c
+  where
+    query_embedding is not null
+    and c.embedding is not null
+  order by
+    c.embedding <=> query_embedding
+  limit least(match_count, 30) * 4
 )
 select
-  contacts.*
+  c.*
 from
   full_text
-  full outer join semantic
-    on full_text.id = semantic.id
-  join contacts
-    on coalesce(full_text.id, semantic.id) = contacts.id
+  full outer join semantic on full_text.id = semantic.id
+  join public.contacts c on coalesce(full_text.id, semantic.id) = c.id
 order by
   coalesce(1.0 / (rrf_k + full_text.rank_ix), 0.0) * full_text_weight +
   coalesce(1.0 / (rrf_k + semantic.rank_ix), 0.0) * semantic_weight

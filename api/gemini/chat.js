@@ -231,6 +231,64 @@ const tools = [
 ];
 
 // Tool implementation handlers
+const normalizeSearchText = (text) => {
+  let q = String(text ?? '').trim();
+  q = q.replace(/^[\s"'“”‘’`]+|[\s"'“”‘’`]+$/g, '');
+  q = q.replace(/[\r\n\t]+/g, ' ');
+  q = q.replace(/[\s]+/g, ' ');
+  q = q.replace(/^(?:please\s+)?(?:find|search(?:\s+for)?|lookup|look\s+up|show\s+me|get|pull|open|list)\s+(?:the\s+)?(?:account|accounts|acct)\s*(?:named|called)?\s*/i, '');
+  q = q.replace(/\s+(?:account|accounts|acct)\s*$/i, '');
+  q = q.replace(/[\s]+/g, ' ').trim();
+  return q;
+};
+
+const toPostgrestOrSafeTerm = (text) => {
+  let q = normalizeSearchText(text);
+  q = q.replace(/[(),.%_]/g, ' ');
+  q = q.replace(/[.]/g, ' ');
+  q = q.replace(/[\s]+/g, ' ').trim();
+  return q;
+};
+
+const splitSearchTokens = (text, maxTokens = 6) => {
+  const q = normalizeSearchText(text);
+  const tokens = q
+    .split(' ')
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2)
+    .slice(0, maxTokens);
+  return tokens;
+};
+
+const scoreAccountMatch = (account, query) => {
+  const q = normalizeSearchText(query).toLowerCase();
+  if (!q) return 0;
+
+  const name = String(account?.name || '').toLowerCase();
+  const domain = String(account?.domain || '').toLowerCase();
+  const industry = String(account?.industry || '').toLowerCase();
+  const city = String(account?.city || '').toLowerCase();
+  const state = String(account?.state || '').toLowerCase();
+  const hay = `${name} ${domain} ${industry} ${city} ${state}`.replace(/[\s]+/g, ' ').trim();
+
+  let score = 0;
+  if (name && name === q) score += 1000;
+  if (name && name.startsWith(q)) score += 600;
+  if (name && name.includes(q)) score += 400;
+  if (domain && domain === q) score += 350;
+  if (domain && domain.includes(q)) score += 250;
+
+  const tokens = splitSearchTokens(q, 8);
+  for (const t of tokens) {
+    const tl = t.toLowerCase();
+    if (tl.length <= 1) continue;
+    if (name.includes(tl)) score += 40;
+    else if (hay.includes(tl)) score += 18;
+  }
+
+  return score;
+};
+
 const toolHandlers = {
   list_contacts: async ({ search, accountId, title, limit = 10 }) => {
     let data = [];
@@ -238,7 +296,7 @@ const toolHandlers = {
 
     if (search || title) {
       try {
-        const query = search || title;
+        const query = normalizeSearchText(search || title);
         const embedding = await generateEmbedding(query);
         if (embedding) {
           console.log(`[list_contacts] Using hybrid search for: "${query}"`);
@@ -250,6 +308,9 @@ const toolHandlers = {
             semantic_weight: 0.5,
             rrf_k: 50
           });
+          if (error) {
+            console.error('[list_contacts] Hybrid search RPC error:', error);
+          }
           if (!error && vectorResults && vectorResults.length > 0) {
             data = vectorResults;
             usedVector = true;
@@ -268,9 +329,10 @@ const toolHandlers = {
       }
 
       if (search || title) {
-        const term = search || title;
-        // Broaden keyword search to include first_name, last_name, title and city
-        query = query.or(`name.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%,title.ilike.%${term}%,city.ilike.%${term}%,metadata->>title.ilike.%${term}%,metadata->>city.ilike.%${term}%`);
+        const term = toPostgrestOrSafeTerm(search || title);
+        if (term.length > 0) {
+          query = query.or(`name.ilike.%${term}%,firstName.ilike.%${term}%,lastName.ilike.%${term}%,email.ilike.%${term}%,title.ilike.%${term}%,city.ilike.%${term}%,state.ilike.%${term}%,metadata->>title.ilike.%${term}%,metadata->>city.ilike.%${term}%`);
+        }
       }
       
       const { data: keywordData, error } = await query;
@@ -564,6 +626,25 @@ const toolHandlers = {
     let data = [];
     let usedVector = false;
 
+    const normalizedSearch = search ? normalizeSearchText(search) : null;
+    const safeSearch = normalizedSearch ? toPostgrestOrSafeTerm(normalizedSearch) : null;
+
+    if (normalizedSearch && normalizedSearch.length > 0) {
+      try {
+        const { data: directName } = await supabaseAdmin
+          .from('accounts')
+          .select('*')
+          .ilike('name', normalizedSearch)
+          .limit(limit);
+        if (directName && directName.length > 0) {
+          data = directName;
+          usedVector = true;
+        }
+      } catch (e) {
+        console.error('[list_accounts] Direct name query error:', e);
+      }
+    }
+
     // 1. Specialized expiration search if year is provided
     if (expiration_year) {
       const yearStr = String(expiration_year);
@@ -602,9 +683,9 @@ const toolHandlers = {
     }
 
     // 2. Use Hybrid Search (replacing Vector Search)
-    if (!usedVector && (search || expiration_year)) {
+    if (!usedVector && (normalizedSearch || expiration_year)) {
       try {
-        const query = search ? search : `accounts expiring in ${expiration_year}`;
+        const query = normalizedSearch ? normalizedSearch : `accounts expiring in ${expiration_year}`;
         const embedding = await generateEmbedding(query);
         if (embedding) {
           console.log(`[list_accounts] Using hybrid search for: "${query}"`);
@@ -616,6 +697,9 @@ const toolHandlers = {
             semantic_weight: 0.5, // Low weight for semantic to prevent "vague" noise
             rrf_k: 50
           });
+          if (error) {
+            console.error('[list_accounts] Hybrid search RPC error:', error);
+          }
           if (!error && vectorResults && vectorResults.length > 0) {
             data = vectorResults;
             usedVector = true;
@@ -638,11 +722,28 @@ const toolHandlers = {
         query = query.gte('contract_end_date', `${yearStr}-01-01`).lte('contract_end_date', `${yearStr}-12-31`);
       } else if (industry) {
         query = query.or(`industry.ilike.%${industry}%,metadata->>industry.ilike.%${industry}%`);
-      } else if (search) {
-        query = query.or(`name.ilike.%${search}%,domain.ilike.%${search}%,industry.ilike.%${search}%,metadata->>industry.ilike.%${search}%`);
+      } else if (safeSearch) {
+        const tokens = splitSearchTokens(safeSearch);
+        const tokenOr = tokens
+          .flatMap((t) => {
+            const term = toPostgrestOrSafeTerm(t);
+            if (!term) return [];
+            return [
+              `name.ilike.%${term}%`,
+              `domain.ilike.%${term}%`,
+              `industry.ilike.%${term}%`,
+              `metadata->>industry.ilike.%${term}%`,
+              `city.ilike.%${term}%`,
+              `state.ilike.%${term}%`
+            ];
+          })
+          .join(',');
+
+        const baseOr = `name.ilike.%${safeSearch}%,domain.ilike.%${safeSearch}%,industry.ilike.%${safeSearch}%,metadata->>industry.ilike.%${safeSearch}%`;
+        query = query.or(tokenOr ? `${baseOr},${tokenOr}` : baseOr);
       }
       
-      const { data: keywordData, error } = await query.limit(100);
+      const { data: keywordData, error } = await query.limit(200);
       data = keywordData || [];
     }
     
@@ -671,6 +772,13 @@ const toolHandlers = {
                    dateStr.endsWith(` ${yearStr}`) ||
                    dateStr.endsWith(` ${shortYear}`);
         });
+    }
+
+    if (normalizedSearch && data.length > 1) {
+      const withScores = data
+        .map((r) => ({ r, s: scoreAccountMatch(r, normalizedSearch) }))
+        .sort((a, b) => b.s - a.s);
+      data = withScores.map((x) => x.r);
     }
 
     data = data.slice(0, limit);
@@ -934,10 +1042,11 @@ export default async function handler(req, res) {
     };
 
     const stripSearchPreamble = (text) => {
-      let q = String(text || '').trim();
+      let q = normalizeSearchText(text);
       q = q.replace(/^\s*(can you\s+)?(please\s+)?(find|search( for)?|look up|do you see|do we have|is there|check( for)?)\s+/i, '');
       q = q.replace(/^\s*(in\s+my\s+crm|in\s+the\s+crm|in\s+my\s+database|in\s+the\s+database)\s*/i, '');
-      q = q.replace(/[?!.]+\s*$/g, '').trim();
+      q = q.replace(/[?!.]+\s*$/g, '');
+      q = normalizeSearchText(q);
       return q;
     };
 

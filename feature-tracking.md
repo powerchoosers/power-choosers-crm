@@ -120,3 +120,12 @@
   - [x] **Grounded Routing**: Added a deterministic CRM path in `api/gemini/chat.js` that intercepts account lookups, expiration-year queries, and contract detail requests.
   - [x] **Context Inference**: Implemented last-account inference from prior `forensic_grid` JSON blocks to support follow-up questions like "contract details".
   - [x] **No Fabrication**: Returns `Unknown` / `Data_Void` when key contract fields are missing instead of inventing values.
+
+### Nodal Architect Account Search Hardening
+- **Status**: Completed
+- **Description**: Improved reliability for multi-word account lookups and reduced dependence on a brittle RPC search function.
+- **Actions**:
+  - [x] **Query Normalization**: Strips common “find/search/list account” preambles and trailing “account(s)” tokens before searching.
+  - [x] **Exact Name Pass**: Adds a direct `name ILIKE <query>` check before hybrid/keyword search.
+  - [x] **Tokenized Fallback**: Expands keyword fallback to search across multiple tokens (name/domain/industry/location) and ranks results in-memory for best match.
+  - [x] **Hybrid Search Upgrade**: Updated `hybrid_search_accounts` SQL to guarantee exact-name matches are pinned above RRF fusion ordering.
