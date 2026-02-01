@@ -971,10 +971,10 @@ export default async function handler(req, res) {
         - If the user asks for accounts, contacts, or internal data, you MUST use the tools.
         - CRITICAL: If the tools return zero results, do NOT search the web for "expiring accounts" or "credits". Do NOT cite researchallofus.org or any other external site for internal CRM data.
         - If the database says no accounts expire in 2026, then NO accounts expire in 2026 in the CRM. Report this fact directly to ${firstName}.
-        - To find accounts expiring in 2026, call `list_accounts({ expiration_year: 2026 })`.
-        - If the user asks about bills, contracts, or documents for a specific company (like "Camp Fire"), you MUST call `list_account_documents({ account_id: "..." })` after finding the account.
-        - NEVER say "I don't see any bills" or "no documents found" unless you have specifically called `list_account_documents` for that account.
-        - If you are viewing an account page (check CURRENT CONTEXT), call `list_account_documents` immediately if the user asks about files or bills.
+        - To find accounts expiring in 2026, call \`list_accounts({ expiration_year: 2026 })\`.
+        - If the user asks about bills, contracts, or documents for a specific company (like "Camp Fire"), you MUST call \`list_account_documents({ account_id: "..." })\` after finding the account.
+        - NEVER say "I don't see any bills" or "no documents found" unless you have specifically called \`list_account_documents\` for that account.
+        - If you are viewing an account page (check CURRENT CONTEXT), call \`list_account_documents\` immediately if the user asks about files or bills.
 
         HYBRID_RESPONSE_MODE:
         - You are capable of providing BOTH narrative analysis AND forensic components in a single response.
