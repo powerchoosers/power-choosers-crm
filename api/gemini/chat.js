@@ -1042,7 +1042,7 @@ export default async function handler(req, res) {
       const apiKey = process.env.OPEN_ROUTER_API_KEY;
       if (!apiKey) throw new Error('OpenRouter API key not configured');
 
-      const model = modelName || 'openai/gpt-oss-120b';
+      const model = modelName || 'openai/gpt-oss-120b:free';
       const openAiTools = convertToolsToOpenAI(tools);
       
       let currentMessages = [
@@ -1347,10 +1347,10 @@ export default async function handler(req, res) {
     // If no bodyModel or it's a gemini model, we proceed to the gemini loop
     if (!bodyModel || bodyModel.includes('gemini')) {
       // (This part already exists in the code below)
-    } else if (process.env.OPEN_ROUTER_API_KEY && !routingDiagnostics.some(d => d.model === 'openai/gpt-oss-120b')) {
+    } else if (process.env.OPEN_ROUTER_API_KEY && !routingDiagnostics.some(d => d.model === 'openai/gpt-oss-120b:free')) {
        // If a non-gemini model was requested but failed, try the default OpenRouter model as a fallback
        try {
-         const orModel = 'openai/gpt-oss-120b';
+         const orModel = 'openai/gpt-oss-120b:free';
          routingDiagnostics.push({
            model: orModel,
            provider: 'openrouter',
@@ -1358,13 +1358,13 @@ export default async function handler(req, res) {
            reason: 'FALLBACK_TO_DEFAULT',
            timestamp: new Date().toISOString()
          });
-         const content = await callOpenRouter();
+         const content = await callOpenRouter(orModel);
          routingDiagnostics.push({ model: orModel, provider: 'openrouter', status: 'success', timestamp: new Date().toISOString() });
          res.writeHead(200, { 'Content-Type': 'application/json' });
          res.end(JSON.stringify({ content, provider: 'openrouter', model: orModel, diagnostics: routingDiagnostics }));
          return;
        } catch (e) {
-         routingDiagnostics.push({ model: 'openai/gpt-oss-120b', provider: 'openrouter', status: 'failed', error: e.message });
+         routingDiagnostics.push({ model: 'openai/gpt-oss-120b:free', provider: 'openrouter', status: 'failed', error: e.message });
        }
     }
 
@@ -1382,6 +1382,9 @@ export default async function handler(req, res) {
       new Set(
         [
           preferredModel,
+          'gemini-3.0-pro-preview',
+          'gemini-3.0-flash-preview',
+          'gemini-2.5-flash-lite',
           'gemini-2.0-flash',
           'gemini-1.5-flash',
           'gemini-1.5-pro'
