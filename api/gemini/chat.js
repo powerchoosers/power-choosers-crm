@@ -245,9 +245,9 @@ const toolHandlers = {
           const { data: vectorResults, error } = await supabaseAdmin.rpc('hybrid_search_contacts', {
             query_text: query,
             query_embedding: embedding,
-            match_count: limit,
-            full_text_weight: 2.0, // Prioritize keyword/exact matches
-            semantic_weight: 1.0,
+            match_count: limit * 5,
+            full_text_weight: 4.0, // High weight for name/email matches
+            semantic_weight: 0.5,
             rrf_k: 50
           });
           if (!error && vectorResults && vectorResults.length > 0) {
@@ -611,9 +611,9 @@ const toolHandlers = {
           const { data: vectorResults, error } = await supabaseAdmin.rpc('hybrid_search_accounts', {
             query_text: query,
             query_embedding: embedding,
-            match_count: limit * 5,
-            full_text_weight: 2.0, // Prioritize keyword/exact matches (User requested)
-            semantic_weight: 1.0,
+            match_count: limit * 10, // Increase match_count to cast a wider net
+            full_text_weight: 4.0, // High weight for exact/partial name matches
+            semantic_weight: 0.5, // Low weight for semantic to prevent "vague" noise
             rrf_k: 50
           });
           if (!error && vectorResults && vectorResults.length > 0) {
@@ -918,6 +918,7 @@ export default async function handler(req, res) {
         - **Selection by Name**: If the user asks for details about a specific entity (e.g., "Camp Fire First Texas") and you do not have its ID in your immediate context, you MUST first run a search (e.g., \`list_accounts({ search: "Camp Fire First Texas" })\`) to retrieve the ID.
         - **ID Persistence**: When a tool returns a list of items, strictly memorize the \`id\` of each item. When the user selects one, use that exact \`id\` for subsequent calls like \`get_account_details\`. Do NOT pass the name as the ID.
         - **Chain of Thought**: 1. Search -> 2. Get ID -> 3. Get Details. Do not skip steps.
+        - **Exhaustive Search**: If a search for a specific name (e.g., "Camp Fire") returns no results, try broader variations (e.g., "Camp Fire First Texas") or check related industries if applicable.
 
         GLOBAL_SEARCH_STRATEGY:
         - When in "GLOBAL_SCOPE" or "GLOBAL_DASHBOARD", you are the master of the entire CRM.
@@ -936,6 +937,11 @@ export default async function handler(req, res) {
         - DO NOT use names like "Pacific Energy Solutions", "Global Manufacturing Inc.", "Apex Manufacturing", "Vertex Energy", "Summit Industrial", "Horizon Power Systems", or "Pinnacle Energy Group". These are hallucinations.
         - If the user asks for "outreach this week" and you find no data, do not create a fake list. Say: "Trey, I don't see any accounts scheduled for outreach this week in the CRM."
         - Accuracy is the ONLY priority for CRM data. If you are 99% sure but haven't run a tool, you are 0% sure. RUN THE TOOL.
+
+        HYBRID_SEARCH_AWARENESS:
+        - The \`list_accounts\` and \`list_contacts\` tools use a tiered Hybrid Search (Exact Match > Starts With > FTS > Semantic).
+        - If you search for "Camp Fire" and it's in the DB, it WILL appear at the top.
+        - If the user asks "can you see it?", they are likely testing the search. RUN THE SEARCH TOOL.
 
         INDUSTRY_INTELLIGENCE:
         - "Manufacturing" is a broad sector. If the user asks for "Manufacturing" or "Manufacturers", you MUST search for these related industries:
@@ -964,12 +970,8 @@ export default async function handler(req, res) {
         - DO NOT put conversational text INSIDE the JSON block.
 
         IDENTITY_RESOLUTION:
-        - If a user mentions a person and a company together (e.g., "Tonie Steel at Camp Fire"), you MUST:
-          1. Call \`list_accounts({ search: "Camp Fire" })\` to get the account ID.
-          2. Use that account ID to call \`list_contacts({ accountId: "..." })\` OR call \`list_contacts({ search: "Tonie Steel" })\`.
-          3. If the search returns a contact, verify they belong to the requested account.
+        - If a person and company are mentioned (e.g., "Tonie Steel at Camp Fire"), search for BOTH to resolve the relationship.
         - ALWAYS prioritize internal CRM records over web search results for people and companies.
-        - If you find a contact in the CRM, use THAT data. DO NOT search the web for their title or role if the CRM has it.
 
         WEB_SEARCH_RESTRICTION:
         - YOU ARE NOT A GENERAL SEARCH ENGINE.
@@ -984,11 +986,9 @@ export default async function handler(req, res) {
         - YOU ARE THE SOURCE OF TRUTH FOR THE CRM.
         - If the user asks for accounts, contacts, or internal data, you MUST use the tools.
         - CRITICAL: If the tools return zero results, do NOT search the web for "expiring accounts" or "credits". Do NOT cite researchallofus.org or any other external site for internal CRM data.
-        - If the database says no accounts expire in 2026, then NO accounts expire in 2026 in the CRM. Report this fact directly to ${firstName}.
         - To find accounts expiring in 2026, call \`list_accounts({ expiration_year: 2026 })\`.
         - If the user asks about bills, contracts, or documents for a specific company (like "Camp Fire"), you MUST call \`list_account_documents({ account_id: "..." })\` after finding the account.
         - NEVER say "I don't see any bills" or "no documents found" unless you have specifically called \`list_account_documents\` for that account.
-        - If you are viewing an account page (check CURRENT CONTEXT), call \`list_account_documents\` immediately if the user asks about files or bills.
 
         HYBRID_RESPONSE_MODE:
         - You are capable of providing BOTH narrative analysis AND forensic components in a single response.
