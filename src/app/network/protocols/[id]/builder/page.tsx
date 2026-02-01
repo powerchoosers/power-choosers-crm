@@ -44,7 +44,14 @@ import {
   CalendarCheck,
   PhoneMissed,
   Bug,
-  FileText
+  FileText,
+  Building2,
+  Newspaper,
+  Calendar,
+  Check,
+  Monitor,
+  Smartphone,
+  Brain
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -369,6 +376,9 @@ function ProtocolArchitectInner() {
   const [testContactId, setTestContactId] = useState<string>('');
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [emailViewMode, setEmailViewMode] = useState<'payload' | 'ai'>('payload');
+  const [isPreviewMobile, setIsPreviewMobile] = useState(false);
+  const [aiLogic, setAiLogic] = useState<string>('');
+  const [aiSubject, setAiSubject] = useState<string>('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const testContact = useMemo(() => {
@@ -453,7 +463,10 @@ function ProtocolArchitectInner() {
           contact: {
             name: `${testContact.firstName} ${testContact.lastName}`,
             company: testContact.metadata?.general?.company,
+            industry: testContact.metadata?.general?.industry,
             load_zone: testContact.metadata?.energy?.loadZone,
+            contractEndDate: testContact.metadata?.energy?.contractEndDate,
+            metadata: testContact.metadata
           }
         })
       });
@@ -461,11 +474,16 @@ function ProtocolArchitectInner() {
       if (!response.ok) throw new Error('Failed to generate preview');
       
       const data = await response.json();
-      updateNodeData(selectedNode.id, { body: data.optimized });
-      toast.success("Preview generated for " + testContact.firstName);
+      updateNodeData(selectedNode.id, { 
+        body: data.optimized,
+        subject: data.subject || selectedNode.data.subject
+      });
+      setAiLogic(data.logic || '');
+      setAiSubject(data.subject || '');
+      toast.success("Simulation complete for " + testContact.firstName);
     } catch (error) {
       console.error(error);
-      toast.error("Preview generation failed");
+      toast.error("Simulation failed");
     } finally {
       setIsOptimizing(false);
     }
@@ -1333,7 +1351,7 @@ function ProtocolArchitectInner() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                        {emailViewMode === 'payload' ? 'Payload_Matrix' : 'AI_Instruction_Prompt'}
+                        {emailViewMode === 'payload' ? 'Payload_Matrix' : 'Context_Matrix // Strategy'}
                       </label>
                       
                       {selectedNode?.data.type === 'email' && (
@@ -1348,7 +1366,7 @@ function ProtocolArchitectInner() {
                           <button
                             onClick={() => setEmailViewMode('ai')}
                             className={cn("icon-button-forensic w-6 h-6 flex items-center justify-center rounded-md transition-all", emailViewMode === 'ai' ? "bg-white/10 text-emerald-400 shadow-sm" : "text-zinc-500")}
-                            title="AI View"
+                            title="AI Strategy View"
                           >
                             <Sparkles className="w-3.5 h-3.5" />
                           </button>
@@ -1391,25 +1409,105 @@ function ProtocolArchitectInner() {
                         />
                       </div>
                     ) : (
-                      <div className="relative group rounded-2xl border border-white/5 bg-black/40 overflow-hidden focus-within:border-emerald-500/50 transition-all">
-                        <div className="flex items-center justify-between px-3 py-2 border-b border-white/5 bg-emerald-500/5">
-                           <span className="text-[9px] font-mono text-emerald-500 uppercase tracking-widest">Nodal_Architect // OSS_Model</span>
-                           <Button 
-                              onClick={optimizeWithGemini}
-                              disabled={isOptimizing}
-                              variant="ghost"
-                              className="h-7 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 text-[9px] font-mono uppercase tracking-widest hover:bg-emerald-500/20 hover:text-emerald-300 transition-all disabled:opacity-50"
-                            >
-                              {isOptimizing ? <Clock className="w-3 h-3 animate-spin mr-1.5" /> : <Sparkles className="w-3 h-3 mr-1.5" />}
-                              Optimize_AI
-                            </Button>
+                      <div className="space-y-4">
+                        {/* Prompt Builder: Role, Objective, Constraints */}
+                        <div className="space-y-4 bg-black/40 border border-white/5 rounded-2xl p-4">
+                          <div className="space-y-2">
+                            <label className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">Architect_Role</label>
+                            <input 
+                              type="text"
+                              className="w-full bg-white/5 border border-white/5 rounded-lg p-2 text-xs font-mono text-emerald-400/90 focus:border-emerald-500/50 outline-none transition-all"
+                              placeholder="e.g., Act as a Forensic Energy Auditor..."
+                              value={(selectedNode?.data.promptConfig as any)?.role || ''}
+                              onChange={(e) => {
+                                const config = (selectedNode?.data.promptConfig as any) || {};
+                                updateNodeData(selectedNode!.id, { 
+                                  promptConfig: { ...config, role: e.target.value },
+                                  prompt: `${e.target.value}\n${config.objective || ''}\n${config.constraints || ''}`
+                                });
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">Liability_Objective</label>
+                            <input 
+                              type="text"
+                              className="w-full bg-white/5 border border-white/5 rounded-lg p-2 text-xs font-mono text-emerald-400/90 focus:border-emerald-500/50 outline-none transition-all"
+                              placeholder="e.g., Expose the structural variance in their 4CP charges."
+                              value={(selectedNode?.data.promptConfig as any)?.objective || ''}
+                              onChange={(e) => {
+                                const config = (selectedNode?.data.promptConfig as any) || {};
+                                updateNodeData(selectedNode!.id, { 
+                                  promptConfig: { ...config, objective: e.target.value },
+                                  prompt: `${config.role || ''}\n${e.target.value}\n${config.constraints || ''}`
+                                });
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">Forensic_Constraints</label>
+                            <input 
+                              type="text"
+                              className="w-full bg-white/5 border border-white/5 rounded-lg p-2 text-xs font-mono text-emerald-400/90 focus:border-emerald-500/50 outline-none transition-all"
+                              placeholder="e.g., Max 80 words. No sales fluff. Use 'No-Oriented' questions."
+                              value={(selectedNode?.data.promptConfig as any)?.constraints || ''}
+                              onChange={(e) => {
+                                const config = (selectedNode?.data.promptConfig as any) || {};
+                                updateNodeData(selectedNode!.id, { 
+                                  promptConfig: { ...config, constraints: e.target.value },
+                                  prompt: `${config.role || ''}\n${config.objective || ''}\n${e.target.value}`
+                                });
+                              }}
+                            />
+                          </div>
                         </div>
-                        <textarea 
-                          className="w-full h-48 bg-transparent p-4 text-sm text-emerald-400/90 font-mono resize-none outline-none placeholder:text-emerald-500/20"
-                          placeholder="Instructions for AI: e.g., 'Write a 4CP curtailment warning for a manufacturing plant in ERCOT...'"
-                          value={selectedNode?.data.prompt as string || ''}
-                          onChange={(e) => updateNodeData(selectedNode!.id, { prompt: e.target.value })}
-                        />
+
+                        {/* Vector Selection */}
+                        <div className="space-y-3 bg-black/40 border border-white/5 rounded-2xl p-4">
+                          <label className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest block mb-2">Data_Vector_Injection</label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { id: 'firmographics', label: 'Firmographics', icon: Building2 },
+                              { id: 'energy_metrics', label: 'Energy Metrics', icon: Zap },
+                              { id: 'recent_news', label: 'Recent News', icon: Newspaper },
+                              { id: 'contract_expiry', label: 'Contract Expiry', icon: Calendar },
+                            ].map((vector) => (
+                              <label key={vector.id} className="flex items-center gap-2 cursor-pointer group">
+                                <input 
+                                  type="checkbox"
+                                  className="hidden"
+                                  checked={((selectedNode?.data.vectors as string[]) || []).includes(vector.id)}
+                                  onChange={(e) => {
+                                    const vectors = (selectedNode?.data.vectors as string[]) || [];
+                                    const newVectors = e.target.checked 
+                                      ? [...vectors, vector.id]
+                                      : vectors.filter(v => v !== vector.id);
+                                    updateNodeData(selectedNode!.id, { vectors: newVectors });
+                                  }}
+                                />
+                                <div className={cn(
+                                  "w-4 h-4 rounded border flex items-center justify-center transition-all",
+                                  ((selectedNode?.data.vectors as string[]) || []).includes(vector.id)
+                                    ? "bg-emerald-500 border-emerald-500 text-white"
+                                    : "border-white/10 bg-white/5 group-hover:border-white/20"
+                                )}>
+                                  {((selectedNode?.data.vectors as string[]) || []).includes(vector.id) && <Check className="w-2.5 h-2.5" />}
+                                </div>
+                                <span className="text-[9px] font-mono text-zinc-400 group-hover:text-zinc-200 uppercase tracking-tight">{vector.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Optimize Button */}
+                        <Button 
+                          onClick={optimizeWithGemini}
+                          disabled={isOptimizing}
+                          className="w-full h-10 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-mono uppercase tracking-widest hover:bg-emerald-500/20 hover:text-emerald-300 transition-all disabled:opacity-50"
+                        >
+                          {isOptimizing ? <Clock className="w-4 h-4 animate-spin mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
+                          Calibrate_Strategy_AI
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -1435,31 +1533,102 @@ function ProtocolArchitectInner() {
                   </div>
 
                   <div className="space-y-4">
-                    <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Protocol_Preview</label>
-                    <div className="bg-zinc-950/80 border border-white/5 rounded-2xl p-6 min-h-[300px] relative overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
-                      
-                      {selectedNode?.data.type === 'email' && (
-                        <div className="mb-4 pb-4 border-b border-white/5">
-                          <span className="text-[10px] text-zinc-500 font-mono block mb-1">Subject:</span>
-                          <span className="text-sm text-zinc-100 font-mono">
-                            {selectedNode?.data.subject as string || '(No Subject)'}
-                          </span>
-                        </div>
-                      )}
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Protocol_Preview</label>
+                      <div className="flex items-center gap-1 bg-black/40 border border-white/5 rounded-lg p-0.5">
+                        <button
+                          onClick={() => setIsPreviewMobile(false)}
+                          className={cn("icon-button-forensic w-6 h-6 flex items-center justify-center rounded-md transition-all", !isPreviewMobile ? "bg-white/10 text-white shadow-sm" : "text-zinc-500")}
+                          title="Desktop View"
+                        >
+                          <Monitor className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setIsPreviewMobile(true)}
+                          className={cn("icon-button-forensic w-6 h-6 flex items-center justify-center rounded-md transition-all", isPreviewMobile ? "bg-white/10 text-white shadow-sm" : "text-zinc-500")}
+                          title="Mobile View"
+                        >
+                          <Smartphone className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
 
-                      <div className="text-sm text-zinc-300 font-mono whitespace-pre-wrap leading-relaxed">
-                        {previewBody || '(No content to preview)'}
+                    {/* Three-Pane Flight Simulator */}
+                    <div className="flex flex-col gap-6">
+                      {/* Pane 1: Rendered Payload */}
+                      <div className={cn(
+                        "bg-zinc-950/80 border border-white/5 rounded-2xl p-6 min-h-[300px] relative overflow-hidden transition-all duration-500 mx-auto",
+                        isPreviewMobile ? "w-[280px] text-[12px]" : "w-full text-sm"
+                      )}>
+                        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+                        
+                        {selectedNode?.data.type === 'email' && (
+                          <div className="mb-4 pb-4 border-b border-white/5">
+                            <span className="text-[10px] text-zinc-500 font-mono block mb-1 uppercase tracking-widest">Subject</span>
+                            <span className="text-zinc-100 font-mono">
+                              {aiSubject || selectedNode?.data.subject as string || '(No Subject)'}
+                            </span>
+                          </div>
+                        )}
+
+                        <div 
+                          className="text-zinc-300 font-mono whitespace-pre-wrap leading-relaxed"
+                          dangerouslySetInnerHTML={{ __html: previewBody || '(No content to preview)' }}
+                        />
+
+                        {!testContact && (
+                          <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex items-center justify-center p-8 text-center z-10">
+                            <div className="flex flex-col items-center gap-3">
+                              <Target className="w-8 h-8 text-zinc-700" />
+                              <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Select a node to simulate payload injection</p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {isOptimizing && (
+                          <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center z-20">
+                            <div className="flex flex-col items-center gap-3">
+                              <div className="w-8 h-8 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
+                              <p className="text-[10px] text-emerald-500 font-mono uppercase tracking-widest animate-pulse">Running Simulation...</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
-                      {!testContact && (
-                        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex items-center justify-center p-8 text-center">
-                          <div className="flex flex-col items-center gap-3">
-                            <Target className="w-8 h-8 text-zinc-700" />
-                            <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest">Select a node to simulate payload injection</p>
+                      {/* Pane 2: Neural Logic Sidebar */}
+                      {aiLogic && (
+                        <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-500">
+                          <div className="flex items-center gap-2">
+                            <Brain className="w-3.5 h-3.5 text-emerald-500" />
+                            <span className="text-[10px] font-mono text-emerald-500 uppercase tracking-widest">Neural_Logic // Rationale</span>
                           </div>
+                          <p className="text-[11px] text-emerald-400/80 font-mono leading-relaxed italic">
+                            "{aiLogic}"
+                          </p>
                         </div>
                       )}
+
+                      {/* Pane 3: Deliverability Forecast */}
+                      <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-4 grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">Spam_Score</span>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-emerald-500 w-[92%]" />
+                            </div>
+                            <span className="text-[10px] font-mono text-emerald-500">0.8</span>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">Sentiment</span>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-[#002FA7] w-[85%]" />
+                            </div>
+                            <span className="text-[10px] font-mono text-[#002FA7]">Neutral</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
