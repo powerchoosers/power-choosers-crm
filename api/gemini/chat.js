@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import crypto from 'crypto';
 import { generateEmbedding } from '../utils/embeddings.js';
 import { supabaseAdmin } from '../_supabase.js';
 import { cors } from '../_cors.js';
@@ -245,7 +246,7 @@ const toolHandlers = {
             query_text: query,
             query_embedding: embedding,
             match_count: limit,
-            full_text_weight: 1.0,
+            full_text_weight: 2.0, // Prioritize keyword/exact matches
             semantic_weight: 1.0,
             rrf_k: 50
           });
@@ -551,6 +552,10 @@ const toolHandlers = {
     return data;
   },
   create_contact: async (contact) => {
+    // Ensure we have a valid UUID for the primary key (since DB column is text without default)
+    if (!contact.id) {
+        contact.id = crypto.randomUUID();
+    }
     const { data, error } = await supabaseAdmin.from('contacts').insert([contact]).select().single();
     if (error) throw error;
     return data;
@@ -607,7 +612,7 @@ const toolHandlers = {
             query_text: query,
             query_embedding: embedding,
             match_count: limit * 5,
-            full_text_weight: 1.0,
+            full_text_weight: 2.0, // Prioritize keyword/exact matches (User requested)
             semantic_weight: 1.0,
             rrf_k: 50
           });
@@ -715,6 +720,10 @@ const toolHandlers = {
     return data;
   },
   create_task: async (task) => {
+    // Ensure we have a valid UUID for the primary key
+    if (!task.id) {
+        task.id = crypto.randomUUID();
+    }
     const { data, error } = await supabaseAdmin.from('tasks').insert([task]).select().single();
     if (error) throw error;
     return data;
@@ -904,6 +913,11 @@ export default async function handler(req, res) {
         - ALWAYS address them by their first name (${firstName}) in your initial greeting or when appropriate.
         - TODAY'S DATE: ${new Date().toISOString().split('T')[0]} (Year: ${new Date().getFullYear()})
         - CURRENT CONTEXT: "This year" means ${new Date().getFullYear()}.
+
+        TOOL_USAGE_PROTOCOL:
+        - **Selection by Name**: If the user asks for details about a specific entity (e.g., "Camp Fire First Texas") and you do not have its ID in your immediate context, you MUST first run a search (e.g., \`list_accounts({ search: "Camp Fire First Texas" })\`) to retrieve the ID.
+        - **ID Persistence**: When a tool returns a list of items, strictly memorize the \`id\` of each item. When the user selects one, use that exact \`id\` for subsequent calls like \`get_account_details\`. Do NOT pass the name as the ID.
+        - **Chain of Thought**: 1. Search -> 2. Get ID -> 3. Get Details. Do not skip steps.
 
         GLOBAL_SEARCH_STRATEGY:
         - When in "GLOBAL_SCOPE" or "GLOBAL_DASHBOARD", you are the master of the entire CRM.
