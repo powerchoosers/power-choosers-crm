@@ -136,7 +136,7 @@ export default function DataIngestionCard({ accountId }: DataIngestionCardProps)
         toast.loading('Neuro-Processing Document...', { id: toastId });
 
         try {
-          const response = await fetch('/api/analyze-document', {
+          const response = await fetch('/ai/analyze-document', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

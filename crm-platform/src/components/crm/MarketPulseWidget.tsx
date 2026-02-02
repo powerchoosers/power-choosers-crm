@@ -18,10 +18,22 @@ export default function MarketPulseWidget() {
       try {
         // Fetch prices from ERCOT scraper
         const priceRes = await fetch('/api/market/ercot?type=prices')
+        if (!priceRes.ok) throw new Error(`Price fetch failed: ${priceRes.status}`)
+        
+        const priceContentType = priceRes.headers.get('content-type')
+        if (!priceContentType || !priceContentType.includes('application/json')) {
+          throw new Error('Price response was not JSON')
+        }
         const priceData = await priceRes.json()
 
         // Fetch grid conditions for reserves
         const gridRes = await fetch('/api/market/ercot?type=grid')
+        if (!gridRes.ok) throw new Error(`Grid fetch failed: ${gridRes.status}`)
+
+        const gridContentType = gridRes.headers.get('content-type')
+        if (!gridContentType || !gridContentType.includes('application/json')) {
+          throw new Error('Grid response was not JSON')
+        }
         const gridData = await gridRes.json()
 
         if (priceData.prices) {

@@ -34,6 +34,7 @@ function ComposePanel({
   const { sendEmail, isSending } = useEmails()
 
   const signatureHtml = profile ? generateNodalSignature(profile, user, true) : ''
+  const outgoingSignatureHtml = profile ? generateNodalSignature(profile, user, false) : ''
 
   const handleSend = () => {
     if (!to || !subject || !content) {
@@ -41,8 +42,15 @@ function ComposePanel({
       return
     }
 
+    // Combine content with signature for the HTML version
+    // Use the outgoing (light-mode) signature for the actual email
+    const fullHtml = `
+      <div style="font-family: sans-serif; white-space: pre-wrap; margin-bottom: 24px; color: #18181b;">${content}</div>
+      ${outgoingSignatureHtml}
+    `
+
     sendEmail(
-      { to, subject, content },
+      { to, subject, content, html: fullHtml },
       {
         onSuccess: () => {
           onClose()

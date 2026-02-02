@@ -97,7 +97,20 @@
     - [x] Applied squircle styling (`rounded-lg`) and Sparkles icon to the enrichment trigger.
   - [x] **Bug Fixes**:
     - [x] **TypeScript Error**: Resolved a type mismatch in `OrgIntelligence.tsx` where `scanStatus` was being compared to incompatible states.
-    - [x] **Apollo Fetch Error**: Fixed a route mismatch in `server.js` that caused `/api/apollo/search-people` calls to fail.
+100→    - [x] **Apollo Fetch Error**: Fixed a route mismatch in `server.js` that caused `/api/apollo/search-people` calls to fail.
+101→
+102→### User Identity & Identity Migration
+103→- **Status**: Completed
+104→- **Description**: Migrated Lewis Patterson's system identity to the new Nodal Point domain and resolved read-only identity constraints.
+105→- **Actions**:
+106→  - [x] **Identity Migration**:
+107→    - [x] Migrated Lewis Patterson's email from `l.patterson@powerchoosers.com` to `l.patterson@nodalpoint.io` across Supabase `users` and Firebase Auth.
+108→    - [x] **Relational Integrity**: Performed a system-wide batch migration of 3,932 `ownerId` references in Supabase (Contacts, Accounts, etc.) to maintain data ownership.
+109→    - [x] **Access Control**: Updated hardcoded admin email references in `call-status.js` and other API files to ensure uninterrupted administrative access.
+110→  - [x] **Settings UI Refinement**:
+111→    - [x] Removed `readOnly` constraints from the Email field in the Settings page.
+112→    - [x] Added visual warnings for system-wide ID synchronization requirements.
+113→    - [x] Standardized email input with `font-mono tabular-nums` and forensic styling.
     - [x] **Routing Sync**: Standardized API routes in `server.js` to match the frontend expectations (`/api/apollo/search-people` and `/api/apollo/search-organizations`).
   - [x] **Integration**: Verified the end-to-end flow from domain-based scanning to account enrichment.
 

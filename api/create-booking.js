@@ -7,7 +7,7 @@ import { cors } from './_cors.js';
 import logger from './_logger.js';
 import { GmailService } from './email/gmail-service.js';
 
-const ADMIN_EMAIL = 'l.patterson@powerchoosers.com';
+const ADMIN_EMAIL = 'l.patterson@nodalpoint.io';
 const DEFAULT_OWNER = 'unassigned';
 
 export default async function handler(req, res) {

@@ -327,13 +327,18 @@ export function useAccountsCount(searchQuery?: string, filters?: AccountFilters,
       const { count, error } = await query
 
       if (error) {
-        console.error("Error fetching accounts count:", error)
+        console.error("Supabase error fetching accounts count:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
         return 0
       }
 
       return count || 0
     },
-    enabled: enabled && !loading && !!user,
+    enabled: enabled && !loading && !!user && !!user?.email,
     staleTime: 1000 * 60 * 5,
   })
 }

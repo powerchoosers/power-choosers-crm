@@ -1,9 +1,17 @@
 'use client'
 import { Clock, Sun, Activity } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { calculateVolatilityIndex } from '@/lib/market-mapping';
 
-export default function TelemetryWidget({ location }: { location?: string }) {
+export default function TelemetryWidget({ location = 'LZ_NORTH' }: { location?: string }) {
   const [time, setTime] = useState('');
+  const [metrics, setMetrics] = useState({
+    price: 24.50,
+    reserves: 3450,
+    capacity: 85000,
+    scarcity: 4.2,
+    loading: true
+  });
   
   useEffect(() => {
     const updateTime = () => {
@@ -18,7 +26,59 @@ export default function TelemetryWidget({ location }: { location?: string }) {
     return () => clearInterval(interval);
   }, []);
 
-  const volatilityIndex = 84; // Mock value
+  useEffect(() => {
+    async function fetchMarketData() {
+      try {
+        // Fetch prices from ERCOT scraper
+        const priceRes = await fetch('/api/market/ercot?type=prices')
+        if (!priceRes.ok) throw new Error(`Price fetch failed: ${priceRes.status}`)
+        
+        const priceContentType = priceRes.headers.get('content-type')
+        if (!priceContentType || !priceContentType.includes('application/json')) {
+          throw new Error('Price response was not JSON')
+        }
+        const priceData = await priceRes.json()
+
+        // Fetch grid conditions for reserves
+        const gridRes = await fetch('/api/market/ercot?type=grid')
+        if (!gridRes.ok) throw new Error(`Grid fetch failed: ${gridRes.status}`)
+
+        const gridContentType = gridRes.headers.get('content-type')
+        if (!gridContentType || !gridContentType.includes('application/json')) {
+          throw new Error('Grid response was not JSON')
+        }
+        const gridData = await gridRes.json()
+
+        // Resolve specific price for the location
+        let zonePrice = 24.50;
+        if (priceData.prices) {
+          const zoneKey = location.toLowerCase().replace('lz_', '') as keyof typeof priceData.prices;
+          zonePrice = priceData.prices[zoneKey] || priceData.prices.north || 24.50;
+        }
+
+        setMetrics({
+          price: zonePrice,
+          reserves: gridData.metrics?.reserves ?? 3450,
+          capacity: gridData.metrics?.total_capacity ?? 85000,
+          scarcity: gridData.metrics?.scarcity_prob ?? 4.2,
+          loading: false
+        });
+      } catch (error) {
+        console.error('Failed to fetch market telemetry:', error);
+      }
+    }
+
+    fetchMarketData();
+    const interval = setInterval(fetchMarketData, 30000);
+    return () => clearInterval(interval);
+  }, [location]);
+
+  const volatilityIndex = calculateVolatilityIndex({
+    price: metrics.price,
+    reserves: metrics.reserves,
+    capacity: metrics.capacity,
+    scarcity: metrics.scarcity
+  });
 
   return (
     <div className="space-y-4">
@@ -43,7 +103,7 @@ export default function TelemetryWidget({ location }: { location?: string }) {
         <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
         <div className="flex items-center justify-between relative z-10">
           <div className="flex items-center gap-2 text-zinc-400">
-            <Activity size={14} className="text-[#002FA7] animate-pulse" />
+            <Activity size={14} className={metrics.loading ? "text-zinc-600" : "text-[#002FA7] animate-pulse"} />
             <span className="text-[10px] font-mono uppercase tracking-wider">Volatility Index</span>
           </div>
           <span className="text-xs font-mono text-[#002FA7] tabular-nums">{volatilityIndex}%</span>
@@ -59,7 +119,9 @@ export default function TelemetryWidget({ location }: { location?: string }) {
           <span>Critical</span>
         </div>
         <p className="text-[10px] text-zinc-500 leading-relaxed italic relative z-10">
-          High volatility detected in {location || 'LZ_NORTH'}. Real-time pricing exceeds $250/MWh.
+          {volatilityIndex > 50 
+            ? `High volatility detected in ${location}. Real-time pricing exceeds $100/MWh.`
+            : `Market conditions in ${location} remain stable. No immediate scarcity risk detected.`}
         </p>
       </div>
     </div>
