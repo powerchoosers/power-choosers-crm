@@ -14,18 +14,23 @@ export default function ContextTasksWidget({ entityId, entityName }: ContextTask
   const { data: tasksData } = useTasks()
   
   const tasks = useMemo(() => {
+    if (!entityId) return []
     const allTasks = tasksData?.pages.flatMap(page => page.tasks) || []
-    // In a real scenario, we would filter by relatedId or similar.
-    // For now, let's filter by relatedTo name matching entityName as a fallback if relatedId isn't present
-    return allTasks.filter(t => t.relatedTo === entityName || t.relatedTo === entityId)
+    return allTasks.filter(t => {
+      const matchesId = (t.accountId && t.accountId === entityId) || 
+                       (t.contactId && t.contactId === entityId);
+      const matchesName = entityName && t.relatedTo === entityName;
+      const matchesRelatedId = t.relatedTo === entityId;
+      
+      return matchesId || matchesName || matchesRelatedId;
+    })
   }, [tasksData, entityId, entityName])
 
   const pendingTasks = tasks.filter(t => t.status !== 'Completed')
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Context Tasks</h3>
+      <div className="flex items-center justify-end">
         <button className="icon-button-forensic p-1 flex items-center justify-center">
           <Plus size={14} />
         </button>

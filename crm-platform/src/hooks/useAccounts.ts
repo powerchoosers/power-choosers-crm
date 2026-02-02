@@ -222,7 +222,7 @@ export function useAccount(id: string) {
 
       const { data, error } = await supabase
         .from('accounts')
-        .select('*')
+        .select('*, meters(*)')
         .eq('id', id)
         .single()
 
@@ -259,7 +259,13 @@ export function useAccount(id: string) {
         electricitySupplier: data.electricity_supplier || '',
         currentRate: data.current_rate || '',
         status: data.status || 'PROSPECT',
-        meters: data.metadata?.meters || [],
+        meters: data.meters?.map((m: any) => ({
+          id: m.id,
+          esiId: m.esid,
+          address: m.service_address,
+          rate: m.metadata?.rate || data.current_rate || '--',
+          endDate: m.metadata?.endDate || data.contract_end_date || '--'
+        })) || [],
         metadata: data.metadata || {}
       } as Account
     },

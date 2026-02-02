@@ -56,8 +56,7 @@ export default function MarketPulseWidget() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Market Pulse</h3>
+      <div className="flex items-center justify-end">
         <div className="flex items-center gap-1.5">
           <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
           <span className="text-[9px] font-mono text-green-500 uppercase tracking-widest">Live</span>

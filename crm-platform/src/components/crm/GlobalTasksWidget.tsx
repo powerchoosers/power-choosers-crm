@@ -19,8 +19,7 @@ export default function GlobalTasksWidget() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Tactical Agenda</h3>
+      <div className="flex items-center justify-end">
         <span className="text-[9px] font-mono text-zinc-600 uppercase tabular-nums">
           {completedCount}/{totalCount} Units
         </span>

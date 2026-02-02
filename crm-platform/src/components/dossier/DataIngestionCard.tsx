@@ -5,6 +5,7 @@ import { UploadCloud, FileText, X, Loader2, Download } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface Document {
   id: string;
@@ -33,6 +34,7 @@ export default function DataIngestionCard({ accountId }: DataIngestionCardProps)
   const [files, setFiles] = useState<Document[]>([]);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
 
   // Fetch Documents
   useEffect(() => {
@@ -129,8 +131,40 @@ export default function DataIngestionCard({ accountId }: DataIngestionCardProps)
           });
 
         if (dbError) throw dbError;
+
+        // 3. AI Analysis
+        toast.loading('Neuro-Processing Document...', { id: toastId });
+
+        try {
+          const response = await fetch('/api/analyze-document', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              accountId,
+              filePath,
+              fileName: file.name
+            })
+          });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            console.error('AI Error:', result);
+            toast.error('AI Extraction Failed', { id: toastId });
+          } else {
+            const type = result.analysis?.type === 'SIGNED_CONTRACT' ? 'CONTRACT SECURED' : 'BILL ANALYZED';
+            toast.success(`${type}: Data Nodes Updated`, { id: toastId });
+            
+            // Refresh Account Data
+            queryClient.invalidateQueries({ queryKey: ['account', accountId] });
+          }
+        } catch (aiErr) {
+          console.error('AI Request Failed:', aiErr);
+          // Don't fail the whole upload if AI fails
+          toast.warning('Document Saved (AI Offline)', { id: toastId });
+        }
       }
-      toast.success('Ingestion complete', { id: toastId });
+      // toast.success('Ingestion complete', { id: toastId }); // Handled above
     } catch (err) {
       console.error('Upload failed:', err);
       toast.error('Ingestion failed', { id: toastId });

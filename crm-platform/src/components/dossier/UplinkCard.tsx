@@ -9,6 +9,7 @@ import { useCallStore } from '@/store/callStore'
 interface UplinkCardProps {
   contact: ContactDetail
   isEditing: boolean
+  onEmailClick?: () => void
   onUpdate: (updates: Partial<ContactDetail>) => void
 }
 
@@ -22,7 +23,7 @@ interface PhoneEntry {
   icon: typeof Smartphone
 }
 
-export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onUpdate }) => {
+export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEmailClick, onUpdate }) => {
   const initiateCall = useCallStore((state) => state.initiateCall)
   // Local state for editing phones
   const [phones, setPhones] = useState<PhoneEntry[]>([])
@@ -308,7 +309,11 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onUp
               className="w-full group flex items-center justify-between p-4 nodal-glass nodal-glass-hover rounded-xl transition-all border border-white/5"
               onClick={() => {
                 if (!email) return
-                window.open(`mailto:${encodeURIComponent(email)}`)
+                if (onEmailClick) {
+                  onEmailClick()
+                } else {
+                  window.open(`mailto:${encodeURIComponent(email)}`)
+                }
               }}
               disabled={!email}
             >
