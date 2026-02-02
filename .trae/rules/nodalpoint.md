@@ -62,6 +62,10 @@ Due to varying structures in legacy data, we use a normalization layer in our ho
 - **Metadata Parsing**: In some cases, Supabase returns the `metadata` column as a stringified JSON string. We use `normalizeMetadata` to safely parse these values.
 - **Energy Data**: Account-level energy metrics (Strike Price, Annual Usage, etc.) are promoted to top-level columns in the `accounts` table for performance.
 
+### 3. Market Telemetry & Forensic Analysis
+- **Telemetry Storage**: We store real-time ERCOT market data in the `market_telemetry` table, throttled to 2x daily (AM/PM) to preserve storage.
+- **Vector Search**: The table includes a `vector(768)` embedding column (`embedding`) generated from the market summary string. This enables semantic search for "days like today" (e.g., finding historical days with similar price spikes or grid stress).
+
 ## ⚡ Quick Start & Architecture
 
 The platform operates using a **Three-Server Architecture**:
