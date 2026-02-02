@@ -12,9 +12,9 @@ export default function NewsFeedWidget() {
   return (
     <div className="space-y-3">
       <div className="space-y-2">
-        {news.map((item, i) => (
+        {news.map((item) => (
           <div 
-            key={i}
+            key={item.title}
             className="group p-3 rounded-xl bg-zinc-900/40 border border-white/5 hover:border-white/10 transition-all cursor-pointer"
           >
             <div className="flex items-start justify-between gap-2 mb-1">

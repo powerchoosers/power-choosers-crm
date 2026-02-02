@@ -1225,7 +1225,7 @@ SELECT * FROM hybrid_search_accounts(
           <AnimatePresence initial={false}>
             {messages.map((m, i) => (
               <motion.div 
-                key={i} 
+                key={m.id || `msg-${i}-${m.timestamp || Date.now()}`} 
                 initial={{ 
                   opacity: 0, 
                   x: m.role === 'user' ? 20 : -20,
@@ -1285,11 +1285,12 @@ SELECT * FROM hybrid_search_accounts(
                       
                       <div className="flex flex-col gap-4 w-full min-w-0 max-w-full overflow-hidden">
                         {m.content.split('JSON_DATA:').map((part, index) => {
+                          const partKey = `${m.id || i}-part-${index}`;
                           if (index === 0) {
                             const text = part.trim()
                             if (!text) return null
                             return (
-                              <div key={index} className="prose prose-invert prose-p:text-zinc-400 prose-headings:font-mono prose-headings:text-zinc-200 prose-headings:tracking-tighter prose-strong:text-white prose-code:text-[#002FA7] text-sm leading-7 max-w-none break-words [word-break:break-word] [overflow-wrap:anywhere]">
+                              <div key={partKey} className="prose prose-invert prose-p:text-zinc-400 prose-headings:font-mono prose-headings:text-zinc-200 prose-headings:tracking-tighter prose-strong:text-white prose-code:text-[#002FA7] text-sm leading-7 max-w-none break-words [word-break:break-word] [overflow-wrap:anywhere]">
                                 <p className="whitespace-pre-wrap">{text}</p>
                               </div>
                             )
@@ -1300,7 +1301,7 @@ SELECT * FROM hybrid_search_accounts(
                             const trailingText = rest.join('END_JSON').trim()
                             
                             return (
-                              <div key={index} className="flex flex-col gap-4 w-full min-w-0 max-w-full overflow-hidden">
+                              <div key={partKey} className="flex flex-col gap-4 w-full min-w-0 max-w-full overflow-hidden">
                                 <div className="w-full overflow-hidden rounded-lg border border-white/5 bg-black/20 grid grid-cols-1">
                                   <ComponentRenderer type={data.type} data={data.data} />
                                 </div>
@@ -1312,7 +1313,7 @@ SELECT * FROM hybrid_search_accounts(
                               </div>
                             )
                           } catch (e) {
-                            return <div key={index} className="text-[10px] text-red-400 font-mono p-2 bg-red-500/10 rounded">[System_Error: Data_Corruption]</div>
+                            return <div key={partKey} className="text-[10px] text-red-400 font-mono p-2 bg-red-500/10 rounded">[System_Error: Data_Corruption]</div>
                           }
                         })}
                       </div>
