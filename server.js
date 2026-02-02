@@ -1017,6 +1017,18 @@ const server = http.createServer(async (req, res) => {
 
   if (!fileExists || isDirectory) {
     console.error(`[Server] File not found or is directory: ${filePath}`);
+    
+    // If it's an API route, return JSON 404
+    if (pathname.startsWith('/api/')) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Not Found', 
+        message: `The requested API endpoint ${pathname} was not found.`,
+        path: pathname
+      }));
+      return;
+    }
+
     res.writeHead(404, { 'Content-Type': 'text/html' });
     res.end(`
       <!DOCTYPE html>
@@ -1068,6 +1080,18 @@ const server = http.createServer(async (req, res) => {
     res.end(data);
   } catch (error) {
     logger.error('Error reading file', 'Server', { filePath, error: error.message });
+    
+    // If it's an API route, return JSON 500
+    if (pathname.startsWith('/api/')) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Internal Server Error', 
+        message: 'An unexpected error occurred while processing the API request.',
+        details: error.message
+      }));
+      return;
+    }
+
     res.writeHead(500, { 'Content-Type': 'text/html' });
     res.end(`
       <!DOCTYPE html>

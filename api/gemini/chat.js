@@ -59,12 +59,14 @@ const tools = [
       },
       {
         name: 'list_accounts',
-        description: 'MANDATORY for finding companies/accounts in the CRM. Search by name, domain, or industry. ALWAYS call this first if a user mentions a company.',
+        description: 'MANDATORY for finding companies/accounts in the CRM. Search by name, domain, industry, or location. ALWAYS call this first if a user mentions a company or a location.',
         parameters: {
           type: 'OBJECT',
           properties: {
             search: { type: 'STRING', description: 'Account name, domain, or industry keyword' },
             industry: { type: 'STRING', description: 'Filter by industry (e.g. "Manufacturing", "Healthcare")' },
+            city: { type: 'STRING', description: 'Filter by city (e.g. "Houston")' },
+            state: { type: 'STRING', description: 'Filter by state (e.g. "Texas")' },
             expiration_year: { type: 'NUMBER', description: 'Filter accounts by contract expiration year (e.g. 2026)' },
             limit: { type: 'NUMBER', description: 'Maximum number of accounts to return' }
           }
@@ -622,14 +624,28 @@ const toolHandlers = {
     if (error) throw error;
     return data;
   },
-  list_accounts: async ({ search, industry, expiration_year, limit = 10 }) => {
+  list_accounts: async ({ search, industry, expiration_year, city, state, limit = 10 }) => {
     let data = [];
     let usedVector = false;
 
     const normalizedSearch = search ? normalizeSearchText(search) : null;
     const safeSearch = normalizedSearch ? toPostgrestOrSafeTerm(normalizedSearch) : null;
 
-    if (normalizedSearch && normalizedSearch.length > 0) {
+    // 0. specialized location search
+    if (city || state) {
+      console.log(`[list_accounts] Performing location search: ${city || ''}, ${state || ''}`);
+      let query = supabaseAdmin.from('accounts').select('*').limit(limit);
+      if (city) query = query.ilike('city', `%${city}%`);
+      if (state) query = query.ilike('state', `%${state}%`);
+      
+      const { data: locData, error } = await query;
+      if (!error && locData && locData.length > 0) {
+        data = locData;
+        usedVector = true; // Skip hybrid search if we found direct location matches
+      }
+    }
+
+    if (!usedVector && normalizedSearch && normalizedSearch.length > 0) {
       try {
         const { data: directName } = await supabaseAdmin
           .from('accounts')
@@ -804,7 +820,9 @@ const toolHandlers = {
         contract_end_date,
         industry: record.industry || metadata.industry || metadata.general?.industry,
         electricity_supplier: record.electricity_supplier || metadata.electricity_supplier || metadata.general?.electricity_supplier,
-        annual_usage: record.annual_usage || metadata.annual_usage || metadata.general?.annual_usage
+        annual_usage: record.annual_usage || metadata.annual_usage || metadata.general?.annual_usage,
+        city: record.city || metadata.city || metadata.general?.city,
+        state: record.state || metadata.state || metadata.general?.state
       };
     });
   },
@@ -1047,20 +1065,44 @@ export default async function handler(req, res) {
       q = q.replace(/^\s*(in\s+my\s+crm|in\s+the\s+crm|in\s+my\s+database|in\s+the\s+database)\s*/i, '');
       q = q.replace(/[?!.]+\s*$/g, '');
       q = normalizeSearchText(q);
+      // Remove common list commands
+      q = q.replace(/^\s*(list|show|get|display)\s+(all\s+)?(accounts|companies|businesses|nodes)\s+/i, '');
+      // Remove noun-based preambles like "accounts in..." or "companies for..."
+      q = q.replace(/^\s*(accounts|companies|businesses|nodes)\s+(in|located in|for)\s+/i, '');
+      // Remove location prepositions if at start
+      q = q.replace(/^\s*(located\s+in|in)\s+/i, '');
       return q;
     };
 
     const inferLastAccountFromHistory = () => {
+      // 1. Check for explicit ID confirmation in the very last user message
+      const lastUserMsg = cleanedMessages[cleanedMessages.length - 1];
+      if (lastUserMsg && lastUserMsg.role === 'user') {
+        const idMatch = lastUserMsg.content.match(/\b([A-Za-z0-9]{20})\b/);
+        if (idMatch) {
+          return { id: idMatch[1] };
+        }
+      }
+
+      // 2. Fallback to scanning assistant history
       for (let i = cleanedMessages.length - 1; i >= 0; i--) {
         const m = cleanedMessages[i];
         if (m.role !== 'assistant') continue;
         const blocks = extractJsonBlocks(m.content);
         for (const b of blocks) {
           if (!b || typeof b !== 'object') continue;
-          if (b.type !== 'forensic_grid') continue;
-          const rows = Array.isArray(b.data?.rows) ? b.data.rows : [];
-          if (rows.length === 1 && rows[0] && rows[0].id) {
-            return { id: String(rows[0].id), name: rows[0].name ? String(rows[0].name) : null };
+          
+          // Check for position_maturity block (highest confidence of "active" account)
+          if (b.type === 'position_maturity' && b.data && b.data.id) {
+            return { id: String(b.data.id), name: b.data.name ? String(b.data.name) : null };
+          }
+
+          // Check for forensic_grid with a single result
+          if (b.type === 'forensic_grid') {
+            const rows = Array.isArray(b.data?.rows) ? b.data.rows : [];
+            if (rows.length === 1 && rows[0] && rows[0].id) {
+              return { id: String(rows[0].id), name: rows[0].name ? String(rows[0].name) : null };
+            }
           }
         }
       }
@@ -1114,8 +1156,9 @@ export default async function handler(req, res) {
       const isInstructionLike = /(\breturn\b|\bonly\b|\bsummarize\b|\bexplain\b|\bdraft\b|\bwrite\b|\bcompose\b|\bgenerate\b|\btranslate\b|\bdefine\b|\bcalculate\b|\bsolve\b)/.test(lower);
       const hasSearchVerb = /(\bfind\b|\bsearch\b|\blook up\b|\bdo you see\b|\bcheck\b)/.test(lower);
       const isSearchQuery = hasSearchVerb || (looksLikeDirectNameQuery && !isInstructionLike);
+      const isLocationQuery = /(location|city|state|located in)\b/.test(lower);
 
-      if (!isExpirationQuery && !isContractQuery && !isSearchQuery) return false;
+      if (!isExpirationQuery && !isContractQuery && !isSearchQuery && !isLocationQuery) return false;
 
       const diagnostics = [
         {
@@ -1128,6 +1171,73 @@ export default async function handler(req, res) {
 
       const inferredAccount = inferLastAccountFromHistory();
       const isContractFollowUp = isContractQuery && /\b(them|it|this|that)\b/.test(lower) && !!inferredAccount?.id;
+
+      if (isLocationQuery) {
+        const q0 = stripSearchPreamble(p);
+        // Simple heuristic: extract the last 1-2 words if they look like a city/state
+        const tokens = q0.split(/\s+/).filter(Boolean);
+        let city = null;
+        let state = null;
+        
+        // Check for "Humble, Texas" or "Humble Texas" or just "Humble"
+        if (tokens.length >= 2) {
+          state = tokens[tokens.length - 1];
+          city = tokens[tokens.length - 2].replace(/,$/, '');
+        } else if (tokens.length === 1) {
+          city = tokens[0];
+        }
+
+          const records = await toolHandlers.list_accounts({ city, state, limit: 20 });
+        diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+
+        // Check for single result to promote to Position Maturity
+        if (records.length === 1) {
+          const match = records[0];
+          const account = await toolHandlers.get_account_details({ account_id: match.id });
+          
+          const expiration = account?.contract_end_date ? String(account.contract_end_date) : null;
+          if (!expiration) {
+            const narrative = `${firstName}, I found ${account?.name || 'the account'} in ${city || state}, but there is no contract expiration date stored on the record right now.`;
+            const dv = buildJsonBlock('data_void', { field: 'Contract Expiration', action: 'REQUIRE_BILL_UPLOAD' });
+            respondGrounded(`${narrative} ${dv}`, diagnostics);
+            return true;
+          }
+
+          const daysRemaining = daysUntil(expiration);
+          const supplier = account?.electricity_supplier ? String(account.electricity_supplier) : 'Unknown';
+          const strike = formatUsdRate(account?.current_rate) || 'Unknown';
+          const usage = formatKwh(account?.annual_usage) || 'Unknown';
+          const narrative = `${firstName}, I found one account in ${city || state}. Here are the energy contract fields for ${account?.name || 'this account'}.`;
+          const pm = buildJsonBlock('position_maturity', {
+            expiration,
+            daysRemaining: typeof daysRemaining === 'number' ? daysRemaining : 0,
+            currentSupplier: supplier,
+            strikePrice: strike,
+            annualUsage: usage,
+            estimatedRevenue: 'Unknown',
+            margin: 'N/A',
+            isSimulation: false,
+          });
+          respondGrounded(`${narrative} ${pm}`, diagnostics);
+          return true;
+        }
+
+        const rows = (records || []).map((r) => ({
+          id: r.id,
+          name: r.name,
+          location: `${r.city || ''}, ${r.state || ''}`.trim().replace(/^,/, '').trim() || 'Unknown',
+        }));
+
+        const narrative = `${firstName}, I searched your CRM for accounts in ${city || ''}${state ? ' ' + state : ''}. These are the matching nodes.`;
+        const grid = buildJsonBlock('forensic_grid', {
+          title: `Accounts in ${city || 'Location'}`,
+          columns: ['id', 'name', 'location'],
+          rows,
+        });
+
+        respondGrounded(`${narrative} ${grid}`, diagnostics);
+        return true;
+      }
 
       if (isExpirationQuery) {
         const year = parseYear(p);
