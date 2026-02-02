@@ -129,3 +129,6 @@
   - [x] **Exact Name Pass**: Adds a direct `name ILIKE <query>` check before hybrid/keyword search.
   - [x] **Tokenized Fallback**: Expands keyword fallback to search across multiple tokens (name/domain/industry/location) and ranks results in-memory for best match.
   - [x] **Hybrid Search Upgrade**: Updated `hybrid_search_accounts` SQL to guarantee exact-name matches are pinned above RRF fusion ordering.
+  - [x] **Location Search**: Implemented dedicated location search path for city/state queries (e.g. "accounts in Houston") with `forensic_grid` response.
+  - [x] **Single Match Promotion**: Added logic to automatically promote single or exact account matches to detailed `position_maturity` view instead of a generic grid.
+  - [x] **RPC Fix**: Resolved `contractEndDate` column name mismatch in `hybrid_search_accounts` RPC function.
