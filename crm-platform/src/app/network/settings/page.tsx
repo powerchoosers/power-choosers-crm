@@ -24,6 +24,7 @@ export default function SettingsPage() {
   const [bio, setBio] = useState('')
   const [jobTitle, setJobTitle] = useState('')
   const [linkedinUrl, setLinkedinUrl] = useState('')
+  const [localEmail, setLocalEmail] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
@@ -99,6 +100,7 @@ export default function SettingsPage() {
     setLastName(profile.lastName || authLastName)
     
     // 2. Other Profile Fields
+    setLocalEmail(profile.email || user?.email || '')
     setBio(profile.bio || '')
     setJobTitle(profile.jobTitle || '')
     setLinkedinUrl(profile.linkedinUrl || '')
@@ -151,6 +153,12 @@ export default function SettingsPage() {
     setIsSaving(true)
     try {
       const emailLower = user.email.toLowerCase().trim()
+      const targetEmail = localEmail.toLowerCase().trim()
+
+      // If email changed, we warn but don't perform the migration here
+      if (targetEmail !== emailLower) {
+        console.warn('[Settings] Email change detected. System-wide migration required.');
+      }
       
       const { error } = await supabase
         .from('users')
@@ -274,10 +282,13 @@ export default function SettingsPage() {
                   <Input
                     id="email"
                     type="email"
-                    value={profile.email || user?.email || ''}
-                    readOnly
-                    className="bg-transparent border-white/10 text-zinc-500 font-mono tabular-nums"
+                    value={localEmail}
+                    onChange={(e) => setLocalEmail(e.target.value)}
+                    className="bg-transparent border-white/10 text-zinc-200 font-mono tabular-nums focus-visible:ring-[#002FA7]"
                   />
+                  <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">
+                    Contact Admin to update system-wide ID
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="bio" className="text-zinc-400">Bio</Label>

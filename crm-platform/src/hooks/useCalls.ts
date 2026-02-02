@@ -75,28 +75,41 @@ export function useCallsCount(searchQuery?: string) {
   return useQuery({
     queryKey: ['calls-count', user?.email, role, searchQuery],
     queryFn: async () => {
-      if (loading || !user) return 0
+      if (loading || !user || !user.email) return 0
 
-      let query = supabase
-        .from('calls')
-        .select('*, contacts(name, ownerId)', { count: 'exact', head: true })
+      try {
+        let query = supabase
+          .from('calls')
+          .select('id', { count: 'exact', head: true })
 
-      if (role !== 'admin' && user.email) {
-        query = query.eq('owner_id', user.email)
-      }
+        if (role !== 'admin') {
+          query = query.eq('owner_id', user.email)
+        }
 
-      if (searchQuery) {
-        query = query.or(`ai_summary.ilike.%${searchQuery}%,transcript.ilike.%${searchQuery}%,contacts.name.ilike.%${searchQuery}%`)
-      }
+        if (searchQuery) {
+          query = query.or(`ai_summary.ilike.%${searchQuery}%,transcript.ilike.%${searchQuery}%`)
+        }
 
-      const { count, error } = await query
-      if (error) {
-        console.error('Calls count error:', error)
+        const { count, error } = await query
+        if (error) {
+          console.error("Supabase error fetching calls count:", {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          })
+          throw error
+        }
+        return count || 0
+      } catch (error: any) {
+        if (error?.name !== 'AbortError' && error?.message !== 'Fetch is aborted') {
+          console.error("Error fetching calls count:", error.message || error)
+        }
         return 0
       }
-      return count || 0
     },
-    enabled: !loading && !!user,
+    enabled: !loading && !!user && !!user?.email,
+    staleTime: 1000 * 60 * 5,
   })
 }
 

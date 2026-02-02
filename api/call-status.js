@@ -183,7 +183,7 @@ export default async function handler(req, res) {
         if (token) {
           const decoded = await admin.auth().verifyIdToken(token);
           userEmail = (decoded && decoded.email) ? String(decoded.email).toLowerCase() : null;
-          isAdmin = userEmail === 'l.patterson@powerchoosers.com';
+         const isAdmin = userEmail === 'l.patterson@nodalpoint.io';
         }
       }
     } catch(_) { /* ignore */ }

@@ -27,7 +27,7 @@ async function getRequestUserEmail(req) {
   } catch (_) { return null; }
 }
 
-const ADMIN_EMAIL = 'l.patterson@powerchoosers.com';
+const ADMIN_EMAIL = 'l.patterson@nodalpoint.io';
 
 // Derive outcome from call status and duration
 function deriveOutcome(call) {
