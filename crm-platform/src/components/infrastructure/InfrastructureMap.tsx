@@ -1,5 +1,5 @@
 'use client'
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { GoogleMap, useLoadScript, MarkerF, CircleF } from '@react-google-maps/api';
 
 // 1. THE NODAL "STEALTH" SKIN
@@ -56,10 +56,47 @@ export default function InfrastructureMap() {
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY as string,
   });
 
+  const [prices, setPrices] = useState({
+    north: 24.15,
+    houston: 21.80,
+    west: 45.20,
+    south: 22.40
+  });
+
+  useEffect(() => {
+    async function fetchMarketData() {
+      try {
+        const res = await fetch('/api/market/ercot?type=prices');
+        if (!res.ok) throw new Error('Failed to fetch prices');
+        
+        const contentType = res.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          throw new Error('Response was not JSON');
+        }
+        
+        const data = await res.json();
+        if (data.prices) {
+          setPrices({
+            north: data.prices.north || prices.north,
+            houston: data.prices.houston || prices.houston,
+            west: data.prices.west || prices.west,
+            south: data.prices.south || prices.south
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch grid telemetry:', error);
+      }
+    }
+
+    fetchMarketData();
+    const interval = setInterval(fetchMarketData, 60000); // Update every minute
+    return () => clearInterval(interval);
+  }, []);
+
   const center = useMemo(() => ({ lat: 31.0000, lng: -99.0000 }), []); // Center on Texas
 
   if (!isLoaded) return (
-    <div className="h-full w-full flex items-center justify-center bg-zinc-950">
+    <div className="h-full w-full flex items-center justify-center bg-zinc-900/10 backdrop-blur-sm">
       <span className="text-xs font-mono text-[#002FA7] animate-pulse">
         {'>'} ESTABLISHING_UPLINK...
       </span>
@@ -67,19 +104,19 @@ export default function InfrastructureMap() {
   );
 
   return (
-    <div className="h-full w-full relative group">
+    <div className="h-full w-full relative group bg-zinc-950">
       
       <GoogleMap
         zoom={6}
         center={center}
-        mapContainerClassName="w-full h-full rounded-none"
+        mapContainerClassName="w-full h-full"
         options={{
           styles: mapStyles,
-          disableDefaultUI: true, // Kills the "Map/Satellite" buttons
-          zoomControl: false,     // Minimalist: No zoom buttons (use scroll)
+          disableDefaultUI: true,
+          zoomControl: false,
           streetViewControl: false,
           mapTypeControl: false,
-          backgroundColor: '#18181b', // Seamless loading bg
+          backgroundColor: '#09090b',
         }}
       >
         {/* RENDER NODES */}
@@ -126,15 +163,19 @@ export default function InfrastructureMap() {
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-8">
               <span className="text-xs text-zinc-400 font-mono">LZ_NORTH</span>
-              <span className="text-xs text-[#002FA7] font-mono">$24.15</span>
+              <span className="text-xs text-[#002FA7] font-mono">${prices.north.toFixed(2)}</span>
             </div>
             <div className="flex items-center justify-between gap-8">
               <span className="text-xs text-zinc-400 font-mono">LZ_HOUSTON</span>
-              <span className="text-xs text-emerald-500 font-mono">$21.80</span>
+              <span className="text-xs text-emerald-500 font-mono">${prices.houston.toFixed(2)}</span>
             </div>
             <div className="flex items-center justify-between gap-8">
               <span className="text-xs text-zinc-400 font-mono">LZ_WEST</span>
-              <span className="text-xs text-amber-500 font-mono">$45.20</span>
+              <span className="text-xs text-amber-500 font-mono">${prices.west.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-8">
+              <span className="text-xs text-zinc-400 font-mono">LZ_SOUTH</span>
+              <span className="text-xs text-rose-500 font-mono">${prices.south.toFixed(2)}</span>
             </div>
           </div>
         </div>
