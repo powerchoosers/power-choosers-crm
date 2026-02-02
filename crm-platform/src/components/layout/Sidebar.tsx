@@ -67,7 +67,7 @@ const navigationStructure = [
   {
     group: "Intelligence",
     items: [
-      { name: 'Telemetry', href: '/network/energy', icon: Activity }, // Keeping /network/energy for now
+      { name: 'Telemetry', href: '/network/infrastructure', icon: Activity },
       { name: 'Vault', href: '/network/vault', icon: FileText }
     ]
   },
