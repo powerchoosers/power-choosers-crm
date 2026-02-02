@@ -8,7 +8,8 @@ export default function MarketPulseWidget() {
     houston: 24.50,
     north: 21.20,
     reserves: 3450,
-    scarcity: 4.2
+    scarcity: 4.2,
+    capacity: 0
   })
   const [loading, setLoading] = useState(true)
 
