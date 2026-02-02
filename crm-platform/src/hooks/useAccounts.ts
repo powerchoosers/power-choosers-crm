@@ -16,6 +16,8 @@ export interface Account {
   employees: string
   revenue?: string
   location: string
+  city?: string
+  state?: string
   serviceAddresses?: any[]
   address?: string
   updated: string
@@ -358,8 +360,8 @@ export function useCreateAccount() {
         service_addresses: newAccount.serviceAddresses,
         contract_end_date: newAccount.contractEnd || null,
         employees: parseInt(newAccount.employees) || null,
-        city: newAccount.location?.split(',')[0]?.trim(),
-        state: newAccount.location?.split(',')[1]?.trim(),
+        city: newAccount.city || newAccount.location?.split(',')[0]?.trim(),
+        state: newAccount.state || newAccount.location?.split(',')[1]?.trim(),
         metadata: {
           sqft: newAccount.sqft,
           occupancy: newAccount.occupancy
@@ -415,6 +417,8 @@ export function useUpdateAccount() {
         dbUpdates.city = parts[0]?.trim() || null
         dbUpdates.state = parts[1]?.trim() || null
       }
+      if (updates.city !== undefined) dbUpdates.city = updates.city || null
+      if (updates.state !== undefined) dbUpdates.state = updates.state || null
       if (updates.address !== undefined) dbUpdates.address = updates.address || null
 
       // Forensic fields mapping
