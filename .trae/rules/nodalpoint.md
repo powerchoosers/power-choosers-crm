@@ -64,7 +64,23 @@ Due to varying structures in legacy data, we use a normalization layer in our ho
 
 ### 3. Market Telemetry & Forensic Analysis
 - **Telemetry Storage**: We store real-time ERCOT market data in the `market_telemetry` table, throttled to 2x daily (AM/PM) to preserve storage.
-- **Vector Search**: The table includes a `vector(768)` embedding column (`embedding`) generated from the market summary string. This enables semantic search for "days like today" (e.g., finding historical days with similar price spikes or grid stress).
+- **Vector Search**: The table includes a `vector(768)` embedding column (`embedding`) generated from the market summary string.
+- **Market Zone Resolution**: We use `market-mapping.ts` to resolve a contact or account's physical location (City/State) to its respective ERCOT Load Zone (North, Houston, West, South). This allows for context-aware market analysis.
+- **Forensic Volatility Index**: A live metric (0-100) calculated from three weighted vectors:
+  - **Real-Time Price (40%)**: Current LZ price vs. historical norms.
+  - **Grid Reserves (40%)**: Available capacity vs. critical thresholds (e.g., < 3000 MW).
+  - **Scarcity Risk (20%)**: Weighted by DAM/RTM spreads and extreme weather events.
+- **Data Resilience**: Frontend widgets (`MarketPulseWidget`, `TelemetryWidget`) and the Infrastructure Map MUST validate API responses for `content-type: application/json` to handle non-JSON error pages (e.g., ERCOT 500 Internal Server Error) gracefully.
+
+## 🗺️ Infrastructure & Asset Mapping
+
+The platform features a "Stealth" geometry map (`InfrastructureMap.tsx`) for grid asset visualization:
+- **Design Skin**: Stripped-down Zinc-950 geometry with Zinc-400 labels and Zinc-700 highways. POIs (schools, parks) are disabled to focus on grid logic.
+- **Live Telemetry HUD**: A floating backdrop-blur overlay displaying real-time prices for all major ERCOT Load Zones (LZ_NORTH, LZ_HOUSTON, LZ_WEST, LZ_SOUTH).
+- **Node Visualization**:
+  - **Protected Nodes**: Klein Blue (`#002FA7`) markers for active clients.
+  - **Risk Nodes**: Rose (`#ef4444`) markers with a subtle pulse effect for targets with high volatility exposure.
+  - **Prospect Nodes**: White markers for potential targets.
 
 ## ⚡ Quick Start & Architecture
 
