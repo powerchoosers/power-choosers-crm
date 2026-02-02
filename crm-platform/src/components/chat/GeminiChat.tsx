@@ -30,11 +30,13 @@ interface ChatSession {
   created_at: string
 }
 
-interface Message {
+interface GeminiMessage {
+  id?: string
   role: 'user' | 'assistant'
   content: string
   type?: 'text' | 'component'
   componentData?: unknown
+  timestamp?: number
 }
 
 type NewsTickerItem = {
@@ -703,9 +705,11 @@ export function GeminiChatPanel() {
   const loadSession = async (sessionId: string) => {
     const { data } = await supabase.from('chat_messages').select('*').eq('session_id', sessionId).order('created_at', { ascending: true })
     if (data) {
-      setMessages(data.map((m: { role: string; content: string }) => ({
+      setMessages(data.map((m: { id: string; role: string; content: string; created_at: string }) => ({
+        id: m.id,
         role: m.role === 'model' ? 'assistant' : m.role as 'user' | 'assistant',
-        content: m.content
+        content: m.content,
+        timestamp: new Date(m.created_at).getTime()
       })))
       setCurrentSessionId(sessionId)
       setIsHistoryOpen(false)
@@ -743,7 +747,7 @@ export function GeminiChatPanel() {
     }
   }
 
-  const [messages, setMessages] = useState<Message[]>([])
+  const [messages, setMessages] = useState<GeminiMessage[]>([])
   const [lastProvider, setLastProvider] = useState<string>('openrouter')
   const [lastModel, setLastModel] = useState<string>('openai/gpt-oss-120b:free')
   const [selectedModel, setSelectedModel] = useState<string>('openai/gpt-oss-120b:free')
@@ -805,6 +809,8 @@ export function GeminiChatPanel() {
       setMessages([
         { 
           role: 'assistant', 
+          id: 'greeting',
+          timestamp: Date.now(),
           content: contextInfo.type === 'contact' 
             ? `System ready, ${firstName}. I see you're viewing contact ${params.id}. Scanning Gmail for recent threads and Apollo for firmographics...`
             : contextInfo.type === 'account'
@@ -931,7 +937,7 @@ SELECT * FROM hybrid_search_accounts(
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
 
-    const userMessage: Message = { role: 'user', content: input }
+    const userMessage: GeminiMessage = { role: 'user', content: input, id: crypto.randomUUID(), timestamp: Date.now() }
     saveMessageToDb('user', input)
     const updatedMessages = [...messages, userMessage]
     
@@ -987,7 +993,12 @@ SELECT * FROM hybrid_search_accounts(
       setLastProvider(typeof data.provider === 'string' ? data.provider : 'gemini')
       setLastModel(typeof data.model === 'string' ? data.model : '')
 
-      setMessages(prev => [...prev, { role: 'assistant', content: data.content }])
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: data.content,
+        id: crypto.randomUUID(),
+        timestamp: Date.now()
+      }])
       saveMessageToDb('model', data.content)
     } catch (err: unknown) {
       console.error('Chat error:', err)
@@ -1013,7 +1024,12 @@ SELECT * FROM hybrid_search_accounts(
         ? "The intelligence network is currently under heavy load. I'm initiating a localized retry protocol, but if this persists, please try again in a moment."
         : "Sorry, I encountered an error. Please try again."
         
-      setMessages(prev => [...prev, { role: 'assistant', content: assistantFallback }])
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: assistantFallback,
+        id: crypto.randomUUID(),
+        timestamp: Date.now()
+      }])
     } finally {
       setIsLoading(false)
     }
@@ -1223,7 +1239,7 @@ SELECT * FROM hybrid_search_accounts(
       <ScrollArea className="flex-1 w-full overflow-hidden relative z-10" ref={scrollRef}>
         <div className="p-4 space-y-8 min-w-0 w-full max-w-full overflow-x-hidden flex flex-col">
           <AnimatePresence initial={false}>
-            {messages.map((m, i) => (
+            {messages.map((m: GeminiMessage, i) => (
               <motion.div 
                 key={m.id || `msg-${i}-${m.timestamp || Date.now()}`} 
                 initial={{ 
