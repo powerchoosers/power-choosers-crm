@@ -685,7 +685,6 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             {accountId && (
               <button
                 onClick={handleEnrichAccount}
-                disabled={scanStatus === 'scanning'}
                 className="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[9px] font-mono text-white transition-all flex items-center gap-1.5 group uppercase tracking-widest whitespace-nowrap"
                 title="Deep_Enrich Account Profile"
               >
