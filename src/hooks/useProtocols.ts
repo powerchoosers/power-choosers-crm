@@ -9,6 +9,10 @@ export interface Protocol {
   description?: string
   status: 'active' | 'inactive' | 'draft'
   steps: ProtocolStep[]
+  bgvector?: {
+    nodes: any[]
+    edges: any[]
+  }
   createdAt: string | Date
   updatedAt?: string | Date
   ownerId?: string
