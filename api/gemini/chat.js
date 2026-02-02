@@ -6,6 +6,7 @@ import { cors } from '../_cors.js';
 import logger from '../_logger.js';
 import { GmailService } from '../email/gmail-service.js';
 import { APOLLO_BASE_URL, fetchWithRetry, getApiKey } from '../apollo/_utils.js';
+import { getErcotMarketData } from '../market/ercot.js';
 
 // Define the tools (functions) Gemini can call
 const tools = [
@@ -227,6 +228,14 @@ const tools = [
             limit: { type: 'NUMBER', description: 'Maximum number of documents to return (default 10)' }
           }
         }
+      },
+      {
+        name: 'get_market_pulse',
+        description: 'Get real-time ERCOT market data, including current prices (LZ_HOUSTON, LZ_NORTH) and grid conditions (Load, Capacity, Reserves). ALWAYS use this when the user asks about market conditions, pricing, or the grid.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {}
+        }
       }
     ]
   }
@@ -363,6 +372,76 @@ const toolHandlers = {
     const { data, error } = await query;
     if (error) throw error;
     return data;
+  },
+  get_market_pulse: async () => {
+    try {
+      logger.info('[Gemini] Tool call: get_market_pulse', 'ChatTool');
+      
+      // Fetch both prices and grid conditions
+      const [priceData, gridData] = await Promise.all([
+        getErcotMarketData('prices'),
+        getErcotMarketData('grid')
+      ]);
+
+      const combinedData = {
+        timestamp: priceData.timestamp || gridData.timestamp,
+        prices: priceData.prices,
+        grid: gridData.metrics,
+        metadata: {
+          price_source: priceData.source || priceData.metadata?.source,
+          grid_source: gridData.source || gridData.metadata?.source,
+          last_updated: new Date().toISOString()
+        }
+      };
+
+      // Throttled logging to Supabase (2x daily)
+      // We check if we already logged in the current AM/PM block
+      try {
+        const now = new Date();
+        const hour = now.getHours();
+        const isAM = hour < 12;
+        const startOfBlock = new Date(now);
+        startOfBlock.setHours(isAM ? 0 : 12, 0, 0, 0);
+        
+        const { data: existing } = await supabaseAdmin
+          .from('market_telemetry')
+          .select('id')
+          .gte('created_at', startOfBlock.toISOString())
+          .limit(1);
+
+        if (!existing || existing.length === 0) {
+          logger.info(`[Gemini] Logging market telemetry for ${isAM ? 'AM' : 'PM'} block`, 'ChatTool');
+          
+          // Generate embedding for semantic search
+          let embedding = null;
+          try {
+            const summary = `Market Pulse ${combinedData.timestamp}: Prices Houston $${combinedData.prices.houston}, North $${combinedData.prices.north}. Grid Load ${combinedData.grid.actual_load} MW, Reserves ${combinedData.grid.reserves} MW.`;
+            embedding = await generateEmbedding(summary);
+          } catch (e) {
+            logger.warn('[Gemini] Failed to generate embedding for market telemetry', e);
+          }
+
+          await supabaseAdmin.from('market_telemetry').insert({
+            timestamp: combinedData.timestamp,
+            prices: combinedData.prices,
+            grid: combinedData.grid,
+            metadata: combinedData.metadata,
+            embedding: embedding
+          });
+        }
+      } catch (logError) {
+        // Don't fail the tool call if logging fails
+        logger.error('[Gemini] Failed to log market telemetry:', 'ChatTool', logError.message);
+      }
+
+      return {
+        type: 'market_pulse',
+        data: combinedData
+      };
+    } catch (error) {
+      logger.error('[Gemini] get_market_pulse failed:', 'ChatTool', error.message);
+      throw error;
+    }
   },
   search_interactions: async ({ query, contact_id, account_id, limit = 5 }) => {
     const results = {

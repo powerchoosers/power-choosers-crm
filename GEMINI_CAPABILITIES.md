@@ -36,14 +36,17 @@ The agent is currently equipped with the following "Tools" and UI protocols whic
 ### ⚡ Energy Market Intelligence
 - **Real-time Awareness**:
     - `get_energy_news`: Fetches the latest Texas energy market and ERCOT news via RSS, providing the agent with current context on grid volatility.
+    - `get_market_pulse`: Retrieves live ERCOT data including real-time prices (LZ_HOUSTON, LZ_NORTH) and system grid metrics (Load, Capacity, Reserves). This data is logged to the `market_telemetry` table for forensic analysis.
 
 ### 🧠 Advanced Intelligence & Accuracy (Updated)
 - **100% Semantic Coverage**: Every Account, Contact, Email, Call, and Transcript in the database is indexed with 768-dimensional vectors for semantic search.
+- **Guaranteed Exact Match Priority (v1.3.0)**: Hybrid search now uses a tiered pinning strategy to ensure exact-name matches (e.g., "Camp Fire First Texas") always rank #1, bypassing RRF scores.
+- **Location-Aware Node Discovery**: The agent can now intelligently filter accounts by `city` and `state` using specialized query normalization that detects "in [location]" patterns.
 - **Deep Transcript Retrieval**: The agent scans raw call transcripts (`call_details`) to find specific commitment events or technical details mentioned in calls.
 - **Robust Date Resolution**: Automatically cross-references multiple metadata fields (`contract_end_date`, `contractEndDate`, `general.contractEndDate`) to find expiration data.
+- **Contextual Contract Persistence**: Enhanced memory logic allows the agent to maintain account context during multi-turn contract inquiries (e.g., "Find Account X" followed by "When does it expire?").
 - **Date Normalization Engine**: Real-time conversion of legacy formats (e.g., `MM/DD/YYYY`) to forensic ISO standards (`YYYY-MM-DD`) during data retrieval.
 - **Enhanced Industry Logic**: Intelligent search expansion for "Manufacturing" and other broad sectors to ensure complete node discovery across related sub-industries.
-- **Expiration Year Filtering (v1.5)**: High-precision filtering using an expanded 1,000-node in-memory scan. Handles standard ISO dates, human-readable legacy strings (e.g., "Jan 1st 2026"), and short-hand year notations (`/26`).
 - **Reliable Model Routing**: Strict pipeline separation between OpenRouter and Gemini providers to eliminate `404` errors and ensure seamless fallback.
 
 ---
@@ -138,5 +141,5 @@ We are actively expanding the Architect's "Brain" to include these forensic ener
 - **Security**: All tool calls are gated by Supabase RLS and server-side validation.
 
 ---
-*Last Updated: 2026-01-31*
-*Status: Nodal Architect v1.5 Operational (Enhanced Precision & Free Model Stack)*
+*Last Updated: 2026-02-01*
+*Status: Nodal Architect v1.3.0 Operational (Guaranteed Exact Matches & Location Awareness)*

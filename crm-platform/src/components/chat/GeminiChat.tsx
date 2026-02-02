@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Copy, Send, X, Loader2, User, Bot, Mic, Activity, AlertTriangle, ArrowRight, History, RefreshCw, Phone, Plus, Sparkles, Cpu } from 'lucide-react'
+import { Copy, Send, X, Loader2, User, Bot, Mic, Activity, AlertTriangle, ArrowRight, History, RefreshCw, Phone, Plus, Sparkles, Cpu, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -96,6 +96,32 @@ type ForensicDocuments = {
 type DataVoid = {
   field: string
   action: string
+}
+
+type MarketPulse = {
+  timestamp: string
+  prices: {
+    houston: number
+    north: number
+    south?: number
+    west?: number
+    hub_avg?: number
+  }
+  grid: {
+    actual_load: number
+    forecast_load: number
+    total_capacity: number
+    reserves: number
+    scarcity_prob: number
+    wind_gen?: number
+    pv_gen?: number
+    frequency?: number
+  }
+  metadata: {
+    price_source: string
+    grid_source: string
+    last_updated: string
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -265,6 +291,99 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
             <div className="text-[9px] font-mono text-zinc-600 mt-1 uppercase tracking-widest">Calculated at {pos.margin || '0.003'} margin base</div>
           </div>
         </motion.div>
+      )
+    }
+    case 'market_pulse': {
+      const pulse = data as MarketPulse
+      const reservePercentage = (pulse.grid.reserves / pulse.grid.total_capacity) * 100
+      const scarcityColor = pulse.grid.scarcity_prob > 30 ? 'text-red-500' : pulse.grid.scarcity_prob > 10 ? 'text-amber-500' : 'text-emerald-500'
+      
+      return (
+        <div className="mt-4 space-y-4 font-mono">
+          <div className="grid grid-cols-2 gap-3">
+            {/* Price HUD */}
+            <div className="rounded-2xl border border-white/10 bg-black/40 p-4 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-2 opacity-20 group-hover:opacity-100 transition-opacity">
+                <Zap size={14} className="text-amber-400" />
+              </div>
+              <h4 className="text-[10px] uppercase tracking-widest text-zinc-500 mb-3">REAL_TIME_PRICES</h4>
+              <div className="space-y-3">
+                <div className="flex justify-between items-end">
+                  <span className="text-[10px] text-zinc-400 uppercase">LZ_HOUSTON</span>
+                  <span className="text-lg font-bold tabular-nums text-white">${pulse.prices.houston.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-end">
+                  <span className="text-[10px] text-zinc-400 uppercase">LZ_NORTH</span>
+                  <span className="text-lg font-bold tabular-nums text-white">${pulse.prices.north.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Grid Scarcity HUD */}
+            <div className="rounded-2xl border border-white/10 bg-black/40 p-4 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-2 opacity-20 group-hover:opacity-100 transition-opacity">
+                <Activity size={14} className="text-emerald-400" />
+              </div>
+              <h4 className="text-[10px] uppercase tracking-widest text-zinc-500 mb-3">SCARCITY_PROB</h4>
+              <div className="flex flex-col items-center justify-center py-1">
+                <span className={cn("text-4xl font-black tabular-nums tracking-tighter", scarcityColor)}>
+                  {pulse.grid.scarcity_prob}%
+                </span>
+                <span className="text-[8px] uppercase tracking-widest text-zinc-500 mt-1">Probability Index</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Grid Metrics HUD */}
+          <div className="rounded-2xl border border-white/10 bg-black/40 p-4">
+            <h4 className="text-[10px] uppercase tracking-widest text-zinc-500 mb-4 flex justify-between">
+              <span>SYSTEM_GRID_METRICS</span>
+              <span className="text-[8px] opacity-50">TS: {pulse.timestamp}</span>
+            </h4>
+            
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="space-y-1">
+                <div className="text-[9px] text-zinc-500 uppercase">Actual Load</div>
+                <div className="text-sm font-bold tabular-nums text-white">{Math.floor(pulse.grid.actual_load).toLocaleString()} MW</div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-[9px] text-zinc-500 uppercase">Forecast</div>
+                <div className="text-sm font-bold tabular-nums text-zinc-300">{Math.floor(pulse.grid.forecast_load).toLocaleString()} MW</div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-[9px] text-zinc-500 uppercase">Reserves</div>
+                <div className="text-sm font-bold tabular-nums text-[#002FA7]">{Math.floor(pulse.grid.reserves).toLocaleString()} MW</div>
+              </div>
+            </div>
+
+            {/* Reserve Meter */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-[8px] uppercase tracking-widest text-zinc-500">
+                <span>Operational Capacity</span>
+                <span>{reservePercentage.toFixed(1)}% Reserves</span>
+              </div>
+              <div className="h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden border border-white/5">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.max(100 - reservePercentage, 10)}%` }}
+                  className="h-full bg-gradient-to-r from-emerald-500 via-[#002FA7] to-amber-500"
+                />
+              </div>
+              <div className="flex justify-between text-[7px] text-zinc-600 uppercase tracking-tighter">
+                <span>Min_Load</span>
+                <span>Total_Cap: {Math.floor(pulse.grid.total_capacity).toLocaleString()} MW</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Sources Ticker */}
+          <div className="flex items-center gap-2 px-1">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[8px] text-zinc-500 uppercase tracking-widest">
+              Data_Nodes: {pulse.metadata.price_source} + {pulse.metadata.grid_source}
+            </span>
+          </div>
+        </div>
       )
     }
     case 'forensic_grid': {
@@ -1159,7 +1278,7 @@ SELECT * FROM hybrid_search_accounts(
                     <div className="pl-6 w-full">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-widest font-bold">
-                          NODAL_ARCHITECT // v1.3
+                          NODAL_ARCHITECT // v1.3.0
                         </span>
                         {isLoading && i === messages.length - 1 && <Waveform />}
                       </div>
