@@ -57,7 +57,15 @@ export function useEmails(searchQuery?: string) {
           .range(from, to)
           .order('timestamp', { ascending: false, nullsFirst: false })
 
-        if (error) throw error
+        if (error) {
+          console.error("Supabase error fetching emails:", {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          })
+          throw error
+        }
 
         const emails = data.map(item => {
           // Normalize type from legacy or current formats
@@ -106,7 +114,7 @@ export function useEmails(searchQuery?: string) {
         if (error?.name === 'AbortError' || error?.message === 'Fetch is aborted') {
           throw error
         }
-        console.error("Error fetching emails:", error)
+        console.error("Error fetching emails:", error.message || error)
         throw error
       }
     },
@@ -116,13 +124,13 @@ export function useEmails(searchQuery?: string) {
   })
 
   const sendEmailMutation = useMutation({
-    mutationFn: async (emailData: { to: string, subject: string, content: string }) => {
+    mutationFn: async (emailData: { to: string, subject: string, content: string, html?: string }) => {
       if (!user?.email) {
         throw new Error('You must be logged in to send email')
       }
 
-      // Simple HTML wrapping
-      const htmlContent = `<div style="white-space:pre-wrap;">${emailData.content}</div>`
+      // Use provided HTML or fallback to simple wrapping
+      const htmlContent = emailData.html || `<div style="white-space:pre-wrap; font-family: sans-serif;">${emailData.content}</div>`
       const explicitFromName = [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim()
       const fromName = explicitFromName || profile.name || user.displayName || undefined
 
@@ -218,14 +226,14 @@ export function useEmailsCount(searchQuery?: string) {
   return useQuery({
     queryKey: ['emails-count', user?.email, role, searchQuery],
     queryFn: async () => {
-      if (loading || !user) return 0
+      if (loading || !user || !user.email) return 0
 
       try {
         let query = supabase
           .from('emails')
-          .select('*', { count: 'exact', head: true })
+          .select('id', { count: 'exact', head: true })
         
-        if (role !== 'admin' && user.email) {
+        if (role !== 'admin') {
            query = query.eq('metadata->>ownerId', user.email.toLowerCase())
         }
 
@@ -234,13 +242,28 @@ export function useEmailsCount(searchQuery?: string) {
         }
 
         const { count, error } = await query
-        if (error) throw error
+        
+        if (error) {
+          console.error("Supabase error fetching emails count:", {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          })
+          throw error
+        }
+        
         return count || 0
-      } catch (error) {
-        console.error("Error fetching emails count:", error)
+      } catch (error: any) {
+        // Suppress logging for aborted requests
+        if (error?.name === 'AbortError' || error?.message === 'Fetch is aborted') {
+          throw error
+        }
+        console.error("Error fetching emails count:", error.message || error)
         return 0
       }
     },
-    enabled: !loading && !!user,
+    enabled: !loading && !!user && !!user?.email,
+    staleTime: 1000 * 60 * 2, // 2 minutes
   })
 }

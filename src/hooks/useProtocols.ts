@@ -169,26 +169,38 @@ export function useProtocolsCount(searchQuery?: string) {
   return useQuery({
     queryKey: ['protocols-count', user?.email, role, searchQuery],
     queryFn: async () => {
-      if (loading || !user) return 0
+      if (loading || !user || !user.email) return 0
 
-      let query = supabase.from('sequences').select('*', { count: 'exact', head: true })
+      try {
+        let query = supabase.from('sequences').select('id', { count: 'exact', head: true })
 
-      if (role !== 'admin' && user.email) {
-        query = query.eq('ownerId', user.email)
-      }
+        if (role !== 'admin') {
+          query = query.eq('ownerId', user.email)
+        }
 
-      if (searchQuery) {
-        query = query.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
-      }
+        if (searchQuery) {
+          query = query.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
+        }
 
-      const { count, error } = await query
-      if (error) {
-        console.error("Error fetching protocols count:", error)
+        const { count, error } = await query
+        if (error) {
+          console.error("Supabase error fetching protocols count:", {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          })
+          throw error
+        }
+        return count || 0
+      } catch (error: any) {
+        if (error?.name !== 'AbortError' && error?.message !== 'Fetch is aborted') {
+          console.error("Error fetching protocols count:", error.message || error)
+        }
         return 0
       }
-      return count || 0
     },
-    enabled: !loading && !!user,
+    enabled: !loading && !!user && !!user?.email,
     staleTime: 1000 * 60 * 5,
   })
 }

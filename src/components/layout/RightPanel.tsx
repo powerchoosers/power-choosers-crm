@@ -23,6 +23,7 @@ import NewsFeedWidget from '../crm/NewsFeedWidget'
 import GlobalTasksWidget from '../crm/GlobalTasksWidget'
 import ContextTasksWidget from '../crm/ContextTasksWidget'
 import OrgIntelligence from '../crm/OrgIntelligence'
+import { mapLocationToZone } from '@/lib/market-mapping'
 
 export function RightPanel() {
   const pathname = usePathname()
@@ -62,7 +63,11 @@ export function RightPanel() {
 
   if (!isReady) return <aside className="fixed right-0 top-0 bottom-0 z-30 w-80 bg-zinc-950 border-l border-white/5 hidden lg:flex" />
 
-  const entityLocation = (contact ? (contact.city || 'LZ_NORTH') : account?.location) || 'LZ_NORTH'
+  const city = contact?.city || account?.metadata?.city || account?.metadata?.general?.city;
+  const state = contact?.state || account?.metadata?.state || account?.metadata?.general?.state;
+  const rawLocation = account?.location || contact?.location;
+  const entityZone = mapLocationToZone(city, state, rawLocation);
+  
   const entityAddress = (contact ? contact.address : account?.address) || ''
   const entityName = contact?.name || account?.name
 
@@ -140,7 +145,7 @@ export function RightPanel() {
                 {/* 1. TELEMETRY (Targeting Mode) */}
                 <div className="space-y-1">
                   <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Telemetry</h3>
-                  <TelemetryWidget location={entityLocation} />
+                  <TelemetryWidget location={entityZone} />
                 </div>
 
                 {/* 2. SATELLITE (Infrastructure) */}
