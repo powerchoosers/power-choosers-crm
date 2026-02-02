@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { Badge } from '@/components/ui/badge'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
+import { ComposeModal } from '@/components/emails/ComposeModal'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
 import DestructModal from '@/components/network/DestructModal'
 import FilterCommandDeck from '@/components/network/FilterCommandDeck'
@@ -84,6 +85,8 @@ export default function PeoplePage() {
   const [isMounted, setIsMounted] = useState(false)
   const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [isComposeOpen, setIsComposeOpen] = useState(false)
+  const [composeTarget, setComposeTarget] = useState<{ email: string; name: string; company: string } | null>(null)
 
   const contacts = useMemo(() => data?.pages.flatMap(page => page.contacts) || [], [data])
 
@@ -370,8 +373,20 @@ export default function PeoplePage() {
                 logoUrl={contact.logoUrl}
                 className="h-8 w-8 icon-button-forensic"
               />
-              <button className="h-8 w-8 icon-button-forensic flex items-center justify-center">
-                <Mail className="h-4 w-4" />
+              <button 
+                className="h-8 w-8 icon-button-forensic flex items-center justify-center"
+                onClick={() => {
+                  setComposeTarget({
+                    email: contact.email || '',
+                    name: contact.name,
+                    company: contact.company || ''
+                  })
+                  setIsComposeOpen(true)
+                }}
+                disabled={!contact.email}
+                title={contact.email ? `Email ${contact.name}` : 'No email available'}
+              >
+                <Mail className={cn("h-4 w-4", !contact.email && "opacity-30")} />
               </button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -603,6 +618,16 @@ export default function PeoplePage() {
         onClose={() => setIsDestructModalOpen(false)}
         onConfirm={handleConfirmPurge}
         count={selectedCount}
+      />
+
+      <ComposeModal
+        isOpen={isComposeOpen}
+        onClose={() => {
+          setIsComposeOpen(false)
+          setComposeTarget(null)
+        }}
+        to={composeTarget?.email}
+        subject=""
       />
     </div>
   )

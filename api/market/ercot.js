@@ -67,16 +67,23 @@ async function getBearerToken() {
       body: params
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      logger.error('[ERCOT] Token request failed:', 'MarketData', data.error_description || data.error);
-      throw new Error(`Token request failed: ${data.error_description || data.error}`);
+    const data = await response.text();
+    let parsedData;
+    try {
+      parsedData = JSON.parse(data);
+    } catch (e) {
+      logger.error('[ERCOT] Token response not valid JSON:', 'MarketData', data.substring(0, 100));
+      throw new Error('ERCOT Token endpoint returned non-JSON response');
     }
 
-    cachedToken = data.id_token || data.access_token;
+    if (!response.ok) {
+      logger.error('[ERCOT] Token request failed:', 'MarketData', parsedData.error_description || parsedData.error || data.substring(0, 100));
+      throw new Error(`Token request failed: ${parsedData.error_description || parsedData.error || 'Unknown error'}`);
+    }
+
+    cachedToken = parsedData.id_token || parsedData.access_token;
     // Set expiry 5 minutes before actual expiry (usually 1 hour)
-    tokenExpiry = now + (data.expires_in * 1000) - (5 * 60 * 1000);
+    tokenExpiry = now + (parsedData.expires_in * 1000) - (5 * 60 * 1000);
     
     logger.info('[ERCOT] Bearer token acquired successfully.', 'MarketData');
     return cachedToken;
@@ -136,23 +143,41 @@ async function fetchFromOfficialApi(type, keys) {
   
   const token = await getBearerToken();
   const primaryKey = keysToTry[0]; 
+
+  const fetchWithLogging = async (url, options) => {
+    try {
+      const res = await fetch(url, options);
+      const contentType = res.headers.get('content-type');
+      
+      if (!res.ok) {
+        const text = await res.text();
+        logger.error(`[ERCOT] API Error (${res.status}): ${text.substring(0, 100)}...`, 'MarketData');
+        throw new Error(`ERCOT API returned ${res.status}: ${text.substring(0, 50)}`);
+      }
+
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await res.text();
+        logger.error(`[ERCOT] Non-JSON response from ${url}: ${text.substring(0, 100)}...`, 'MarketData');
+        throw new Error('ERCOT API returned non-JSON response');
+      }
+
+      return res.json();
+    } catch (error) {
+      logger.error(`[ERCOT] Fetch failed for ${url}:`, 'MarketData', error.message);
+      throw error;
+    }
+  };
   
   if (type === 'prices') {
     // Fetch LZ_HOUSTON and LZ_NORTH prices
-    const [houstonRes, northRes] = await Promise.all([
-      fetch('https://api.ercot.com/api/public-reports/np6-905-cd/spp_node_zone_hub?settlementPoint=LZ_HOUSTON&size=5', {
+    const [houstonData, northData] = await Promise.all([
+      fetchWithLogging('https://api.ercot.com/api/public-reports/np6-905-cd/spp_node_zone_hub?settlementPoint=LZ_HOUSTON&size=5', {
         headers: { 'Ocp-Apim-Subscription-Key': primaryKey, 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
       }),
-      fetch('https://api.ercot.com/api/public-reports/np6-905-cd/spp_node_zone_hub?settlementPoint=LZ_NORTH&size=5', {
+      fetchWithLogging('https://api.ercot.com/api/public-reports/np6-905-cd/spp_node_zone_hub?settlementPoint=LZ_NORTH&size=5', {
         headers: { 'Ocp-Apim-Subscription-Key': primaryKey, 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
       })
     ]);
-
-    if (!houstonRes.ok || !northRes.ok) {
-      throw new Error(`Price API failed: H:${houstonRes.status} N:${northRes.status}`);
-    }
-
-    const [houstonData, northData] = await Promise.all([houstonRes.json(), northRes.json()]);
     
     // Map data (Indices: 0:date, 1:hour, 2:interval, 3:point, 5:price)
     const h = houstonData.data?.[0] || [];
@@ -175,15 +200,9 @@ async function fetchFromOfficialApi(type, keys) {
     };
   } else {
     // Fetch Grid conditions
-    const gridRes = await fetch('https://api.ercot.com/api/public-reports/np6-345-cd/act_sys_load_by_wzn?size=5', {
+    const gridData = await fetchWithLogging('https://api.ercot.com/api/public-reports/np6-345-cd/act_sys_load_by_wzn?size=5', {
       headers: { 'Ocp-Apim-Subscription-Key': primaryKey, 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
     });
-
-    if (!gridRes.ok) {
-      throw new Error(`Grid API failed: ${gridRes.status}`);
-    }
-
-    const gridData = await gridRes.json();
     const g = gridData.data?.[0] || [];
     const actualLoad = parseFloat(g[10]) || 0;
     const forecastLoad = actualLoad * 1.05; 

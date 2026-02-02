@@ -328,6 +328,11 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         params: connectParams
       })
 
+      // Set dialing status immediately
+      setStatus('dialing')
+      setActive(true)
+      setCurrentCall(call)
+
       call.on('accept', () => {
         setCurrentCall(call)
         setStatus('connected')

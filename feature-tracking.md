@@ -98,6 +98,10 @@
     - Created `useEmails.ts` with TanStack Query for real-time email list management (ported from `emails-redesigned.js`).
   - [x] **UI Implementation**:
     - Created `ComposeModal.tsx` for sending emails (replacing `email-compose-global.js`).
+    - [x] **Integration**:
+      - Integrated `ComposeModal` into the `ContactDossierPage` email button, replacing `mailto:` with the internal composer.
+      - Integrated `ComposeModal` into the `PeoplePage` table actions for direct node-to-email workflow.
+      - Implemented pre-filled `To` and `Subject` fields (pre-filled with Company name) to match legacy global compose behavior.
 
 ### Market Telemetry & Operational Sentinel
 - **Status**: Completed

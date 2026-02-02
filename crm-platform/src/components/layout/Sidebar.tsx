@@ -181,16 +181,31 @@ export function Sidebar() {
           <motion.div 
             layout
             key={group.group} 
-            className={cn("flex flex-col gap-1", groupIndex !== navigationStructure.length - 1 && "mb-8")}
+            className={cn("flex flex-col gap-1", groupIndex !== navigationStructure.length - 1 && (isHovered ? "mb-8" : "mb-4"))}
           >
             <AnimatePresence mode="popLayout">
-              {isHovered && (
+              {isHovered ? (
                 <motion.div 
+                  key="header"
                   layout
+                  initial={{ opacity: 0, filter: "blur(4px)" }}
+                  animate={{ opacity: 1, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, filter: "blur(4px)" }}
                   className="mb-2 px-2 text-[10px] font-bold text-zinc-600 uppercase tracking-[0.2em] overflow-hidden"
                 >
                   {group.group}
                 </motion.div>
+              ) : (
+                groupIndex !== 0 && (
+                  <motion.div
+                    key="divider"
+                    layout
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: 32 }}
+                    exit={{ opacity: 0, width: 0 }}
+                    className="h-px bg-white/10 mx-auto mb-4 mt-2"
+                  />
+                )
               )}
             </AnimatePresence>
             

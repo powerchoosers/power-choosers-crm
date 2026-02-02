@@ -3,11 +3,15 @@
 import { 
   Zap, CheckCircle, Play, DollarSign, Mic, ChevronRight 
 } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, usePathname } from 'next/navigation'
 import { format } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useContact } from '@/hooks/useContacts'
 import { useAccount } from '@/hooks/useAccounts'
+import { useCallStore } from '@/store/callStore'
+import { ActiveCallInterface } from '../calls/ActiveCallInterface'
+import { cn } from '@/lib/utils'
 
 // Widgets
 import TelemetryWidget from '../crm/TelemetryWidget'
@@ -33,20 +37,56 @@ export function RightPanel() {
   const { data: contact } = useContact(isContactPage ? entityId : '')
   const { data: account } = useAccount(isAccountPage ? entityId : '')
   
+  const { isActive, status } = useCallStore()
+  const isCallActive = isActive && (status === 'connected' || status === 'dialing')
+  
+  const [isReady, setIsReady] = useState(false)
+  const [isScrolled, setIsScrolled] = useState(false)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setIsReady(true)
+  }, [])
+
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    const handleScroll = () => {
+      setIsScrolled(container.scrollTop > 10)
+    }
+
+    container.addEventListener('scroll', handleScroll)
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [isReady, isCallActive])
+
+  if (!isReady) return <aside className="fixed right-0 top-0 bottom-0 z-30 w-80 bg-zinc-950 border-l border-white/5 hidden lg:flex" />
+
   const entityLocation = (contact ? (contact.city || 'LZ_NORTH') : account?.location) || 'LZ_NORTH'
   const entityAddress = (contact ? contact.address : account?.address) || ''
   const entityName = contact?.name || account?.name
 
   return (
-    <aside className="fixed right-0 top-0 bottom-0 z-30 w-80 bg-zinc-950 border-l border-white/5 pt-9 pb-8 px-6 flex flex-col gap-6 overflow-y-auto hidden lg:flex np-scroll">
+    <aside className="fixed right-0 top-0 bottom-0 z-30 w-80 bg-zinc-950 border-l border-white/5 flex flex-col overflow-hidden hidden lg:flex np-scroll">
       
-      {/* Calibration Marks (System Status Header) */}
-      <div className="flex items-center justify-between px-2 mb-2 h-6 select-none shrink-0">
+      {/* 1. THE HEADER (Fixed HUD Info) - Glassmorphic Blur */}
+      <div className={cn(
+        "absolute top-0 left-0 right-0 z-50 px-6 h-24 flex items-center justify-between select-none transition-all duration-300 ease-in-out",
+        isScrolled 
+          ? "bg-zinc-950/80 backdrop-blur-xl border-b border-white/5 shadow-[0_0_30px_rgba(0,0,0,0.5)] backdrop-saturate-150" 
+          : "bg-transparent border-b border-transparent"
+      )}>
         {/* 1. THE LIVE INDICATOR */}
         <div className="flex items-center gap-2">
           <span className="relative flex h-1.5 w-1.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#002FA7] opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#002FA7]"></span>
+            <span className={cn(
+              "animate-ping absolute inline-flex h-full w-full rounded-full opacity-75",
+              isActiveContext ? "bg-[#002FA7]" : "bg-emerald-500"
+            )}></span>
+            <span className={cn(
+              "relative inline-flex rounded-full h-1.5 w-1.5",
+              isActiveContext ? "bg-[#002FA7]" : "bg-emerald-500"
+            )}></span>
           </span>
           <span className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase">
             {isActiveContext ? 'Active_Context' : 'Scanning_Mode'}
@@ -68,92 +108,94 @@ export function RightPanel() {
       </div>
 
       <AnimatePresence mode="wait">
-        {isActiveContext ? (
+        {isCallActive ? (
           <motion.div
-            key="active-context"
-            initial={{ y: -20, opacity: 0, filter: "blur(10px)" }}
-            animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
-            exit={{ y: 20, opacity: 0, filter: "blur(10px)" }}
+            key="active-call"
+            initial={{ x: 320, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 320, opacity: 0 }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="flex flex-col gap-8 mt-2"
+            className="flex-1 overflow-hidden pt-24"
           >
-            {/* 1. TELEMETRY (Targeting Mode) */}
-            <div className="space-y-1">
-              <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Telemetry</h3>
-              <TelemetryWidget location={entityLocation} />
-            </div>
-
-            {/* 2. OPERATIONS DECK */}
-            <div className="bg-zinc-900/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6">
-              <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-4">Operations</h3>
-              <div className="grid grid-cols-2 gap-3">
-                  <OperationalButton icon={CheckCircle} label="Add Task" />
-                  <OperationalButton icon={Play} label="Protocol" />
-                  <OperationalButton icon={DollarSign} label="Create Deal" />
-                  <OperationalButton icon={Mic} label="Log Call" />
-              </div>
-            </div>
-
-            {/* 3. SATELLITE UPLINK */}
-            <div className="space-y-1">
-              <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Asset Recon</h3>
-              <SatelliteUplink address={entityAddress} />
-            </div>
-
-            {/* 4. ORG INTELLIGENCE */}
-            <div className="space-y-1">
-              <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Organizational Intelligence</h3>
-              <OrgIntelligence 
-                companyName={contact?.companyName || account?.name}
-                website={contact?.website || account?.domain}
-                accountId={contact?.accountId || account?.id}
-              />
-            </div>
-
-            {/* 5. CONTEXT TASKS */}
-            <ContextTasksWidget entityId={entityId} entityName={entityName} />
+            <ActiveCallInterface contact={contact} account={account} />
           </motion.div>
         ) : (
-          <motion.div
-            key="global-context"
-            initial={{ y: 20, opacity: 0, filter: "blur(10px)" }}
-            animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
-            exit={{ y: -20, opacity: 0, filter: "blur(10px)" }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="flex flex-col gap-8 mt-2"
+          <motion.div 
+            key="content-wrapper"
+            ref={scrollContainerRef}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex-1 flex flex-col gap-6 overflow-y-auto px-6 pt-24 pb-32 np-scroll scroll-smooth"
           >
-            {/* 1. RAPID INGESTION */}
-            <QuickActionsGrid />
+            {isActiveContext ? (
+              <motion.div
+                key="active-context"
+                initial={{ y: -20, opacity: 0, filter: "blur(10px)" }}
+                animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
+                exit={{ y: 20, opacity: 0, filter: "blur(10px)" }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="flex flex-col gap-8 mt-2"
+              >
+                {/* 1. TELEMETRY (Targeting Mode) */}
+                <div className="space-y-1">
+                  <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Telemetry</h3>
+                  <TelemetryWidget location={entityLocation} />
+                </div>
 
-            {/* 2. TACTICAL AGENDA (Scanning Mode) */}
-            <GlobalTasksWidget />
+                {/* 2. SATELLITE (Infrastructure) */}
+                <div className="space-y-1">
+                  <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Satellite_Uplink</h3>
+                  <SatelliteUplink address={entityAddress} />
+                </div>
 
-            {/* 3. MARKET PULSE (ERCOT) */}
-            <MarketPulseWidget />
+                {/* 3. ORGANIZATIONAL (Intelligence) */}
+                <div className="space-y-1">
+                  <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Org_Intelligence</h3>
+                  <OrgIntelligence 
+                    domain={contact?.companyDomain || account?.domain}
+                    companyName={contact?.company || account?.name}
+                    website={contact?.website || account?.domain}
+                    accountId={isContactPage ? contact?.accountId : entityId}
+                  />
+                </div>
 
-            {/* 4. SIGNAL FEED */}
-            <NewsFeedWidget />
+                {/* 4. TASKS (Execution) */}
+                <div className="space-y-1 pb-4">
+                  <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Node_Tasks</h3>
+                  <ContextTasksWidget entityId={entityId} entityName={entityName} />
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="scanning-mode"
+                initial={{ opacity: 0, filter: "blur(10px)" }}
+                animate={{ opacity: 1, filter: "blur(0px)" }}
+                exit={{ opacity: 0, filter: "blur(10px)" }}
+                className="flex flex-col gap-8"
+              >
+                {/* 1. MARKET PULSE (Global Energy Status) */}
+                <div className="space-y-1">
+                  <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Market_Pulse</h3>
+                  <MarketPulseWidget />
+                </div>
+
+                {/* 2. SYSTEM TASKS (Network-wide tasks) */}
+                <div className="space-y-1">
+                  <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Network_Tasks</h3>
+                  <GlobalTasksWidget />
+                </div>
+
+                {/* 3. NEWS FEED (Global Events) */}
+                <div className="space-y-1 pb-4">
+                  <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">System_Feed</h3>
+                  <NewsFeedWidget />
+                </div>
+              </motion.div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* System Status (Sticky at bottom) */}
-      <div className="mt-auto pt-6">
-        <div className="p-4 rounded-2xl nodal-glass">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 rounded-lg bg-green-500/10 text-green-500">
-              <Zap size={16} />
-            </div>
-            <div>
-              <div className="text-xs font-medium text-zinc-400">System Status</div>
-              <div className="text-sm font-bold text-white">All Systems Go</div>
-            </div>
-          </div>
-          <div className="w-full bg-zinc-800 h-1 rounded-full overflow-hidden">
-            <div className="bg-green-500 h-full w-full" />
-          </div>
-        </div>
-      </div>
 
     </aside>
   )
