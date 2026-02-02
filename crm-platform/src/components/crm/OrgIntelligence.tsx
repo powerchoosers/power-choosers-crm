@@ -81,20 +81,57 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   }, [initialDomain, website, companyName]);
 
   // Load cache on mount or when domain/company changes
-  useMemo(() => {
+  useMemo(async () => {
     if (typeof window === 'undefined') return;
     
-    const cacheKey = `apollo_cache_${domain || companyName}`;
+    const key = domain || companyName;
+    if (!key) return;
+
+    // 1. Try Supabase first (Persistent Cloud Cache)
+    try {
+      const { data: supabaseData, error } = await supabase
+        .from('apollo_searches')
+        .select('data, created_at')
+        .eq('key', key)
+        .single();
+
+      if (supabaseData && supabaseData.data) {
+        const { company, contacts, timestamp } = supabaseData.data;
+        // Check if Supabase data is fresher or we just want to use it
+        // (Supabase data is generally preferred as it's shared)
+        setData(contacts);
+        setCompanySummary(company);
+        setScanStatus('complete');
+        
+        // Update local cache to match
+        const cacheKey = `apollo_cache_${key}`;
+        localStorage.setItem(cacheKey, JSON.stringify({
+          company,
+          contacts,
+          timestamp: timestamp || new Date(supabaseData.created_at).getTime()
+        }));
+        return;
+      }
+    } catch (err) {
+      console.warn('Supabase cache fetch failed:', err);
+    }
+
+    // 2. Fallback to LocalStorage
+    const cacheKey = `apollo_cache_${key}`;
     const cached = localStorage.getItem(cacheKey);
     
     if (cached) {
       try {
-        const { company, contacts, timestamp } = JSON.parse(cached);
+        const parsed = JSON.parse(cached);
+        const { company, contacts, timestamp } = parsed;
         // Cache valid for 24 hours
         if (Date.now() - timestamp < 1000 * 60 * 60 * 24) {
           setData(contacts);
           setCompanySummary(company);
           setScanStatus('complete');
+          
+          // SYNC BACK: If found in local but not Supabase, push to Supabase (Migration)
+          saveToSupabase(key, parsed);
         }
       } catch (e) {
         console.error('Failed to parse Apollo cache:', e);
@@ -102,14 +139,38 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     }
   }, [domain, companyName]);
 
+  async function saveToSupabase(key: string, data: any) {
+    try {
+      await supabase
+        .from('apollo_searches')
+        .upsert({
+          key,
+          data,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'key' });
+    } catch (err) {
+      console.warn('Failed to persist to Supabase:', err);
+    }
+  }
+
   const saveToCache = (company: ApolloCompany | null, contacts: ApolloContactRow[]) => {
     if (typeof window === 'undefined') return;
-    const cacheKey = `apollo_cache_${domain || companyName}`;
-    localStorage.setItem(cacheKey, JSON.stringify({
+    
+    const key = domain || companyName;
+    if (!key) return;
+
+    const cacheData = {
       company,
       contacts,
       timestamp: Date.now()
-    }));
+    };
+
+    // Local Storage
+    const cacheKey = `apollo_cache_${key}`;
+    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+    
+    // Supabase Persistence
+    saveToSupabase(key, cacheData);
   };
 
   const handleAcquire = async (person: ApolloContactRow) => {
@@ -359,12 +420,165 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     }
   };
 
+  const handleSearch = async () => {
+    if (!searchTerm) {
+      // If search is empty, just filter local data (or reset to initial scan if we want)
+      return;
+    }
+
+    setScanStatus('scanning');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await fetch('/api/apollo/contacts', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({
+          pages: { page: 0, size: 50 },
+          filters: { 
+            person_name: searchTerm,
+            companies: { 
+              include: domain ? { domains: [domain] } : { names: [companyName] }
+            }
+          }
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to search Apollo');
+      }
+
+      const result: unknown = await response.json();
+      const apolloContacts: unknown[] =
+        isRecord(result) && Array.isArray(result.contacts) ? (result.contacts as unknown[]) : []
+
+      // Extract all emails to check in Supabase
+      const emailsToCheck = apolloContacts
+        .map((c) => (isRecord(c) && typeof c.email === 'string' ? c.email : null))
+        .filter(Boolean);
+
+      let existingEmails = new Set<string>();
+
+      if (emailsToCheck.length > 0) {
+        const { data: existingContacts, error } = await supabase
+          .from('contacts')
+          .select('email')
+          .in('email', emailsToCheck);
+        
+        if (!error && existingContacts) {
+          existingEmails = new Set(existingContacts.map(c => c.email));
+        }
+      }
+
+      // Map Apollo results
+      const mappedData: ApolloContactRow[] = apolloContacts
+        .map((contact): ApolloContactRow | null => {
+          if (!isRecord(contact)) return null
+          const name = typeof contact.name === 'string' ? contact.name : ''
+          if (!name) return null
+          
+          const id = typeof contact.id === 'string' ? contact.id : 
+                     typeof contact.contactId === 'string' ? contact.contactId : 
+                     typeof contact.person_id === 'string' ? contact.person_id : '';
+          
+          if (!id) return null;
+
+          const firstName = typeof contact.first_name === 'string' ? contact.first_name : name.split(' ')[0]
+          const lastName = typeof contact.last_name === 'string' ? contact.last_name : name.split(' ').slice(1).join(' ')
+          const title = typeof contact.title === 'string' ? contact.title : undefined
+          const email = typeof contact.email === 'string' ? contact.email : 'N/A'
+          const emailStatus = typeof contact.email_status === 'string' ? contact.email_status : ''
+          const status: ApolloContactRow['status'] = emailStatus === 'verified' ? 'verified' : 'unverified'
+          const isMonitored = email !== 'N/A' && existingEmails.has(email)
+          
+          const location = [
+            typeof contact.city === 'string' ? contact.city : null,
+            typeof contact.state === 'string' ? contact.state : null
+          ].filter(Boolean).join(', ')
+
+          const linkedin = typeof contact.linkedin_url === 'string' ? contact.linkedin_url : undefined
+          
+          const phones: string[] = []
+          if (Array.isArray(contact.phones)) {
+            contact.phones.forEach(p => {
+              if (isRecord(p) && typeof p.sanitized_number === 'string') {
+                phones.push(p.sanitized_number)
+              }
+            })
+          }
+
+          return { 
+            id,
+            name, 
+            firstName, 
+            lastName, 
+            title, 
+            email, 
+            status, 
+            isMonitored,
+            location,
+            linkedin,
+            phones
+          }
+        })
+        .filter((v): v is ApolloContactRow => v !== null)
+
+      setData(mappedData);
+      setScanStatus('complete');
+      setCurrentPage(1);
+      
+      // MERGE & SAVE STRATEGY
+      // 1. Get current cache (to avoid losing existing contacts)
+      const key = domain || companyName;
+      let existingContacts: ApolloContactRow[] = [];
+      
+      // Try local storage first for speed (since we sync it on load)
+      const cacheKey = `apollo_cache_${key}`;
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          existingContacts = Array.isArray(parsed.contacts) ? parsed.contacts : [];
+        } catch (e) {}
+      }
+      
+      // 2. Merge new results into existing
+      const existingIds = new Set(existingContacts.map(c => c.id));
+      const newContacts = mappedData.filter(c => !existingIds.has(c.id));
+      const mergedContacts = [...existingContacts, ...newContacts];
+      
+      // 3. Save merged list
+      if (newContacts.length > 0) {
+        saveToCache(companySummary, mergedContacts);
+      }
+      
+    } catch (error) {
+      console.error('Apollo Search Error:', error);
+      setScanStatus('complete'); // Go back to complete so user can try again
+      toast.error('Search failed. Please try again.');
+    }
+  };
+
   const filteredData = useMemo(() => {
-    return data.filter(person => 
-      person.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      person.title?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [data, searchTerm]);
+    // If we just searched via API, data is already filtered.
+    // But if we are in "browse" mode, we might want to filter locally too?
+    // Actually, if we search via API, `data` contains the search results.
+    // If we haven't searched (browsing), `data` contains the browse results.
+    // The previous logic was ONLY local filtering.
+    // Now we want `searchTerm` to trigger API search on Enter.
+    // So we should probably remove the local filtering if we are using API search.
+    // But for now, let's keep local filtering as a fallback or for refining results?
+    // No, if I search "John", I get Johns. If I type "Director" in the box...
+    // The user expects the search box to SEARCH APOLLO.
+    
+    // So I will remove the local filter dependency on searchTerm if I use it for API search.
+    // OR, I can use a separate state for "local filter" vs "api search term".
+    // Let's assume the input is for API search.
+    return data; 
+  }, [data]);
 
   const paginatedData = useMemo(() => {
     const start = (currentPage - 1) * CONTACTS_PER_PAGE;
