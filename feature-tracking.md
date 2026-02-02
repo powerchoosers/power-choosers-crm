@@ -132,3 +132,24 @@
   - [x] **Location Search**: Implemented dedicated location search path for city/state queries (e.g. "accounts in Houston") with `forensic_grid` response.
   - [x] **Single Match Promotion**: Added logic to automatically promote single or exact account matches to detailed `position_maturity` view instead of a generic grid.
   - [x] **RPC Fix**: Resolved `contractEndDate` column name mismatch in `hybrid_search_accounts` RPC function.
+
+### ERCOT API Migration & Market Pulse
+- **Status**: Completed
+- **Description**: Migrated the Market Pulse widget to use official ERCOT API data with ROPC authentication and robust fallback mechanisms.
+- **Actions**:
+  - [x] **Official API Integration**:
+    - [x] Implemented OAuth2 ROPC (Resource Owner Password Credentials) flow in `ercot.js` to acquire Bearer tokens.
+    - [x] Integrated `NP6-905-CD` (Prices) and `NP6-345-CD` (Grid) endpoints for real-time market data.
+    - [x] Added `ERCOT_USERNAME` and `ERCOT_PASSWORD` credentials to the backend environment.
+  - [x] **Data Normalization & Simulation**:
+    - [x] Implemented simulated metric generation for `reserves`, `scarcity_prob`, `forecast_load`, and `total_capacity` derived from actual system load.
+    - [x] Added support for both `prices` and `grid` data types via a single API proxy.
+  - [x] **Robustness & Fallback**:
+    - [x] Maintained the legacy CDR scraper as a primary fallback if the official API fails or credentials expire.
+    - [x] Implemented `headersSent` checks to prevent server crashes during multi-step fallback logic.
+    - [x] Fixed Next.js `SyntaxError` by ensuring all `/api/*` routes return structured JSON even on 404/500 errors.
+  - [x] **UI/UX Enhancement**:
+    - [x] Updated `MarketPulseWidget.tsx` to display real-time price feeds for Houston and North zones.
+    - [x] Integrated a dynamic "Grid Reserves" progress bar that scales relative to total capacity.
+    - [x] Added "Scarcity Probability" tracking with live updates every 30 seconds.
+    - [x] Applied forensic monospaced typography and tabular numbers for all market metrics.
