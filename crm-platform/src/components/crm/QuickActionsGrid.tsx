@@ -15,8 +15,7 @@ export default function QuickActionsGrid() {
   ]
 
   return (
-    <div className="space-y-3">
-      <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Rapid Ingestion</h3>
+    <>
       <div className="grid grid-cols-3 gap-3">
         {actions.map((action) => (
           action.type === 'link' ? (
@@ -47,6 +46,6 @@ export default function QuickActionsGrid() {
         isOpen={isImportModalOpen} 
         onClose={() => setIsImportModalOpen(false)} 
       />
-    </div>
+    </>
   )
 }

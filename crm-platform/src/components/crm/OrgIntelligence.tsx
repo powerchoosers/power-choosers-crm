@@ -139,8 +139,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         }
       }
 
-      // If no cache, trigger a fresh scan automatically
-      handleScan();
+      // If no cache, stay in idle mode so the user can trigger the scan manually
+      setScanStatus('idle');
     }
 
     loadCache();
@@ -362,8 +362,11 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       }
 
       const result: unknown = await peopleResp.json();
+      
+      // The search-people endpoint returns { people: [...], pagination: {...} }
+      // while handleScan previously expected { contacts: [...] }
       const apolloContacts: unknown[] =
-        isRecord(result) && Array.isArray(result.contacts) ? (result.contacts as unknown[]) : []
+        isRecord(result) && Array.isArray(result.people) ? (result.people as unknown[]) : []
 
       // Extract all emails to check in Supabase
       const emailsToCheck = apolloContacts
@@ -501,8 +504,13 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       }
 
       const result: unknown = await response.json();
+      
+      // The search-people endpoint used here (contacts.js) returns { contacts: [...] }
+      // But let's check for both just in case
       const apolloContacts: unknown[] =
-        isRecord(result) && Array.isArray(result.contacts) ? (result.contacts as unknown[]) : []
+        isRecord(result) 
+          ? (Array.isArray(result.contacts) ? (result.contacts as unknown[]) : (Array.isArray(result.people) ? (result.people as unknown[]) : []))
+          : []
 
       // Extract all emails to check in Supabase
       const emailsToCheck = apolloContacts
@@ -679,8 +687,24 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                   setSearchTerm(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full bg-black/40 border border-white/5 rounded-lg pl-8 pr-3 py-1.5 text-[10px] font-mono text-zinc-300 focus:outline-none focus:border-[#002FA7]/50 transition-all placeholder:text-zinc-700"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearch();
+                  }
+                }}
+                className="w-full bg-black/40 border border-white/5 rounded-lg pl-8 pr-16 py-1.5 text-[10px] font-mono text-zinc-300 focus:outline-none focus:border-[#002FA7]/50 transition-all placeholder:text-zinc-700"
               />
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {searchTerm && (
+                  <button
+                    onClick={handleSearch}
+                    className="p-1 rounded bg-white/5 hover:bg-white/10 text-[#002FA7] transition-colors"
+                    title="Search Apollo"
+                  >
+                    <Search className="w-2.5 h-2.5" />
+                  </button>
+                )}
+              </div>
             </div>
             {accountId && (
               <button
