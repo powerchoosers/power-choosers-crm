@@ -123,28 +123,31 @@ export function RightPanel() {
         </button>
       </div>
 
-      <AnimatePresence mode="wait">
-        {isCallActive ? (
-          <motion.div
-            key="active-call"
-            initial={{ x: 320, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 320, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="flex-1 overflow-hidden pt-24"
-          >
-            <ActiveCallInterface contact={contact} account={account} />
-          </motion.div>
-        ) : (
-          <motion.div 
-            key="content-wrapper"
-            ref={scrollContainerRef}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="flex-1 flex flex-col gap-6 overflow-y-auto px-6 pt-24 pb-32 np-scroll scroll-smooth"
-          >
-            {isActiveContext ? (
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+        <AnimatePresence>
+          {isCallActive && (
+            <motion.div
+              key="active-call-overlay"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="z-40 border-b border-white/10 bg-zinc-950 px-6 py-4 pt-28"
+            >
+              <ActiveCallInterface contact={contact} account={account} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <motion.div 
+          key="content-wrapper"
+          ref={scrollContainerRef}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="flex-1 flex flex-col gap-6 overflow-y-auto px-6 pt-24 pb-32 np-scroll scroll-smooth"
+        >
+          {isActiveContext ? (
               <motion.div
                 key="active-context"
                 initial={{ y: -20, opacity: 0, filter: "blur(10px)" }}
@@ -232,9 +235,7 @@ export function RightPanel() {
               </motion.div>
             )}
           </motion.div>
-        )}
-      </AnimatePresence>
-
+      </div>
     </aside>
   )
 }

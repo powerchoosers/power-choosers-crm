@@ -2,7 +2,7 @@
 
 import { useCallStore } from '@/store/callStore'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Phone, Mic, PhoneOff, ArrowRightLeft, RefreshCw, Bell, X, Shield, Search } from 'lucide-react'
+import { Phone, Mic, PhoneOff, Grid3X3, RefreshCw, Bell, X, Shield, Search } from 'lucide-react'
 import { cn, formatToE164 } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { GlobalSearch } from '@/components/search/GlobalSearch'
@@ -49,7 +49,7 @@ export function TopBar() {
   const isGeminiOpen = useGeminiStore((state) => state.isOpen)
   const setIsGeminiOpen = useGeminiStore((state) => state.setIsOpen)
   const { profile } = useAuth()
-  const { connect, disconnect, mute, isMuted, metadata: voiceMetadata } = useVoice()
+  const { connect, disconnect, mute, isMuted, sendDigits, metadata: voiceMetadata } = useVoice()
   const pathname = usePathname()
   const params = useParams()
   
@@ -135,6 +135,7 @@ export function TopBar() {
     return { ...baseContext, displayLabel };
   }, [pathname, params, storeContext])
 
+  const [isDialpadOpen, setIsDialpadOpen] = useState(false)
   const [isDialerOpen, setIsDialerOpen] = useState(false)
   const [isShowingCallBar, setIsShowingCallBar] = useState(true)
   const [isScrolled, setIsScrolled] = useState(false)
@@ -409,9 +410,46 @@ export function TopBar() {
                                 >
                                     <Mic size={16} />
                                 </button>
-                                <button className="icon-button-forensic p-1.5">
-                                    <ArrowRightLeft size={16} />
-                                </button>
+                                <div className="relative">
+                                    <button 
+                                        onClick={() => setIsDialpadOpen(!isDialpadOpen)}
+                                        className={cn(
+                                            "icon-button-forensic p-1.5",
+                                            isDialpadOpen ? "bg-[#002FA7]/20 text-[#002FA7] border-[#002FA7]/30" : ""
+                                        )}
+                                        title="Dialpad (DTMF)"
+                                    >
+                                        <Grid3X3 size={16} />
+                                    </button>
+
+                                    <AnimatePresence>
+                                        {isDialpadOpen && (
+                                            <motion.div
+                                                key="dialpad-popover"
+                                                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                className="absolute top-full mt-3 right-0 w-48 bg-zinc-950/90 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50"
+                                            >
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map((digit) => (
+                                                        <button
+                                                            key={digit}
+                                                            onClick={() => {
+                                                                sendDigits(digit);
+                                                                // Haptic feedback feel
+                                                                toast.success(`Sent: ${digit}`, { duration: 500 });
+                                                            }}
+                                                            className="h-10 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 text-white font-mono text-sm transition-all active:scale-95"
+                                                        >
+                                                            {digit}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
                                 <button 
                                     onClick={handleHangup}
                                     className="icon-button-forensic p-1.5 text-red-500 hover:text-red-400"

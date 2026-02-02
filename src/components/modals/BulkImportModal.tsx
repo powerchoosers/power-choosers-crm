@@ -47,6 +47,8 @@ const ACCOUNT_FIELDS = [
   { id: 'company_phone', label: 'Company Phone', required: false },
   { id: 'linkedin_url', label: 'Company LinkedIn', required: false },
   { id: 'service_address', label: 'Service Address', required: false },
+  { id: 'city', label: 'City', required: false },
+  { id: 'state', label: 'State', required: false },
   { id: 'annual_revenue', label: 'Annual Revenue', required: false },
   { id: 'employee_count', label: 'Headcount', required: false },
   { id: 'energy_supplier', label: 'Current Supplier', required: false },
@@ -304,6 +306,8 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
             companyPhone: mappedData.company_phone || '',
             linkedinUrl: mappedData.linkedin_url || '',
             serviceAddresses: mappedData.service_address ? [mappedData.service_address] : [],
+            city: mappedData.city || '',
+            state: mappedData.state || '',
             contractEnd: mappedData.contract_end || null,
             employees: mappedData.employee_count || '',
             annualUsage: mappedData.annual_usage || '',
@@ -312,6 +316,8 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
               service_address: mappedData.service_address,
               annual_revenue: mappedData.annual_revenue,
               energy_supplier: mappedData.energy_supplier,
+              city: mappedData.city,
+              state: mappedData.state,
               import_batch: new Date().toISOString(),
               enriched: isEnriching
             }
