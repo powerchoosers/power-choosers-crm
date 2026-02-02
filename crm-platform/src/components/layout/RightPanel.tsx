@@ -179,6 +179,12 @@ export function RightPanel() {
                 exit={{ opacity: 0, filter: "blur(10px)" }}
                 className="flex flex-col gap-8"
               >
+                {/* 0. QUICK ACTIONS (Rapid Ingestion) */}
+                <div className="space-y-1">
+                  <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Rapid_Ingestion</h3>
+                  <QuickActionsGrid />
+                </div>
+
                 {/* 1. MARKET PULSE (Global Energy Status) */}
                 <div className="space-y-1">
                   <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Market_Pulse</h3>
