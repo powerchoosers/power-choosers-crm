@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react';
 import { MapPin, Satellite, Wifi, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function SatelliteUplink({ address }: { address: string }) {
   const [isActive, setIsActive] = useState(false);
@@ -36,27 +37,26 @@ export default function SatelliteUplink({ address }: { address: string }) {
   return (
     <div className="bg-zinc-900/40 backdrop-blur-xl border border-white/5 rounded-3xl overflow-hidden relative group">
       
-      {/* HEADER: Always Visible */}
-      <div className="p-4 border-b border-white/5 flex justify-between items-start bg-zinc-900/50">
-        <div>
-          <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1 flex items-center gap-2">
-            <MapPin className="w-3 h-3 text-[#002FA7]" /> Asset Location
-          </h3>
-          <p className="text-sm text-zinc-300 font-medium truncate max-w-[200px]">{address || 'No Address Provided'}</p>
-        </div>
-        {isActive && !isLoading && (
-          <div className="flex items-center gap-1.5">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-            </span>
-            <span className="text-[10px] font-mono text-green-500">LIVE</span>
+      {/* UPLINK HEADER */}
+      <div className="flex items-center justify-between p-3 bg-zinc-900/40 border-b border-white/5 backdrop-blur-xl">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center border transition-all duration-500 bg-zinc-800/30 border-white/5 text-zinc-600">
+            <Satellite className="w-4 h-4" />
           </div>
-        )}
+          <div>
+            <div className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">Asset_Status</div>
+            <div className="text-[9px] font-mono text-zinc-600 uppercase mt-0.5">
+              {isActive ? 'Signal_Acquired' : 'Idle_Standby'}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* BODY: The Toggle */}
-      <div className="h-48 relative w-full bg-zinc-950 flex flex-col items-center justify-center">
+      <div className={cn(
+        "h-48 relative w-full bg-zinc-950 flex flex-col items-center justify-center transition-all duration-500",
+        (!isActive || !apiKey) && !isLoading ? "opacity-50" : "opacity-100"
+      )}>
         
         {isLoading ? (
           <div className="flex flex-col items-center gap-2">
@@ -64,7 +64,7 @@ export default function SatelliteUplink({ address }: { address: string }) {
             <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Negotiating Uplink...</span>
           </div>
         ) : !isActive || !apiKey ? (
-          <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-10 flex flex-col items-center justify-center">
+          <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-20 flex flex-col items-center justify-center">
             {/* The "Locked" State */}
             <div className="z-10 text-center">
               <div className="mb-3 mx-auto w-12 h-12 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center text-zinc-500 group-hover:text-white group-hover:border-[#002FA7] transition-all">

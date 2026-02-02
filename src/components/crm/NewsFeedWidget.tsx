@@ -11,7 +11,6 @@ export default function NewsFeedWidget() {
 
   return (
     <div className="space-y-3">
-      <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Signal Feed</h3>
       <div className="space-y-2">
         {news.map((item, i) => (
           <div 

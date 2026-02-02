@@ -1,6 +1,6 @@
 'use client'
-import { useState, useMemo } from 'react';
-import { Users, Search, Lock, ShieldCheck, Loader2, ChevronLeft, ChevronRight, Globe, MapPin, Linkedin, Phone, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Users, Search, Lock, ShieldCheck, Loader2, ChevronLeft, ChevronRight, Globe, MapPin, Linkedin, Phone, ExternalLink, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import Image from 'next/image';
 import { CompanyIcon } from '@/components/ui/CompanyIcon';
 import { supabase } from '@/lib/supabase';
@@ -81,63 +81,113 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   }, [initialDomain, website, companyName]);
 
   // Load cache on mount or when domain/company changes
-  useMemo(async () => {
-    if (typeof window === 'undefined') return;
-    
-    const key = domain || companyName;
-    if (!key) return;
-
-    // 1. Try Supabase first (Persistent Cloud Cache)
-    try {
-      const { data: supabaseData, error } = await supabase
-        .from('apollo_searches')
-        .select('data, created_at')
-        .eq('key', key)
-        .single();
-
-      if (supabaseData && supabaseData.data) {
-        const { company, contacts, timestamp } = supabaseData.data;
-        // Check if Supabase data is fresher or we just want to use it
-        // (Supabase data is generally preferred as it's shared)
-        setData(contacts);
-        setCompanySummary(company);
-        setScanStatus('complete');
-        
-        // Update local cache to match
-        const cacheKey = `apollo_cache_${key}`;
-        localStorage.setItem(cacheKey, JSON.stringify({
-          company,
-          contacts,
-          timestamp: timestamp || new Date(supabaseData.created_at).getTime()
-        }));
+  useEffect(() => {
+    async function loadCache() {
+      if (typeof window === 'undefined') return;
+      
+      const key = domain || companyName;
+      if (!key) {
+        setData([]);
+        setCompanySummary(null);
+        setScanStatus('idle');
         return;
       }
-    } catch (err) {
-      console.warn('Supabase cache fetch failed:', err);
-    }
 
-    // 2. Fallback to LocalStorage
-    const cacheKey = `apollo_cache_${key}`;
-    const cached = localStorage.getItem(cacheKey);
-    
-    if (cached) {
+      // 1. Try Supabase first (Persistent Cloud Cache)
       try {
-        const parsed = JSON.parse(cached);
-        const { company, contacts, timestamp } = parsed;
-        // Cache valid for 24 hours
-        if (Date.now() - timestamp < 1000 * 60 * 60 * 24) {
+        const { data: supabaseData, error } = await supabase
+          .from('apollo_searches')
+          .select('data, created_at')
+          .eq('key', key)
+          .single();
+
+        if (supabaseData && supabaseData.data) {
+          const { company, contacts, timestamp } = supabaseData.data;
           setData(contacts);
           setCompanySummary(company);
           setScanStatus('complete');
           
-          // SYNC BACK: If found in local but not Supabase, push to Supabase (Migration)
-          saveToSupabase(key, parsed);
+          const cacheKey = `apollo_cache_${key}`;
+          localStorage.setItem(cacheKey, JSON.stringify({
+            company,
+            contacts,
+            timestamp: timestamp || new Date(supabaseData.created_at).getTime()
+          }));
+          return;
         }
-      } catch (e) {
-        console.error('Failed to parse Apollo cache:', e);
+      } catch (err) {
+        console.warn('Supabase cache fetch failed:', err);
       }
+
+      // 2. Fallback to LocalStorage
+      const cacheKey = `apollo_cache_${key}`;
+      const cached = localStorage.getItem(cacheKey);
+      
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          const { company, contacts, timestamp } = parsed;
+          if (Date.now() - timestamp < 1000 * 60 * 60 * 24) {
+            setData(contacts);
+            setCompanySummary(company);
+            setScanStatus('complete');
+            saveToSupabase(key, parsed);
+            return;
+          }
+        } catch (e) {
+          console.error('Failed to parse Apollo cache:', e);
+        }
+      }
+
+      // If no cache, trigger a fresh scan automatically
+      handleScan();
     }
+
+    loadCache();
   }, [domain, companyName]);
+
+  const handleEnrichAccount = async () => {
+    if (!accountId || !companySummary) {
+      toast.error('No account context or summary available for enrichment');
+      return;
+    }
+
+    setScanStatus('scanning'); // This will trigger the blur overlay
+    try {
+      // Use the existing companySummary from Apollo to update the CRM account
+      const { error } = await supabase
+        .from('accounts')
+        .update({
+          industry: companySummary.industry,
+          employees: companySummary.employees?.toString(),
+          description: companySummary.description,
+          location: [companySummary.city, companySummary.state].filter(Boolean).join(', '),
+          address: [companySummary.city, companySummary.state, companySummary.country].filter(Boolean).join(', '),
+          linkedinUrl: companySummary.linkedin,
+          companyPhone: companySummary.companyPhone,
+          metadata: {
+            ...((companySummary as any).metadata || {}),
+            apollo_enriched_at: new Date().toISOString(),
+            apollo_raw_data: companySummary
+          }
+        })
+        .eq('id', accountId);
+
+      if (error) throw error;
+
+      toast.success('DEEP_ENRICHMENT complete. Node profile updated.');
+      
+      // We don't have a direct way to trigger a refetch of useAccount from here 
+      // without passing down a refetch function, but the user will see the 
+      // success and can refresh or navigate. For now, we just show the success.
+      
+    } catch (err) {
+      console.error('Enrichment Error:', err);
+      toast.error('Enrichment failed. Verification required.');
+    } finally {
+      setScanStatus('complete');
+    }
+  };
 
   async function saveToSupabase(key: string, data: any) {
     try {
@@ -291,28 +341,27 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         console.warn('Company summary fetch failed:', err);
       }
 
-      // 2. Fetch Contacts
-      const response = await fetch('/api/apollo/contacts', {
+      // 2. Get Decision Makers (Initial Batch)
+      const peopleResp = await fetch('/api/apollo/search-people', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`
         },
         body: JSON.stringify({
-          pages: { page: 0, size: 50 },
-          filters: { 
-            companies: { 
-              include: domain ? { domains: [domain] } : { names: [companyName] }
-            }
-          }
+          page: 1,
+          per_page: 50,
+          q_organization_domains: domain || undefined,
+          q_organization_name: companyName || undefined,
+          q_keywords: 'owner, founder, c-level, vp, director, manager'
         }),
       });
 
-      if (!response.ok) {
+      if (!peopleResp.ok) {
         throw new Error('Failed to fetch from Apollo');
       }
 
-      const result: unknown = await response.json();
+      const result: unknown = await peopleResp.json();
       const apolloContacts: unknown[] =
         isRecord(result) && Array.isArray(result.contacts) ? (result.contacts as unknown[]) : []
 
@@ -593,12 +642,22 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       {/* HEADER - Status & Controls */}
       <div className="p-4 pb-2 flex justify-between items-center border-b border-white/5 bg-zinc-900/50">
         <div className="flex items-center gap-2">
-          <Users className={cn("w-3.5 h-3.5", scanStatus === 'complete' ? "text-[#002FA7]" : "text-zinc-500")} />
+          <Users className={cn("w-3.5 h-3.5", scanStatus === 'complete' ? "text-white" : "text-zinc-500")} />
           <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
             {scanStatus === 'scanning' ? 'Scanning...' : `Target_Pool [${filteredData.length}]`}
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {accountId && companySummary && scanStatus === 'complete' && (
+            <button
+              onClick={handleEnrichAccount}
+              disabled={scanStatus === 'scanning'}
+              className="px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-[9px] font-mono text-white transition-all flex items-center gap-1.5 group uppercase tracking-widest"
+            >
+              <Sparkles className="w-2.5 h-2.5 text-blue-400 group-hover:animate-pulse" />
+              Deep_Enrich
+            </button>
+          )}
           {scanStatus === 'complete' && (
             <button 
               onClick={() => {
@@ -636,7 +695,31 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       )}
 
       {/* CONTENT AREA */}
-      <div className="flex-1 p-1">
+      <div className={cn(
+        "flex-1 p-1 relative min-h-0 transition-opacity duration-500",
+        scanStatus === 'idle' ? "opacity-50" : "opacity-100"
+      )}>
+        {/* Blur Overlay for Enrichment Scanning */}
+        {scanStatus === 'scanning' && data.length > 0 && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/40 backdrop-blur-md animate-in fade-in duration-300 rounded-2xl">
+            <div className="flex flex-col items-center gap-3">
+              <div className="relative">
+                <div className="w-12 h-12 rounded-2xl border border-white/20 bg-zinc-900/50 flex items-center justify-center">
+                  <Sparkles className="w-6 h-6 text-[#002FA7] animate-pulse" />
+                </div>
+                <div className="absolute -inset-1 rounded-2xl bg-[#002FA7]/20 animate-ping" />
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-mono text-white uppercase tracking-[0.2em] animate-pulse">
+                  Enrichment_Commencing
+                </span>
+                <span className="text-[8px] font-mono text-zinc-500 uppercase mt-1">
+                  Synchronizing_Nodes...
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
         {/* STATE 1: IDLE */}
         {scanStatus === 'idle' && (
           <div className="h-full flex flex-col items-center justify-center py-8 px-4 text-center">
@@ -730,9 +813,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                       {companySummary.companyPhone && (
                         <button 
                           onClick={() => handleCompanyCall(companySummary.companyPhone!, companySummary.name)}
-                          className="flex items-center gap-1 text-[9px] font-mono text-[#002FA7] hover:text-white transition-colors uppercase tracking-widest"
+                          className="flex items-center gap-1 text-[9px] font-mono text-zinc-500 hover:text-white transition-colors uppercase tracking-widest"
                         >
-                          <Phone className="w-2.5 h-2.5" />
+                          <Phone className="w-2.5 h-2.5 text-zinc-500" />
                           {companySummary.companyPhone}
                         </button>
                       )}

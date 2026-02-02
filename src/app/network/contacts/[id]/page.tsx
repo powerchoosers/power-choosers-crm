@@ -21,6 +21,7 @@ import { useGeminiStore } from '@/store/geminiStore'
 import { Button } from '@/components/ui/button'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
+import { ComposeModal } from '@/components/emails/ComposeModal'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
@@ -62,6 +63,7 @@ export default function ContactDossierPage() {
 
   const [isSaving, setIsSaving] = useState(false)
   const [showSynced, setShowSynced] = useState(false)
+  const [isComposeOpen, setIsComposeOpen] = useState(false)
   const [currentCallPage, setCurrentCallPage] = useState(1)
   const [activeEditField, setActiveEditField] = useState<'logo' | 'website' | 'linkedin' | null>(null)
   const CALLS_PER_PAGE = 4
@@ -661,6 +663,7 @@ export default function ContactDossierPage() {
                       primaryPhoneField: editPrimaryField
                     }}
                     isEditing={isEditing}
+                    onEmailClick={() => setIsComposeOpen(true)}
                     onUpdate={(updates) => {
                       if (updates.email !== undefined) setEditEmail(updates.email)
                       if (updates.mobile !== undefined) {
@@ -1006,6 +1009,13 @@ export default function ContactDossierPage() {
           </div>
         </div>
       </div>
+
+      <ComposeModal 
+        isOpen={isComposeOpen} 
+        onClose={() => setIsComposeOpen(false)} 
+        to={editEmail}
+        subject=""
+      />
     </div>
   )
 }

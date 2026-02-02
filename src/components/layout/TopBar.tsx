@@ -2,7 +2,7 @@
 
 import { useCallStore } from '@/store/callStore'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Phone, Mic, PhoneOff, ArrowRightLeft, RefreshCw, Bell, X, Shield } from 'lucide-react'
+import { Phone, Mic, PhoneOff, ArrowRightLeft, RefreshCw, Bell, X, Shield, Search } from 'lucide-react'
 import { cn, formatToE164 } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { GlobalSearch } from '@/components/search/GlobalSearch'
@@ -136,6 +136,7 @@ export function TopBar() {
   }, [pathname, params, storeContext])
 
   const [isDialerOpen, setIsDialerOpen] = useState(false)
+  const [isShowingCallBar, setIsShowingCallBar] = useState(true)
   const [isScrolled, setIsScrolled] = useState(false)
   const [callDuration, setCallDuration] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -196,6 +197,10 @@ export function TopBar() {
 
   // Track call duration
   useEffect(() => {
+    if (status === 'connected' || status === 'dialing') {
+      setIsShowingCallBar(true)
+    }
+
     if (status === 'connected') {
       callStartRef.current = Date.now()
       if (durationInterval.current) clearInterval(durationInterval.current)
@@ -330,15 +335,28 @@ export function TopBar() {
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
           >
               <AnimatePresence mode="wait">
-              {!isActive ? (
+              {(!isActive || !isShowingCallBar) ? (
                   <motion.div
                       key="search"
                       initial={{ opacity: 0, y: -20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
-                      className="w-full"
+                      className="w-full flex items-center gap-4"
                   >
-                      <GlobalSearch />
+                      <div className="flex-1">
+                          <GlobalSearch />
+                      </div>
+                      {isActive && (
+                          <button 
+                              onClick={() => setIsShowingCallBar(true)}
+                              className="icon-button-forensic h-[50px] px-4 flex items-center gap-2 text-emerald-500 bg-emerald-500/5 border-emerald-500/20"
+                              title="Return to Call"
+                          >
+                              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                              <Phone size={16} />
+                              <span className="text-[10px] font-mono uppercase tracking-widest hidden lg:inline">Active Call</span>
+                          </button>
+                      )}
                   </motion.div>
               ) : (
                     <motion.div
@@ -350,36 +368,38 @@ export function TopBar() {
                     >
                         <div className="w-full max-w-2xl h-[50px] nodal-glass border-signal/50 rounded-2xl shadow-[0_10px_30px_-10px_rgba(0,47,167,0.5)] flex items-center justify-between px-6">
                             <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-2xl bg-zinc-800 flex items-center justify-center border border-white/5 overflow-hidden">
+                                <div className="w-8 h-8 rounded-[14px] bg-zinc-800 flex items-center justify-center border border-white/5 overflow-hidden shadow-[0_0_10px_rgba(0,0,0,0.5)]">
                                     {displayMetadata?.logoUrl ? (
                                         <Image 
                                             src={displayMetadata.logoUrl} 
                                             alt={displayMetadata.name || "Caller"} 
                                             width={32}
                                             height={32}
-                                            className="w-full h-full object-cover" 
+                                            className="w-full h-full object-cover rounded-[14px]" 
                                         />
                                     ) : (
                                         <span className="text-zinc-400 font-mono text-[10px]">ID</span>
                                     )}
                                 </div>
                                 <div>
-                                    <div className="text-sm font-medium text-white">{displayMetadata?.name || phoneNumber || "Unknown Caller"}</div>
-                                    <div className="text-xs text-signal font-mono uppercase tracking-tighter flex items-center gap-2">
+                                    <div className="text-sm font-medium text-white leading-none mb-1">{displayMetadata?.name || phoneNumber || "Unknown Caller"}</div>
+                                    <div className="text-[10px] text-signal font-mono uppercase tracking-tighter flex items-center gap-2">
                                         {status === 'dialing' ? 'Dialing...' : formatDuration(callDuration)}
                                         {selectedNumberName && (
                                             <span className="text-[10px] text-zinc-500 lowercase">via {selectedNumberName}</span>
                                         )}
                                     </div>
-                                    {displayMetadata?.account && (
-                                        <div className="text-[10px] text-zinc-500 truncate max-w-[150px]">
-                                            {displayMetadata.account}
-                                        </div>
-                                    )}
                                 </div>
                             </div>
 
                             <div className="flex items-center gap-3">
+                                <button 
+                                    onClick={() => setIsShowingCallBar(false)}
+                                    className="icon-button-forensic p-1.5"
+                                    title="Search while on call"
+                                >
+                                    <Search size={16} />
+                                </button>
                                 <button 
                                     onClick={() => mute(!isMuted)}
                                     className={cn(
