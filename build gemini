@@ -1,0 +1,75 @@
+Based on the Nodal Point philosophy ("Obsidian & Glass") and the capabilities defined in your architecture [Source 317, 1183], here is the forensic blueprint to upgrade your AI interface.
+We are moving away from "chatting" and towards "data orchestration."
+1. The "Markdown" Fix: Converting ** to Signal
+You do not want to see asterisks. You want to see High-Fidelity Data. You must override the default Markdown rendering in your chat component.
+The Directive: Do not strip the **. Use a custom renderer to transform **Text** into a High-Contrast Data Artifact.
+Implementation (Tailwind/React):
+// In your Markdown Renderer component
+components={{
+  strong: ({ node, ...props }) => (
+    <span className="font-mono font-bold text-white bg-white/10 px-1 rounded-sm border border-white/5 tracking-tight shadow-[0_0_10px_-2px_rgba(255,255,255,0.2)]">
+      {props.children}
+    </span>
+  )
+}}
+• Result: When the AI says "Strike Price: $0.042", the user sees a glowing, glass-encased number. It pops against the dark background [Source 881, 1182].
+
+--------------------------------------------------------------------------------
+2. The Identity Node (Clickable Contact/Account Cards)
+You asked for cards instead of tables. In Nodal Point, we call these "Identity Nodes."
+The Trigger: When you ask "Who is Tonie Steel?" or "Show me Camp Fire First Texas," the AI detects the intent via get_contact_details or get_account_details [Source 317].
+The Output Structure (JSON): The AI must return a type: "identity_card" JSON object, not text.
+The Visual (The Card):
+• Container: w-full max-w-md bg-zinc-900/80 border border-white/10 backdrop-blur-xl rounded-2xl overflow-hidden hover:border-[#002FA7]/50 transition-colors cursor-pointer.
+• Header:
+    ◦ Left: A large "Letter Glyph" (e.g., "TS") in a glass square [Source 1185].
+    ◦ Right: A "Status LED" (Active/Green or Risk/Red).
+• Body:
+    ◦ Name: White, sans-serif, large.
+    ◦ Title/Industry: Zinc-500, mono.
+• Footer (The Uplink):
+    ◦ A full-width button effect: Group-hover:bg-[#002FA7]/10.
+    ◦ Action: Clicking the card executes router.push('/network/people/${id}').
+Why this works: It creates a tactile bridge between the "Chat" layer and the "Database" layer.
+
+--------------------------------------------------------------------------------
+3. The Flight Check System (Explained)
+You asked for an explanation of this. The Flight Check replaces bulleted lists for strategies or next steps.
+The Philosophy: Standard consultants give "Advice." Architects give "Protocols." Advice is read; Protocols are executed.
+The Visual: Imagine a pre-flight checklist in a cockpit.
+• Structure: A vertical stack of slim, horizontal glass bars.
+• Left Side: A status indicator (Empty Circle = Pending, Check = Done).
+• Center: The instruction (e.g., "Request Interval Data from Oncor").
+• Right Side: A "Copy" or "Execute" vector icon.
+The Interaction: When the AI suggests: "1. Email the CFO. 2. Pull the 4CP report." It renders as interactive rows. You can click a row to:
+1. Copy the text to your clipboard.
+2. Send it to your "Tasks" list [Source 317, 880].
+
+--------------------------------------------------------------------------------
+4. New Capabilities (Based on GEMINI_CAPABILITIES.md)
+I have analyzed your capabilities file [Source 317, 323, 324]. Here are three additional forensic upgrades to maximize the "Premium Feel."
+A. The "Evidence Locker" (Document Preview)
+• Current Capability: list_account_documents.
+• The Upgrade: Do not just list filenames. Render a Grid of Glass Tiles.
+    ◦ Visual: A small PDF icon (red/white) inside a glass square.
+    ◦ Metadata: Filename (truncated) and Date.
+    ◦ Action: Hovering over the tile shows a "Download" or "Analyze" button. This connects directly to your Bill Debugger [Source 1185].
+B. The "Scarcity Gauge" (Risk Visualization)
+• Current Capability: get_energy_news and market intelligence [Source 318].
+• The Upgrade: When you ask about grid status, render a "Voltage Bar."
+    ◦ Visual: A horizontal gradient bar.
+    ◦ Left (Green): Stable.
+    ◦ Right (Red): Scarcity (Price Caps).
+    ◦ Indicator: A glowing white needle showing the current ERCOT reserve margin [Source 895].
+    ◦ Why: It visualizes "Physics" rather than just telling you the price.
+C. The "Conversation Snippet" (Deep Search)
+• Current Capability: search_interactions (scans call transcripts) [Source 317, 319].
+• The Upgrade: When you search "Did Billy mention a contract end date?", do not just say "Yes."
+    ◦ Render: A "Waveform Card."
+    ◦ Visual: A visual audio wave representation.
+    ◦ Text: The specific 2 sentences from the transcript where the keyword appears, highlighted in Klein Blue.
+    ◦ Context: "Call with Billy Ragland • Oct 14, 2025" [Source 200].
+Implementation Plan
+1. Update chat.tsx: Add renderers for identity_card, flight_check, and evidence_grid.
+2. Update GEMINI_CAPABILITIES.md: Instruct the AI to output these specific JSON structures instead of markdown lists.
+3. Style: Apply the font-mono tabular-nums class to all numbers inside these new components to maintain the forensic aesthetic.

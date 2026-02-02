@@ -51,10 +51,11 @@ import {
   Check,
   Monitor,
   Smartphone,
-  Brain
+  Brain,
+  AlertTriangle
 } from 'lucide-react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -70,7 +71,16 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useContacts, type Contact } from '@/hooks/useContacts';
+import { useProtocolBuilder } from '@/hooks/useProtocolBuilder';
 import { toast } from 'sonner';
 
 // Mock Data for Visualization (The "Test Sequence")
@@ -333,15 +343,83 @@ export default function ProtocolArchitect() {
 
 function ProtocolArchitectInner() {
   const { id } = useParams();
+  const router = useRouter();
   const { screenToFlowPosition } = useReactFlow();
   
-  // Initialize state based on the ID (Test vs. Fresh)
+  // Real Data Integration
+  const { protocol, saveProtocol, isSaving } = useProtocolBuilder(id as string);
+  
+  // State
   const [nodes, setNodes, onNodesChange] = useNodesState(
     id === TEST_PROTOCOL_ID ? MOCK_NODES : FRESH_NODES
   );
   const [edges, setEdges, onEdgesChange] = useEdgesState(
     id === TEST_PROTOCOL_ID ? MOCK_EDGES : FRESH_EDGES
   );
+  
+  const [isDirty, setIsDirty] = useState(false);
+  const [showExitDialog, setShowExitDialog] = useState(false);
+  const dataLoadedRef = useRef(false);
+
+  // Load Data Effect
+  useEffect(() => {
+    if (protocol?.bgvector && !dataLoadedRef.current && id !== TEST_PROTOCOL_ID) {
+       // Only load if valid data exists and we haven't loaded yet
+       if (Array.isArray(protocol.bgvector.nodes) && protocol.bgvector.nodes.length > 0) {
+           setNodes(protocol.bgvector.nodes);
+           setEdges(protocol.bgvector.edges || []);
+       }
+       dataLoadedRef.current = true;
+       // Reset dirty state after initial load
+       setIsDirty(false);
+    }
+  }, [protocol, id, setNodes, setEdges]);
+
+  // Dirty State Wrappers
+  const handleNodesChange = useCallback((changes: any) => {
+    onNodesChange(changes);
+    if (changes.length > 0) setIsDirty(true);
+  }, [onNodesChange]);
+
+  const handleEdgesChange = useCallback((changes: any) => {
+    onEdgesChange(changes);
+    if (changes.length > 0) setIsDirty(true);
+  }, [onEdgesChange]);
+
+  const handleSave = async () => {
+    if (id === TEST_PROTOCOL_ID) {
+      toast.info("Cannot save test protocol (Read Only)");
+      return;
+    }
+    try {
+      await saveProtocol({ nodes, edges });
+      setIsDirty(false);
+    } catch (err) {
+      // Error handled in hook
+    }
+  };
+
+  const handleExit = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (isDirty) {
+      setShowExitDialog(true);
+    } else {
+      router.push('/network/protocols');
+    }
+  };
+
+  // Browser Navigation Warning
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
+
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [activeHandleId, setActiveHandleId] = useState<string | null>(null);
@@ -510,6 +588,7 @@ function ProtocolArchitectInner() {
 
   // Phase 2: Two-Way Binding
   const updateNodeData = useCallback((nodeId: string, newData: any) => {
+    setIsDirty(true);
     setNodes((nds) =>
       nds.map((node) => {
         if (node.id === nodeId) {
@@ -528,6 +607,7 @@ function ProtocolArchitectInner() {
   }, [selectedNode, setNodes]);
 
   const deleteNode = useCallback((nodeId: string) => {
+    setIsDirty(true);
     setNodes((nds) => nds.filter((node) => node.id !== nodeId));
     setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
     if (selectedNode?.id === nodeId) {
@@ -537,6 +617,7 @@ function ProtocolArchitectInner() {
   }, [selectedNode, setNodes, setEdges]);
 
   const duplicateNode = useCallback((node: Node) => {
+    setIsDirty(true);
     const newNodeId = crypto.randomUUID();
     const newNode: Node = {
       ...node,
@@ -552,6 +633,7 @@ function ProtocolArchitectInner() {
   }, [setNodes]);
 
   const updateOutcomeLabel = (nodeId: string, outcomeId: string, newLabel: string) => {
+    setIsDirty(true);
     setNodes((nds) =>
       nds.map((node) => {
         if (node.id === nodeId) {
@@ -609,6 +691,7 @@ function ProtocolArchitectInner() {
 
   const onConnect = useCallback(
     (params: Connection) => {
+      setIsDirty(true);
       // Find the source node to check if it's a split node
       const sourceNode = nodes.find(n => n.id === params.source);
       
@@ -755,6 +838,7 @@ function ProtocolArchitectInner() {
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
+      setIsDirty(true);
       
       const type = event.dataTransfer.getData('application/reactflow');
 
@@ -945,18 +1029,19 @@ function ProtocolArchitectInner() {
       {/* Page Header */}
       <div className="flex items-center justify-between px-2">
         <div className="flex items-center gap-4">
-          <Link href="/network/protocols">
-            <button className="icon-button-forensic w-9 h-9 flex items-center justify-center rounded-xl border border-white/5 bg-transparent text-zinc-400">
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-          </Link>
+          <button 
+            onClick={handleExit}
+            className="icon-button-forensic w-9 h-9 flex items-center justify-center rounded-xl border border-white/5 bg-transparent text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
           <div className="flex items-center gap-3">
             <div>
               <h1 className="text-xl font-semibold tracking-tighter text-zinc-100">Protocol_Architect</h1>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className={cn("w-1.5 h-1.5 rounded-full animate-pulse", isDirty ? "bg-amber-500" : "bg-emerald-500")} />
                 <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                  Status: Designing // Protocol ID: {id?.toString().slice(0, 8)}...
+                  Status: {isDirty ? 'Unsaved_Changes' : 'Synced'} // Protocol ID: {id?.toString().slice(0, 8)}...
                 </span>
               </div>
             </div>
@@ -974,8 +1059,17 @@ function ProtocolArchitectInner() {
           >
             <Bug className="w-3.5 h-3.5 mr-2" /> {debugMode ? 'Debug_On' : 'Debug_Off'}
           </button>
-          <button className="icon-button-forensic text-zinc-400 font-mono text-[10px] uppercase tracking-wider h-9 px-4 rounded-xl flex items-center transition-all" title="Save Draft">
-            <Save className="w-3.5 h-3.5 mr-2" /> Save_Draft
+          <button 
+            onClick={handleSave}
+            disabled={isSaving}
+            className={cn(
+              "icon-button-forensic text-zinc-400 font-mono text-[10px] uppercase tracking-wider h-9 px-4 rounded-xl flex items-center transition-all hover:text-white hover:bg-white/5",
+              isSaving && "opacity-50 cursor-not-allowed"
+            )} 
+            title="Save Draft"
+          >
+            {isSaving ? <Clock className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-2" />}
+            {isSaving ? 'Saving...' : 'Save_Draft'}
           </button>
           <button 
             className="bg-white text-zinc-950 hover:bg-zinc-200 font-mono text-[10px] uppercase tracking-widest font-bold h-9 px-5 rounded-xl shadow-[0_0_30px_-5px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)] transition-all"
@@ -1673,6 +1767,47 @@ function ProtocolArchitectInner() {
           </div>
         </div>
       </div>
+
+      {/* Exit Dialog */}
+      <Dialog open={showExitDialog} onOpenChange={setShowExitDialog}>
+        <DialogContent className="bg-zinc-900 border-white/10 text-white sm:max-w-[425px]">
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-amber-500 mb-2">
+              <AlertTriangle className="w-5 h-5" />
+              <DialogTitle>Unsaved Changes</DialogTitle>
+            </div>
+            <DialogDescription className="text-zinc-400">
+              You have unsaved changes in your protocol. If you leave now, these changes will be lost.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="ghost" 
+              onClick={() => setShowExitDialog(false)}
+              className="text-zinc-400 hover:text-white hover:bg-white/5"
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => router.push('/network/protocols')}
+              className="bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20"
+            >
+              Discard Changes
+            </Button>
+            <Button 
+              onClick={async () => {
+                await handleSave();
+                setShowExitDialog(false);
+                router.push('/network/protocols');
+              }}
+              className="bg-[#002FA7] hover:bg-[#002FA7]/90 text-white"
+            >
+              Save & Exit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
