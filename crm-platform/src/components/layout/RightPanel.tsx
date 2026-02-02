@@ -1,7 +1,7 @@
 'use client'
 
 import { 
-  Zap, CheckCircle, Play, DollarSign, Mic, ChevronRight 
+  Zap, CheckCircle, Play, DollarSign, Mic, ChevronRight, Plus 
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useParams, usePathname } from 'next/navigation'
@@ -10,8 +10,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useContact } from '@/hooks/useContacts'
 import { useAccount } from '@/hooks/useAccounts'
 import { useCallStore } from '@/store/callStore'
+import { useTasks } from '@/hooks/useTasks'
 import { ActiveCallInterface } from '../calls/ActiveCallInterface'
 import { cn } from '@/lib/utils'
+import { useMemo } from 'react'
 
 // Widgets
 import TelemetryWidget from '../crm/TelemetryWidget'
@@ -44,6 +46,15 @@ export function RightPanel() {
   const [isReady, setIsReady] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  const { data: tasksData } = useTasks()
+  
+  const taskCounts = useMemo(() => {
+    const tasks = tasksData?.pages.flatMap(page => page.tasks) || []
+    const completedCount = tasks.filter(t => t.status === 'Completed').length
+    const totalCount = tasks.length
+    return { completed: completedCount, total: totalCount }
+  }, [tasksData])
 
   useEffect(() => {
     setIsReady(true)
@@ -143,19 +154,19 @@ export function RightPanel() {
                 className="flex flex-col gap-8 mt-2"
               >
                 {/* 1. TELEMETRY (Targeting Mode) */}
-                <div className="space-y-1">
+                <div className="space-y-3">
                   <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Telemetry</h3>
                   <TelemetryWidget location={entityZone} />
                 </div>
 
                 {/* 2. SATELLITE (Infrastructure) */}
-                <div className="space-y-1">
+                <div className="space-y-3">
                   <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Satellite_Uplink</h3>
                   <SatelliteUplink address={entityAddress} />
                 </div>
 
                 {/* 3. ORGANIZATIONAL (Intelligence) */}
-                <div className="space-y-1">
+                <div className="space-y-3">
                   <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Org_Intelligence</h3>
                   <OrgIntelligence 
                     domain={contact?.companyDomain || account?.domain}
@@ -166,8 +177,13 @@ export function RightPanel() {
                 </div>
 
                 {/* 4. TASKS (Execution) */}
-                <div className="space-y-1 pb-4">
-                  <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Node_Tasks</h3>
+                <div className="space-y-3 pb-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Node_Tasks</h3>
+                    <button className="icon-button-forensic p-1 flex items-center justify-center">
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                   <ContextTasksWidget entityId={entityId} entityName={entityName} />
                 </div>
               </motion.div>
@@ -180,25 +196,36 @@ export function RightPanel() {
                 className="flex flex-col gap-8"
               >
                 {/* 0. QUICK ACTIONS (Rapid Ingestion) */}
-                <div className="space-y-1">
+                <div className="space-y-3">
                   <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Rapid_Ingestion</h3>
                   <QuickActionsGrid />
                 </div>
 
                 {/* 1. MARKET PULSE (Global Energy Status) */}
-                <div className="space-y-1">
-                  <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Market_Pulse</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Market_Pulse</h3>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                      <span className="text-[9px] font-mono text-green-500 uppercase tracking-widest">Live</span>
+                    </div>
+                  </div>
                   <MarketPulseWidget />
                 </div>
 
                 {/* 2. SYSTEM TASKS (Network-wide tasks) */}
-                <div className="space-y-1">
-                  <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Network_Tasks</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Network_Tasks</h3>
+                    <span className="text-[9px] font-mono text-zinc-600 uppercase tabular-nums tracking-wider">
+                      {taskCounts.completed}/{taskCounts.total} Units
+                    </span>
+                  </div>
                   <GlobalTasksWidget />
                 </div>
 
                 {/* 3. NEWS FEED (Global Events) */}
-                <div className="space-y-1 pb-4">
+                <div className="space-y-3 pb-4">
                   <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">System_Feed</h3>
                   <NewsFeedWidget />
                 </div>
