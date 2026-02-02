@@ -883,9 +883,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             {/* CONTACTS LIST */}
             <div className="space-y-1 px-1">
               {paginatedData.length > 0 ? (
-                paginatedData.map((person, i) => (
+                paginatedData.map((person) => (
                   <div 
-                    key={i} 
+                    key={person.id} 
                     className="group flex flex-col p-2.5 rounded-xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5 space-y-2"
                   >
                     <div className="flex items-center justify-between">
@@ -954,9 +954,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                         )}
                         {person.phones && person.phones.length > 0 && (
                           <div className="flex items-center gap-1.5">
-                            {person.phones.map((phone, idx) => (
+                            {person.phones.map((phone) => (
                               <button
-                                key={idx}
+                                key={phone}
                                 onClick={() => {
                                   initiateCall(phone, {
                                     name: person.name,
