@@ -710,6 +710,8 @@ export function useCreateContact() {
         otherPhone: newContact.otherPhone,
         status: newContact.status,
         accountId: newContact.accountId || null,
+        city: (newContact as any).city || null,
+        state: (newContact as any).state || null,
         metadata: {
             company: newContact.company, // Fallback if no account ID
             domain: newContact.companyDomain
@@ -743,6 +745,8 @@ export function useUpdateContact() {
       if (updates.accountId !== undefined) dbUpdates.accountId = updates.accountId
       if (updates.notes !== undefined) dbUpdates.notes = updates.notes
       if (updates.title !== undefined) dbUpdates.title = updates.title
+      if (updates.city !== undefined) dbUpdates.city = updates.city
+      if (updates.state !== undefined) dbUpdates.state = updates.state
       if (updates.linkedinUrl !== undefined) dbUpdates.linkedinUrl = updates.linkedinUrl
       if (updates.mobile !== undefined) dbUpdates.mobile = updates.mobile
       if (updates.workDirectPhone !== undefined) dbUpdates.workPhone = updates.workDirectPhone
