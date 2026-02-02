@@ -88,6 +88,19 @@
     - [x] **Deep Audit**: Identified and replaced hardcoded `rounded-full` instances with `rounded-2xl` in `GeminiChat`, `EmailList`, `SatelliteUplink`, `BulkImportModal`, `OrgIntelligence`, `DataIngestionCard`, `TaskManagement`, and all Dossier empty/error states.
     - [x] Preserved `rounded-full` ONLY for decorative status indicators, signal dots, and pulsing animations per forensic aesthetic requirements.
 
+### Org Intelligence & Account Enrichment
+- **Status**: Completed
+- **Description**: Enhanced the Organizational Intelligence widget with account enrichment capabilities and resolved critical fetch and type errors.
+- **Actions**:
+  - [x] **UI Optimization**:
+    - [x] Relocated the **Enrich** button to the right of the **Search Decision Makers** input field for optimal access during lead filtering.
+    - [x] Applied squircle styling (`rounded-lg`) and Sparkles icon to the enrichment trigger.
+  - [x] **Bug Fixes**:
+    - [x] **TypeScript Error**: Resolved a type mismatch in `OrgIntelligence.tsx` where `scanStatus` was being compared to incompatible states.
+    - [x] **Apollo Fetch Error**: Fixed a route mismatch in `server.js` that caused `/api/apollo/search-people` calls to fail.
+    - [x] **Routing Sync**: Standardized API routes in `server.js` to match the frontend expectations (`/api/apollo/search-people` and `/api/apollo/search-organizations`).
+  - [x] **Integration**: Verified the end-to-end flow from domain-based scanning to account enrichment.
+
 ### Emails Page & Integration
 - **Status**: Completed
 - **Description**: Migrated legacy email features (Inbox Sync, Composition, Tracking) to the new Next.js platform.

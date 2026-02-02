@@ -54,8 +54,8 @@ export default function SatelliteUplink({ address }: { address: string }) {
 
       {/* BODY: The Toggle */}
       <div className={cn(
-        "h-48 relative w-full bg-zinc-950 flex flex-col items-center justify-center transition-all duration-500",
-        (!isActive || !apiKey) && !isLoading ? "opacity-50" : "opacity-100"
+        "h-48 relative w-full bg-zinc-900/40 flex flex-col items-center justify-center transition-all duration-500",
+        (!isActive || !apiKey) && !isLoading ? "opacity-70" : "opacity-100"
       )}>
         
         {isLoading ? (
@@ -64,20 +64,19 @@ export default function SatelliteUplink({ address }: { address: string }) {
             <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Negotiating Uplink...</span>
           </div>
         ) : !isActive || !apiKey ? (
-          <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-20 flex flex-col items-center justify-center">
+          <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-30 flex flex-col items-center justify-center">
             {/* The "Locked" State */}
-            <div className="z-10 text-center">
-              <div className="mb-3 mx-auto w-12 h-12 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center text-zinc-500 group-hover:text-white group-hover:border-[#002FA7] transition-all">
-                <Satellite className="w-5 h-5" />
+            <div className="z-10 text-center px-6">
+              <div className="mb-3 mx-auto w-10 h-10 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center text-zinc-500 group-hover:text-white group-hover:border-[#002FA7] transition-all">
+                <Satellite className="w-4 h-4" />
               </div>
               <button 
                 onClick={establishUplink}
-                className="icon-button-forensic text-xs font-mono !text-[#002FA7] border border-[#002FA7]/30 bg-[#002FA7]/5 px-4 py-2 rounded-xl hover:!bg-[#002FA7] hover:!text-white transition-all uppercase tracking-wider flex items-center gap-2 hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)]"
+                className="icon-button-forensic h-8 pl-4 pr-6 text-[10px] font-mono !text-[#4D88FF] border border-[#4D88FF]/50 bg-[#4D88FF]/20 rounded-lg hover:!bg-[#4D88FF] hover:!text-white transition-all uppercase tracking-widest flex items-center justify-center gap-2.5 hover:shadow-[0_0_30px_-5px_rgba(77,136,255,0.6)] mx-auto"
                 title="Establish Uplink"
               >
-                <Wifi className="w-3 h-3" /> Establish Uplink
+                <Wifi className="w-3.5 h-3.5" /> Establish Uplink
               </button>
-              <p className="text-[10px] text-zinc-600 mt-2">Consumes 1 API Credit</p>
             </div>
           </div>
         ) : (

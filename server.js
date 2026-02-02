@@ -681,8 +681,8 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/apollo/enrich' ||
     pathname === '/api/apollo/usage' ||
     pathname === '/api/apollo/health' ||
-    pathname === '/api/apollo/search/people' ||
-    pathname === '/api/apollo/search/organizations' ||
+    pathname === '/api/apollo/search-people' ||
+    pathname === '/api/apollo/search-organizations' ||
     pathname === '/api/upload/host-google-avatar' ||
     pathname === '/api/upload/signature-image' ||
     pathname === '/api/posts/generate-ai' ||
@@ -875,10 +875,10 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/apollo/health') {
     return handleApiApolloHealth(req, res, parsedUrl);
   }
-  if (pathname === '/api/apollo/search/people') {
+  if (pathname === '/api/apollo/search-people') {
     return handleApiApolloSearchPeople(req, res);
   }
-  if (pathname === '/api/apollo/search/organizations') {
+  if (pathname === '/api/apollo/search-organizations') {
     return handleApiApolloSearchOrganizations(req, res, parsedUrl);
   }
   if (pathname === '/api/apollo/phone-webhook') {
