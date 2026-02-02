@@ -61,7 +61,7 @@ export default function InfrastructureMap() {
   if (!isLoaded) return (
     <div className="h-full w-full flex items-center justify-center bg-zinc-950">
       <span className="text-xs font-mono text-[#002FA7] animate-pulse">
-        > ESTABLISHING_UPLINK...
+        {'>'} ESTABLISHING_UPLINK...
       </span>
     </div>
   );
