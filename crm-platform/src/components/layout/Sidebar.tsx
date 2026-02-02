@@ -147,16 +147,16 @@ export function Sidebar() {
         </motion.div>
         <AnimatePresence>
           {isHovered && (
-            <motion.span 
+            <motion.div 
               layout="position"
               initial={{ opacity: 0, x: -10, filter: "blur(4px)" }}
               animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
               exit={{ opacity: 0, x: -10, filter: "blur(4px)" }}
               transition={{ duration: 0.3, delay: 0.1 }}
-              className="ml-4 font-bold text-lg tracking-tight text-white"
+              className="ml-4 font-bold text-lg tracking-tighter text-white"
             >
-              Nodal Point Network
-            </motion.span>
+              Nodal<span className="text-[#002FA7]">Point</span> Network
+            </motion.div>
           )}
         </AnimatePresence>
       </motion.div>

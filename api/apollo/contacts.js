@@ -49,14 +49,7 @@ export default async function handler(req, res) {
     const searchBody = {
       page: page + 1, // Apollo uses 1-based pagination
       per_page: Math.min(size, 100), // Apollo max is 100
-    };
-
-    // If searching by name, DO NOT restrict by title - we want to find ANYONE with that name
-    if (personName) {
-      searchBody.q_keywords = personName;
-    } else {
-      // Browsing mode: Filter by specific decision-maker titles
-      searchBody.person_titles = [
+      person_titles: [
         // Facilities & Energy
         'Facilities Director',
         'Facilities Manager',
@@ -100,10 +93,14 @@ export default async function handler(req, res) {
         'IT Manager',
         'Chief Compliance Officer',
         'Compliance Manager'
-      ];
-      
-      // Include similar titles (e.g., "Senior Facilities Manager", "VP Finance", etc.)
-      searchBody.include_similar_titles = true;
+      ],
+      include_similar_titles: true
+    };
+
+    // If searching by name, use q_keywords (which searches name, title, email)
+    // BUT we keep the person_titles above to ensure we only find DECISION MAKERS matching that name
+    if (personName) {
+      searchBody.q_keywords = personName;
     }
     
     // COMBINED FILTERING STRATEGY:

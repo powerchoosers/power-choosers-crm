@@ -99,6 +99,27 @@
   - [x] **UI Implementation**:
     - Created `ComposeModal.tsx` for sending emails (replacing `email-compose-global.js`).
 
+### Market Telemetry & Operational Sentinel
+- **Status**: Completed
+- **Description**: Integrated real-time ERCOT market data and seasonal intelligence into the platform's core UI and intelligence layer.
+- **Actions**:
+  - [x] **ERCOT Data Pipeline**:
+    - [x] Implemented OAuth2 ROPC flow with token caching for the ERCOT API.
+    - [x] Built a robust scraper fallback to ensure data continuity during API outages.
+    - [x] Created `useMarketPulse.ts` hook for unified price and grid data access.
+  - [x] **Operational Sentinel (TopBar)**:
+    - [x] Integrated a real-time strategy engine that adjusts based on seasonal 4CP windows and grid physics (ACCUMULATION vs. 4CP_DEFENSE).
+    - [x] Added a "System Heartbeat" (System_Live) to the TopBar with millisecond-precision sync tracking.
+    - [x] Applied forensic instrument aesthetic with `font-mono tabular-nums` and pulsing LED status dots.
+    - [x] Moved brand identity ("NodalPoint Network") to the Sidebar with two-color styling, freeing up space for Strategic Context in the TopBar.
+  - [x] **Dossier Integration**:
+    - [x] Created the `MarketPulseHUD` component in `GeminiChat.tsx` for real-time market visualization during AI consultations.
+    - [x] Integrated `get_market_pulse` tool into the Gemini chat backend for real-time data retrieval.
+  - [x] **Telemetry Storage (Supabase)**:
+    - [x] Created `market_telemetry` table with `vector(768)` support for semantic search of historical market days.
+    - [x] Implemented throttled 2x daily (AM/PM) logging to preserve storage while maintaining a "source of truth" for the grid.
+    - [x] Documented the schema strategy in `nodalpoint.md`.
+
 ### Nodal Architect Search Fixes
 - **Status**: Completed
 - **Description**: Resolved critical logic failures in the AI search system preventing fallback to keyword search when vector results were empty.

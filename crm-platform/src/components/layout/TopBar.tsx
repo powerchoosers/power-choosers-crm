@@ -14,6 +14,24 @@ import Image from 'next/image'
 import { usePathname, useParams } from 'next/navigation'
 import { GeminiChatTrigger, GeminiChatPanel } from '@/components/chat/GeminiChat'
 import { useGeminiStore } from '@/store/geminiStore'
+import { useMarketPulse } from '@/hooks/useMarketPulse'
+
+function getDaysUntilJune() {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  let juneFirst = new Date(currentYear, 5, 1); // June 1st
+  
+  if (now >= juneFirst && now < new Date(currentYear, 9, 1)) {
+    return 0; // Already in season
+  }
+  
+  if (now >= new Date(currentYear, 9, 1)) {
+    juneFirst = new Date(currentYear + 1, 5, 1);
+  }
+  
+  const diffTime = juneFirst.getTime() - now.getTime();
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
 
 export function TopBar() {
   const { 
@@ -35,7 +53,51 @@ export function TopBar() {
   const pathname = usePathname()
   const params = useParams()
   
+  const { data: marketPulse } = useMarketPulse()
   const storeContext = useGeminiStore((state) => state.activeContext)
+
+  // Operational Strategy Logic
+  const marketStrategy = useMemo(() => {
+    const now = new Date();
+    const month = now.getMonth() + 1; // 1-12
+    const isSummer = month >= 6 && month <= 9;
+    
+    // Default strategy
+    let strategy = 'ACCUMULATION';
+    let statusColor = 'bg-emerald-500';
+    let pulseColor = 'shadow-[0_0_8px_#10b981]';
+    const daysUntilJune = getDaysUntilJune();
+    let windowText = `4CP_WINDOW: INACTIVE (${daysUntilJune} DAYS)`;
+
+    if (isSummer) {
+      strategy = '4CP_DEFENSE';
+      windowText = '4CP_WINDOW: ACTIVE (CRITICAL)';
+      statusColor = 'bg-amber-500';
+      pulseColor = 'shadow-[0_0_8px_#f59e0b]';
+      
+      // Check market conditions if data is available
+      if (marketPulse) {
+        const avgPrice = marketPulse.prices.houston;
+        const scarcity = marketPulse.grid.scarcity_prob;
+        
+        if (avgPrice > 200 || scarcity > 20) {
+          strategy = 'GRID_EMERGENCY';
+          statusColor = 'bg-red-500';
+          pulseColor = 'shadow-[0_0_8px_#ef4444]';
+        } else if (avgPrice > 100 || scarcity > 10) {
+          strategy = '4CP_ALERT';
+        }
+      }
+    } else {
+      if (marketPulse && marketPulse.prices.houston > 100) {
+        strategy = 'VOLATILITY_HEDGE';
+        statusColor = 'bg-amber-500';
+        pulseColor = 'shadow-[0_0_8px_#f59e0b]';
+      }
+    }
+
+    return { strategy, statusColor, pulseColor, windowText };
+  }, [marketPulse])
 
   // Use voiceMetadata if active, otherwise use storeMetadata if it exists (for dialer display)
   const displayMetadata = isActive ? voiceMetadata : storeMetadata
@@ -74,11 +136,25 @@ export function TopBar() {
   }, [pathname, params, storeContext])
 
   const [isDialerOpen, setIsDialerOpen] = useState(false)
+  const [isScrolled, setIsScrolled] = useState(false)
   const [callDuration, setCallDuration] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const durationInterval = useRef<NodeJS.Timeout | null>(null)
   const callStartRef = useRef<number | null>(null)
+
+  // Listen for scroll on the main content container
+  useEffect(() => {
+    const mainContainer = document.querySelector('main.np-scroll');
+    if (!mainContainer) return;
+
+    const handleScroll = () => {
+      setIsScrolled(mainContainer.scrollTop > 20);
+    };
+
+    mainContainer.addEventListener('scroll', handleScroll);
+    return () => mainContainer.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const selectedNumber = profile.selectedPhoneNumber || (profile.twilioNumbers && profile.twilioNumbers.length > 0 ? profile.twilioNumbers[0].number : null)
   const selectedNumberName = profile.twilioNumbers?.find(n => n.number === selectedNumber)?.name || "Default"
@@ -223,10 +299,32 @@ export function TopBar() {
   }
 
   return (
-    // Updated positioning: constrained to match main content area
-    <header className="fixed top-0 left-[70px] right-0 lg:right-80 z-40 flex items-start justify-center p-6 pointer-events-none nodal-glass !border-none !shadow-none">
-      <div className="w-full max-w-[1200px] 2xl:max-w-[1400px] flex items-center gap-4 pointer-events-auto">
-          {/* Left Side: Search or Active Call */}
+    // Updated positioning: constrained to match main content area with "Frost Shield" scroll effect
+    <header className={cn(
+        "fixed top-0 left-[70px] right-0 lg:right-80 z-40 flex items-center justify-center h-24 pointer-events-none transition-all duration-300 ease-in-out",
+        isScrolled 
+           ? "bg-zinc-950/80 backdrop-blur-xl border-b border-white/5 shadow-[0_0_30px_rgba(0,0,0,0.5)] backdrop-saturate-150" 
+           : "bg-transparent border-b border-transparent"
+    )}>
+      <div className="w-full px-8 flex items-center justify-between gap-6 pointer-events-auto">
+          {/* Operational Sentinel */}
+          <div className="flex items-center gap-6 shrink-0">
+              <div className="hidden xl:flex flex-col h-8 justify-center">
+                  <div className="flex items-center gap-2">
+                      <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", marketStrategy.statusColor, marketStrategy.pulseColor)} />
+                      <span className="text-[10px] font-mono text-zinc-400 tracking-widest uppercase">
+                          STRATEGY: <span className="text-white font-semibold">{marketStrategy.strategy}</span>
+                      </span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-0.5">
+                      <div className="text-[9px] font-mono text-[#002FA7] tracking-wider">
+                          {marketStrategy.windowText}
+                      </div>
+                  </div>
+              </div>
+          </div>
+
+          {/* Center Side: Search or Active Call */}
           <motion.div 
               className="flex-1 min-w-0"
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
@@ -321,7 +419,7 @@ export function TopBar() {
                     mass: 0.8
                 }}
                 className={cn(
-                    "glass-panel shadow-lg overflow-visible flex flex-col relative h-12 transition-all",
+                    "glass-panel !shadow-[0_0_20px_rgba(0,0,0,0.5)] overflow-visible flex flex-col relative h-12 transition-all",
                     isDialerOpen && "hover:bg-white/5 hover:border-white/10 group/dialer"
                 )}
             >

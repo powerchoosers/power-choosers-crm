@@ -115,7 +115,7 @@ export function GlobalSearch() {
           }}
           onFocus={() => setIsOpen(true)}
           placeholder="Query Database [CMD+K]..."
-          className="w-full h-12 nodal-glass rounded-full pl-12 pr-16 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[#002FA7]/40 focus:bg-zinc-900/80 transition-all shadow-2xl"
+          className="w-full h-12 nodal-glass !border-white/5 rounded-full pl-12 pr-16 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[#002FA7]/40 focus:bg-zinc-900/80 transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)]"
         />
         <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-3">
           {isSearching && (
@@ -137,7 +137,7 @@ export function GlobalSearch() {
       </div>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-950/95 border border-white/10 rounded-2xl shadow-[0_0_50px_-12px_rgba(0,0,0,0.8)] backdrop-blur-3xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-950/95 border border-white/5 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.6)] backdrop-blur-3xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200">
           <div className="p-2 max-h-[70vh] overflow-y-auto np-scroll">
             
             {/* Quick Actions */}
