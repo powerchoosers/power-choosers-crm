@@ -11,11 +11,14 @@ Migrate all legacy CRM features to the new Next.js application, ensuring a moder
 
 ### 1. Feature Tracking & Planning
 - **MANDATORY**: Use `feature-tracking.md` in the root directory.
-- **Shared Log**: Never delete other active features. Append/Merge your updates.
+- **Context Maintenance**: Frequently consult this file to maintain architectural context and track progress.
+- **Log Management**: Append/Merge updates for active features. Proactively remove completed or deprecated items if the file exceeds a reasonable length to ensure the most relevant context is preserved for the AI.
 - **Task Management**: Use `TodoWrite` for every migration task.
 
 ### 2. Migration Source of Truth
-The legacy dashboard file `c:\Users\Lap3p\OneDrive\Documents\Power Choosers CRM\backups\crm-dashboard.html` is the **Reference** for feature requirements. **We are no longer using this file for active development.**
+- **Feature Reference**: The legacy dashboard file `backups/crm-dashboard.html` is the primary reference for feature requirements.
+- **Technical Reference**: Consult the `SUPABASE DOCS/` directory for deep technical understanding of our database schema, vector search implementations, and SQL functions.
+- **Note**: We are no longer using the legacy HTML for active development; it is for logic reference only.
 
 **Key Features to Migrate:**
 1.  **Top Bar Navigation**: Search, Twilio Call Button, Scripts, Refresh, Notifications, Profile.
