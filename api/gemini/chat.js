@@ -1071,6 +1071,10 @@ export default async function handler(req, res) {
       q = q.replace(/^\s*(accounts|companies|businesses|nodes)\s+(in|located in|for)\s+/i, '');
       // Remove location prepositions if at start
       q = q.replace(/^\s*(located\s+in|in)\s+/i, '');
+      // Remove contract-related suffixes
+      q = q.replace(/\s+(contract|expiration|expires|expiry|end date|maturity|position|details)\s*.*$/i, '');
+      // Remove question words if they appear at start (what is, when does)
+      q = q.replace(/^(what is|when does|show me|get|find)\s+/i, '');
       return q;
     };
 
@@ -1152,10 +1156,11 @@ export default async function handler(req, res) {
       const lower = p.toLowerCase();
       const isExpirationQuery = /(expir|expire|expires|expiration)\b/.test(lower) && !!parseYear(p);
       const isContractQuery = /(contract|position maturity|strike price|annual usage|supplier|current supplier|current rate)\b/.test(lower);
+      const isDirectContractQuestion = isContractQuery && /(what is|when does|show me|get|find)\b/.test(lower);
       const looksLikeDirectNameQuery = /^[a-z0-9][a-z0-9\s&.'-]{1,80}\??$/i.test(p) && !/(\bwho\b|\bwhat\b|\bwhy\b|\bhow\b|\bwhen\b)/i.test(p);
       const isInstructionLike = /(\breturn\b|\bonly\b|\bsummarize\b|\bexplain\b|\bdraft\b|\bwrite\b|\bcompose\b|\bgenerate\b|\btranslate\b|\bdefine\b|\bcalculate\b|\bsolve\b)/.test(lower);
       const hasSearchVerb = /(\bfind\b|\bsearch\b|\blook up\b|\bdo you see\b|\bcheck\b)/.test(lower);
-      const isSearchQuery = hasSearchVerb || (looksLikeDirectNameQuery && !isInstructionLike);
+      const isSearchQuery = hasSearchVerb || isDirectContractQuestion || (looksLikeDirectNameQuery && !isInstructionLike);
       const isLocationQuery = /(location|city|state|located in)\b/.test(lower);
 
       if (!isExpirationQuery && !isContractQuery && !isSearchQuery && !isLocationQuery) return false;
@@ -1340,6 +1345,39 @@ export default async function handler(req, res) {
             usedQuery = q;
             break;
           }
+        }
+
+        // Check for single result or exact match to promote to Position Maturity
+        if (records.length === 1 || (records.length > 0 && records[0].name.toLowerCase() === usedQuery.toLowerCase())) {
+          const match = records[0];
+          const account = await toolHandlers.get_account_details({ account_id: match.id });
+          diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+
+          const expiration = account?.contract_end_date ? String(account.contract_end_date) : null;
+          if (!expiration) {
+            const narrative = `${firstName}, I found ${account?.name || 'the account'}, but there is no contract expiration date stored on the record right now.`;
+            const dv = buildJsonBlock('data_void', { field: 'Contract Expiration', action: 'REQUIRE_BILL_UPLOAD' });
+            respondGrounded(`${narrative} ${dv}`, diagnostics);
+            return true;
+          }
+
+          const daysRemaining = daysUntil(expiration);
+          const supplier = account?.electricity_supplier ? String(account.electricity_supplier) : 'Unknown';
+          const strike = formatUsdRate(account?.current_rate) || 'Unknown';
+          const usage = formatKwh(account?.annual_usage) || 'Unknown';
+          const narrative = `${firstName}, I pulled the energy contract fields directly from the CRM record for ${account?.name || 'this account'}. Anything not present in the database is labeled Unknown.`;
+          const pm = buildJsonBlock('position_maturity', {
+            expiration,
+            daysRemaining: typeof daysRemaining === 'number' ? daysRemaining : 0,
+            currentSupplier: supplier,
+            strikePrice: strike,
+            annualUsage: usage,
+            estimatedRevenue: 'Unknown',
+            margin: 'N/A',
+            isSimulation: false,
+          });
+          respondGrounded(`${narrative} ${pm}`, diagnostics);
+          return true;
         }
 
         if (!Array.isArray(records) || records.length === 0) {
