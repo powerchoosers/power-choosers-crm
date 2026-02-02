@@ -113,6 +113,7 @@ import uploadSignatureImageHandler from './api/upload/signature-image.js';
 import generateStaticPostHandler from './api/posts/generate-static.js';
 import generateAiPostHandler from './api/posts/generate-ai.js';
 import analyzeBillHandler from './api/analyze-bill.js';
+import analyzeDocumentHandler from './api/analyze-document.js';
 import generateCallScriptHandler from './api/ai/generate-call-script.js';
 import postsListHandler from './api/posts/list.js';
 import sitemapHandler from './api/sitemap.js';
@@ -798,18 +799,32 @@ const server = http.createServer(async (req, res) => {
     return handleApiTxPrice(req, res, parsedUrl);
   }
   if (pathname === '/api/analyze-bill') {
-    if (req.method === 'POST') {
-      try {
-        req.body = await parseRequestBody(req);
-      } catch (error) {
-        console.error('[Server] Analyze Bill - Body Parse Error:', error.message);
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Invalid request body' }));
-        return;
+        if (req.method === 'POST') {
+          try {
+            req.body = await parseRequestBody(req);
+          } catch (error) {
+            console.error('[Server] Analyze Bill - Body Parse Error:', error.message);
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Invalid request body' }));
+            return;
+          }
+        }
+        return handleApiAnalyzeBill(req, res);
       }
-    }
-    return handleApiAnalyzeBill(req, res);
-  }
+
+      if (pathname === '/api/analyze-document') {
+        if (req.method === 'POST') {
+          try {
+            req.body = await parseRequestBody(req);
+          } catch (error) {
+            console.error('[Server] Analyze Document - Body Parse Error:', error.message);
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Invalid request body' }));
+            return;
+          }
+        }
+        return analyzeDocumentHandler(req, res);
+      }
 
   // Email tracking routes
   if (pathname === '/api/email/sendgrid-send') {
