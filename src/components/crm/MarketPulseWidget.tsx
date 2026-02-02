@@ -32,16 +32,11 @@ export default function MarketPulseWidget() {
         }
 
         if (gridData.metrics) {
-          // Calculate a simulated "reserves" based on actual vs forecast or other metrics
-          // For now, let's just use a reasonable number if we don't have direct reserves
-          const load = gridData.metrics.actual_load
-          const forecast = gridData.metrics.forecast_load
-          const diff = forecast - load
-          
           setPrices(prev => ({
             ...prev,
-            reserves: Math.floor(load / 10), // Placeholder logic for visual pulse
-            scarcity: +(Math.abs(diff / 1000)).toFixed(1)
+            reserves: gridData.metrics.reserves ?? Math.floor(gridData.metrics.actual_load / 10),
+            scarcity: gridData.metrics.scarcity_prob ?? +(Math.abs((gridData.metrics.forecast_load - gridData.metrics.actual_load) / 1000)).toFixed(1),
+            capacity: gridData.metrics.total_capacity
           }))
         }
         
@@ -55,6 +50,8 @@ export default function MarketPulseWidget() {
     const interval = setInterval(fetchMarketData, 30000) // Update every 30 seconds
     return () => clearInterval(interval)
   }, [])
+
+  const reservePercentage = prices.capacity ? Math.min(100, Math.max(0, (prices.reserves / prices.capacity) * 100)) : 65;
 
   return (
     <div className="space-y-4">
@@ -70,14 +67,14 @@ export default function MarketPulseWidget() {
         <div className="p-3 rounded-2xl bg-zinc-900/40 border border-white/5 backdrop-blur-xl space-y-1">
           <span className="text-[9px] font-mono text-zinc-500 uppercase">LZ_HOUSTON</span>
           <div className="flex items-baseline gap-1">
-            <span className="text-sm font-mono font-medium text-white tabular-nums">${prices.houston}</span>
+            <span className="text-sm font-mono font-medium text-white tabular-nums">${prices.houston.toFixed(2)}</span>
             <span className="text-[8px] font-mono text-zinc-600">MWh</span>
           </div>
         </div>
         <div className="p-3 rounded-2xl bg-zinc-900/40 border border-white/5 backdrop-blur-xl space-y-1">
           <span className="text-[9px] font-mono text-zinc-500 uppercase">LZ_NORTH</span>
           <div className="flex items-baseline gap-1">
-            <span className="text-sm font-mono font-medium text-white tabular-nums">${prices.north}</span>
+            <span className="text-sm font-mono font-medium text-white tabular-nums">${prices.north.toFixed(2)}</span>
             <span className="text-[8px] font-mono text-zinc-600">MWh</span>
           </div>
         </div>
@@ -89,13 +86,13 @@ export default function MarketPulseWidget() {
             <TrendingUp size={14} className="text-[#002FA7]" />
             <span className="text-[10px] font-mono uppercase tracking-wider">Grid Reserves</span>
           </div>
-          <span className="text-xs font-mono text-white tabular-nums">{prices.reserves} MW</span>
+          <span className="text-xs font-mono text-white tabular-nums">{prices.reserves.toLocaleString()} MW</span>
         </div>
         
         <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
           <div 
             className="h-full bg-[#002FA7] transition-all duration-1000" 
-            style={{ width: '65%' }}
+            style={{ width: `${reservePercentage}%` }}
           />
         </div>
 
