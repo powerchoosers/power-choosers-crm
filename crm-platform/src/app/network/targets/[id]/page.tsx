@@ -19,8 +19,8 @@ import { ArrowUpDown, Clock, Plus, Phone, Mail, MoreHorizontal, Check, Radar, Us
 import { motion, AnimatePresence } from 'framer-motion'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
-import { useContacts, useContactsCount, Contact } from '@/hooks/useContacts'
-import { useAccounts, useAccountsCount, Account } from '@/hooks/useAccounts'
+import { useContacts, useContactsCount, useDeleteContacts, Contact } from '@/hooks/useContacts'
+import { useAccounts, useAccountsCount, useDeleteAccounts, Account } from '@/hooks/useAccounts'
 import { useTarget } from '@/hooks/useTargets'
 import { useTableState } from '@/hooks/useTableState'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -28,6 +28,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
+import BulkActionDeck from '@/components/network/BulkActionDeck'
+import DestructModal from '@/components/network/DestructModal'
 import FilterCommandDeck from '@/components/network/FilterCommandDeck'
 import { ForensicTableSkeleton } from '@/components/network/ForensicTableSkeleton'
 import Link from 'next/link'
@@ -57,6 +59,8 @@ export default function TargetDetailPage() {
   const { id } = useParams() as { id: string }
   const [isMounted, setIsMounted] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = useState('')
 
@@ -114,6 +118,9 @@ export default function TargetDetailPage() {
   )
   const accountCount = useAccountsCount(searchQuery, filters, isAccountList ? id : undefined, isAccountList && !!target)
 
+  const { mutateAsync: deleteContacts } = useDeleteContacts()
+  const { mutateAsync: deleteAccounts } = useDeleteAccounts()
+
   const query = isPeopleList ? contactQuery : accountQuery
   const data = useMemo(() => {
     if (isPeopleList) return contactQuery.data?.pages.flatMap(page => page.contacts) || []
@@ -149,6 +156,40 @@ export default function TargetDetailPage() {
       return [...prev, { id: columnId, value }]
     })
     setPage(0)
+  }
+
+  const selectedCount = Object.keys(rowSelection).length
+
+  const handleSelectCount = async (count: number) => {
+    const newSelection: RowSelectionState = {}
+    for (let i = 0; i < count; i++) {
+      newSelection[i] = true
+    }
+    setRowSelection(newSelection)
+  }
+
+  const handleBulkAction = async (action: string) => {
+    if (action === 'delete') {
+      setIsDestructModalOpen(true)
+    } else {
+      console.log(`Executing ${action} for ${selectedCount} nodes`)
+      // Implement other actions as needed
+    }
+  }
+
+  const handleConfirmPurge = async () => {
+    const selectedIndices = Object.keys(rowSelection).map(Number)
+    const selectedIds = selectedIndices.map(index => data[index]?.id).filter(Boolean)
+    
+    if (selectedIds.length > 0) {
+      if (isPeopleList) {
+        await deleteContacts(selectedIds)
+      } else {
+        await deleteAccounts(selectedIds)
+      }
+      setRowSelection({})
+      setIsDestructModalOpen(false)
+    }
   }
 
   // Column definitions for People
@@ -460,6 +501,7 @@ export default function TargetDetailPage() {
         pageIndex,
         pageSize
       },
+      rowSelection,
     },
     onPaginationChange: (updater) => {
       if (typeof updater === 'function') {
@@ -467,6 +509,7 @@ export default function TargetDetailPage() {
         setPage(newState.pageIndex)
       }
     },
+    onRowSelectionChange: setRowSelection,
     manualPagination: false,
     pageCount,
     getCoreRowModel: getCoreRowModel(),
@@ -617,6 +660,21 @@ export default function TargetDetailPage() {
           </div>
         </div>
       </div>
+
+      <BulkActionDeck 
+        selectedCount={selectedCount}
+        totalAvailable={totalRecords}
+        onClear={() => setRowSelection({})}
+        onAction={handleBulkAction}
+        onSelectCount={handleSelectCount}
+      />
+
+      <DestructModal 
+        isOpen={isDestructModalOpen}
+        onClose={() => setIsDestructModalOpen(false)}
+        onConfirm={handleConfirmPurge}
+        count={selectedCount}
+      />
     </div>
   )
 }
