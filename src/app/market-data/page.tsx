@@ -1,13 +1,15 @@
 'use client'
 
 import { motion } from 'framer-motion';
-import { AlertTriangle, Activity, Menu, X } from 'lucide-react';
+import { AlertTriangle, Activity, Menu, X, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { useMarketPulse } from '@/hooks/useMarketPulse';
 
 export default function MarketData() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const { data: marketData, isError, error } = useMarketPulse();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -16,6 +18,8 @@ export default function MarketData() {
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
+
+  const displayPrice = marketData?.prices?.houston?.toFixed(2) || "24.15";
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-[#002FA7]">
@@ -102,14 +106,21 @@ export default function MarketData() {
             initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
             className="col-span-1 md:col-span-2 p-10 rounded-3xl bg-zinc-900/50 border border-white/10 backdrop-blur-md relative overflow-hidden"
           >
-            <div className="absolute top-6 right-6 flex items-center gap-2 text-[#002FA7] animate-pulse">
-              <span className="h-2 w-2 rounded-full bg-[#002FA7]"></span>
-              <span className="text-xs font-mono uppercase tracking-widest">Live Feed</span>
-            </div>
+            {isError ? (
+              <div className="absolute top-6 right-6 flex items-center gap-2 text-rose-500 animate-pulse">
+                <AlertCircle className="h-4 w-4" />
+                <span className="text-xs font-mono uppercase tracking-widest">error in read</span>
+              </div>
+            ) : (
+              <div className="absolute top-6 right-6 flex items-center gap-2 text-[#002FA7] animate-pulse">
+                <span className="h-2 w-2 rounded-full bg-[#002FA7]"></span>
+                <span className="text-xs font-mono uppercase tracking-widest">Live Feed</span>
+              </div>
+            )}
             
             <h3 className="text-zinc-500 font-mono text-sm uppercase tracking-widest mb-2">ERCOT System Lambda</h3>
             <div className="flex items-baseline gap-4">
-              <span className="text-8xl font-bold tracking-tighter font-mono">$24.15</span>
+              <span className="text-8xl font-bold tracking-tighter font-mono">${displayPrice}</span>
               <span className="text-xl text-zinc-500">/ MWh</span>
             </div>
             

@@ -1,5 +1,5 @@
 'use client'
-import { Clock, Sun, Activity } from 'lucide-react';
+import { Clock, Sun, Activity, AlertCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { calculateVolatilityIndex } from '@/lib/market-mapping';
 
@@ -10,7 +10,8 @@ export default function TelemetryWidget({ location = 'LZ_NORTH' }: { location?: 
     reserves: 3450,
     capacity: 85000,
     scarcity: 4.2,
-    loading: true
+    loading: true,
+    error: false
   });
   
   useEffect(() => {
@@ -61,10 +62,12 @@ export default function TelemetryWidget({ location = 'LZ_NORTH' }: { location?: 
           reserves: gridData.metrics?.reserves ?? 3450,
           capacity: gridData.metrics?.total_capacity ?? 85000,
           scarcity: gridData.metrics?.scarcity_prob ?? 4.2,
-          loading: false
+          loading: false,
+          error: false
         });
       } catch (error) {
         console.error('Failed to fetch market telemetry:', error);
+        setMetrics(prev => ({ ...prev, loading: false, error: true }));
       }
     }
 
@@ -82,6 +85,22 @@ export default function TelemetryWidget({ location = 'LZ_NORTH' }: { location?: 
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-2">
+          {metrics.error ? (
+            <div className="flex items-center gap-1.5 text-rose-500 animate-pulse">
+              <AlertCircle size={10} />
+              <span className="text-[9px] font-mono uppercase tracking-widest">error in read</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 text-[#002FA7] animate-pulse">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#002FA7]" />
+              <span className="text-[9px] font-mono uppercase tracking-widest">Live Telemetry</span>
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div className="p-3 rounded-2xl bg-zinc-900/40 border border-white/5 backdrop-blur-xl space-y-2">
           <div className="flex items-center gap-2 text-zinc-500">
