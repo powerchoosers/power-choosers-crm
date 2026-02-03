@@ -13,6 +13,7 @@ import { useUpsertContact } from '@/hooks/useContacts';
 import { useUpsertAccount } from '@/hooks/useAccounts';
 import { useTargets, useCreateTarget } from '@/hooks/useTargets';
 import { Input } from '@/components/ui/input';
+import { useQueryClient } from '@tanstack/react-query';
 
 // --- FORENSIC TYPES ---
 type ImportVector = 'CONTACTS' | 'ACCOUNTS';
@@ -76,6 +77,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
   const [isAddingNewList, setIsAddingNewList] = useState(false);
   const [newListName, setNewListName] = useState('');
 
+  const queryClient = useQueryClient();
   const { data: targets } = useTargets();
   const createTargetList = useCreateTarget();
   const upsertContact = useUpsertContact();
@@ -384,8 +386,11 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
     setStep('PROCESSING');
     let successCount = 0;
     let errorCount = 0;
+    let listAddCount = 0;
+    let listAddErrors = 0;
 
     const total = csvData.length;
+    const selectedListName = targets?.find(t => t.id === selectedListId)?.name;
     
     for (let i = 0; i < csvData.length; i++) {
       const row = csvData[i];
@@ -431,11 +436,32 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
           
           // Add to list if selected
           if (selectedListId && result.id) {
-            await supabase.from('list_members').insert({
-              listId: selectedListId,
-              targetId: result.id,
-              targetType: 'people'
-            });
+            // Check if already in list
+            const { data: existing } = await supabase
+              .from('list_members')
+              .select('id')
+              .eq('listId', selectedListId)
+              .eq('targetId', result.id)
+              .maybeSingle();
+            
+            if (!existing) {
+              const { error: listError } = await supabase.from('list_members').insert({
+                id: crypto.randomUUID(),
+                listId: selectedListId,
+                targetId: result.id,
+                targetType: 'people'
+              });
+              
+              if (listError) {
+                console.error('Error adding to list:', listError);
+                listAddErrors++;
+              } else {
+                listAddCount++;
+              }
+            } else {
+              // Already in list, count as skipped duplicate
+              listAddErrors++;
+            }
           }
         } else {
           // Process Account
@@ -469,11 +495,32 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
           
           // Add to list if selected
           if (selectedListId && result.id) {
-            await supabase.from('list_members').insert({
-              listId: selectedListId,
-              targetId: result.id,
-              targetType: 'account'
-            });
+            // Check if already in list
+            const { data: existing } = await supabase
+              .from('list_members')
+              .select('id')
+              .eq('listId', selectedListId)
+              .eq('targetId', result.id)
+              .maybeSingle();
+            
+            if (!existing) {
+              const { error: listError } = await supabase.from('list_members').insert({
+                id: crypto.randomUUID(),
+                listId: selectedListId,
+                targetId: result.id,
+                targetType: 'account'
+              });
+              
+              if (listError) {
+                console.error('Error adding to list:', listError);
+                listAddErrors++;
+              } else {
+                listAddCount++;
+              }
+            } else {
+              // Already in list, count as skipped duplicate
+              listAddErrors++;
+            }
           }
         }
         successCount++;
@@ -485,7 +532,18 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
       setProgress(Math.round(((i + 1) / total) * 100));
     }
 
-    toast.success(`Import complete: ${successCount} successful, ${errorCount} failed.`);
+    // Invalidate queries to refresh counts
+    queryClient.invalidateQueries({ queryKey: ['targets'] });
+    queryClient.invalidateQueries({ queryKey: ['contacts'] });
+    queryClient.invalidateQueries({ queryKey: ['accounts'] });
+
+    // Show success toasts
+    toast.success(`Import complete: ${successCount} ${importVector === 'CONTACTS' ? 'contacts' : 'accounts'} processed${errorCount > 0 ? `, ${errorCount} failed` : ''}.`);
+    
+    if (selectedListId && listAddCount > 0) {
+      toast.success(`${listAddCount} ${importVector === 'CONTACTS' ? 'contacts' : 'accounts'} added to list: "${selectedListName}"${listAddErrors > 0 ? ` (${listAddErrors} duplicates skipped)` : ''}`);
+    }
+    
     setIsProcessing(false);
     onClose();
   };
