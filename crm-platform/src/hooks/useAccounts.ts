@@ -377,6 +377,7 @@ export function useCreateAccount() {
         employees: parseInt(newAccount.employees) || null,
         city: newAccount.city || newAccount.location?.split(',')[0]?.trim(),
         state: newAccount.state || newAccount.location?.split(',')[1]?.trim(),
+        description: newAccount.description || '',
         metadata: {
           sqft: newAccount.sqft,
           occupancy: newAccount.occupancy

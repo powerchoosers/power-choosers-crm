@@ -55,14 +55,21 @@ The platform has transitioned from **Firebase/Firestore** to **Supabase (Postgre
 - **Unified Contacts**: The legacy `people` and `contacts` collections have been merged into a single `contacts` table in Supabase.
 - **Location Data**: `city` and `state` are now top-level columns in the `contacts` table, indexed for performance.
 
-### 2. Data Mapping & Normalization
+### 3. Data Mapping & Normalization
 Due to varying structures in legacy data, we use a normalization layer in our hooks (see `useContacts.ts`):
 - **Name Resolution**: We prioritize `firstName`/`lastName` columns, then fall back to `first_name`/`last_name` (underscore format), and finally check nested paths in `metadata` (e.g., `metadata.general.firstName`).
 - **Location Resolution**: We prioritize the specific `city`/`state` columns on the contact record. If absent, we fall back to the linked Account's location to ensure no "Unknown" gaps.
 - **Metadata Parsing**: In some cases, Supabase returns the `metadata` column as a stringified JSON string. We use `normalizeMetadata` to safely parse these values.
 - **Energy Data**: Account-level energy metrics (Strike Price, Annual Usage, etc.) are promoted to top-level columns in the `accounts` table for performance.
 
-### 3. Market Telemetry & Forensic Analysis
+### 4. Bulk Data Ingestion (BulkImportModal)
+The platform features a high-performance CSV ingestion system with intelligent field mapping:
+- **Persistent Mapping Caching**: Field mappings are cached in `localStorage` using vector-specific keys (`nodal_import_mapping_CONTACTS` vs. `nodal_import_mapping_ACCOUNTS`). This ensures that re-uploading similar CSV structures requires zero reconfiguration.
+- **Forensic Log Integration**: The `description` field for accounts is mapped as "Forensic Log / Description" to align with the `FORENSIC_LOG_STREAM` component on Account Dossier pages.
+- **Automated Mapping Recovery**: The system prioritizes user-defined cached mappings over automated field detection to maintain consistency across batches.
+- **Schema Parity Rule**: When adding new fields to the CRM (Accounts or Contacts), they **MUST** be added to the `ACCOUNT_FIELDS` or `CONTACT_FIELDS` arrays in `BulkImportModal.tsx` and the corresponding ingestion logic to maintain parity.
+
+### 5. Market Telemetry & Forensic Analysis
 - **Telemetry Storage**: We store real-time ERCOT market data in the `market_telemetry` table, throttled to 2x daily (AM/PM) to preserve storage.
 - **Vector Search**: The table includes a `vector(768)` embedding column (`embedding`) generated from the market summary string.
 - **Market Zone Resolution**: We use `market-mapping.ts` to resolve a contact or account's physical location (City/State) to its respective ERCOT Load Zone (North, Houston, West, South). This allows for context-aware market analysis.

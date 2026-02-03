@@ -1,4 +1,29 @@
 
+### Industry Filtering & Logistics Migration
+- **Status**: Completed
+- **Description**: Migrated logistics and warehouse industries into a dedicated high-level filter vector for enhanced forensic search.
+- **Actions**:
+  - [x] **Industry Vector Expansion**: Created a dedicated `Logistics & Warehouse` vector in `industry-mapping.ts`.
+  - [x] **Mapping Consolidation**: Pulled logistics-related sub-industries (Cross-border, 3PL, Transportation, Warehousing) out of the generic `Services` vector and grouped them.
+  - [x] **Keyword Audit**: Included additional high-impact keywords like `distribution` and `supply chain` to capture missing records identified in Supabase.
+  - [x] **UI Integration**: Verified that `FilterCommandDeck.tsx` dynamically picks up the new vector, providing a dedicated filter button across all network pages.
+  - [x] **Data Ingestion Parity**: Confirmed `BulkImportModal.tsx` supports the industry field mapping for future logistics data ingestion.
+
+### Bulk Import Description & Mapping Caching
+- **Status**: Completed
+- **Description**: Enhanced the Bulk Import system with company description mapping and persistent field mapping caching.
+- **Actions**:
+  - [x] **Description Mapping**: 
+    - [x] Added `description` field to `ACCOUNT_FIELDS` schema in `BulkImportModal.tsx`.
+    - [x] Labeled as "Forensic Log / Description" to align with the `FORENSIC_LOG_STREAM` component on Account Dossier pages.
+    - [x] Updated ingestion logic to map CSV columns to the `description` field for Account vectors.
+  - [x] **Persistent Mapping Caching**:
+    - [x] Implemented `localStorage`-based caching for CSV field mappings.
+    - [x] Unique cache keys for `CONTACTS` and `ACCOUNTS` import vectors to prevent mapping collisions.
+    - [x] Automated mapping recovery: Loads previously saved mappings when a new CSV is uploaded.
+    - [x] Real-time updates: Saves mapping changes immediately as the user calibrates fields.
+    - [x] Prioritizes user-defined cached mappings over automated field detection.
+
 ### Sitewide Layout Consistency
 - **Status**: Completed
 - **Description**: Standardized the layout across all pages by resolving uneven padding issues caused by scrollbar reservation.

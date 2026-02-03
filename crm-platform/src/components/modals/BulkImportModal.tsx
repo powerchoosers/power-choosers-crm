@@ -54,6 +54,7 @@ const ACCOUNT_FIELDS = [
   { id: 'energy_supplier', label: 'Current Supplier', required: false },
   { id: 'annual_usage', label: 'Annual Usage (kWh)', required: false },
   { id: 'contract_end', label: 'Contract End Date', required: false },
+  { id: 'description', label: 'Forensic Log / Description', required: false },
 ];
 
 export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
@@ -79,6 +80,29 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
   const createTargetList = useCreateTarget();
   const createContact = useCreateContact();
   const createAccount = useCreateAccount();
+
+  // --- LOGIC: CACHED MAPPINGS ---
+  const getCacheKey = (vector: ImportVector | null) => `nodal_import_mapping_${vector}`;
+
+  const saveMappingToCache = (vector: ImportVector | null, mapping: Record<string, string>) => {
+    if (!vector) return;
+    try {
+      localStorage.setItem(getCacheKey(vector), JSON.stringify(mapping));
+    } catch (e) {
+      console.error('Failed to cache mapping:', e);
+    }
+  };
+
+  const loadMappingFromCache = (vector: ImportVector | null): Record<string, string> => {
+    if (!vector) return {};
+    try {
+      const cached = localStorage.getItem(getCacheKey(vector));
+      return cached ? JSON.parse(cached) : {};
+    } catch (e) {
+      console.error('Failed to load cached mapping:', e);
+      return {};
+    }
+  };
 
   // Reset state on close
   useEffect(() => {
@@ -160,9 +184,17 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                 
                 // --- PRE-CALIBRATE MAPPING BEFORE TRANSITION ---
                 const newMapping: Record<string, string> = {};
+                const cachedMapping = loadMappingFromCache(importVector);
                 const targetFields = importVector === 'CONTACTS' ? CONTACT_FIELDS : ACCOUNT_FIELDS;
                 
                 headers.forEach(header => {
+                  // 1. Try Cached Mapping First
+                  if (cachedMapping[header.raw]) {
+                    newMapping[header.raw] = cachedMapping[header.raw];
+                    return;
+                  }
+
+                  // 2. Fallback to Auto-Detection
                   const headerLower = header.raw.toLowerCase();
                   const match = targetFields.find(f => 
                     headerLower.includes(f.label.toLowerCase()) || 
@@ -172,6 +204,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                   if (match) newMapping[header.raw] = match.id;
                 });
                 setFieldMapping(newMapping);
+                saveMappingToCache(importVector, newMapping);
               }
               
               // Only transition once everything is ready
@@ -311,6 +344,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
             contractEnd: mappedData.contract_end || null,
             employees: mappedData.employee_count || '',
             annualUsage: mappedData.annual_usage || '',
+            description: mappedData.description || '',
             metadata: {
               linkedin_url: mappedData.linkedin_url,
               service_address: mappedData.service_address,
@@ -561,7 +595,11 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                             </div>
                             <Select 
                               value={fieldMapping[header.raw]} 
-                              onValueChange={(val) => setFieldMapping(prev => ({ ...prev, [header.raw]: val }))}
+                              onValueChange={(val) => {
+                                const updatedMapping = { ...fieldMapping, [header.raw]: val };
+                                setFieldMapping(updatedMapping);
+                                saveMappingToCache(importVector, updatedMapping);
+                              }}
                             >
                               <SelectTrigger className="h-9 w-full max-w-[240px] bg-black/40 border-white/10 text-xs font-mono focus:ring-1 focus:ring-[#002FA7] focus:border-[#002FA7] text-right">
                                 <SelectValue placeholder="-- SKIP --" />
