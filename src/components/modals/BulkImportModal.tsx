@@ -9,8 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
-import { useCreateContact } from '@/hooks/useContacts';
-import { useCreateAccount } from '@/hooks/useAccounts';
+import { useUpsertContact } from '@/hooks/useContacts';
+import { useUpsertAccount } from '@/hooks/useAccounts';
 import { useTargets, useCreateTarget } from '@/hooks/useTargets';
 import { Input } from '@/components/ui/input';
 
@@ -78,8 +78,65 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
 
   const { data: targets } = useTargets();
   const createTargetList = useCreateTarget();
-  const createContact = useCreateContact();
-  const createAccount = useCreateAccount();
+  const upsertContact = useUpsertContact();
+  const upsertAccount = useUpsertAccount();
+
+  const [analysis, setAnalysis] = useState<{ new: number; existing: number; total: number } | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // --- LOGIC: ANALYZE CSV FOR ENRICHMENT ---
+  const runPreImportAnalysis = async () => {
+    if (!csvData.length || !importVector) return;
+    
+    setIsAnalyzing(true);
+    let existingCount = 0;
+    
+    try {
+      // We check in batches of 50 to avoid URL length issues or payload limits
+      const batchSize = 50;
+      for (let i = 0; i < csvData.length; i += batchSize) {
+        const batch = csvData.slice(i, i + batchSize);
+        const mappedIdentifiers: string[] = [];
+
+        batch.forEach(row => {
+          Object.entries(fieldMapping).forEach(([csvHeader, nodalId]) => {
+            if (nodalId === (importVector === 'CONTACTS' ? 'email' : 'website')) {
+              const val = row[csvHeader];
+              if (val) mappedIdentifiers.push(val);
+            }
+          });
+        });
+
+        if (mappedIdentifiers.length > 0) {
+          const { data, error } = await supabase
+            .from(importVector === 'CONTACTS' ? 'contacts' : 'accounts')
+            .select('id')
+            .in(importVector === 'CONTACTS' ? 'email' : 'domain', mappedIdentifiers);
+
+          if (!error && data) {
+            existingCount += data.length;
+          }
+        }
+      }
+
+      setAnalysis({
+        total: csvData.length,
+        existing: existingCount,
+        new: csvData.length - existingCount
+      });
+    } catch (err) {
+      console.error('Analysis error:', err);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  // Run analysis when mapping or data changes
+  useEffect(() => {
+    if (step === 'CALIBRATION' && csvData.length > 0 && Object.keys(fieldMapping).length > 0) {
+      runPreImportAnalysis();
+    }
+  }, [step, fieldMapping]);
 
   // --- LOGIC: CACHED MAPPINGS ---
   const getCacheKey = (vector: ImportVector | null) => `nodal_import_mapping_${vector}`;
@@ -319,7 +376,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
             }
           };
 
-          const result = await createContact.mutateAsync(contactData as any);
+          const result = await upsertContact.mutateAsync(contactData as any);
           
           // Add to list if selected
           if (selectedListId && result.id) {
@@ -357,7 +414,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
             }
           };
 
-          const result = await createAccount.mutateAsync(accountData as any);
+          const result = await upsertAccount.mutateAsync(accountData as any);
           
           // Add to list if selected
           if (selectedListId && result.id) {
@@ -764,12 +821,32 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                   )}
                 </div>
 
-                <div className="mt-8 flex justify-end flex-none pt-4 border-t border-white/5">
+                <div className="mt-8 flex flex-col gap-4 flex-none pt-4 border-t border-white/5">
+                  {analysis && (
+                    <div className="flex items-center justify-between px-4 py-3 bg-[#002FA7]/5 border border-[#002FA7]/20 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-[#002FA7]/20 flex items-center justify-center">
+                          <Database className="w-4 h-4 text-[#002FA7]" />
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Ingestion Analysis</div>
+                          <div className="text-sm font-bold text-white">
+                            {analysis.new} New Nodes // {analysis.existing} Enrichments
+                          </div>
+                        </div>
+                      </div>
+                      {isAnalyzing && (
+                        <Loader2 className="w-4 h-4 text-[#002FA7] animate-spin" />
+                      )}
+                    </div>
+                  )}
+                  
                   <Button 
                     className="w-full bg-white text-black hover:bg-zinc-200 font-mono text-[10px] font-bold uppercase tracking-[0.2em]"
                     onClick={handleInitiateIngestion}
+                    disabled={isAnalyzing}
                   >
-                    [ INITIATE_INGESTION ]
+                    {isAnalyzing ? '[ ANALYZING_PAYLOAD... ]' : '[ INITIATE_INGESTION ]'}
                   </Button>
                 </div>
               </motion.div>
