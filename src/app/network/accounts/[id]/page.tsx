@@ -292,6 +292,7 @@ export default function AccountDossierPage() {
                 <AnimatePresence>
                   {isEditing && activeEditField === 'logo' && (
                     <motion.div
+                      key="logo-edit"
                       initial={{ width: 0, opacity: 0, x: -10 }}
                       animate={{ width: "auto", opacity: 1, x: 0 }}
                       exit={{ width: 0, opacity: 0, x: -10 }}
@@ -348,6 +349,7 @@ export default function AccountDossierPage() {
                       <AnimatePresence>
                         {isEditing && activeEditField === 'domain' && (
                           <motion.div
+                            key="domain-edit"
                             initial={{ width: 0, opacity: 0 }}
                             animate={{ width: "auto", opacity: 1 }}
                             exit={{ width: 0, opacity: 0 }}
@@ -393,6 +395,7 @@ export default function AccountDossierPage() {
                       <AnimatePresence>
                         {isEditing && activeEditField === 'linkedin' && (
                           <motion.div
+                            key="linkedin-edit"
                             initial={{ width: 0, opacity: 0 }}
                             animate={{ width: "auto", opacity: 1 }}
                             exit={{ width: 0, opacity: 0 }}
@@ -462,6 +465,7 @@ export default function AccountDossierPage() {
                     <AnimatePresence>
                       {showSynced && (
                         <motion.div 
+                          key="synced-indicator"
                           initial={{ opacity: 0, scale: 0.9, filter: "blur(4px)" }}
                           animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
                           exit={{ opacity: 0, scale: 0.9, filter: "blur(4px)" }}

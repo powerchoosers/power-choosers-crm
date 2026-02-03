@@ -85,13 +85,15 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     async function loadCache() {
       if (typeof window === 'undefined') return;
       
+      // Clear current data immediately to prevent stale views when switching entities
+      setData([]);
+      setCompanySummary(null);
+      setScanStatus('idle');
+      setSearchTerm('');
+      setCurrentPage(1);
+      
       const key = domain || companyName;
-      if (!key) {
-        setData([]);
-        setCompanySummary(null);
-        setScanStatus('idle');
-        return;
-      }
+      if (!key) return;
 
       // 1. Try Supabase first (Persistent Cloud Cache)
       try {
@@ -995,6 +997,19 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                   </p>
                 </div>
               )}
+
+              {/* USAGE SUMMARY FOOTER */}
+              <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center text-[9px] font-mono text-zinc-600 uppercase tracking-widest px-1 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-1 h-1 rounded-full bg-[#002FA7] shadow-[0_0_8px_rgba(0,47,167,0.6)]" />
+                  Apollo_Node_Link
+                </div>
+                <div className="flex items-center gap-2">
+                  <span>Found: <span className="text-zinc-400 tabular-nums">{data.length}</span></span>
+                  <div className="w-1 h-1 rounded-full bg-zinc-800" />
+                  <span>Synced: <span className="text-zinc-400 tabular-nums">{data.filter(d => d.isMonitored).length}</span></span>
+                </div>
+              </div>
             </div>
           </div>
         )}
