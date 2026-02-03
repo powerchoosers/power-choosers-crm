@@ -1,6 +1,10 @@
 'use client'
 import React, { useMemo, useState, useEffect } from 'react';
 import { GoogleMap, useLoadScript, MarkerF, CircleF } from '@react-google-maps/api';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
+import { mapLocationToZone, ERCOT_ZONES } from '@/lib/market-mapping';
+import { useAuth } from '@/context/AuthContext';
 
 // 1. THE NODAL "STEALTH" SKIN
 // This JSON strips away parks, schools, and labels, leaving only the grid geometry.
@@ -44,14 +48,8 @@ const mapStyles = [
   },
 ];
 
-// MOCK DATA - Replace this with your Supabase fetch later
-const NODES = [
-  { id: 1, name: "Allen Brothers", lat: 32.7767, lng: -96.7970, status: "risk", load: "HIGH" }, // Dallas
-  { id: 2, name: "Tech Manufacturing", lat: 29.7604, lng: -95.3698, status: "protected", load: "MED" }, // Houston
-  { id: 3, name: "West TX Pumps", lat: 31.8460, lng: -102.3680, status: "prospect", load: "LOW" }, // Odessa
-];
-
 export default function InfrastructureMap() {
+  const { user, role, loading: authLoading } = useAuth();
   const { isLoaded } = useLoadScript({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY as string,
   });
@@ -62,6 +60,100 @@ export default function InfrastructureMap() {
     west: 45.20,
     south: 22.40
   });
+
+  // Fetch real contacts from Supabase
+  const { data: contactsData, isLoading: contactsLoading } = useInfiniteQuery({
+    queryKey: ['contacts-infrastructure', user?.email],
+    initialPageParam: 0,
+    queryFn: async ({ pageParam = 0 }) => {
+      if (!user) return { contacts: [], nextCursor: null };
+      
+      let query = supabase
+        .from('contacts')
+        .select('*, accounts(name, city, state, industry, annual_usage)', { count: 'exact' });
+
+      if (role !== 'admin' && user?.email) {
+        query = query.eq('ownerId', user.email);
+      }
+
+      const PAGE_SIZE = 1000; // Get as many as possible for the map
+      const from = pageParam * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      const { data, error, count } = await query.range(from, to);
+
+      if (error) throw error;
+
+      return {
+        contacts: data || [],
+        nextCursor: count && from + PAGE_SIZE < count ? pageParam + 1 : null
+      };
+    },
+    enabled: !!user && !authLoading,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+  });
+
+  // Flatten contacts and map to nodes
+  const nodes = useMemo(() => {
+    if (!contactsData) return [];
+    
+    return contactsData.pages.flatMap(page => page.contacts).map(contact => {
+      const account = Array.isArray(contact.accounts) ? contact.accounts[0] : contact.accounts;
+      
+      // Determine location - prioritizing metadata/direct fields if available
+      const city = contact.city || account?.city || '';
+      const state = contact.state || account?.state || '';
+      
+      // Map to ERCOT zone
+      const zone = mapLocationToZone(city, state);
+      
+      // Calculate Risk Status based on current prices
+      let status = 'prospect';
+      const currentPrice = zone === ERCOT_ZONES.HOUSTON ? prices.houston :
+                          zone === ERCOT_ZONES.WEST ? prices.west :
+                          zone === ERCOT_ZONES.SOUTH ? prices.south :
+                          prices.north;
+
+      // Logic: If price > $40 and load is high, mark as risk
+      const annualUsage = contact.annual_usage || account?.annual_usage || 0;
+      const load = annualUsage > 500000 ? 'HIGH' : annualUsage > 100000 ? 'MED' : 'LOW';
+
+      if (currentPrice > 40 && load === 'HIGH') {
+        status = 'risk';
+      } else if (load === 'HIGH' || load === 'MED') {
+        status = 'protected';
+      }
+
+      // Geocoding fallback: If no lat/lng, use approximate city coordinates
+      // In a real app, you'd have these stored. For now, we'll use the mock ones if match, 
+      // or approximate Texas center with slight jitter
+      let lat = contact.latitude || contact.lat;
+      let lng = contact.longitude || contact.lng;
+
+      if (!lat || !lng) {
+        // Simple city-based jitter for visualization if no real coords
+        const hash = (contact.id || '').split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0);
+        const jitterLat = (hash % 100) / 100;
+        const jitterLng = ((hash >> 4) % 100) / 100;
+        
+        // Base coords for Texas zones
+        if (zone === ERCOT_ZONES.HOUSTON) { lat = 29.7604 + jitterLat; lng = -95.3698 + jitterLng; }
+        else if (zone === ERCOT_ZONES.WEST) { lat = 31.8460 + jitterLat; lng = -102.3680 + jitterLng; }
+        else if (zone === ERCOT_ZONES.SOUTH) { lat = 29.4241 + jitterLat; lng = -98.4936 + jitterLng; }
+        else { lat = 32.7767 + jitterLat; lng = -96.7970 + jitterLng; }
+      }
+
+      return {
+        id: contact.id,
+        name: contact.name || account?.name || 'Unknown Asset',
+        lat,
+        lng,
+        status,
+        load,
+        zone
+      };
+    });
+  }, [contactsData, prices]);
 
   useEffect(() => {
     async function fetchMarketData() {
@@ -95,11 +187,18 @@ export default function InfrastructureMap() {
 
   const center = useMemo(() => ({ lat: 31.0000, lng: -99.0000 }), []); // Center on Texas
 
-  if (!isLoaded) return (
+  if (!isLoaded || authLoading || contactsLoading) return (
     <div className="h-full w-full flex items-center justify-center bg-zinc-900/10 backdrop-blur-sm">
-      <span className="text-xs font-mono text-[#002FA7] animate-pulse">
-        {'>'} ESTABLISHING_UPLINK...
-      </span>
+      <div className="flex flex-col items-center gap-4">
+        <span className="text-xs font-mono text-[#002FA7] animate-pulse">
+          {authLoading ? '> INITIALIZING_AUTH...' : contactsLoading ? '> RETRIEVING_GRID_ASSETS...' : '> ESTABLISHING_UPLINK...'}
+        </span>
+        {contactsLoading && (
+          <div className="w-48 h-1 bg-zinc-800 rounded-full overflow-hidden">
+            <div className="h-full bg-[#002FA7] animate-progress" />
+          </div>
+        )}
+      </div>
     </div>
   );
 
@@ -120,7 +219,7 @@ export default function InfrastructureMap() {
         }}
       >
         {/* RENDER NODES */}
-        {NODES.map((node) => (
+        {nodes.map((node) => (
           <React.Fragment key={node.id}>
             {/* The Pulse Effect for High Value Targets */}
             {node.status === 'risk' && (

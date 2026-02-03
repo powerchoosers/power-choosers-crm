@@ -43,22 +43,23 @@ export default function DestructModal({ isOpen, onClose, onConfirm, count }: Des
     };
   }, [isHolding, onConfirm]);
 
-  if (!isOpen) return null;
-
   return (
     <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-      >
+      {isOpen && (
         <motion.div
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.95, opacity: 0 }}
-          className="w-full max-w-md bg-zinc-950 border border-red-500/20 rounded-2xl shadow-2xl overflow-hidden"
+          key="destruct-modal-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
         >
+          <motion.div
+            key="destruct-modal-content"
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="w-full max-w-md bg-zinc-950 border border-red-500/20 rounded-2xl shadow-2xl overflow-hidden"
+          >
           {/* Header */}
           <div className="p-6 border-b border-white/5 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -127,6 +128,7 @@ export default function DestructModal({ isOpen, onClose, onConfirm, count }: Des
           <div className="h-1 bg-gradient-to-r from-transparent via-red-500/20 to-transparent" />
         </motion.div>
       </motion.div>
+      )}
     </AnimatePresence>
   );
 }

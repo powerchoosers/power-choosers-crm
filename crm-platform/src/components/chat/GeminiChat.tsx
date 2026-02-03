@@ -1111,6 +1111,7 @@ SELECT * FROM hybrid_search_accounts(
       <AnimatePresence>
         {showDiagnostics && (
           <motion.div
+            key="diagnostics-hud"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -1189,6 +1190,7 @@ SELECT * FROM hybrid_search_accounts(
       <AnimatePresence>
         {isHistoryOpen && (
           <motion.div
+            key="history-panel"
             initial={{ x: '-100%' }}
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}

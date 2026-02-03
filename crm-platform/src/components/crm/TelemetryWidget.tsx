@@ -85,22 +85,6 @@ export default function TelemetryWidget({ location = 'LZ_NORTH' }: { location?: 
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between px-1">
-        <div className="flex items-center gap-2">
-          {metrics.error ? (
-            <div className="flex items-center gap-1.5 text-rose-500 animate-pulse">
-              <AlertCircle size={10} />
-              <span className="text-[9px] font-mono uppercase tracking-widest">error in read</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 text-[#002FA7] animate-pulse">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#002FA7]" />
-              <span className="text-[9px] font-mono uppercase tracking-widest">Live Telemetry</span>
-            </div>
-          )}
-        </div>
-      </div>
-
       <div className="grid grid-cols-2 gap-3">
         <div className="p-3 rounded-2xl bg-zinc-900/40 border border-white/5 backdrop-blur-xl space-y-2">
           <div className="flex items-center gap-2 text-zinc-500">

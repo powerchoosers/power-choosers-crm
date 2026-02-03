@@ -36,17 +36,16 @@ export default function BulkActionDeck({ selectedCount, totalAvailable, onClear,
     setIsEditing(false);
   };
 
-  // Only render if items are selected
-  if (selectedCount === 0) return null;
-
   return (
     <AnimatePresence>
-      <motion.div 
-        initial={{ y: 100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 100, opacity: 0 }}
-        className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50"
-      >
+      {selectedCount > 0 && (
+        <motion.div 
+          key="bulk-action-deck"
+          initial={{ y: 100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 100, opacity: 0 }}
+          className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50"
+        >
         <div className="bg-zinc-950/90 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_0_50px_-10px_rgba(0,0,0,0.7)] p-2 pr-6 flex items-center gap-6 whitespace-nowrap">
           
           {/* 1. THE COUNTER & CLEAR */}
@@ -107,6 +106,7 @@ export default function BulkActionDeck({ selectedCount, totalAvailable, onClear,
 
         </div>
       </motion.div>
+      )}
     </AnimatePresence>
   );
 }

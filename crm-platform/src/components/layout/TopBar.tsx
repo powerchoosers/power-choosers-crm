@@ -351,7 +351,7 @@ export function TopBar() {
               <AnimatePresence mode="wait">
               {(!isActive || !isShowingCallBar) ? (
                   <motion.div
-                      key="search"
+                      key="search-container"
                       initial={{ opacity: 0, y: -20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}

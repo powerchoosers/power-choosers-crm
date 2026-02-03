@@ -140,7 +140,13 @@ export function RightPanel() {
               >
                 {/* 1. TELEMETRY (Targeting Mode) */}
                 <div className="space-y-3">
-                  <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Telemetry</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Telemetry</h3>
+                    <div className="flex items-center gap-1.5 text-[#002FA7] animate-pulse">
+                      <span className="h-1 w-1 rounded-full bg-[#002FA7]" />
+                      <span className="text-[9px] font-mono uppercase tracking-widest">Live</span>
+                    </div>
+                  </div>
                   <TelemetryWidget location={entityZone} />
                 </div>
 

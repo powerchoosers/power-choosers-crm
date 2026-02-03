@@ -149,28 +149,29 @@ export default function BillDebuggerPage() {
         <main className="relative z-10 flex-1 flex flex-col items-center justify-center w-full max-w-4xl mx-auto px-6 py-20 md:py-0">
             <AnimatePresence mode="wait">
                 {view === 'upload' && (
-                    <UploadView onUpload={handleUpload} />
+                    <UploadView key="upload" onUpload={handleUpload} />
                 )}
                 {view === 'console' && (
                     <ConsoleView 
+                        key="console"
                         messages={processMessages} 
                         onComplete={handleConsoleComplete} 
                     />
                 )}
                 {view === 'analyzing' && (
-                    <AnalyzingView />
+                    <AnalyzingView key="analyzing" />
                 )}
                 {view === 'email' && (
-                    <EmailCaptureView onComplete={() => {
+                    <EmailCaptureView key="email" onComplete={() => {
                         setView('success')
                         setFooterText('DIAGNOSTIC COMPLETE')
                     }} />
                 )}
                 {view === 'success' && extractedData && (
-                    <SuccessView data={extractedData} />
+                    <SuccessView key="success" data={extractedData} />
                 )}
                 {view === 'error' && (
-                    <ErrorView message={errorMsg} onRetry={() => {
+                    <ErrorView key="error" message={errorMsg} onRetry={() => {
                         setView('upload')
                         setIsProcessing(false)
                         setFooterText('Waiting for input stream...')
