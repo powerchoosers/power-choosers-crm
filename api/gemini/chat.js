@@ -1791,11 +1791,26 @@ export default async function handler(req, res) {
           ];
       
       // Ensure the last message is from the user if it's not already
-      if (currentMessages[currentMessages.length - 1].role !== 'user') {
-        currentMessages.push({ role: 'user', content: prompt });
+      if (currentMessages[currentMessages.length - 1].role !== 'user' && currentMessages[currentMessages.length - 1].role !== 'tool') {
+        const lastUserMsg = cleanedMessages.slice().reverse().find(m => m.role === 'user');
+        if (lastUserMsg) {
+          currentMessages.push({ role: 'user', content: lastUserMsg.content });
+        }
       }
 
-      console.log(`[AI Router] Calling OpenRouter with model: ${model}`);
+      const requestBody = {
+        model: model,
+        messages: currentMessages,
+        tools: openAiTools,
+        temperature: 0.7,
+        max_tokens: 2048,
+      };
+
+      if (jsonMode) {
+        requestBody.response_format = { type: 'json_object' };
+      }
+
+      console.log(`[AI Router] Calling OpenRouter with model: ${model}, jsonMode: ${!!jsonMode}`);
 
       // Loop for tool calls (max 10 turns)
       let turnCount = 0;
@@ -1812,17 +1827,13 @@ export default async function handler(req, res) {
             'HTTP-Referer': 'https://nodalpoint.io',
             'X-Title': 'Nodal Point CRM',
           },
-          body: JSON.stringify({
-            model: model,
-            messages: currentMessages,
-            tools: openAiTools,
-            temperature: 0.7,
-            max_tokens: 2048,
-          }),
+          body: JSON.stringify(requestBody),
         });
 
         if (!response.ok) {
           const errText = await response.text().catch(() => '');
+          console.error(`[AI Router] OpenRouter Error (${response.status}):`, errText);
+          console.error(`[AI Router] Request Body:`, JSON.stringify(requestBody, null, 2));
           throw new Error(`OpenRouter error: ${response.status} ${response.statusText}${errText ? ` - ${errText}` : ''}`);
         }
 
@@ -1989,7 +2000,7 @@ export default async function handler(req, res) {
       provider = 'openrouter';
     } else if (bodyModel.startsWith('sonar')) {
       provider = 'perplexity';
-    } else if (bodyModel.startsWith('openai/gpt-oss') || bodyModel.startsWith('nvidia/')) {
+    } else if (bodyModel.startsWith('openai/gpt-oss') || bodyModel.startsWith('nvidia/') || bodyModel.startsWith('meta-llama/') || bodyModel.startsWith('mistralai/') || bodyModel.startsWith('anthropic/')) {
       provider = 'openrouter';
     }
 
@@ -2113,6 +2124,9 @@ export default async function handler(req, res) {
       new Set(
         [
           preferredModel,
+          'gemini-2.5-flash-lite',
+          'gemini-2.5-flash',
+          'gemini-2.0-flash-lite-preview-02-05',
           'gemini-2.0-flash',
           'gemini-2.0-flash-thinking-exp-01-21',
           'gemini-2.0-pro-exp-02-05',
@@ -2206,6 +2220,7 @@ export default async function handler(req, res) {
           generationConfig: {
             maxOutputTokens: 2048,
             temperature: 0.7,
+            responseMimeType: jsonMode ? 'application/json' : 'text/plain',
           },
         });
 
