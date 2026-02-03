@@ -88,6 +88,27 @@
     - [x] **Deep Audit**: Identified and replaced hardcoded `rounded-full` instances with `rounded-2xl` in `GeminiChat`, `EmailList`, `SatelliteUplink`, `BulkImportModal`, `OrgIntelligence`, `DataIngestionCard`, `TaskManagement`, and all Dossier empty/error states.
     - [x] Preserved `rounded-full` ONLY for decorative status indicators, signal dots, and pulsing animations per forensic aesthetic requirements.
 
+### Infrastructure Map Migration & Real-Time Grid
+- **Status**: Completed
+- **Description**: Migrated the Infrastructure Map from mock data to real-time Supabase contacts and implemented dynamic risk visualization based on ERCOT market data.
+- **Actions**:
+  - [x] **Real-Time Data Layer**:
+    - [x] Replaced mock `MOCK_NODES` with live Supabase contact fetching (`useContacts` logic).
+    - [x] Implemented **Active Load Filtering**: Configured map to strictly display only contacts with associated `ACTIVE_LOAD` accounts (current clients).
+    - [x] Added inner join logic on `accounts` table to enforce status filtering.
+  - [x] **ERCOT Market Integration**:
+    - [x] Implemented `mapLocationToZone` utility to resolve contacts to ERCOT Load Zones (Houston, North, South, West) based on city/address.
+    - [x] **Expanded City Mapping**: Added comprehensive Texas city arrays (including Deer Park, Katy, Sugar Land, etc.) to `market-mapping.ts` to ensure accurate zone resolution for smaller municipalities.
+    - [x] Connected to `/api/market/ercot` endpoint for 60-second real-time pricing updates.
+  - [x] **Dynamic Visualization**:
+    - [x] Implemented price-based risk coloring (Green < $50, Yellow $50-$100, Red > $100).
+    - [x] Added geocoding fallback (city-based jitter) for contacts missing precise lat/lng coordinates.
+    - [x] Standardized map container with "Obsidian & Glass" aesthetic, fixed height, and Sync_Block footer.
+  - [x] **Bug Fixes**:
+    - [x] **Build Error**: Fixed TypeScript implicit `any` error in the contact ID hashing function (`InfrastructureMap.tsx`).
+    - [x] **Import Error**: Corrected `useAuth` import path to `@/context/AuthContext`.
+    - [x] **Animation**: Added missing `animate-progress` keyframes to `tailwind.config.ts`.
+
 ### Org Intelligence & Account Enrichment
 - **Status**: Completed
 - **Description**: Enhanced the Organizational Intelligence widget with account enrichment capabilities and resolved critical fetch and type errors.
