@@ -99,6 +99,24 @@
     - [x] **TypeScript Error**: Resolved a type mismatch in `OrgIntelligence.tsx` where `scanStatus` was being compared to incompatible states.
 100→    - [x] **Apollo Fetch Error**: Fixed a route mismatch in `server.js` that caused `/api/apollo/search-people` calls to fail.
 101→
+102→### Neural Scan & AI Script Generation
+103→- **Status**: Completed
+104→- **Description**: Fixed critical AI generation failures (400 errors) and implemented a robust fallback system with Gemini 2.5 Flash-Lite.
+105→- **Actions**:
+106→  - [x] **400 Error Resolution**:
+107→    - [x] Fixed a ReferenceError in `chat.js` where `prompt` was incorrectly scoped in the OpenRouter handler.
+108→    - [x] Corrected routing logic in `chat.js` to recognize `meta-llama/` and `mistralai/` prefixes for OpenRouter.
+109→    - [x] Enforced structured JSON output by adding `response_format` (OpenRouter) and `responseMimeType` (Gemini) headers.
+110→  - [x] **Gemini 2.5 Fallback**:
+111→    - [x] Integrated **Gemini 2.5 Flash-Lite** as the primary fallback and high-performance provider.
+112→    - [x] Updated model candidates to prioritize Gemini 2.5 for cost and speed efficiency.
+113→  - [x] **Bespoke Script Logic**:
+114→    - [x] Modified `useAI.ts` to inject contact-specific context (Name, Company) into the user prompt, forcing the AI to generate personalized scripts.
+115→    - [x] Switched the default model to **Llama 3.1 70B** on OpenRouter for superior script reasoning.
+116→  - [x] **Safety Protocols**:
+117→    - [x] Implemented a "Graceful Fallback" in `useAI.ts` that returns a high-quality default NEPQ script if the API is unreachable.
+118→    - [x] Added debug logging to `_supabase.js` and `chat.js` to monitor 401/406 authentication errors.
+101→
 102→### User Identity & Identity Migration
 103→- **Status**: Completed
 104→- **Description**: Migrated Lewis Patterson's system identity to the new Nodal Point domain and resolved read-only identity constraints.

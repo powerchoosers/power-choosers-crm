@@ -73,6 +73,9 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
         agent_name: profile?.firstName || 'Trey',
         agent_title: profile?.jobTitle || 'Energy Consultant',
         
+        // Context Type
+        is_account_only: metadata?.isAccountOnly || false,
+        
         // Contact/Account Context
         name: displayContact.name,
         title: displayContact.title,

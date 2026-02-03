@@ -20,7 +20,15 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
     initiateCall(account.companyPhone, { 
       name: account.name,
       account: account.name,
-      logoUrl: account.logoUrl
+      logoUrl: account.logoUrl,
+      industry: account.industry,
+      description: account.description,
+      location: account.location || account.city,
+      annualUsage: account.annualUsage,
+      supplier: account.electricitySupplier,
+      currentRate: account.currentRate,
+      contractEnd: account.contractEnd,
+      isAccountOnly: true
     })
   }
 
