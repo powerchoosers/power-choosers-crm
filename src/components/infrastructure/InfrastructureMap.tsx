@@ -133,7 +133,7 @@ export default function InfrastructureMap() {
 
       if (!lat || !lng) {
         // Simple city-based jitter for visualization if no real coords
-        const hash = (contact.id || '').split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0);
+        const hash = (contact.id || '').split('').reduce((a: number, b: string) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0);
         const jitterLat = (hash % 100) / 100;
         const jitterLng = ((hash >> 4) % 100) / 100;
         
