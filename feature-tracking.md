@@ -327,3 +327,18 @@
   - [x] **Auto-Recovery**: Implemented automatic device re-initialization on `TransportError (31009)` and `AccessTokenInvalid (20101)` errors.
   - [x] **Signaling Optimization**: Configured explicit `edge` regions (`ashburn`, `roaming`) and increased signaling timeouts for better reliability in browser environments.
   - [x] **UI Noise Reduction**: Suppressed repetitive "Transport Unavailable" toast notifications during background recovery attempts.
+
+### Satellite Uplink & Asset Intelligence
+- **Status**: Completed
+- **Description**: Enhanced the Satellite Uplink widget with name-based address resolution and automated forensic data enrichment for contacts and accounts.
+- **Actions**:
+  - [x] **Address Resolution**:
+    - [x] Implemented server-side Google Places API proxy (`/api/maps/search`) to secure API keys.
+    - [x] Added fallback logic to search by Name (Contact Name or Account Name) if the entity has no address on file.
+  - [x] **Forensic Enrichment**:
+    - [x] Auto-syncs discovered Address to the `address` field if currently empty.
+    - [x] Auto-syncs discovered Phone Number to the `phone` (Contact) or `company_phone` (Account) field if currently empty.
+    - [x] Updates Supabase directly and triggers a UI refetch via `onSyncComplete` callback.
+  - [x] **UI/UX Enhancement**:
+    - [x] Added real-time status updates ("Initiating Satellite Scan...", "Asset Intelligence Acquired").
+    - [x] Integrated `RightPanel` context awareness to pass `entityId`, `entityType`, and `currentPhone` props dynamically.

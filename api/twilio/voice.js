@@ -120,40 +120,31 @@ export default async function handler(req, res) {
         const base = envBase ? envBase.replace(/\/$/, '') : (host ? `${proto}://${host}` : 'https://nodalpoint.io');
 
         // Extract metadata and create initial call record to ensure it appears in CRM immediately
+        let contactId = '';
+        let accountId = '';
         if (CallSid && src.metadata) {
             try {
                 const meta = typeof src.metadata === 'string' ? JSON.parse(src.metadata) : src.metadata;
                 
-                // Only create if we have meaningful context
-                if (meta.id || meta.accountId) {
-                    const initialCallData = {
-                        callSid: CallSid,
-                        to: To,
-                        from: From,
-                        status: 'initiated', // Initial status
-                        direction: isInboundToBusiness ? 'inbound' : 'outbound',
-                        contactId: meta.type === 'contact' ? meta.id : undefined,
-                        contactName: meta.name,
-                        accountId: meta.accountId || (meta.type === 'account' ? meta.id : undefined),
-                        accountName: meta.accountName || (meta.type === 'account' ? meta.name : undefined),
-                        ownerId: meta.ownerId, 
-                        timestamp: new Date().toISOString()
-                    };
+                // Extract IDs for propagation to dial status callbacks
+                contactId = meta.contactId || '';
+                accountId = meta.accountId || '';
 
-                    // Fire and forget upsert
-                    // Use global fetch (Node 18+)
-                    fetch(`${base}/api/calls`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(initialCallData)
-                    }).catch(err => logger.error('[Voice] Failed to create initial call record:', err));
-                    
-                    logger.log(`[Voice] Initiated call record for ${CallSid} with context:`, meta);
+                // [REMOVED] Initial creation to match "only post on completion" requirement
+                // We still log the context for debugging
+                if (meta.id || meta.accountId) {
+                    logger.log(`[Voice] Call context for ${CallSid}:`, meta);
                 }
             } catch (e) {
                 logger.warn('[Voice] Failed to process call metadata:', e);
             }
         }
+
+        // Build callback URLs with CRM context if available
+        const callbackParams = new URLSearchParams();
+        if (contactId) callbackParams.append('contactId', contactId);
+        if (accountId) callbackParams.append('accountId', accountId);
+        const callbackQuery = callbackParams.toString() ? `?${callbackParams.toString()}` : '';
 
         logger.log(`[Voice Webhook] From: ${From || 'N/A'} To: ${To || 'N/A'} CallSid: ${CallSid || 'N/A'} inbound=${isInboundToBusiness} callerId=${callerIdForDial}`);
 
@@ -170,13 +161,13 @@ export default async function handler(req, res) {
                 hangupOnStar: false,
                 timeLimit: 14400,
                 // action must return TwiML; use dial-complete endpoint
-                action: `${base}/api/twilio/dial-complete`,
-                statusCallback: `${base}/api/twilio/dial-status`,
+                action: `${base}/api/twilio/dial-complete${callbackQuery}`,
+                statusCallback: `${base}/api/twilio/dial-status${callbackQuery}`,
                 statusCallbackEvent: 'initiated ringing answered completed',
                 // Note: statusCallbackMethod is not a valid attribute for Dial verb
                 // Dual-channel from answer
                 record: 'record-from-answer-dual',
-                recordingStatusCallback: `${base}/api/twilio/recording`,
+                recordingStatusCallback: `${base}/api/twilio/recording${callbackQuery}`,
                 recordingStatusCallbackMethod: 'POST'
             });
             // Small prompt to keep caller informed
@@ -201,13 +192,13 @@ export default async function handler(req, res) {
                 answerOnBridge: true,
                 hangupOnStar: false,
                 timeLimit: 14400,
-                action: `${base}/api/twilio/dial-complete`,
-                statusCallback: `${base}/api/twilio/dial-status`,
+                action: `${base}/api/twilio/dial-complete${callbackQuery}`,
+                statusCallback: `${base}/api/twilio/dial-status${callbackQuery}`,
                 statusCallbackEvent: 'initiated ringing answered completed',
                 // Note: statusCallbackMethod is not a valid attribute for Dial verb
                 // Dual-channel from answer
                 record: 'record-from-answer-dual',
-                recordingStatusCallback: `${base}/api/twilio/recording`,
+                recordingStatusCallback: `${base}/api/twilio/recording${callbackQuery}`,
                 recordingStatusCallbackMethod: 'POST'
             });
             dial.number(To);
@@ -222,13 +213,13 @@ export default async function handler(req, res) {
                 hangupOnStar: false,
                 timeLimit: 14400,
                 // action must return TwiML; use dial-complete endpoint
-                action: `${base}/api/twilio/dial-complete`,
-                statusCallback: `${base}/api/twilio/dial-status`,
+                action: `${base}/api/twilio/dial-complete${callbackQuery}`,
+                statusCallback: `${base}/api/twilio/dial-status${callbackQuery}`,
                 statusCallbackEvent: 'initiated ringing answered completed',
                 // Note: statusCallbackMethod is not a valid attribute for Dial verb
                 // Dual-channel from answer
                 record: 'record-from-answer-dual',
-                recordingStatusCallback: `${base}/api/twilio/recording`,
+                recordingStatusCallback: `${base}/api/twilio/recording${callbackQuery}`,
                 recordingStatusCallbackMethod: 'POST'
             });
             dial.client('agent');

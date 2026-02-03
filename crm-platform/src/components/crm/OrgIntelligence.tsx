@@ -248,7 +248,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           'Authorization': `Bearer ${session?.access_token}`
         },
         body: JSON.stringify({
-          contactIds: [person.id],
+          contacts: [person],
           revealEmails,
           revealPhones,
           company: { name: companySummary?.name || companyName, domain: domain }
@@ -340,6 +340,11 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       toast.success(`${person.name} ${typeLabel} revealed & synced`);
       
       // 3. Update local state
+      // Merge new phones with existing ones, avoiding duplicates
+      const newPhones = enriched.phones?.map((ph: { number: string }) => ph.number) || [];
+      const existingPhones = person.phones || [];
+      const allPhones = Array.from(new Set([...existingPhones, ...newPhones]));
+
       setData(prev => prev.map(p => 
         p.id === person.id ? { 
           ...p, 
@@ -352,7 +357,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           title: enriched.jobTitle || p.title,
           linkedin: enriched.linkedin || p.linkedin,
           location: enriched.location || p.location,
-          phones: enriched.phones?.map((ph: { number: string }) => ph.number) || p.phones
+          phones: allPhones
         } : p
       ));
     } catch (error) {

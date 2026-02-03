@@ -19,7 +19,7 @@ import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail, MoreH
 import { motion, AnimatePresence } from 'framer-motion'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
-import { useContacts, useContactsCount, Contact } from '@/hooks/useContacts'
+import { useContacts, useContactsCount, useDeleteContacts, Contact } from '@/hooks/useContacts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
@@ -80,6 +80,7 @@ export default function PeoplePage() {
 
   const { data, isLoading: queryLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useContacts(debouncedFilter, contactFilters)
   const { data: totalContacts } = useContactsCount(debouncedFilter, contactFilters)
+  const { mutateAsync: deleteContacts } = useDeleteContacts()
   const [sorting, setSorting] = useState<SortingState>([])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [isMounted, setIsMounted] = useState(false)
@@ -159,11 +160,15 @@ export default function PeoplePage() {
     }
   }
 
-  const handleConfirmPurge = () => {
-    console.log(`Purging ${selectedCount} nodes`)
-    setIsDestructModalOpen(false)
-    setRowSelection({})
-    // Implement actual deletion logic here
+  const handleConfirmPurge = async () => {
+    const selectedIndices = Object.keys(rowSelection).map(Number)
+    const selectedIds = selectedIndices.map(index => contacts[index]?.id).filter(Boolean)
+    
+    if (selectedIds.length > 0) {
+      await deleteContacts(selectedIds)
+      setRowSelection({})
+      setIsDestructModalOpen(false)
+    }
   }
 
   const columns = useMemo<ColumnDef<Contact>[]>(() => {

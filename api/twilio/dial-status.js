@@ -32,6 +32,16 @@ export default async function handler(req, res) {
       body = req.query || {};
     }
 
+    // Extract CRM context from query parameters
+    let contactId, accountId;
+    try {
+      const protocol = req.headers['x-forwarded-proto'] || 'https';
+      const host = req.headers.host || req.headers['x-forwarded-host'] || '';
+      const requestUrl = new URL(req.url, `${protocol}://${host}`);
+      contactId = requestUrl.searchParams.get('contactId');
+      accountId = requestUrl.searchParams.get('accountId');
+    } catch (_) {}
+
     // Determine the dial status event - prioritize more specific status fields
     const event = (body.DialCallStatus || body.CallStatus || body.DialStatus || body.CallStatusEvent || '').toLowerCase();
     const parentSid = body.ParentCallSid || body.CallSid || '';
@@ -107,6 +117,38 @@ export default async function handler(req, res) {
                 });
               }
             }
+          }
+
+          // Post to /api/calls on completion if we have CRM context
+          // This ensures browser-initiated calls show up in the dossier log
+          try {
+            // Compute absolute base URL
+            const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
+            const host = req.headers['x-forwarded-host'] || req.headers.host || '';
+            const envBase = process.env.PUBLIC_BASE_URL || '';
+            const base = host ? `${proto}://${host}` : (envBase || 'https://nodalpoint.io');
+
+            const payload = {
+              callSid: parentSid || childSid,
+              to: body.To,
+              from: body.From,
+              status: 'completed',
+              duration: parseInt(body.DialCallDuration || body.CallDuration || '0', 10),
+              contactId,
+              accountId,
+              source: 'dial-status'
+            };
+
+            logger.log(`[Dial-Status] Posting completed call to /api/calls: ${payload.callSid}`);
+            await fetch(`${base}/api/calls`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            }).catch(err => {
+              logger.warn('[Dial-Status] Failed posting to /api/calls:', err?.message);
+            });
+          } catch (innerError) {
+            logger.warn('[Dial-Status] Error preparing /api/calls post:', innerError?.message);
           }
         }
       } catch (error) {

@@ -835,11 +835,25 @@ export default function AccountDossierPage() {
                       </div>
                     ) : calls && calls.length > 0 ? (
                       <div className="space-y-2">
-                        {calls.slice(0, 5).map(call => (
-                          <div key={call.id} className="animate-in fade-in slide-in-from-right-4 duration-500 hover:translate-x-1 transition-transform">
-                            <CallListItem call={call} contactId={call.contactId || ''} variant="minimal" />
-                          </div>
-                        ))}
+                        <AnimatePresence initial={false} mode="popLayout">
+                          {calls.slice(0, 5).map(call => (
+                            <motion.div 
+                              key={call.id}
+                              layout
+                              initial={{ opacity: 0, x: 20, scale: 0.98 }}
+                              animate={{ opacity: 1, x: 0, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.98 }}
+                              transition={{ 
+                                type: "spring",
+                                stiffness: 400,
+                                damping: 30
+                              }}
+                              className="hover:translate-x-1 transition-transform"
+                            >
+                              <CallListItem call={call} contactId={call.contactId || ''} variant="minimal" />
+                            </motion.div>
+                          ))}
+                        </AnimatePresence>
                       </div>
                     ) : (
                       <div className="p-8 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] flex flex-col items-center justify-center gap-3 group/empty">

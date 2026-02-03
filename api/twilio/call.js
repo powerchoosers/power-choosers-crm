@@ -12,12 +12,14 @@ const handler = async function handler(req, res) {
     }
     
     try {
-        const { to, from, agent_phone } = req.body;
+        const { to, from, agent_phone, contactId, accountId } = req.body;
 
         logger.log('[Call Debug] Incoming call request:', {
           to,
           from,
           agent_phone,
+          contactId,
+          accountId,
           body: req.body,
           headers: req.headers,
           timestamp: new Date().toISOString()
@@ -53,15 +55,25 @@ const handler = async function handler(req, res) {
         // Always use production URL for webhooks to avoid preview-domain auth (401)
         const baseUrl = process.env.PUBLIC_BASE_URL || 'https://nodalpoint.io';
         
-        // Build bridge URL with target and callerId (selected Twilio number)
-        const bridgeUrl = `${baseUrl}/api/twilio/bridge?target=${encodeURIComponent(to)}&callerId=${encodeURIComponent(twilioPhone)}`;
+        // Build bridge URL with target, callerId (selected Twilio number), and CRM context
+        let bridgeUrl = `${baseUrl}/api/twilio/bridge?target=${encodeURIComponent(to)}&callerId=${encodeURIComponent(twilioPhone)}`;
+        if (contactId) bridgeUrl += `&contactId=${encodeURIComponent(contactId)}`;
+        if (accountId) bridgeUrl += `&accountId=${encodeURIComponent(accountId)}`;
         
+        // Build status callback URL with CRM context
+        let statusCallbackUrl = `${baseUrl}/api/twilio/status`;
+        const params = new URLSearchParams();
+        if (contactId) params.append('contactId', contactId);
+        if (accountId) params.append('accountId', accountId);
+        const query = params.toString();
+        if (query) statusCallbackUrl += `?${query}`;
+
         const call = await client.calls.create({
             from: twilioPhone,
             to: agentPhone, // Call your phone first
             url: bridgeUrl,
             method: 'POST',
-            statusCallback: `${baseUrl}/api/twilio/status`,
+            statusCallback: statusCallbackUrl,
             statusCallbackMethod: 'POST',
             statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
             // Add timeout to prevent hanging calls

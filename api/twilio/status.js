@@ -32,6 +32,16 @@ export default async function handler(req, res) {
         }
         if (!body || typeof body !== 'object') body = {};
 
+        // Extract CRM context from query parameters
+        let contactId, accountId;
+        try {
+            const protocol = req.headers['x-forwarded-proto'] || 'https';
+            const host = req.headers.host || req.headers['x-forwarded-host'] || '';
+            const requestUrl = new URL(req.url, `${protocol}://${host}`);
+            contactId = requestUrl.searchParams.get('contactId');
+            accountId = requestUrl.searchParams.get('accountId');
+        } catch (_) {}
+
         const {
             CallSid,
             CallStatus,
@@ -245,39 +255,11 @@ export default async function handler(req, res) {
         switch (CallStatus) {
             case 'ringing':
                 logger.log(`  📞 Call is ringing...`);
-                // Early upsert for badge visibility (minimal fields)
-                try {
-                    await fetch(`${base}/api/calls`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            callSid: CallSid,
-                            to: To,
-                            from: From,
-                            status: CallStatus,
-                            targetPhone: targetPhone || undefined,
-                            businessPhone: businessPhone || undefined
-                        })
-                    }).catch(()=>{});
-                } catch(_) {}
+                // [REMOVED] Early upsert to match "only post on completion" requirement
                 break;
             case 'in-progress':
                 logger.log(`  📞 Call answered and in progress`);
-                // Early upsert for badge visibility (minimal fields)
-                try {
-                    await fetch(`${base}/api/calls`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            callSid: CallSid,
-                            to: To,
-                            from: From,
-                            status: CallStatus,
-                            targetPhone: targetPhone || undefined,
-                            businessPhone: businessPhone || undefined
-                        })
-                    }).catch(()=>{});
-                } catch(_) {}
+                // [REMOVED] Early upsert to match "only post on completion" requirement
                 break;
             case 'completed':
                 const duration = Duration || CallDuration || '0';
@@ -317,7 +299,9 @@ export default async function handler(req, res) {
                         status: CallStatus,
                         duration: parseInt((Duration || CallDuration || '0'), 10),
                         targetPhone: targetPhone || undefined,
-                        businessPhone: businessPhone || undefined
+                        businessPhone: businessPhone || undefined,
+                        contactId,
+                        accountId
                     };
                     if (RecordingUrl) {
                         body.recordingUrl = RecordingUrl.endsWith('.mp3') ? RecordingUrl : `${RecordingUrl}.mp3`;
@@ -384,10 +368,20 @@ export default async function handler(req, res) {
                     } catch(_) {}
                 }
                 if (foundUrl) {
+                    const payload = {
+                        callSid: CallSid,
+                        status: 'completed',
+                        duration: Duration || CallDuration,
+                        recordingUrl: foundUrl,
+                        recordingSid: foundRecSid,
+                        contactId,
+                        accountId,
+                        timestamp: new Date().toISOString()
+                    };
                     await fetch(`${base}/api/calls`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ callSid: CallSid, recordingUrl: foundUrl })
+                        body: JSON.stringify(payload)
                     }).catch(() => {});
                 } else {
                     logger.log(`[Status] No recordings found yet for ${CallSid} on parent or children`);

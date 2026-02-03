@@ -1,34 +1,120 @@
 'use client'
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MapPin, Satellite, Wifi, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
 
-export default function SatelliteUplink({ address }: { address: string }) {
+interface SatelliteUplinkProps {
+  address: string;
+  name?: string;
+  entityId?: string;
+  entityType?: 'contact' | 'account';
+  currentPhone?: string;
+  onSyncComplete?: () => void;
+}
+
+export default function SatelliteUplink({ 
+  address, 
+  name,
+  entityId,
+  entityType,
+  currentPhone,
+  onSyncComplete
+}: SatelliteUplinkProps) {
   const [isActive, setIsActive] = useState(false);
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [activeAddress, setActiveAddress] = useState(address);
+
+  // Update local address when prop changes
+  useEffect(() => {
+    setActiveAddress(address);
+  }, [address]);
 
   const establishUplink = async () => {
     if (isLoading) return
-    if (apiKey) {
+    
+    // If we already have a key and an address, just show it
+    if (apiKey && activeAddress) {
       setIsActive(true)
       return
     }
 
     setIsLoading(true)
     try {
+      // 1. Fetch API Key
       const res = await fetch('/api/maps/config')
       const data: unknown = await res.json()
       const nextKey =
         data && typeof data === 'object' && typeof (data as Record<string, unknown>).apiKey === 'string'
           ? ((data as Record<string, unknown>).apiKey as string)
           : null
-      if (nextKey) {
-        setApiKey(nextKey)
-        setIsActive(true)
+          
+      if (!nextKey) throw new Error("Encryption Key Missing");
+      
+      setApiKey(nextKey)
+
+      // 2. Resolve Address if missing (Search by Name)
+      let resolvedAddress = activeAddress;
+      
+      if (!resolvedAddress && name) {
+        toast.info('Initiating Satellite Scan...', { description: `Searching for ${name}` });
+        
+        const searchRes = await fetch(`/api/maps/search?q=${encodeURIComponent(name)}`);
+        const searchData = await searchRes.json();
+        
+        if (searchData.found && searchData.address) {
+          resolvedAddress = searchData.address;
+          setActiveAddress(resolvedAddress);
+          
+          // 3. Auto-Sync Data (Forensic Enrichment)
+          if (entityId && entityType) {
+            const updates: Record<string, any> = {};
+            
+            // Sync Address if empty
+            if (!address) {
+              updates.address = resolvedAddress;
+            }
+            
+            // Sync Phone if empty
+            if (!currentPhone && searchData.phone) {
+              updates.phone = searchData.phone;
+            }
+            
+            if (Object.keys(updates).length > 0) {
+               const table = entityType === 'contact' ? 'contacts' : 'accounts';
+               const { error } = await supabase
+                 .from(table)
+                 .update(updates)
+                 .eq('id', entityId);
+                 
+               if (!error) {
+                 toast.success('Asset Intelligence Acquired', {
+                   description: `Synced: ${Object.keys(updates).join(', ')}`
+                 });
+                 onSyncComplete?.();
+               } else {
+                 console.error('Sync failed:', error);
+               }
+            }
+          }
+        } else {
+          toast.error('Target Not Found', { description: 'Satellite sweep returned no coordinates.' });
+          setIsLoading(false);
+          return;
+        }
+      } else if (!resolvedAddress && !name) {
+         toast.warning('Targeting Error', { description: 'Missing Name or Address for uplink.' });
+         setIsLoading(false);
+         return;
       }
+
+      setIsActive(true)
+      
     } catch (err) {
       console.error('Failed to load Maps API key:', err)
+      toast.error('Uplink Failed', { description: 'Signal interference detected.' });
     } finally {
       setIsLoading(false)
     }
@@ -87,7 +173,7 @@ export default function SatelliteUplink({ address }: { address: string }) {
             style={{ border: 0 }} 
             loading="lazy" 
             allowFullScreen 
-            src={`https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${encodeURIComponent(address)}&maptype=satellite`}>
+            src={`https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${encodeURIComponent(activeAddress)}&maptype=satellite`}>
           </iframe>
         )}
       </div>

@@ -47,6 +47,10 @@ export default async function handler(req, res) {
             RecordingStatus,
             RecordingDuration
         } = body;
+
+        // Extract CRM context from query params
+        const contactId = req.query.contactId || '';
+        const accountId = req.query.accountId || '';
         
         // Use shared logger for Cloud Run cost optimization
         try {
@@ -182,7 +186,9 @@ export default async function handler(req, res) {
                             recordingSource: body.RecordingSource || body.Source || undefined,
                             source: 'twilio-recording-webhook',
                             targetPhone: targetPhone || undefined,
-                            businessPhone: businessPhone || undefined
+                            businessPhone: businessPhone || undefined,
+                            contactId: contactId || undefined,
+                            accountId: accountId || undefined
                         })
                     }).catch(() => {});
 

@@ -24,11 +24,13 @@ export default async function handler(req, res) {
         logger.log('[Bridge] Request Host:', req.headers.host);
         
         // Get query parameters (server.js should populate req.query, but fallback to manual parsing)
-        let target, callerId;
+        let target, callerId, contactId, accountId;
         if (req.query && typeof req.query === 'object') {
             // Use req.query from server.js if available
             target = req.query.target;
             callerId = req.query.callerId;
+            contactId = req.query.contactId;
+            accountId = req.query.accountId;
             logger.log('[Bridge] Using req.query from server.js');
         } else {
             // Fallback: manually parse query parameters from req.url
@@ -39,6 +41,8 @@ export default async function handler(req, res) {
                 
                 target = requestUrl.searchParams.get('target');
                 callerId = requestUrl.searchParams.get('callerId');
+                contactId = requestUrl.searchParams.get('contactId');
+                accountId = requestUrl.searchParams.get('accountId');
                 logger.log('[Bridge] Manually parsed from req.url (fallback)');
             } catch (parseError) {
                 logger.error('[Bridge] Error parsing URL query parameters:', parseError.message);
@@ -51,9 +55,13 @@ export default async function handler(req, res) {
         // Decode URL-encoded parameters if present
         if (target) target = decodeURIComponent(target);
         if (callerId) callerId = decodeURIComponent(callerId);
+        if (contactId) contactId = decodeURIComponent(contactId);
+        if (accountId) accountId = decodeURIComponent(accountId);
         
         logger.log('[Bridge] Parsed target:', target);
         logger.log('[Bridge] Parsed callerId:', callerId);
+        logger.log('[Bridge] Parsed contactId:', contactId);
+        logger.log('[Bridge] Parsed accountId:', accountId);
         
         // Use req.body that was already parsed by server.js (avoid re-reading stream)
         // If req.body doesn't exist (shouldn't happen with server.js), fallback to empty object
@@ -125,26 +133,10 @@ export default async function handler(req, res) {
         // Seed the Calls API with correct phone context for this CallSid
         const apiCallStart = Date.now();
         try {
-            const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
-            const businessPhone = dynamicCallerId;
-            const target10 = norm(target);
-            const payload = {
-                callSid: CallSid,
-                to: target,
-                from: dynamicCallerId, // Use dynamic caller ID
-                status: 'in-progress',
-                targetPhone: target10,
-                businessPhone
-            };
-            // Fire-and-forget; don't block TwiML
-            fetch(`${base}/api/calls`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            }).catch(()=>{});
-            logger.log(`[Bridge] API call completed in ${Date.now() - apiCallStart}ms`);
+            // [REMOVED] Initial creation to match "only post on completion" requirement
+            logger.log(`[Bridge] Call context for ${CallSid} ready (posting deferred to completion)`);
         } catch(_) {
-            logger.log(`[Bridge] API call failed in ${Date.now() - apiCallStart}ms`);
+            logger.log(`[Bridge] API logging failed`);
         }
 
         // Create TwiML to bridge the call
@@ -152,6 +144,22 @@ export default async function handler(req, res) {
         const twiml = new VoiceResponse();
         // Outbound PSTN leg: enable TwiML dual-channel recording on the Dialed number
         
+        // Build dial status callback URL with CRM context
+        let dialStatusUrl = `${base}/api/twilio/dial-status`;
+        let dialCompleteUrl = `${base}/api/twilio/dial-complete`;
+        let recordingUrl = `${base}/api/twilio/recording`;
+        
+        const dialParams = new URLSearchParams();
+        if (contactId) dialParams.append('contactId', contactId);
+        if (accountId) dialParams.append('accountId', accountId);
+        const dialQuery = dialParams.toString();
+        
+        if (dialQuery) {
+            dialStatusUrl += `?${dialQuery}`;
+            dialCompleteUrl += `?${dialQuery}`;
+            recordingUrl += `?${dialQuery}`;
+        }
+
         // Dial the target number immediately without any intro message
         const dial = twiml.dial({
             callerId: dynamicCallerId, // Use dynamic caller ID from query param
@@ -160,13 +168,13 @@ export default async function handler(req, res) {
             hangupOnStar: false,
             timeLimit: 14400,      // 4 hours max call duration
             // Return to our handler after dial completes
-            action: `${base}/api/twilio/dial-complete`,
-            statusCallback: `${base}/api/twilio/dial-status`,
+            action: dialCompleteUrl,
+            statusCallback: dialStatusUrl,
             statusCallbackEvent: 'initiated ringing answered completed',
             // Note: statusCallbackMethod is not a valid attribute for Dial verb
             // TwiML dual-channel from answer
             record: 'record-from-answer-dual',
-            recordingStatusCallback: `${base}/api/twilio/recording`,
+            recordingStatusCallback: recordingUrl,
             recordingStatusCallbackMethod: 'POST'
         });
         
