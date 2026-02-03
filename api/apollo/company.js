@@ -19,10 +19,10 @@ export default async function handler(req, res) {
   try {
     const { domain, company, companyId } = req.query || {};
     
-    if (!domain && !companyId) {
+    if (!domain && !companyId && !company) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
-        error: 'Missing required parameter: domain or companyId required for enrichment' 
+        error: 'Missing required parameter: domain, companyId, or company name required for enrichment' 
       }));
       return;
     }
@@ -148,6 +148,40 @@ export default async function handler(req, res) {
         }
       } else {
         const text = await enrichResp.text();
+      }
+    }
+
+    // ============================================================================
+    // FALLBACK METHOD: Search by Company Name
+    // Used when domain is missing (e.g. from search results)
+    // ============================================================================
+    
+    if (company) {
+      const searchUrl = `${APOLLO_BASE_URL}/organizations/search`;
+      const searchResp = await fetchWithRetry(searchUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Api-Key': APOLLO_API_KEY
+        },
+        body: JSON.stringify({
+          q_organization_name: company,
+          page: 1,
+          per_page: 1
+        })
+      });
+
+      if (searchResp.ok) {
+        const searchData = await searchResp.json();
+        if (searchData.organizations && searchData.organizations.length > 0) {
+          const org = searchData.organizations[0];
+          // If we found an org, we can either return it directly or try to enrich it further
+          // Usually search results are rich enough for our needs
+          const companyData = mapApolloCompanyToLushaFormat(org);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(companyData));
+          return;
+        }
       }
     }
     

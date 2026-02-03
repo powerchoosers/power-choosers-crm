@@ -39,8 +39,8 @@ export function RightPanel() {
   const isActiveContext = isContactPage || isAccountPage
   const entityId = params.id as string
   
-  const { data: contact } = useContact(isContactPage ? entityId : '')
-  const { data: account } = useAccount(isAccountPage ? entityId : '')
+  const { data: contact, refetch: refetchContact } = useContact(isContactPage ? entityId : '')
+  const { data: account, refetch: refetchAccount } = useAccount(isAccountPage ? entityId : '')
   
   const [isReady, setIsReady] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
@@ -158,7 +158,17 @@ export function RightPanel() {
                 {/* 2. SATELLITE (Infrastructure) */}
                 <div className="space-y-3">
                   <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Satellite_Uplink</h3>
-                  <SatelliteUplink address={entityAddress} />
+                  <SatelliteUplink 
+                    address={entityAddress} 
+                    name={entityName}
+                    entityId={entityId}
+                    entityType={isContactPage ? 'contact' : 'account'}
+                    currentPhone={contact?.phone || account?.companyPhone}
+                    onSyncComplete={() => {
+                      if (isContactPage) refetchContact()
+                      else refetchAccount()
+                    }}
+                  />
                 </div>
 
                 {/* 3. ORGANIZATIONAL (Intelligence) */}

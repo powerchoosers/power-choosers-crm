@@ -1,5 +1,0 @@
----
-description: Always add supplier suggestions (datalist) to electricity supplier fields across all pages and widgets. Use the shared supplier data from window.SupplierData and window.SupplierNames. Apply supplier suggestions to any field named 'electricitySupplier' or similar energy supplier fields. Use unique datalist IDs per page/context (e.g., 'contact-supplier-list', 'account-supplier-list', 'health-supplier-list'). Ensure supplier suggestions work in both regular field editing and account field editing contexts. When creating new forms or widgets with supplier fields, automatically include the addSupplierSuggestions() functionality.
-globs:
-alwaysApply: true
----

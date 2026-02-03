@@ -40,6 +40,25 @@ export interface Account {
   metadata?: any
 }
 
+export function useDeleteAccounts() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase
+        .from('accounts')
+        .delete()
+        .in('id', ids)
+
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts-count'] })
+    }
+  })
+}
+
 export interface AccountFilters {
   industry?: string[]
   status?: string[]
@@ -409,18 +428,33 @@ export function useUpsertAccount() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (account: Omit<Account, 'id'> & { id?: string }) => {
-      // 1. Try to find existing account by domain if ID is missing
+      // 1. Try to find existing account by domain or name if ID is missing
       let existingId = account.id;
       
-      if (!existingId && account.domain) {
-        const { data: existing } = await supabase
-          .from('accounts')
-          .select('id, metadata')
-          .eq('domain', account.domain)
-          .maybeSingle();
+      if (!existingId) {
+        if (account.domain) {
+          const { data: existing } = await supabase
+            .from('accounts')
+            .select('id, metadata')
+            .eq('domain', account.domain)
+            .maybeSingle();
+          
+          if (existing) {
+            existingId = existing.id;
+          }
+        }
         
-        if (existing) {
-          existingId = existing.id;
+        // Fallback: Try to find by name if no domain match found
+        if (!existingId && account.name) {
+          const { data: existing } = await supabase
+            .from('accounts')
+            .select('id, metadata')
+            .ilike('name', account.name)
+            .maybeSingle();
+          
+          if (existing) {
+            existingId = existing.id;
+          }
         }
       }
 

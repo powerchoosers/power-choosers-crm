@@ -247,33 +247,45 @@ export function useCalls(searchQuery?: string) {
 
 export function useAccountCalls(accountId: string) {
   const { user, loading } = useAuth()
+  const queryClient = useQueryClient()
+
+  // Subscribe to real-time updates for calls belonging to this account
+  useEffect(() => {
+    if (!accountId || !user || loading) return
+
+    const channel = supabase
+      .channel(`account-calls-${accountId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'calls',
+          filter: `account_id=eq.${accountId}`,
+        },
+        (payload) => {
+          console.log('Real-time call update for account:', accountId, payload)
+          // Invalidate the account calls query to refresh the list
+          queryClient.invalidateQueries({ queryKey: ['account-calls', accountId] })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [accountId, user, loading, queryClient])
 
   return useQuery({
     queryKey: ['account-calls', accountId, user?.email ?? 'guest'],
     queryFn: async () => {
       if (!accountId || loading || !user) return []
 
-      // Get all contacts for this account first
-      const { data: contacts, error: contactsError } = await supabase
-        .from('contacts')
-        .select('id')
-        .eq('accountId', accountId)
-
-      if (contactsError) {
-        if (contactsError.message?.includes('Abort') || contactsError.message === 'FetchUserError: Request was aborted') {
-          throw contactsError
-        }
-        throw contactsError
-      }
-      
-      const contactIds = (contacts || []).map(c => c.id)
-      if (contactIds.length === 0) return []
-
-      // Fetch calls for these contacts
+      // Fetch calls directly by account_id
       const { data, error } = await supabase
         .from('calls')
         .select('*, contacts(name)')
-        .in('contact_id', contactIds)
+        .eq('account_id', accountId)
         .order('timestamp', { ascending: false })
 
       if (error) throw error
@@ -281,7 +293,7 @@ export function useAccountCalls(accountId: string) {
       return (data as any[]).map(item => ({
         id: item.id,
         callSid: item.call_sid,
-        contactName: item.contacts?.name || 'Unknown',
+        contactName: item.contacts?.name || item.contact_name || 'Unknown',
         phoneNumber: item.phone_number,
         type: item.type as 'Inbound' | 'Outbound',
         status: item.status as any,
@@ -292,7 +304,8 @@ export function useAccountCalls(accountId: string) {
         recordingSid: item.recording_sid,
         transcript: item.transcript,
         aiInsights: item.ai_insights,
-        contactId: item.contact_id
+        contactId: item.contact_id,
+        accountId: item.account_id
       })) as Call[]
     },
     enabled: !!accountId && !loading && !!user,

@@ -957,11 +957,26 @@ export default function ContactDossierPage() {
                     ) : recentCalls && recentCalls.length > 0 ? (
                       <>
                         <div className="space-y-4 min-h-[320px]">
-                          {recentCalls
-                            .slice((currentCallPage - 1) * CALLS_PER_PAGE, currentCallPage * CALLS_PER_PAGE)
-                            .map((call) => (
-                              <CallListItem key={call.id} call={call} contactId={id} />
-                            ))}
+                          <AnimatePresence initial={false} mode="popLayout">
+                            {recentCalls
+                              .slice((currentCallPage - 1) * CALLS_PER_PAGE, currentCallPage * CALLS_PER_PAGE)
+                              .map((call) => (
+                                <motion.div
+                                  key={call.id}
+                                  layout
+                                  initial={{ opacity: 0, y: -20, scale: 0.95 }}
+                                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                                  exit={{ opacity: 0, scale: 0.95 }}
+                                  transition={{ 
+                                    type: "spring",
+                                    stiffness: 400,
+                                    damping: 30
+                                  }}
+                                >
+                                  <CallListItem call={call} contactId={id} />
+                                </motion.div>
+                              ))}
+                          </AnimatePresence>
                         </div>
                         
                         {/* Sync_Block Footer with Integrated Pagination */}

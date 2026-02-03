@@ -44,7 +44,9 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
           annualUsage: contact.annualUsage,
           supplier: contact.electricitySupplier,
           currentRate: contact.currentRate,
-          contractEnd: contact.contractEnd
+          contractEnd: contact.contractEnd,
+          accountId: contact.accountId,
+          contactId: contact.id
         }
       : { 
           name: contact.name, 
@@ -59,7 +61,9 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
           supplier: contact.electricitySupplier,
           currentRate: contact.currentRate,
           contractEnd: contact.contractEnd,
-          location: contact.location
+          location: contact.location,
+          accountId: contact.accountId,
+          contactId: contact.id
         }
 
     initiateCall(phone.value, metadata)

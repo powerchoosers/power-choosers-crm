@@ -1,3 +1,7 @@
+---
+alwaysApply: false
+description: when needing a refresher of certain features of Nodal Point CRM
+---
 # Nodal Point CRM Platform
 
 Welcome to the **Nodal Point CRM Platform**, a modern, scalable, and high-performance Customer Relationship Management system built with Next.js 16. This platform is the evolution of the legacy "Power Choosers CRM".

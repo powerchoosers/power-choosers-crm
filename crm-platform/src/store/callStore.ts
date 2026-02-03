@@ -18,6 +18,8 @@ interface CallState {
     contractEnd?: string
     location?: string
     isAccountOnly?: boolean
+    contactId?: string
+    accountId?: string
   } | null
   setActive: (active: boolean) => void
   setStatus: (status: CallState['status']) => void

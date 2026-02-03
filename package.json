@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "dev:all": "concurrently \"npm run dev --prefix crm-platform -- --port 3000\" \"nodemon server.js\"",
+    "dev:all": "node scripts/dev-all.js",
     "clear-logs": "powershell -Command \"Clear-Content .cursor/debug.log\"",
     "build": "echo 'No build step required'",
     "test": "echo 'No tests configured'"
