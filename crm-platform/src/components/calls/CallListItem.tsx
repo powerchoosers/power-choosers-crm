@@ -110,13 +110,16 @@ export function CallListItem({ call, contactId }: CallListItemProps) {
             disabled={currentStatus === 'processing'}
             title={currentStatus === 'processing' ? 'AI Analysis in Progress...' : 'Start Forensic Analysis'}
           >
-            {currentStatus === 'processing' && (
-              <motion.div 
-                className="absolute inset-0 bg-amber-500/5"
-                animate={{ opacity: [0.2, 0.5, 0.2] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              />
-            )}
+            <AnimatePresence>
+              {currentStatus === 'processing' && (
+                <motion.div 
+                  key="processing-indicator"
+                  className="absolute inset-0 bg-amber-500/5"
+                  animate={{ opacity: [0.2, 0.5, 0.2] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                />
+              )}
+            </AnimatePresence>
             {currentStatus === 'processing' ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : currentStatus === 'ready' ? (
