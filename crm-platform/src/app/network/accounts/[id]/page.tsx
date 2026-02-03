@@ -823,7 +823,7 @@ export default function AccountDossierPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between px-1">
                     <h3 className="text-[10px] font-mono text-zinc-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                      <Phone className="w-3.5 h-3.5 text-[#002FA7]" /> Engagement Log
+                      Engagement Log
                     </h3>
                     <span className="text-[9px] font-mono text-zinc-600 font-bold tabular-nums">{calls?.length || 0} RECORDS</span>
                   </div>
@@ -837,15 +837,12 @@ export default function AccountDossierPage() {
                       <div className="space-y-2">
                         {calls.slice(0, 5).map(call => (
                           <div key={call.id} className="animate-in fade-in slide-in-from-right-4 duration-500 hover:translate-x-1 transition-transform">
-                            <CallListItem call={call} contactId={call.contactId || ''} />
+                            <CallListItem call={call} contactId={call.contactId || ''} variant="minimal" />
                           </div>
                         ))}
                       </div>
                     ) : (
                       <div className="p-8 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] flex flex-col items-center justify-center gap-3 group/empty">
-                        <div className="p-4 rounded-2xl bg-zinc-900/50 border border-white/5 group-hover/empty:border-[#002FA7]/30 transition-colors duration-500">
-                          <Phone className="w-6 h-6 text-[#002FA7]" />
-                    </div>
                         <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-[0.3em]">No signals detected</p>
                       </div>
                     )}

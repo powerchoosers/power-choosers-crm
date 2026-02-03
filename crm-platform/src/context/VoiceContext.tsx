@@ -6,6 +6,7 @@ import { useCallStore } from '@/store/callStore'
 import { useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
 import { formatToE164 } from '@/lib/utils'
+import { usePathname } from 'next/navigation'
 
 interface VoiceMetadata {
   name?: string
@@ -46,9 +47,14 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   const [metadata, setMetadata] = useState<VoiceMetadata | null>(null)
   
   const { user } = useAuth()
+  const pathname = usePathname()
   const { setStatus, setActive } = useCallStore()
+
+  // Helper to check if we are in the platform area
+  const isPlatform = pathname?.startsWith('/network') || pathname?.startsWith('/dashboard')
   const tokenRefreshTimer = useRef<NodeJS.Timeout | null>(null)
   const deviceRef = useRef<Device | null>(null)
+  const isInitializing = useRef(false)
 
   const resolvePhoneMeta = useCallback(async (phoneNumber: string) => {
     try {
@@ -76,11 +82,23 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const initDevice = useCallback(async () => {
-    // Only initialize on the client side and when user is authenticated
-    // Also check for session cookie to prevent pre-login API failures
-    if (typeof window === 'undefined' || !user || !document.cookie.includes('np_session=')) return
+    // Only initialize on the client side, when user is authenticated, and in platform routes
+    if (typeof window === 'undefined' || !user || !isPlatform || !document.cookie.includes('np_session=')) {
+      // We don't clean up the device here anymore to avoid dropping active calls if navigating away,
+      // but the error guards (isPlatform) will prevent toasts on public pages.
+      return
+    }
+    
+    // Prevent overlapping initializations
+    if (isInitializing.current) {
+      console.log('[Voice] Initialization already in progress, skipping...')
+      return
+    }
 
     try {
+      isInitializing.current = true
+      console.log('[Voice] Fetching new access token...')
+      
       const response = await fetch('/api/twilio/token?identity=agent')
       if (!response.ok) {
         throw new Error(`Failed to fetch token: ${response.statusText}`)
@@ -93,15 +111,37 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
       // Cleanup existing device before creating new one
       if (deviceRef.current) {
-        console.log('[Voice] Cleaning up existing device...')
-        deviceRef.current.unregister()
-        deviceRef.current.destroy()
+        const d = deviceRef.current
+        console.log('[Voice] Cleaning up existing device... State:', d.state)
+        
+        try {
+          // Only unregister if in a valid state
+          if (d.state === 'registered' || d.state === 'registering') {
+            // Note: Twilio SDK might throw if we unregister while registering, 
+            // but we'll wrap it in try-catch to be safe
+            if (d.state === 'registered') {
+              await d.unregister()
+            }
+          }
+        } catch (cleanupError) {
+          console.warn('[Voice] Error during device unregister:', cleanupError)
+        }
+        
+        try {
+          d.destroy()
+        } catch (destroyError) {
+          console.warn('[Voice] Error during device destroy:', destroyError)
+        }
+        
         deviceRef.current = null
       }
 
       const newDevice = new Device(data.token, {
         codecPreferences: [Call.Codec.Opus, Call.Codec.PCMU],
         enableImprovedSignalingErrorPrecision: true,
+        // Twilio suggests these for better reliability in browser environments
+        edge: ['ashburn', 'roaming'], 
+        maxCallSignalingTimeoutMs: 30000,
       })
 
       // Ported from legacy phone.js: Set audio constraints for better quality
@@ -145,6 +185,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       newDevice.on('registered', () => {
         console.log('[Voice] Device registered')
         setIsReady(true)
+        isInitializing.current = false
       })
 
       newDevice.on('warning', (name, data) => {
@@ -153,9 +194,17 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
       newDevice.on('error', (error) => {
         console.error('[Voice] Device error:', error)
-        toast.error('Twilio Device Error', { description: error.message })
-        if (error.code === 20101 || error.code === 31204) {
-          // Token expired or invalid, re-init
+        
+        // Don't show toast for "transport unavailable" as we'll try to recover
+        // Also only show toasts if we are in the platform area
+        if (error.code !== 31009 && isPlatform) {
+          toast.error('Twilio Device Error', { description: error.message })
+        }
+        
+        if (error.code === 20101 || error.code === 31204 || error.code === 31009) {
+          // Token expired, invalid, or transport lost - trigger re-init
+          console.log('[Voice] Triggering device re-initialization due to error:', error.code)
+          isInitializing.current = false // Allow re-init
           initDevice()
         }
       })
@@ -163,6 +212,12 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       newDevice.on('incoming', async (call) => {
         console.log('[Voice] Incoming call')
         
+        // Only show incoming call UI if in platform
+        if (!isPlatform) {
+          call.reject()
+          return
+        }
+
         // Resolve metadata for incoming call
         // Ported from legacy phone.js: Check originalCaller parameter first
         const from = call.parameters.originalCaller || call.parameters.From || ''
@@ -245,24 +300,35 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
     } catch (error) {
       console.error('[Voice] Failed to init device:', error)
-      toast.error('Voice System Offline', { 
-        description: 'Could not connect to Twilio service.' 
-      })
+      if (isPlatform) {
+        toast.error('Voice System Offline', { 
+          description: 'Could not connect to Twilio service.' 
+        })
+      }
+    } finally {
+      isInitializing.current = false
     }
-  }, [resolvePhoneMeta, setActive, setStatus, user])
+  }, [resolvePhoneMeta, setActive, setStatus, user, isPlatform])
 
   useEffect(() => {
     initDevice()
     return () => {
       if (tokenRefreshTimer.current) clearInterval(tokenRefreshTimer.current)
       if (deviceRef.current) {
-        console.log('[Voice] Provider unmounting, destroying device')
-        deviceRef.current.unregister()
-        deviceRef.current.destroy()
+        const d = deviceRef.current
+        console.log('[Voice] Provider unmounting, destroying device. State:', d.state)
+        try {
+          if (d.state === 'registered') {
+            d.unregister()
+          }
+          d.destroy()
+        } catch (e) {
+          console.warn('[Voice] Cleanup error during unmount:', e)
+        }
         deviceRef.current = null
       }
     }
-  }, [initDevice])
+  }, [initDevice, pathname])
 
   const connect = useCallback(async (params: { To: string; From?: string; metadata?: VoiceMetadata }) => {
     if (!device || !isReady) {

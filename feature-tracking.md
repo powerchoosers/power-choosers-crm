@@ -97,38 +97,39 @@
     - [x] Applied squircle styling (`rounded-lg`) and Sparkles icon to the enrichment trigger.
   - [x] **Bug Fixes**:
     - [x] **TypeScript Error**: Resolved a type mismatch in `OrgIntelligence.tsx` where `scanStatus` was being compared to incompatible states.
-100→    - [x] **Apollo Fetch Error**: Fixed a route mismatch in `server.js` that caused `/api/apollo/search-people` calls to fail.
-101→
-102→### Neural Scan & AI Script Generation
-103→- **Status**: Completed
-104→- **Description**: Fixed critical AI generation failures (400 errors) and implemented a robust fallback system with Gemini 2.5 Flash-Lite.
-105→- **Actions**:
-106→  - [x] **400 Error Resolution**:
-107→    - [x] Fixed a ReferenceError in `chat.js` where `prompt` was incorrectly scoped in the OpenRouter handler.
-108→    - [x] Corrected routing logic in `chat.js` to recognize `meta-llama/` and `mistralai/` prefixes for OpenRouter.
-109→    - [x] Enforced structured JSON output by adding `response_format` (OpenRouter) and `responseMimeType` (Gemini) headers.
-110→  - [x] **Gemini 2.5 Fallback**:
-111→    - [x] Integrated **Gemini 2.5 Flash-Lite** as the primary fallback and high-performance provider.
-112→    - [x] Updated model candidates to prioritize Gemini 2.5 for cost and speed efficiency.
-113→  - [x] **Bespoke Script Logic**:
-114→    - [x] Modified `useAI.ts` to inject contact-specific context (Name, Company) into the user prompt, forcing the AI to generate personalized scripts.
-115→    - [x] Switched the default model to **Llama 3.1 70B** on OpenRouter for superior script reasoning.
-116→  - [x] **Safety Protocols**:
-117→    - [x] Implemented a "Graceful Fallback" in `useAI.ts` that returns a high-quality default NEPQ script if the API is unreachable.
-118→    - [x] Added debug logging to `_supabase.js` and `chat.js` to monitor 401/406 authentication errors.
-101→
-102→### User Identity & Identity Migration
-103→- **Status**: Completed
-104→- **Description**: Migrated Lewis Patterson's system identity to the new Nodal Point domain and resolved read-only identity constraints.
-105→- **Actions**:
-106→  - [x] **Identity Migration**:
-107→    - [x] Migrated Lewis Patterson's email from `l.patterson@powerchoosers.com` to `l.patterson@nodalpoint.io` across Supabase `users` and Firebase Auth.
-108→    - [x] **Relational Integrity**: Performed a system-wide batch migration of 3,932 `ownerId` references in Supabase (Contacts, Accounts, etc.) to maintain data ownership.
-109→    - [x] **Access Control**: Updated hardcoded admin email references in `call-status.js` and other API files to ensure uninterrupted administrative access.
-110→  - [x] **Settings UI Refinement**:
-111→    - [x] Removed `readOnly` constraints from the Email field in the Settings page.
-112→    - [x] Added visual warnings for system-wide ID synchronization requirements.
-113→    - [x] Standardized email input with `font-mono tabular-nums` and forensic styling.
+    - [x] **Apollo Fetch Error**: Fixed a route mismatch in `server.js` that caused `/api/apollo/search-people` calls to fail.
+    - [x] **Search Optimization**: Fixed 0 results issue for specific companies by switching from strict `q_keywords` to `person_titles` filtering and preventing guessed domains from polluting search parameters.
+
+### Neural Scan & AI Script Generation
+- **Status**: Completed
+- **Description**: Fixed critical AI generation failures (400 errors) and implemented a robust fallback system with Gemini 2.5 Flash-Lite.
+- **Actions**:
+  - [x] **400 Error Resolution**:
+    - [x] Fixed a ReferenceError in `chat.js` where `prompt` was incorrectly scoped in the OpenRouter handler.
+    - [x] Corrected routing logic in `chat.js` to recognize `meta-llama/` and `mistralai/` prefixes for OpenRouter.
+    - [x] Enforced structured JSON output by adding `response_format` (OpenRouter) and `responseMimeType` (Gemini) headers.
+  - [x] **Gemini 2.5 Flash-Lite Integration**:
+    - [x] Integrated **Gemini 2.5 Flash-Lite** as the primary fallback and high-performance provider.
+    - [x] Updated model candidates to prioritize Gemini 2.5 for cost and speed efficiency.
+  - [x] **Bespoke Script Logic**:
+    - [x] Modified `useAI.ts` to inject contact-specific context (Name, Company) into the user prompt, forcing the AI to generate personalized scripts.
+    - [x] Switched the default model to **Llama 3.1 70B** on OpenRouter for superior script reasoning.
+  - [x] **Safety Protocols**:
+    - [x] Implemented a "Graceful Fallback" in `useAI.ts` that returns a high-quality default NEPQ script if the API is unreachable.
+    - [x] Added debug logging to `_supabase.js` and `chat.js` to monitor 401/406 authentication errors.
+
+### User Identity & Identity Migration
+- **Status**: Completed
+- **Description**: Migrated Lewis Patterson's system identity to the new Nodal Point domain and resolved read-only identity constraints.
+- **Actions**:
+  - [x] **Identity Migration**:
+    - [x] Migrated Lewis Patterson's email from `l.patterson@powerchoosers.com` to `l.patterson@nodalpoint.io` across Supabase `users` and Firebase Auth.
+    - [x] **Relational Integrity**: Performed a system-wide batch migration of 3,932 `ownerId` references in Supabase (Contacts, Accounts, etc.) to maintain data ownership.
+    - [x] **Access Control**: Updated hardcoded admin email references in `call-status.js` and other API files to ensure uninterrupted administrative access.
+  - [x] **Settings UI Refinement**:
+    - [x] Removed `readOnly` constraints from the Email field in the Settings page.
+    - [x] Added visual warnings for system-wide ID synchronization requirements.
+    - [x] Standardized email input with `font-mono tabular-nums` and forensic styling.
     - [x] **Routing Sync**: Standardized API routes in `server.js` to match the frontend expectations (`/api/apollo/search-people` and `/api/apollo/search-organizations`).
   - [x] **Integration**: Verified the end-to-end flow from domain-based scanning to account enrichment.
 
@@ -190,6 +191,25 @@
   - [x] **Context Inference**: Implemented last-account inference from prior `forensic_grid` JSON blocks to support follow-up questions like "contract details".
   - [x] **No Fabrication**: Returns `Unknown` / `Data_Void` when key contract fields are missing instead of inventing values.
 
+### Infrastructure Map & Asset Tracking
+- **Status**: Completed
+- **Description**: Migrated the Infrastructure Map from mock data to real-time asset tracking using Supabase contacts and ERCOT market data, with strict account status filtering.
+- **Actions**:
+  - [x] **Real-Time Data Uplink**:
+    - [x] Replaced mock nodes with live contacts from Supabase (`useInfiniteQuery`).
+    - [x] Implemented ERCOT Zone resolution based on contact city/state via `mapLocationToZone`.
+    - [x] Integrated real-time market pricing via `/api/market/ercot` (60-second polling).
+  - [x] **Dynamic Risk Logic**:
+    - [x] Implemented price-sensitive risk detection (Red Dot): Nodes turn "Risk" (Red) if Price > $40 AND Load is HIGH.
+    - [x] Added "Protected" status (Blue) for High/Med load accounts under safe price thresholds.
+  - [x] **Customer Verification**:
+    - [x] Applied strict filtering to only display contacts linked to accounts with `ACTIVE_LOAD` status (Current Customers).
+    - [x] Confirmed `ACTIVE_LOAD` status is automatically set upon contract upload in the Data Locker (`analyze-document.js`).
+  - [x] **UI/UX Standardization**:
+    - [x] Aligned map container layout with People/Protocol Builder pages (Glass container, Sync_Block footer).
+    - [x] Added `animate-progress` loading state for initial data fetch.
+    - [x] Fixed `useAuth` import path error causing build failures.
+
 ### Nodal Architect Account Search Hardening
 - **Status**: Completed
 - **Description**: Improved reliability for multi-word account lookups and reduced dependence on a brittle RPC search function.
@@ -225,9 +245,39 @@
 
 ### React Documentation & Standards Update
 - **Status**: Completed
-- **Description**: Integrated React best practices from `react.dev` into the project's documentation to prevent recurring key warnings and builder errors.
+- **Description**: Standardized React development patterns to prevent hydration mismatches and race conditions.
 - **Actions**:
+  - [x] **Key Protocol**: Enforced unique, stable keys for all mapped elements.
+  - [x] **Hydration Safety**: Implemented mounted-state checks for browser-only globals.
+  - [x] **Effect Dependencies**: Validated all `useEffect` and `useCallback` dependency arrays.
   - [x] **Research**: Audited `react.dev` for key protocol, hydration safety, and performance best practices.
   - [x] **Instruction Update**: Added a new **React & Next.js Development Standards** section to `builder-agent-instructions.md`.
   - [x] **Source of Truth**: Synchronized the documentation update with `nodalpoint.md` to ensure zero drift in architectural standards.
   - [x] **Self-Correction**: Added "Agent Self-Correction & Efficiency" rules to prevent looping and improve search strategies.
+
+### React Key Warning Resolution & Animation Safety
+- **Status**: Completed
+- **Description**: Performed a project-wide audit of all components using `AnimatePresence` and `motion` to resolve React "unique key prop" warnings and ensure stable exit animations.
+- **Actions**:
+  - [x] **Deep Audit**: Identified 22 files using `AnimatePresence` via recursive Grep and audited each for key consistency.
+  - [x] **Key Implementation**:
+    - [x] Fixed `BulkActionDeck.tsx`: Added `AnimatePresence` and unique `key="bulk-action-deck"`.
+    - [x] Fixed `GeminiChat.tsx`: Added semantic keys `diagnostics-hud` and `history-panel` to dynamic motion overlays.
+    - [x] Fixed `FilterCommandDeck.tsx`: Added unique `key="filter-deck"`.
+    - [x] Fixed `TopBar.tsx`: Renamed search container key from `search` to `search-container` for better uniqueness.
+    - [x] Fixed `CallListItem.tsx`: Added `AnimatePresence` wrapper with semantic `key="processing-indicator"`.
+  - [x] **Animation Logic**:
+    - [x] Fixed `DestructModal.tsx`: Corrected `AnimatePresence` logic by moving the `isOpen` conditional *inside* the wrapper and adding unique keys to the overlay and content containers, ensuring smooth exit transitions.
+  - [x] **Validation**: Verified stable keys in all core table views (`PeoplePage`, `AccountsPage`, `TasksPage`, `EnergyPage`) using stable row IDs.
+  - [x] **Git Synchronization**: Pushed all key-related fixes to the repository.
+
+### Twilio Voice Stability & Token Management
+- **Status**: Completed
+- **Description**: Resolved critical Twilio Voice errors (Transport, Token Invalid, and State errors) occurring during long idle sessions.
+- **Actions**:
+  - [x] **Token Persistence**: Increased Twilio Access Token TTL from 1 hour to 24 hours in `api/twilio/token.js` to ensure session continuity.
+  - [x] **State-Aware Cleanup**: Modified `VoiceContext.tsx` to check `device.state` before unregistering, eliminating `InvalidStateError` during re-initialization.
+  - [x] **Concurrency Control**: Added `isInitializing` ref to prevent overlapping device initializations from timers and error events.
+  - [x] **Auto-Recovery**: Implemented automatic device re-initialization on `TransportError (31009)` and `AccessTokenInvalid (20101)` errors.
+  - [x] **Signaling Optimization**: Configured explicit `edge` regions (`ashburn`, `roaming`) and increased signaling timeouts for better reliability in browser environments.
+  - [x] **UI Noise Reduction**: Suppressed repetitive "Transport Unavailable" toast notifications during background recovery attempts.

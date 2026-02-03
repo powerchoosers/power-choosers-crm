@@ -11,6 +11,52 @@ export const ERCOT_ZONES = {
 
 export type ErcotZone = typeof ERCOT_ZONES[keyof typeof ERCOT_ZONES];
 
+// City definitions for easier management
+const CITIES_HOUSTON = [
+  'houston', 'katy', 'sugar land', 'the woodlands', 'conroe', 'cypress', 'humble',
+  'alvin', 'angleton', 'bay city', 'channelview', 'cleveland', 'deer park',
+  'friendswood', 'fulshear', 'la porte', 'league city', 'manvel', 'missouri city',
+  'needville', 'pasadena', 'pasedena', 'pearland', 'porter', 'richmond', 'rosenberg',
+  'rosharon', 'spring', 'stafford', 'tomball', 'waller', 'webster', 'galveston',
+  'lake jackson', 'freeport', 'wharton', 'el campo'
+];
+
+const CITIES_WEST = [
+  'midland', 'odessa', 'lubbock', 'amarillo', 'san angelo', 'abilene',
+  'pecos', 'sweetwater', 'seymour', 'big spring', 'snyder', 'monahans',
+  'andrews', 'lamesa', 'brownfield', 'levelland', 'hereford', 'plainview',
+  'canyon', 'pampa', 'borger', 'dalhart', 'childress', 'vernon'
+];
+
+const CITIES_SOUTH = [
+  'san antonio', 'corpus christi', 'laredo', 'mcallen', 'brownsville',
+  'austin', 'round rock', 'san marcos', 'new braunfels', 'georgetown',
+  'pflugerville', 'cedar park', 'leander', 'kyle', 'buda', 'lockhart',
+  'segovia', 'kerrville', 'fredericksburg', 'boerne', 'pleasanton',
+  'victoria', 'harlingen', 'mission', 'pharr', 'edinburg', 'weslaco',
+  'del rio', 'eagle pass', 'alice', 'kingsville', 'rockport', 'port aransas',
+  'bulverde', 'manor', 'marion', 'schertz', 'cibolo', 'converse'
+];
+
+// Note: LZ_NORTH is the default catch-all for Dallas/Fort Worth and others,
+// but we list major ones here for explicit matching if needed.
+const CITIES_NORTH = [
+  'dallas', 'fort worth', 'arlington', 'plano', 'garland', 'irving',
+  'grand prairie', 'mckinney', 'frisco', 'mesquite', 'carrollton',
+  'denton', 'richardson', 'lewisville', 'tyler', 'waco', 'wichita falls',
+  'college station', 'bryan', 'killeen', 'temple', 'longview', 'flower mound',
+  'north richland hills', 'mansfield', 'rowlett', 'euless', 'desoto',
+  'grapevine', 'bedford', 'cedar hill', 'texas city', 'haltom city',
+  'wylie', 'keller', 'coppell', 'rockwall', 'huntsville', 'sherman',
+  'denison', 'the colony', 'burleson', 'hurst', 'lancaster', 'little elm',
+  'texarkana', 'lufkin', 'nacogdoches', 'paris', 'corsicana', 'greenville',
+  'weatherford', 'waxahachie', 'cleburne', 'midlothian', 'stephenville',
+  'granbury', 'mineral wells', 'gainesville', 'bonham', 'sulphur springs',
+  'mount pleasant', 'jacksonville', 'palestine', 'athens', 'terrell',
+  'forney', 'sachse', 'seagoville', 'balch springs', 'university park',
+  'colleyville', 'southlake', 'keller', 'trophy club', 'highland village'
+];
+
 /**
  * Maps a city or state string to an ERCOT Load Zone.
  * Primarily focused on Texas cities.
@@ -25,49 +71,22 @@ export function mapLocationToZone(city?: string, state?: string, rawLocation?: s
     return ERCOT_ZONES.NORTH;
   }
 
-  // Houston Area
-  if (
-    c.includes('houston') || 
-    c.includes('katy') || 
-    c.includes('sugar land') || 
-    c.includes('the woodlands') || 
-    c.includes('conroe') ||
-    c.includes('cypress') ||
-    c.includes('humble') ||
-    r.includes('houston') ||
-    r.includes('lz_houston')
-  ) {
+  // Check Houston
+  if (CITIES_HOUSTON.some(city => c.includes(city)) || r.includes('houston') || r.includes('lz_houston')) {
     return ERCOT_ZONES.HOUSTON;
   }
 
-  // West Texas
-  if (
-    c.includes('midland') || 
-    c.includes('odessa') || 
-    c.includes('lubbock') || 
-    c.includes('amarillo') || 
-    c.includes('san angelo') || 
-    c.includes('abilene') ||
-    r.includes('west') ||
-    r.includes('lz_west')
-  ) {
+  // Check West
+  if (CITIES_WEST.some(city => c.includes(city)) || r.includes('west') || r.includes('lz_west')) {
     return ERCOT_ZONES.WEST;
   }
 
-  // South Texas
-  if (
-    c.includes('san antonio') || 
-    c.includes('corpus christi') || 
-    c.includes('laredo') || 
-    c.includes('mcallen') || 
-    c.includes('brownsville') ||
-    r.includes('south') ||
-    r.includes('lz_south')
-  ) {
+  // Check South
+  if (CITIES_SOUTH.some(city => c.includes(city)) || r.includes('south') || r.includes('lz_south')) {
     return ERCOT_ZONES.SOUTH;
   }
 
-  // Default to North (Dallas, Fort Worth, Austin, etc.)
+  // Default to North (Dallas, Fort Worth, etc.)
   return ERCOT_ZONES.NORTH;
 }
 

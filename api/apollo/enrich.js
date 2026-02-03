@@ -21,19 +21,29 @@ export default async function handler(req, res) {
   try {
     const { 
       requestId, 
-      contactIds, 
+      contactIds = [], 
       contacts = [],  // NEW: Accept contact objects with cached data
       company, 
       name, 
+      firstName,
+      lastName,
+      email,
+      linkedinUrl,
       title, 
       revealEmails, 
       revealPhones 
     } = req.body || {};
     
-    if (!contactIds || contactIds.length === 0) {
+    // If we have an email or linkedinUrl but no contactIds, we can still enrich
+    if (contactIds.length === 0 && (email || linkedinUrl || (firstName && lastName && company?.domain))) {
+      // Create a dummy contactId to trigger the loop once
+      contactIds.push('rapid_init_' + Date.now());
+    }
+
+    if (contactIds.length === 0) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
-        error: 'Missing contactIds' 
+        error: 'Missing contactIds or identification parameters' 
       }));
       return;
     }
@@ -76,9 +86,13 @@ export default async function handler(req, res) {
         }
         
         // Strategy 1: Use cached email (BEST - most reliable match)
-        const emailToUse = cachedContact.email || (i === 0 ? req.body.email : null);
+        const emailToUse = cachedContact.email || (i === 0 ? email : null);
         if (emailToUse) {
           matchBody.email = emailToUse;
+        }
+        // Strategy 1b: Use LinkedIn URL (New Strategy for Rapid Init)
+        else if (i === 0 && linkedinUrl) {
+          matchBody.linkedin_url = linkedinUrl;
         }
         // Strategy 2: Use cached Apollo person ID (GOOD - from previous widget session)
         else if (cachedContact.apolloId || cachedContact.personId || cachedContact.id || (!cachedContact.id && contactId && contactId.length > 15)) {
