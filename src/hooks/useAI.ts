@@ -5,6 +5,7 @@ export interface AIPayload {
   contact_context: {
     agent_name?: string
     agent_title?: string
+    is_account_only?: boolean
     name?: string
     title?: string
     company?: string
@@ -48,9 +49,9 @@ AGENT CONTEXT:
 - Title: ${payload.contact_context.agent_title}
 
 TARGET CONTEXT:
-- Name: ${payload.contact_context.name}
-- Title: ${payload.contact_context.title}
-- Company: ${payload.contact_context.company}
+${payload.contact_context.is_account_only 
+  ? `- Entity: ${payload.contact_context.company} (Corporate Line)` 
+  : `- Name: ${payload.contact_context.name}\n- Title: ${payload.contact_context.title}\n- Company: ${payload.contact_context.company}`}
 - Industry: ${payload.contact_context.industry}
 - Description: ${payload.contact_context.description || 'Not available'}
 - Location: ${payload.contact_context.location || 'Not available'}
@@ -64,10 +65,11 @@ STRICT RULES:
 3. NEPQ TONE: Use low-pressure, curious, and professional language. Avoid "How are you today?" or "I'm calling to save you money."
 4. NO JARGON: Do not use industry terms like "deregulation", "LOA", or "RFP" unless explaining them in a forensic/analytical way.
 5. SPECIFIC RISK: ${payload.contact_context.industry ? `Mention the specific risk of ${industryRisks[payload.contact_context.industry] || 'unmanaged volatility'} affecting their operations.` : ''}
+6. TARGETING: ${payload.contact_context.is_account_only ? "Since you are calling the corporate line, the goal is to navigate to the decision-maker or establish a high-level corporate interest." : `Address the prospect by their name (${payload.contact_context.name}) and acknowledge their role as ${payload.contact_context.title}.`}
 
 OUTPUT SCHEMA (JSON ONLY):
 {
-  "opener": "Short, curious introduction. 'Hi [Name], it's ${payload.contact_context.agent_name} with Nodal Point...'",
+  "opener": "Short, curious introduction. 'Hi, this is ${payload.contact_context.agent_name} with Nodal Point...'",
   "hook": "The specific reason for the call today, mentioning ${payload.contact_context.company}'s specific situation or industry risk.",
   "disturb": "A NEPQ-style question that gently 'disturbs' their current state of mind about their energy strategy.",
   "close": "A low-pressure request for a brief diagnostic conversation."
@@ -77,22 +79,30 @@ Vector Type: ${payload.vector_type}
 Additional Live Context: ${payload.contact_context.additional_context || 'None'}`
 
     try {
-      const response = await fetch('/api/gemini/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [
-            {
-              role: 'system',
-              content: systemPrompt
-            }
-          ],
-          model: 'openai/gpt-oss-120b:free',
-          jsonMode: true
-        }),
-      })
+      const userContent = payload.contact_context.is_account_only 
+          ? `Generate a bespoke cold call script for a prospect at ${payload.contact_context.company}. I am calling their corporate line. Focus on opening with a business-level value prop.`
+          : `Generate a bespoke cold call script for ${payload.contact_context.name} at ${payload.contact_context.company}.`;
+
+        const response = await fetch('/api/gemini/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messages: [
+              {
+                role: 'system',
+                content: systemPrompt
+              },
+              {
+                role: 'user',
+                content: userContent
+              }
+            ],
+            model: 'meta-llama/llama-3.1-70b-instruct',
+            jsonMode: true
+          }),
+        })
 
       if (!response.ok) {
         throw new Error('Failed to generate AI response')
@@ -117,7 +127,12 @@ Additional Live Context: ${payload.contact_context.additional_context || 'None'}
       const msg = err instanceof Error ? err.message : 'Unknown AI error'
       setError(msg)
       console.error('AI Generation Error:', err)
-      return null
+      return {
+        opener: "I'm not sure if you're the right person to speak with...",
+        hook: `I noticed some ${payload.vector_type || 'volatility'} that might be impacting your operations.`,
+        disturb: "Usually, when that happens, it leads to significant cost leakage that goes unnoticed.",
+        close: "Would you be open to a brief look at the data to see if that's actually the case?"
+      }
     } finally {
       setIsLoading(false)
     }

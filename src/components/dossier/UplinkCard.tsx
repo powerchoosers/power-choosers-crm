@@ -35,7 +35,17 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
 
     const isCompany = phone.id === 'companyPhone'
     const metadata = isCompany 
-      ? { name: contact.companyName || contact.company }
+      ? { 
+          name: contact.companyName || contact.company,
+          account: contact.companyName || contact.company,
+          isAccountOnly: true,
+          industry: contact.industry,
+          location: contact.location,
+          annualUsage: contact.annualUsage,
+          supplier: contact.electricitySupplier,
+          currentRate: contact.currentRate,
+          contractEnd: contact.contractEnd
+        }
       : { 
           name: contact.name, 
           account: contact.companyName || contact.company,
