@@ -58,6 +58,10 @@ export function useEmails(searchQuery?: string) {
           .order('timestamp', { ascending: false, nullsFirst: false })
 
         if (error) {
+          // Silent abort for network cancellations
+          if (error.message === 'FetchUserError: Request was aborted' || error.message?.includes('abort')) {
+            throw error
+          }
           console.error("Supabase error fetching emails:", {
             message: error.message,
             details: error.details,
@@ -111,7 +115,7 @@ export function useEmails(searchQuery?: string) {
         }
       } catch (error: any) {
         // Suppress logging for aborted requests (intentional cancellations by React Query)
-        if (error?.name === 'AbortError' || error?.message === 'Fetch is aborted') {
+        if (error?.name === 'AbortError' || error?.message === 'Fetch is aborted' || error?.message?.includes('abort')) {
           throw error
         }
         console.error("Error fetching emails:", error.message || error)
@@ -210,7 +214,10 @@ export function useSearchEmails(queryTerm: string) {
           from: item.from,
           date: item.timestamp || item.created_at
         }))
-      } catch (error) {
+      } catch (error: any) {
+        if (error?.name === 'AbortError' || error?.message === 'Fetch is aborted' || error?.message?.includes('abort')) {
+          return []
+        }
         console.error("Search emails error:", error)
         return []
       }
@@ -244,6 +251,9 @@ export function useEmailsCount(searchQuery?: string) {
         const { count, error } = await query
         
         if (error) {
+          if (error.message === 'FetchUserError: Request was aborted' || error.message?.includes('abort')) {
+            throw error
+          }
           console.error("Supabase error fetching emails count:", {
             message: error.message,
             details: error.details,
@@ -256,7 +266,7 @@ export function useEmailsCount(searchQuery?: string) {
         return count || 0
       } catch (error: any) {
         // Suppress logging for aborted requests
-        if (error?.name === 'AbortError' || error?.message === 'Fetch is aborted') {
+        if (error?.name === 'AbortError' || error?.message === 'Fetch is aborted' || error?.message?.includes('abort')) {
           throw error
         }
         console.error("Error fetching emails count:", error.message || error)

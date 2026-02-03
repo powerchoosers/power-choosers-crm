@@ -148,6 +148,7 @@ export function Sidebar() {
         <AnimatePresence>
           {isHovered && (
             <motion.div 
+              key="sidebar-title"
               layout="position"
               initial={{ opacity: 0, x: -10, filter: "blur(4px)" }}
               animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
@@ -216,7 +217,7 @@ export function Sidebar() {
                 <>
                   <AnimatePresence>
                     {isActive && (
-                      <>
+                      <motion.div key="active-indicator">
                         <motion.div
                           layoutId="activeBackground"
                           className="absolute inset-0 bg-white/[0.05] rounded-xl border border-white/5"
@@ -234,7 +235,7 @@ export function Sidebar() {
                           exit={{ opacity: 0, x: -2 }}
                           transition={{ type: "spring", stiffness: 400, damping: 30 }}
                         />
-                      </>
+                      </motion.div>
                     )}
                   </AnimatePresence>
                   
@@ -256,6 +257,7 @@ export function Sidebar() {
                   <AnimatePresence mode="popLayout">
                     {isHovered && (
                       <motion.span 
+                        key="nav-item-name"
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -10 }}
@@ -336,6 +338,7 @@ export function Sidebar() {
             <AnimatePresence>
               {isHovered && (
                 <motion.div 
+                  key="user-profile-info"
                   layout="position"
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -351,6 +354,7 @@ export function Sidebar() {
             <AnimatePresence>
               {isHovered && (
                 <motion.button
+                  key="logout-button"
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.8 }}

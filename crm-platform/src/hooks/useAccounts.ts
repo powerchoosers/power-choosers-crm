@@ -69,6 +69,9 @@ export function useSearchAccounts(queryTerm: string) {
         const { data, error } = await query.limit(10);
 
         if (error) {
+          if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
+            return [];
+          }
           console.error("Search error:", error);
           return [];
         }
@@ -154,10 +157,10 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
 
         if (error) {
           // Suppress logging for aborted requests
-          if (error.message?.includes('Abort')) {
+          if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
             throw error;
           }
-          console.error("Supabase error:", error);
+          console.error("Supabase error fetching accounts:", error);
           throw error;
         }
         
