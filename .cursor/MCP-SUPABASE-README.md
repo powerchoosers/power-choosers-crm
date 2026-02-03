@@ -6,6 +6,7 @@ This project's MCP server (`mcp-server/index.js`) is configured in `.cursor/mcp.
 - **clear_logs** – Clear the debug log file
 - **supabase_migration_list** – List applied and pending Supabase migrations
 - **supabase_db_push** – Apply pending migrations to the linked remote database (optional `dry_run: true` to preview)
+- **supabase_execute_sql** – Run SQL against the linked remote database (file path or raw SQL). **Requires one-time setup below.**
 
 ## Enabling the MCP in Cursor
 
@@ -53,3 +54,21 @@ This project's MCP server (`mcp-server/index.js`) is configured in `.cursor/mcp.
 4. Ask the AI to run **supabase_db_push** (without dry run) to apply the migration.
 
 If there are duplicate rows in `list_members`, the unique constraint will fail. In that case, clean duplicates first (see `.fixes/bulk-import-future-optimization.md`) or remove the constraint from the migration and re-apply after cleanup.
+
+## Running SQL from the MCP (supabase_execute_sql)
+
+So the AI can run fix scripts (e.g. duplicate FK fix) for you without copy-pasting into the Dashboard:
+
+1. **Install MCP dependencies** (once):  
+   From repo root: `cd mcp-server && npm install`
+
+2. **Add database URL** (once):  
+   In project root `.env`, add:
+   ```bash
+   SUPABASE_DB_URL=postgresql://postgres.[PROJECT_REF]:[YOUR_DB_PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres
+   ```
+   Get it from **Supabase Dashboard → Project Settings → Database → Connection string** (use the **URI** for the **Transaction** pooler).
+
+3. **Reload MCP**: Restart Cursor or run **Developer: Reload Window** so the new tool is available.
+
+4. Ask the AI to run the fix, e.g.: *"Run the duplicate FK fix"* or *"Execute supabase/fix_duplicate_fks.sql"*.

@@ -7,11 +7,18 @@ const {
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
+const { Client } = require("pg");
+
+// Load .env from project root so MCP can use SUPABASE_DB_URL
+require("dotenv").config({ path: path.join(path.resolve(__dirname, ".."), ".env") });
 
 // Paths relative to this script (mcp-server/ is inside project root)
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 const LOG_FILE_PATH = path.join(PROJECT_ROOT, ".cursor", "debug.log");
 const MIGRATIONS_DIR = path.join(PROJECT_ROOT, "supabase", "migrations");
+
+const SUPABASE_DB_URL_HELP =
+  "Set SUPABASE_DB_URL in your project root .env file. Get it from: Supabase Dashboard → Project Settings → Database → Connection string (URI). Use the 'Transaction' pooler URI.";
 
 /**
  * Run a Supabase CLI command from the project root.
@@ -97,6 +104,23 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
         },
       },
+      {
+        name: "supabase_execute_sql",
+        description: "Execute SQL against the linked Supabase database. Use either file (path relative to project root, e.g. supabase/fix_duplicate_fks.sql) or sql (raw SQL string). Requires SUPABASE_DB_URL in project root .env (Dashboard → Database → Connection string URI).",
+        inputSchema: {
+          type: "object",
+          properties: {
+            file: {
+              type: "string",
+              description: "Path to a .sql file relative to project root (e.g. supabase/fix_duplicate_fks.sql)",
+            },
+            sql: {
+              type: "string",
+              description: "Raw SQL to execute (alternative to file)",
+            },
+          },
+        },
+      },
     ],
   };
 });
@@ -163,6 +187,56 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       content: [{ type: "text", text }],
       isError: !result.success,
     };
+  }
+
+  if (name === "supabase_execute_sql") {
+    const dbUrl = process.env.SUPABASE_DB_URL;
+    if (!dbUrl || dbUrl.trim() === "") {
+      return {
+        content: [{ type: "text", text: `SUPABASE_DB_URL is not set. ${SUPABASE_DB_URL_HELP}` }],
+        isError: true,
+      };
+    }
+    let sqlText = "";
+    if (args && args.file) {
+      const filePath = path.isAbsolute(args.file) ? args.file : path.join(PROJECT_ROOT, args.file);
+      if (!fs.existsSync(filePath)) {
+        return {
+          content: [{ type: "text", text: `File not found: ${filePath}` }],
+          isError: true,
+        };
+      }
+      sqlText = fs.readFileSync(filePath, "utf8");
+    } else if (args && args.sql) {
+      sqlText = args.sql;
+    } else {
+      return {
+        content: [{ type: "text", text: "Provide either file (path to .sql) or sql (raw string)." }],
+        isError: true,
+      };
+    }
+    const client = new Client({ connectionString: dbUrl });
+    try {
+      await client.connect();
+      const result = await client.query(sqlText);
+      const rows = result.rows || [];
+      const rowCount = result.rowCount != null ? result.rowCount : (Array.isArray(result) ? result.length : 0);
+      let out = "SQL executed successfully.";
+      if (rows.length > 0) {
+        out += "\n\nResult (first 50 rows):\n" + JSON.stringify(rows.slice(0, 50), null, 2);
+      }
+      if (rowCount !== undefined && typeof rowCount === "number" && result.command) {
+        out += `\n\nCommand: ${result.command}, rowCount: ${rowCount}`;
+      }
+      return { content: [{ type: "text", text: out }] };
+    } catch (err) {
+      return {
+        content: [{ type: "text", text: `SQL execution failed: ${err.message}` }],
+        isError: true,
+      };
+    } finally {
+      try { await client.end(); } catch (_) {}
+    }
   }
 
   throw new Error(`Tool not found: ${name}`);

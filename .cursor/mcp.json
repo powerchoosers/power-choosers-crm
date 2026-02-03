@@ -3,6 +3,7 @@
     "crm-debugger": {
       "command": "node",
       "args": ["mcp-server/index.js"],
+      "cwd": "${workspaceFolder}",
       "env": {},
       "disabled": false
     }
