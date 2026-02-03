@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "crm-debugger": {
+      "command": "node",
+      "args": ["mcp-server/index.js"],
+      "env": {},
+      "disabled": false
+    }
+  }
+}

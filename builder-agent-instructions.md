@@ -39,11 +39,24 @@ Migrate all legacy CRM features to the new Next.js application, ensuring a moder
 - **Self-Update Rule**: You are **REQUIRED** to maintain the "Source of Truth". If you change how the app looks or works, update `nodalpoint.md` and this file immediately.
 
 ## 🚀 Server & Development
-1.  **Local Development (Unified)**:
-    -   **URL**: `http://localhost:3000` (Frontend) & `http://localhost:3001` (Backend)
-    -   **Run Command**: `npm run dev:all` (from Root Directory)
-    -   *Note*: This concurrently starts both the Next.js frontend and the Node.js legacy backend.
-2.  **Production Environment**: Refer to `nodalpoint.md` for Cloud Run URLs, region (`us-central1`), and Twilio webhook configurations.
+
+### How to Start the Server (Local Development)
+
+1.  **From the repo root** (e.g. `Power Choosers CRM`), run:
+    ```bash
+    npm run dev:all
+    ```
+2.  This starts **both** processes in one terminal:
+    -   **Next.js (Frontend)** → `http://localhost:3000`
+    -   **Legacy Node backend** → `http://localhost:3001`
+3.  **Stop**: Press `Ctrl+C` in the terminal to stop both processes.
+4.  **Script**: The command runs `node scripts/dev-all.js` (not `concurrently`), which launches Next.js from `crm-platform/` and the legacy backend with `PORT=3001` from the root; no need to run two terminals. This launcher avoids Windows spawn (EPERM) issues.
+
+### Other Commands (Reference)
+
+-   **Frontend only** (from `crm-platform/`): `npm run dev` (Next.js on port 3000).
+-   **Backend only** (from root): `npx nodemon server.js` with `PORT=3001` (or `set PORT=3001` on Windows before running).
+-   **Production Environment**: Refer to `nodalpoint.md` for Cloud Run URLs, region (`us-central1`), and Twilio webhook configurations.
 
 ## ⚠️ Migration Rules
 1.  **No Regression**: Performance must match or exceed legacy features.
