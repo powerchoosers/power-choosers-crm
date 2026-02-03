@@ -25,9 +25,10 @@ import { Button } from '@/components/ui/button'
 interface CallListItemProps {
   call: Call
   contactId: string
+  variant?: 'default' | 'minimal'
 }
 
-export function CallListItem({ call, contactId }: CallListItemProps) {
+export function CallListItem({ call, contactId, variant = 'default' }: CallListItemProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const { status, error, processCall } = useCallProcessor({
     callSid: call.id,
@@ -51,18 +52,20 @@ export function CallListItem({ call, contactId }: CallListItemProps) {
     )}>
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4 flex-1">
-          <div className={cn(
-            "p-3 rounded-xl transition-colors duration-300",
-            call.type === 'Inbound' 
-              ? "bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500/20" 
-              : "bg-[#002FA7]/10 text-[#002FA7] group-hover:bg-[#002FA7]/20"
-          )}>
-            <Phone className="w-5 h-5" />
-          </div>
+          {variant !== 'minimal' && (
+            <div className={cn(
+              "p-3 rounded-xl transition-colors duration-300",
+              call.type === 'Inbound' 
+                ? "bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500/20" 
+                : "bg-[#002FA7]/10 text-[#002FA7] group-hover:bg-[#002FA7]/20"
+            )}>
+              <Phone className="w-5 h-5" />
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <div className="text-sm font-semibold text-white flex items-center justify-between gap-4 w-full">
               <div className="flex items-center gap-3">
-                {call.type} Call
+                {call.type} {variant === 'minimal' ? '' : 'Call'}
                 {isProcessed && (
                   <span className="px-2 py-0.5 rounded border border-white/10 text-[9px] font-mono text-zinc-500 uppercase tracking-widest bg-transparent">
                     [ STATUS: DECRYPTED ]
