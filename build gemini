@@ -22,7 +22,7 @@ The Output Structure (JSON): The AI must return a type: "identity_card" JSON obj
 The Visual (The Card):
 • Container: w-full max-w-md bg-zinc-900/80 border border-white/10 backdrop-blur-xl rounded-2xl overflow-hidden hover:border-[#002FA7]/50 transition-colors cursor-pointer.
 • Header:
-    ◦ Left: A large "Letter Glyph" (e.g., "TS") in a glass square [Source 1185].
+    ◦ Left: A large "Letter Glyph" (e.g., "TS") / Company logo from global logo url rules in a glass squircle from  global icon rules [Source 1185].
     ◦ Right: A "Status LED" (Active/Green or Risk/Red).
 • Body:
     ◦ Name: White, sans-serif, large.
