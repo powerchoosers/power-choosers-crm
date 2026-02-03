@@ -363,9 +363,10 @@ export function useAccountsCount(searchQuery?: string, filters?: AccountFilters,
 export function useCreateAccount() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (newAccount: Omit<Account, 'id'>) => {
+    mutationFn: async (newAccount: Omit<Account, 'id'> & { id?: string }) => {
       // Map frontend fields to DB columns
       const dbAccount = {
+        id: newAccount.id || crypto.randomUUID(),
         name: newAccount.name,
         industry: newAccount.industry,
         domain: newAccount.domain,
@@ -380,7 +381,8 @@ export function useCreateAccount() {
         description: newAccount.description || '',
         metadata: {
           sqft: newAccount.sqft,
-          occupancy: newAccount.occupancy
+          occupancy: newAccount.occupancy,
+          ...newAccount.metadata
         }
       }
 
@@ -390,10 +392,96 @@ export function useCreateAccount() {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase insert error:', error)
+        throw error
+      }
       
-      // Return roughly what we sent, plus ID
       return { id: data.id, ...newAccount }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+    }
+  })
+}
+
+export function useUpsertAccount() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (account: Omit<Account, 'id'> & { id?: string }) => {
+      // 1. Try to find existing account by domain if ID is missing
+      let existingId = account.id;
+      
+      if (!existingId && account.domain) {
+        const { data: existing } = await supabase
+          .from('accounts')
+          .select('id, metadata')
+          .eq('domain', account.domain)
+          .maybeSingle();
+        
+        if (existing) {
+          existingId = existing.id;
+        }
+      }
+
+      const dbAccount: any = {
+        name: account.name,
+        industry: account.industry,
+        domain: account.domain,
+        logo_url: account.logoUrl,
+        phone: account.companyPhone,
+        linkedin_url: account.linkedinUrl,
+        service_addresses: account.serviceAddresses,
+        contract_end_date: account.contractEnd || null,
+        employees: parseInt(account.employees) || null,
+        description: account.description || '',
+        updatedAt: new Date().toISOString()
+      };
+
+      if (account.city) dbAccount.city = account.city;
+      if (account.state) dbAccount.state = account.state;
+      
+      if (!existingId) {
+        dbAccount.id = crypto.randomUUID();
+        dbAccount.metadata = {
+          sqft: account.sqft,
+          occupancy: account.occupancy,
+          ...account.metadata
+        };
+        
+        const { data, error } = await supabase
+          .from('accounts')
+          .insert(dbAccount)
+          .select()
+          .single();
+          
+        if (error) throw error;
+        return { id: data.id, ...account, _isNew: true };
+      } else {
+        // Merge metadata for enrichment
+        const { data: current } = await supabase
+          .from('accounts')
+          .select('metadata')
+          .eq('id', existingId)
+          .single();
+          
+        dbAccount.metadata = {
+          ...(current?.metadata || {}),
+          sqft: account.sqft || current?.metadata?.sqft,
+          occupancy: account.occupancy || current?.metadata?.occupancy,
+          ...account.metadata
+        };
+
+        const { data, error } = await supabase
+          .from('accounts')
+          .update(dbAccount)
+          .eq('id', existingId)
+          .select()
+          .single();
+          
+        if (error) throw error;
+        return { id: data.id, ...account, _isNew: false };
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] })

@@ -706,9 +706,10 @@ export function useContact(id: string) {
 export function useCreateContact() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (newContact: Omit<Contact, 'id'>) => {
+    mutationFn: async (newContact: Omit<Contact, 'id'> & { id?: string }) => {
       // Basic insert - handling linked account is more complex in UI, assuming ID provided if linked
       const dbContact = {
+        id: newContact.id || crypto.randomUUID(),
         name: newContact.name,
         email: newContact.email,
         phone: newContact.phone,
@@ -721,7 +722,8 @@ export function useCreateContact() {
         state: (newContact as any).state || null,
         metadata: {
             company: newContact.company, // Fallback if no account ID
-            domain: newContact.companyDomain
+            domain: newContact.companyDomain,
+            ...newContact.metadata
         }
       }
       
@@ -731,8 +733,93 @@ export function useCreateContact() {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase insert error (contact):', error)
+        throw error
+      }
       return { id: data.id, ...newContact }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+    }
+  })
+}
+
+export function useUpsertContact() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (contact: Omit<Contact, 'id'> & { id?: string }) => {
+      // 1. Try to find existing contact by email if ID is missing
+      let existingId = contact.id;
+      
+      if (!existingId && contact.email) {
+        const { data: existing } = await supabase
+          .from('contacts')
+          .select('id, metadata')
+          .eq('email', contact.email)
+          .maybeSingle();
+        
+        if (existing) {
+          existingId = existing.id;
+        }
+      }
+
+      const dbContact: any = {
+        name: contact.name,
+        email: contact.email,
+        phone: contact.phone,
+        mobile: contact.mobile,
+        workPhone: contact.workPhone,
+        otherPhone: contact.otherPhone,
+        status: contact.status,
+        accountId: contact.accountId || null,
+        updatedAt: new Date().toISOString()
+      };
+
+      if ((contact as any).city) dbContact.city = (contact as any).city;
+      if ((contact as any).state) dbContact.state = (contact as any).state;
+      
+      if (!existingId) {
+        dbContact.id = crypto.randomUUID();
+        dbContact.metadata = {
+          company: contact.company,
+          domain: contact.companyDomain,
+          ...contact.metadata
+        };
+        
+        const { data, error } = await supabase
+          .from('contacts')
+          .insert(dbContact)
+          .select()
+          .single();
+          
+        if (error) throw error;
+        return { id: data.id, ...contact, _isNew: true };
+      } else {
+        // Merge metadata for enrichment
+        const { data: current } = await supabase
+          .from('contacts')
+          .select('metadata')
+          .eq('id', existingId)
+          .single();
+          
+        dbContact.metadata = {
+          ...(current?.metadata || {}),
+          company: contact.company || current?.metadata?.company,
+          domain: contact.companyDomain || current?.metadata?.domain,
+          ...contact.metadata
+        };
+
+        const { data, error } = await supabase
+          .from('contacts')
+          .update(dbContact)
+          .eq('id', existingId)
+          .select()
+          .single();
+          
+        if (error) throw error;
+        return { id: data.id, ...contact, _isNew: false };
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
