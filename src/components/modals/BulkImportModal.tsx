@@ -92,31 +92,80 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
     let existingCount = 0;
     
     try {
-      // We check in batches of 50 to avoid URL length issues or payload limits
-      const batchSize = 50;
+      // Process in batches
+      const batchSize = 25;
       for (let i = 0; i < csvData.length; i += batchSize) {
         const batch = csvData.slice(i, i + batchSize);
-        const mappedIdentifiers: string[] = [];
-
-        batch.forEach(row => {
+        
+        const batchPromises = batch.map(async (row) => {
+          const mappedData: any = {};
           Object.entries(fieldMapping).forEach(([csvHeader, nodalId]) => {
-            if (nodalId === (importVector === 'CONTACTS' ? 'email' : 'website')) {
-              const val = row[csvHeader];
-              if (val) mappedIdentifiers.push(val);
+            if (nodalId && nodalId !== 'skip') {
+              mappedData[nodalId] = row[csvHeader];
             }
           });
+
+          if (importVector === 'ACCOUNTS') {
+            const domain = mappedData.website;
+            const name = mappedData.name;
+
+            // Try domain match
+            if (domain) {
+              const { data } = await supabase
+                .from('accounts')
+                .select('id')
+                .eq('domain', domain)
+                .maybeSingle();
+              if (data) return true;
+            }
+
+            // Try name match
+            if (name) {
+              const { data } = await supabase
+                .from('accounts')
+                .select('id')
+                .ilike('name', name)
+                .maybeSingle();
+              if (data) return true;
+            }
+          } else {
+            const email = mappedData.email;
+            const fName = mappedData.first_name;
+            const lName = mappedData.last_name;
+            const company = mappedData.company_name;
+
+            // Try email match
+            if (email) {
+              const { data } = await supabase
+                .from('contacts')
+                .select('id')
+                .eq('email', email)
+                .maybeSingle();
+              if (data) return true;
+            }
+
+            // Try name + company match
+            if (fName && lName && company) {
+              const { data: nameMatches } = await supabase
+                .from('contacts')
+                .select('id, metadata')
+                .ilike('firstName', fName)
+                .ilike('lastName', lName);
+              
+              if (nameMatches && nameMatches.length > 0) {
+                const companyMatch = nameMatches.find(m => {
+                  const existingCompany = m.metadata?.company || m.metadata?.companyName;
+                  return existingCompany && existingCompany.toLowerCase() === company.toLowerCase();
+                });
+                if (companyMatch) return true;
+              }
+            }
+          }
+          return false;
         });
 
-        if (mappedIdentifiers.length > 0) {
-          const { data, error } = await supabase
-            .from(importVector === 'CONTACTS' ? 'contacts' : 'accounts')
-            .select('id')
-            .in(importVector === 'CONTACTS' ? 'email' : 'domain', mappedIdentifiers);
-
-          if (!error && data) {
-            existingCount += data.length;
-          }
-        }
+        const results = await Promise.all(batchPromises);
+        existingCount += results.filter(Boolean).length;
       }
 
       setAnalysis({
@@ -354,6 +403,8 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
           // Process Contact
           const contactData = {
             name: `${mappedData.first_name || ''} ${mappedData.last_name || ''}`.trim(),
+            firstName: mappedData.first_name || '',
+            lastName: mappedData.last_name || '',
             email: mappedData.email || '',
             phone: mappedData.phone || '',
             mobile: mappedData.mobile_phone || '',

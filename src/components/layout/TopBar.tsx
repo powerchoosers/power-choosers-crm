@@ -442,7 +442,7 @@ export function TopBar() {
                                                 initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                                className="absolute top-full mt-3 right-0 w-48 bg-zinc-950/90 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50"
+                                                className="absolute top-full mt-3 left-1/2 -translate-x-1/2 w-48 bg-zinc-950/90 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50"
                                             >
                                                 <div className="grid grid-cols-3 gap-2">
                                                     {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map((digit) => (
@@ -450,8 +450,6 @@ export function TopBar() {
                                                             key={digit}
                                                             onClick={() => {
                                                                 sendDigits(digit);
-                                                                // Haptic feedback feel
-                                                                toast.success(`Sent: ${digit}`, { duration: 500 });
                                                             }}
                                                             className="h-10 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 text-white font-mono text-sm transition-all active:scale-95"
                                                         >

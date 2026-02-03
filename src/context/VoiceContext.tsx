@@ -23,6 +23,8 @@ interface VoiceMetadata {
   contractEnd?: string
   location?: string
   isAccountOnly?: boolean
+  contactId?: string
+  accountId?: string
 }
 
 interface VoiceContextType {
@@ -67,10 +69,13 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
             meta.name = data.contact.name
             meta.account = data.contact.account
             meta.title = data.contact.title
+            meta.contactId = data.contact.id
+            meta.accountId = data.contact.accountId
           } else if (data.account) {
             meta.name = data.account.name
             meta.logoUrl = data.account.logoUrl
             meta.domain = data.account.domain
+            meta.accountId = data.account.id
           }
           return meta
         }

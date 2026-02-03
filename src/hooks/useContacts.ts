@@ -58,6 +58,25 @@ export type ContactDetail = Contact & {
   primaryPhoneField?: 'mobile' | 'workDirectPhone' | 'otherPhone'
 }
 
+export function useDeleteContacts() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase
+        .from('contacts')
+        .delete()
+        .in('id', ids)
+
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      queryClient.invalidateQueries({ queryKey: ['contacts-count'] })
+    }
+  })
+}
+
 export interface ContactFilters {
   industry?: string[]
   status?: string[]
@@ -385,12 +404,12 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
         // but some contacts might have them directly. We'll check both if possible, or focus on account join
         if (filters?.industry && filters.industry.length > 0) {
           // Filter by account industry
-          query = query.filter('accounts.industry', 'in', `(${filters.industry.map(i => `"${i}"`).join(',')})`);
+          query = query.filter('accounts.industry', 'in', `(${filters.industry.map((i: string) => `"${i}"`).join(',')})`);
         }
         
         if (filters?.location && filters.location.length > 0) {
           // Filter by account location (city or state)
-          const conditions = filters.location.flatMap(loc => [
+          const conditions = filters.location.flatMap((loc: string) => [
             `city.ilike.%${loc}%`,
             `state.ilike.%${loc}%`
           ]).join(',');
@@ -544,11 +563,11 @@ export function useContactsCount(searchQuery?: string, filters?: ContactFilters,
       }
       
       if (filters?.industry && filters.industry.length > 0) {
-        query = query.filter('accounts.industry', 'in', `(${filters.industry.map(i => `"${i}"`).join(',')})`);
+        query = query.filter('accounts.industry', 'in', `(${filters.industry.map((i: string) => `"${i}"`).join(',')})`);
       }
       
       if (filters?.location && filters.location.length > 0) {
-        const conditions = filters.location.flatMap(loc => [
+        const conditions = filters.location.flatMap((loc: string) => [
           `city.ilike.%${loc}%`,
           `state.ilike.%${loc}%`
         ]).join(',');
@@ -749,23 +768,48 @@ export function useUpsertContact() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (contact: Omit<Contact, 'id'> & { id?: string }) => {
-      // 1. Try to find existing contact by email if ID is missing
+      // 1. Try to find existing contact by email or name+company if ID is missing
       let existingId = contact.id;
       
-      if (!existingId && contact.email) {
-        const { data: existing } = await supabase
-          .from('contacts')
-          .select('id, metadata')
-          .eq('email', contact.email)
-          .maybeSingle();
+      if (!existingId) {
+        if (contact.email) {
+          const { data: existing } = await supabase
+            .from('contacts')
+            .select('id, metadata')
+            .eq('email', contact.email)
+            .maybeSingle();
+          
+          if (existing) {
+            existingId = existing.id;
+          }
+        }
         
-        if (existing) {
-          existingId = existing.id;
+        // Fallback: Try to find by first name, last name, and company if no email match found
+        if (!existingId && contact.firstName && contact.lastName && contact.company) {
+          const { data: nameMatches } = await supabase
+            .from('contacts')
+            .select('id, metadata')
+            .ilike('firstName', contact.firstName)
+            .ilike('lastName', contact.lastName);
+            
+          if (nameMatches && nameMatches.length > 0) {
+            // Filter by company name in metadata
+            const companyMatch = nameMatches.find(m => {
+              const existingCompany = m.metadata?.company || m.metadata?.companyName;
+              return existingCompany && existingCompany.toLowerCase() === contact.company.toLowerCase();
+            });
+            
+            if (companyMatch) {
+              existingId = companyMatch.id;
+            }
+          }
         }
       }
 
       const dbContact: any = {
         name: contact.name,
+        firstName: contact.firstName,
+        lastName: contact.lastName,
         email: contact.email,
         phone: contact.phone,
         mobile: contact.mobile,

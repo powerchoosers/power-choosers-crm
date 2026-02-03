@@ -28,7 +28,8 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
       supplier: account.electricitySupplier,
       currentRate: account.currentRate,
       contractEnd: account.contractEnd,
-      isAccountOnly: true
+      isAccountOnly: true,
+      accountId: account.id
     })
   }
 

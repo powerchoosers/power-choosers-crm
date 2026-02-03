@@ -16,6 +16,8 @@ interface ClickToCallButtonProps {
   className?: string
   children?: React.ReactNode
   isCompany?: boolean
+  contactId?: string
+  accountId?: string
 }
 
 export const ClickToCallButton: React.FC<ClickToCallButtonProps> = ({
@@ -28,7 +30,9 @@ export const ClickToCallButton: React.FC<ClickToCallButtonProps> = ({
   size = 'icon',
   className,
   children,
-  isCompany = false
+  isCompany = false,
+  contactId,
+  accountId
 }) => {
   const initiateCall = useCallStore((state) => state.initiateCall)
 
@@ -39,12 +43,18 @@ export const ClickToCallButton: React.FC<ClickToCallButtonProps> = ({
     if (!phoneNumber) return
 
     const metadata = isCompany 
-      ? { name: account || name }
+      ? { 
+          name: account || name,
+          accountId,
+          isAccountOnly: true
+        }
       : { 
           name, 
           account,
           title,
-          logoUrl
+          logoUrl,
+          contactId,
+          accountId
         }
 
     initiateCall(phoneNumber, metadata)
