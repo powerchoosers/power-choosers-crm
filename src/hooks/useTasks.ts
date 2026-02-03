@@ -54,13 +54,21 @@ export function useTasks(searchQuery?: string) {
           .range(from, to)
           .order('createdAt', { ascending: false })
         
-        if (error) throw error
+        if (error) {
+          if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
+            throw error;
+          }
+          throw error
+        }
         
         return {
           tasks: (data || []) as Task[],
           nextCursor: count && (pageParam + 1) * PAGE_SIZE < count ? pageParam + 1 : null
         }
-      } catch (error: unknown) {
+      } catch (error: any) {
+        if (error?.name === 'AbortError' || error?.message?.includes('Abort') || error?.message === 'FetchUserError: Request was aborted') {
+          throw error;
+        }
         console.error('Error fetching tasks:', error)
         throw error
       }
@@ -176,6 +184,9 @@ export function useTasksCount(searchQuery?: string) {
 
         const { count, error } = await query
         if (error) {
+          if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
+            return 0
+          }
           console.error("Supabase error fetching tasks count:", {
             message: error.message,
             details: error.details,
@@ -218,12 +229,18 @@ export function useSearchTasks(queryTerm: string) {
         const { data, error } = await query.limit(10)
 
         if (error) {
+          if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
+            return []
+          }
           console.error("Search error:", error)
           return []
         }
 
         return data as Task[]
-      } catch (err) {
+      } catch (err: any) {
+        if (err?.name === 'AbortError' || err?.message?.includes('Abort') || err?.message === 'FetchUserError: Request was aborted') {
+          return []
+        }
         console.error("Search hook error:", err)
         return []
       }

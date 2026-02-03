@@ -9,6 +9,14 @@ interface CallState {
     account?: string
     title?: string
     logoUrl?: string
+    industry?: string
+    description?: string
+    linkedinUrl?: string
+    annualUsage?: string
+    supplier?: string
+    currentRate?: string
+    contractEnd?: string
+    location?: string
   } | null
   setActive: (active: boolean) => void
   setStatus: (status: CallState['status']) => void

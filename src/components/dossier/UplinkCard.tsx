@@ -40,7 +40,16 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
           name: contact.name, 
           account: contact.companyName || contact.company,
           title: contact.title,
-          logoUrl: contact.logoUrl
+          logoUrl: contact.logoUrl,
+          // Expanded Context for AI Script Generation
+          industry: contact.industry,
+          description: contact.accountDescription,
+          linkedinUrl: contact.linkedinUrl,
+          annualUsage: contact.annualUsage,
+          supplier: contact.electricitySupplier,
+          currentRate: contact.currentRate,
+          contractEnd: contact.contractEnd,
+          location: contact.location
         }
 
     initiateCall(phone.value, metadata)
