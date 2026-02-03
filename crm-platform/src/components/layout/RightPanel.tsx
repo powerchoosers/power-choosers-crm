@@ -1,7 +1,7 @@
 'use client'
 
 import { 
-  Zap, CheckCircle, Play, DollarSign, Mic, ChevronRight, Plus 
+  Zap, CheckCircle, Play, DollarSign, Mic, ChevronRight, Plus, AlertCircle 
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useParams, usePathname } from 'next/navigation'
@@ -9,11 +9,10 @@ import { format } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useContact } from '@/hooks/useContacts'
 import { useAccount } from '@/hooks/useAccounts'
-import { useCallStore } from '@/store/callStore'
 import { useTasks } from '@/hooks/useTasks'
-import { ActiveCallInterface } from '../calls/ActiveCallInterface'
 import { cn } from '@/lib/utils'
 import { useMemo } from 'react'
+import { useMarketPulse } from '@/hooks/useMarketPulse'
 
 // Widgets
 import TelemetryWidget from '../crm/TelemetryWidget'
@@ -40,14 +39,12 @@ export function RightPanel() {
   const { data: contact } = useContact(isContactPage ? entityId : '')
   const { data: account } = useAccount(isAccountPage ? entityId : '')
   
-  const { isActive, status } = useCallStore()
-  const isCallActive = isActive && (status === 'connected' || status === 'dialing')
-  
   const [isReady, setIsReady] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   const { data: tasksData } = useTasks()
+  const { isError: isMarketError } = useMarketPulse()
   
   const taskCounts = useMemo(() => {
     const tasks = tasksData?.pages.flatMap(page => page.tasks) || []
@@ -70,7 +67,7 @@ export function RightPanel() {
 
     container.addEventListener('scroll', handleScroll)
     return () => container.removeEventListener('scroll', handleScroll)
-  }, [isReady, isCallActive])
+  }, [isReady])
 
   if (!isReady) return <aside className="fixed right-0 top-0 bottom-0 z-30 w-80 bg-zinc-950 border-l border-white/5 hidden lg:flex" />
 
@@ -124,21 +121,6 @@ export function RightPanel() {
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden relative">
-        <AnimatePresence>
-          {isCallActive && (
-            <motion.div
-              key="active-call-overlay"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="z-40 border-b border-white/10 bg-zinc-950 px-6 py-4 pt-28"
-            >
-              <ActiveCallInterface contact={contact} account={account} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         <motion.div 
           key="content-wrapper"
           ref={scrollContainerRef}
@@ -209,8 +191,17 @@ export function RightPanel() {
                   <div className="flex items-center justify-between">
                     <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Market_Pulse</h3>
                     <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                      <span className="text-[9px] font-mono text-green-500 uppercase tracking-widest">Live</span>
+                      {isMarketError ? (
+                        <div className="flex items-center gap-1.5 text-rose-500 animate-pulse">
+                          <AlertCircle size={10} />
+                          <span className="text-[9px] font-mono uppercase tracking-widest">error in read</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-[#002FA7] animate-pulse">
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#002FA7]" />
+                          <span className="text-[9px] font-mono uppercase tracking-widest">Live</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <MarketPulseWidget />
