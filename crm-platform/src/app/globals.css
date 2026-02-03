@@ -233,6 +233,14 @@
     animation: subtle-pulse 3s infinite;
   }
 
+  /* Nodal Ingestion Input Style */
+  .nodal-input {
+    @apply w-full bg-zinc-900/50 border border-white/10 rounded px-3 py-2 text-xs font-mono text-white placeholder:text-zinc-700 outline-none transition-all;
+  }
+  .nodal-input:focus {
+    @apply border-[#002FA7] bg-zinc-900 ring-1 ring-[#002FA7]/20;
+  }
+
   @keyframes subtle-pulse {
     0%, 100% { box-shadow: 0 0 0 0 rgba(0, 47, 167, 0.2); }
     50% { box-shadow: 0 0 0 12px rgba(0, 47, 167, 0); }

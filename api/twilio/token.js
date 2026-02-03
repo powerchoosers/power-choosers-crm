@@ -115,7 +115,7 @@ export default async function handler(req, res) {
       apiKeySecret,
       { 
         identity: identity,
-        ttl: 3600 // 1 hour expiration
+        ttl: 86400 // 24 hours expiration
       }
     );
     

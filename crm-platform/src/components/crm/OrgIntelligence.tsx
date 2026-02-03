@@ -1,6 +1,6 @@
 'use client'
 import { useState, useMemo, useEffect } from 'react';
-import { Users, Search, Lock, Unlock, ShieldCheck, Loader2, ChevronLeft, ChevronRight, Globe, MapPin, Linkedin, Phone, ExternalLink, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { Users, Search, Lock, Unlock, ShieldCheck, Loader2, ChevronLeft, ChevronRight, Globe, MapPin, Linkedin, Phone, ExternalLink, ChevronDown, ChevronUp, Sparkles, Mail } from 'lucide-react';
 import Image from 'next/image';
 import { CompanyIcon } from '@/components/ui/CompanyIcon';
 import { supabase } from '@/lib/supabase';
@@ -27,6 +27,7 @@ interface ApolloContactRow {
   isMonitored?: boolean;
   location?: string;
   linkedin?: string;
+  crmId?: string;
   phones?: string[];
 }
 
@@ -225,12 +226,15 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     saveToSupabase(key, cacheData);
   };
 
-  const handleAcquire = async (person: ApolloContactRow) => {
+  const handleAcquire = async (person: ApolloContactRow, type: 'email' | 'phone' | 'both' = 'both') => {
     if (!accountId) {
       toast.error('No account ID provided for acquisition');
       return;
     }
     
+    const revealEmails = type === 'email' || type === 'both';
+    const revealPhones = type === 'phone' || type === 'both';
+
     setAcquiringEmail(person.id);
     
     try {
@@ -245,9 +249,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         },
         body: JSON.stringify({
           contactIds: [person.id],
-          revealEmails: true,
-          revealPhones: true,
-          company: { name: companyName, domain: domain }
+          revealEmails,
+          revealPhones,
+          company: { name: companySummary?.name || companyName, domain: domain }
         })
       });
 
@@ -268,34 +272,79 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
 
       if (!enriched) throw new Error('No enrichment data available');
 
-      // 2. Insert into Supabase
-      const { error } = await supabase
-        .from('contacts')
-        .insert({
-          name: enriched.fullName || person.name,
-          first_name: enriched.firstName || person.firstName,
-          last_name: enriched.lastName || person.lastName,
-          title: enriched.jobTitle || person.title,
-          email: enriched.email || person.email,
-          accountId: accountId,
-          companyName: companyName,
-          status: 'Active',
-          metadata: {
-            source: 'Apollo Organizational Intelligence',
-            acquired_at: new Date().toISOString(),
-            original_apollo_data: enriched
-          }
-        });
+      // 2. Insert or Update Supabase
+      let crmId = person.crmId;
+      
+      const contactData = {
+        name: enriched.fullName || person.name,
+        first_name: enriched.firstName || person.firstName,
+        last_name: enriched.lastName || person.lastName,
+        title: enriched.jobTitle || person.title,
+        email: enriched.email || person.email,
+        accountId: accountId,
+        company: companySummary?.name || companyName || domain,
+        status: 'Active',
+        metadata: {
+          source: 'Apollo Organizational Intelligence',
+          acquired_at: new Date().toISOString(),
+          original_apollo_data: enriched
+        }
+      };
 
-      if (error) throw error;
+      if (crmId) {
+        // Update existing
+        const { error } = await supabase
+          .from('contacts')
+          .update(contactData)
+          .eq('id', crmId);
+        if (error) throw error;
+      } else {
+        // Check if email exists to avoid duplicates if not monitored
+        if (contactData.email && contactData.email !== 'N/A') {
+             const { data: existing } = await supabase
+               .from('contacts')
+               .select('id')
+               .eq('email', contactData.email)
+               .single();
+             
+             if (existing) {
+                crmId = existing.id;
+                const { error } = await supabase
+                  .from('contacts')
+                  .update(contactData)
+                  .eq('id', crmId);
+                if (error) throw error;
+             } else {
+                // Insert new
+                const { data: newContact, error } = await supabase
+                  .from('contacts')
+                  .insert(contactData)
+                  .select()
+                  .single();
+                if (error) throw error;
+                crmId = newContact.id;
+             }
+        } else {
+             // Fallback insert if no email (unlikely for valid contact but possible)
+             const { data: newContact, error } = await supabase
+               .from('contacts')
+               .insert(contactData)
+               .select()
+               .single();
+             if (error) throw error;
+             crmId = newContact.id;
+        }
+      }
 
-      toast.success(`${person.name} revealed & synced`);
+      const typeLabel = type === 'both' ? 'details' : type === 'email' ? 'email' : 'phone';
+      toast.success(`${person.name} ${typeLabel} revealed & synced`);
       
       // 3. Update local state
       setData(prev => prev.map(p => 
         p.id === person.id ? { 
           ...p, 
           isMonitored: true,
+          crmId: crmId,
           name: enriched.fullName || p.name,
           firstName: enriched.firstName || p.firstName,
           lastName: enriched.lastName || p.lastName,
@@ -353,9 +402,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         body: JSON.stringify({
           page: 1,
           per_page: 50,
-          q_organization_domains: domain || undefined,
+          q_organization_domains: (initialDomain || website) ? domain : undefined,
           q_organization_name: companyName || undefined,
-          q_keywords: 'owner, founder, c-level, vp, director, manager'
+          person_titles: ['owner', 'founder', 'c-level', 'vp', 'director', 'manager']
         }),
       });
 
@@ -922,19 +971,34 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                             </div>
                           </>
                         ) : (
-                          <button 
-                            onClick={() => handleAcquire(person)}
-                          disabled={acquiringEmail === person.id}
-                          className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
-                          title="Reveal & Monitor"
-                        >
-                          {acquiringEmail === person.id ? (
-                            <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
-                          ) : (
-                            <Lock className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
-                          )}
-                          Reveal
-                        </button>
+                          <div className="flex items-center gap-1">
+                            <button 
+                              onClick={() => handleAcquire(person, 'email')}
+                              disabled={acquiringEmail === person.id}
+                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
+                              title="Reveal Email"
+                            >
+                              {acquiringEmail === person.id ? (
+                                <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
+                              ) : (
+                                <Mail className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
+                              )}
+                              Email
+                            </button>
+                            <button 
+                              onClick={() => handleAcquire(person, 'phone')}
+                              disabled={acquiringEmail === person.id}
+                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
+                              title="Reveal Phone"
+                            >
+                              {acquiringEmail === person.id ? (
+                                <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
+                              ) : (
+                                <Phone className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
+                              )}
+                              Phone
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -942,11 +1006,25 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                     {/* GATED DETAILS */}
                     {person.isMonitored ? (
                       <div className="flex flex-wrap gap-x-3 gap-y-1.5 pt-1 border-t border-white/5">
-                        {person.email !== 'N/A' && (
+                        {person.email !== 'N/A' ? (
                           <div className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-400 uppercase tracking-tighter">
                             <Globe className="w-2.5 h-2.5 text-zinc-600" />
                             {person.email}
                           </div>
+                        ) : (
+                           <button 
+                              onClick={() => handleAcquire(person, 'email')}
+                              disabled={acquiringEmail === person.id}
+                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
+                              title="Reveal Email"
+                            >
+                              {acquiringEmail === person.id ? (
+                                <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
+                              ) : (
+                                <Mail className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
+                              )}
+                              Email
+                            </button>
                         )}
                         {person.location && (
                           <div className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-tighter">
@@ -954,7 +1032,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                             {person.location}
                           </div>
                         )}
-                        {person.phones && person.phones.length > 0 && (
+                        {person.phones && person.phones.length > 0 ? (
                           <div className="flex items-center gap-1.5">
                             {person.phones.map((phone) => (
                               <button
@@ -974,6 +1052,20 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                               </button>
                             ))}
                           </div>
+                        ) : (
+                            <button 
+                              onClick={() => handleAcquire(person, 'phone')}
+                              disabled={acquiringEmail === person.id}
+                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
+                              title="Reveal Phone"
+                            >
+                              {acquiringEmail === person.id ? (
+                                <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
+                              ) : (
+                                <Phone className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
+                              )}
+                              Phone
+                            </button>
                         )}
                       </div>
                     ) : (

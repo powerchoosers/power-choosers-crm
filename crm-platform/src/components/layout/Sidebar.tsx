@@ -22,8 +22,10 @@ import {
   Activity, 
   FileText, 
   Settings, 
-  LogOut
+  LogOut,
+  Plus
 } from 'lucide-react'
+import { useUIStore } from '@/store/uiStore'
 
 const navigationStructure = [
   // ZONE 1: COMMAND (The Overview)
@@ -82,6 +84,7 @@ const navigationStructure = [
 ];
 
 export function Sidebar() {
+  const { setRightPanelMode } = useUIStore()
   const pathname = usePathname()
   const router = useRouter()
   const { user, role } = useAuth()
@@ -210,7 +213,7 @@ export function Sidebar() {
               )}
             </AnimatePresence>
             
-            {group.items.map((item) => {
+            {group.items.map((item: any) => {
               const isActive = pathname === item.href
               
               const content = (
@@ -243,15 +246,22 @@ export function Sidebar() {
                     layout
                     className="flex-shrink-0 w-12 flex justify-center items-center relative z-10"
                   >
-                    <item.icon 
-                      size={20} 
-                      className={cn(
-                        "transition-all duration-300", 
-                        isActive 
-                          ? "text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]" 
-                          : "text-zinc-500 group-hover:text-zinc-200 group-hover:scale-110"
-                      )} 
-                    />
+                    <div className="relative">
+                      <item.icon 
+                        size={20} 
+                        className={cn(
+                          "transition-all duration-300", 
+                          isActive 
+                            ? "text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]" 
+                            : "text-zinc-500 group-hover:text-zinc-200 group-hover:scale-110"
+                        )} 
+                      />
+                      {item.isAction && (
+                        <div className="absolute -top-1 -right-1">
+                          <Plus size={8} className="text-white fill-white" />
+                        </div>
+                      )}
+                    </div>
                   </motion.div>
                   
                   <AnimatePresence mode="popLayout">
@@ -272,11 +282,24 @@ export function Sidebar() {
               );
 
               const buttonClasses = cn(
-           "flex items-center rounded-xl group relative h-12 justify-start w-full overflow-hidden",
-           isActive 
-             ? "text-white" 
-             : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.02]"
-         );
+                "flex items-center rounded-xl group relative h-12 justify-start w-full overflow-hidden",
+                isActive 
+                  ? "text-white" 
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.02]"
+              );
+
+              if (item.isAction) {
+                return (
+                  <motion.div layout key={item.name}>
+                    <button
+                      onClick={() => setRightPanelMode(item.action)}
+                      className={buttonClasses}
+                    >
+                      {content}
+                    </button>
+                  </motion.div>
+                )
+              }
 
               return (
                 <motion.div layout key={item.href}>

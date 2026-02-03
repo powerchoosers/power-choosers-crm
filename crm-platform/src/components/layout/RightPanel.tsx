@@ -13,6 +13,8 @@ import { useTasks } from '@/hooks/useTasks'
 import { cn } from '@/lib/utils'
 import { useMemo } from 'react'
 import { useMarketPulse } from '@/hooks/useMarketPulse'
+import { useUIStore } from '@/store/uiStore'
+import { NodeIngestion } from '../right-panel/NodeIngestion'
 
 // Widgets
 import TelemetryWidget from '../crm/TelemetryWidget'
@@ -27,6 +29,7 @@ import OrgIntelligence from '../crm/OrgIntelligence'
 import { mapLocationToZone } from '@/lib/market-mapping'
 
 export function RightPanel() {
+  const { rightPanelMode } = useUIStore()
   const pathname = usePathname()
   const params = useParams()
   
@@ -57,19 +60,15 @@ export function RightPanel() {
     setIsReady(true)
   }, [])
 
-  useEffect(() => {
-    const container = scrollContainerRef.current
-    if (!container) return
-
-    const handleScroll = () => {
-      setIsScrolled(container.scrollTop > 10)
-    }
-
-    container.addEventListener('scroll', handleScroll)
-    return () => container.removeEventListener('scroll', handleScroll)
-  }, [isReady])
-
   if (!isReady) return <aside className="fixed right-0 top-0 bottom-0 z-30 w-80 bg-zinc-950 border-l border-white/5 hidden lg:flex" />
+
+  if (rightPanelMode !== 'DEFAULT') {
+    return (
+      <aside className="fixed right-0 top-0 bottom-0 z-30 w-80 bg-zinc-950 border-l border-white/5 flex flex-col overflow-hidden hidden lg:flex">
+        <NodeIngestion />
+      </aside>
+    )
+  }
 
   const city = contact?.city || account?.metadata?.city || account?.metadata?.general?.city;
   const state = contact?.state || account?.metadata?.state || account?.metadata?.general?.state;
@@ -86,8 +85,8 @@ export function RightPanel() {
       <div className={cn(
         "absolute top-0 left-0 right-0 z-50 px-6 h-24 flex items-center justify-between select-none transition-all duration-300 ease-in-out",
         isScrolled 
-          ? "bg-zinc-950/80 backdrop-blur-xl border-b border-white/5 shadow-[0_0_30px_rgba(0,0,0,0.5)] backdrop-saturate-150" 
-          : "bg-transparent border-b border-transparent"
+          ? "bg-zinc-950/80 backdrop-blur-xl border-b border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.5)] backdrop-saturate-150" 
+          : "bg-transparent"
       )}>
         {/* 1. THE LIVE INDICATOR */}
         <div className="flex items-center gap-2">
@@ -124,6 +123,12 @@ export function RightPanel() {
         <motion.div 
           key="content-wrapper"
           ref={scrollContainerRef}
+          onScroll={(e) => {
+            const target = e.currentTarget;
+            if (target.scrollTop > 10 !== isScrolled) {
+              setIsScrolled(target.scrollTop > 10);
+            }
+          }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
