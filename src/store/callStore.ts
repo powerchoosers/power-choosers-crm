@@ -17,6 +17,7 @@ interface CallState {
     currentRate?: string
     contractEnd?: string
     location?: string
+    isAccountOnly?: boolean
   } | null
   setActive: (active: boolean) => void
   setStatus: (status: CallState['status']) => void
