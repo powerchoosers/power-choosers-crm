@@ -92,6 +92,9 @@ export function useCallsCount(searchQuery?: string) {
 
         const { count, error } = await query
         if (error) {
+          if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
+            return 0
+          }
           console.error("Supabase error fetching calls count:", {
             message: error.message,
             details: error.details,
@@ -256,7 +259,12 @@ export function useAccountCalls(accountId: string) {
         .select('id')
         .eq('accountId', accountId)
 
-      if (contactsError) throw contactsError
+      if (contactsError) {
+        if (contactsError.message?.includes('Abort') || contactsError.message === 'FetchUserError: Request was aborted') {
+          throw contactsError
+        }
+        throw contactsError
+      }
       
       const contactIds = (contacts || []).map(c => c.id)
       if (contactIds.length === 0) return []

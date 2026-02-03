@@ -12,7 +12,12 @@ export function useTargets() {
         .from('lists')
         .select('*, list_members(count)')
       
-      if (error) throw error
+      if (error) {
+        if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
+          throw error;
+        }
+        throw error
+      }
       
       // Transform data to include count
       return (data as (Target & { list_members: { count: number }[] })[]).map((list) => ({
@@ -72,7 +77,12 @@ export function useTarget(id: string) {
         .eq('id', id)
         .single()
       
-      if (error) throw error
+      if (error) {
+        if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
+          throw error;
+        }
+        throw error
+      }
       
       const target = data as (Target & { list_members: { count: number }[] })
       return {
@@ -105,6 +115,9 @@ export function useSearchTargets(queryTerm: string) {
         const { data, error } = await query.limit(10)
 
         if (error) {
+          if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
+            return []
+          }
           console.error("Search error:", error)
           return []
         }
@@ -113,8 +126,11 @@ export function useSearchTargets(queryTerm: string) {
           ...list,
           count: list.list_members?.[0]?.count || 0
         })) as Target[]
-      } catch (err) {
-        console.error("Search hook error:", err)
+      } catch (error: any) {
+        if (error?.name === 'AbortError' || error?.message?.includes('Abort') || error?.message === 'FetchUserError: Request was aborted') {
+          return []
+        }
+        console.error("Search hook error:", error)
         return []
       }
     },

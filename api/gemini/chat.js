@@ -1070,7 +1070,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    const { messages, userProfile } = req.body;
+    const { messages, userProfile, jsonMode } = req.body;
     if (!messages || !Array.isArray(messages)) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Invalid messages format' }));
@@ -1602,7 +1602,7 @@ export default async function handler(req, res) {
       return false;
     };
 
-    if (await maybeHandleGroundedCrmRequest()) return;
+    if (!jsonMode && await maybeHandleGroundedCrmRequest()) return;
 
     const buildSystemPrompt = () => {
       return `
@@ -1761,21 +1761,34 @@ export default async function handler(req, res) {
       if (!apiKey) throw new Error('OpenRouter API key not configured');
 
       const model = modelName || 'openai/gpt-oss-120b:free';
-      const openAiTools = convertToolsToOpenAI(tools);
+      const openAiTools = jsonMode ? undefined : convertToolsToOpenAI(tools);
       
-      let currentMessages = [
-        { role: 'system', content: buildSystemPrompt().trim() },
-        ...cleanedMessages.slice(-15).map(m => {
-          const msg = {
-            role: m.role === 'tool' ? 'tool' : (m.role === 'user' ? 'user' : 'assistant'),
-            content: m.content || null,
-          };
-          if (m.tool_calls) msg.tool_calls = m.tool_calls;
-          if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
-          if (m.name) msg.name = m.name;
-          return msg;
-        })
-      ];
+      const hasSystemPrompt = cleanedMessages.some(m => m.role === 'system');
+      
+      let currentMessages = hasSystemPrompt 
+        ? cleanedMessages.slice(-15).map(m => {
+            const msg = {
+              role: m.role === 'tool' ? 'tool' : (m.role === 'user' ? 'user' : (m.role === 'system' ? 'system' : 'assistant')),
+              content: m.content || null,
+            };
+            if (m.tool_calls) msg.tool_calls = m.tool_calls;
+            if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
+            if (m.name) msg.name = m.name;
+            return msg;
+          })
+        : [
+            { role: 'system', content: buildSystemPrompt().trim() },
+            ...cleanedMessages.slice(-15).map(m => {
+              const msg = {
+                role: m.role === 'tool' ? 'tool' : (m.role === 'user' ? 'user' : 'assistant'),
+                content: m.content || null,
+              };
+              if (m.tool_calls) msg.tool_calls = m.tool_calls;
+              if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
+              if (m.name) msg.name = m.name;
+              return msg;
+            })
+          ];
       
       // Ensure the last message is from the user if it's not already
       if (currentMessages[currentMessages.length - 1].role !== 'user') {
@@ -2177,11 +2190,15 @@ export default async function handler(req, res) {
           timestamp: new Date().toISOString()
         });
 
+        const systemPrompt = hasSystemPrompt 
+          ? cleanedMessages.find(m => m.role === 'system')?.content 
+          : buildSystemPrompt();
+
         console.log(`[Gemini Chat] Attempting request with model: ${modelName}`);
         const model = genAI.getGenerativeModel({
           model: modelName,
-          tools,
-          systemInstruction: buildSystemPrompt(),
+          tools: jsonMode ? undefined : tools,
+          systemInstruction: systemPrompt,
         });
 
         const chat = model.startChat({

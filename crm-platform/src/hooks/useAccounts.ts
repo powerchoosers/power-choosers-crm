@@ -83,8 +83,11 @@ export function useSearchAccounts(queryTerm: string) {
           domain: item.domain || '',
           logoUrl: item.logo_url || '',
         }));
-      } catch (err) {
-        console.error("Search hook error:", err);
+      } catch (error: any) {
+        if (error?.name === 'AbortError' || error?.message?.includes('Abort') || error?.message === 'FetchUserError: Request was aborted') {
+          return [];
+        }
+        console.error("Search hook error:", error);
         return [];
       }
     },
@@ -205,7 +208,10 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
           accounts, 
           nextCursor: hasNextPage ? pageParam + 1 : null
         };
-      } catch (error) {
+      } catch (error: any) {
+        if (error?.name === 'AbortError' || error?.message?.includes('Abort') || error?.message === 'FetchUserError: Request was aborted') {
+          throw error;
+        }
         console.error("Error fetching accounts from Supabase:", error);
         throw error;
       }
@@ -232,6 +238,9 @@ export function useAccount(id: string) {
         .single()
 
       if (error) {
+        if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
+          throw error;
+        }
         console.error("Error fetching account from Supabase:", error)
         throw error
       }
@@ -332,6 +341,9 @@ export function useAccountsCount(searchQuery?: string, filters?: AccountFilters,
       const { count, error } = await query
 
       if (error) {
+        if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
+          return 0;
+        }
         console.error("Supabase error fetching accounts count:", {
           message: error.message,
           details: error.details,

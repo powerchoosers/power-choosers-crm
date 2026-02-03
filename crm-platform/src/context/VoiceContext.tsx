@@ -13,6 +13,14 @@ interface VoiceMetadata {
   title?: string
   logoUrl?: string
   domain?: string
+  industry?: string
+  description?: string
+  linkedinUrl?: string
+  annualUsage?: string
+  supplier?: string
+  currentRate?: string
+  contractEnd?: string
+  location?: string
 }
 
 interface VoiceContextType {

@@ -12,11 +12,20 @@ import {
   User,
   Clock,
   ArrowRight,
-  Activity as ActivityIcon
+  Activity as ActivityIcon,
+  Sparkles
 } from 'lucide-react'
+
+interface ScriptResult {
+  opener: string;
+  hook: string;
+  disturb: string;
+  close: string;
+}
 import { useAI } from '@/hooks/useAI'
 import { useCallStore } from '@/store/callStore'
 import { useVoice } from '@/context/VoiceContext'
+import { useAuth } from '@/context/AuthContext'
 import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
@@ -26,12 +35,13 @@ interface ActiveCallInterfaceProps {
 }
 
 export function ActiveCallInterface({ contact, account }: ActiveCallInterfaceProps) {
-  const [aiResponse, setAiResponse] = useState<string | null>(null)
+  const [aiResponse, setAiResponse] = useState<ScriptResult | null>(null)
   const [loadingVector, setLoadingVector] = useState<string | null>(null)
   const [liveInput, setLiveInput] = useState('')
-  const { generateScript } = useAI()
+  const { generateScript, isLoading } = useAI()
   const { metadata: storeMetadata, status, isActive } = useCallStore()
   const { metadata: voiceMetadata } = useVoice()
+  const { profile } = useAuth()
   
   const metadata = isActive ? (voiceMetadata || storeMetadata) : storeMetadata
   
@@ -41,7 +51,15 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
   const displayContact = contact || {
     name: metadata?.name || 'Unknown Node',
     title: metadata?.title || 'Operational Lead',
-    company: metadata?.account || 'Unknown Asset'
+    company: metadata?.account || 'Unknown Asset',
+    industry: metadata?.industry,
+    description: metadata?.description,
+    linkedinUrl: metadata?.linkedinUrl,
+    annualUsage: metadata?.annualUsage,
+    supplier: metadata?.supplier,
+    currentRate: metadata?.currentRate,
+    contractEnd: metadata?.contractEnd,
+    location: metadata?.location
   }
 
   const handleVectorClick = async (vector: string) => {
@@ -51,10 +69,25 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
     const payload = {
       vector_type: vector,
       contact_context: {
+        // Agent Info
+        agent_name: profile?.firstName || 'Trey',
+        agent_title: profile?.jobTitle || 'Energy Consultant',
+        
+        // Contact/Account Context
+        name: displayContact.name,
         title: displayContact.title,
-        industry: account?.industry || 'Unknown',
-        load_zone: account?.loadZone || 'LZ_NORTH',
-        contract_end: account?.contractEndDate || 'UNKNOWN',
+        company: displayContact.company,
+        industry: displayContact.industry || account?.industry || 'Unknown',
+        description: displayContact.description || account?.description,
+        linkedin_url: displayContact.linkedinUrl || account?.linkedinUrl,
+        location: displayContact.location || account?.location,
+        
+        // Energy Specifics
+        annual_usage: displayContact.annualUsage || account?.annualUsage,
+        supplier: displayContact.supplier || account?.electricitySupplier,
+        current_rate: displayContact.currentRate || account?.currentRate,
+        contract_end: displayContact.contractEnd || account?.contractEndDate || 'UNKNOWN',
+        
         additional_context: vector === 'LIVE_PIVOT' ? liveInput : undefined
       }
     }
@@ -116,23 +149,39 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
       <ScrollArea className="flex-1">
         <div className="p-6 flex flex-col gap-6">
           <AnimatePresence mode="wait">
-            {aiResponse ? (
+            {loadingVector ? (
+              <NeuralScan key="loading" />
+            ) : aiResponse ? (
               <motion.div 
+                key="result"
                 initial={{ opacity: 0, y: 10, filter: 'blur(10px)' }}
                 animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                className="bg-zinc-900/40 border border-[#002FA7]/30 p-6 rounded-2xl relative group overflow-hidden shadow-2xl"
+                className="flex flex-col gap-4"
               >
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#002FA7]/50 to-transparent" />
-                <div className="flex items-center gap-2 mb-4 text-[#002FA7]">
-                  <Zap size={14} className="animate-pulse" />
-                  <span className="text-[11px] font-mono uppercase tracking-[0.2em] font-bold">Neural_Suggestion</span>
-                </div>
-                <p className="text-base text-zinc-100 leading-relaxed font-sans italic">
-                  "{aiResponse}"
-                </p>
+                <ScriptStep 
+                  label="The Opener" 
+                  content={aiResponse.opener} 
+                  delay={0.1}
+                />
+                <ScriptStep 
+                  label="The Hook" 
+                  content={aiResponse.hook} 
+                  delay={0.2}
+                />
+                <ScriptStep 
+                  label="The Disturb" 
+                  content={aiResponse.disturb} 
+                  delay={0.3}
+                  accent
+                />
+                <ScriptStep 
+                  label="The Close" 
+                  content={aiResponse.close} 
+                  delay={0.4}
+                />
               </motion.div>
             ) : (
-              <div className="py-20 flex flex-col items-center justify-center text-center opacity-40">
+              <div key="empty" className="py-20 flex flex-col items-center justify-center text-center opacity-40">
                 <ActivityIcon size={32} className="text-zinc-700 animate-pulse mb-4" />
                 <div className="text-xs font-mono text-zinc-600 uppercase tracking-[0.3em]">
                   Awaiting Vector Trigger...
@@ -211,6 +260,71 @@ function VectorButton({ label, icon: Icon, color, loading, onClick }: any) {
         {loading ? '...' : label}
       </span>
     </button>
+  )
+}
+
+function NeuralScan() {
+  const [step, setStep] = useState(0)
+  const steps = [
+    "> ACCESSING_GRID_TELEMETRY...",
+    "> CALCULATING_VARIANCE...",
+    "> SYNTHESIZING_PROTOCOL..."
+  ]
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setStep((s) => (s + 1) % steps.length)
+    }, 800)
+    return () => clearInterval(timer)
+  }, [])
+
+  return (
+    <div className="py-20 flex flex-col items-center justify-center text-center">
+      <div className="relative mb-8">
+        <motion.div
+          animate={{
+            scale: [1, 1.2, 1],
+            opacity: [0.5, 1, 0.5],
+          }}
+          transition={{
+            duration: 2,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="absolute inset-0 bg-[#002FA7]/20 blur-2xl rounded-full"
+        />
+        <Sparkles size={48} className="text-[#002FA7] relative z-10 animate-pulse" />
+      </div>
+      <motion.div
+        key={step}
+        initial={{ opacity: 0, y: 5 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-[10px] font-mono text-[#002FA7] uppercase tracking-[0.3em]"
+      >
+        {steps[step]}
+      </motion.div>
+    </div>
+  )
+}
+
+function ScriptStep({ label, content, delay, accent = false }: { label: string, content: string, delay: number, accent?: boolean }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay }}
+      className={cn(
+        "bg-zinc-900/40 border p-4 rounded-xl relative overflow-hidden",
+        accent ? "border-[#002FA7]/40 bg-[#002FA7]/5" : "border-white/5"
+      )}
+    >
+      <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-2">
+        {label}
+      </div>
+      <p className="text-sm text-zinc-100 leading-relaxed font-sans italic">
+        "{content}"
+      </p>
+    </motion.div>
   )
 }
 
