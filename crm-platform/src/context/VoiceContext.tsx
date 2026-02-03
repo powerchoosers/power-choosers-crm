@@ -21,6 +21,7 @@ interface VoiceMetadata {
   currentRate?: string
   contractEnd?: string
   location?: string
+  isAccountOnly?: boolean
 }
 
 interface VoiceContextType {
