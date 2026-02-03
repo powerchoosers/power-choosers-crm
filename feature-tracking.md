@@ -204,3 +204,12 @@
     - [x] Integrated a dynamic "Grid Reserves" progress bar that scales relative to total capacity.
     - [x] Added "Scarcity Probability" tracking with live updates every 30 seconds.
     - [x] Applied forensic monospaced typography and tabular numbers for all market metrics.
+
+### React Documentation & Standards Update
+- **Status**: Completed
+- **Description**: Integrated React best practices from `react.dev` into the project's documentation to prevent recurring key warnings and builder errors.
+- **Actions**:
+  - [x] **Research**: Audited `react.dev` for key protocol, hydration safety, and performance best practices.
+  - [x] **Instruction Update**: Added a new **React & Next.js Development Standards** section to `builder-agent-instructions.md`.
+  - [x] **Source of Truth**: Synchronized the documentation update with `nodalpoint.md` to ensure zero drift in architectural standards.
+  - [x] **Self-Correction**: Added "Agent Self-Correction & Efficiency" rules to prevent looping and improve search strategies.

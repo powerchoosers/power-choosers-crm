@@ -54,6 +54,32 @@ Migrate all legacy CRM features to the new Next.js application, ensuring a moder
 6.  **Squircle Enforcement**: Never use `rounded-full` for contact or company icons. Always verify that small icons (36px) use `rounded-[14px]` to maintain the squircle shape.
 7.  **Schema Extensions**: When adding new fields to Accounts or Contacts for future edits, you **MUST** also add these fields to the `BulkImportModal.tsx` mapping schemas to maintain ingestion parity.
 
+## ⚛️ React & Next.js Development Standards
+
+To prevent hydration mismatches, unique key warnings, and infinite render loops:
+
+1.  **The Key Protocol**:
+    *   **Uniqueness**: Every element in a list (`.map()`) MUST have a unique `key`.
+    *   **Stability**: NEVER use `Math.random()` or `crypto.randomUUID()` in the render path. Use stable IDs from the database (e.g., `contact.id`).
+    *   **Outer Element**: The `key` must be on the outermost element of the loop. If using fragments, use `<Fragment key={...}>` from `react`.
+    *   **AnimatePresence**: Children of `<AnimatePresence>` MUST have unique keys to be tracked during exit animations.
+    *   **Undefined Check**: Ensure the value used for the key is not `undefined` or `null`.
+
+2.  **Hydration Integrity**:
+    *   Avoid using browser-only globals (`window`, `localStorage`) during initial render. Wrap browser-only logic in `useEffect` or use a `mounted` state to ensure server/client HTML match.
+
+3.  **Effect & Performance Safety**:
+    *   Always provide a dependency array to `useEffect`.
+    *   Avoid creating new objects or functions inside the component body that are then used as dependencies, unless wrapped in `useMemo` or `useCallback`.
+    *   Never mutate state objects directly; always use the spread operator or functional updates.
+
+4.  **Next.js Component Gating**:
+    *   Mark components with `'use client'` ONLY when using hooks or browser APIs. Keep data-fetching components as Server Components where possible.
+
+## 🤖 Agent Self-Correction & Efficiency
+- **Loop Prevention**: If you find yourself searching for the same symbol or file more than twice without success, STOP and broaden your search strategy (e.g., search for partial strings or parent directories).
+- **Context Awareness**: Before implementing a fix, verify the component's role in the global layout to avoid "Whack-a-Mole" error patterns.
+
 ## 🔐 Cloud & CLI Authentication
 
 1.  **Google Cloud (Browser-Based Login)**: When the user needs to log into `gcloud`, ALWAYS use the browser-based flow to avoid terminal password prompts.

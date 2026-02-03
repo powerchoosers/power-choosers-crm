@@ -171,6 +171,30 @@ The platform uses **Firebase Authentication**.
     - Verify against the legacy behavior.
 4.  **Schema Parity**: When adding new fields to Account or Contact models for future edits, you **MUST** also update the field mapping schemas in `BulkImportModal.tsx` to ensure new data can be ingested via CSV.
 
+## ⚛️ React & Next.js Development Standards
+
+To prevent hydration mismatches, unique key warnings, and infinite render loops:
+
+### 1. The Key Protocol
+- **Uniqueness**: Every element in a list (`.map()`) MUST have a unique `key`.
+- **Stability**: NEVER use `Math.random()` or `crypto.randomUUID()` in the render path. Use stable IDs from the database (e.g., `contact.id`).
+- **Outer Element**: The `key` must be on the outermost element of the loop. If using fragments, use `<Fragment key={...}>` from `react`.
+- **AnimatePresence**: Children of `<AnimatePresence>` MUST have unique keys to be tracked during exit animations.
+- **Undefined Check**: Ensure the value used for the key is not `undefined` or `null`.
+
+### 2. Hydration Integrity
+- Avoid using browser-only globals (`window`, `localStorage`) during initial render.
+- Wrap browser-only logic in `useEffect` or use a `mounted` state to ensure server/client HTML match.
+
+### 3. Effect & Performance Safety
+- Always provide a dependency array to `useEffect`.
+- Avoid creating new objects or functions inside the component body that are then used as dependencies, unless wrapped in `useMemo` or `useCallback`.
+- Never mutate state objects directly; always use the spread operator or functional updates.
+
+### 4. Next.js Component Gating
+- Mark components with `'use client'` ONLY when using hooks or browser APIs.
+- Keep data-fetching components as Server Components where possible.
+
 ## 🎨 Design Guidelines
 
 - **Theme**: Dark/Light mode support (System default).

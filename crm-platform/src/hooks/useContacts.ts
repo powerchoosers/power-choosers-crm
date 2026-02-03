@@ -286,7 +286,10 @@ export function useSearchContacts(queryTerm: string) {
         const { data, error } = await query.limit(10);
 
         if (error) {
-          console.error("Search error:", error);
+          // Only log if it's not a cancellation/abort error
+          if (error.message !== 'FetchUserError: Request was aborted') {
+            console.error("Search error:", error);
+          }
           return [];
         }
 
@@ -401,12 +404,10 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
           .order('createdAt', { ascending: false });
 
         if (error) {
-          // Suppress logging for aborted requests
-          if (error.code === 'PGRST116' || error.message?.includes('Abort')) {
-            throw error;
+          if (error.message !== 'FetchUserError: Request was aborted') {
+            console.error("Error fetching contacts:", error);
           }
-          console.error("Supabase error:", error);
-          throw error;
+          return { contacts: [], nextCursor: null };
         }
         if (!data) return { contacts: [], nextCursor: null };
 
