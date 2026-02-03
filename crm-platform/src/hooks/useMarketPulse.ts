@@ -35,8 +35,25 @@ export function useMarketPulse() {
         fetch('/api/market/ercot?type=grid')
       ])
       
-      if (!priceRes.ok || !gridRes.ok) throw new Error('Failed to fetch market data')
+      if (!priceRes.ok || !gridRes.ok) {
+        console.error('Market fetch error:', { 
+          priceStatus: priceRes.status, 
+          gridStatus: gridRes.status 
+        });
+        throw new Error('error in read')
+      }
       
+      const priceContentType = priceRes.headers.get('content-type')
+      const gridContentType = gridRes.headers.get('content-type')
+      
+      if (!priceContentType?.includes('application/json') || !gridContentType?.includes('application/json')) {
+        console.error('Market fetch non-JSON response:', { 
+          priceType: priceContentType, 
+          gridType: gridContentType 
+        });
+        throw new Error('error in read')
+      }
+
       const priceData = await priceRes.json()
       const gridData = await gridRes.json()
       
@@ -52,6 +69,8 @@ export function useMarketPulse() {
       }
     },
     refetchInterval: 60 * 1000, // Refetch every minute
-    staleTime: 30 * 1000 // Consider data stale after 30 seconds
+    staleTime: 30 * 1000, // Consider data stale after 30 seconds
+    retry: 2, // Retry twice before failing
+    retryDelay: (attempt) => Math.min(attempt * 1000, 3000) // Staggered retry
   })
 }

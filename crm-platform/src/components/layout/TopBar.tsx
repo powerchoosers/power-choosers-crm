@@ -2,7 +2,7 @@
 
 import { useCallStore } from '@/store/callStore'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Phone, Mic, PhoneOff, Grid3X3, RefreshCw, Bell, X, Shield, Search } from 'lucide-react'
+import { Phone, Mic, PhoneOff, Grid3X3, RefreshCw, Bell, X, Shield, Search, Zap } from 'lucide-react'
 import { cn, formatToE164 } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { GlobalSearch } from '@/components/search/GlobalSearch'
@@ -15,6 +15,7 @@ import { usePathname, useParams } from 'next/navigation'
 import { GeminiChatTrigger, GeminiChatPanel } from '@/components/chat/GeminiChat'
 import { useGeminiStore } from '@/store/geminiStore'
 import { useMarketPulse } from '@/hooks/useMarketPulse'
+import { ActiveCallInterface } from '@/components/calls/ActiveCallInterface'
 
 function getDaysUntilJune() {
   const now = new Date();
@@ -44,7 +45,9 @@ export function TopBar() {
     metadata: storeMetadata,
     setMetadata: setStoreMetadata,
     callTriggered,
-    clearCallTrigger
+    clearCallTrigger,
+    isCallHUDOpen,
+    setIsCallHUDOpen
   } = useCallStore()
   const isGeminiOpen = useGeminiStore((state) => state.isOpen)
   const setIsGeminiOpen = useGeminiStore((state) => state.setIsOpen)
@@ -53,7 +56,7 @@ export function TopBar() {
   const pathname = usePathname()
   const params = useParams()
   
-  const { data: marketPulse } = useMarketPulse()
+  const { data: marketPulse, isError: isMarketError } = useMarketPulse()
   const storeContext = useGeminiStore((state) => state.activeContext)
 
   // Operational Strategy Logic
@@ -62,6 +65,16 @@ export function TopBar() {
     const month = now.getMonth() + 1; // 1-12
     const isSummer = month >= 6 && month <= 9;
     
+    // Check for error state first
+    if (isMarketError) {
+      return {
+        strategy: 'TELEMETRY_ERROR',
+        statusColor: 'bg-rose-500',
+        pulseColor: 'shadow-[0_0_8px_#f43f5e]',
+        windowText: 'SYSTEM: ERROR IN READ'
+      };
+    }
+
     // Default strategy
     let strategy = 'ACCUMULATION';
     let statusColor = 'bg-emerald-500';
@@ -467,7 +480,7 @@ export function TopBar() {
             <motion.div 
                 initial={false}
                 animate={{ 
-                    width: isGeminiOpen ? 480 : (isDialerOpen ? 350 : 172),
+                    width: (isGeminiOpen || isCallHUDOpen) ? 480 : (isDialerOpen ? 350 : 172),
                     borderRadius: 24,
                 }}
                 transition={{ 
@@ -545,8 +558,37 @@ export function TopBar() {
                             <span className="absolute top-2 right-2.5 w-2 h-2 bg-signal rounded-full border border-zinc-900" />
                         </button>
                         
-                        {/* Manual Dialer Trigger */}
-                        {!isActive && (
+                        {/* Manual Dialer Trigger OR Active Call HUD Trigger */}
+                        {isActive ? (
+                            <button 
+                                onClick={() => {
+                                  const nextOpen = !isCallHUDOpen
+                                  if (nextOpen) {
+                                      setIsGeminiOpen(false)
+                                      setIsDialerOpen(false)
+                                  }
+                                  setIsCallHUDOpen(nextOpen)
+                                }}
+                                className={cn(
+                                    "icon-button-forensic w-9 h-9 relative overflow-hidden transition-all duration-300",
+                                    isCallHUDOpen ? "text-emerald-500 scale-110 shadow-[0_0_15px_rgba(16,185,129,0.4)] bg-emerald-500/10 border-emerald-500/30" : "text-emerald-500/70"
+                                )}
+                                title={isCallHUDOpen ? "Close Neural HUD" : "Open Neural HUD"}
+                            >
+                                <AnimatePresence mode="wait">
+                                    <motion.div
+                                        key={isCallHUDOpen ? "close" : "zap"}
+                                        initial={{ opacity: 0, scale: 0.5 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.5 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="flex items-center justify-center"
+                                    >
+                                        {isCallHUDOpen ? <X size={22} /> : <Zap size={22} className="animate-pulse" />}
+                                    </motion.div>
+                                </AnimatePresence>
+                            </button>
+                        ) : (
                             <button 
                                 onClick={() => {
                                   const nextOpen = !isDialerOpen
@@ -575,7 +617,7 @@ export function TopBar() {
                         )}
                     </div>
 
-                {/* Expanded Content: Dialer or Gemini */}
+                {/* Expanded Content: Dialer, Gemini, or Active Call HUD */}
                 <AnimatePresence>
                     {isDialerOpen && (
                         <motion.div
@@ -625,6 +667,19 @@ export function TopBar() {
                     )}
                     {isGeminiOpen && (
                         <GeminiChatPanel />
+                    )}
+                    {isCallHUDOpen && (
+                        <motion.div
+                            key="active-call-hud"
+                            initial={{ opacity: 0, y: 4, scaleY: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scaleY: 1 }}
+                            exit={{ opacity: 0, y: 4, scaleY: 0.98, transition: { duration: 0.12 } }}
+                            transition={{ duration: 0.18, delay: 0.05 }}
+                            style={{ transformOrigin: 'top' }}
+                            className="absolute top-12 right-2 mt-2 w-[calc(100%-1rem)] max-w-[480px] flex flex-col h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl bg-zinc-950/80 backdrop-blur-3xl border border-white/10 shadow-2xl overflow-hidden z-50"
+                        >
+                            <ActiveCallInterface />
+                        </motion.div>
                     )}
                 </AnimatePresence>
             </motion.div>

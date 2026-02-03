@@ -705,6 +705,27 @@ const server = http.createServer(async (req, res) => {
     // New: allow generic preflight for any API path (covers phone lookup/search variants)
     pathname.startsWith('/api/')
   )) {
+    const origin = req.headers.origin;
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'https://powerchoosers.com',
+      'https://www.powerchoosers.com',
+      'https://nodalpoint.io',
+      'https://power-choosers-crm-792458658491.us-central1.run.app'
+    ];
+
+    if (allowedOrigins.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    } else if (!origin && process.env.NODE_ENV !== 'production') {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.setHeader('Vary', 'Origin');
+
     res.writeHead(204);
     res.end();
     return;

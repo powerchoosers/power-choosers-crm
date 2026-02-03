@@ -17,6 +17,8 @@ interface CallState {
   initiateCall: (phone: string, metadata?: CallState['metadata']) => void
   clearCallTrigger: () => void
   callTriggered: boolean
+  isCallHUDOpen: boolean
+  setIsCallHUDOpen: (isOpen: boolean) => void
 }
 
 export const useCallStore = create<CallState>((set) => ({
@@ -25,10 +27,16 @@ export const useCallStore = create<CallState>((set) => ({
   phoneNumber: '',
   metadata: null,
   callTriggered: false,
-  setActive: (active) => set({ isActive: active }),
+  isCallHUDOpen: false,
+  setActive: (active) => set((state) => ({ 
+    isActive: active,
+    // Auto-close HUD when call ends
+    isCallHUDOpen: active ? state.isCallHUDOpen : false 
+  })),
   setStatus: (status) => set({ status }),
   setPhoneNumber: (phoneNumber) => set({ phoneNumber }),
   setMetadata: (metadata) => set({ metadata }),
+  setIsCallHUDOpen: (isCallHUDOpen) => set({ isCallHUDOpen }),
   initiateCall: (phoneNumber, metadata = null) => set({ 
     phoneNumber, 
     metadata, 
