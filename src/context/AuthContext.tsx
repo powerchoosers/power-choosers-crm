@@ -110,7 +110,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (data) {
       const settings = (data.settings as Record<string, any>) || {}
-      setRole(settings.role || 'employee')
+      // Hardcode l.patterson@nodalpoint.io as admin
+      const isAdmin = emailLower === 'l.patterson@nodalpoint.io'
+      setRole(isAdmin ? 'admin' : (settings.role || 'employee'))
 
       const firstName = data.first_name || null
       const lastName = data.last_name || null
@@ -259,7 +261,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (data) {
               const settings = (data.settings as Record<string, any>) || {}
-              setRole(settings.role || 'employee')
+              // Hardcode l.patterson@nodalpoint.io as admin
+              const isAdmin = emailLower === 'l.patterson@nodalpoint.io'
+              setRole(isAdmin ? 'admin' : (settings.role || 'employee'))
 
               const firstName = data.first_name || null
               const lastName = data.last_name || null
@@ -289,7 +293,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 bridgeToMobile: settings.bridgeToMobile || false
               })
             } else {
-              setRole('employee')
+              // Hardcode l.patterson@nodalpoint.io as admin
+              const isAdmin = emailLower === 'l.patterson@nodalpoint.io'
+              setRole(isAdmin ? 'admin' : 'employee')
               const inferred = inferNameFromString(user.displayName) || inferNameFromEmail(emailLower)
               const derivedName = inferred?.fullName || user.displayName?.trim() || null
               
@@ -298,10 +304,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 email: emailLower,
                 first_name: inferred?.firstName || null,
                 last_name: inferred?.lastName || null,
-                name: derivedName,
                 bio: null,
                 settings: {
-                  role: 'employee',
+                  role: isAdmin ? 'admin' : 'employee',
                   twilioNumbers: [],
                   selectedPhoneNumber: null,
                   bridgeToMobile: false
