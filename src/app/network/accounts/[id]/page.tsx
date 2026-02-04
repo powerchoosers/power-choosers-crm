@@ -490,13 +490,15 @@ export default function AccountDossierPage() {
                         <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-900/50 border border-white/5 backdrop-blur-sm">
                           <div className={cn(
                             "w-1.5 h-1.5 rounded-full",
-                            isActive ? "bg-signal animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.5)]" : 
+                            isCustomer ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
+                            isActiveLoad ? "bg-signal animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.5)]" : 
                             isExpired ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" : 
                             "bg-zinc-600"
                           )} />
                           <span className={cn(
                             "text-[10px] font-mono uppercase tracking-widest font-medium",
-                            isActive ? "text-signal" : 
+                            isCustomer ? "text-emerald-500" :
+                            isActiveLoad ? "text-signal" : 
                             isExpired ? "text-red-500/80" : 
                             "text-zinc-500"
                           )}>
