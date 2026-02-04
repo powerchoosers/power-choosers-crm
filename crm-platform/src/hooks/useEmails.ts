@@ -46,6 +46,16 @@ export function useEmails(searchQuery?: string) {
            query = query.eq('metadata->>ownerId', user.email.toLowerCase())
         }
 
+        // Filter out mailwarming and automated emails
+        query = query
+          .not('subject', 'ilike', '%mailwarming%')
+          .not('subject', 'ilike', '%mail warming%')
+          .not('subject', 'ilike', '%test email%')
+          .not('from', 'ilike', '%apollo.io%')
+          .not('from', 'ilike', '%mailwarm%')
+          .not('from', 'ilike', '%lemwarm%')
+          .not('from', 'ilike', '%warmup%')
+
         if (searchQuery) {
           query = query.or(`subject.ilike.%${searchQuery}%,from.ilike.%${searchQuery}%,text.ilike.%${searchQuery}%`)
         }
@@ -202,6 +212,13 @@ export function useSearchEmails(queryTerm: string) {
            query = query.eq('metadata->>ownerId', user.email.toLowerCase())
         }
 
+        // Filter out mailwarming emails
+        query = query
+          .not('subject', 'ilike', '%mailwarming%')
+          .not('subject', 'ilike', '%mail warming%')
+          .not('from', 'ilike', '%apollo.io%')
+          .not('from', 'ilike', '%mailwarm%')
+
         query = query.or(`subject.ilike.%${queryTerm}%,from.ilike.%${queryTerm}%,text.ilike.%${queryTerm}%`)
 
         const { data, error } = await query.limit(5)
@@ -243,6 +260,16 @@ export function useEmailsCount(searchQuery?: string) {
         if (role !== 'admin') {
            query = query.eq('metadata->>ownerId', user.email.toLowerCase())
         }
+
+        // Filter out mailwarming emails
+        query = query
+          .not('subject', 'ilike', '%mailwarming%')
+          .not('subject', 'ilike', '%mail warming%')
+          .not('subject', 'ilike', '%test email%')
+          .not('from', 'ilike', '%apollo.io%')
+          .not('from', 'ilike', '%mailwarm%')
+          .not('from', 'ilike', '%lemwarm%')
+          .not('from', 'ilike', '%warmup%')
 
         if (searchQuery) {
           query = query.or(`subject.ilike.%${searchQuery}%,from.ilike.%${searchQuery}%,text.ilike.%${searchQuery}%`)
