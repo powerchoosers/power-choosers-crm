@@ -252,7 +252,7 @@ export function useAccount(id: string) {
 
       const { data, error } = await supabase
         .from('accounts')
-        .select('*, meters(*)')
+        .select('*')
         .eq('id', id)
         .single()
 
@@ -292,13 +292,8 @@ export function useAccount(id: string) {
         electricitySupplier: data.electricity_supplier || '',
         currentRate: data.current_rate || '',
         status: data.status || 'PROSPECT',
-        meters: data.meters?.map((m: any) => ({
-          id: m.id,
-          esiId: m.esid,
-          address: m.service_address,
-          rate: m.rate || m.metadata?.rate || data.current_rate || '--',
-          endDate: m.end_date || m.metadata?.endDate || data.contract_end_date || '--'
-        })) || [],
+        // Read meters from metadata if available, otherwise empty array
+        meters: data.metadata?.meters || [],
         metadata: data.metadata || {}
       } as Account
     },
@@ -573,7 +568,15 @@ export function useUpdateAccount() {
       if (updates.occupancy !== undefined) { newMetadata.occupancy = updates.occupancy; hasMetadataUpdate = true; }
       if (updates.loadFactor !== undefined) { newMetadata.loadFactor = updates.loadFactor; hasMetadataUpdate = true; }
       if (updates.loadZone !== undefined) { newMetadata.loadZone = updates.loadZone; hasMetadataUpdate = true; }
-      if (updates.meters !== undefined) { newMetadata.meters = updates.meters; hasMetadataUpdate = true; }
+      if (updates.meters !== undefined) { 
+        newMetadata.meters = updates.meters; 
+        hasMetadataUpdate = true;
+        // Also sync meters back to serviceAddresses for consistency
+        const addresses = (updates.meters as any[])?.map((m: any) => m.address).filter(Boolean) || []
+        if (addresses.length > 0) {
+          dbUpdates.service_addresses = addresses
+        }
+      }
 
       if (hasMetadataUpdate) {
          dbUpdates.metadata = newMetadata

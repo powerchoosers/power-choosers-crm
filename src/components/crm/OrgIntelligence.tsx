@@ -191,6 +191,25 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         }];
       }
 
+      // Get existing metadata to preserve other fields
+      const { data: currentData } = await supabase
+        .from('accounts')
+        .select('metadata')
+        .eq('id', accountId)
+        .single();
+      
+      const currentMetadata = currentData?.metadata || {};
+
+      // Build meters array with service address if we have address data
+      const fullAddress = companySummary.address || [companySummary.city, companySummary.state, companySummary.country].filter(Boolean).join(', ');
+      const meters = fullAddress ? [{
+        id: crypto.randomUUID(),
+        esiId: '',
+        address: fullAddress,
+        rate: '',
+        endDate: ''
+      }] : (currentMetadata.meters || []);
+
       // Use the existing companySummary from Apollo to update the CRM account
       const { data, error } = await supabase
         .from('accounts')
@@ -201,13 +220,14 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           city: companySummary.city || null,
           state: companySummary.state || null,
           country: companySummary.country || null,
-          address: [companySummary.city, companySummary.state, companySummary.country].filter(Boolean).join(', ') || null,
+          address: fullAddress || null, // Populate uplink address
           service_addresses: serviceAddresses, // Update service_addresses with HQ location
           logo_url: companySummary.logoUrl || null, // Replace with Apollo logo when enriching
           linkedin_url: companySummary.linkedin || null,
           phone: companySummary.companyPhone || null,
           metadata: {
-            ...((companySummary as any).metadata || {}),
+            ...currentMetadata,
+            meters: meters, // Save meter with service address
             apollo_enriched_at: new Date().toISOString(),
             apollo_raw_data: companySummary
           }

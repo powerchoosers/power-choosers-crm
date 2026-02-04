@@ -325,6 +325,15 @@ export function NodeIngestion() {
           });
         }
 
+        // Build meters array with service address
+        const meters = address ? [{
+          id: crypto.randomUUID(),
+          esiId: '',
+          address: address,
+          rate: '',
+          endDate: ''
+        }] : [];
+
         const { error } = await supabase.from('accounts').insert({
           id,
           name: entityName,
@@ -333,15 +342,18 @@ export function NodeIngestion() {
           description: description || scanResult?.description,
           revenue: revenue,
           employees: parseInt(employees) || 0,
-          address: address, // Keep address field for backward compatibility
+          address: address, // Populate uplink address
           city: city,
           state: state,
           country: scanResult?.country,
-          service_addresses: serviceAddresses, // NEW: Save to service_addresses JSONB array
+          service_addresses: serviceAddresses, // Save to service_addresses JSONB array
           logo_url: scanResult?.logo,
           phone: phone || scanResult?.phone,
           linkedin_url: scanResult?.linkedin,
           status: 'active',
+          metadata: {
+            meters: meters // Save meter with service address to metadata
+          },
           createdAt: now,
           updatedAt: now
         });
