@@ -166,7 +166,7 @@ export function EmailList({
             </button>
         </div>
         <div className="text-[10px] text-zinc-600 font-mono uppercase tracking-[0.2em]">
-          Total_Entropy: <span className="text-zinc-400 tabular-nums">{totalEmails ?? filteredEmails.length}</span>
+          Total_Entropy: <span className="text-zinc-400 tabular-nums">{filteredEmails.length}</span>
         </div>
       </div>
 
@@ -294,7 +294,7 @@ export function EmailList({
             <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
               <span>Sync_Block {showingStart}–{showingEnd}</span>
               <div className="h-1 w-1 rounded-full bg-zinc-800" />
-              <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{totalEmails ?? filteredEmails.length}</span></span>
+              <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{filteredEmails.length}</span></span>
             </div>
         </div>
         <div className="flex items-center gap-2">
