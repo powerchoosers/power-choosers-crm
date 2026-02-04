@@ -172,11 +172,19 @@ export function useEmails(searchQuery?: string) {
 
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('[Email Sent] Success:', data);
       toast.success('Email sent successfully');
+      // Invalidate and refetch emails immediately
       queryClient.invalidateQueries({ queryKey: ['emails'] });
+      queryClient.invalidateQueries({ queryKey: ['emails-count'] });
+      // Force refetch after a small delay to ensure backend has processed
+      setTimeout(() => {
+        queryClient.refetchQueries({ queryKey: ['emails'] });
+      }, 500);
     },
     onError: (error: Error) => {
+      console.error('[Email Send] Error:', error);
       toast.error(`Failed to send: ${error.message}`);
     }
   });
