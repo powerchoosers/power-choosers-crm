@@ -16,7 +16,6 @@ import { GeminiChatTrigger, GeminiChatPanel } from '@/components/chat/GeminiChat
 import { useGeminiStore } from '@/store/geminiStore'
 import { useMarketPulse } from '@/hooks/useMarketPulse'
 import { ActiveCallInterface } from '@/components/calls/ActiveCallInterface'
-import { useSyncStore } from '@/store/syncStore'
 
 function getDaysUntilJune() {
   const now = new Date();
@@ -59,7 +58,6 @@ export function TopBar() {
   
   const { data: marketPulse, isError: isMarketError } = useMarketPulse()
   const storeContext = useGeminiStore((state) => state.activeContext)
-  const { isSyncing: isGlobalSyncing } = useSyncStore()
 
   // Operational Strategy Logic
   const marketStrategy = useMemo(() => {
@@ -556,19 +554,6 @@ export function TopBar() {
                             if (!isGeminiOpen) setIsDialerOpen(false)
                           }}
                         />
-
-                        {/* Gmail Sync Indicator */}
-                        {isGlobalSyncing && (
-                          <div 
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-white/10 bg-black/20 backdrop-blur-md"
-                            title="Syncing emails..."
-                          >
-                            <RefreshCw size={12} className="text-[#002FA7] animate-spin" />
-                            <span className="text-[9px] font-mono text-zinc-400 tracking-wider uppercase">
-                              Net_Sync
-                            </span>
-                          </div>
-                        )}
 
                         {/* Refresh Data */}
                         <button 

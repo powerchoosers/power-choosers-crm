@@ -159,7 +159,6 @@ export function useGmailSync() {
 
   const syncGmail = useCallback(async (user: User, options: { silent?: boolean } = {}) => {
     if (isSyncing) {
-      if (!options.silent) console.log('[Gmail Sync] Already syncing, skipping...')
       return;
     }
     
@@ -167,7 +166,6 @@ export function useGmailSync() {
     if (options.silent) {
         const cachedToken = sessionStorage.getItem('gmail_oauth_token');
         if (!cachedToken) {
-          console.log('[Gmail Sync] No OAuth token found, skipping silent sync')
           return; // Skip background sync if no token
         }
     }
@@ -177,7 +175,6 @@ export function useGmailSync() {
     if (lastSyncTime && options.silent) {
       const timeSinceLastSync = Date.now() - parseInt(lastSyncTime, 10)
       if (timeSinceLastSync < 60 * 1000) { // 1 minute
-        console.log(`[Gmail Sync] Last sync was ${Math.round(timeSinceLastSync / 1000)}s ago, skipping`)
         return
       }
     }
@@ -185,7 +182,6 @@ export function useGmailSync() {
     setIsSyncing(true);
     setGlobalSyncing(true);
     if (!options.silent) setSyncStatus('Starting sync...');
-    console.log('[Gmail Sync] Starting sync...', { silent: options.silent });
 
     try {
       let accessToken = await getAccessToken();
@@ -266,7 +262,6 @@ export function useGmailSync() {
           ));
         
         if (isMailwarming) {
-          if (!options.silent) console.log('[Gmail Sync] Skipping mailwarming email:', emailData.subject);
           continue;
         }
         
@@ -327,8 +322,6 @@ export function useGmailSync() {
         if (!options.silent) toast.success(`Synced ${syncedCount} new emails`);
         // Invalidate emails query to refresh the list
         queryClient.invalidateQueries({ queryKey: ['emails'] });
-      } else {
-        console.log('[Gmail Sync] No new emails to sync')
       }
       
       // Store last successful sync time
@@ -345,10 +338,9 @@ export function useGmailSync() {
         return;
       }
       
-      console.error('[Gmail Sync] Error:', error.message || error);
-      
+      // Only log errors for non-silent syncs (user-triggered)
       if (!options.silent) {
-        console.error('Sync failed:', error);
+        console.error('[Gmail Sync] Error:', error.message || error);
         setSyncStatus('Sync failed');
         toast.error('Gmail sync failed');
       }
