@@ -472,6 +472,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
             logoUrl: mappedData.logo_url || '',
             companyPhone: mappedData.company_phone || '',
             linkedinUrl: mappedData.linkedin_url || '',
+            address: mappedData.service_address || '', // Populate uplink address
             serviceAddresses: mappedData.service_address ? [mappedData.service_address] : [],
             city: mappedData.city || '',
             state: mappedData.state || '',
@@ -487,7 +488,15 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
               city: mappedData.city,
               state: mappedData.state,
               import_batch: new Date().toISOString(),
-              enriched: isEnriching
+              enriched: isEnriching,
+              // Create initial meter with service address
+              meters: mappedData.service_address ? [{
+                id: crypto.randomUUID(),
+                esiId: '',
+                address: mappedData.service_address,
+                rate: mappedData.current_rate || '',
+                endDate: mappedData.contract_end || ''
+              }] : []
             }
           };
 
