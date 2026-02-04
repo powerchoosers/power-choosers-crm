@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { GoogleAuthProvider, signInWithPopup, User } from 'firebase/auth';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { useSyncStore } from '@/store/syncStore';
 
 // Gmail API Types
 interface GmailHeader {
@@ -44,6 +45,7 @@ export function useGmailSync() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string>('');
   const queryClient = useQueryClient();
+  const { setIsSyncing: setGlobalSyncing, setLastSyncTime, incrementSyncCount } = useSyncStore();
 
   const reauthenticateWithGmailScope = useCallback(async (silent = false) => {
     try {
@@ -156,16 +158,34 @@ export function useGmailSync() {
   }, []);
 
   const syncGmail = useCallback(async (user: User, options: { silent?: boolean } = {}) => {
-    if (isSyncing) return;
+    if (isSyncing) {
+      if (!options.silent) console.log('[Gmail Sync] Already syncing, skipping...')
+      return;
+    }
     
     // For background/silent sync, only proceed if we already have a token
     if (options.silent) {
         const cachedToken = sessionStorage.getItem('gmail_oauth_token');
-        if (!cachedToken) return; // Skip background sync if no token
+        if (!cachedToken) {
+          console.log('[Gmail Sync] No OAuth token found, skipping silent sync')
+          return; // Skip background sync if no token
+        }
+    }
+
+    // Throttle syncs: don't sync if we synced less than 1 minute ago
+    const lastSyncTime = sessionStorage.getItem('gmail_last_sync_time')
+    if (lastSyncTime && options.silent) {
+      const timeSinceLastSync = Date.now() - parseInt(lastSyncTime, 10)
+      if (timeSinceLastSync < 60 * 1000) { // 1 minute
+        console.log(`[Gmail Sync] Last sync was ${Math.round(timeSinceLastSync / 1000)}s ago, skipping`)
+        return
+      }
     }
 
     setIsSyncing(true);
+    setGlobalSyncing(true);
     if (!options.silent) setSyncStatus('Starting sync...');
+    console.log('[Gmail Sync] Starting sync...', { silent: options.silent });
 
     try {
       let accessToken = await getAccessToken();
@@ -307,12 +327,25 @@ export function useGmailSync() {
         if (!options.silent) toast.success(`Synced ${syncedCount} new emails`);
         // Invalidate emails query to refresh the list
         queryClient.invalidateQueries({ queryKey: ['emails'] });
+      } else {
+        console.log('[Gmail Sync] No new emails to sync')
       }
+      
+      // Store last successful sync time
+      const now = Date.now()
+      sessionStorage.setItem('gmail_last_sync_time', now.toString())
+      setLastSyncTime(now)
+      incrementSyncCount()
+      
     } catch (error: any) {
       // Ignore abort errors
       if (error?.name === 'AbortError' || error?.message?.includes('aborted')) {
+        setIsSyncing(false);
+        setGlobalSyncing(false);
         return;
       }
+      
+      console.error('[Gmail Sync] Error:', error.message || error);
       
       if (!options.silent) {
         console.error('Sync failed:', error);
@@ -321,6 +354,7 @@ export function useGmailSync() {
       }
     } finally {
       setIsSyncing(false);
+      setGlobalSyncing(false);
       if (!options.silent) setTimeout(() => setSyncStatus(''), 3000);
     }
   }, [isSyncing, getAccessToken, reauthenticateWithGmailScope, parseGmailMessage, queryClient]);
