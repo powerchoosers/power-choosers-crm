@@ -7,7 +7,7 @@ import {
   Building2, MapPin, Globe, Phone, FileText, Activity, 
   Zap, Server, Users, ArrowLeft, MoreHorizontal,
   LayoutDashboard, Database, Terminal, Shield, Sparkles, Clock, Mic,
-  Lock, Unlock, Linkedin, Check
+  Lock, Unlock, Linkedin, Check, Plus
 } from 'lucide-react'
 import { useAccount, useUpdateAccount } from '@/hooks/useAccounts'
 import { useAccountContacts, Contact } from '@/hooks/useContacts'
@@ -63,7 +63,7 @@ export default function AccountDossierPage() {
   const { data: calls, isLoading: isLoadingCalls } = useAccountCalls(id)
   const updateAccount = useUpdateAccount()
   
-  const { isEditing, setIsEditing, toggleEditing } = useUIStore()
+  const { isEditing, setIsEditing, toggleEditing, setRightPanelMode, setIngestionContext } = useUIStore()
   const setContext = useGeminiStore((state) => state.setContext)
 
   const [isSaving, setIsSaving] = useState(false)
@@ -423,7 +423,17 @@ export default function AccountDossierPage() {
                       const hasContract = !!account.contractEnd
                       const contractEnd = parseContractEndDate(account.contractEnd)
                       const isExpired = hasContract && contractEnd && contractEnd < new Date()
-                      const isActive = (hasContract && !isExpired) || account.status === 'ACTIVE_LOAD'
+                      const isCustomer = account.status === 'CUSTOMER'
+                      const isActiveLoad = (hasContract && !isExpired) || account.status === 'ACTIVE_LOAD'
+
+                      const displayStatus = isCustomer
+                        ? 'Customer'
+                        : isActiveLoad
+                          ? 'Active Load'
+                          : isExpired
+                            ? 'Expired'
+                            : 'No Contract'
+                      const isActive = isCustomer || isActiveLoad
 
                       return (
                         <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-900/50 border border-white/5 backdrop-blur-sm">
@@ -439,7 +449,7 @@ export default function AccountDossierPage() {
                             isExpired ? "text-red-500/80" : 
                             "text-zinc-500"
                           )}>
-                             {isActive ? 'Active Load' : isExpired ? 'Expired' : 'No Contract'}
+                             {displayStatus}
                            </span>
                          </div>
                        )
@@ -811,10 +821,22 @@ export default function AccountDossierPage() {
               </div>
             </div>
 
-            {/* Column C: Network (3 cols) */}
+            {/* Column C: Network / Command Chain (3 cols) */}
             <div className="col-span-3 h-full overflow-y-auto p-6 np-scroll scrollbar-thin scrollbar-thumb-zinc-700/50 hover:scrollbar-thumb-[#002FA7]/50 scrollbar-track-transparent transition-all duration-300">
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-700">
-                <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em] mb-4">03 // Network</div>
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em]">03 // Network</span>
+                  <button
+                    onClick={() => {
+                      setIngestionContext({ accountId: account.id, accountName: account.name || 'Unknown Account' })
+                      setRightPanelMode('INGEST_CONTACT')
+                    }}
+                    className="icon-button-forensic w-8 h-8"
+                    title="Inject Node into Command Chain"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
                 
                 {/* Stakeholder Map */}
                 <StakeholderMap contacts={contacts || []} />

@@ -279,7 +279,16 @@ export default function AccountsPage() {
           const account = row.original
           const hasContract = !!account.contractEnd
           const isExpired = hasContract && new Date(account.contractEnd) < new Date()
-          const isActive = hasContract && !isExpired
+          const isCustomer = account.status === 'CUSTOMER'
+          const isActiveLoad = (hasContract && !isExpired) || account.status === 'ACTIVE_LOAD'
+          const displayStatus = isCustomer
+            ? 'Customer'
+            : isActiveLoad
+              ? 'Active'
+              : isExpired
+                ? 'Expired'
+                : 'No Contract'
+          const isActive = isCustomer || isActiveLoad
 
           return (
             <div className="flex items-center gap-2">
@@ -295,7 +304,7 @@ export default function AccountsPage() {
                 isExpired ? "text-red-500/80" : 
                 "text-zinc-500"
               )}>
-                {isActive ? 'Active' : isExpired ? 'Expired' : 'No Contract'}
+                {displayStatus}
               </span>
             </div>
           )
