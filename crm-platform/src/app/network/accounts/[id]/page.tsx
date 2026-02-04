@@ -82,6 +82,8 @@ export default function AccountDossierPage() {
   const [editLogoUrl, setEditLogoUrl] = useState('')
   const [editDomain, setEditDomain] = useState('')
   const [editLinkedinUrl, setEditLinkedinUrl] = useState('')
+  const [editMeters, setEditMeters] = useState<any[]>([])
+  const [editContractEnd, setEditContractEnd] = useState('')
 
   // Refraction Event State (for field glow animations)
   const [glowingFields, setGlowingFields] = useState<Set<string>>(new Set())
@@ -117,6 +119,8 @@ export default function AccountDossierPage() {
       setEditLogoUrl(account.logoUrl || '')
       setEditDomain(account.domain || '')
       setEditLinkedinUrl(account.linkedinUrl || '')
+      setEditMeters(account.meters || [])
+      setEditContractEnd(account.contractEnd || '')
     }
     return () => setContext(null)
   }, [account, setContext])
@@ -142,7 +146,9 @@ export default function AccountDossierPage() {
             location: editLocation,
             logoUrl: editLogoUrl,
             domain: editDomain,
-            linkedinUrl: editLinkedinUrl
+            linkedinUrl: editLinkedinUrl,
+            meters: editMeters,
+            contractEnd: editContractEnd
           })
           setShowSynced(true)
           setTimeout(() => setShowSynced(false), 3000)
@@ -160,7 +166,7 @@ export default function AccountDossierPage() {
       }
       triggerSave()
     }
-  }, [isEditing, id, editNotes, editAnnualUsage, editStrikePrice, editIndustry, editLocation, editLogoUrl, editDomain, editLinkedinUrl, updateAccount])
+  }, [isEditing, id, editNotes, editAnnualUsage, editStrikePrice, editIndustry, editLocation, editLogoUrl, editDomain, editLinkedinUrl, editMeters, editContractEnd, updateAccount])
 
   const handleUpdate = async (updates: any) => {
     try {
@@ -170,6 +176,10 @@ export default function AccountDossierPage() {
       console.error(err)
       toast.error('Failed to update account')
     }
+  }
+
+  const handleMetersUpdate = (updatedMeters: any[]) => {
+    setEditMeters(updatedMeters)
   }
 
   // Handle Document Ingestion Complete (Refraction Event)
@@ -624,14 +634,23 @@ export default function AccountDossierPage() {
                   <div>
                     <div className="flex justify-between items-end mb-2">
                       <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Position Maturity</h4>
-                      <div className="text-right">
-                        <span className="text-xs text-zinc-500 mr-2">Expiration:</span>
-                        <span className={cn(
-                          "text-white font-mono font-bold tabular-nums transition-all duration-800",
-                          glowingFields.has('contractEnd') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)] animate-in fade-in duration-500"
-                        )}>
-                          {contractEndDate ? format(contractEndDate, 'MMM dd, yyyy') : 'TBD'}
-                        </span>
+                      <div className="text-right flex items-center gap-2">
+                        <span className="text-xs text-zinc-500">Expiration:</span>
+                        {isEditing ? (
+                          <input
+                            type="date"
+                            value={editContractEnd}
+                            onChange={(e) => setEditContractEnd(e.target.value)}
+                            className="bg-black/40 border border-white/5 rounded-lg px-2 py-1 text-xs font-mono text-white tabular-nums focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
+                          />
+                        ) : (
+                          <span className={cn(
+                            "text-white font-mono font-bold tabular-nums transition-all duration-800",
+                            glowingFields.has('contractEnd') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)] animate-in fade-in duration-500"
+                          )}>
+                            {contractEndDate ? format(contractEndDate, 'MMM dd, yyyy') : 'TBD'}
+                          </span>
+                        )}
                       </div>
                     </div>
                     
@@ -865,7 +884,11 @@ export default function AccountDossierPage() {
                 </div>
 
                 {/* Meter Array */}
-                <MeterArray meters={account.meters} />
+                <MeterArray 
+                  meters={editMeters} 
+                  isEditing={isEditing}
+                  onUpdate={handleMetersUpdate}
+                />
                 
                 {/* Data Locker */}
                 <DataIngestionCard 

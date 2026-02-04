@@ -286,8 +286,8 @@ export function useAccount(id: string) {
         ownerId: data.ownerId,
         linkedinUrl: data.linkedinUrl || data.linkedin_url || '',
         // Forensic/Asset Fields
-        loadFactor: data.metadata?.loadFactor ?? 0.45,
-        loadZone: data.metadata?.loadZone || 'LZ_NORTH',
+        loadFactor: data.load_factor ?? data.metadata?.loadFactor ?? 0.45,
+        loadZone: data.load_zone || data.metadata?.loadZone || 'LZ_NORTH',
         annualUsage: data.annual_usage || '',
         electricitySupplier: data.electricity_supplier || '',
         currentRate: data.current_rate || '',
@@ -296,8 +296,8 @@ export function useAccount(id: string) {
           id: m.id,
           esiId: m.esid,
           address: m.service_address,
-          rate: m.metadata?.rate || data.current_rate || '--',
-          endDate: m.metadata?.endDate || data.contract_end_date || '--'
+          rate: m.rate || m.metadata?.rate || data.current_rate || '--',
+          endDate: m.end_date || m.metadata?.endDate || data.contract_end_date || '--'
         })) || [],
         metadata: data.metadata || {}
       } as Account
