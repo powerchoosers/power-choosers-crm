@@ -301,7 +301,7 @@ export function useAccountCalls(accountId: string) {
           contactName: contact?.name || 'Unknown',
           phoneNumber: item.from_phone || item.to_phone || '',
           type: type as Call['type'],
-          status: status as Call['type'],
+          status: status as Call['status'],
           duration: durationStr,
           date: item.timestamp || item.created_at,
           note: item.ai_summary || item.summary,
