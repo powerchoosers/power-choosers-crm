@@ -270,9 +270,6 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   };
 
   const handleAcquire = async (person: ApolloContactRow, type: 'email' | 'phone' | 'both' = 'both') => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OrgIntelligence.tsx:handleAcquire:entry',message:'handleAcquire called',data:{personId:person?.id,personIdType:typeof person?.id,type,hasAccountId:!!accountId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
-    // #endregion
     if (!accountId) {
       toast.error('No account ID provided for acquisition');
       return;
@@ -304,14 +301,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         })
       });
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OrgIntelligence.tsx:handleAcquire:afterFetch',message:'enrich response',data:{ok:enrichResp.ok,status:enrichResp.status},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
-      // #endregion
       if (!enrichResp.ok) {
         const errorText = await enrichResp.text();
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OrgIntelligence.tsx:handleAcquire:errorResp',message:'API error response',data:{status:enrichResp.status,errorText:errorText?.slice(0,200)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
-        // #endregion
         console.error('Apollo enrich API error:', errorText);
         throw new Error(`Enrichment failed: ${enrichResp.status} ${errorText}`);
       }
@@ -329,31 +320,26 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       };
       const enriched = enrichData.contacts?.[0];
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OrgIntelligence.tsx:handleAcquire:enrichData',message:'enrich result',data:{contactsLength:enrichData?.contacts?.length,hasEnriched:!!enriched},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
-      // #endregion
       if (!enriched) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OrgIntelligence.tsx:handleAcquire:noEnriched',message:'No enrichment data',data:{enrichDataKeys:enrichData?Object.keys(enrichData):[]},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
-        // #endregion
         throw new Error('No enrichment data available');
       }
 
       // 2. Insert or Update Supabase
+      // Note: Before reveal we only have first name, last initial, title; full name/email come from enriched.
       let crmId = person.crmId;
       
-      const contactData = {
+      const contactData: Record<string, unknown> = {
         name: enriched.fullName || person.name,
-        first_name: enriched.firstName || person.firstName,
-        last_name: enriched.lastName || person.lastName,
+        firstName: enriched.firstName || person.firstName,
+        lastName: enriched.lastName || person.lastName,
         title: enriched.jobTitle || person.title,
         email: enriched.email || person.email,
         accountId: accountId,
-        company: companySummary?.name || companyName || domain,
         status: 'Active',
         metadata: {
           source: 'Apollo Organizational Intelligence',
           acquired_at: new Date().toISOString(),
+          company: companySummary?.name || companyName || domain,
           original_apollo_data: enriched
         }
       };
@@ -382,7 +368,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                   .eq('id', crmId);
                 if (error) throw error;
              } else {
-                // Insert new
+                // Insert new: contacts.id is required (text primary key, no default)
+                contactData.id = crypto.randomUUID();
                 const { data: newContact, error } = await supabase
                   .from('contacts')
                   .insert(contactData)
@@ -392,7 +379,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                 crmId = newContact.id;
              }
         } else {
-             // Fallback insert if no email (unlikely for valid contact but possible)
+             // Fallback insert if no email (e.g. reveal returned no email)
+             contactData.id = crypto.randomUUID();
              const { data: newContact, error } = await supabase
                .from('contacts')
                .insert(contactData)
@@ -406,8 +394,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       const typeLabel = type === 'both' ? 'details' : type === 'email' ? 'email' : 'phone';
       toast.success(`${person.name} ${typeLabel} revealed & synced`);
       
-      // 3. Update local state
-      // Merge new phones with existing ones, avoiding duplicates
+      // 3. Update local state (phones from immediate response; may be empty when reveal_phone_number=true)
       const newPhones = enriched.phones?.map((ph: { number: string }) => ph.number) || [];
       const existingPhones = person.phones || [];
       const allPhones = Array.from(new Set([...existingPhones, ...newPhones]));
@@ -427,6 +414,43 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           phones: allPhones
         } : p
       ));
+
+      // 4. If we requested phone reveal, Apollo delivers phones asynchronously via webhook (can take several minutes).
+      // Poll phone-retrieve until ready, then update contact and local state.
+      if ((type === 'phone' || type === 'both') && crmId) {
+        toast.info('Phone numbers can take a few minutes. Checking in background.', { duration: 5000 });
+        const apolloPersonId = person.id;
+        const maxAttempts = 30; // 5 min at 10s interval
+        const intervalMs = 10000;
+        let attempts = 0;
+        const pollForPhones = async () => {
+          if (attempts >= maxAttempts) return;
+          attempts += 1;
+          try {
+            const res = await fetch(`/api/apollo/phone-retrieve?personId=${encodeURIComponent(apolloPersonId)}`);
+            if (!res.ok) return;
+            const json = await res.json();
+            if (json.ready && Array.isArray(json.phones) && json.phones.length > 0) {
+              const phoneStrings = json.phones.map((p: { sanitized_number?: string; raw_number?: string }) => p.sanitized_number || p.raw_number).filter(Boolean);
+              if (phoneStrings.length === 0) return;
+              const phoneUpdate: Record<string, string> = {};
+              if (phoneStrings[0]) phoneUpdate.phone = phoneStrings[0];
+              if (phoneStrings[1]) phoneUpdate.mobile = phoneStrings[1];
+              if (phoneStrings[2]) phoneUpdate.workPhone = phoneStrings[2];
+              const { error: updateError } = await supabase.from('contacts').update(phoneUpdate).eq('id', crmId);
+              if (!updateError) {
+                setData(prev => prev.map(p => 
+                  p.id === person.id ? { ...p, phones: Array.from(new Set([...(p.phones || []), ...phoneStrings])) } : p
+                ));
+                toast.success(`Phone numbers for ${person.name} received & saved.`);
+              }
+              return;
+            }
+          } catch (_) {}
+          setTimeout(pollForPhones, intervalMs);
+        };
+        setTimeout(pollForPhones, intervalMs);
+      }
     } catch (error) {
       console.error('Acquisition Error:', error);
       toast.error('Failed to reveal contact details');
@@ -1014,12 +1038,17 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex flex-col min-w-0 flex-1 mr-2">
-                        <span className="text-[11px] font-semibold text-zinc-200 truncate group-hover:text-white transition-colors">
-                          {person.isMonitored 
-                            ? person.name 
-                            : `${person.firstName} ${person.lastName?.charAt(0) || ''}.`
-                          }
-                        </span>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-[11px] font-semibold text-zinc-200 truncate group-hover:text-white transition-colors">
+                            {person.isMonitored 
+                              ? person.name 
+                              : `${person.firstName} ${person.lastName?.charAt(0) || ''}.`
+                            }
+                          </span>
+                          {person.isMonitored && (
+                            <ShieldCheck className="w-3 h-3 text-green-500 shrink-0" aria-label="Synced" />
+                          )}
+                        </div>
                         <span className="text-[9px] font-mono text-zinc-500 truncate uppercase tracking-tighter">
                           {person.title || 'Nodal Analyst'}
                         </span>
@@ -1027,22 +1056,16 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                       
                       <div className="flex items-center gap-1.5">
                         {person.isMonitored ? (
-                          <>
-                            {person.linkedin && (
-                              <a 
-                                href={person.linkedin} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="icon-button-forensic w-7 h-7 flex items-center justify-center"
-                              >
-                                <Linkedin className="w-2.5 h-2.5" />
-                              </a>
-                            )}
-                            <div className="flex items-center gap-1 text-green-500 text-[8px] font-mono uppercase tracking-widest bg-green-500/10 px-1.5 py-1 rounded-md border border-green-500/20">
-                              <ShieldCheck className="w-2.5 h-2.5" />
-                              Synced
-                            </div>
-                          </>
+                          person.linkedin ? (
+                            <a 
+                              href={person.linkedin} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="icon-button-forensic w-7 h-7 flex items-center justify-center"
+                            >
+                              <Linkedin className="w-2.5 h-2.5" />
+                            </a>
+                          ) : null
                         ) : (
                           <div className="flex items-center gap-1">
                             <button 
@@ -1099,12 +1122,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                               Email
                             </button>
                         )}
-                        {person.location && (
-                          <div className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-tighter">
-                            <MapPin className="w-2.5 h-2.5" />
-                            {person.location}
-                          </div>
-                        )}
+                        {/* Reveal Phone button - right after email */}
                         {person.phones && person.phones.length > 0 ? (
                           <div className="flex items-center gap-1.5">
                             {person.phones.map((phone) => (
@@ -1139,6 +1157,12 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                               )}
                               Phone
                             </button>
+                        )}
+                        {person.location && (
+                          <div className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-tighter">
+                            <MapPin className="w-2.5 h-2.5" />
+                            {person.location}
+                          </div>
                         )}
                       </div>
                     ) : (
