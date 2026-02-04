@@ -712,7 +712,7 @@ export function useContact(id: string) {
         mobile: typedData.mobile || '',
         workDirectPhone: typedData.workPhone || '',
         otherPhone: typedData.otherPhone || '',
-        companyPhone: account?.phone || '',
+        companyPhone: typedData.companyPhone || '',
         primaryPhoneField: normalizePrimaryPhoneField(typedData.primaryPhoneField)
       } as ContactDetail
     },
@@ -889,6 +889,7 @@ export function useUpdateContact() {
       if (updates.mobile !== undefined) dbUpdates.mobile = updates.mobile
       if (updates.workDirectPhone !== undefined) dbUpdates.workPhone = updates.workDirectPhone
       if (updates.otherPhone !== undefined) dbUpdates.otherPhone = updates.otherPhone
+      if (updates.companyPhone !== undefined) dbUpdates.companyPhone = updates.companyPhone
       if (updates.primaryPhoneField !== undefined) dbUpdates.primaryPhoneField = updates.primaryPhoneField
       if (updates.city !== undefined) dbUpdates.city = updates.city
       if (updates.state !== undefined) dbUpdates.state = updates.state

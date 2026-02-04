@@ -322,13 +322,13 @@ export default function PeoplePage() {
             <div className="flex items-center gap-2">
               <div className={cn(
                 "w-1.5 h-1.5 rounded-full",
-                isCustomer ? "bg-signal animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.5)]" : 
+                isCustomer ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" : 
                 isLead ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" : 
                 "bg-zinc-600"
               )} />
               <span className={cn(
                 "text-[10px] font-mono uppercase tracking-wider tabular-nums",
-                isCustomer ? "text-signal" : 
+                isCustomer ? "text-emerald-500" : 
                 isLead ? "text-blue-500/80" : 
                 "text-zinc-500"
               )}>
