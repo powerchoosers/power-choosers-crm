@@ -15,22 +15,31 @@ The CRM now automatically syncs Gmail emails in the background, ensuring you rec
 ## How It Works
 
 ### 1. **Initial Authentication** (First Time Only)
-When you first open the CRM at `nodalpoint.io/network` or `localhost:3000/network`:
-1. You'll be prompted with a Google OAuth popup to grant Gmail access
-2. This happens **once** - the token is cached in sessionStorage
-3. After authentication, emails sync automatically
+The first time you want to sync Gmail:
+1. Go to `/network/emails`
+2. Click the **"Net_Sync"** button
+3. Google OAuth popup appears - grant Gmail access
+4. Token is cached in sessionStorage
+5. Background sync starts automatically
+
+**Why manual first-time setup?**
+- Browsers block popups that aren't triggered by user interaction
+- Attempting auto-OAuth on page load triggers popup blockers
+- Manual button click = user action = no popup block
 
 ### 2. **Automatic Background Sync**
 After initial auth:
-- **On CRM Load:** Syncs 2 seconds after you open `/network`
+- **On CRM Load:** Syncs 3 seconds after you open `/network` (if token exists)
 - **Every 3 Minutes:** Background sync runs silently
 - **Throttled:** Won't sync more than once per minute (prevents spam)
-- **Silent:** No popups or toasts for background syncs
+- **Completely Silent:** No popups, toasts, or visual indicators
 
-### 3. **Global Sync Status**
-The TopBar shows a live "Net_Sync" indicator when syncing:
-- 🔄 **Blue spinning icon** = Currently syncing
-- **Hidden** = Not syncing
+### 3. **Silent Operation**
+- ✅ No console logs (unless errors occur)
+- ✅ No visual indicators in TopBar
+- ✅ No notifications or toasts
+- ✅ Runs completely in the background
+- ✅ Only logs errors on user-triggered syncs
 
 ---
 
@@ -106,17 +115,19 @@ Used by TopBar to show sync indicator across the entire app.
 
 ### First-Time User
 1. Logs into CRM → Arrives at `/network`
-2. 2 seconds later → Google OAuth popup appears
-3. User grants Gmail access
-4. Initial sync runs (fetches last 50 emails)
-5. Toast: "Synced X new emails"
-6. Background sync starts (every 3 min)
+2. Navigate to `/network/emails`
+3. Click **"Net_Sync"** button
+4. Google OAuth popup appears → Grant Gmail access
+5. Initial sync runs (fetches last 50 emails)
+6. Toast: "Synced X new emails"
+7. Background sync starts automatically (every 3 min)
 
 ### Returning User
 1. Logs into CRM → Arrives at `/network`
-2. 2 seconds later → Silent sync (no popup, no toast)
+2. 3 seconds later → Silent background sync (no indication)
 3. New emails appear automatically
 4. Background sync continues (every 3 min)
+5. Completely invisible operation
 
 ---
 
@@ -134,13 +145,13 @@ const interval = setInterval(() => {
 ```
 
 ### Initial Delay
-**Default:** 2 seconds after CRM load  
+**Default:** 3 seconds after CRM load  
 **Location:** `GlobalSync.tsx` line 31
 
 ```ts
 const timer = setTimeout(() => {
-  syncGmail(user, { silent: false })
-}, 2000) // 2 seconds
+  syncGmail(user, { silent: true })
+}, 3000) // 3 seconds - waits for Firebase auth to fully initialize
 ```
 
 ### Max Messages Per Sync
