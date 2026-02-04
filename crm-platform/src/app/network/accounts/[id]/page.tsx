@@ -119,7 +119,21 @@ export default function AccountDossierPage() {
       setEditLogoUrl(account.logoUrl || '')
       setEditDomain(account.domain || '')
       setEditLinkedinUrl(account.linkedinUrl || '')
-      setEditMeters(account.meters || [])
+      // Transform serviceAddresses into meters format for MeterArray component
+      const transformedMeters = (account.serviceAddresses || []).map((addr: any, idx: number) => {
+        // Handle both string addresses and structured meter objects
+        if (typeof addr === 'string') {
+          return {
+            id: `addr_${idx}`,
+            esiId: '',
+            address: addr,
+            rate: account.currentRate || '',
+            endDate: account.contractEnd || ''
+          }
+        }
+        return addr // Already structured
+      })
+      setEditMeters(account.meters?.length ? account.meters : transformedMeters)
       setEditContractEnd(account.contractEnd || '')
     }
     return () => setContext(null)
