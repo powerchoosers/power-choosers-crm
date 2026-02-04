@@ -140,6 +140,7 @@ import twilioOperatorWebhookHandler from './api/twilio/operator-webhook.js';
 import aiOptimizeHandler from './api/ai/optimize.js';
 import twilio from 'twilio';
 import { admin } from './api/_firebase.js';
+import { supabaseAdmin } from './api/_supabase.js';
 
 // Import body parsers
 import { readFormUrlEncodedBody } from './api/_form-parser.js';
@@ -2106,8 +2107,8 @@ async function handleApiEmailTrack(req, res, parsedUrl) {
     // Detect device type
     const deviceType = detectDeviceType(userAgent);
 
-    // Best-effort: record open event in Firestore
-    if (trackingId && trackingId.length > 0 && admin) {
+    // Best-effort: record open event in Supabase
+    if (trackingId && trackingId.length > 0 && supabaseAdmin) {
       // CRITICAL FIX: In-memory deduplication to prevent rapid duplicate opens
       // This is especially important for Gmail threads where opening one email
       // may load/render all emails in the thread, triggering multiple pixels
@@ -2127,16 +2128,20 @@ async function handleApiEmailTrack(req, res, parsedUrl) {
         trackingDedupeCache.set(dedupeKey, now);
 
         try {
-          const db = admin.firestore();
-          const ref = db.collection('emails').doc(trackingId);
-          const snap = await ref.get();
+          // Fetch current email record from Supabase
+          const { data: emailRecord, error: fetchError } = await supabaseAdmin
+            .from('emails')
+            .select('openCount, opens')
+            .eq('id', trackingId)
+            .single();
 
-          if (snap.exists) {
+          if (fetchError) {
+            logger.error('[Email Track] Supabase fetch error', 'Server', { error: fetchError.message });
+          } else if (emailRecord) {
             const openedAt = new Date().toISOString();
-            const currentData = snap.data() || {};
-            const existingOpens = currentData.opens || [];
+            const existingOpens = emailRecord.opens || [];
 
-            // Secondary deduplication: Check Firestore for recent opens from same user
+            // Secondary deduplication: Check Supabase for recent opens from same user
             // This catches cases where in-memory cache was cleared (server restart)
             const recentOpen = existingOpens.find(open => {
               const openTime = new Date(open.openedAt).getTime();
@@ -2154,26 +2159,33 @@ async function handleApiEmailTrack(req, res, parsedUrl) {
                 isBotFlagged: deviceType === 'bot'
               };
 
-              await ref.update({
-                openCount: (currentData.openCount || 0) + 1,
-                opens: existingOpens.concat([openEvent]),
-                updatedAt: openedAt,
-                lastOpened: openedAt
-              });
+              // Update Supabase with new open event
+              const { error: updateError } = await supabaseAdmin
+                .from('emails')
+                .update({
+                  openCount: (emailRecord.openCount || 0) + 1,
+                  opens: [...existingOpens, openEvent],
+                  updatedAt: openedAt
+                })
+                .eq('id', trackingId);
 
-              logger.debug('[Email Track] Recorded open', 'Server', {
-                trackingId: trackingId.substring(0, 20) + '...',
-                deviceType,
-                openCount: (currentData.openCount || 0) + 1
-              });
+              if (updateError) {
+                logger.error('[Email Track] Supabase update error', 'Server', { error: updateError.message });
+              } else {
+                logger.debug('[Email Track] Recorded open in Supabase', 'Server', {
+                  trackingId: trackingId.substring(0, 20) + '...',
+                  deviceType,
+                  openCount: (emailRecord.openCount || 0) + 1
+                });
+              }
             } else {
-              logger.debug('[Email Track] Duplicate open ignored (Firestore check)', 'Server', {
+              logger.debug('[Email Track] Duplicate open ignored (Supabase check)', 'Server', {
                 trackingId: trackingId.substring(0, 20) + '...'
               });
             }
           }
         } catch (dbError) {
-          logger.error('[Email Track] Firestore error', 'Server', { error: dbError.message });
+          logger.error('[Email Track] Supabase error', 'Server', { error: dbError.message });
         }
       }
     }
@@ -2228,16 +2240,20 @@ async function handleApiEmailClick(req, res, parsedUrl) {
     // Detect device type
     const deviceType = detectDeviceType(userAgent);
 
-    // Best-effort: record click event in Firestore
-    if (trackingId && trackingId.length > 0 && admin) {
+    // Best-effort: record click event in Supabase
+    if (trackingId && trackingId.length > 0 && supabaseAdmin) {
       try {
-        const db = admin.firestore();
-        const ref = db.collection('emails').doc(trackingId);
-        const snap = await ref.get();
+        // Fetch current email record from Supabase
+        const { data: emailRecord, error: fetchError } = await supabaseAdmin
+          .from('emails')
+          .select('clickCount, clicks')
+          .eq('id', trackingId)
+          .single();
 
-        if (snap.exists) {
+        if (fetchError) {
+          logger.error('[Email Click] Supabase fetch error', 'Server', { error: fetchError.message });
+        } else if (emailRecord) {
           const clickedAt = new Date().toISOString();
-          const currentData = snap.data() || {};
 
           // Create click event object
           const clickEvent = {
@@ -2250,21 +2266,28 @@ async function handleApiEmailClick(req, res, parsedUrl) {
             referer
           };
 
-          await ref.update({
-            clickCount: (currentData.clickCount || 0) + 1,
-            clicks: (currentData.clicks || []).concat([clickEvent]),
-            updatedAt: clickedAt,
-            lastClicked: clickedAt
-          });
+          // Update Supabase with new click event
+          const { error: updateError } = await supabaseAdmin
+            .from('emails')
+            .update({
+              clickCount: (emailRecord.clickCount || 0) + 1,
+              clicks: [...(emailRecord.clicks || []), clickEvent],
+              updatedAt: clickedAt
+            })
+            .eq('id', trackingId);
 
-          logger.debug('[Email Click] Recorded click', 'Server', {
-            trackingId: trackingId.substring(0, 20) + '...',
-            url: originalUrl.substring(0, 50) + '...',
-            deviceType
-          });
+          if (updateError) {
+            logger.error('[Email Click] Supabase update error', 'Server', { error: updateError.message });
+          } else {
+            logger.debug('[Email Click] Recorded click in Supabase', 'Server', {
+              trackingId: trackingId.substring(0, 20) + '...',
+              url: originalUrl.substring(0, 50) + '...',
+              deviceType
+            });
+          }
         }
       } catch (dbError) {
-        logger.error('[Email Click] Firestore error', 'Server', { error: dbError.message });
+        logger.error('[Email Click] Supabase error', 'Server', { error: dbError.message });
       }
     }
 
@@ -2461,16 +2484,33 @@ async function handleApiEmailStats(req, res, parsedUrl) {
       return;
     }
 
-    // TODO: Fetch email stats from database
-    // For now, return mock data
+    // Fetch email stats from Supabase
+    if (!supabaseAdmin) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Database not available' }));
+      return;
+    }
+
+    const { data: emailRecord, error: fetchError } = await supabaseAdmin
+      .from('emails')
+      .select('openCount, clickCount, opens, clicks, metadata')
+      .eq('id', trackingId)
+      .single();
+
+    if (fetchError) {
+      logger.error('[Email Stats] Supabase error', 'Server', { error: fetchError.message });
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Email tracking record not found' }));
+      return;
+    }
+
     const stats = {
       trackingId,
-      openCount: 0,
-      replyCount: 0,
-      lastOpened: null,
-      lastReplied: null,
-      opens: [],
-      replies: []
+      openCount: emailRecord?.openCount || 0,
+      clickCount: emailRecord?.clickCount || 0,
+      opens: emailRecord?.opens || [],
+      clicks: emailRecord?.clicks || [],
+      metadata: emailRecord?.metadata || {}
     };
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
