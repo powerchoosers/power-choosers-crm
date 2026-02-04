@@ -139,7 +139,11 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
         toast.loading('Neuro-Processing Document...', { id: toastId });
 
         try {
-          const response = await fetch('/api/analyze-document', {
+          // Use backend API URL in production, local in development
+          const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+          const apiUrl = apiBaseUrl ? `${apiBaseUrl}/api/analyze-document` : '/api/analyze-document';
+          
+          const response = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -183,8 +187,9 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
               }
             }, scanInterval);
             
-            // 3. Invalidate queries to trigger data refresh
-            queryClient.invalidateQueries({ queryKey: ['account', accountId] });
+            // 3. Invalidate AND refetch queries immediately
+            await queryClient.invalidateQueries({ queryKey: ['account', accountId] });
+            await queryClient.refetchQueries({ queryKey: ['account', accountId] });
             
             // 4. Callback to trigger parent component animations
             onIngestionComplete?.();

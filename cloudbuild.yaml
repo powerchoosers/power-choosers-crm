@@ -75,6 +75,8 @@ steps:
     - '--set-env-vars'
     - 'NEXT_PUBLIC_GOOGLE_MAPS_KEY=${_NEXT_PUBLIC_GOOGLE_MAPS_KEY}'
     - '--set-env-vars'
+    - 'NEXT_PUBLIC_API_BASE_URL=https://nodal-point-network-792458658491.us-central1.run.app'
+    - '--set-env-vars'
     - 'API_BASE_URL=https://nodal-point-network-792458658491.us-central1.run.app'
     - '--set-env-vars'
     - 'PUBLIC_BASE_URL=https://nodalpoint.io'
