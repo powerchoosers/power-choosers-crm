@@ -71,7 +71,8 @@ export function RightPanel() {
   const rawLocation = account?.location || contact?.location;
   const entityZone = mapLocationToZone(city, state, rawLocation);
   
-  const entityAddress = (contact ? contact.address : account?.address) || ''
+  // Always use account address for the map, fall back to contact address only if no account
+  const entityAddress = account?.address || contact?.address || ''
   const entityName = contact?.name || account?.name
 
   /** Effective panel content mode: on dossier use dossierPanelView, else always scanning. */
@@ -250,6 +251,8 @@ export function RightPanel() {
                     entityId={entityId}
                     entityType={isContactPage ? 'contact' : 'account'}
                     currentPhone={contact?.phone || account?.companyPhone}
+                    city={city}
+                    state={state}
                     onSyncComplete={() => {
                       if (isContactPage) refetchContact()
                       else refetchAccount()

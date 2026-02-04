@@ -11,6 +11,8 @@ interface SatelliteUplinkProps {
   entityId?: string;
   entityType?: 'contact' | 'account';
   currentPhone?: string;
+  city?: string;
+  state?: string;
   onSyncComplete?: () => void;
 }
 
@@ -20,6 +22,8 @@ export default function SatelliteUplink({
   entityId,
   entityType,
   currentPhone,
+  city,
+  state,
   onSyncComplete
 }: SatelliteUplinkProps) {
   const [isActive, setIsActive] = useState(false);
@@ -59,9 +63,18 @@ export default function SatelliteUplink({
       let resolvedAddress = activeAddress;
       
       if (!resolvedAddress && name) {
+        // Build search query: Name + city + state for better results
+        let searchQuery = name
+        
+        // Add location context if available
+        if (city || state) {
+          const locationParts = [city, state].filter(Boolean)
+          searchQuery = `${name} ${locationParts.join(' ')}`
+        }
+        
         toast.info('Initiating Satellite Scan...', { description: `Searching for ${name}` });
         
-        const searchRes = await fetch(`/api/maps/search?q=${encodeURIComponent(name)}`);
+        const searchRes = await fetch(`/api/maps/search?q=${encodeURIComponent(searchQuery)}`);
         const searchData = await searchRes.json();
         
         if (searchData.found && searchData.address) {
