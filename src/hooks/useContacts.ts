@@ -22,6 +22,7 @@ export interface Contact {
   mobile?: string
   workPhone?: string
   otherPhone?: string
+  companyPhone?: string
   metadata?: any
 }
 
@@ -170,6 +171,7 @@ type ContactRow = {
   mobile?: string | null
   workPhone?: string | null
   otherPhone?: string | null
+  companyPhone?: string | null
   primaryPhoneField?: string | null
   status?: Contact['status'] | null
   created_at?: string | null
@@ -735,6 +737,7 @@ export function useCreateContact() {
         mobile: newContact.mobile,
         workPhone: newContact.workPhone,
         otherPhone: newContact.otherPhone,
+        companyPhone: newContact.companyPhone,
         status: newContact.status,
         accountId: newContact.accountId || null,
         city: (newContact as any).city || null,
@@ -815,6 +818,7 @@ export function useUpsertContact() {
         mobile: contact.mobile,
         workPhone: contact.workPhone,
         otherPhone: contact.otherPhone,
+        companyPhone: contact.companyPhone,
         status: contact.status,
         accountId: contact.accountId || null,
         updatedAt: new Date().toISOString()
