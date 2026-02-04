@@ -8,6 +8,7 @@ import { useCallStore } from '@/store/callStore';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { formatPhoneNumber } from '@/lib/formatPhone';
 
 interface OrgIntelligenceProps {
   domain?: string;
@@ -224,7 +225,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           service_addresses: serviceAddresses, // Update service_addresses with HQ location
           logo_url: companySummary.logoUrl || null, // Replace with Apollo logo when enriching
           linkedin_url: companySummary.linkedin || null,
-          phone: companySummary.companyPhone || null,
+          phone: formatPhoneNumber(companySummary.companyPhone) || null,
           metadata: {
             ...currentMetadata,
             meters: meters, // Save meter with service address
@@ -459,9 +460,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
               const phoneStrings = json.phones.map((p: { sanitized_number?: string; raw_number?: string }) => p.sanitized_number || p.raw_number).filter(Boolean);
               if (phoneStrings.length === 0) return;
               const phoneUpdate: Record<string, string> = {};
-              if (phoneStrings[0]) phoneUpdate.phone = phoneStrings[0];
-              if (phoneStrings[1]) phoneUpdate.mobile = phoneStrings[1];
-              if (phoneStrings[2]) phoneUpdate.workPhone = phoneStrings[2];
+              if (phoneStrings[0]) phoneUpdate.phone = formatPhoneNumber(phoneStrings[0]);
+              if (phoneStrings[1]) phoneUpdate.mobile = formatPhoneNumber(phoneStrings[1]);
+              if (phoneStrings[2]) phoneUpdate.workPhone = formatPhoneNumber(phoneStrings[2]);
               const { error: updateError } = await supabase.from('contacts').update(phoneUpdate).eq('id', crmId);
               if (!updateError) {
                 setData(prev => {
