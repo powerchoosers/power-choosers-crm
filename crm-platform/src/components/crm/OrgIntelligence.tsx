@@ -399,7 +399,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       const existingPhones = person.phones || [];
       const allPhones = Array.from(new Set([...existingPhones, ...newPhones]));
 
-      setData(prev => prev.map(p => 
+      const updatedData = data.map(p => 
         p.id === person.id ? { 
           ...p, 
           isMonitored: true,
@@ -413,9 +413,14 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           location: enriched.location || p.location,
           phones: allPhones
         } : p
-      ));
+      );
+      
+      setData(updatedData);
+      
+      // 4. Save updated contact list to cache so refresh doesn't lose revealed data
+      saveToCache(companySummary, updatedData);
 
-      // 4. If we requested phone reveal, Apollo delivers phones asynchronously via webhook (can take several minutes).
+      // 5. If we requested phone reveal, Apollo delivers phones asynchronously via webhook (can take several minutes).
       // Poll phone-retrieve until ready, then update contact and local state.
       if ((type === 'phone' || type === 'both') && crmId) {
         toast.info('Phone numbers can take a few minutes. Checking in background.', { duration: 5000 });
@@ -439,9 +444,14 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
               if (phoneStrings[2]) phoneUpdate.workPhone = phoneStrings[2];
               const { error: updateError } = await supabase.from('contacts').update(phoneUpdate).eq('id', crmId);
               if (!updateError) {
-                setData(prev => prev.map(p => 
-                  p.id === person.id ? { ...p, phones: Array.from(new Set([...(p.phones || []), ...phoneStrings])) } : p
-                ));
+                setData(prev => {
+                  const updatedDataWithPhones = prev.map(p => 
+                    p.id === person.id ? { ...p, phones: Array.from(new Set([...(p.phones || []), ...phoneStrings])) } : p
+                  );
+                  // Save updated phones to cache
+                  saveToCache(companySummary, updatedDataWithPhones);
+                  return updatedDataWithPhones;
+                });
                 toast.success(`Phone numbers for ${person.name} received & saved.`);
               }
               return;
