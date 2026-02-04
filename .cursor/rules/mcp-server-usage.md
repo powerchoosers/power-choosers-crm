@@ -2,6 +2,8 @@
 
 This project has a **Cursor MCP server** named **crm-debugger** that exposes tools for frontend debugging and Supabase migration management. Use this rule to understand when and how to use it.
 
+**When Supabase queries fail** (e.g. "more than one relationship found", "could not find relationship"), **check the MCP debugger first**: use `supabase_execute_sql` to inspect the real schema (foreign key names, column names) and fix queries using the exact constraint names from the database—do not guess.
+
 ---
 
 ## Configuration
@@ -70,6 +72,84 @@ The AI can invoke MCP tools when they are relevant (e.g. "check migrations", "ap
 
 ---
 
+### 5. `supabase_execute_sql`
+
+**When to use:** Need to **inspect or change** the linked Supabase database directly (e.g. check schema, foreign keys, create tables, fix data). Use this **before guessing** when Supabase errors mention relationships, schema, or "could not find relationship."
+
+**Parameters:**
+- `sql` (optional, string): Raw SQL to execute (e.g. `SELECT ... FROM information_schema ...`).
+- `file` (optional, string): Path to a `.sql` file relative to project root (alternative to `sql`).
+
+**Behavior:** Runs the SQL against the linked remote database. Requires **SUPABASE_DB_URL** in project root `.env` (Dashboard → Database → Connection string URI). Returns result rows or execution status.
+
+**Example asks:** "What foreign keys exist on `list_members`?" / "List all tables in public schema." / "Check the actual constraint names for lists and list_members."
+
+---
+
+## When Supabase Things Aren't Working — Use the MCP Debugger First
+
+If you see errors like:
+
+- **"Could not embed because more than one relationship was found for 'X' and 'Y'"**
+- **"Could not find a relationship between 'X' and 'Y' in the schema cache"**
+- **Queries failing with vague schema/relationship errors**
+
+**Do this:**
+
+1. **Inspect the real schema** with `supabase_execute_sql` so you're not guessing constraint names or column casing.
+2. **Fix the query** using the **exact** foreign key constraint name and casing from the database (e.g. `list_members_listid_fkey` not `list_members_listId_fkey`).
+
+### Inspecting schema via MCP
+
+Use `supabase_execute_sql` with `sql` to run read-only queries against the linked DB. Examples:
+
+**List foreign keys on a table:**
+```sql
+SELECT tc.constraint_name, tc.table_name, kcu.column_name,
+       ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name
+FROM information_schema.table_constraints AS tc
+JOIN information_schema.key_column_usage AS kcu
+  ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+JOIN information_schema.constraint_column_usage AS ccu
+  ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema
+WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = 'list_members';
+```
+
+**List tables in public schema:**
+```sql
+SELECT table_name FROM information_schema.tables
+WHERE table_schema = 'public' ORDER BY table_name;
+```
+
+**Describe columns of a table:**
+```sql
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'public' AND table_name = 'accounts'
+ORDER BY ordinal_position;
+```
+
+### Fixing relationship / embed errors
+
+1. Run the foreign-key query above for the table that is failing (e.g. `list_members`).
+2. Note the **exact** `constraint_name` (Postgres often lowercases it, e.g. `list_members_listid_fkey`).
+3. In your Supabase client query, **specify the relationship** using that name:
+   - From parent table: `list_members!list_members_listid_fkey(count)`
+   - From child table: `lists!list_members_listid_fkey(name)`
+4. Use the **exact** casing returned by the schema query; do not assume camelCase.
+
+### Creating tables and other schema changes
+
+- **Preferred:** Add a new migration file under `supabase/migrations/` with your `CREATE TABLE` or `ALTER TABLE` SQL, then use `supabase_db_push` (dry run first) to apply it. This keeps schema in version control.
+- **Direct SQL:** For one-off fixes or exploratory changes, use `supabase_execute_sql` with a `sql` string or a `file` path to a `.sql` script. Avoid using direct SQL for schema that should be tracked in migrations long-term.
+
+### Other issues
+
+- **RLS / permissions:** If inserts or selects fail with permission errors, check RLS policies in the Dashboard or via `information_schema` and adjust policies in a migration.
+- **Migration history out of sync:** Use `supabase_migration_list` to see local vs remote state; use the **terminal** for `supabase migration repair` (see Limitations and References).
+
+---
+
 ## Workflow Summary
 
 | Goal | Action |
@@ -78,6 +158,9 @@ The AI can invoke MCP tools when they are relevant (e.g. "check migrations", "ap
 | Preview what would be applied | Use `supabase_db_push` with `dry_run: true`. |
 | Apply pending migrations | Use `supabase_db_push` (after dry run if desired). |
 | Fix "remote not in local" / history sync | Use **terminal**: `supabase migration repair --status reverted <versions...>` (see CLI output or `supabase-cli-migration-workflow.md`). |
+| **Schema / relationship errors** | Use **MCP first**: `supabase_execute_sql` to inspect FK names and schema; fix queries with exact constraint names. |
+| Inspect tables, FKs, or run SQL | Use `supabase_execute_sql` with `sql` or `file`. |
+| Create tables / schema changes | Prefer migrations + `supabase_db_push`; one-off fixes via `supabase_execute_sql` if needed. |
 | See frontend logs | Use `get_frontend_logs` (optional: pass `limit`). |
 | Clear frontend logs | Use `clear_logs`. |
 
@@ -88,6 +171,7 @@ The AI can invoke MCP tools when they are relevant (e.g. "check migrations", "ap
 - **Supabase CLI in MCP:** The server runs `npx supabase` from the project root. If that fails (e.g. EPERM on Windows), run the same commands in the **integrated terminal** where Supabase CLI is installed (e.g. via Scoop) and PATH is set (see `.vscode/settings.json` for `terminal.integrated.env.windows`).
 - **No repair tool:** Migration history repair is done via the terminal (`supabase migration repair`), not via MCP.
 - **Log file:** Frontend tools read/write `.cursor/debug.log`; the app must write logs there for `get_frontend_logs` to be useful.
+- **supabase_execute_sql:** Requires `SUPABASE_DB_URL` in project root `.env`. Use read-only queries for inspection; use migrations for tracked schema changes when possible.
 
 ---
 

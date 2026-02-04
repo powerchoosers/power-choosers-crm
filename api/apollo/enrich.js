@@ -5,6 +5,12 @@
  * - Direct enrichment (no search required) - saves 50% credits
  * - Auto-save to Apollo contacts - makes future enrichments FREE
  * - Smart strategy selection based on cached data
+ * 
+ * Reveal Behavior:
+ * - Email reveals: INSTANT (directly returned in API response)
+ * - Phone reveals: ASYNC (webhook-based, takes time to process)
+ * - Use revealEmails=true for fast email-only reveals
+ * - Use revealPhones=true to reveal BOTH email + phone (slower)
  */
 
 import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL, formatLocation } from './_utils.js';
@@ -67,7 +73,7 @@ export default async function handler(req, res) {
         // 4. Fallback to Apollo ID from contactIds array
         
         const matchBody = {
-          reveal_personal_emails: revealEmails !== false,
+          reveal_personal_emails: revealEmails === true,
           reveal_phone_number: revealPhones === true
         };
         

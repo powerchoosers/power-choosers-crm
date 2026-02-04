@@ -86,7 +86,7 @@ export default function FilterCommandDeck({
 
   const statusOptions = type === 'people' 
     ? ['Lead', 'Customer', 'Churned']
-    : ['ACTIVE_LOAD', 'PROSPECT', 'CHURNED'];
+    : ['PROSPECT', 'ACTIVE_LOAD', 'CUSTOMER', 'CHURNED'];
 
   const industryOptions = Object.keys(INDUSTRY_VECTORS);
   const titleOptions = Object.keys(TITLE_VECTORS);

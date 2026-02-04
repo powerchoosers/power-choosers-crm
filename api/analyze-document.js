@@ -117,7 +117,7 @@ export default async function handler(req, res) {
     if (data.annual_usage) updates.annual_usage = String(data.annual_usage);
 
     if (type === 'SIGNED_CONTRACT') {
-      updates.status = 'ACTIVE_LOAD';
+      updates.status = 'CUSTOMER'; // Actual customer once contract is in Data Locker
     }
 
     if (Object.keys(updates).length > 0) {

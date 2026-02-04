@@ -608,7 +608,7 @@ export function TopBar() {
                                         transition={{ duration: 0.2, ease: "easeInOut" }}
                                         className="flex items-center justify-center"
                                     >
-                                        {isDialerOpen ? <X size={22} /> : <Phone size={22} />}
+                                        {isDialerOpen ? <X size={20} /> : <Phone size={20} />}
                                     </motion.div>
                                 </AnimatePresence>
                             </button>

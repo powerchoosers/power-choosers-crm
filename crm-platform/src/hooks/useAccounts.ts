@@ -29,7 +29,7 @@ export interface Account {
   annualUsage?: string
   electricitySupplier?: string
   currentRate?: string
-  status?: 'ACTIVE_LOAD' | 'PROSPECT' | 'CHURNED'
+  status?: 'ACTIVE_LOAD' | 'PROSPECT' | 'CHURNED' | 'CUSTOMER'
   meters?: Array<{
     id: string
     esiId: string
@@ -563,7 +563,7 @@ export function useUpdateAccount() {
       if (updates.annualUsage !== undefined) dbUpdates.annual_usage = updates.annualUsage || null
       if (updates.electricitySupplier !== undefined) dbUpdates.electricity_supplier = updates.electricitySupplier || null
       if (updates.currentRate !== undefined) dbUpdates.current_rate = updates.currentRate || null
-      if (updates.status !== undefined) dbUpdates.status = updates.status || 'PROSPECT'
+      if (updates.status !== undefined) dbUpdates.status = updates.status || 'PROSPECT' // PROSPECT | ACTIVE_LOAD | CUSTOMER | CHURNED
 
       // Metadata updates
       const newMetadata = { ...currentMetadata }

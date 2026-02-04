@@ -40,6 +40,7 @@ interface ApolloCompany {
   city?: string;
   state?: string;
   country?: string;
+  address?: string; // Full street address from Apollo (raw_address or street_address)
   logoUrl?: string;
   linkedin?: string;
   companyPhone?: string;
@@ -70,7 +71,11 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
 
   const domain = useMemo(() => {
     if (initialDomain) return initialDomain;
-    if (!website) return companyName?.toLowerCase().replace(/\s+/g, '') + '.com';
+    if (!website) {
+      // Only create fallback domain if companyName exists
+      if (!companyName) return undefined;
+      return companyName.toLowerCase().replace(/\s+/g, '') + '.com';
+    }
     try {
       let s = website.trim();
       if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
@@ -157,27 +162,65 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
 
     setScanStatus('scanning'); // This will trigger the blur overlay
     try {
+      // Parse employees to integer (database schema uses int, not text)
+      const employeesValue = companySummary.employees 
+        ? (typeof companySummary.employees === 'number' 
+            ? companySummary.employees 
+            : parseInt(String(companySummary.employees).replace(/[^0-9]/g, ''), 10) || null)
+        : null;
+
+      // Get existing account data to preserve service_addresses if they exist
+      const { data: existingAccount } = await supabase
+        .from('accounts')
+        .select('service_addresses')
+        .eq('id', accountId)
+        .single();
+
+      // Build service_addresses array - preserve existing or create new with HQ address
+      let serviceAddresses = existingAccount?.service_addresses || [];
+      
+      // If we have address data from Apollo and no existing service addresses, add it as HQ
+      if (serviceAddresses.length === 0 && (companySummary.address || companySummary.city || companySummary.state)) {
+        serviceAddresses = [{
+          address: companySummary.address || '', // Full street address from Apollo
+          city: companySummary.city || '',
+          state: companySummary.state || '',
+          country: companySummary.country || '',
+          type: 'headquarters',
+          isPrimary: true
+        }];
+      }
+
       // Use the existing companySummary from Apollo to update the CRM account
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('accounts')
         .update({
-          industry: companySummary.industry,
-          employees: companySummary.employees?.toString(),
-          description: companySummary.description,
-          location: [companySummary.city, companySummary.state].filter(Boolean).join(', '),
-          address: [companySummary.city, companySummary.state, companySummary.country].filter(Boolean).join(', '),
-          linkedinUrl: companySummary.linkedin,
-          companyPhone: companySummary.companyPhone,
+          industry: companySummary.industry || null,
+          employees: employeesValue,
+          description: companySummary.description || null,
+          city: companySummary.city || null,
+          state: companySummary.state || null,
+          country: companySummary.country || null,
+          address: [companySummary.city, companySummary.state, companySummary.country].filter(Boolean).join(', ') || null,
+          service_addresses: serviceAddresses, // Update service_addresses with HQ location
+          logo_url: companySummary.logoUrl || null, // Replace with Apollo logo when enriching
+          linkedin_url: companySummary.linkedin || null,
+          phone: companySummary.companyPhone || null,
           metadata: {
             ...((companySummary as any).metadata || {}),
             apollo_enriched_at: new Date().toISOString(),
             apollo_raw_data: companySummary
           }
         })
-        .eq('id', accountId);
+        .eq('id', accountId)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase enrichment error:', error);
+        throw error;
+      }
 
+      console.log('Enrichment successful:', data);
       toast.success('DEEP_ENRICHMENT complete. Node profile updated.');
       
       // We don't have a direct way to trigger a refetch of useAccount from here 
@@ -186,7 +229,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       
     } catch (err) {
       console.error('Enrichment Error:', err);
-      toast.error('Enrichment failed. Verification required.');
+      toast.error(`Enrichment failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setScanStatus('complete');
     }
@@ -232,7 +275,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       return;
     }
     
-    const revealEmails = type === 'email' || type === 'both';
+    // Email button: only reveal email (fast)
+    // Phone button: reveal BOTH email AND phone (slower, reveals everything)
+    const revealEmails = type === 'email' || type === 'phone' || type === 'both';
     const revealPhones = type === 'phone' || type === 'both';
 
     setAcquiringEmail(person.id);
@@ -453,6 +498,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             city: (first.organization_city as string) || undefined,
             state: (first.organization_state as string) || undefined,
             country: (first.organization_country as string) || undefined,
+            address: (first.organization_raw_address as string) || (first.organization_street_address as string) || undefined,
             description: (first.organization_description as string) || undefined,
             linkedin: (first.organization_linkedin_url as string) || undefined,
             companyPhone: (first.organization_phone as string) || undefined,

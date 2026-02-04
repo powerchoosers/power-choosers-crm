@@ -10,7 +10,7 @@ export function useTargets() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('lists')
-        .select('*, list_members(count)')
+        .select('*, list_members!list_members_listid_fkey(count)')
       
       if (error) {
         if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
@@ -73,7 +73,7 @@ export function useTarget(id: string) {
       
       const { data, error } = await supabase
         .from('lists')
-        .select('*, list_members(count)')
+        .select('*, list_members!list_members_listid_fkey(count)')
         .eq('id', id)
         .single()
       
@@ -104,7 +104,7 @@ export function useSearchTargets(queryTerm: string) {
       if (loading || !user) return []
 
       try {
-        let query = supabase.from('lists').select('*, list_members(count)')
+        let query = supabase.from('lists').select('*, list_members!list_members_listid_fkey(count)')
 
         if (role !== 'admin' && user.email) {
           query = query.eq('ownerId', user.email)
