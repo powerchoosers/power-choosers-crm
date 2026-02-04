@@ -1,52 +1,50 @@
-Based on the Nodal Point philosophy of "Obsidian & Glass" and "Forensic Precision," text floating in a void is a design error. It lacks hierarchy and tactile feedback. Furthermore, sending an email without seeing the "Open/Click" telemetry is like firing a weapon with no impact sensor.
-Here is the architectural directive to upgrade your Emails Table (UPLINK_OUT).
-1. The Header Fix: "The Switch-Blade"
-Current State: Floating text (ALL_NODES, UPLINK_IN, UPLINK_OUT) that looks like a command line error. New Protocol: Encapsulate these options in a Segmented Control Module.
-The Component: Create a low-profile glass container that holds the three states.
-• Container: bg-black/40 border border-white/5 rounded-lg p-1 flex gap-1 inline-flex.
-• Inactive State: text-zinc-500 hover:text-zinc-300 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider transition-colors.
-• Active State: bg-white/10 text-white shadow-[0_0_10px_-2px_rgba(255,255,255,0.1)] border border-white/5 rounded-[4px].
-Visual Logic: This makes the navigation feel like a physical switch on a piece of hardware. It clearly delineates the active scope.
-2. The Telemetry Injection (Opens & Clicks)
-You asked where to put "Opens" and "Clicks." In Nodal Point, we do not simply add columns; we add Signal Indicators.
-Location: Between the TRANSMISSION (Subject/Snippet) column and the TIMESTAMP column.
-The Visual (The "Signal Array"): Do not use standard text (e.g., "Opens: 2"). Use Glyphs and Heat.
-• Header Label: TELEMETRY
-• Row Content:
-    ◦ Render a small pill container: flex items-center gap-3 bg-white/5 rounded px-2 py-1 border border-white/5.
-    ◦ Opens:
-        ▪ Icon: Eye (Lucide) size 12.
-        ▪ Text: Number count.
-        ▪ Logic: If count > 0, icon glows Emerald. If count > 2, text glows White.
-    ◦ Clicks:
-        ▪ Icon: MousePointer2 (Lucide) size 12.
-        ▪ Text: Number count.
-        ▪ Logic: If count > 0, icon and text turn Klein Blue (#002FA7). This is the highest value signal.
-3. The "Pulse" Feature
-You asked if there is "anything we should do with that." Yes. If a row has a Click, it is no longer just a row. It is a Hot Lead.
-• The Effect: Apply a subtle border-l-2 border-[#002FA7] (left border) to the entire table row if clicks > 0.
-• Why: When scanning a list of 50 emails, the user's eye should instantly snap to the rows with clicks. This filters the "Noise" (unopened emails) from the "Signal" (engaged targets).
-IDE Prompt
-Copy this into your IDE to execute the changes:
-@EmailsPage.tsx @components/ui
+Based on the Nodal Point philosophy of "Forensic Precision" and the NEPQ (Neuro-Emotional Persuasion Questioning) methodology found in your new sources [Source 678, 726], here is the architectural guide for your cold calls and the specific text prompt to feed into your IDE.
+This approach blends the "Market Architect" authority with your specific persona: a sharp, 29-year-old African American professional who cuts through the noise with competence, not volume.
+The Nodal Point Cold Call Guide (NEPQ Framework)
+Your goal is not to "sell energy." It is to diagnose a financial liability that the prospect didn't know they had.
+Phase 1: The Connection (The "Smooth" Entry)
+• Objective: Lower resistance immediately. Do not sound like a "cheerleader." Sound like a peer.
+• Technique: Use a "Permission-Based Opener" with a "Down-Tone" (drop your voice at the end of the sentence to sound authoritative, not seeking approval) [Source 606, 1263].
+• The Script:
+Phase 2: The Problem (The "Ghost" Hunt)
+• Objective: Introduce a specific, expensive problem they are likely ignoring.
+• Technique: "Problem Awareness Question." Stop talking about "saving money." Talk about "variance" and "waste."
+• The Script:
+Phase 3: The Solution Awareness (The "Architect" Pivot)
+• Objective: Make them visualize a future where they control the risk.
+• The Script:
+Phase 4: The Commitment (The "Low Friction" Close)
+• Objective: Get a "Micro-Commitment," not a marriage.
+• Technique: "No-Oriented Question" (People feel safer saying 'No' than 'Yes') [Source 1308].
+• The Script:
 
-1. HEADER REFACTOR:
-   Wrap the "ALL_NODES", "UPLINK_IN", "UPLINK_OUT" navigation in a segmented control component.
-   - Container: bg-black/40 border border-white/5 rounded-lg p-1 inline-flex.
-   - Active Item: bg-white/10 text-white shadow-sm border border-white/5 rounded-[4px].
-   - Inactive Item: text-zinc-500 hover:text-zinc-300.
-   - Typography: text-[10px] font-mono uppercase tracking-wider.
-   - UPLINK_OUT Filter: Only show emails sent through CRM (tracking ID format: gmail_*), not all Gmail sent emails.
+--------------------------------------------------------------------------------
+[ IDE PROMPT // COPY & PASTE BELOW ]
+This prompt instructs your AI agent to adopt your specific persona and the Nodal philosophy when generating scripts or handling objections live.
+@CallIntelligence.tsx @NodeIngestion.tsx
 
-2. TELEMETRY COLUMNS (Uplink Out Only):
-   In the table, add a "TELEMETRY" column between Transmission and Timestamp.
-   - CRITICAL: Only show this column when filter === 'sent' (UPLINK_OUT tab).
-   - Hide the entire column for UPLINK_IN and ALL_NODES (received emails don't have tracking).
-   - When hidden, expand Transmission column from col-span-4 to col-span-6.
-   - Render a pill: `flex items-center gap-3 bg-white/5 px-2 py-1 rounded border border-white/5 w-fit`.
-   - Open Indicator: <Eye size={12} /> + count. If count > 0, text-emerald-400.
-   - Click Indicator: <MousePointer2 size={12} /> + count. If count > 0, text-[#002FA7].
-   - If count is 0, style as text-zinc-600 (inactive).
+ACT AS: "Lewis," the Director of Energy Architecture at Nodal Point.
+AGE/PERSONA: 29-year-old African American business executive. 
+TONE: "Obsidian & Glass." You are smooth, calm, and dangerously competent. You do not use "sales voice" (high pitch/enthusiastic). You use "executive voice" (lower register, measured pace, declarative). You are skeptical of the status quo.
 
-3. ROW HIGHLIGHT:
-   If `clicks > 0`, add a `border-l-2 border-[#002FA7]` to the table row to signal h
+CORE PHILOSOPHY (The Nodal Way):
+1. Energy is a Liability, not a Commodity. We fix "design flaws" in the contract.
+2. Trade on Physics, not History. Focus on Phantom Charges, Hidden Fees, and Surge Premiums.
+3. Be the Critic. Do not "save money." Eliminate "waste that nobody's tracking."
+
+METHODOLOGY (NEPQ):
+- Always use "Permission-Based Openers" (e.g., "Did I catch you at a bad time?").
+- Use "Problem Awareness Questions" to expose gaps (e.g., "When was the last time someone showed you where the waste is?").
+- Use "No-Oriented Questions" for the close (e.g., "Would you be opposed?").
+- NO JARGON: Avoid "4CP", "demand ratchet", "ancillary services", "LOA", "RFP". Use "phantom charges", "hidden fees", "surge premiums" instead.
+
+SCENARIO INSTRUCTIONS:
+- If the user clicks [OPENER]: Generate a script that references the prospect's Industry and Location. Use the "Phantom Charges on Idle Equipment" hook for Logistics/Manufacturing. Use the "Hidden Fees" hook for Commercial/Retail.
+- If the user clicks [OBJECTION: "Send Info"]: Reply with a "Diffusing" question: "I can do that, but just so I don't send you generic fluff, what specifically are you trying to fix? The phantom charges, the hidden fees, or something else?"
+- If the user clicks [OBJECTION: "We are under contract"]: Reply with the "Forensic Audit" pivot: "I assumed you were. I'm not looking to sell you power; I'm looking to audit the phantom charges that your contract doesn't cover. When was the last time someone audited those line items?"
+
+VISUALS:
+- Keep outputs short (under 50 words per bubble).
+- Highlight key data points (e.g., "Phantom Charges", "Surge Premiums", location) in Klein Blue.
+- Maintain the "Forensic Instrument" aesthetic.
+- Use plain business language—no technical jargon.

@@ -44,26 +44,29 @@ export default function SatelliteUplink({
     setActiveAddress(address);
   }, [address]);
 
-  // Geocode address to coordinates
+  // Geocode address to coordinates using Google Maps Geocoder
   const geocodeAddress = async (addressToGeocode: string): Promise<{ lat: number; lng: number } | null> => {
-    if (!addressToGeocode) return null;
+    if (!addressToGeocode || !isLoaded) return null;
     
     try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
-          addressToGeocode
-        )}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}`
-      );
-      const data = await response.json();
+      // Use the Google Maps JavaScript API Geocoder
+      const geocoder = new google.maps.Geocoder();
       
-      if (data.results && data.results.length > 0) {
-        const location = data.results[0].geometry.location;
-        return { lat: location.lat, lng: location.lng };
-      }
+      return new Promise((resolve) => {
+        geocoder.geocode({ address: addressToGeocode }, (results, status) => {
+          if (status === 'OK' && results && results.length > 0) {
+            const location = results[0].geometry.location;
+            resolve({ lat: location.lat(), lng: location.lng() });
+          } else {
+            console.error('Geocoding failed:', status);
+            resolve(null);
+          }
+        });
+      });
     } catch (error) {
       console.error('Geocoding error:', error);
+      return null;
     }
-    return null;
   };
 
   const establishUplink = async () => {
