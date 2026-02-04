@@ -14,6 +14,7 @@ import { useUpsertAccount } from '@/hooks/useAccounts';
 import { useTargets, useCreateTarget } from '@/hooks/useTargets';
 import { Input } from '@/components/ui/input';
 import { useQueryClient } from '@tanstack/react-query';
+import { formatPhoneNumber } from '@/lib/formatPhone';
 
 // --- FORENSIC TYPES ---
 type ImportVector = 'CONTACTS' | 'ACCOUNTS';
@@ -411,10 +412,10 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
             firstName: mappedData.first_name || '',
             lastName: mappedData.last_name || '',
             email: mappedData.email || '',
-            phone: mappedData.phone || '',
-            mobile: mappedData.mobile_phone || '',
-            workPhone: mappedData.work_direct || '',
-            otherPhone: mappedData.other_phone || '',
+            phone: formatPhoneNumber(mappedData.phone) || '',
+            mobile: formatPhoneNumber(mappedData.mobile_phone) || '',
+            workPhone: formatPhoneNumber(mappedData.work_direct) || '',
+            otherPhone: formatPhoneNumber(mappedData.other_phone) || '',
             status: 'Lead',
             company: mappedData.company_name || '',
             city: mappedData.city || '',
@@ -470,7 +471,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
             industry: mappedData.industry || '',
             domain: mappedData.website || '',
             logoUrl: mappedData.logo_url || '',
-            companyPhone: mappedData.company_phone || '',
+            companyPhone: formatPhoneNumber(mappedData.company_phone) || '',
             linkedinUrl: mappedData.linkedin_url || '',
             address: mappedData.service_address || '', // Populate uplink address
             serviceAddresses: mappedData.service_address ? [mappedData.service_address] : [],
