@@ -64,14 +64,14 @@ RUN chown nextjs:nodejs .next
 
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing
-# Copy standalone output (which includes crm-platform/server.js and crm-platform/.next)
+# Copy standalone output (includes `server.js` at image root)
 COPY --from=builder --chown=nextjs:nodejs /app/crm-platform/.next/standalone ./
 
-# Copy public directory to the correct location (inside crm-platform because server.js is there)
-COPY --from=builder --chown=nextjs:nodejs /app/crm-platform/public ./crm-platform/public
+# Copy public directory next to `server.js`
+COPY --from=builder --chown=nextjs:nodejs /app/crm-platform/public ./public
 
-# Copy static files to the correct location (inside crm-platform/.next)
-COPY --from=builder --chown=nextjs:nodejs /app/crm-platform/.next/static ./crm-platform/.next/static
+# Copy static files next to `server.js`
+COPY --from=builder --chown=nextjs:nodejs /app/crm-platform/.next/static ./.next/static
 
 USER nextjs
 
@@ -79,5 +79,4 @@ EXPOSE 3000
 
 ENV PORT 3000
 
-# server.js is located in crm-platform/server.js due to turbopack root config
-CMD ["node", "crm-platform/server.js"]
+CMD ["node", "server.js"]
