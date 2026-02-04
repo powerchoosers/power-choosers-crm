@@ -54,8 +54,8 @@ export function useSearchCalls(queryTerm: string) {
         return {
           id: item.id,
           contactName: contact?.name || 'Unknown',
-          summary: item.summary,
-          date: item.timestamp || item.createdAt
+          summary: item.ai_summary || item.summary,
+          date: item.timestamp || item.created_at || item.createdAt
         }
       })
     },
@@ -118,16 +118,25 @@ type CallRow = {
   status?: string | null
   duration?: number | null
   timestamp?: string | null
+  created_at?: string | null
   createdAt?: string | null
   summary?: string | null
+  ai_summary?: string | null
+  recording_url?: string | null
   recordingUrl?: string | null
+  recording_sid?: string | null
   recordingSid?: string | null
   transcript?: string | null
+  ai_insights?: Record<string, unknown> | null
   aiInsights?: Record<string, unknown> | null
+  contact_id?: string | null
   contactId?: string | null
+  account_id?: string | null
   accountId?: string | null
   from?: string | null
+  from_phone?: string | null
   to?: string | null
+  to_phone?: string | null
   contacts?: CallContact | CallContact[] | null
 }
 
@@ -183,7 +192,7 @@ export function useCalls(searchQuery?: string) {
 
       const { data, error, count } = await query
         .range(from, to)
-        .order('createdAt', { ascending: false })
+        .order('created_at', { ascending: false })
 
       if (error) {
         console.error('Error fetching calls:', error)
@@ -207,17 +216,17 @@ export function useCalls(searchQuery?: string) {
         return {
           id: item.id,
           contactName: contact?.name || 'Unknown',
-          phoneNumber: item.from === user.email ? item.to : item.from, // Rough guess
+          phoneNumber: (item.from_phone || item.from) === user.email ? (item.to_phone || item.to) : (item.from_phone || item.from), // Rough guess
           type: type as Call['type'],
           status: status as Call['status'],
           duration: durationStr,
-          date: item.timestamp || item.createdAt,
-          note: item.summary,
-          recordingUrl: item.recordingUrl,
-          recordingSid: item.recordingSid,
+          date: item.timestamp || item.created_at || item.createdAt,
+          note: item.ai_summary || item.summary,
+          recordingUrl: item.recording_url || item.recordingUrl,
+          recordingSid: item.recording_sid || item.recordingSid,
           transcript: item.transcript,
-          aiInsights: item.aiInsights,
-          contactId: item.contactId
+          aiInsights: item.ai_insights || item.aiInsights,
+          contactId: item.contact_id || item.contactId
         }
       }) as Call[]
 
@@ -249,7 +258,7 @@ export function useAccountCalls(accountId: string) {
           event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
           schema: 'public',
           table: 'calls',
-          filter: `accountId=eq.${accountId}`,
+          filter: `account_id=eq.${accountId}`,
         },
         (payload) => {
           console.log('Real-time call update for account:', accountId, payload)
@@ -273,7 +282,7 @@ export function useAccountCalls(accountId: string) {
       const { data, error } = await supabase
         .from('calls')
         .select('*, contacts(name)')
-        .eq('accountId', accountId)
+        .eq('account_id', accountId)
         .order('timestamp', { ascending: false })
 
       if (error) throw error
@@ -290,18 +299,18 @@ export function useAccountCalls(accountId: string) {
         return {
           id: item.id,
           contactName: contact?.name || 'Unknown',
-          phoneNumber: item.from || item.to || '',
+          phoneNumber: item.from_phone || item.to_phone || '',
           type: type as Call['type'],
-          status: status as Call['status'],
+          status: status as Call['type'],
           duration: durationStr,
-          date: item.timestamp || item.createdAt,
-          note: item.summary,
-          recordingUrl: item.recordingUrl,
-          recordingSid: item.recordingSid,
+          date: item.timestamp || item.created_at,
+          note: item.ai_summary || item.summary,
+          recordingUrl: item.recording_url,
+          recordingSid: item.recording_sid,
           transcript: item.transcript,
-          aiInsights: item.aiInsights,
-          contactId: item.contactId,
-          accountId: item.accountId
+          aiInsights: item.ai_insights,
+          contactId: item.contact_id,
+          accountId: item.account_id
         }
       }) as Call[]
     },
@@ -326,7 +335,7 @@ export function useContactCalls(contactId: string) {
           event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
           schema: 'public',
           table: 'calls',
-          filter: `contactId=eq.${contactId}`,
+          filter: `contact_id=eq.${contactId}`,
         },
         (payload) => {
           console.log('Real-time call update for contact:', contactId, payload)
@@ -349,8 +358,8 @@ export function useContactCalls(contactId: string) {
       const { data, error } = await supabase
         .from('calls')
         .select('*')
-        .eq('contactId', contactId)
-        .order('createdAt', { ascending: false })
+        .eq('contact_id', contactId)
+        .order('created_at', { ascending: false })
         .limit(20) // Increased from 10 to 20 for better coverage
 
       if (error) {
@@ -369,17 +378,17 @@ export function useContactCalls(contactId: string) {
         return {
           id: item.id,
           contactName: '', // Not needed for single contact view
-          phoneNumber: item.from === user.email ? item.to : item.from,
+          phoneNumber: item.from_phone === user.email ? item.to_phone : item.from_phone,
           type: type as Call['type'],
           status: status as Call['status'],
           duration: durationStr,
-          date: item.timestamp || item.createdAt,
-          note: item.summary,
-          recordingUrl: item.recordingUrl,
-          recordingSid: item.recordingSid,
+          date: item.timestamp || item.created_at,
+          note: item.ai_summary || item.summary,
+          recordingUrl: item.recording_url,
+          recordingSid: item.recording_sid,
           transcript: item.transcript,
-          aiInsights: item.aiInsights,
-          contactId: item.contactId
+          aiInsights: item.ai_insights,
+          contactId: item.contact_id
         }
       }) as Call[]
     },

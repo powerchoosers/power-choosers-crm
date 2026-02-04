@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { formatPhoneNumber } from '@/lib/formatPhone';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface OrgIntelligenceProps {
   domain?: string;
@@ -60,6 +61,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   const [acquiringEmail, setAcquiringEmail] = useState<string | null>(null);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const { initiateCall } = useCallStore();
+  const queryClient = useQueryClient();
   const CONTACTS_PER_PAGE = 5;
 
   const handleCompanyCall = (phone: string, name: string) => {
@@ -414,6 +416,12 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
 
       const typeLabel = type === 'both' ? 'details' : type === 'email' ? 'email' : 'phone';
       toast.success(`${person.name} ${typeLabel} revealed & synced`);
+      
+      // Invalidate queries to refresh the contacts list immediately
+      if (accountId) {
+        queryClient.invalidateQueries({ queryKey: ['account-contacts', accountId] });
+        queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      }
       
       // 3. Update local state (phones from immediate response; may be empty when reveal_phone_number=true)
       const newPhones = enriched.phones?.map((ph: { number: string }) => ph.number) || [];

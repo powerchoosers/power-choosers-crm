@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { formatPhoneNumber } from '@/lib/formatPhone';
+import { useQueryClient } from '@tanstack/react-query';
 
 // REAL API ENRICHMENT
 const enrichNode = async (identifier: string, type: 'ACCOUNT' | 'CONTACT') => {
@@ -86,6 +87,7 @@ const enrichNode = async (identifier: string, type: 'ACCOUNT' | 'CONTACT') => {
 
 export function NodeIngestion() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { rightPanelMode, setRightPanelMode, ingestionContext, setIngestionContext } = useUIStore();
   const type = rightPanelMode === 'INGEST_ACCOUNT' ? 'ACCOUNT' : 'CONTACT';
   const isRapidContactInjection = type === 'CONTACT' && !!ingestionContext?.accountId;
@@ -386,10 +388,15 @@ export function NodeIngestion() {
         className: "bg-zinc-900 border-white/10 text-white font-mono",
       });
       
-      // Navigate to the dossier page
+      // Invalidate queries to refresh the lists immediately
       if (type === 'ACCOUNT') {
+        queryClient.invalidateQueries({ queryKey: ['accounts'] });
         router.push(`/network/accounts/${id}`);
       } else {
+        queryClient.invalidateQueries({ queryKey: ['contacts'] });
+        if (ingestionContext?.accountId) {
+          queryClient.invalidateQueries({ queryKey: ['account-contacts', ingestionContext.accountId] });
+        }
         router.push(`/network/contacts/${id}`);
       }
       
