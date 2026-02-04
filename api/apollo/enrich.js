@@ -40,6 +40,10 @@ export default async function handler(req, res) {
       revealPhones 
     } = req.body || {};
     
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/apollo/enrich.js:handler:entry',message:'enrich request',data:{contactIdsLength:contactIds?.length,contactIdsFirst:contactIds?.[0],contactsLength:contacts?.length,revealEmails,revealPhones},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
+
     // If we have an email or linkedinUrl but no contactIds, we can still enrich
     if (contactIds.length === 0 && (email || linkedinUrl || (firstName && lastName && company?.domain))) {
       // Create a dummy contactId to trigger the loop once
@@ -131,6 +135,10 @@ export default async function handler(req, res) {
           matchBody.id = contactId;
         }
 
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/apollo/enrich.js:matchBody',message:'Apollo match body',data:{matchBodyKeys:Object.keys(matchBody),matchBodyId:matchBody.id},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
+        // #endregion
+
         let url = `${APOLLO_BASE_URL}/people/match`;
         if (revealPhones === true && webhookUrl) {
           const qs = `webhook_url=${encodeURIComponent(webhookUrl)}`;
@@ -146,8 +154,14 @@ export default async function handler(req, res) {
           body: JSON.stringify(matchBody)
         });
 
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/apollo/enrich.js:apolloResp',message:'Apollo people/match response',data:{ok:resp.ok,status:resp.status},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+        // #endregion
         if (!resp.ok) {
           const text = await resp.text();
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/apollo/enrich.js:apolloError',message:'Apollo error body',data:{status:resp.status,textSlice:text?.slice(0,200)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+          // #endregion
           continue;
         }
 
@@ -174,6 +188,10 @@ export default async function handler(req, res) {
       contacts: enrichedContacts,
       requestId: requestId || 'apollo_enrich_' + Date.now()
     };
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/apollo/enrich.js:response',message:'enrich response',data:{enrichedContactsLength:enrichedContacts.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(response));

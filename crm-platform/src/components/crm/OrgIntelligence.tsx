@@ -270,6 +270,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   };
 
   const handleAcquire = async (person: ApolloContactRow, type: 'email' | 'phone' | 'both' = 'both') => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OrgIntelligence.tsx:handleAcquire:entry',message:'handleAcquire called',data:{personId:person?.id,personIdType:typeof person?.id,type,hasAccountId:!!accountId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
     if (!accountId) {
       toast.error('No account ID provided for acquisition');
       return;
@@ -293,14 +296,25 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           'Authorization': `Bearer ${session?.access_token}`
         },
         body: JSON.stringify({
-          contacts: [person],
+          contactIds: [person.id],  // Array of Apollo person IDs
+          contacts: [person],       // Full contact objects for context
           revealEmails,
           revealPhones,
           company: { name: companySummary?.name || companyName, domain: domain }
         })
       });
 
-      if (!enrichResp.ok) throw new Error('Enrichment failed');
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OrgIntelligence.tsx:handleAcquire:afterFetch',message:'enrich response',data:{ok:enrichResp.ok,status:enrichResp.status},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+      // #endregion
+      if (!enrichResp.ok) {
+        const errorText = await enrichResp.text();
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OrgIntelligence.tsx:handleAcquire:errorResp',message:'API error response',data:{status:enrichResp.status,errorText:errorText?.slice(0,200)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+        // #endregion
+        console.error('Apollo enrich API error:', errorText);
+        throw new Error(`Enrichment failed: ${enrichResp.status} ${errorText}`);
+      }
       const enrichData = await enrichResp.json() as { 
         contacts?: Array<{
           fullName?: string;
@@ -315,7 +329,15 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       };
       const enriched = enrichData.contacts?.[0];
 
-      if (!enriched) throw new Error('No enrichment data available');
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OrgIntelligence.tsx:handleAcquire:enrichData',message:'enrich result',data:{contactsLength:enrichData?.contacts?.length,hasEnriched:!!enriched},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
+      // #endregion
+      if (!enriched) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OrgIntelligence.tsx:handleAcquire:noEnriched',message:'No enrichment data',data:{enrichDataKeys:enrichData?Object.keys(enrichData):[]},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
+        // #endregion
+        throw new Error('No enrichment data available');
+      }
 
       // 2. Insert or Update Supabase
       let crmId = person.crmId;
