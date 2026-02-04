@@ -467,6 +467,7 @@ export function useUpsertAccount() {
         updatedAt: new Date().toISOString()
       };
 
+      if (account.address) dbAccount.address = account.address;
       if (account.city) dbAccount.city = account.city;
       if (account.state) dbAccount.state = account.state;
       

@@ -5,6 +5,7 @@ import { Phone, Mail, Clock, Plus, Sparkles, Star, Building2, Smartphone, Landma
 import { format } from 'date-fns'
 import { ContactDetail } from '@/hooks/useContacts'
 import { useCallStore } from '@/store/callStore'
+import { formatPhoneNumber } from '@/lib/formatPhone'
 
 interface UplinkCardProps {
   contact: ContactDetail
@@ -103,15 +104,16 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
   }, [contact, isEditing])
 
   const handlePhoneChange = (id: PhoneType, value: string) => {
-    const updated = phones.map(p => p.id === id ? { ...p, value } : p)
+    const formattedValue = formatPhoneNumber(value)
+    const updated = phones.map(p => p.id === id ? { ...p, value: formattedValue } : p)
     setPhones(updated)
     
     // Prepare updates for parent
     const updates: Partial<ContactDetail> = {}
-    if (id === 'mobile') updates.mobile = value
-    else if (id === 'workDirectPhone') updates.workDirectPhone = value
-    else if (id === 'otherPhone') updates.otherPhone = value
-    else if (id === 'companyPhone') updates.companyPhone = value
+    if (id === 'mobile') updates.mobile = formattedValue
+    else if (id === 'workDirectPhone') updates.workDirectPhone = formattedValue
+    else if (id === 'otherPhone') updates.otherPhone = formattedValue
+    else if (id === 'companyPhone') updates.companyPhone = formattedValue
     
     onUpdate(updates)
   }

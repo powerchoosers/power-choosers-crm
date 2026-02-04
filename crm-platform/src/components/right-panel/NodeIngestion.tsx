@@ -11,6 +11,7 @@ import { useUIStore } from '@/store/uiStore';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { formatPhoneNumber } from '@/lib/formatPhone';
 
 // REAL API ENRICHMENT
 const enrichNode = async (identifier: string, type: 'ACCOUNT' | 'CONTACT') => {
@@ -348,7 +349,7 @@ export function NodeIngestion() {
           country: scanResult?.country,
           service_addresses: serviceAddresses, // Save to service_addresses JSONB array
           logo_url: scanResult?.logo,
-          phone: phone || scanResult?.phone,
+          phone: formatPhoneNumber(phone || scanResult?.phone) || null,
           linkedin_url: scanResult?.linkedin,
           status: 'active',
           metadata: {
@@ -366,7 +367,7 @@ export function NodeIngestion() {
           lastName: lastName,
           name: entityName || `${firstName} ${lastName}`.trim(),
           email: email,
-          phone: phone,
+          phone: formatPhoneNumber(phone) || null,
           title: title,
           linkedinUrl: identifier.includes('linkedin.com') ? identifier : scanResult?.linkedin,
           accountId: ingestionContext?.accountId ?? scanResult?.accountId,
