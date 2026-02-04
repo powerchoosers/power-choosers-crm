@@ -40,17 +40,74 @@ export default async function handler(req, res) {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
     // 1. Download file from Supabase Storage
-    const { data: fileData, error: downloadError } = await supabaseAdmin
+    logger.log('[Analyze Document] Attempting download from vault:', filePath);
+    
+    let fileData;
+    let downloadError;
+    
+    // Try direct download first
+    const downloadResult = await supabaseAdmin
       .storage
       .from('vault')
       .download(filePath);
+    
+    fileData = downloadResult.data;
+    downloadError = downloadResult.error;
+
+    // If direct download fails, try using signed URL method
+    if (downloadError || !fileData) {
+      logger.warn('[Analyze Document] Direct download failed, trying signed URL method...', {
+        error: downloadError?.message,
+        filePath
+      });
+      
+      try {
+        const { data: signedUrlData, error: signedUrlError } = await supabaseAdmin
+          .storage
+          .from('vault')
+          .createSignedUrl(filePath, 60);
+        
+        if (signedUrlError || !signedUrlData?.signedUrl) {
+          throw new Error(signedUrlError?.message || 'Failed to create signed URL');
+        }
+        
+        // Fetch the file using the signed URL
+        const response = await fetch(signedUrlData.signedUrl);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const blob = await response.blob();
+        fileData = blob;
+        downloadError = null;
+        logger.log('[Analyze Document] Signed URL method succeeded');
+      } catch (fallbackError) {
+        logger.error('[Analyze Document] Both download methods failed:', {
+          originalError: downloadError?.message,
+          fallbackError: fallbackError.message,
+          filePath
+        });
+      }
+    }
 
     if (downloadError || !fileData) {
-      logger.error('[Analyze Document] Download Error:', downloadError);
+      logger.error('[Analyze Document] Final Download Error:', {
+        error: downloadError,
+        message: downloadError?.message,
+        statusCode: downloadError?.statusCode,
+        filePath,
+        hasFileData: !!fileData
+      });
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Failed to download file from storage' }));
+      res.end(JSON.stringify({ 
+        error: 'Failed to download file from storage',
+        details: downloadError?.message || 'No file data returned',
+        filePath 
+      }));
       return;
     }
+    
+    logger.log('[Analyze Document] File downloaded successfully, size:', fileData.size);
 
     // 2. Prepare file for Gemini
     const arrayBuffer = await fileData.arrayBuffer();
@@ -73,11 +130,16 @@ export default async function handler(req, res) {
     - "OTHER": Anything else.
 
     Task 2: Extract key data fields.
-    - contract_end_date: The specific expiration date. If not found, estimate based on term length.
+    - contract_end_date: The specific expiration date. If not found, estimate based on term length or service end date.
     - strike_price: The energy rate (in cents/kWh or $/MWh). Convert to cents (e.g., 0.045).
     - supplier: The name of the retail electricity provider (REP).
     - annual_usage: Estimated annual kWh. If a monthly bar chart exists, sum it up. If only one month, multiply by 12.
-    - esids: An array of ESI ID numbers (17-22 digits) and their service addresses found in the document.
+    - monthly_kwh: The total kWh consumed in the billing period (for load factor calculation).
+    - peak_demand_kw: The peak demand in kW during the billing period (often labeled as "Demand", "Peak kW", "Max Demand").
+    - billing_days: Number of days in the billing period (to calculate accurate load factor).
+    - esids: An array of ALL ESI ID numbers (17-22 digits) found in the document. Include EVERY ESI ID you find, with their service addresses.
+
+    CRITICAL: Extract ALL ESI IDs from the document. Bills often have multiple meters listed.
 
     Return ONLY a JSON object with this structure:
     {
@@ -87,8 +149,11 @@ export default async function handler(req, res) {
         "strike_price": number (e.g., 0.045) or null,
         "supplier": string or null,
         "annual_usage": number or null,
+        "monthly_kwh": number or null,
+        "peak_demand_kw": number or null,
+        "billing_days": number or null,
         "esids": [
-          { "id": "100...", "address": "123 Main St..." }
+          { "id": "10000000000000000000", "address": "123 Main St, Dallas, TX 75201", "rate": "0.045", "end_date": "03/25" }
         ]
       }
     }
@@ -116,6 +181,26 @@ export default async function handler(req, res) {
     if (data.supplier) updates.electricity_supplier = data.supplier;
     if (data.annual_usage) updates.annual_usage = String(data.annual_usage);
 
+    // Calculate Load Factor
+    // Formula: Load Factor = (Total kWh) / (Peak Demand kW × Hours in Period)
+    // Result is a decimal between 0 and 1 (e.g., 0.65 = 65% load factor)
+    if (data.monthly_kwh && data.peak_demand_kw && data.billing_days) {
+      const hoursInPeriod = data.billing_days * 24;
+      const loadFactor = data.monthly_kwh / (data.peak_demand_kw * hoursInPeriod);
+      
+      // Clamp between 0 and 1, and round to 3 decimal places
+      const clampedLoadFactor = Math.min(Math.max(loadFactor, 0), 1);
+      updates.load_factor = Number(clampedLoadFactor.toFixed(3));
+      
+      logger.log('[Analyze Document] Load Factor Calculated:', {
+        monthly_kwh: data.monthly_kwh,
+        peak_demand_kw: data.peak_demand_kw,
+        billing_days: data.billing_days,
+        hours: hoursInPeriod,
+        load_factor: updates.load_factor
+      });
+    }
+
     if (type === 'SIGNED_CONTRACT') {
       updates.status = 'CUSTOMER'; // Actual customer once contract is in Data Locker
     }
@@ -131,19 +216,31 @@ export default async function handler(req, res) {
 
     // Insert Meters (ESIDs)
     if (data.esids && data.esids.length > 0) {
+      logger.log('[Analyze Document] Processing ESIDs:', data.esids.length);
+      
       const metersToInsert = data.esids.map((m) => ({
         account_id: accountId,
         esid: m.id,
         service_address: m.address,
+        rate: m.rate || null,
+        end_date: m.end_date || null,
         status: 'Active',
-        metadata: { source: 'ai_extraction', document: fileName }
+        metadata: { 
+          source: 'ai_extraction', 
+          document: fileName,
+          extracted_at: new Date().toISOString()
+        }
       }));
 
       const { error: meterError } = await supabaseAdmin
         .from('meters')
         .upsert(metersToInsert, { onConflict: 'esid' });
       
-      if (meterError) logger.error('[Analyze Document] Meter Insert Error:', meterError);
+      if (meterError) {
+        logger.error('[Analyze Document] Meter Insert Error:', meterError);
+      } else {
+        logger.log('[Analyze Document] Successfully inserted/updated', metersToInsert.length, 'meters');
+      }
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
