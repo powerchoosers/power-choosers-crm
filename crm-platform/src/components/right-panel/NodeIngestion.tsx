@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, Building2, User, Link2, MapPin, 
-  Sparkles, AlertTriangle, CheckCircle, ArrowRight, Loader2
+  Sparkles, AlertTriangle, CheckCircle, ArrowRight, Loader2, Lock, X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useUIStore } from '@/store/uiStore';
@@ -22,16 +22,19 @@ const enrichNode = async (identifier: string, type: 'ACCOUNT' | 'CONTACT') => {
       return {
         id: data.id,
         name: data.name,
+        domain: data.domain,
         industry: data.industry,
         employees: data.employees,
         revenue: data.revenue,
+        description: data.description, // Apollo returns short_description
         logo: data.logoUrl,
-        address: data.address,
+        address: data.address, // Full raw_address from Apollo
         city: data.city,
         state: data.state,
+        country: data.country,
         zip: data.zip,
-        phone: data.phone,
-        linkedin: data.linkedin_url
+        phone: data.companyPhone, // Fixed: was data.phone, should be data.companyPhone
+        linkedin: data.linkedin // Fixed: was data.linkedin_url, Apollo returns as 'linkedin'
       };
     } else {
       // For contacts, we try to match by email or linkedin url
@@ -80,8 +83,9 @@ const enrichNode = async (identifier: string, type: 'ACCOUNT' | 'CONTACT') => {
 };
 
 export function NodeIngestion() {
-  const { rightPanelMode, setRightPanelMode } = useUIStore();
+  const { rightPanelMode, setRightPanelMode, ingestionContext, setIngestionContext } = useUIStore();
   const type = rightPanelMode === 'INGEST_ACCOUNT' ? 'ACCOUNT' : 'CONTACT';
+  const isRapidContactInjection = type === 'CONTACT' && !!ingestionContext?.accountId;
   
   const [step, setStep] = useState<'SIGNAL' | 'VERIFY' | 'COMMIT'>('SIGNAL');
   const [identifier, setIdentifier] = useState('');
@@ -89,9 +93,11 @@ export function NodeIngestion() {
   const [isCommitting, setIsCommitting] = useState(false);
   const [scanResult, setScanResult] = useState<any>(null);
   const [isManual, setIsManual] = useState(false);
+  const firstNameInputRef = useRef<HTMLInputElement>(null);
   
   // Form State
   const [entityName, setEntityName] = useState('');
+  const [description, setDescription] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [title, setTitle] = useState('');
@@ -104,6 +110,166 @@ export function NodeIngestion() {
   const [state, setState] = useState('');
   const [nodeTopology, setNodeTopology] = useState<'PARENT' | 'SUBSIDIARY'>('PARENT');
 
+  // Apollo Search & Enrichment State (Rapid Injection)
+  const [isSearching, setIsSearching] = useState(false);
+  const [isEnriching, setIsEnriching] = useState(false);
+  const [accountData, setAccountData] = useState<any>(null);
+  const [potentialMatches, setPotentialMatches] = useState<any[]>([]);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+
+  // Rapid Contact Injection: focus First Name when context is set
+  useEffect(() => {
+    if (isRapidContactInjection && step === 'SIGNAL') {
+      const timer = setTimeout(() => firstNameInputRef.current?.focus(), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isRapidContactInjection, step]);
+
+  // Fetch account data for Apollo search context
+  useEffect(() => {
+    if (isRapidContactInjection && ingestionContext?.accountId) {
+      const fetchAccountData = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('accounts')
+            .select('name, website, industry')
+            .eq('id', ingestionContext.accountId)
+            .single();
+          
+          if (data && !error) {
+            setAccountData(data);
+          }
+        } catch (err) {
+          console.error('Error fetching account data:', err);
+        }
+      };
+      fetchAccountData();
+    }
+  }, [isRapidContactInjection, ingestionContext?.accountId]);
+
+  // Apollo Search: Debounced search when typing first name
+  useEffect(() => {
+    if (!isRapidContactInjection || !accountData || !firstName || firstName.length < 2) return;
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      setPotentialMatches([]);
+      
+      try {
+        // Extract domain from website URL
+        let domain = null;
+        if (accountData.website) {
+          try {
+            const url = accountData.website.startsWith('http') 
+              ? accountData.website 
+              : `https://${accountData.website}`;
+            domain = new URL(url).hostname.replace('www.', '');
+          } catch (e) {
+            console.error('Invalid website URL:', e);
+          }
+        }
+
+        // Use Apollo mixed_people/search to find contacts
+        const searchBody: any = {
+          page: 1,
+          per_page: 10,
+          q_keywords: firstName // Search by first name
+        };
+
+        // Add company context if we have domain
+        if (domain) {
+          searchBody.q_organization_domains = [domain];
+        } else if (accountData.name) {
+          searchBody.q_organization_name = accountData.name;
+        }
+
+        const response = await fetch('/api/apollo/search-people', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(searchBody)
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const people = data.people || [];
+          
+          // Filter to matches where first name matches (case insensitive)
+          const matches = people.filter((p: any) => 
+            p.firstName?.toLowerCase() === firstName.toLowerCase()
+          );
+
+          // If we have lastName input, further filter by last name initial
+          if (lastName && matches.length > 0) {
+            const lastInitial = lastName.charAt(0).toLowerCase();
+            const filteredByInitial = matches.filter((p: any) => 
+              p.lastName?.charAt(0).toLowerCase() === lastInitial
+            );
+            
+            if (filteredByInitial.length > 0) {
+              setPotentialMatches(filteredByInitial);
+              setShowVerifyModal(true);
+            }
+          } else if (matches.length > 0) {
+            // Just first name - show all matches
+            setPotentialMatches(matches);
+            setShowVerifyModal(true);
+          }
+        }
+      } catch (error) {
+        console.error('Apollo search error:', error);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 1200); // 1.2s debounce
+
+    return () => clearTimeout(timer);
+  }, [firstName, lastName, isRapidContactInjection, accountData]);
+
+  // Handle match selection and enrichment
+  const handleSelectMatch = async (match: any) => {
+    setShowVerifyModal(false);
+    setIsEnriching(true);
+    
+    try {
+      // Enrich using the person's ID to reveal email
+      const enrichBody = {
+        contactIds: [match.id],
+        revealEmails: true,
+        revealPhones: false // Only enrich email, not phone
+      };
+
+      const response = await fetch('/api/apollo/enrich', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(enrichBody)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.contacts && data.contacts.length > 0) {
+          const contact = data.contacts[0];
+          
+          // Auto-populate all fields with enriched data
+          setFirstName(contact.firstName || firstName);
+          setLastName(contact.lastName || lastName);
+          setTitle(contact.jobTitle || title);
+          setEmail(contact.email || email);
+          setCity(contact.city || city);
+          setState(contact.state || state);
+          
+          toast.success(`Enriched ${contact.firstName} ${contact.lastName}`, {
+            description: contact.email ? `Email: ${contact.email}` : contact.jobTitle
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Apollo enrichment error:', error);
+      toast.error('Failed to enrich contact');
+    } finally {
+      setIsEnriching(false);
+    }
+  };
+
   const handleScan = async () => {
     if (!identifier) return;
     setIsScanning(true);
@@ -112,6 +278,7 @@ export function NodeIngestion() {
       if (data) {
         setScanResult(data);
         setEntityName(data.name || '');
+        setDescription(data.description || '');
         setFirstName(data.firstName || '');
         setLastName(data.lastName || '');
         setTitle(data.title || '');
@@ -143,16 +310,32 @@ export function NodeIngestion() {
       const now = new Date().toISOString();
 
       if (type === 'ACCOUNT') {
+        // Build service_addresses array if we have address data
+        const serviceAddresses = [];
+        if (address || city || state) {
+          serviceAddresses.push({
+            address: address || '',
+            city: city || '',
+            state: state || '',
+            country: scanResult?.country || '',
+            type: 'headquarters',
+            isPrimary: true
+          });
+        }
+
         const { error } = await supabase.from('accounts').insert({
           id,
           name: entityName,
           domain: identifier.includes('.') ? identifier : scanResult?.domain,
           industry: scanResult?.industry,
+          description: description || scanResult?.description,
           revenue: revenue,
           employees: parseInt(employees) || 0,
-          address: address,
+          address: address, // Keep address field for backward compatibility
           city: city,
           state: state,
+          country: scanResult?.country,
+          service_addresses: serviceAddresses, // NEW: Save to service_addresses JSONB array
           logo_url: scanResult?.logo,
           phone: phone || scanResult?.phone,
           linkedin_url: scanResult?.linkedin,
@@ -172,7 +355,7 @@ export function NodeIngestion() {
           phone: phone,
           title: title,
           linkedinUrl: identifier.includes('linkedin.com') ? identifier : scanResult?.linkedin,
-          accountId: scanResult?.accountId,
+          accountId: ingestionContext?.accountId ?? scanResult?.accountId,
           city: city,
           state: state,
           status: 'active',
@@ -202,11 +385,13 @@ export function NodeIngestion() {
 
   const resetProtocol = () => {
     setRightPanelMode('DEFAULT');
+    setIngestionContext(null);
     setStep('SIGNAL');
     setIdentifier('');
     setScanResult(null);
     setIsManual(false);
     setEntityName('');
+    setDescription('');
     setFirstName('');
     setLastName('');
     setTitle('');
@@ -238,7 +423,7 @@ export function NodeIngestion() {
       <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
         <AnimatePresence mode="wait">
           
-          {/* STEP 1: SIGNAL ACQUISITION */}
+          {/* STEP 1: SIGNAL ACQUISITION (or Rapid Contact Injection with Context Lock) */}
           {step === 'SIGNAL' && (
             <motion.div 
               key="signal"
@@ -247,34 +432,126 @@ export function NodeIngestion() {
               exit={{ opacity: 0, x: -20 }}
               className="space-y-6"
             >
-              <div className="space-y-2">
-                <label className="text-[10px] font-mono text-zinc-500 uppercase flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 bg-[#002FA7] rounded-full animate-pulse" />
-                  Signal Source
-                </label>
-                <div className="relative group">
-                  <input 
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleScan()}
-                    placeholder={type === 'ACCOUNT' ? "company.com" : "linkedin.com/in/..."}
-                    className="w-full bg-zinc-900/50 border border-white/10 rounded-lg p-4 text-sm font-mono text-white placeholder:text-zinc-700 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7]/50 outline-none transition-all"
-                    autoFocus
-                  />
-                  <div className="absolute right-4 top-4">
-                    {isScanning ? (
-                      <div className="w-4 h-4 border-2 border-zinc-600 border-t-[#002FA7] rounded-full animate-spin" />
-                    ) : (
-                      <button onClick={handleScan} className="text-zinc-600 hover:text-[#002FA7] transition-colors">
-                        <ArrowRight className="w-4 h-4" />
-                      </button>
+              {isRapidContactInjection ? (
+                <>
+                  <div className="space-y-2">
+                    {/* Context Lock: contact hard-linked to this account */}
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#002FA7]/10 border border-[#002FA7]/30">
+                      <Lock className="w-4 h-4 text-[#002FA7] shrink-0" />
+                      <span className="text-[10px] font-mono text-zinc-300 uppercase tracking-widest truncate">
+                        {ingestionContext?.accountName ?? 'Account'}
+                      </span>
+                    </div>
+                    
+                    {/* Apollo Search/Enrichment Indicator */}
+                    {(isSearching || isEnriching) && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+                        <Loader2 className="w-3 h-3 text-emerald-500 shrink-0 animate-spin" />
+                        <span className="text-[9px] font-mono text-emerald-400 uppercase tracking-widest">
+                          {isSearching ? 'Searching Apollo...' : 'Enriching Email...'}
+                        </span>
+                      </div>
                     )}
                   </div>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase">First Name</label>
+                        <input 
+                          ref={firstNameInputRef}
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          className="nodal-input w-full"
+                          placeholder="First Name"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase">Last Name</label>
+                        <input 
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          className="nodal-input w-full"
+                          placeholder="Last Name"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-mono text-zinc-500 uppercase">Job Title</label>
+                      <input 
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        className="nodal-input w-full"
+                        placeholder="e.g. CEO, Energy Manager"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase">Email</label>
+                        <input 
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="nodal-input w-full"
+                          placeholder="email@example.com"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase">Phone</label>
+                        <input 
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          className="nodal-input w-full"
+                          placeholder="+1 (555) 000-0000"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t border-white/10">
+                    <Button 
+                      onClick={handleCommit}
+                      disabled={isCommitting || (!firstName && !lastName)}
+                      className="w-full bg-white text-black hover:bg-zinc-200 font-mono text-xs font-bold h-10 tracking-tight flex items-center justify-center gap-2"
+                    >
+                      {isCommitting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          COMMITTING...
+                        </>
+                      ) : (
+                        '[ COMMIT_NODE_TO_DB ]'
+                      )}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-[#002FA7] rounded-full animate-pulse" />
+                    Signal Source
+                  </label>
+                  <div className="relative group">
+                    <input 
+                      value={identifier}
+                      onChange={(e) => setIdentifier(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleScan()}
+                      placeholder={type === 'ACCOUNT' ? "company.com" : "linkedin.com/in/..."}
+                      className="w-full bg-zinc-900/50 border border-white/10 rounded-lg p-4 text-sm font-mono text-white placeholder:text-zinc-700 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7]/50 outline-none transition-all"
+                      autoFocus
+                    />
+                    <div className="absolute right-4 top-4">
+                      {isScanning ? (
+                        <div className="w-4 h-4 border-2 border-zinc-600 border-t-[#002FA7] rounded-full animate-spin" />
+                      ) : (
+                        <button onClick={handleScan} className="text-zinc-600 hover:text-[#002FA7] transition-colors">
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-zinc-600 pl-1">
+                    Input vector required for probabilistic enrichment.
+                  </p>
                 </div>
-                <p className="text-[10px] text-zinc-600 pl-1">
-                  Input vector required for probabilistic enrichment.
-                </p>
-              </div>
+              )}
             </motion.div>
           )}
 
@@ -318,15 +595,27 @@ export function NodeIngestion() {
               {/* DATA PAYLOAD */}
               <div className="space-y-4">
                 {type === 'ACCOUNT' ? (
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-zinc-500 uppercase">Entity Name</label>
-                    <input 
-                      value={entityName}
-                      onChange={(e) => setEntityName(e.target.value)}
-                      className="nodal-input w-full"
-                      placeholder="Legal Entity Name"
-                    />
-                  </div>
+                  <>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-mono text-zinc-500 uppercase">Entity Name</label>
+                      <input 
+                        value={entityName}
+                        onChange={(e) => setEntityName(e.target.value)}
+                        className="nodal-input w-full"
+                        placeholder="Legal Entity Name"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-mono text-zinc-500 uppercase">Description</label>
+                      <textarea 
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        className="nodal-input w-full min-h-[60px] resize-none"
+                        placeholder="Company overview..."
+                        rows={3}
+                      />
+                    </div>
+                  </>
                 ) : (
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
@@ -485,6 +774,88 @@ export function NodeIngestion() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* VERIFICATION MODAL: Confirm Apollo Match */}
+      <AnimatePresence>
+        {showVerifyModal && potentialMatches.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6"
+            onClick={() => setShowVerifyModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-zinc-900 border border-white/20 rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto custom-scrollbar"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-mono text-white uppercase tracking-widest">
+                    Verify Match
+                  </h3>
+                  <button
+                    onClick={() => setShowVerifyModal(false)}
+                    className="icon-button-forensic w-8 h-8"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <p className="text-xs font-mono text-zinc-400">
+                  Found {potentialMatches.length} potential match{potentialMatches.length !== 1 ? 'es' : ''} for <span className="text-white">{firstName}</span> at <span className="text-white">{accountData?.name}</span>
+                </p>
+
+                <div className="space-y-2">
+                  {potentialMatches.map((match, index) => (
+                    <button
+                      key={match.id || index}
+                      onClick={() => handleSelectMatch(match)}
+                      className="w-full p-4 rounded-xl border border-white/10 bg-zinc-800/50 hover:bg-zinc-800 hover:border-[#002FA7]/50 transition-all text-left group"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-mono text-white">
+                              {match.firstName} {match.lastName}
+                            </span>
+                            {match.emailStatus === 'verified' && (
+                              <CheckCircle className="w-3 h-3 text-emerald-500 shrink-0" />
+                            )}
+                          </div>
+                          {match.title && (
+                            <p className="text-xs font-mono text-zinc-400 mb-1">
+                              {match.title}
+                            </p>
+                          )}
+                          {match.location && (
+                            <p className="text-[10px] font-mono text-zinc-500">
+                              {match.location}
+                            </p>
+                          )}
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-[#002FA7] shrink-0 transition-colors" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="pt-4 border-t border-white/10">
+                  <button
+                    onClick={() => setShowVerifyModal(false)}
+                    className="w-full py-2 text-xs font-mono text-zinc-500 hover:text-white transition-colors"
+                  >
+                    [ CANCEL ]
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -71,7 +71,7 @@ export default function InfrastructureMap() {
       let query = supabase
         .from('contacts')
         .select('*, accounts!inner(name, city, state, industry, annual_usage, status)', { count: 'exact' })
-        .eq('accounts.status', 'ACTIVE_LOAD');
+        .in('accounts.status', ['ACTIVE_LOAD', 'CUSTOMER']);
 
       if (role !== 'admin' && user?.email) {
         query = query.eq('ownerId', user.email);

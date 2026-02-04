@@ -626,7 +626,7 @@ export function useContact(id: string) {
         .from('list_members')
         .select(`
           listId,
-          lists (
+          lists!list_members_listid_fkey (
             name
           )
         `)

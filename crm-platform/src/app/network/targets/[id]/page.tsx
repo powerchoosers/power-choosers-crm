@@ -454,14 +454,17 @@ export default function TargetDetailPage() {
         const account = row.original
         const hasContract = !!account.contractEnd
         const isExpired = hasContract && new Date(account.contractEnd) < new Date()
-        const isActive = hasContract && !isExpired
+        const isCustomer = account.status === 'CUSTOMER'
+        const isActiveLoad = (hasContract && !isExpired) || account.status === 'ACTIVE_LOAD'
+        const displayStatus = isCustomer ? 'Customer' : isActiveLoad ? 'Active' : isExpired ? 'Expired' : 'No Contract'
+        const isActive = isCustomer || isActiveLoad
         return (
           <div className="flex items-center gap-2">
             <div className={cn(
               "w-1.5 h-1.5 rounded-full",
               isActive ? "bg-emerald-500 animate-pulse" : isExpired ? "bg-red-500" : "bg-zinc-600"
             )} />
-            <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">{isActive ? 'Active' : isExpired ? 'Expired' : 'No Contract'}</span>
+            <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">{displayStatus}</span>
           </div>
         )
       }
