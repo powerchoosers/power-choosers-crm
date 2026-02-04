@@ -52,8 +52,6 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { setStatus, setActive } = useCallStore()
 
-  // Helper to check if we are in the platform area
-  const isPlatform = pathname?.startsWith('/network') || pathname?.startsWith('/dashboard')
   const tokenRefreshTimer = useRef<NodeJS.Timeout | null>(null)
   const deviceRef = useRef<Device | null>(null)
   const isInitializing = useRef(false)
@@ -87,6 +85,10 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const initDevice = useCallback(async () => {
+    // Helper to check if we are in the platform area (check at call time)
+    const currentPath = window.location.pathname
+    const isPlatform = currentPath?.startsWith('/network') || currentPath?.startsWith('/dashboard')
+    
     // Only initialize on the client side, when user is authenticated, and in platform routes
     if (typeof window === 'undefined' || !user || !isPlatform || !document.cookie.includes('np_session=')) {
       // We don't clean up the device here anymore to avoid dropping active calls if navigating away,
@@ -202,7 +204,9 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         
         // Don't show toast for "transport unavailable" as we'll try to recover
         // Also only show toasts if we are in the platform area
-        if (error.code !== 31009 && isPlatform) {
+        const currentPath = window.location.pathname
+        const isInPlatform = currentPath?.startsWith('/network') || currentPath?.startsWith('/dashboard')
+        if (error.code !== 31009 && isInPlatform) {
           toast.error('Twilio Device Error', { description: error.message })
         }
         
@@ -218,7 +222,9 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         console.log('[Voice] Incoming call')
         
         // Only show incoming call UI if in platform
-        if (!isPlatform) {
+        const currentPath = window.location.pathname
+        const isInPlatform = currentPath?.startsWith('/network') || currentPath?.startsWith('/dashboard')
+        if (!isInPlatform) {
           call.reject()
           return
         }
@@ -305,7 +311,9 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
     } catch (error) {
       console.error('[Voice] Failed to init device:', error)
-      if (isPlatform) {
+      const currentPath = window.location.pathname
+      const isInPlatform = currentPath?.startsWith('/network') || currentPath?.startsWith('/dashboard')
+      if (isInPlatform) {
         toast.error('Voice System Offline', { 
           description: 'Could not connect to Twilio service.' 
         })
@@ -313,7 +321,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     } finally {
       isInitializing.current = false
     }
-  }, [resolvePhoneMeta, setActive, setStatus, user, isPlatform])
+  }, [resolvePhoneMeta, setActive, setStatus, user])
 
   useEffect(() => {
     initDevice()
@@ -333,7 +341,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         deviceRef.current = null
       }
     }
-  }, [initDevice, pathname])
+  }, [initDevice])
 
   const connect = useCallback(async (params: { To: string; From?: string; metadata?: VoiceMetadata }) => {
     if (!device || !isReady) {
