@@ -154,6 +154,7 @@ export function TopBar() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [callDuration, setCallDuration] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  const dialpadContainerRef = useRef<HTMLDivElement>(null)
 
   const durationInterval = useRef<NodeJS.Timeout | null>(null)
   const callStartRef = useRef<number | null>(null)
@@ -254,6 +255,18 @@ export function TopBar() {
         setTimeout(() => inputRef.current?.focus(), 100)
     }
   }, [isDialerOpen])
+
+  // Close dialpad when clicking outside the button or popover
+  useEffect(() => {
+    if (!isDialpadOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dialpadContainerRef.current && !dialpadContainerRef.current.contains(e.target as Node)) {
+        setIsDialpadOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isDialpadOpen])
 
   const handleRefresh = () => {
     toast.info("Refreshing Data...")
@@ -423,14 +436,16 @@ export function TopBar() {
                                 >
                                     <Mic size={16} />
                                 </button>
-                                <div className="relative">
+                                <div className="relative" ref={dialpadContainerRef}>
                                     <button 
+                                        type="button"
                                         onClick={() => setIsDialpadOpen(!isDialpadOpen)}
                                         className={cn(
-                                            "icon-button-forensic p-1.5",
-                                            isDialpadOpen ? "bg-[#002FA7]/20 text-[#002FA7] border-[#002FA7]/30" : ""
+                                            "icon-button-forensic p-1.5 rounded-[14px] focus:outline-none focus-visible:ring-0",
+                                            isDialpadOpen && "text-white [&_svg]:scale-[1.15]"
                                         )}
                                         title="Dialpad (DTMF)"
+                                        aria-expanded={isDialpadOpen}
                                     >
                                         <Grid3X3 size={16} />
                                     </button>
@@ -448,6 +463,7 @@ export function TopBar() {
                                                     {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map((digit) => (
                                                         <button
                                                             key={digit}
+                                                            type="button"
                                                             onClick={() => {
                                                                 sendDigits(digit);
                                                             }}
