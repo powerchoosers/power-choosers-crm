@@ -1,13 +1,9 @@
 import type { NextConfig } from "next";
-import path from "path";
 
 const nextConfig: NextConfig = {
   output: "standalone",
   images: {
     unoptimized: true,
-  },
-  turbopack: {
-    root: path.resolve(__dirname, ".."),
   },
   async rewrites() {
     const isProd = process.env.NODE_ENV === 'production';
