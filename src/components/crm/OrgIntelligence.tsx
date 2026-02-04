@@ -1111,63 +1111,74 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
 
                     {/* GATED DETAILS */}
                     {person.isMonitored ? (
-                      <div className="flex flex-wrap gap-x-3 gap-y-1.5 pt-1 border-t border-white/5">
-                        {person.email !== 'N/A' ? (
-                          <div className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-400 uppercase tracking-tighter">
-                            <Globe className="w-2.5 h-2.5 text-zinc-600" />
-                            {person.email}
-                          </div>
-                        ) : (
-                           <button 
-                              onClick={() => handleAcquire(person, 'email')}
-                              disabled={acquiringEmail === person.id}
-                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
-                              title="Reveal Email"
+                      <div className="flex flex-col gap-y-1.5 pt-1 border-t border-white/5">
+                        {/* Email & Phone Row - Fixed Two-Column Layout */}
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 items-center">
+                          {/* Email Column */}
+                          {person.email !== 'N/A' ? (
+                            <div 
+                              className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-400 uppercase tracking-tighter min-w-0"
+                              title={person.email}
                             >
-                              {acquiringEmail === person.id ? (
-                                <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
-                              ) : (
-                                <Mail className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
-                              )}
-                              Email
-                            </button>
-                        )}
-                        {/* Reveal Phone button - right after email */}
-                        {person.phones && person.phones.length > 0 ? (
-                          <div className="flex items-center gap-1.5">
-                            {person.phones.map((phone) => (
-                              <button
-                                key={phone}
-                                onClick={() => {
-                                  initiateCall(phone, {
-                                    name: person.name,
-                                    account: companyName,
-                                    title: person.title
-                                  });
-                                  toast.info(`Calling ${person.name}...`);
-                                }}
-                                className="flex items-center gap-1 text-[9px] font-mono text-[#002FA7] hover:text-white transition-colors uppercase tracking-widest"
+                              <Globe className="w-2.5 h-2.5 text-zinc-600 shrink-0" />
+                              <span className="truncate">{person.email}</span>
+                            </div>
+                          ) : (
+                             <button 
+                                onClick={() => handleAcquire(person, 'email')}
+                                disabled={acquiringEmail === person.id}
+                                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
+                                title="Reveal Email"
                               >
-                                <Phone className="w-2.5 h-2.5" />
-                                {phone}
+                                {acquiringEmail === person.id ? (
+                                  <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
+                                ) : (
+                                  <Mail className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
+                                )}
+                                Email
                               </button>
-                            ))}
-                          </div>
-                        ) : (
-                            <button 
-                              onClick={() => handleAcquire(person, 'phone')}
-                              disabled={acquiringEmail === person.id}
-                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
-                              title="Reveal Phone"
-                            >
-                              {acquiringEmail === person.id ? (
-                                <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
-                              ) : (
-                                <Phone className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
-                              )}
-                              Phone
-                            </button>
-                        )}
+                          )}
+                          
+                          {/* Phone Column */}
+                          {person.phones && person.phones.length > 0 ? (
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {person.phones.map((phone) => (
+                                <button
+                                  key={phone}
+                                  onClick={() => {
+                                    initiateCall(phone, {
+                                      name: person.name,
+                                      account: companyName,
+                                      title: person.title
+                                    });
+                                    toast.info(`Calling ${person.name}...`);
+                                  }}
+                                  className="flex items-center gap-1 text-[9px] font-mono text-zinc-400 hover:text-white transition-colors uppercase tracking-tighter"
+                                  title={phone}
+                                >
+                                  <Phone className="w-2.5 h-2.5 text-zinc-600" />
+                                  {phone}
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                              <button 
+                                onClick={() => handleAcquire(person, 'phone')}
+                                disabled={acquiringEmail === person.id}
+                                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest shrink-0"
+                                title="Reveal Phone"
+                              >
+                                {acquiringEmail === person.id ? (
+                                  <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
+                                ) : (
+                                  <Phone className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
+                                )}
+                                Phone
+                              </button>
+                          )}
+                        </div>
+                        
+                        {/* Location Row */}
                         {person.location && (
                           <div className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-tighter">
                             <MapPin className="w-2.5 h-2.5" />
