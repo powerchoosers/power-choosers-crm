@@ -1,10 +1,12 @@
 'use client'
 
-import React from 'react'
-import { Phone, Globe, MapPin, Building2, ArrowUpRight, Sparkles, Star } from 'lucide-react'
+import React, { useState } from 'react'
+import { Phone, Globe, MapPin, Building2, ArrowUpRight, Sparkles, Star, Satellite } from 'lucide-react'
 import { Account } from '@/hooks/useAccounts'
 import { useCallStore } from '@/store/callStore'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+import { supabase } from '@/lib/supabase'
 
 interface AccountUplinkCardProps {
   account: Account
@@ -14,6 +16,8 @@ interface AccountUplinkCardProps {
 
 export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, isEditing, onUpdate }) => {
   const initiateCall = useCallStore((state) => state.initiateCall)
+  const [isSearching, setIsSearching] = useState(false)
+  const [justUpdated, setJustUpdated] = useState(false)
 
   const handleCallClick = () => {
     if (!account.companyPhone || isEditing) return
@@ -31,6 +35,55 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
       isAccountOnly: true,
       accountId: account.id
     })
+  }
+
+  const handleAddressSearch = async () => {
+    if (isSearching || isEditing || account.address) return
+
+    setIsSearching(true)
+    try {
+      toast.info('Initiating Satellite Scan...', { description: `Searching for ${account.name}` })
+      
+      // Search for the address using the Maps API
+      const searchRes = await fetch(`/api/maps/search?q=${encodeURIComponent(account.name)}`)
+      const searchData = await searchRes.json()
+      
+      if (searchData.found && searchData.address) {
+        // Update the database
+        const { error } = await supabase
+          .from('accounts')
+          .update({ address: searchData.address })
+          .eq('id', account.id)
+          
+        if (!error) {
+          // Trigger the animation
+          setJustUpdated(true)
+          setTimeout(() => setJustUpdated(false), 2000)
+          
+          // Update local state
+          onUpdate?.({ address: searchData.address })
+          
+          toast.success('Asset Intelligence Acquired', {
+            description: `Location coordinates synced`
+          })
+          
+          // Open the map with the found address
+          setTimeout(() => {
+            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchData.address)}`, '_blank')
+          }, 500)
+        } else {
+          console.error('Sync failed:', error)
+          toast.error('Sync Failed', { description: 'Could not update location data' })
+        }
+      } else {
+        toast.error('Target Not Found', { description: 'Satellite sweep returned no coordinates.' })
+      }
+    } catch (err) {
+      console.error('Address search failed:', err)
+      toast.error('Uplink Failed', { description: 'Signal interference detected.' })
+    } finally {
+      setIsSearching(false)
+    }
   }
 
   return (
@@ -145,20 +198,56 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
 
             <button
               type="button"
-              className="w-full group flex items-center justify-between p-3 nodal-glass nodal-glass-hover rounded-xl transition-all border border-white/5"
-              onClick={() => account.address && window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(account.address)}`, '_blank')}
-              disabled={!account.address}
+              className={cn(
+                "w-full group flex items-center justify-between p-3 nodal-glass rounded-xl transition-all border",
+                account.address 
+                  ? "nodal-glass-hover border-white/5" 
+                  : "border-[#4D88FF]/30 hover:border-[#4D88FF]/50 hover:bg-[#4D88FF]/10 cursor-pointer",
+                justUpdated && "animate-in fade-in slide-in-from-right-4 duration-500 border-green-500/50 bg-green-500/10"
+              )}
+              onClick={() => {
+                if (account.address) {
+                  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(account.address)}`, '_blank')
+                } else {
+                  handleAddressSearch()
+                }
+              }}
+              disabled={isSearching}
             >
               <div className="flex items-center gap-3 min-w-0">
-                <MapPin className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
+                {isSearching ? (
+                  <Satellite className="w-4 h-4 text-[#4D88FF] animate-pulse shrink-0" />
+                ) : (
+                  <MapPin className={cn(
+                    "w-4 h-4 transition-colors shrink-0",
+                    account.address 
+                      ? "text-zinc-500 group-hover:text-zinc-300" 
+                      : "text-[#4D88FF] group-hover:text-[#4D88FF]",
+                    justUpdated && "text-green-500"
+                  )} />
+                )}
                 <div className="flex flex-col items-start min-w-0">
                   <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">Asset Recon (Location)</span>
-                  <span className="text-xs tracking-tight text-zinc-400 group-hover:text-zinc-200 truncate w-full text-left">
-                    {account.address || 'No location'}
+                  <span className={cn(
+                    "text-xs tracking-tight truncate w-full text-left transition-all",
+                    account.address 
+                      ? "text-zinc-400 group-hover:text-zinc-200" 
+                      : "text-[#4D88FF] group-hover:text-white font-mono",
+                    isSearching && "animate-pulse",
+                    justUpdated && "text-green-400 font-semibold"
+                  )}>
+                    {isSearching ? 'Scanning satellite...' : account.address || 'Search location'}
                   </span>
                 </div>
               </div>
-              <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-zinc-400 transition-colors shrink-0" />
+              {account.address ? (
+                <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-zinc-400 transition-colors shrink-0" />
+              ) : (
+                <Satellite className={cn(
+                  "w-3 h-3 transition-colors shrink-0",
+                  isSearching ? "text-[#4D88FF] animate-spin" : "text-[#4D88FF] group-hover:text-white"
+                )} />
+              )}
             </button>
           </div>
         )}
