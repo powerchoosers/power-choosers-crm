@@ -7,6 +7,7 @@ import { useCallStore } from '@/store/callStore'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
+import { formatPhoneNumber } from '@/lib/formatPhone'
 
 interface AccountUplinkCardProps {
   account: Account
@@ -42,10 +43,19 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
 
     setIsSearching(true)
     try {
+      // Build search query: Company name + city + state for better results
+      let searchQuery = account.name
+      
+      // Add location context if available
+      if (account.city || account.state) {
+        const locationParts = [account.city, account.state].filter(Boolean)
+        searchQuery = `${account.name} ${locationParts.join(' ')}`
+      }
+      
       toast.info('Initiating Satellite Scan...', { description: `Searching for ${account.name}` })
       
-      // Search for the address using the Maps API
-      const searchRes = await fetch(`/api/maps/search?q=${encodeURIComponent(account.name)}`)
+      // Search for the address using the Maps API with enhanced query
+      const searchRes = await fetch(`/api/maps/search?q=${encodeURIComponent(searchQuery)}`)
       const searchData = await searchRes.json()
       
       if (searchData.found && searchData.address) {
@@ -110,7 +120,7 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
               <input
                 type="text"
                 value={account.companyPhone || ''}
-                onChange={(e) => onUpdate?.({ companyPhone: e.target.value })}
+                onChange={(e) => onUpdate?.({ companyPhone: formatPhoneNumber(e.target.value) })}
                 className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3 text-sm font-mono tabular-nums text-white focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
                 placeholder="+1 (000) 000-0000"
               />
