@@ -177,8 +177,9 @@ export function useGmailSync() {
 
       // Fetch messages list
       if (!options.silent) setSyncStatus('Fetching messages...');
-      // Sync both inbox and sent messages
-      const query = 'in:inbox OR in:sent';
+      // Sync both inbox and sent messages, excluding mailwarming and spam
+      // Note: Gmail search doesn't support label negation for custom labels, so we filter after fetch
+      const query = '(in:inbox OR in:sent) -label:spam';
       const listRes = await fetch(`${GMAIL_API_BASE}/messages?q=${encodeURIComponent(query)}&maxResults=${MAX_MESSAGES_PER_SYNC}`, {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
@@ -229,6 +230,25 @@ export function useGmailSync() {
         const msgData = await msgRes.json();
         
         const emailData = parseGmailMessage(msgData, user.email || '');
+        
+        // Filter out mailwarming and automated emails
+        const isMailwarming = 
+          emailData.subject.toLowerCase().includes('mailwarming') ||
+          emailData.subject.toLowerCase().includes('mail warming') ||
+          emailData.from.toLowerCase().includes('apollo.io') ||
+          emailData.from.toLowerCase().includes('mailwarm') ||
+          emailData.from.toLowerCase().includes('lemwarm') ||
+          emailData.from.toLowerCase().includes('warmup') ||
+          emailData.subject.toLowerCase().includes('test email') ||
+          (msgData.labelIds && msgData.labelIds.some((label: string) => 
+            label.toLowerCase().includes('mailwarm') || 
+            label.toLowerCase().includes('apollo')
+          ));
+        
+        if (isMailwarming) {
+          if (!options.silent) console.log('[Gmail Sync] Skipping mailwarming email:', emailData.subject);
+          continue;
+        }
         
         // 1. Ensure the thread exists first to satisfy Foreign Key constraint
         if (emailData.gmailThreadId) {
