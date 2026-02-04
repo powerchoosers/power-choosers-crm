@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react';
-import { MapPin, Satellite, Wifi, Loader2 } from 'lucide-react';
+import { MapPin, Satellite, Wifi, Loader2, Search } from 'lucide-react';
+import { GoogleMap, useLoadScript, MarkerF } from '@react-google-maps/api';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
@@ -27,39 +29,55 @@ export default function SatelliteUplink({
   onSyncComplete
 }: SatelliteUplinkProps) {
   const [isActive, setIsActive] = useState(false);
-  const [apiKey, setApiKey] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [activeAddress, setActiveAddress] = useState(address);
+  const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
+
+  const { isLoaded } = useLoadScript({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY as string,
+  });
 
   // Update local address when prop changes
   useEffect(() => {
     setActiveAddress(address);
   }, [address]);
 
+  // Geocode address to coordinates
+  const geocodeAddress = async (addressToGeocode: string): Promise<{ lat: number; lng: number } | null> => {
+    if (!addressToGeocode) return null;
+    
+    try {
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+          addressToGeocode
+        )}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}`
+      );
+      const data = await response.json();
+      
+      if (data.results && data.results.length > 0) {
+        const location = data.results[0].geometry.location;
+        return { lat: location.lat, lng: location.lng };
+      }
+    } catch (error) {
+      console.error('Geocoding error:', error);
+    }
+    return null;
+  };
+
   const establishUplink = async () => {
     if (isLoading) return
     
-    // If we already have a key and an address, just show it
-    if (apiKey && activeAddress) {
+    // If we already have coordinates and address, just show it
+    if (coordinates && activeAddress) {
       setIsActive(true)
       return
     }
 
     setIsLoading(true)
     try {
-      // 1. Fetch API Key
-      const res = await fetch('/api/maps/config')
-      const data: unknown = await res.json()
-      const nextKey =
-        data && typeof data === 'object' && typeof (data as Record<string, unknown>).apiKey === 'string'
-          ? ((data as Record<string, unknown>).apiKey as string)
-          : null
-          
-      if (!nextKey) throw new Error("Encryption Key Missing");
-      
-      setApiKey(nextKey)
-
-      // 2. Resolve Address if missing (Search by Name)
+      // Resolve Address if missing (Search by Name)
       let resolvedAddress = activeAddress;
       
       if (!resolvedAddress && name) {
@@ -81,7 +99,7 @@ export default function SatelliteUplink({
           resolvedAddress = searchData.address;
           setActiveAddress(resolvedAddress);
           
-          // 3. Auto-Sync Data (Forensic Enrichment)
+          // Auto-Sync Data (Forensic Enrichment)
           if (entityId && entityType) {
             const updates: Record<string, any> = {};
             
@@ -123,14 +141,52 @@ export default function SatelliteUplink({
          return;
       }
 
-      setIsActive(true)
+      // Geocode the address to get coordinates
+      const coords = await geocodeAddress(resolvedAddress);
+      if (coords) {
+        setCoordinates(coords);
+        setIsActive(true);
+      } else {
+        toast.error('Geocoding Failed', { description: 'Could not locate coordinates.' });
+      }
       
     } catch (err) {
-      console.error('Failed to load Maps API key:', err)
+      console.error('Failed to establish uplink:', err)
       toast.error('Uplink Failed', { description: 'Signal interference detected.' });
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleSearch = async () => {
+    if (!searchInput.trim()) return;
+    
+    setIsLoading(true);
+    try {
+      const coords = await geocodeAddress(searchInput);
+      if (coords) {
+        setCoordinates(coords);
+        setActiveAddress(searchInput);
+        setIsActive(true);
+        setIsSearchOpen(false);
+        setSearchInput('');
+        toast.success('Location Found', { description: searchInput });
+      } else {
+        toast.error('Location Not Found', { description: 'Try a different address.' });
+      }
+    } catch (error) {
+      toast.error('Search Failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!isLoaded) {
+    return (
+      <div className="bg-zinc-900/40 backdrop-blur-xl border border-white/5 rounded-3xl overflow-hidden relative h-48 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-[#002FA7] animate-spin" />
+      </div>
+    );
   }
 
   return (
@@ -149,12 +205,58 @@ export default function SatelliteUplink({
             </div>
           </div>
         </div>
+
+        {/* SEARCH ICON BUTTON */}
+        <button
+          onClick={() => setIsSearchOpen(!isSearchOpen)}
+          className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/10 bg-zinc-800/50 text-zinc-400 hover:text-white hover:border-[#002FA7]/50 hover:bg-[#002FA7]/20 transition-all hover:scale-110 hover:brightness-125"
+          title="Search Location"
+        >
+          <Search className="w-4 h-4" />
+        </button>
       </div>
 
-      {/* BODY: The Toggle */}
+      {/* ANIMATED SEARCH DRAWER */}
+      <AnimatePresence>
+        {isSearchOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+            className="overflow-hidden border-b border-white/5 bg-zinc-900/60 backdrop-blur-xl"
+          >
+            <div className="p-3 flex gap-2">
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                placeholder="Enter address or location..."
+                className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
+                autoFocus
+              />
+              <button
+                onClick={handleSearch}
+                disabled={!searchInput.trim() || isLoading}
+                className="px-4 py-2 rounded-xl bg-[#002FA7] text-white font-mono text-xs uppercase tracking-widest hover:bg-[#002FA7]/90 hover:scale-105 hover:brightness-125 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:brightness-100 flex items-center gap-2"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Search className="w-4 h-4" />
+                )}
+                Locate
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* BODY: The Map */}
       <div className={cn(
-        "h-48 relative w-full bg-zinc-900/40 flex flex-col items-center justify-center transition-all duration-500",
-        (!isActive || !apiKey) && !isLoading ? "opacity-70" : "opacity-100"
+        "h-96 relative w-full bg-zinc-900/40 flex flex-col items-center justify-center transition-all duration-500",
+        (!isActive || !coordinates) && !isLoading ? "opacity-70" : "opacity-100"
       )}>
         
         {isLoading ? (
@@ -162,7 +264,7 @@ export default function SatelliteUplink({
             <Loader2 className="w-6 h-6 text-[#002FA7] animate-spin" />
             <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Negotiating Uplink...</span>
           </div>
-        ) : !isActive || !apiKey ? (
+        ) : !isActive || !coordinates ? (
           <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-30 flex flex-col items-center justify-center">
             {/* The "Locked" State */}
             <div className="z-10 text-center px-6">
@@ -171,7 +273,7 @@ export default function SatelliteUplink({
               </div>
               <button 
                 onClick={establishUplink}
-                className="icon-button-forensic h-8 pl-4 pr-6 text-[10px] font-mono !text-[#4D88FF] border border-[#4D88FF]/50 bg-[#4D88FF]/20 rounded-lg hover:!bg-[#4D88FF] hover:!text-white transition-all uppercase tracking-widest flex items-center justify-center gap-2.5 hover:shadow-[0_0_30px_-5px_rgba(77,136,255,0.6)] mx-auto"
+                className="h-8 pl-4 pr-6 text-[10px] font-mono text-[#4D88FF] border border-[#4D88FF]/50 bg-[#4D88FF]/20 rounded-lg hover:bg-[#4D88FF] hover:text-white hover:scale-105 hover:brightness-125 transition-all uppercase tracking-widest flex items-center justify-center gap-2.5 hover:shadow-[0_0_30px_-5px_rgba(77,136,255,0.6)] mx-auto"
                 title="Establish Uplink"
               >
                 <Wifi className="w-3.5 h-3.5" /> Establish Uplink
@@ -179,15 +281,22 @@ export default function SatelliteUplink({
             </div>
           </div>
         ) : (
-          /* The "Unlocked" State - Google Maps Iframe */
-          <iframe 
-            width="100%" 
-            height="100%" 
-            style={{ border: 0 }} 
-            loading="lazy" 
-            allowFullScreen 
-            src={`https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${encodeURIComponent(activeAddress)}&maptype=satellite`}>
-          </iframe>
+          /* The "Unlocked" State - Full Interactive Google Map */
+          <GoogleMap
+            zoom={18}
+            center={coordinates}
+            mapContainerClassName="w-full h-full"
+            options={{
+              mapTypeId: 'satellite',
+              zoomControl: true,
+              streetViewControl: true,
+              mapTypeControl: true,
+              fullscreenControl: true,
+              styles: [],
+            }}
+          >
+            <MarkerF position={coordinates} />
+          </GoogleMap>
         )}
       </div>
     </div>
