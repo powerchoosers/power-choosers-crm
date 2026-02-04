@@ -3,7 +3,7 @@
 import { 
   Zap, CheckCircle, Play, DollarSign, Mic, ChevronRight, Plus, AlertCircle 
 } from 'lucide-react'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, usePathname } from 'next/navigation'
 import { format } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -15,6 +15,9 @@ import { useMemo } from 'react'
 import { useMarketPulse } from '@/hooks/useMarketPulse'
 import { useUIStore } from '@/store/uiStore'
 import { NodeIngestion } from '../right-panel/NodeIngestion'
+
+/** When on dossier: 'context' = Active Context widgets, 'scanning' = Scanning Mode widgets. Only used when isActiveContext. */
+type DossierPanelView = 'context' | 'scanning'
 
 // Widgets
 import TelemetryWidget from '../crm/TelemetryWidget'
@@ -45,6 +48,12 @@ export function RightPanel() {
   const [isReady, setIsReady] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  /** On dossier: which content to show. Only relevant when isActiveContext. */
+  const [dossierPanelView, setDossierPanelView] = useState<DossierPanelView>('context')
+  /** Hover over header mode strip: reveal other mode (carousel) without switching. */
+  const [headerHoverReveal, setHeaderHoverReveal] = useState(false)
+  /** Prevent immediate re-hover after clicking to switch modes. */
+  const hoverLockRef = useRef(false)
 
   const { data: tasksData } = useTasks()
   const { isError: isMarketError } = useMarketPulse()
@@ -55,6 +64,43 @@ export function RightPanel() {
     const totalCount = tasks.length
     return { completed: completedCount, total: totalCount }
   }, [tasksData])
+
+  // All hooks MUST come before any conditional returns
+  const city = contact?.city || account?.metadata?.city || account?.metadata?.general?.city;
+  const state = contact?.state || account?.metadata?.state || account?.metadata?.general?.state;
+  const rawLocation = account?.location || contact?.location;
+  const entityZone = mapLocationToZone(city, state, rawLocation);
+  
+  const entityAddress = (contact ? contact.address : account?.address) || ''
+  const entityName = contact?.name || account?.name
+
+  /** Effective panel content mode: on dossier use dossierPanelView, else always scanning. */
+  const effectiveView: DossierPanelView = isActiveContext ? dossierPanelView : 'scanning'
+
+  const handleSwitchToScanning = useCallback(() => {
+    setDossierPanelView('scanning')
+    setHeaderHoverReveal(false)
+    // Lock hover for 300ms to prevent immediate re-trigger
+    hoverLockRef.current = true
+    setTimeout(() => { hoverLockRef.current = false }, 300)
+  }, [])
+  const handleSwitchToContext = useCallback(() => {
+    setDossierPanelView('context')
+    setHeaderHoverReveal(false)
+    // Lock hover for 300ms to prevent immediate re-trigger
+    hoverLockRef.current = true
+    setTimeout(() => { hoverLockRef.current = false }, 300)
+  }, [])
+  
+  const handleMouseEnterHeader = useCallback(() => {
+    if (!hoverLockRef.current) {
+      setHeaderHoverReveal(true)
+    }
+  }, [])
+  
+  const handleMouseLeaveHeader = useCallback(() => {
+    setHeaderHoverReveal(false)
+  }, [])
 
   useEffect(() => {
     setIsReady(true)
@@ -70,14 +116,6 @@ export function RightPanel() {
     )
   }
 
-  const city = contact?.city || account?.metadata?.city || account?.metadata?.general?.city;
-  const state = contact?.state || account?.metadata?.state || account?.metadata?.general?.state;
-  const rawLocation = account?.location || contact?.location;
-  const entityZone = mapLocationToZone(city, state, rawLocation);
-  
-  const entityAddress = (contact ? contact.address : account?.address) || ''
-  const entityName = contact?.name || account?.name
-
   return (
     <aside className="fixed right-0 top-0 bottom-0 z-30 w-80 bg-zinc-950 border-l border-white/5 flex flex-col overflow-hidden hidden lg:flex np-scroll">
       
@@ -88,26 +126,73 @@ export function RightPanel() {
           ? "bg-zinc-950/80 backdrop-blur-xl border-b border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.5)] backdrop-saturate-150" 
           : "bg-transparent"
       )}>
-        {/* 1. THE LIVE INDICATOR */}
-        <div className="flex items-center gap-2">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className={cn(
-              "animate-ping absolute inline-flex h-full w-full rounded-full opacity-75",
-              isActiveContext ? "bg-[#002FA7]" : "bg-emerald-500"
-            )}></span>
-            <span className={cn(
-              "relative inline-flex rounded-full h-1.5 w-1.5",
-              isActiveContext ? "bg-[#002FA7]" : "bg-emerald-500"
-            )}></span>
-          </span>
-          <span className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase">
-            {isActiveContext ? 'Active_Context' : 'Scanning_Mode'}
-          </span>
-        </div>
+        {/* 1. MODE INDICATOR — On dossier: hover-reveal carousel to switch to Scanning Mode; click to switch */}
+        {isActiveContext ? (
+          <div
+            className="relative h-[18px] w-[140px] overflow-hidden cursor-pointer"
+            onMouseEnter={handleMouseEnterHeader}
+            onMouseLeave={handleMouseLeaveHeader}
+            aria-label="Panel mode: hover to reveal Scanning Mode, click to switch"
+          >
+            {/* Active_Context row — slides up/out on hover when current; slides up into view when other is revealed */}
+            <motion.div
+              className="absolute inset-x-0 top-0 flex h-[18px] items-center gap-2"
+              initial={false}
+              animate={{
+                y: dossierPanelView === 'context' ? (headerHoverReveal ? -18 : 0) : (headerHoverReveal ? 0 : 18),
+                opacity: (dossierPanelView === 'context' && !headerHoverReveal) || (headerHoverReveal && dossierPanelView === 'scanning') ? 1 : 0,
+              }}
+              transition={{ type: 'tween', duration: 0.25, ease: 'easeInOut' }}
+            >
+              <span className="relative flex h-1.5 w-1.5 shrink-0">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-[#002FA7] opacity-75 animate-ping" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#002FA7]" />
+              </span>
+              <span className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase">Active_Context</span>
+            </motion.div>
+            {/* Scanning_Mode row — clickable when revealed to switch to scanning */}
+            <motion.div
+              className="absolute inset-x-0 top-0 flex h-[18px] items-center gap-2"
+              initial={false}
+              animate={{
+                y: dossierPanelView === 'scanning' ? (headerHoverReveal ? -18 : 0) : (headerHoverReveal ? 0 : 18),
+                opacity: (dossierPanelView === 'scanning' && !headerHoverReveal) || (headerHoverReveal && dossierPanelView === 'context') ? 1 : 0,
+              }}
+              transition={{ type: 'tween', duration: 0.25, ease: 'easeInOut' }}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (headerHoverReveal && dossierPanelView === 'context') handleSwitchToScanning()
+              }}
+            >
+              <span className="relative flex h-1.5 w-1.5 shrink-0">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75 animate-ping" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              </span>
+              <span className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase">Scanning_Mode</span>
+            </motion.div>
+            {/* Clickable overlay when Context is revealed (to switch back) */}
+            {headerHoverReveal && dossierPanelView === 'scanning' && (
+              <motion.div
+                className="absolute inset-0 z-10 cursor-pointer"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                onClick={(e) => { e.stopPropagation(); handleSwitchToContext() }}
+              />
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75 animate-ping" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            </span>
+            <span className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase">Scanning_Mode</span>
+          </div>
+        )}
 
         {/* 2. THE SYSTEM CLOCK (Forensic Detail) */}
         <div className="text-[10px] font-mono text-zinc-600 hidden md:block tabular-nums">
-          {isActiveContext ? 'T-MINUS 14 D' : format(new Date(), 'HH:mm:ss')}
+          {effectiveView === 'context' ? 'T-MINUS 14 D' : format(new Date(), 'HH:mm:ss')}
         </div>
 
         {/* 3. THE CONTROL (Minimize) */}
@@ -134,13 +219,14 @@ export function RightPanel() {
           exit={{ opacity: 0 }}
           className="flex-1 flex flex-col gap-6 overflow-y-auto px-6 pt-24 pb-32 np-scroll scroll-smooth"
         >
-          {isActiveContext ? (
+          <AnimatePresence mode="wait" initial={false}>
+          {effectiveView === 'context' ? (
               <motion.div
                 key="active-context"
-                initial={{ y: -20, opacity: 0, filter: "blur(10px)" }}
-                animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
-                exit={{ y: 20, opacity: 0, filter: "blur(10px)" }}
-                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                initial={{ y: 24, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -24, opacity: 0 }}
+                transition={{ type: "tween", duration: 0.25, ease: "easeInOut" }}
                 className="flex flex-col gap-8 mt-2"
               >
                 {/* 1. TELEMETRY (Targeting Mode) */}
@@ -196,9 +282,10 @@ export function RightPanel() {
             ) : (
               <motion.div
                 key="scanning-mode"
-                initial={{ opacity: 0, filter: "blur(10px)" }}
-                animate={{ opacity: 1, filter: "blur(0px)" }}
-                exit={{ opacity: 0, filter: "blur(10px)" }}
+                initial={{ y: 24, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -24, opacity: 0 }}
+                transition={{ type: "tween", duration: 0.25, ease: "easeInOut" }}
                 className="flex flex-col gap-8"
               >
                 {/* 0. QUICK ACTIONS (Rapid Ingestion) */}
@@ -246,6 +333,7 @@ export function RightPanel() {
                 </div>
               </motion.div>
             )}
+          </AnimatePresence>
           </motion.div>
       </div>
     </aside>

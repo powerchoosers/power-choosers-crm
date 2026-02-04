@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useUIStore } from '@/store/uiStore';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
 
 // REAL API ENRICHMENT
 const enrichNode = async (identifier: string, type: 'ACCOUNT' | 'CONTACT') => {
@@ -83,6 +84,7 @@ const enrichNode = async (identifier: string, type: 'ACCOUNT' | 'CONTACT') => {
 };
 
 export function NodeIngestion() {
+  const router = useRouter();
   const { rightPanelMode, setRightPanelMode, ingestionContext, setIngestionContext } = useUIStore();
   const type = rightPanelMode === 'INGEST_ACCOUNT' ? 'ACCOUNT' : 'CONTACT';
   const isRapidContactInjection = type === 'CONTACT' && !!ingestionContext?.accountId;
@@ -370,6 +372,13 @@ export function NodeIngestion() {
         description: `${entityName || firstName + ' ' + lastName} has been committed to the database.`,
         className: "bg-zinc-900 border-white/10 text-white font-mono",
       });
+      
+      // Navigate to the dossier page
+      if (type === 'ACCOUNT') {
+        router.push(`/network/accounts/${id}`);
+      } else {
+        router.push(`/network/contacts/${id}`);
+      }
       
       resetProtocol();
     } catch (error: any) {

@@ -37,8 +37,10 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} antialiased`}>
       <body className="bg-zinc-950 text-zinc-100 font-sans selection:bg-[#002FA7]">
         <Providers>
-          {children}
-          <Toaster position="top-right" theme="dark" />
+          <>
+            {children}
+            <Toaster position="top-right" theme="dark" />
+          </>
         </Providers>
       </body>
     </html>
