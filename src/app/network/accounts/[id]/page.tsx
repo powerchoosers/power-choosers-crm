@@ -83,6 +83,10 @@ export default function AccountDossierPage() {
   const [editDomain, setEditDomain] = useState('')
   const [editLinkedinUrl, setEditLinkedinUrl] = useState('')
 
+  // Refraction Event State (for field glow animations)
+  const [glowingFields, setGlowingFields] = useState<Set<string>>(new Set())
+  const [isRecalibrating, setIsRecalibrating] = useState(false)
+
   // Set Gemini Context
   useEffect(() => {
     if (account) {
@@ -166,6 +170,29 @@ export default function AccountDossierPage() {
       console.error(err)
       toast.error('Failed to update account')
     }
+  }
+
+  // Handle Document Ingestion Complete (Refraction Event)
+  const handleIngestionComplete = () => {
+    // Trigger the container blur/desaturation
+    setIsRecalibrating(true)
+    
+    // Mark all key fields as "glowing" for the reveal animation
+    const fieldsToGlow = new Set([
+      'contractEnd',
+      'daysRemaining',
+      'currentSupplier',
+      'strikePrice',
+      'annualVolume',
+      'revenue'
+    ])
+    setGlowingFields(fieldsToGlow)
+    
+    // Clear effects after animation duration
+    setTimeout(() => {
+      setIsRecalibrating(false)
+      setGlowingFields(new Set())
+    }, 1500)
   }
 
   // Maturity Logic
@@ -587,7 +614,11 @@ export default function AccountDossierPage() {
                 />
 
                 {/* Position Maturity (Ported Style) */}
-                <div className={`rounded-2xl border transition-all duration-500 bg-zinc-900/30 backdrop-blur-xl p-6 relative overflow-hidden shadow-lg space-y-6 ${isEditing ? 'border-[#002FA7]/30' : 'border-white/10'}`}>
+                <div className={cn(
+                  "rounded-2xl border transition-all duration-500 bg-zinc-900/30 backdrop-blur-xl p-6 relative overflow-hidden shadow-lg space-y-6",
+                  isEditing ? 'border-[#002FA7]/30' : 'border-white/10',
+                  isRecalibrating && 'grayscale backdrop-blur-2xl'
+                )}>
                   <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
                   
                   <div>
@@ -595,7 +626,10 @@ export default function AccountDossierPage() {
                       <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Position Maturity</h4>
                       <div className="text-right">
                         <span className="text-xs text-zinc-500 mr-2">Expiration:</span>
-                        <span className="text-white font-mono font-bold tabular-nums">
+                        <span className={cn(
+                          "text-white font-mono font-bold tabular-nums transition-all duration-800",
+                          glowingFields.has('contractEnd') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)] animate-in fade-in duration-500"
+                        )}>
                           {contractEndDate ? format(contractEndDate, 'MMM dd, yyyy') : 'TBD'}
                         </span>
                       </div>
@@ -608,7 +642,10 @@ export default function AccountDossierPage() {
                     </div>
                     
                     <div className="flex justify-between mt-2">
-                      <span className="text-xs text-[#002FA7] font-mono tabular-nums ml-auto">
+                      <span className={cn(
+                        "text-xs text-[#002FA7] font-mono tabular-nums ml-auto transition-all duration-800",
+                        glowingFields.has('daysRemaining') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-in fade-in duration-500"
+                      )}>
                         {daysRemaining != null ? `${Math.max(daysRemaining, 0)} Days Remaining` : '-- Days Remaining'}
                       </span>
                     </div>
@@ -616,7 +653,12 @@ export default function AccountDossierPage() {
 
                   <div>
                     <div className="text-zinc-500 text-[10px] font-mono uppercase tracking-[0.2em] mb-2">Current Supplier</div>
-                    <div className="text-xl font-semibold tracking-tighter text-white">{account.electricitySupplier || '--'}</div>
+                    <div className={cn(
+                      "text-xl font-semibold tracking-tighter text-white transition-all duration-800",
+                      glowingFields.has('currentSupplier') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)] animate-in fade-in duration-500"
+                    )}>
+                      {account.electricitySupplier || '--'}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -631,7 +673,10 @@ export default function AccountDossierPage() {
                           placeholder="0.000"
                         />
                       ) : (
-                        <div className="text-xl font-mono tabular-nums tracking-tighter text-[#002FA7]">
+                        <div className={cn(
+                          "text-xl font-mono tabular-nums tracking-tighter text-[#002FA7] transition-all duration-800",
+                          glowingFields.has('strikePrice') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-in fade-in duration-500"
+                        )}>
                           {editStrikePrice ? `${editStrikePrice}¢` : '--'}
                         </div>
                       )}
@@ -656,7 +701,10 @@ export default function AccountDossierPage() {
                         placeholder="0"
                       />
                     ) : (
-                      <div className="text-3xl font-mono tabular-nums tracking-tighter text-white font-semibold">
+                      <div className={cn(
+                        "text-3xl font-mono tabular-nums tracking-tighter text-white font-semibold transition-all duration-800",
+                        glowingFields.has('annualVolume') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)] animate-in fade-in duration-500"
+                      )}>
                         {account.annualUsage ? `${parseInt(account.annualUsage).toLocaleString()} kWh` : '--'}
                       </div>
                     )}
@@ -664,7 +712,10 @@ export default function AccountDossierPage() {
 
                   <div className="pt-4 border-t border-white/5">
                     <div className="text-zinc-500 text-[10px] font-mono uppercase tracking-[0.2em] mb-2">Estimated Annual Revenue</div>
-                    <div className="text-3xl font-mono tabular-nums tracking-tighter text-green-500/80">
+                    <div className={cn(
+                      "text-3xl font-mono tabular-nums tracking-tighter text-green-500/80 transition-all duration-800",
+                      glowingFields.has('revenue') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-in fade-in duration-500"
+                    )}>
                       {(() => {
                         const usageStr = isEditing ? editAnnualUsage : (account.annualUsage || '0');
                         const usage = parseInt(usageStr.toString().replace(/[^0-9]/g, '')) || 0;
@@ -817,7 +868,10 @@ export default function AccountDossierPage() {
                 <MeterArray meters={account.meters} />
                 
                 {/* Data Locker */}
-                <DataIngestionCard accountId={account.id} />
+                <DataIngestionCard 
+                  accountId={account.id} 
+                  onIngestionComplete={handleIngestionComplete}
+                />
               </div>
             </div>
 

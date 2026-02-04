@@ -18,6 +18,7 @@ interface Document {
 
 interface DataIngestionCardProps {
   accountId?: string;
+  onIngestionComplete?: () => void; // Callback to trigger parent animation
 }
 
 function formatBytes(bytes: number, decimals = 2) {
@@ -29,11 +30,13 @@ function formatBytes(bytes: number, decimals = 2) {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
 }
 
-export default function DataIngestionCard({ accountId }: DataIngestionCardProps) {
+export default function DataIngestionCard({ accountId, onIngestionComplete }: DataIngestionCardProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [files, setFiles] = useState<Document[]>([]);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isRecalibrating, setIsRecalibrating] = useState(false);
+  const [scanProgress, setScanProgress] = useState(0);
   const queryClient = useQueryClient();
 
   // Fetch Documents
@@ -155,8 +158,42 @@ export default function DataIngestionCard({ accountId }: DataIngestionCardProps)
             const type = result.analysis?.type === 'SIGNED_CONTRACT' ? 'CONTRACT SECURED' : 'BILL ANALYZED';
             toast.success(`${type}: Data Nodes Updated`, { id: toastId });
             
-            // Refresh Account Data
+            // ============================================
+            // THE REFRACTION EVENT (from build.md)
+            // ============================================
+            
+            // 1. Trigger blur/desaturation state
+            setIsRecalibrating(true);
+            
+            // 2. Animate Klein Blue scan line
+            setScanProgress(0);
+            const scanDuration = 800; // ms
+            const scanInterval = 20; // ms
+            const scanSteps = scanDuration / scanInterval;
+            const scanIncrement = 100 / scanSteps;
+            
+            let currentScan = 0;
+            const scanTimer = setInterval(() => {
+              currentScan += scanIncrement;
+              if (currentScan >= 100) {
+                setScanProgress(100);
+                clearInterval(scanTimer);
+              } else {
+                setScanProgress(currentScan);
+              }
+            }, scanInterval);
+            
+            // 3. Invalidate queries to trigger data refresh
             queryClient.invalidateQueries({ queryKey: ['account', accountId] });
+            
+            // 4. Callback to trigger parent component animations
+            onIngestionComplete?.();
+            
+            // 5. Clear refraction state after animation completes
+            setTimeout(() => {
+              setIsRecalibrating(false);
+              setScanProgress(0);
+            }, 1500);
           }
         } catch (aiErr) {
           console.error('AI Request Failed:', aiErr);
@@ -242,8 +279,34 @@ export default function DataIngestionCard({ accountId }: DataIngestionCardProps)
           ? 'bg-[#002FA7]/10 border-[#002FA7] shadow-[0_0_30px_-10px_rgba(0,47,167,0.5)]' 
           : 'bg-zinc-900/40 border-white/5 backdrop-blur-xl'}
         border flex flex-col
+        ${isRecalibrating ? 'grayscale' : ''}
       `}
     >
+      {/* THE REFRACTION EVENT OVERLAY */}
+      {isRecalibrating && (
+        <div className="absolute inset-0 z-50 pointer-events-none">
+          {/* High-Intensity Blur Layer */}
+          <div className="absolute inset-0 backdrop-blur-xl bg-black/30 animate-in fade-in duration-200" />
+          
+          {/* Klein Blue Laser Scan Line */}
+          <div 
+            className="absolute left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#002FA7] to-transparent shadow-[0_0_20px_#002FA7] transition-all duration-100 ease-linear"
+            style={{ top: `${scanProgress}%` }}
+          >
+            {/* Glow effect */}
+            <div className="absolute inset-0 bg-[#002FA7] blur-md opacity-70" />
+          </div>
+          
+          {/* Scan line trail effect */}
+          {scanProgress > 10 && (
+            <div 
+              className="absolute left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#002FA7]/30 to-transparent transition-all duration-100"
+              style={{ top: `${scanProgress - 5}%` }}
+            />
+          )}
+        </div>
+      )}
+    
       {/* HEADER - NOW INSIDE CONTAINER */}
       <div className="flex justify-between items-center p-4 border-b border-white/5 bg-white/[0.02]">
         <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
