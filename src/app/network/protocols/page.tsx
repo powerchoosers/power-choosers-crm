@@ -38,15 +38,19 @@ import {
   ChevronRight,
   Clock,
   Filter,
-  Layers
+  Layers,
+  Check
 } from 'lucide-react'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
+import BulkActionDeck from '@/components/network/BulkActionDeck'
+import DestructModal from '@/components/network/DestructModal'
 import { toast } from 'sonner'
 import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTableState } from '@/hooks/useTableState'
+import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 50
 
@@ -87,6 +91,8 @@ export default function ProtocolsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [newProtocolName, setNewProtocolName] = useState('')
   const [newProtocolDesc, setNewProtocolDesc] = useState('')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
 
   const protocols = useMemo(() => data?.pages.flatMap(page => page.protocols) || [], [data])
 
@@ -141,6 +147,45 @@ export default function ProtocolsPage() {
     if (confirm('Are you sure you want to delete this protocol?')) {
       deleteProtocol(id)
       toast.success('Protocol deleted')
+    }
+  }
+
+  const selectedCount = selectedIds.size
+  const allOnPageSelected = pagedProtocols.length > 0 && pagedProtocols.every(p => selectedIds.has(p.id))
+  const toggleAllOnPage = () => {
+    if (allOnPageSelected) {
+      const next = new Set(selectedIds)
+      pagedProtocols.forEach(p => next.delete(p.id))
+      setSelectedIds(next)
+    } else {
+      const next = new Set(selectedIds)
+      pagedProtocols.forEach(p => next.add(p.id))
+      setSelectedIds(next)
+    }
+  }
+  const toggleRow = (protocol: Protocol) => {
+    const next = new Set(selectedIds)
+    if (next.has(protocol.id)) next.delete(protocol.id)
+    else next.add(protocol.id)
+    setSelectedIds(next)
+  }
+  const handleBulkAction = (action: string) => {
+    if (action === 'delete') {
+      setIsDestructModalOpen(true)
+      return
+    }
+    toast.info(`Bulk action "${action}" for ${selectedCount} protocols — coming soon.`)
+  }
+  const handleConfirmPurge = async () => {
+    selectedIds.forEach(id => deleteProtocol(id))
+    setSelectedIds(new Set())
+    setIsDestructModalOpen(false)
+  }
+  const handleSelectCount = async (count: number) => {
+    const ids = protocols.slice(0, count).map(p => p.id)
+    setSelectedIds(new Set(ids))
+    if (count > protocols.length && hasNextPage && !isFetchingNextPage) {
+      await fetchNextPage()
     }
   }
 
@@ -215,6 +260,21 @@ export default function ProtocolsPage() {
             <Table>
                 <TableHeader className="sticky top-0 bg-zinc-900/80 backdrop-blur-sm z-20 border-b border-white/5">
                 <TableRow className="border-none hover:bg-transparent">
+                    <TableHead className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3 w-12">
+                      <div className="flex items-center justify-center px-2">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); toggleAllOnPage(); }}
+                          className={cn(
+                            "w-4 h-4 rounded border border-white/20 transition-all flex items-center justify-center",
+                            allOnPageSelected ? "bg-[#002FA7] border-[#002FA7]" : "bg-transparent opacity-50 hover:opacity-100"
+                          )}
+                          aria-label="Select all on page"
+                        >
+                          {allOnPageSelected && <Check className="w-3 h-3 text-white" />}
+                        </button>
+                      </div>
+                    </TableHead>
                     <TableHead className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3 w-[300px]">Name</TableHead>
                     <TableHead className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">Steps</TableHead>
                     <TableHead className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">Status</TableHead>
@@ -223,12 +283,40 @@ export default function ProtocolsPage() {
                 </TableRow>
                 </TableHeader>
                 <TableBody>
-                {pagedProtocols.map((protocol) => (
+                {pagedProtocols.map((protocol, index) => {
+                  const rowIndex = pageIndex * PAGE_SIZE + index + 1
+                  const isSelected = selectedIds.has(protocol.id)
+                  return (
                     <TableRow 
                       key={protocol.id} 
-                      className="border-white/5 hover:bg-white/[0.02] transition-colors group cursor-pointer"
+                      className={cn(
+                        "border-white/5 transition-colors group cursor-pointer",
+                        isSelected ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10" : "hover:bg-white/[0.02]"
+                      )}
                       onClick={() => router.push(`/network/protocols/${protocol.id}/builder`)}
                     >
+                    <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-center px-2 relative group/select">
+                        <span className={cn(
+                          "font-mono text-[10px] text-zinc-700 transition-opacity",
+                          isSelected ? "opacity-0" : "group-hover/select:opacity-0"
+                        )}>
+                          {rowIndex.toString().padStart(2, '0')}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => toggleRow(protocol)}
+                          className={cn(
+                            "absolute inset-0 m-auto w-4 h-4 rounded border transition-all flex items-center justify-center",
+                            isSelected
+                              ? "bg-[#002FA7] border-[#002FA7] opacity-100"
+                              : "bg-white/5 border-white/10 opacity-0 group-hover/select:opacity-100"
+                          )}
+                        >
+                          {isSelected && <Check className="w-3 h-3 text-white" />}
+                        </button>
+                      </div>
+                    </TableCell>
                     <TableCell className="font-medium text-zinc-200">
                         <div className="flex flex-col">
                         <span>{protocol.name}</span>
@@ -313,7 +401,8 @@ export default function ProtocolsPage() {
                         </div>
                     </TableCell>
                     </TableRow>
-                ))}
+                  )
+                })}
                 </TableBody>
             </Table>
             )}
@@ -360,6 +449,21 @@ export default function ProtocolsPage() {
             </div>
         </div>
       </div>
+
+      <BulkActionDeck
+        selectedCount={selectedCount}
+        totalAvailable={effectiveTotalRecords}
+        onClear={() => setSelectedIds(new Set())}
+        onAction={handleBulkAction}
+        onSelectCount={handleSelectCount}
+      />
+
+      <DestructModal
+        isOpen={isDestructModalOpen}
+        onClose={() => setIsDestructModalOpen(false)}
+        onConfirm={handleConfirmPurge}
+        count={selectedCount}
+      />
     </div>
   )
 }

@@ -10,8 +10,9 @@ import {
   ColumnDef,
   SortingState,
   ColumnFiltersState,
+  RowSelectionState,
 } from '@tanstack/react-table'
-import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, PhoneIncoming, PhoneOutgoing, Plus, Search, Filter, MoreHorizontal } from 'lucide-react'
+import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, PhoneIncoming, PhoneOutgoing, Plus, Search, Filter, MoreHorizontal, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
@@ -37,6 +38,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useRouter } from 'next/navigation'
 import { useTableState } from '@/hooks/useTableState'
+import BulkActionDeck from '@/components/network/BulkActionDeck'
+import { toast } from 'sonner'
 
 const PAGE_SIZE = 50
 
@@ -59,6 +62,7 @@ export default function CallsPage() {
   const calls = useMemo(() => data?.pages.flatMap(page => page.calls) || [], [data])
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
   useEffect(() => {
     const needed = (pageIndex + 2) * PAGE_SIZE
@@ -67,7 +71,64 @@ export default function CallsPage() {
     }
   }, [pageIndex, calls.length, hasNextPage, isFetchingNextPage, fetchNextPage])
 
+  const selectedCount = Object.keys(rowSelection).length
+  const handleSelectCount = (count: number) => {
+    const idsToSelect = calls.slice(0, count).map(c => c.id)
+    const newSelection: RowSelectionState = {}
+    idsToSelect.forEach(id => { newSelection[id] = true })
+    setRowSelection(newSelection)
+  }
+  const handleBulkAction = (action: string) => {
+    if (action === 'delete') {
+      toast.info('Bulk delete for call logs is not available.')
+      return
+    }
+    toast.info(`Bulk action "${action}" for ${selectedCount} calls — coming soon.`)
+  }
+
   const columns: ColumnDef<Call>[] = [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <div className="flex items-center justify-center px-2">
+          <button
+            type="button"
+            onClick={table.getToggleAllPageRowsSelectedHandler()}
+            className={cn(
+              "w-4 h-4 rounded border border-white/20 transition-all flex items-center justify-center",
+              table.getIsAllPageRowsSelected() ? "bg-[#002FA7] border-[#002FA7]" : "bg-transparent opacity-50 hover:opacity-100"
+            )}
+          >
+            {table.getIsAllPageRowsSelected() && <Check className="w-3 h-3 text-white" />}
+          </button>
+        </div>
+      ),
+      cell: ({ row, table }) => {
+        const pageIndex = table.getState().pagination.pageIndex
+        const index = row.index + 1 + pageIndex * PAGE_SIZE
+        const isSelected = row.getIsSelected()
+        return (
+          <div className="flex items-center justify-center px-2 relative group/select">
+            <span className={cn(
+              "font-mono text-[10px] text-zinc-700 transition-opacity",
+              isSelected ? "opacity-0" : "group-hover/select:opacity-0"
+            )}>
+              {index.toString().padStart(2, '0')}
+            </span>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); row.toggleSelected(); }}
+              className={cn(
+                "absolute inset-0 m-auto w-4 h-4 rounded border transition-all flex items-center justify-center",
+                isSelected ? "bg-[#002FA7] border-[#002FA7] opacity-100" : "bg-white/5 border-white/10 opacity-0 group-hover/select:opacity-100"
+              )}
+            >
+              {isSelected && <Check className="w-3 h-3 text-white" />}
+            </button>
+          </div>
+        )
+      },
+    },
     {
       accessorKey: 'contactName',
       header: ({ column }) => {
@@ -198,11 +259,13 @@ export default function CallsPage() {
   const table = useReactTable({
     data: calls || [],
     columns,
+    getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
+    onRowSelectionChange: setRowSelection,
     autoResetPageIndex: false,
     state: {
       sorting,
@@ -211,6 +274,7 @@ export default function CallsPage() {
         pageIndex,
         pageSize: PAGE_SIZE,
       },
+      rowSelection,
     },
   })
 
@@ -270,8 +334,11 @@ export default function CallsPage() {
                 table.getRowModel().rows.map((row) => (
                     <TableRow
                     key={row.id}
-                    data-state={row.getIsSelected() && "selected"}
-                    className="border-white/5 hover:bg-white/[0.02] transition-colors group"
+                    data-state={row.getIsSelected() ? "selected" : undefined}
+                    className={cn(
+                      "border-white/5 transition-colors group",
+                      row.getIsSelected() ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10" : "hover:bg-white/[0.02]"
+                    )}
                     >
                     {row.getVisibleCells().map((cell) => (
                         <TableCell key={cell.id} className="py-3">
@@ -332,6 +399,14 @@ export default function CallsPage() {
             </div>
         </div>
       </div>
+
+      <BulkActionDeck
+        selectedCount={selectedCount}
+        totalAvailable={totalRecords}
+        onClear={() => setRowSelection({})}
+        onAction={handleBulkAction}
+        onSelectCount={handleSelectCount}
+      />
     </div>
   )
 }
