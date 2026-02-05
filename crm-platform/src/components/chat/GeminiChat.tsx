@@ -993,6 +993,11 @@ SELECT * FROM hybrid_search_accounts(
       setLastProvider(typeof data.provider === 'string' ? data.provider : 'gemini')
       setLastModel(typeof data.model === 'string' ? data.model : '')
 
+      // Sync dropdown to actual model used (backend may have fallen back)
+      if (typeof data.model === 'string' && data.model.trim()) {
+        setSelectedModel(data.model)
+      }
+
       setMessages(prev => [...prev, { 
         role: 'assistant', 
         content: data.content,
@@ -1412,6 +1417,9 @@ SELECT * FROM hybrid_search_accounts(
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
                     Gemini Intelligence Stack
                   </div>
+                  <SelectItem value="gemini-3-flash-preview" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GEMINI-3.0-FLASH-PREVIEW
+                  </SelectItem>
                   <SelectItem value="gemini-2.0-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                     GEMINI-2.0-FLASH
                   </SelectItem>

@@ -142,6 +142,20 @@ const tools = [
         }
       },
       {
+        name: 'search_transcripts',
+        description: 'Search call transcripts and summaries. Use this to find past conversations about specific topics, keywords, or mentions of people/companies.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            query: { type: 'STRING', description: 'Search term for transcript content, summary, or topic' },
+            account_id: { type: 'STRING', description: 'Filter by account ID' },
+            contact_id: { type: 'STRING', description: 'Filter by contact ID' },
+            limit: { type: 'NUMBER', description: 'Max results (default 10)' }
+          },
+          required: ['query']
+        }
+      },
+      {
         name: 'search_prospects',
         description: 'Search for new prospects (people) using Apollo API.',
         parameters: {
@@ -944,48 +958,42 @@ const toolHandlers = {
     return result;
   },
   search_emails: async ({ query, limit = 10 }) => {
-    // Global email search with Vector Support
+    // Global email search with Hybrid Search
     let data = [];
-    let usedVector = false;
+    let usedHybrid = false;
 
     if (query) {
       try {
         const embedding = await generateEmbedding(query);
         if (embedding) {
-          const { data: vectorResults, error } = await supabaseAdmin.rpc('match_emails', {
+          console.log(`[search_emails] Using hybrid search for: "${query}"`);
+          const { data: hybridResults, error } = await supabaseAdmin.rpc('hybrid_search_emails', {
+            query_text: query,
             query_embedding: embedding,
-            match_threshold: 0.3,
-            match_count: limit
+            match_count: limit,
+            full_text_weight: 4.0,
+            semantic_weight: 0.5,
+            rrf_k: 50
           });
           
-          if (!error && vectorResults && vectorResults.length > 0) {
-            // Need to join contacts/accounts manually since RPC only returns emails table
-            const emailIds = vectorResults.map(e => e.id);
-            if (emailIds.length > 0) {
-                 const { data: fullData, error: joinError } = await supabaseAdmin
-                    .from('emails')
-                    .select('*, contacts(first_name, last_name, email), accounts(name)')
-                    .in('id', emailIds);
-                 
-                 if (!joinError) {
-                     // Sort by similarity order (which is lost in the IN query, so we might lose relevance sorting)
-                     // Or just return fullData sorted by date?
-                     // Let's sort by date for now as standard email search expectation, but filter by relevance
-                     data = fullData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-                     usedVector = true;
-                 }
-            }
+          if (error) {
+            console.error('[search_emails] Hybrid search RPC error:', error);
+          }
+          
+          if (!error && hybridResults && hybridResults.length > 0) {
+            data = hybridResults;
+            usedHybrid = true;
           }
         }
       } catch (e) {
-         console.error('[search_emails] Vector error:', e);
+         console.error('[search_emails] Hybrid generation error:', e);
       }
     }
 
-    if (!usedVector) {
+    if (!usedHybrid) {
         const { data: keywordData, error } = await supabaseAdmin
         .from('emails')
-        .select('*, contacts(first_name, last_name, email), accounts(name)')
+        .select('*')
         .or(`subject.ilike.%${query}%,text.ilike.%${query}%,from.ilike.%${query}%`)
         .order('timestamp', { ascending: false })
         .limit(limit);
@@ -994,6 +1002,69 @@ const toolHandlers = {
         data = keywordData;
     }
 
+    console.log(`[search_emails] Found ${data?.length || 0} results (Hybrid: ${usedHybrid})`);
+    return data;
+  },
+  search_transcripts: async ({ query, account_id, contact_id, limit = 10 }) => {
+    // Search call transcripts with Hybrid Search
+    let data = [];
+    let usedHybrid = false;
+
+    if (query) {
+      try {
+        const embedding = await generateEmbedding(query);
+        if (embedding) {
+          console.log(`[search_transcripts] Using hybrid search for: "${query}"`);
+          const { data: hybridResults, error } = await supabaseAdmin.rpc('hybrid_search_calls', {
+            query_text: query,
+            query_embedding: embedding,
+            match_count: limit,
+            full_text_weight: 4.0,
+            semantic_weight: 0.5,
+            rrf_k: 50
+          });
+          
+          if (error) {
+            console.error('[search_transcripts] Hybrid search RPC error:', error);
+          }
+          
+          if (!error && hybridResults && hybridResults.length > 0) {
+            data = hybridResults;
+            usedHybrid = true;
+            
+            // Apply filters if provided
+            if (account_id) {
+              data = data.filter(c => c.accountId === account_id);
+            }
+            if (contact_id) {
+              data = data.filter(c => c.contactId === contact_id);
+            }
+          }
+        }
+      } catch (e) {
+         console.error('[search_transcripts] Hybrid generation error:', e);
+      }
+    }
+
+    if (!usedHybrid) {
+        let query_builder = supabaseAdmin
+          .from('calls')
+          .select('*')
+          .not('transcript', 'is', null)
+          .or(`transcript.ilike.%${query}%,summary.ilike.%${query}%`)
+          .order('timestamp', { ascending: false })
+          .limit(limit);
+        
+        if (account_id) query_builder = query_builder.eq('accountId', account_id);
+        if (contact_id) query_builder = query_builder.eq('contactId', contact_id);
+        
+        const { data: keywordData, error } = await query_builder;
+        
+        if (error) throw error;
+        data = keywordData;
+    }
+
+    console.log(`[search_transcripts] Found ${data?.length || 0} results (Hybrid: ${usedHybrid})`);
     return data;
   },
   search_prospects: async ({ q_keywords, person_locations, q_organization_name, limit = 10 }) => {
@@ -1741,7 +1812,10 @@ export default async function handler(req, res) {
         msg.includes('resource_exhausted') ||
         msg.includes('exceeded') ||
         msg.includes('billing') ||
-        msg.includes('payment required')
+        msg.includes('payment required') ||
+        msg.includes('permission_denied') ||
+        msg.includes('consumer_invalid') ||
+        msg.includes('user location is not supported')
       );
     };
 
@@ -2124,6 +2198,7 @@ export default async function handler(req, res) {
       new Set(
         [
           preferredModel,
+          'gemini-3-flash-preview',
           'gemini-2.5-flash-lite',
           'gemini-2.5-flash',
           'gemini-2.0-flash-lite-preview-02-05',
@@ -2131,7 +2206,7 @@ export default async function handler(req, res) {
           'gemini-2.0-flash-thinking-exp-01-21',
           'gemini-2.0-pro-exp-02-05',
           'gemini-2.0-flash-exp'
-        ].filter(m => m && typeof m === 'string' && (m.startsWith('gemini-2.')))
+        ].filter(m => m && typeof m === 'string' && (m.startsWith('gemini-2.') || m.startsWith('gemini-3.')))
       )
     );
 
@@ -2139,6 +2214,8 @@ export default async function handler(req, res) {
       const msg = String(error?.message || '').toLowerCase();
       return msg.includes('not found for api version') || (msg.includes('models/') && msg.includes('404'));
     };
+
+    const hasSystemPrompt = cleanedMessages.some(m => m.role === 'system');
 
     // Build Gemini-specific history with proper role alternation and tool support
     const validHistory = [];
