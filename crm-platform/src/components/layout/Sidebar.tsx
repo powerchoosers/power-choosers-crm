@@ -229,10 +229,10 @@ export function Sidebar() {
                           exit={{ opacity: 0 }}
                           transition={{ type: "spring", stiffness: 300, damping: 30 }}
                         />
-                        {/* Laser Sight Indicator */}
+                        {/* Laser Sight Indicator - full height of nav item */}
                         <motion.div
                           layoutId="laserSight"
-                          className="absolute left-0 w-1 h-6 bg-[#002FA7] rounded-r-full z-20 shadow-[0_0_10px_rgba(0,47,167,0.5)]"
+                          className="absolute left-0 top-0 bottom-0 w-1 bg-[#002FA7] rounded-r-full z-20 shadow-[0_0_10px_rgba(0,47,167,0.5)]"
                           initial={{ opacity: 0, x: -2 }}
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, x: -2 }}

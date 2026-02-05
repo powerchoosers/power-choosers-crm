@@ -1,7 +1,15 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  turbopack: {
+    root: path.resolve(process.cwd()),
+  },
+  // Show dev indicator (bottom-right so it's not covered by sidebar) in development
+  devIndicators: {
+    position: "bottom-right",
+  },
   images: {
     unoptimized: true,
   },
