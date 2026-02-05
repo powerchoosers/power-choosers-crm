@@ -48,6 +48,8 @@ export function RightPanel() {
   const [isReady, setIsReady] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const scrollRafRef = useRef<number | null>(null)
+  const lastScrolledRef = useRef<boolean | null>(null)
   /** On dossier: which content to show. Only relevant when isActiveContext. */
   const [dossierPanelView, setDossierPanelView] = useState<DossierPanelView>('context')
   /** Hover over header mode strip: reveal other mode (carousel) without switching. */
@@ -211,9 +213,15 @@ export function RightPanel() {
           ref={scrollContainerRef}
           onScroll={(e) => {
             const target = e.currentTarget;
-            if (target.scrollTop > 10 !== isScrolled) {
-              setIsScrolled(target.scrollTop > 10);
-            }
+            if (scrollRafRef.current !== null) return;
+            scrollRafRef.current = requestAnimationFrame(() => {
+              scrollRafRef.current = null;
+              const value = target.scrollTop > 10;
+              if (value !== lastScrolledRef.current) {
+                lastScrolledRef.current = value;
+                setIsScrolled(value);
+              }
+            });
           }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

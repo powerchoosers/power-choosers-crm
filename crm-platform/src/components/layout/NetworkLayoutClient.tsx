@@ -15,8 +15,10 @@ const inter = Inter({ subsets: ["latin"] });
 
 export function NetworkLayoutClient({
   children,
+  initialHasSessionCookie = false,
 }: {
   children: React.ReactNode;
+  initialHasSessionCookie?: boolean;
 }) {
   const { user, loading } = useAuth()
   const router = useRouter()
@@ -28,7 +30,11 @@ export function NetworkLayoutClient({
     }
   }, [loading, user, router])
 
-  if (loading) {
+  // Optimistic render: when we have a session cookie (returning user), show the full UI
+  // immediately so LCP isn't blocked by Firebase/Supabase auth. If auth then fails, we redirect.
+  const showShell = !loading || (loading && initialHasSessionCookie)
+
+  if (!showShell) {
     return (
       <div className={cn(inter.className, "bg-zinc-950 text-foreground antialiased min-h-screen flex items-center justify-center")}> 
         <LoadingOrb label="Initialising Terminal..." />
@@ -38,28 +44,31 @@ export function NetworkLayoutClient({
 
   if (!user) {
     const hasSessionCookie = typeof document !== 'undefined' && document.cookie.includes('np_session=1')
-    if (process.env.NODE_ENV === 'development' && hasSessionCookie) {
-        return (
-            <div className={cn(inter.className, "bg-zinc-950 text-foreground antialiased min-h-screen flex items-center justify-center")}> 
-                <LoadingOrb label="Bypassing Security Protocols..." />
-            </div>
-        )
-    }
-
-    return (
-      <div className={cn(inter.className, "bg-zinc-950 text-foreground antialiased min-h-screen flex items-center justify-center")}> 
-        <div className="flex flex-col items-center gap-4">
-          <div className="text-sm text-zinc-500 font-mono uppercase tracking-widest">Unauthorized Access Detected</div>
-          <button
-            type="button"
-            onClick={() => router.replace('/login')}
-            className="px-6 py-2 rounded-xl nodal-glass nodal-glass-hover text-white font-medium transition-all"
-          >
-            Authenticate
-          </button>
+    // Optimistic: session cookie present and auth still loading — show full UI so LCP can paint
+    if (loading && initialHasSessionCookie) {
+      // Fall through to render shell + children
+    } else if (process.env.NODE_ENV === 'development' && hasSessionCookie) {
+      return (
+        <div className={cn(inter.className, "bg-zinc-950 text-foreground antialiased min-h-screen flex items-center justify-center")}> 
+          <LoadingOrb label="Bypassing Security Protocols..." />
         </div>
-      </div>
-    )
+      )
+    } else {
+      return (
+        <div className={cn(inter.className, "bg-zinc-950 text-foreground antialiased min-h-screen flex items-center justify-center")}> 
+          <div className="flex flex-col items-center gap-4">
+            <div className="text-sm text-zinc-500 font-mono uppercase tracking-widest">Unauthorized Access Detected</div>
+            <button
+              type="button"
+              onClick={() => router.replace('/login')}
+              className="px-6 py-2 rounded-xl nodal-glass nodal-glass-hover text-white font-medium transition-all"
+            >
+              Authenticate
+            </button>
+          </div>
+        </div>
+      )
+    }
   }
 
   return (
