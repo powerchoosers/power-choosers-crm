@@ -406,6 +406,46 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
 
       try {
         if (importVector === 'CONTACTS') {
+          // --- ROBUST ACCOUNT MERGE LOGIC ---
+          // Look up existing account by company name; if none, create a new account
+          let linkedAccountId: string | undefined = undefined;
+          const companyName = mappedData.company_name?.trim();
+          
+          if (companyName) {
+            // Try to find existing account with exact name match (case-insensitive)
+            const { data: existingAccount } = await supabase
+              .from('accounts')
+              .select('id')
+              .ilike('name', companyName)
+              .maybeSingle();
+            
+            if (existingAccount) {
+              linkedAccountId = existingAccount.id;
+            } else {
+              // No match: create a new account with the company name
+              try {
+                const newAccount = await upsertAccount.mutateAsync({
+                  name: companyName,
+                  domain: '',
+                  industry: '',
+                  description: '',
+                  companyPhone: '',
+                  contractEnd: '',
+                  employees: '',
+                  location: '',
+                  serviceAddresses: [],
+                  metadata: { import_source: 'bulk_import_contact', import_batch: new Date().toISOString() }
+                } as any);
+                if (newAccount?.id) {
+                  linkedAccountId = newAccount.id;
+                }
+              } catch (accountErr) {
+                console.error('Failed to create account for company:', companyName, accountErr);
+                // Continue without account link; contact still has company in metadata
+              }
+            }
+          }
+          
           // Process Contact
           const contactData = {
             name: `${mappedData.first_name || ''} ${mappedData.last_name || ''}`.trim(),
@@ -417,7 +457,8 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
             workPhone: formatPhoneNumber(mappedData.work_direct) || '',
             otherPhone: formatPhoneNumber(mappedData.other_phone) || '',
             status: 'Lead',
-            company: mappedData.company_name || '',
+            company: companyName || '',
+            accountId: linkedAccountId, // Link to existing account if found
             city: mappedData.city || '',
             state: mappedData.state || '',
             // Add metadata fields
