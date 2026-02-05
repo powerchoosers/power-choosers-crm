@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { format, formatDistanceToNow, isAfter, subMonths } from 'date-fns'
+import { motion } from 'framer-motion'
 import { Mail, ArrowUpRight, ArrowDownLeft, RefreshCw, Loader2, Eye, MousePointer2, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
 import { Email } from '@/hooks/useEmails'
 import { cn } from '@/lib/utils'
@@ -127,43 +128,67 @@ export function EmailList({
     <div className="flex flex-col h-full bg-zinc-950/30">
       {/* Filters Header - Segmented Control */}
       <div className="flex-none p-4 border-b border-white/5 flex items-center justify-between bg-zinc-900/50 backdrop-blur-sm z-10">
-        <div className="bg-black/40 border border-white/5 rounded-lg p-1 inline-flex gap-1">
-            <button
-            onClick={() => { setFilter('all'); setCurrentPage(1); }}
-            className={cn(
-                "px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider transition-colors rounded-[4px]",
-                filter === 'all' 
-                  ? "bg-white/10 text-white shadow-[0_0_10px_-2px_rgba(255,255,255,0.1)] border border-white/5" 
-                  : "text-zinc-500 hover:text-zinc-300"
+        <div className="bg-black/40 border border-white/5 rounded-lg px-2 py-1.5 flex items-center gap-2 relative">
+          <div className="relative inline-flex">
+            {filter === 'all' && (
+              <motion.div
+                layoutId="emails-filter-pill"
+                className="absolute inset-0 rounded-md bg-white/10"
+                transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+              />
             )}
-            title="All Nodes"
-            >
-            All_Nodes
-            </button>
             <button
-            onClick={() => { setFilter('received'); setCurrentPage(1); }}
-            className={cn(
-                "px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider transition-colors rounded-[4px]",
-                filter === 'received' 
-                  ? "bg-white/10 text-white shadow-[0_0_10px_-2px_rgba(255,255,255,0.1)] border border-white/5" 
-                  : "text-zinc-500 hover:text-zinc-300"
-            )}
-            title="Uplink In"
+              type="button"
+              onClick={() => { setFilter('all'); setCurrentPage(1); }}
+              className={cn(
+                "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider transition-colors duration-200 gap-2 flex items-center shrink-0",
+                filter === 'all' ? "text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+              )}
+              title="All Nodes"
             >
-            Uplink_In
+              All_Nodes
             </button>
+          </div>
+          <div className="relative inline-flex">
+            {filter === 'received' && (
+              <motion.div
+                layoutId="emails-filter-pill"
+                className="absolute inset-0 rounded-md bg-white/10"
+                transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+              />
+            )}
             <button
-            onClick={() => { setFilter('sent'); setCurrentPage(1); }}
-            className={cn(
-                "px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider transition-colors rounded-[4px]",
-                filter === 'sent' 
-                  ? "bg-white/10 text-white shadow-[0_0_10px_-2px_rgba(255,255,255,0.1)] border border-white/5" 
-                  : "text-zinc-500 hover:text-zinc-300"
-            )}
-            title="Uplink Out"
+              type="button"
+              onClick={() => { setFilter('received'); setCurrentPage(1); }}
+              className={cn(
+                "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider transition-colors duration-200 gap-2 flex items-center shrink-0",
+                filter === 'received' ? "text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+              )}
+              title="Uplink In"
             >
-            Uplink_Out
+              Uplink_In
             </button>
+          </div>
+          <div className="relative inline-flex">
+            {filter === 'sent' && (
+              <motion.div
+                layoutId="emails-filter-pill"
+                className="absolute inset-0 rounded-md bg-white/10"
+                transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => { setFilter('sent'); setCurrentPage(1); }}
+              className={cn(
+                "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider transition-colors duration-200 gap-2 flex items-center shrink-0",
+                filter === 'sent' ? "text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+              )}
+              title="Uplink Out"
+            >
+              Uplink_Out
+            </button>
+          </div>
         </div>
         <div className="text-[10px] text-zinc-600 font-mono uppercase tracking-[0.2em]">
           Total_Entropy: <span className="text-zinc-400 tabular-nums">{filteredEmails.length}</span>
