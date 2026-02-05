@@ -126,12 +126,20 @@ export default function InfrastructureMap() {
       }
 
       // Geocoding fallback: If no lat/lng, use approximate city coordinates
-      // In a real app, you'd have these stored. For now, we'll use the mock ones if match, 
+      // In a real app, you'd have these stored. For now, we'll use the cached columns, 
       // or approximate Texas center with slight jitter
-      let lat = contact.latitude || contact.lat;
-      let lng = contact.longitude || contact.lng;
+      let lat = contact.latitude ?? contact.lat;
+      let lng = contact.longitude ?? contact.lng;
 
-      if (!lat || !lng) {
+      // Inherit from account if contact has no direct coordinates
+      if (lat == null || lng == null) {
+        if (account?.latitude && account?.longitude) {
+          lat = account.latitude;
+          lng = account.longitude;
+        }
+      }
+
+      if (lat == null || lng == null) {
         // Simple city-based jitter for visualization if no real coords
         const hash = (contact.id || '').split('').reduce((a: number, b: string) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0);
         const jitterLat = (hash % 100) / 100;

@@ -119,6 +119,8 @@ import postsListHandler from './api/posts/list.js';
 import sitemapHandler from './api/sitemap.js';
 import algoliaReindexHandler from './api/algolia/reindex.js';
 import mapsConfigHandler from './api/maps/config.js';
+import mapsSearchHandler from './api/maps/search.js';
+import mapsGeocodeHandler from './api/maps/geocode.js';
 import debugCallHandler from './api/debug/call.js';
 import debugHealthHandler from './api/debug/health.js';
 import debugLogHandler from './api/debug/log.js';
@@ -691,6 +693,8 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/posts/list' ||
     pathname === '/api/algolia/reindex' ||
     pathname === '/api/maps/config' ||
+    pathname === '/api/maps/search' ||
+    pathname === '/api/maps/geocode' ||
     pathname === '/api/debug/call' ||
     pathname === '/api/debug/health' ||
     pathname === '/api/debug/log' ||
@@ -947,6 +951,12 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/maps/config') {
     return handleApiMapsConfig(req, res);
+  }
+  if (pathname === '/api/maps/search') {
+    return handleApiMapsSearch(req, res);
+  }
+  if (pathname === '/api/maps/geocode') {
+    return handleApiMapsGeocode(req, res);
   }
   if (pathname === '/api/debug/call') {
     return handleApiDebugCall(req, res);
@@ -1496,6 +1506,14 @@ async function handleApiAlgoliaReindex(req, res) {
 
 async function handleApiMapsConfig(req, res) {
   return await mapsConfigHandler(req, res);
+}
+
+async function handleApiMapsSearch(req, res) {
+  return await mapsSearchHandler(req, res);
+}
+
+async function handleApiMapsGeocode(req, res) {
+  return await mapsGeocodeHandler(req, res);
 }
 
 // Debug handlers
