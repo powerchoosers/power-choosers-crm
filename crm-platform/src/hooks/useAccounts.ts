@@ -79,7 +79,8 @@ export function useSearchAccounts(queryTerm: string) {
       try {
         let query = supabase.from('accounts').select('*');
 
-        if (role !== 'admin' && user?.email) {
+        // Admin and dev see all accounts; others filtered by ownerId
+        if (role !== 'admin' && role !== 'dev' && user?.email) {
           query = query.eq('ownerId', user.email);
         }
 
@@ -332,7 +333,8 @@ export function useAccountsCount(searchQuery?: string, filters?: AccountFilters,
         query = query.in('id', targetIds);
       }
 
-      if (role !== 'admin' && user.email) {
+      // Admin and dev see all accounts; others filtered by ownerId
+      if (role !== 'admin' && role !== 'dev' && user.email) {
         query = query.eq('ownerId', user.email)
       }
 

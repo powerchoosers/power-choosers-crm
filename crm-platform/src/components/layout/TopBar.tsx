@@ -335,7 +335,7 @@ export function TopBar() {
     <header className={cn(
         "fixed top-0 left-[70px] right-0 lg:right-80 z-40 flex items-center justify-center h-24 pointer-events-none transition-all duration-300 ease-in-out",
         isScrolled 
-           ? "bg-zinc-950/80 backdrop-blur-xl border-b border-white/5 shadow-[0_0_30px_rgba(0,0,0,0.5)] backdrop-saturate-150" 
+           ? "bg-zinc-950/80 backdrop-blur-xl border-b border-r border-white/5 shadow-[0_0_30px_rgba(0,0,0,0.5)] backdrop-saturate-150" 
            : "bg-transparent border-b border-transparent"
     )}>
       <div className="w-full px-8 flex items-center justify-between gap-6 pointer-events-auto">

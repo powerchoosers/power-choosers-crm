@@ -300,7 +300,8 @@ export function useSearchContacts(queryTerm: string) {
           .from('contacts')
           .select('*, accounts(name, domain, logo_url)');
 
-        if (role !== 'admin' && user?.email) {
+        // Admin and dev see all contacts; others filtered by ownerId
+        if (role !== 'admin' && role !== 'dev' && user?.email) {
           query = query.eq('ownerId', user.email);
         }
 
@@ -385,7 +386,8 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
           query = query.in('id', targetIds);
         }
 
-        if (role !== 'admin' && user?.email) {
+        // Admin and dev see all contacts; others filtered by ownerId
+        if (role !== 'admin' && role !== 'dev' && user?.email) {
            query = query.eq('ownerId', user.email);
         }
 
@@ -547,7 +549,8 @@ export function useContactsCount(searchQuery?: string, filters?: ContactFilters,
         query = query.in('id', targetIds);
       }
 
-      if (role !== 'admin' && user.email) {
+      // Admin and dev see all contacts; others filtered by ownerId
+      if (role !== 'admin' && role !== 'dev' && user.email) {
         query = query.eq('ownerId', user.email)
       }
 
