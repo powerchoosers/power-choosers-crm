@@ -337,6 +337,24 @@ export function NodeIngestion() {
           endDate: ''
         }] : [];
 
+        // Geocode the address for the Infrastructure Map (One-time cost)
+        let lat = null;
+        let lng = null;
+        const addressToGeocode = address || (city && state ? `${city}, ${state}` : null);
+        
+        if (addressToGeocode) {
+          try {
+            const geoResp = await fetch(`/api/maps/geocode?address=${encodeURIComponent(addressToGeocode)}`);
+            const geoData = await geoResp.json();
+            if (geoData.found) {
+              lat = geoData.lat;
+              lng = geoData.lng;
+            }
+          } catch (e) {
+            console.warn('One-time geocode failed during ingestion:', e);
+          }
+        }
+
         const { error } = await supabase.from('accounts').insert({
           id,
           name: entityName,
@@ -349,6 +367,8 @@ export function NodeIngestion() {
           city: city,
           state: state,
           country: scanResult?.country,
+          latitude: lat,
+          longitude: lng,
           service_addresses: serviceAddresses, // Save to service_addresses JSONB array
           logo_url: scanResult?.logo,
           phone: formatPhoneNumber(phone || scanResult?.phone) || null,
