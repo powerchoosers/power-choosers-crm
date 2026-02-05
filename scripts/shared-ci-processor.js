@@ -68,7 +68,7 @@ window.SharedCIProcessor = (function() {
             // Get API base URL
             let base = (window.crm && typeof window.crm.getApiBaseUrl === 'function')
                 ? window.crm.getApiBaseUrl()
-                : (window.PUBLIC_BASE_URL || window.API_BASE_URL || 'https://power-choosers-crm-792458658491.us-central1.run.app');
+                : (window.PUBLIC_BASE_URL || window.API_BASE_URL || 'https://nodal-point-network-792458658491.us-central1.run.app');
             base = String(base).replace(/\/$/, '');
 
             // Make CI request
@@ -137,7 +137,7 @@ window.SharedCIProcessor = (function() {
                     
                     // Immediately trigger poll to get results
                     try {
-                        const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '') || 'https://power-choosers-crm-792458658491.us-central1.run.app';
+                        const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '') || 'https://nodal-point-network-792458658491.us-central1.run.app';
                         await fetch(`${base}/api/twilio/poll-ci-analysis`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -212,7 +212,7 @@ window.SharedCIProcessor = (function() {
         const transcriptSid = btn?.getAttribute('data-transcript-sid') || null;
         
         try {
-            const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '') || 'https://power-choosers-crm-792458658491.us-central1.run.app';
+            const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '') || 'https://nodal-point-network-792458658491.us-central1.run.app';
             const resp = await fetch(`${base}/api/twilio/poll-ci-analysis`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -350,7 +350,7 @@ window.SharedCIProcessor = (function() {
         let attempts = 0;
         const maxAttempts = 40; // ~2 minutes at 3s intervals
         const delayMs = 3000;
-        const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '') || 'https://power-choosers-crm-792458658491.us-central1.run.app';
+        const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '') || 'https://nodal-point-network-792458658491.us-central1.run.app';
 
         const isReady = (call) => {
             if (!call) return false;
@@ -473,7 +473,7 @@ window.SharedCIProcessor = (function() {
 
         // First try to trigger background processing
         try {
-            const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '') || 'https://power-choosers-crm-792458658491.us-central1.run.app';
+            const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '') || 'https://nodal-point-network-792458658491.us-central1.run.app';
             
             if (transcriptSid) {
                 // Use transcriptSid for more reliable polling
