@@ -43,7 +43,7 @@ export function RightPanel() {
   const entityId = params.id as string
   
   const { data: contact, refetch: refetchContact } = useContact(isContactPage ? entityId : '')
-  const { data: account, refetch: refetchAccount } = useAccount(isAccountPage ? entityId : '')
+  const { data: account, refetch: refetchAccount } = useAccount(isAccountPage ? entityId : (contact?.accountId || ''))
   
   const [isReady, setIsReady] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
