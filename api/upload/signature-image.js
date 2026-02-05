@@ -65,10 +65,17 @@ export default async function handler(req, res) {
     
     let imgurResponse;
     try {
+      const imgurClientId = process.env.IMGUR_CLIENT_ID;
+      if (!imgurClientId) {
+        logger.error('[SignatureUpload] IMGUR_CLIENT_ID not set');
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Image upload not configured' }));
+        return;
+      }
       imgurResponse = await fetch('https://api.imgur.com/3/image', {
         method: 'POST',
         headers: {
-          'Authorization': 'Client-ID 546c25a59c58ad7', // Public Imgur client ID
+          'Authorization': `Client-ID ${imgurClientId}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ image, type: 'base64' }),

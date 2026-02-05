@@ -49,7 +49,7 @@ So the problem is usually one of:
 
 1. **Confirm the key and project**
    - Open: [Credentials – power-choosers-crm](https://console.cloud.google.com/apis/credentials?project=power-choosers-crm)
-   - Find the key that matches: `AIzaSyCydOVPsFnyY83M5ABb2lBZWcMqh4wqV2k`
+   - Find the key you use for Maps (the value in `NEXT_PUBLIC_GOOGLE_MAPS_KEY` in your env — never commit this key to git).
    - If it’s **not** listed there, the key was created in a **different project**. Either:
      - Switch to that project in the console and fix referrer/billing there, or  
      - Create a **new** API key in **power-choosers-crm** and put that in `NEXT_PUBLIC_GOOGLE_MAPS_KEY` in `crm-platform/.env.local`.
