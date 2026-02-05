@@ -812,6 +812,50 @@ export function useUpsertContact() {
         }
       }
 
+      // --- ACCOUNT LINKING LOGIC ---
+      // If accountId is not provided but company name exists, find or create account
+      let finalAccountId = contact.accountId;
+      
+      if (!finalAccountId && contact.company) {
+        const { data: matchingAccount } = await supabase
+          .from('accounts')
+          .select('id')
+          .ilike('name', contact.company)
+          .maybeSingle();
+        
+        if (matchingAccount) {
+          finalAccountId = matchingAccount.id;
+        } else {
+          // No matching account: create a new one with the company name
+          const newAccountId = crypto.randomUUID();
+          const now = new Date().toISOString();
+          const { error: insertAccountError } = await supabase
+            .from('accounts')
+            .insert({
+              id: newAccountId,
+              name: contact.company,
+              domain: '',
+              industry: '',
+              description: '',
+              logo_url: null,
+              phone: null,
+              linkedin_url: null,
+              service_addresses: [],
+              contract_end_date: null,
+              employees: null,
+              city: null,
+              state: null,
+              address: null,
+              metadata: { import_source: 'contact_upsert', import_batch: now },
+              createdAt: now,
+              updatedAt: now,
+            });
+          if (!insertAccountError) {
+            finalAccountId = newAccountId;
+          }
+        }
+      }
+
       const dbContact: any = {
         name: contact.name,
         firstName: contact.firstName,
@@ -823,7 +867,7 @@ export function useUpsertContact() {
         otherPhone: contact.otherPhone,
         companyPhone: contact.companyPhone,
         status: contact.status,
-        accountId: contact.accountId || null,
+        accountId: finalAccountId || null,
         updatedAt: new Date().toISOString()
       };
 
@@ -850,9 +894,51 @@ export function useUpsertContact() {
         // Merge metadata for enrichment
         const { data: current } = await supabase
           .from('contacts')
-          .select('metadata')
+          .select('metadata, accountId')
           .eq('id', existingId)
           .single();
+        
+        // If contact doesn't have accountId yet but has company name, find or create account
+        if (!current?.accountId && !finalAccountId && contact.company) {
+          const { data: matchingAccount } = await supabase
+            .from('accounts')
+            .select('id')
+            .ilike('name', contact.company)
+            .maybeSingle();
+          
+          if (matchingAccount) {
+            finalAccountId = matchingAccount.id;
+            dbContact.accountId = finalAccountId;
+          } else {
+            const newAccountId = crypto.randomUUID();
+            const now = new Date().toISOString();
+            const { error: insertAccountError } = await supabase
+              .from('accounts')
+              .insert({
+                id: newAccountId,
+                name: contact.company,
+                domain: '',
+                industry: '',
+                description: '',
+                logo_url: null,
+                phone: null,
+                linkedin_url: null,
+                service_addresses: [],
+                contract_end_date: null,
+                employees: null,
+                city: null,
+                state: null,
+                address: null,
+                metadata: { import_source: 'contact_upsert', import_batch: now },
+                createdAt: now,
+                updatedAt: now,
+              });
+            if (!insertAccountError) {
+              finalAccountId = newAccountId;
+              dbContact.accountId = finalAccountId;
+            }
+          }
+        }
           
         dbContact.metadata = {
           ...(current?.metadata || {}),
@@ -874,6 +960,7 @@ export function useUpsertContact() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
     }
   })
 }
