@@ -159,17 +159,31 @@ export function TopBar() {
   const durationInterval = useRef<NodeJS.Timeout | null>(null)
   const callStartRef = useRef<number | null>(null)
 
-  // Listen for scroll on the main content container
+  // Listen for scroll on the main content container (passive + rAF throttle for smooth scroll)
   useEffect(() => {
     const mainContainer = document.querySelector('main.np-scroll');
     if (!mainContainer) return;
 
+    let rafId: number | null = null;
+    let lastValue: boolean | null = null;
+
     const handleScroll = () => {
-      setIsScrolled(mainContainer.scrollTop > 20);
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        const value = mainContainer.scrollTop > 20;
+        if (value !== lastValue) {
+          lastValue = value;
+          setIsScrolled(value);
+        }
+      });
     };
 
-    mainContainer.addEventListener('scroll', handleScroll);
-    return () => mainContainer.removeEventListener('scroll', handleScroll);
+    mainContainer.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      mainContainer.removeEventListener('scroll', handleScroll);
+    };
   }, []);
 
   const selectedNumber = profile.selectedPhoneNumber || (profile.twilioNumbers && profile.twilioNumbers.length > 0 ? profile.twilioNumbers[0].number : null)
