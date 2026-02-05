@@ -44,25 +44,23 @@ export default function SatelliteUplink({
     setActiveAddress(address);
   }, [address]);
 
-  // Geocode address to coordinates using Google Maps Geocoder
+  // Geocode address to coordinates – use server API (works in production + localhost)
   const geocodeAddress = async (addressToGeocode: string): Promise<{ lat: number; lng: number } | null> => {
-    if (!addressToGeocode || !isLoaded) return null;
-    
+    if (!addressToGeocode) return null;
+
     try {
-      // Use the Google Maps JavaScript API Geocoder
-      const geocoder = new google.maps.Geocoder();
-      
-      return new Promise((resolve) => {
-        geocoder.geocode({ address: addressToGeocode }, (results, status) => {
-          if (status === 'OK' && results && results.length > 0) {
-            const location = results[0].geometry.location;
-            resolve({ lat: location.lat(), lng: location.lng() });
-          } else {
-            console.error('Geocoding failed:', status);
-            resolve(null);
-          }
-        });
-      });
+      const res = await fetch(
+        `/api/maps/geocode?address=${encodeURIComponent(addressToGeocode)}`
+      );
+      const data = await res.json();
+
+      if (data.found && data.lat != null && data.lng != null) {
+        return { lat: data.lat, lng: data.lng };
+      }
+      if (data.formattedAddress) {
+        setActiveAddress(data.formattedAddress);
+      }
+      return null;
     } catch (error) {
       console.error('Geocoding error:', error);
       return null;
@@ -101,6 +99,16 @@ export default function SatelliteUplink({
         if (searchData.found && searchData.address) {
           resolvedAddress = searchData.address;
           setActiveAddress(resolvedAddress);
+          // Use location from search when available (same API, works in production)
+          if (searchData.location?.latitude != null && searchData.location?.longitude != null) {
+            setCoordinates({
+              lat: Number(searchData.location.latitude),
+              lng: Number(searchData.location.longitude),
+            });
+            setIsActive(true);
+            setIsLoading(false);
+            return;
+          }
           
           // Auto-Sync Data (Forensic Enrichment)
           if (entityId && entityType) {
@@ -192,6 +200,8 @@ export default function SatelliteUplink({
     );
   }
 
+  const mapExpanded = isActive && !!coordinates;
+
   return (
     <div className="bg-zinc-900/40 backdrop-blur-xl border border-white/5 rounded-3xl overflow-hidden relative group">
       
@@ -256,14 +266,18 @@ export default function SatelliteUplink({
         )}
       </AnimatePresence>
 
-      {/* BODY: The Map */}
-      <div className={cn(
-        "h-96 relative w-full bg-zinc-900/40 flex flex-col items-center justify-center transition-all duration-500",
-        (!isActive || !coordinates) && !isLoading ? "opacity-70" : "opacity-100"
-      )}>
-        
+      {/* BODY: The Map – animates height when map is active */}
+      <motion.div
+        className={cn(
+          "relative w-full bg-zinc-900/40 flex flex-col items-center justify-center overflow-hidden",
+          (!isActive || !coordinates) && !isLoading ? "opacity-70" : "opacity-100"
+        )}
+        initial={false}
+        animate={{ height: mapExpanded ? 384 : 128 }}
+        transition={{ duration: 0.4, ease: 'easeInOut' }}
+      >
         {isLoading ? (
-          <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-col items-center gap-2 absolute inset-0 justify-center">
             <Loader2 className="w-6 h-6 text-[#002FA7] animate-spin" />
             <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Negotiating Uplink...</span>
           </div>
@@ -288,7 +302,7 @@ export default function SatelliteUplink({
           <GoogleMap
             zoom={18}
             center={coordinates}
-            mapContainerClassName="w-full h-full"
+            mapContainerClassName="w-full h-full min-h-[384px]"
             options={{
               mapTypeId: 'satellite',
               zoomControl: true,
@@ -301,7 +315,7 @@ export default function SatelliteUplink({
             <MarkerF position={coordinates} />
           </GoogleMap>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }

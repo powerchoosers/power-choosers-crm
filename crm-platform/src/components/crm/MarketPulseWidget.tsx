@@ -31,18 +31,18 @@ export default function MarketPulseWidget() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
-        <div className="p-3 rounded-2xl bg-zinc-900/40 border border-white/5 backdrop-blur-xl space-y-1">
-          <span className="text-[9px] font-mono text-zinc-500 uppercase">LZ_HOUSTON</span>
-          <div className="flex items-baseline gap-1">
-            <span className="text-sm font-mono font-medium text-white tabular-nums">${prices.houston.toFixed(2)}</span>
-            <span className="text-[8px] font-mono text-zinc-600">MWh</span>
+        <div className="px-3 !pt-[3px] !pb-[12px] rounded-2xl bg-zinc-900/40 border border-white/5 backdrop-blur-xl space-y-0.5">
+          <span className="text-[9px] font-mono text-zinc-500 uppercase leading-none">LZ_HOUSTON</span>
+          <div className="flex items-baseline gap-1 leading-none">
+            <span className="text-sm font-mono font-medium text-white tabular-nums leading-none">${prices.houston.toFixed(2)}</span>
+            <span className="text-[8px] font-mono text-zinc-600 leading-none">MWh</span>
           </div>
         </div>
-        <div className="p-3 rounded-2xl bg-zinc-900/40 border border-white/5 backdrop-blur-xl space-y-1">
-          <span className="text-[9px] font-mono text-zinc-500 uppercase">LZ_NORTH</span>
-          <div className="flex items-baseline gap-1">
-            <span className="text-sm font-mono font-medium text-white tabular-nums">${prices.north.toFixed(2)}</span>
-            <span className="text-[8px] font-mono text-zinc-600">MWh</span>
+        <div className="px-3 !pt-[3px] !pb-[12px] rounded-2xl bg-zinc-900/40 border border-white/5 backdrop-blur-xl space-y-0.5">
+          <span className="text-[9px] font-mono text-zinc-500 uppercase leading-none">LZ_NORTH</span>
+          <div className="flex items-baseline gap-1 leading-none">
+            <span className="text-sm font-mono font-medium text-white tabular-nums leading-none">${prices.north.toFixed(2)}</span>
+            <span className="text-[8px] font-mono text-zinc-600 leading-none">MWh</span>
           </div>
         </div>
       </div>
