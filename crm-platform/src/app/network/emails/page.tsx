@@ -7,6 +7,7 @@ import { useGmailSync } from '@/hooks/useGmailSync'
 import { useAuth } from '@/context/AuthContext'
 import { EmailList } from '@/components/emails/EmailList'
 import { ComposeModal } from '@/components/emails/ComposeModal'
+import BulkActionDeck from '@/components/network/BulkActionDeck'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Search, Plus, RefreshCw, Mail, Filter } from 'lucide-react'
@@ -22,6 +23,7 @@ export default function EmailsPage() {
   
   const [searchTerm, setSearchTerm] = useState(searchQuery)
   const [debouncedSearch, setDebouncedSearch] = useState(searchQuery)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   // Debounce search query
   useEffect(() => {
@@ -40,10 +42,27 @@ export default function EmailsPage() {
   const [isComposeOpen, setIsComposeOpen] = useState(false)
 
   const emails = data?.pages.flatMap(page => page.emails) || []
+  const effectiveTotal = totalEmails ?? emails.length
 
   const handleSync = () => {
     if (!user) return
     syncGmail(user, { silent: false })
+  }
+
+  const handleSelectionChange = (ids: Set<string>) => setSelectedIds(ids)
+  const handleSelectCount = (count: number) => {
+    const all = emails.slice(0, count).map(e => e.id)
+    setSelectedIds(new Set(all))
+    if (count > emails.length && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage()
+    }
+  }
+  const handleBulkAction = (action: string) => {
+    if (action === 'delete') {
+      toast.info('Bulk delete for emails is not available yet.')
+      return
+    }
+    toast.info(`Bulk action "${action}" for ${selectedIds.size} emails — coming soon.`)
   }
 
   return (
@@ -88,8 +107,20 @@ export default function EmailsPage() {
                 isFetchingNextPage={isFetchingNextPage}
                 currentPage={pageIndex + 1}
                 onPageChange={(p) => setPage(p - 1)}
+                selectedIds={selectedIds}
+                onSelectionChange={handleSelectionChange}
+                totalAvailable={effectiveTotal}
+                onSelectCount={handleSelectCount}
             />
       </div>
+
+      <BulkActionDeck
+        selectedCount={selectedIds.size}
+        totalAvailable={effectiveTotal}
+        onClear={() => setSelectedIds(new Set())}
+        onAction={handleBulkAction}
+        onSelectCount={handleSelectCount}
+      />
 
       <ComposeModal 
         isOpen={isComposeOpen} 

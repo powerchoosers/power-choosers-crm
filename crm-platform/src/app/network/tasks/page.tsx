@@ -12,8 +12,9 @@ import {
   SortingState,
   ColumnFiltersState,
   PaginationState,
+  RowSelectionState,
 } from '@tanstack/react-table'
-import { ArrowUpDown, Calendar, ChevronLeft, ChevronRight, CheckCircle2, Circle, Clock, Plus, Filter, MoreHorizontal, Search } from 'lucide-react'
+import { ArrowUpDown, Calendar, ChevronLeft, ChevronRight, CheckCircle2, Circle, Clock, Plus, Filter, MoreHorizontal, Search, Check } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { useTasks, useTasksCount, Task } from '@/hooks/useTasks'
@@ -41,6 +42,8 @@ import { cn } from '@/lib/utils'
 import { format, formatDistanceToNow, subMonths, isAfter } from 'date-fns'
 import { useRouter } from 'next/navigation'
 import { useTableState } from '@/hooks/useTableState'
+import BulkActionDeck from '@/components/network/BulkActionDeck'
+import DestructModal from '@/components/network/DestructModal'
 
 const PAGE_SIZE = 50
 
@@ -62,7 +65,9 @@ export default function TasksPage() {
   const { data: totalTasks } = useTasksCount(debouncedFilter)
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [isMounted, setIsMounted] = useState(false)
+  const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
 
   useEffect(() => {
     setIsMounted(true)
@@ -84,7 +89,74 @@ export default function TasksPage() {
     }
   }, [pageIndex, tasks.length, hasNextPage, isFetchingNextPage, fetchNextPage])
 
+  const selectedCount = Object.keys(rowSelection).length
+  const handleSelectCount = async (count: number) => {
+    if (count > tasks.length && hasNextPage && !isFetchingNextPage) {
+      await fetchNextPage()
+    }
+    const idsToSelect = tasks.slice(0, count).map(t => t.id)
+    const newSelection: RowSelectionState = {}
+    idsToSelect.forEach(id => { newSelection[id] = true })
+    setRowSelection(newSelection)
+  }
+  const handleBulkAction = async (action: string) => {
+    if (action === 'delete') {
+      setIsDestructModalOpen(true)
+      return
+    }
+    // Other actions: list, sequence, enrich — placeholder
+  }
+  const handleConfirmPurge = async () => {
+    // rowSelection keys are row ids when getRowId is set
+    const selectedIds = Object.keys(rowSelection).filter(Boolean)
+    selectedIds.forEach(id => deleteTask(id))
+    setRowSelection({})
+    setIsDestructModalOpen(false)
+  }
+
   const columns: ColumnDef<Task>[] = [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <div className="flex items-center justify-center px-2">
+          <button
+            type="button"
+            onClick={table.getToggleAllPageRowsSelectedHandler()}
+            className={cn(
+              "w-4 h-4 rounded border border-white/20 transition-all flex items-center justify-center",
+              table.getIsAllPageRowsSelected() ? "bg-[#002FA7] border-[#002FA7]" : "bg-transparent opacity-50 hover:opacity-100"
+            )}
+          >
+            {table.getIsAllPageRowsSelected() && <Check className="w-3 h-3 text-white" />}
+          </button>
+        </div>
+      ),
+      cell: ({ row, table }) => {
+        const pageIndex = table.getState().pagination.pageIndex
+        const index = row.index + 1 + pageIndex * PAGE_SIZE
+        const isSelected = row.getIsSelected()
+        return (
+          <div className="flex items-center justify-center px-2 relative group/select">
+            <span className={cn(
+              "font-mono text-[10px] text-zinc-700 transition-opacity",
+              isSelected ? "opacity-0" : "group-hover/select:opacity-0"
+            )}>
+              {index.toString().padStart(2, '0')}
+            </span>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); row.toggleSelected(); }}
+              className={cn(
+                "absolute inset-0 m-auto w-4 h-4 rounded border transition-all flex items-center justify-center",
+                isSelected ? "bg-[#002FA7] border-[#002FA7] opacity-100" : "bg-white/5 border-white/10 opacity-0 group-hover/select:opacity-100"
+              )}
+            >
+              {isSelected && <Check className="w-3 h-3 text-white" />}
+            </button>
+          </div>
+        )
+      },
+    },
     {
       accessorKey: 'title',
       header: ({ column }) => {
@@ -221,11 +293,13 @@ export default function TasksPage() {
   const table = useReactTable({
     data: tasks || [],
     columns,
+    getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
+    onRowSelectionChange: setRowSelection,
     autoResetPageIndex: false,
     state: {
       sorting,
@@ -234,6 +308,7 @@ export default function TasksPage() {
         pageIndex,
         pageSize: PAGE_SIZE,
       },
+      rowSelection,
     },
   })
 
@@ -302,7 +377,7 @@ export default function TasksPage() {
                           delay: Math.min(index * 0.02, 0.4),
                           ease: [0.23, 1, 0.32, 1] 
                         }}
-                        data-state={row.getIsSelected() && "selected"}
+                        data-state={row.getIsSelected() ? "selected" : undefined}
                         className={cn(
                           "border-b border-white/5 transition-colors group cursor-pointer relative z-10",
                           row.getIsSelected() 
@@ -376,6 +451,21 @@ export default function TasksPage() {
             </div>
         </div>
       </div>
+
+      <BulkActionDeck
+        selectedCount={selectedCount}
+        totalAvailable={effectiveTotalRecords}
+        onClear={() => setRowSelection({})}
+        onAction={handleBulkAction}
+        onSelectCount={handleSelectCount}
+      />
+
+      <DestructModal
+        isOpen={isDestructModalOpen}
+        onClose={() => setIsDestructModalOpen(false)}
+        onConfirm={handleConfirmPurge}
+        count={selectedCount}
+      />
     </div>
   )
 }
