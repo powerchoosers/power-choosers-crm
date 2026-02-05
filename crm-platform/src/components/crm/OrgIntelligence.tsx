@@ -1,5 +1,6 @@
 'use client'
 import { useState, useMemo, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { Users, Search, Lock, Unlock, ShieldCheck, Loader2, ChevronLeft, ChevronRight, Globe, MapPin, Linkedin, Phone, ExternalLink, ChevronDown, ChevronUp, Sparkles, Mail } from 'lucide-react';
 import Image from 'next/image';
 import { CompanyIcon } from '@/components/ui/CompanyIcon';
@@ -831,8 +832,15 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
 
   const totalPages = Math.ceil(filteredData.length / CONTACTS_PER_PAGE);
 
+  const contentExpanded = scanStatus === 'complete';
+
   return (
-    <div className="relative overflow-hidden rounded-3xl transition-all duration-300 bg-zinc-900/40 border border-white/5 backdrop-blur-xl flex flex-col min-h-[400px]">
+    <motion.div
+      className="relative overflow-hidden rounded-3xl transition-all duration-300 bg-zinc-900/40 border border-white/5 backdrop-blur-xl flex flex-col"
+      initial={false}
+      animate={{ minHeight: contentExpanded ? 400 : 140 }}
+      transition={{ duration: 0.4, ease: 'easeInOut' }}
+    >
       
       {/* HEADER - Status & Controls */}
       <div className="p-4 pb-2 flex justify-between items-center border-b border-white/5 bg-zinc-900/50">
@@ -1289,6 +1297,6 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       <div className="absolute inset-0 pointer-events-none opacity-[0.03] overflow-hidden">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
       </div>
-    </div>
+    </motion.div>
   );
 }

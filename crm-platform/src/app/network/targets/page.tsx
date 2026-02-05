@@ -14,12 +14,22 @@ import {
   Loader2
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useTargets } from '@/hooks/useTargets'
+import { useTargets, useCreateTarget } from '@/hooks/useTargets'
 import { formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 function TargetSkeleton() {
   return (
@@ -40,16 +50,30 @@ function TargetSkeleton() {
   )
 }
 
+const TARGETS_MODE_STORAGE_KEY = 'targets-page-mode'
+
 export default function TargetOverviewPage() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  // STATE: Active Mode (People vs Accounts)
-  const [activeMode, setActiveMode] = useState<'people' | 'account'>((searchParams.get('mode') as 'people' | 'account') || 'people')
+  // STATE: Active Mode (People vs Accounts) — URL on load, then persisted to localStorage
+  const [activeMode, setActiveMode] = useState<'people' | 'account'>(() => {
+    const urlMode = searchParams.get('mode') as 'people' | 'account' | null
+    return urlMode === 'people' || urlMode === 'account' ? urlMode : 'people'
+  })
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '')
 
-  // Update URL when state changes
+  // On mount: if no mode in URL, restore from localStorage (client-only, avoids hydration mismatch)
+  useEffect(() => {
+    if (searchParams.get('mode')) return
+    try {
+      const stored = localStorage.getItem(TARGETS_MODE_STORAGE_KEY) as 'people' | 'account' | null
+      if (stored === 'people' || stored === 'account') setActiveMode(stored)
+    } catch (_) {}
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- run once on mount to restore preference
+
+  // Update URL and persist mode to localStorage when state changes
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString())
     if (activeMode !== 'people') params.set('mode', activeMode)
@@ -64,10 +88,17 @@ export default function TargetOverviewPage() {
     if (newString !== oldString) {
       router.replace(`${pathname}?${newString}`, { scroll: false })
     }
+
+    try {
+      localStorage.setItem(TARGETS_MODE_STORAGE_KEY, activeMode)
+    } catch (_) {}
   }, [activeMode, searchQuery, pathname, router, searchParams])
   
   // DATA FETCHING
   const { data: targets, isLoading, error } = useTargets()
+  const createTarget = useCreateTarget()
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [newTargetName, setNewTargetName] = useState('')
 
   // Filter based on toggle and search
   const filteredTargets = targets?.filter(l => {
@@ -88,6 +119,21 @@ export default function TargetOverviewPage() {
     
     return true
   }) || []
+
+  const handleCreateTarget = async () => {
+    if (!newTargetName.trim()) return
+    try {
+      await createTarget.mutateAsync({
+        name: newTargetName.trim(),
+        kind: activeMode === 'people' ? 'people' : 'account',
+      })
+      setIsCreateOpen(false)
+      setNewTargetName('')
+      toast.success('Target initialized successfully')
+    } catch {
+      toast.error('Failed to initialize target')
+    }
+  }
 
   if (error) {
     return (
@@ -112,6 +158,7 @@ export default function TargetOverviewPage() {
 
           <div className="flex items-center gap-3">
             <Button 
+              onClick={() => setIsCreateOpen(true)}
               className="h-10 px-4 rounded-xl flex items-center gap-2 bg-white text-zinc-950 hover:bg-zinc-200 transition-all hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)] font-medium"
             >
               <Plus className="w-4 h-4" /> Initialize Target
@@ -119,6 +166,32 @@ export default function TargetOverviewPage() {
           </div>
         </div>
       </div>
+
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent className="bg-zinc-950 border-white/10 text-zinc-100">
+          <DialogHeader>
+            <DialogTitle>Initialize New Target</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="target-name">Name</Label>
+              <Input 
+                id="target-name" 
+                value={newTargetName} 
+                onChange={(e) => setNewTargetName(e.target.value)} 
+                placeholder={`e.g. ${activeMode === 'people' ? 'Q1 Contacts' : 'Enterprise Accounts'}`}
+                className="bg-zinc-900 border-white/10"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsCreateOpen(false)} className="hover:bg-white/10 hover:text-white text-zinc-400">Cancel</Button>
+            <Button onClick={handleCreateTarget} disabled={createTarget.isPending || !newTargetName.trim()} className="bg-white text-zinc-950 hover:bg-zinc-200">
+              {createTarget.isPending ? 'Creating...' : 'Initialize Target'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* 2. THE DATA CONTAINER (Contained & Scrollable) */}
       <div className="flex-1 rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl overflow-hidden flex flex-col relative">
@@ -146,32 +219,50 @@ export default function TargetOverviewPage() {
               <span className="text-emerald-500 font-semibold">{activeMode === 'people' ? 'HUMAN_INTEL' : 'ASSET_INTEL'}</span>
             </div>
 
-            {/* Target Switcher */}
-            <div className="bg-black/40 border border-white/5 rounded-lg p-1 flex items-center">
-              <button 
-                onClick={() => setActiveMode('people')}
-                className={cn(
-                  "px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-wider transition-all gap-2 flex items-center",
-                  activeMode === 'people' 
-                  ? "bg-white/10 text-white brightness-125 scale-105" 
-                  : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+            {/* Target Switcher — sliding pill animation */}
+            <div className="bg-black/40 border border-white/5 rounded-lg px-2 py-1.5 flex items-center gap-2 relative">
+              <div className="relative inline-flex">
+                {activeMode === 'people' && (
+                  <motion.div
+                    layoutId="targets-toggle-pill"
+                    className="absolute inset-0 rounded-md bg-white/10"
+                    transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                  />
                 )}
-                title="Human Intel Layer"
-              >
-                <Users className="w-3 h-3" /> People
-              </button>
-              <button 
-                onClick={() => setActiveMode('account')}
-                className={cn(
-                  "px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-wider transition-all gap-2 flex items-center",
-                  activeMode === 'account' 
-                  ? "bg-white/10 text-white brightness-125 scale-105" 
-                  : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                <button 
+                  onClick={() => setActiveMode('people')}
+                  className={cn(
+                    "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider transition-colors duration-200 gap-2 flex items-center shrink-0",
+                    activeMode === 'people' 
+                    ? "text-white" 
+                    : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                  )}
+                  title="Human Intel Layer"
+                >
+                  <Users className="w-3 h-3 shrink-0" /> People
+                </button>
+              </div>
+              <div className="relative inline-flex">
+                {activeMode === 'account' && (
+                  <motion.div
+                    layoutId="targets-toggle-pill"
+                    className="absolute inset-0 rounded-md bg-white/10"
+                    transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                  />
                 )}
-                title="Asset Intel Layer"
-              >
-                <Building2 className="w-3 h-3" /> Accounts
-              </button>
+                <button 
+                  onClick={() => setActiveMode('account')}
+                  className={cn(
+                    "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider transition-colors duration-200 gap-2 flex items-center shrink-0",
+                    activeMode === 'account' 
+                    ? "text-white" 
+                    : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                  )}
+                  title="Asset Intel Layer"
+                >
+                  <Building2 className="w-3 h-3 shrink-0" /> Accounts
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -240,7 +331,11 @@ export default function TargetOverviewPage() {
               </AnimatePresence>
 
               {/* Add New Target Card */}
-              <button className="border border-dashed border-zinc-800 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 text-zinc-600 hover:text-zinc-400 hover:border-zinc-700 hover:bg-white/[0.02] transition-all h-44">
+              <button 
+                type="button"
+                onClick={() => setIsCreateOpen(true)}
+                className="border border-dashed border-zinc-800 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 text-zinc-600 hover:text-zinc-400 hover:border-zinc-700 hover:bg-white/[0.02] transition-all h-44"
+              >
                 <div className="w-10 h-10 rounded-2xl bg-zinc-900 flex items-center justify-center">
                   <Plus className="w-5 h-5" />
                 </div>
