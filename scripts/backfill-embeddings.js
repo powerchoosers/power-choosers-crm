@@ -1,119 +1,165 @@
-import { supabaseAdmin } from '../api/_supabase.js';
+#!/usr/bin/env node
+/**
+ * Backfill Embeddings Script
+ * 
+ * Generates embeddings for all accounts, contacts, and emails that don't have them yet.
+ * Uses the same embedding generation function as the API.
+ * 
+ * Usage: node scripts/backfill-embeddings.js [--table=accounts|contacts|emails|all]
+ */
+
 import { generateEmbedding } from '../api/utils/embeddings.js';
-import logger from '../api/_logger.js';
+import { supabaseAdmin } from '../api/_supabase.js';
 
-async function backfillTable(tableName, textFields) {
-  logger.log(`[Backfill] Starting backfill for table: ${tableName}`);
+const args = process.argv.slice(2);
+const tableArg = args.find(arg => arg.startsWith('--table='));
+const targetTable = tableArg ? tableArg.split('=')[1] : 'all';
+
+// Progress tracking
+let processed = 0;
+let succeeded = 0;
+let failed = 0;
+let skipped = 0;
+
+// Rate limiting (to avoid hitting API limits)
+const BATCH_SIZE = 5; // Process 5 at a time
+const DELAY_MS = 500; // 500ms delay between batches
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function generateAccountEmbedding(account) {
+  const text = [
+    'Account Name: ' + (account.name || ''),
+    'Industry: ' + (account.industry || ''),
+    'Description: ' + (account.description || ''),
+    'Location: ' + (account.city || '') + ', ' + (account.state || '')
+  ].join('\n');
   
-  let totalProcessed = 0;
-  let hasMore = true;
+  return generateEmbedding(text);
+}
 
-  while (hasMore) {
-    // Fetch rows with null embedding
-    const { data: rows, error } = await supabaseAdmin
-      .from(tableName)
-      .select('*')
-      .is('embedding', null)
-      .limit(50); // Smaller batches for better reliability
+async function generateContactEmbedding(contact) {
+  const text = [
+    'Contact Name: ' + (contact.firstName || '') + ' ' + (contact.lastName || ''),
+    'Title: ' + (contact.title || ''),
+    'Email: ' + (contact.email || ''),
+    'Location: ' + (contact.city || '') + ', ' + (contact.state || '')
+  ].join('\n');
+  
+  return generateEmbedding(text);
+}
 
-    if (error) {
-      logger.error(`[Backfill] Error fetching ${tableName}:`, error);
-      break;
-    }
+async function generateEmailEmbedding(email) {
+  const text = [
+    'Subject: ' + (email.subject || ''),
+    'From: ' + (email.from || ''),
+    'Body: ' + (email.text || '').substring(0, 2000)
+  ].join('\n');
+  
+  return generateEmbedding(text);
+}
 
-    if (!rows || rows.length === 0) {
-      hasMore = false;
-      continue;
-    }
-
-    logger.log(`[Backfill] Processing batch of ${rows.length} rows for ${tableName} (Total so far: ${totalProcessed})`);
-
-    for (const row of rows) {
-      // Construct text representation
-      let textParts = textFields.map(field => {
-          return row[field] || '';
-      });
-      
-      // Special handling for JSON fields or metadata
-      if (tableName === 'accounts' && row.metadata) {
-          if (row.metadata.industry) textParts.push(row.metadata.industry);
-          if (row.metadata.description) textParts.push(row.metadata.description);
-          if (row.metadata.general?.description) textParts.push(row.metadata.general.description);
-      }
-
-      if (tableName === 'contacts' && row.metadata) {
-          if (row.metadata.notes) textParts.push(row.metadata.notes);
-          if (row.metadata.general?.notes) textParts.push(row.metadata.general.notes);
-          if (row.metadata.title) textParts.push(row.metadata.title);
-      }
-
-      if (tableName === 'calls') {
-          if (row.transcript) textParts.push(row.transcript);
-          if (row.summary) textParts.push(row.summary);
-      }
-
-      if (tableName === 'call_details') {
-          if (row.transcript) textParts.push(row.transcript);
-          if (row.formattedTranscript) textParts.push(row.formattedTranscript);
-      }
-      
-      if (tableName === 'emails') {
-          // Fallback to HTML if text is empty, but strip tags roughly
-          if (!row.text && row.html) {
-             const stripped = row.html.replace(/<[^>]*>?/gm, ' ');
-             textParts.push(stripped);
-          }
-      }
-
-      const textToEmbed = textParts.join(' ').replace(/\s+/g, ' ').trim();
-      
-      if (!textToEmbed || textToEmbed.length < 2) {
-        logger.warn(`[Backfill] No text content for ${tableName} ID ${row.id}. Marking with zero vector.`);
-        const zeroVector = Array(768).fill(0);
-        await supabaseAdmin.from(tableName).update({ embedding: zeroVector }).eq('id', row.id);
-        continue; 
-      }
-
+async function backfillTable(tableName, embeddingFn, columns = '*') {
+  console.log(`\n🔍 Fetching ${tableName} without embeddings...`);
+  
+  const { data: records, error } = await supabaseAdmin
+    .from(tableName)
+    .select(columns)
+    .is('embedding', null);
+  
+  if (error) {
+    console.error(`❌ Error fetching ${tableName}:`, error);
+    return;
+  }
+  
+  if (!records || records.length === 0) {
+    console.log(`✅ All ${tableName} already have embeddings!`);
+    return;
+  }
+  
+  console.log(`📦 Found ${records.length} ${tableName} to process`);
+  
+  // Process in batches
+  for (let i = 0; i < records.length; i += BATCH_SIZE) {
+    const batch = records.slice(i, i + BATCH_SIZE);
+    
+    await Promise.all(batch.map(async (record) => {
       try {
-        const embedding = await generateEmbedding(textToEmbed);
+        const embedding = await embeddingFn(record);
         
-        if (embedding) {
-          const { error: updateError } = await supabaseAdmin
-            .from(tableName)
-            .update({ embedding })
-            .eq('id', row.id);
-            
-          if (updateError) {
-            logger.error(`[Backfill] Failed to update ${tableName} ID ${row.id}:`, updateError);
-          } else {
-            totalProcessed++;
-          }
-        } else {
-            // If generation failed but text existed, mark with zero vector to avoid infinite loop
-            logger.warn(`[Backfill] Embedding generation failed for ${tableName} ID ${row.id}. Marking with zero vector.`);
-            const zeroVector = Array(768).fill(0);
-            await supabaseAdmin.from(tableName).update({ embedding: zeroVector }).eq('id', row.id);
+        if (!embedding) {
+          console.log(`⚠️  Skipped ${tableName} ${record.id} - no embedding generated`);
+          skipped++;
+          return;
         }
-      } catch (e) {
-        logger.error(`[Backfill] Critical error processing ${tableName} ID ${row.id}:`, e);
+        
+        const { error: updateError } = await supabaseAdmin
+          .from(tableName)
+          .update({ embedding })
+          .eq('id', record.id);
+        
+        if (updateError) {
+          console.error(`❌ Failed to update ${tableName} ${record.id}:`, updateError);
+          failed++;
+        } else {
+          succeeded++;
+          if (succeeded % 10 === 0) {
+            console.log(`✅ Progress: ${succeeded}/${records.length} ${tableName}`);
+          }
+        }
+      } catch (err) {
+        console.error(`❌ Error processing ${tableName} ${record.id}:`, err.message);
+        failed++;
       }
-
-      // Rate limit kindness
-      await new Promise(resolve => setTimeout(resolve, 100)); 
+      
+      processed++;
+    }));
+    
+    // Rate limit between batches
+    if (i + BATCH_SIZE < records.length) {
+      await sleep(DELAY_MS);
     }
   }
-
-  logger.log(`[Backfill] Completed ${tableName}: ${totalProcessed} rows updated.`);
-}
-
-async function run() {
-  await backfillTable('accounts', ['name', 'industry', 'description', 'city', 'state']);
-  await backfillTable('contacts', ['first_name', 'last_name', 'name', 'email', 'title', 'notes', 'city', 'state']);
-  await backfillTable('emails', ['subject', 'text', 'from']); 
-  await backfillTable('calls', ['transcript', 'summary']);
-  await backfillTable('call_details', ['transcript', 'formattedTranscript']);
   
-  logger.log('[Backfill] Full process finished.');
+  console.log(`\n✅ Completed ${tableName}:`);
+  console.log(`   Succeeded: ${succeeded}`);
+  console.log(`   Failed: ${failed}`);
+  console.log(`   Skipped: ${skipped}`);
 }
 
-run();
+async function main() {
+  console.log('🚀 Starting embedding backfill...\n');
+  console.log(`Target: ${targetTable}`);
+  console.log(`Batch size: ${BATCH_SIZE}`);
+  console.log(`Delay: ${DELAY_MS}ms between batches\n`);
+  
+  const startTime = Date.now();
+  
+  if (targetTable === 'accounts' || targetTable === 'all') {
+    await backfillTable('accounts', generateAccountEmbedding);
+  }
+  
+  if (targetTable === 'contacts' || targetTable === 'all') {
+    // Reset counters
+    processed = 0; succeeded = 0; failed = 0; skipped = 0;
+    await backfillTable('contacts', generateContactEmbedding);
+  }
+  
+  if (targetTable === 'emails' || targetTable === 'all') {
+    // Reset counters
+    processed = 0; succeeded = 0; failed = 0; skipped = 0;
+    await backfillTable('emails', generateEmailEmbedding);
+  }
+  
+  const duration = Math.round((Date.now() - startTime) / 1000);
+  console.log(`\n🎉 Backfill complete in ${duration}s!`);
+  
+  process.exit(0);
+}
+
+main().catch(err => {
+  console.error('💥 Fatal error:', err);
+  process.exit(1);
+});
