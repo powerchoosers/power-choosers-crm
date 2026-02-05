@@ -46,6 +46,6 @@ private.key
 *.pem
 client_secret_*.json
 
-# INI files
+# INI files (often contain keys – never commit)
 *.ini
-# Power Choosers CRM - Local Development.ini
+Power Choosers CRM - Local Development.ini
