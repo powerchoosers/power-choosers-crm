@@ -64,14 +64,15 @@ export default function TargetOverviewPage() {
   })
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '')
 
-  // On mount: if no mode in URL, restore from localStorage (client-only, avoids hydration mismatch)
+  // When on list page with no mode in URL, restore from localStorage (runs on mount and when navigating back)
   useEffect(() => {
-    if (searchParams.get('mode')) return
+    const isListPage = pathname === '/network/targets' || pathname?.endsWith('/network/targets')
+    if (!isListPage || searchParams.get('mode')) return
     try {
       const stored = localStorage.getItem(TARGETS_MODE_STORAGE_KEY) as 'people' | 'account' | null
       if (stored === 'people' || stored === 'account') setActiveMode(stored)
     } catch (_) {}
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- run once on mount to restore preference
+  }, [pathname, searchParams])
 
   // Update URL and persist mode to localStorage when state changes
   useEffect(() => {
