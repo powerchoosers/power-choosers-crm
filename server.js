@@ -624,7 +624,6 @@ const server = http.createServer(async (req, res) => {
     'http://127.0.0.1:3000',
     'https://powerchoosers.com',
     'https://www.powerchoosers.com',
-    'https://power-choosers-crm-792458658491.us-central1.run.app',
     'https://nodalpoint.io',
     'https://www.nodalpoint.io',
     'https://nodal-point-network-792458658491.us-central1.run.app'
@@ -717,7 +716,7 @@ const server = http.createServer(async (req, res) => {
       'https://powerchoosers.com',
       'https://www.powerchoosers.com',
       'https://nodalpoint.io',
-      'https://power-choosers-crm-792458658491.us-central1.run.app'
+      'https://nodal-point-network-792458658491.us-central1.run.app'
     ];
 
     if (allowedOrigins.includes(origin)) {
