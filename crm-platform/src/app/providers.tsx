@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { AuthProvider } from '@/context/AuthContext'
 import { VoiceProvider } from '@/context/VoiceContext'
 import { createIDBPersister } from '@/lib/persister'
+import { ChunkLoadErrorHandler } from '@/components/layout/ChunkLoadErrorHandler'
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
@@ -43,6 +44,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     >
       <AuthProvider>
         <VoiceProvider>
+          <ChunkLoadErrorHandler />
           {children}
         </VoiceProvider>
       </AuthProvider>
