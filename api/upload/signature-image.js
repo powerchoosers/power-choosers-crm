@@ -63,19 +63,13 @@ export default async function handler(req, res) {
       controller.abort();
     }, 25000); // 25 second timeout for Imgur
     
+    // Imgur anonymous upload (public Client ID – no account or env required)
     let imgurResponse;
     try {
-      const imgurClientId = process.env.IMGUR_CLIENT_ID;
-      if (!imgurClientId) {
-        logger.error('[SignatureUpload] IMGUR_CLIENT_ID not set');
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Image upload not configured' }));
-        return;
-      }
       imgurResponse = await fetch('https://api.imgur.com/3/image', {
         method: 'POST',
         headers: {
-          'Authorization': `Client-ID ${imgurClientId}`,
+          'Authorization': 'Client-ID 546c25a59c58ad7',
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ image, type: 'base64' }),

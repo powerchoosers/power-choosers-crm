@@ -49,3 +49,7 @@ client_secret_*.json
 # INI files (often contain keys – never commit)
 *.ini
 Power Choosers CRM - Local Development.ini
+
+# Vendor / toolchain (avoid false-positive secret scans; keep repo smaller)
+usr/
+mingw64/
