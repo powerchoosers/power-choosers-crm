@@ -38,6 +38,14 @@ Migrate all legacy CRM features to the new Next.js application, ensuring a moder
 ## 📚 Documentation Maintenance
 - **Self-Update Rule**: You are **REQUIRED** to maintain the "Source of Truth". If you change how the app looks or works, update `nodalpoint.md` and this file immediately.
 
+## 🌐 API Routes (Where They Live)
+
+**All `/api/*` requests are proxied to the backend.** Next.js does **not** serve API routes from `crm-platform/src/app/api/`.
+
+- **Rewrite**: In `crm-platform/next.config.ts`, `rewrites()` send every `/api/:path*` request to the backend URL (localhost:3001 in dev, Cloud Run in production).
+- **Implement APIs in the root `api/` folder** (repo root, next to `server.js`), e.g. `api/maps/geocode.js`, `api/apollo/company.js`. Register each route in `server.js` (import handler, add `pathname === '/api/...'` check, call handler).
+- **Do not add API route handlers under `crm-platform/src/app/api/`** — they will never be hit. Keep a single source of truth in the root `api/` directory.
+
 ## 🚀 Server & Development
 
 ### How to Start the Server (Local Development)

@@ -183,6 +183,23 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       // Build service_addresses array - preserve existing or create new with HQ address
       let serviceAddresses = existingAccount?.service_addresses || [];
       
+      // Get geocoordinates if we have a full address
+      let lat = null;
+      let lng = null;
+      
+      if (fullAddress) {
+        try {
+          const geoResp = await fetch(`/api/maps/geocode?address=${encodeURIComponent(fullAddress)}`);
+          const geoData = await geoResp.json();
+          if (geoData.found) {
+            lat = geoData.lat;
+            lng = geoData.lng;
+          }
+        } catch (e) {
+          console.warn('One-time geocode failed during enrichment:', e);
+        }
+      }
+
       // If we have address data from Apollo and no existing service addresses, add it as HQ
       if (serviceAddresses.length === 0 && (companySummary.address || companySummary.city || companySummary.state)) {
         serviceAddresses = [{
@@ -224,6 +241,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           city: companySummary.city || null,
           state: companySummary.state || null,
           country: companySummary.country || null,
+          latitude: lat,
+          longitude: lng,
           address: fullAddress || null, // Populate uplink address
           service_addresses: serviceAddresses, // Update service_addresses with HQ location
           logo_url: companySummary.logoUrl || null, // Replace with Apollo logo when enriching

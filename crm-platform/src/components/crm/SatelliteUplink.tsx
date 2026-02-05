@@ -157,6 +157,20 @@ export default function SatelliteUplink({
       if (coords) {
         setCoordinates(coords);
         setIsActive(true);
+
+        // PERSIST COORDINATES TO DATABASE (One-time cost, lifetime free)
+        if (entityId && entityType) {
+          const table = entityType === 'contact' ? 'contacts' : 'accounts';
+          await supabase
+            .from(table)
+            .update({
+              latitude: coords.lat,
+              longitude: coords.lng,
+              // Also update address if it was resolved but missing
+              ...(resolvedAddress && !address ? { address: resolvedAddress } : {})
+            })
+            .eq('id', entityId);
+        }
       } else {
         toast.error('Geocoding Failed', { description: 'Could not locate coordinates.' });
       }
@@ -182,6 +196,19 @@ export default function SatelliteUplink({
         setIsSearchOpen(false);
         setSearchInput('');
         toast.success('Location Found', { description: searchInput });
+
+        // PERSIST COORDINATES TO DATABASE
+        if (entityId && entityType) {
+          const table = entityType === 'contact' ? 'contacts' : 'accounts';
+          await supabase
+            .from(table)
+            .update({
+              latitude: coords.lat,
+              longitude: coords.lng,
+              address: searchInput
+            })
+            .eq('id', entityId);
+        }
       } else {
         toast.error('Location Not Found', { description: 'Try a different address.' });
       }
