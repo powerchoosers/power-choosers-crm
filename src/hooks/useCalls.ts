@@ -258,7 +258,7 @@ export function useAccountCalls(accountId: string) {
           event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
           schema: 'public',
           table: 'calls',
-          filter: `account_id=eq.${accountId}`,
+          filter: `accountId=eq.${accountId}`,
         },
         (payload) => {
           console.log('Real-time call update for account:', accountId, payload)
@@ -278,11 +278,11 @@ export function useAccountCalls(accountId: string) {
     queryFn: async () => {
       if (!accountId || loading || !user) return []
 
-      // Fetch calls directly by accountId
+      // Fetch calls directly by accountId (use camelCase column name)
       const { data, error } = await supabase
         .from('calls')
         .select('*, contacts(name)')
-        .eq('account_id', accountId)
+        .eq('accountId', accountId)
         .order('timestamp', { ascending: false })
 
       if (error) throw error
@@ -335,7 +335,7 @@ export function useContactCalls(contactId: string) {
           event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
           schema: 'public',
           table: 'calls',
-          filter: `contact_id=eq.${contactId}`,
+          filter: `contactId=eq.${contactId}`,
         },
         (payload) => {
           console.log('Real-time call update for contact:', contactId, payload)
@@ -358,8 +358,8 @@ export function useContactCalls(contactId: string) {
       const { data, error } = await supabase
         .from('calls')
         .select('*')
-        .eq('contact_id', contactId)
-        .order('created_at', { ascending: false })
+        .eq('contactId', contactId)
+        .order('createdAt', { ascending: false })
         .limit(20) // Increased from 10 to 20 for better coverage
 
       if (error) {

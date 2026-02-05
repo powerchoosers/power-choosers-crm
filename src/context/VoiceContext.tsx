@@ -55,6 +55,8 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   const tokenRefreshTimer = useRef<NodeJS.Timeout | null>(null)
   const deviceRef = useRef<Device | null>(null)
   const isInitializing = useRef(false)
+  const reconnectAttemptsRef = useRef(0)
+  const maxReconnectAttempts = 5
 
   const resolvePhoneMeta = useCallback(async (phoneNumber: string) => {
     try {
@@ -193,6 +195,16 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         console.log('[Voice] Device registered')
         setIsReady(true)
         isInitializing.current = false
+        reconnectAttemptsRef.current = 0 // Reset reconnect counter on success
+        
+        // Set up proactive token refresh (refresh at 23 hours, 1 hour before 24h expiry)
+        if (tokenRefreshTimer.current) {
+          clearTimeout(tokenRefreshTimer.current)
+        }
+        tokenRefreshTimer.current = setTimeout(() => {
+          console.log('[Voice] Proactive token refresh (before expiry)')
+          initDevice()
+        }, 23 * 60 * 60 * 1000) // 23 hours
       })
 
       newDevice.on('warning', (name, data) => {
@@ -211,10 +223,25 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         }
         
         if (error.code === 20101 || error.code === 31204 || error.code === 31009) {
-          // Token expired, invalid, or transport lost - trigger re-init
+          // Token expired, invalid, or transport lost - trigger re-init with exponential backoff
           console.log('[Voice] Triggering device re-initialization due to error:', error.code)
           isInitializing.current = false // Allow re-init
-          initDevice()
+          
+          if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000) // Max 30s
+            reconnectAttemptsRef.current++
+            console.log(`[Voice] Reconnect attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts} in ${delay}ms`)
+            
+            setTimeout(() => {
+              initDevice()
+            }, delay)
+          } else {
+            console.error('[Voice] Max reconnection attempts reached. Please refresh the page.')
+            toast.error('Connection Lost', { 
+              description: 'Unable to reconnect to Twilio. Please refresh the page.',
+              duration: Infinity
+            })
+          }
         }
       })
 
@@ -341,6 +368,24 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         deviceRef.current = null
       }
     }
+  }, [initDevice])
+
+  // Handle tab visibility changes - refresh connection when tab becomes active
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && deviceRef.current) {
+        const d = deviceRef.current
+        // If device is in error state or not registered, try to re-init
+        if (d.state === 'destroyed' || d.state === 'unregistered') {
+          console.log('[Voice] Tab became visible and device not registered, re-initializing...')
+          reconnectAttemptsRef.current = 0 // Reset attempts when user manually activates tab
+          initDevice()
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [initDevice])
 
   const connect = useCallback(async (params: { To: string; From?: string; metadata?: VoiceMetadata }) => {
