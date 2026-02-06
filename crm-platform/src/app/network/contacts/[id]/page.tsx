@@ -15,6 +15,9 @@ import { UplinkCard } from '@/components/dossier/UplinkCard'
 import DataIngestionCard from '@/components/dossier/DataIngestionCard'
 import { useContact, useUpdateContact } from '@/hooks/useContacts'
 import { useContactCalls } from '@/hooks/useCalls'
+import { useEntityTasks } from '@/hooks/useEntityTasks'
+import { useTasks } from '@/hooks/useTasks'
+import { TaskCommandBar } from '@/components/crm/TaskCommandBar'
 import { CallListItem } from '@/components/calls/CallListItem'
 import { useUIStore } from '@/store/uiStore'
 import { useGeminiStore } from '@/store/geminiStore'
@@ -54,7 +57,7 @@ export default function ContactDossierPage() {
   const router = useRouter()
   const id = (params?.id as string) || ''
 
-  const { data: contact, isLoading } = useContact(id)
+  const { data: contact, isLoading, isFetched } = useContact(id)
   const { data: recentCalls, isLoading: isLoadingCalls } = useContactCalls(id)
   const updateContact = useUpdateContact()
   const { isEditing, setIsEditing, toggleEditing } = useUIStore()
@@ -66,7 +69,7 @@ export default function ContactDossierPage() {
   const [isComposeOpen, setIsComposeOpen] = useState(false)
   const [currentCallPage, setCurrentCallPage] = useState(1)
   const [activeEditField, setActiveEditField] = useState<'logo' | 'website' | 'linkedin' | null>(null)
-  const CALLS_PER_PAGE = 4
+  const CALLS_PER_PAGE = 8
   const prevIsEditing = useRef(isEditing)
 
   // Local Field States for Editing
@@ -95,6 +98,23 @@ export default function ContactDossierPage() {
   // Refraction Event State (for field glow animations)
   const [glowingFields, setGlowingFields] = useState<Set<string>>(new Set())
   const [isRecalibrating, setIsRecalibrating] = useState(false)
+
+  const { pendingTasks } = useEntityTasks(id, contact?.name)
+  const { updateTask } = useTasks()
+  const [currentTaskIndex, setCurrentTaskIndex] = useState(0)
+  const hasTasks = pendingTasks.length > 0
+  const displayTaskIndex = Math.min(currentTaskIndex, Math.max(0, pendingTasks.length - 1))
+
+  useEffect(() => {
+    setCurrentTaskIndex((prev) => Math.min(prev, Math.max(0, pendingTasks.length - 1)))
+  }, [pendingTasks.length])
+
+  const handleCompleteAndAdvance = () => {
+    const task = pendingTasks[displayTaskIndex]
+    if (!task) return
+    updateTask({ id: task.id, status: 'Completed' })
+    if (pendingTasks.length <= 1) toast.success('Mission complete')
+  }
 
   // Reset pagination when contact changes
   useEffect(() => {
@@ -331,7 +351,9 @@ export default function ContactDossierPage() {
     return typeof primary.address === 'string' ? primary.address : String(primary.address)
   }, [contact?.serviceAddresses])
 
-  if (isLoading) {
+  // Show loading until we've actually attempted to fetch (avoids flash of "Subject Not Found" on refresh when query is disabled or pending)
+  const stillLoading = isLoading || (!!id && contact == null && !isFetched)
+  if (stillLoading) {
     return (
       <div className="flex flex-col h-[calc(100vh-8rem)] items-center justify-center space-y-4 animate-in fade-in duration-500">
         <LoadingOrb label="Initialising Terminal..." />
@@ -642,36 +664,56 @@ export default function ContactDossierPage() {
             <div className="text-right">
               <div className="flex flex-col items-end gap-0.5">
                 <div className="flex items-center gap-2">
+                  {!hasTasks && (
                     <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Dossier Status</div>
-                    <button
-                      onClick={toggleEditing}
-                      className={cn(
-                        "w-7 h-7 flex items-center justify-center transition-all duration-300",
-                        isEditing 
-                          ? "text-blue-400 bg-blue-400/10 border border-blue-400/30 rounded-lg shadow-[0_0_15px_rgba(59,130,246,0.2)] scale-110" 
-                          : "text-zinc-500 hover:text-white bg-transparent border border-transparent"
-                      )}
-                      title={isEditing ? "Lock Dossier" : "Unlock Dossier"}
-                    >
-                      {isEditing ? (
-                        <Unlock className="w-4 h-4" />
-                      ) : (
-                        <Lock className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-                <div className="flex items-center gap-2">
-                  <div className={cn(
-                    "h-2 w-2 rounded-full animate-pulse",
-                    isEditing ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]" : "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
-                  )} />
-                  <span className={cn(
-                    "text-xs font-mono uppercase tracking-widest transition-colors duration-300",
-                    isEditing ? "text-blue-400" : "text-green-500"
-                  )}>
-                    {isEditing ? "SECURE_FIELD_OVERRIDE" : "ACTIVE_INTELLIGENCE"}
-                  </span>
+                  )}
+                  <button
+                    onClick={toggleEditing}
+                    className={cn(
+                      "w-7 h-7 flex items-center justify-center transition-all duration-300",
+                      isEditing 
+                        ? "text-blue-400 bg-blue-400/10 border border-blue-400/30 rounded-lg shadow-[0_0_15px_rgba(59,130,246,0.2)] scale-110" 
+                        : "text-zinc-500 hover:text-white bg-transparent border border-transparent"
+                    )}
+                    title={isEditing ? "Lock Dossier" : "Unlock Dossier"}
+                  >
+                    {isEditing ? (
+                      <Unlock className="w-4 h-4" />
+                    ) : (
+                      <Lock className="w-4 h-4" />
+                    )}
+                  </button>
+                  {hasTasks && (
+                    <>
+                      <div className={cn(
+                        "h-2 w-2 rounded-full animate-pulse shrink-0",
+                        isEditing ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]" : "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
+                      )} />
+                    <TaskCommandBar
+                      pendingTasks={pendingTasks}
+                      currentIndex={displayTaskIndex}
+                      onPrev={() => setCurrentTaskIndex((p) => Math.max(0, p - 1))}
+                      onNext={() => setCurrentTaskIndex((p) => Math.min(pendingTasks.length - 1, p + 1))}
+                      onSkip={() => setCurrentTaskIndex((p) => Math.min(pendingTasks.length - 1, p + 1))}
+                      onCompleteAndAdvance={handleCompleteAndAdvance}
+                    />
+                    </>
+                  )}
                 </div>
+                {!hasTasks && (
+                  <div className="flex items-center gap-2">
+                    <div className={cn(
+                      "h-2 w-2 rounded-full animate-pulse",
+                      isEditing ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]" : "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
+                    )} />
+                    <span className={cn(
+                      "text-xs font-mono uppercase tracking-widest transition-colors duration-300",
+                      isEditing ? "text-blue-400" : "text-green-500"
+                    )}>
+                      {isEditing ? "SECURE_FIELD_OVERRIDE" : "ACTIVE_INTELLIGENCE"}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -979,103 +1021,105 @@ export default function ContactDossierPage() {
                   </div>
                 </div>
 
-                {/* RECENT CALLS & AI INSIGHTS */}
+                {/* Transmission Log — same functionality as account dossier Engagement Log */}
                 <div className="rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl p-6 shadow-xl">
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                        <Mic className="w-5 h-5 text-white" /> Transmission Log
-                      </h3>
-                      <p className="text-xs text-zinc-500 mt-1 uppercase tracking-widest font-mono">Forensic Voice Data</p>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-[10px] font-mono text-zinc-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                      <Mic className="w-3.5 h-3.5" /> Transmission Log
+                    </h3>
+                    <span className="text-[9px] font-mono text-zinc-600 font-bold tabular-nums">{recentCalls?.length ?? 0} RECORDS</span>
+                  </div>
+                  <div className="flex items-center justify-end gap-2 mb-3">
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#002FA7]/20 border border-[#002FA7]/30">
+                      <Sparkles className="w-3 h-3 text-[#002FA7]" />
+                      <span className="text-[10px] font-mono text-white uppercase tracking-tighter">AI_ENABLED</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#002FA7]/20 border border-[#002FA7]/30">
-                        <Sparkles className="w-3 h-3 text-[#002FA7]" />
-                        <span className="text-[10px] font-mono text-white uppercase tracking-tighter">AI_ENABLED</span>
-                      </div>
-                      <button 
-                        className="text-zinc-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5"
-                        onClick={() => router.push('/network/calls')}
-                      >
-                        <ArrowRightLeft className="w-4 h-4" />
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      className="text-zinc-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5"
+                      onClick={() => router.push('/network/calls')}
+                      title="View all calls"
+                    >
+                      <ArrowRightLeft className="w-4 h-4" />
+                    </button>
                   </div>
 
-                  {/* Recent Calls List */}
-                  <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
+                  <div className="space-y-3">
                     {isLoadingCalls ? (
-                      <div className="flex flex-col items-center justify-center py-20 text-zinc-600">
-                        <LoadingOrb size="sm" label="Intercepting_Signals..." />
+                      <div className="text-center py-12 text-xs font-mono text-zinc-600 animate-pulse">
+                        SYNCING LOGS...
                       </div>
                     ) : recentCalls && recentCalls.length > 0 ? (
-                      <>
-                        <div className="space-y-4 min-h-[320px]">
-                          <AnimatePresence initial={false} mode="popLayout">
-                            {recentCalls
-                              .slice((currentCallPage - 1) * CALLS_PER_PAGE, currentCallPage * CALLS_PER_PAGE)
-                              .map((call) => (
-                                <motion.div
-                                  key={call.id}
-                                  layout
-                                  initial={{ opacity: 0, y: -20, scale: 0.95 }}
-                                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                                  exit={{ opacity: 0, scale: 0.95 }}
-                                  transition={{ 
-                                    type: "spring",
-                                    stiffness: 400,
-                                    damping: 30
-                                  }}
-                                >
-                                  <CallListItem call={call} contactId={id} />
-                                </motion.div>
-                              ))}
-                          </AnimatePresence>
-                        </div>
-                        
-                        {/* Sync_Block Footer with Integrated Pagination */}
-                        <div className="mt-4 pt-4 pb-6 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                          <div className="flex items-center gap-4">
-                            <span className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                              Sync_Block {((currentCallPage - 1) * CALLS_PER_PAGE + 1).toString().padStart(2, '0')}–{Math.min(currentCallPage * CALLS_PER_PAGE, recentCalls.length).toString().padStart(2, '0')}
-                            </span>
-                            <span className="opacity-40">|</span>
-                            <span>Total_Nodes: {recentCalls.length}</span>
-                          </div>
-                          
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              onClick={() => setCurrentCallPage(prev => Math.max(1, prev - 1))}
-                              disabled={currentCallPage === 1}
-                              className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
-                            >
-                              <ChevronLeft className="h-3.5 w-3.5" />
-                            </Button>
-                            <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
-                              {currentCallPage.toString().padStart(2, '0')}
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              onClick={() => setCurrentCallPage(prev => prev + 1)}
-                              disabled={currentCallPage >= Math.ceil(recentCalls.length / CALLS_PER_PAGE)}
-                              className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
-                            >
-                              <ChevronRight className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      </>
+                      <div className="space-y-2">
+                        <AnimatePresence initial={false} mode="popLayout">
+                          {recentCalls
+                            .slice((currentCallPage - 1) * CALLS_PER_PAGE, currentCallPage * CALLS_PER_PAGE)
+                            .map((call) => (
+                              <motion.div
+                                key={call.id}
+                                layout
+                                initial={{ opacity: 0, x: 20, scale: 0.98 }}
+                                animate={{ opacity: 1, x: 0, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.98 }}
+                                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                                className="hover:translate-x-1 transition-transform"
+                              >
+                                <CallListItem
+                                  call={call}
+                                  contactId={id}
+                                  accountId={contact?.linkedAccountId}
+                                  contactName={contact?.name}
+                                  customerAvatar="contact"
+                                  variant="minimal"
+                                />
+                              </motion.div>
+                            ))}
+                        </AnimatePresence>
+                      </div>
                     ) : (
-                      <div className="flex flex-col items-center justify-center py-20 text-zinc-600">
-                        <History className="w-12 h-12 mb-4 opacity-10" />
-                        <p className="text-[10px] font-mono uppercase tracking-[0.2em]">No_Historical_Data_Found</p>
+                      <div className="p-8 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] flex flex-col items-center justify-center gap-3">
+                        <History className="w-12 h-12 text-zinc-600 opacity-20" />
+                        <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-[0.3em]">No signals detected</p>
                       </div>
                     )}
                   </div>
+
+                  {/* Sync_Block Footer with pagination — more horizontal space on 2-panel layout */}
+                  {recentCalls && recentCalls.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+                      <div className="flex items-center gap-4">
+                        <span className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          Sync_Block {((currentCallPage - 1) * CALLS_PER_PAGE + 1).toString().padStart(2, '0')}–{Math.min(currentCallPage * CALLS_PER_PAGE, recentCalls.length).toString().padStart(2, '0')}
+                        </span>
+                        <span className="opacity-40">|</span>
+                        <span>Total_Nodes: {recentCalls.length}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setCurrentCallPage(prev => Math.max(1, prev - 1))}
+                          disabled={currentCallPage === 1}
+                          className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
+                        >
+                          <ChevronLeft className="h-3.5 w-3.5" />
+                        </Button>
+                        <span className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
+                          {currentCallPage.toString().padStart(2, '0')}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setCurrentCallPage(prev => prev + 1)}
+                          disabled={currentCallPage >= Math.ceil(recentCalls.length / CALLS_PER_PAGE)}
+                          className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white hover:bg-white/5 transition-all"
+                        >
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

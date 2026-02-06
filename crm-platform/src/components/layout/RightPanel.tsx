@@ -29,6 +29,8 @@ import NewsFeedWidget from '../crm/NewsFeedWidget'
 import GlobalTasksWidget from '../crm/GlobalTasksWidget'
 import ContextTasksWidget from '../crm/ContextTasksWidget'
 import OrgIntelligence from '../crm/OrgIntelligence'
+import { VectorControlModule } from '../crm/VectorControlModule'
+import { TaskInjectionPopover } from '../crm/TaskInjectionPopover'
 import { mapLocationToZone } from '@/lib/market-mapping'
 
 export function RightPanel() {
@@ -226,7 +228,7 @@ export function RightPanel() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="flex-1 flex flex-col gap-6 overflow-y-auto px-6 pt-24 pb-32 np-scroll scroll-smooth"
+          className="flex-1 flex flex-col gap-4 overflow-y-auto px-6 pt-[93px] pb-32 np-scroll scroll-smooth"
         >
           <AnimatePresence mode="wait" initial={false}>
           {effectiveView === 'context' ? (
@@ -236,9 +238,34 @@ export function RightPanel() {
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: -24, opacity: 0 }}
                 transition={{ type: "tween", duration: 0.25, ease: "easeInOut" }}
-                className="flex flex-col gap-8 mt-2"
+                className="flex flex-col gap-4 mt-1"
               >
-                {/* 1. TELEMETRY (Targeting Mode) */}
+                {/* 0. TARGET VECTOR ASSIGNMENT (Protocol/List Selector) - Only for Contacts */}
+                {isContactPage && entityId && (
+                  <VectorControlModule contactId={entityId} />
+                )}
+
+                {/* 1. NODE TASKS (Execution) */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Node_Tasks</h3>
+                    <TaskInjectionPopover
+                      entityId={entityId}
+                      entityName={entityName}
+                      entityType={isContactPage ? 'contact' : 'account'}
+                      contactId={isContactPage ? entityId : undefined}
+                      accountId={isAccountPage ? entityId : undefined}
+                      trigger={
+                        <button className="icon-button-forensic p-1 flex items-center justify-center" type="button">
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      }
+                    />
+                  </div>
+                  <ContextTasksWidget entityId={entityId} entityName={entityName} />
+                </div>
+
+                {/* 2. TELEMETRY (Targeting Mode) */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Telemetry</h3>
@@ -250,7 +277,7 @@ export function RightPanel() {
                   <TelemetryWidget location={entityZone} />
                 </div>
 
-                {/* 2. SATELLITE (Infrastructure) */}
+                {/* 3. SATELLITE (Infrastructure) */}
                 <div className="space-y-3">
                   <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Satellite_Uplink</h3>
                   <SatelliteUplink 
@@ -268,8 +295,8 @@ export function RightPanel() {
                   />
                 </div>
 
-                {/* 3. ORGANIZATIONAL (Intelligence) */}
-                <div className="space-y-3">
+                {/* 4. ORGANIZATIONAL (Intelligence) */}
+                <div className="space-y-3 pb-4">
                   <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Org_Intelligence</h3>
                   <OrgIntelligence 
                     domain={contact?.companyDomain || account?.domain}
@@ -277,17 +304,6 @@ export function RightPanel() {
                     website={contact?.website || account?.domain}
                     accountId={isContactPage ? contact?.accountId : entityId}
                   />
-                </div>
-
-                {/* 4. TASKS (Execution) */}
-                <div className="space-y-3 pb-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Node_Tasks</h3>
-                    <button className="icon-button-forensic p-1 flex items-center justify-center">
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  <ContextTasksWidget entityId={entityId} entityName={entityName} />
                 </div>
               </motion.div>
             ) : (

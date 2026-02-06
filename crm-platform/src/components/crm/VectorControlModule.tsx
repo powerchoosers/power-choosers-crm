@@ -1,0 +1,287 @@
+'use client'
+
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { X, Plus, Radar, GitMerge } from 'lucide-react'
+import { useContactListMemberships, useAddContactToList, useRemoveContactFromList } from '@/hooks/useContactListMemberships'
+import { useContactProtocolMemberships, useAddContactToProtocol, useRemoveContactFromProtocol } from '@/hooks/useContactProtocolMemberships'
+import { useTargets } from '@/hooks/useTargets'
+import { useProtocols } from '@/hooks/useProtocols'
+import { useCreateTarget } from '@/hooks/useTargets'
+import { cn } from '@/lib/utils'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Input } from '@/components/ui/input'
+import { useAuth } from '@/context/AuthContext'
+import { toast } from 'sonner'
+
+interface VectorControlModuleProps {
+  contactId: string
+}
+
+type VectorChip = 
+  | { type: 'target'; id: string; membershipId: string; name: string }
+  | { type: 'protocol'; id: string; membershipId: string; name: string }
+
+export function VectorControlModule({ contactId }: VectorControlModuleProps) {
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const { user } = useAuth()
+
+  const { data: listMemberships = [], isLoading: isLoadingListMemberships } = useContactListMemberships(contactId)
+  const { data: protocolMemberships = [], isLoading: isLoadingProtocolMemberships } = useContactProtocolMemberships(contactId)
+  const { data: targetsData, isLoading: isLoadingTargets } = useTargets()
+  const { data: protocolsData, createProtocolAsync, isLoading: isLoadingProtocols } = useProtocols()
+  const createTarget = useCreateTarget()
+  const addContactToList = useAddContactToList()
+  const addContactToProtocol = useAddContactToProtocol()
+  const removeContactFromList = useRemoveContactFromList()
+  const removeContactFromProtocol = useRemoveContactFromProtocol()
+
+  const protocols = protocolsData?.pages?.flatMap(p => p.protocols) ?? []
+  const contactListKinds = ['people', 'person', 'contact', 'contacts'] as const
+  const targetLists = (targetsData ?? []).filter(list =>
+    list.kind && contactListKinds.includes(list.kind as (typeof contactListKinds)[number])
+  )
+
+  const searchLower = searchQuery.trim().toLowerCase()
+  const matchingProtocols = protocols.filter(p =>
+    p.name.toLowerCase().includes(searchLower)
+  )
+  const matchingTargets = targetLists.filter(t =>
+    t.name.toLowerCase().includes(searchLower)
+  )
+  const availableProtocols = matchingProtocols.filter(p =>
+    !protocolMemberships.some(m => m.sequenceId === p.id)
+  )
+  const availableTargets = matchingTargets.filter(t =>
+    !listMemberships.some(m => m.listId === t.id)
+  )
+  const hasExactMatch = searchLower && (
+    protocols.some(p => p.name.toLowerCase() === searchLower) ||
+    targetLists.some(t => t.name.toLowerCase() === searchLower)
+  )
+  const showCreateOptions = searchLower && !hasExactMatch
+
+  const chips: VectorChip[] = [
+    ...listMemberships.map(m => ({ type: 'target' as const, id: m.listId, membershipId: m.id, name: m.listName })),
+    ...protocolMemberships.map(m => ({ type: 'protocol' as const, id: m.sequenceId, membershipId: m.id, name: m.sequenceName }))
+  ]
+  const hasAnyAssignments = chips.length > 0
+  const isLoading = isLoadingListMemberships || isLoadingProtocolMemberships
+
+  const handleAddToList = async (listId: string) => {
+    try {
+      await addContactToList.mutateAsync({ contactId, listId })
+      setIsPopoverOpen(false)
+      setSearchQuery('')
+    } catch (_) {}
+  }
+
+  const handleAddToProtocol = async (sequenceId: string) => {
+    try {
+      await addContactToProtocol.mutateAsync({ contactId, sequenceId })
+      setIsPopoverOpen(false)
+      setSearchQuery('')
+    } catch (_) {}
+  }
+
+  const handleRemoveList = async (membershipId: string) => {
+    try {
+      await removeContactFromList.mutateAsync({ contactId, membershipId })
+    } catch (_) {}
+  }
+
+  const handleRemoveProtocol = async (membershipId: string) => {
+    try {
+      await removeContactFromProtocol.mutateAsync({ contactId, membershipId })
+    } catch (_) {}
+  }
+
+  const handleCreateTarget = async () => {
+    const name = searchQuery.trim()
+    if (!name || !user) return
+    try {
+      const newList = await createTarget.mutateAsync({ name, kind: 'contact' })
+      await addContactToList.mutateAsync({ contactId, listId: newList.id })
+      toast.success(`Target list "${name}" created and contact added`)
+      setIsPopoverOpen(false)
+      setSearchQuery('')
+    } catch (_) {}
+  }
+
+  const handleCreateProtocol = async () => {
+    const name = searchQuery.trim()
+    if (!name || !user) return
+    try {
+      const newProtocol = await createProtocolAsync({
+        name,
+        description: '',
+        status: 'draft',
+        steps: []
+      })
+      await addContactToProtocol.mutateAsync({ contactId, sequenceId: newProtocol.id })
+      toast.success(`Protocol "${name}" created and contact added`)
+      setIsPopoverOpen(false)
+      setSearchQuery('')
+    } catch (_) {}
+  }
+
+  const renderPopoverContent = () => {
+    const hasResults = availableProtocols.length > 0 || availableTargets.length > 0
+    const showSections = hasResults
+
+    return (
+      <>
+        <div className="p-4 border-b border-white/5">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-2">ASSIGN_VECTOR</div>
+          <Input
+            placeholder="> SEARCH_OR_CREATE..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="bg-zinc-900/50 border-white/10 text-white placeholder:text-zinc-600 font-mono text-xs"
+            autoFocus
+          />
+        </div>
+        <motion.div
+          layout
+          className="max-h-[320px] overflow-y-auto"
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+        >
+          {isLoadingTargets || isLoadingProtocols ? (
+            <div className="p-4 text-center text-zinc-500 font-mono text-xs">Loading...</div>
+          ) : (
+            <>
+              {showSections && (
+                <>
+                  {availableProtocols.length > 0 && (
+                    <div className="p-2">
+                      <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-500 px-2 py-1.5 flex items-center gap-1.5">
+                        <GitMerge className="w-3 h-3 text-blue-400" /> PROTOCOLS
+                      </div>
+                      {availableProtocols.map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => handleAddToProtocol(p.id)}
+                          className="w-full text-left px-3 py-2 rounded hover:bg-blue-500/10 hover:text-blue-400 transition-colors text-xs font-mono text-zinc-400"
+                        >
+                          {p.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {availableTargets.length > 0 && (
+                    <div className={`p-2 ${availableProtocols.length > 0 ? 'border-t border-white/5' : ''}`}>
+                      <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-500 px-2 py-1.5 flex items-center gap-1.5">
+                        <Radar className="w-3 h-3 text-emerald-400" /> TARGETS
+                      </div>
+                      {availableTargets.map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => handleAddToList(t.id)}
+                          className="w-full text-left px-3 py-2 rounded hover:bg-emerald-500/10 hover:text-emerald-400 transition-colors text-xs font-mono text-zinc-400"
+                        >
+                          {t.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+              {showCreateOptions && (
+                <div className={`p-2 ${showSections ? 'border-t border-white/10' : ''} space-y-1`}>
+                  <button
+                    onClick={handleCreateProtocol}
+                    className="w-full text-left px-3 py-2 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 transition-colors text-xs font-mono flex items-center gap-2"
+                  >
+                    <Plus className="w-3 h-3" /> Create New Protocol: &quot;{searchQuery.trim()}&quot;
+                  </button>
+                  <button
+                    onClick={handleCreateTarget}
+                    className="w-full text-left px-3 py-2 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-colors text-xs font-mono flex items-center gap-2"
+                  >
+                    <Plus className="w-3 h-3" /> Create New Target List: &quot;{searchQuery.trim()}&quot;
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </motion.div>
+      </>
+    )
+  }
+
+  if (!isLoading && !hasAnyAssignments) {
+    return (
+      <div className="mb-2">
+        <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+          <PopoverTrigger asChild>
+            <button
+              className="w-full py-3 border border-dashed border-zinc-700 hover:border-[#002FA7] hover:bg-[#002FA7]/10 rounded-lg transition-all group flex items-center justify-center gap-2"
+            >
+              <Radar className="w-4 h-4 text-zinc-500 group-hover:text-[#002FA7] transition-colors" />
+              <span className="font-mono text-xs text-zinc-500 group-hover:text-white transition-colors">
+                ASSIGN_OPERATIONAL_VECTOR
+              </span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 bg-zinc-950 border-white/10 p-0" align="start" side="bottom">
+            {renderPopoverContent()}
+          </PopoverContent>
+        </Popover>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mb-2 space-y-4">
+      <div className="flex items-center justify-between">
+        <h4 className="text-[10px] uppercase text-zinc-500 font-mono tracking-widest">VECTOR_ASSIGNMENT</h4>
+        <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+          <PopoverTrigger asChild>
+            <button
+              className="icon-button-forensic p-1.5 hover:bg-[#002FA7]/10 hover:text-[#002FA7] transition-colors"
+              title="Assign to more vectors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 bg-zinc-950 border-white/10 p-0" align="start" side="bottom">
+            {renderPopoverContent()}
+          </PopoverContent>
+        </Popover>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <AnimatePresence mode="popLayout">
+          {chips.map((chip) => (
+            <motion.div
+              key={chip.type === 'target' ? `t-${chip.membershipId}` : `p-${chip.membershipId}`}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className={cn(
+                'rounded px-2 py-1 flex items-center gap-2 group',
+                chip.type === 'protocol'
+                  ? 'bg-blue-500/10 border border-blue-500/30 text-blue-400'
+                  : 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+              )}
+            >
+              {chip.type === 'protocol' ? (
+                <GitMerge className="w-3 h-3 shrink-0" />
+              ) : (
+                <Radar className="w-3 h-3 shrink-0" />
+              )}
+              <span className="font-mono text-xs">{chip.name}</span>
+              <button
+                onClick={() => chip.type === 'target' ? handleRemoveList(chip.membershipId) : handleRemoveProtocol(chip.membershipId)}
+                className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-white"
+                title="Remove"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+    </div>
+  )
+}

@@ -163,23 +163,23 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
               >
                 <ScriptStep 
                   label="The Opener" 
-                  content={aiResponse.opener} 
+                  content={aiResponse.opener ?? ''} 
                   delay={0.1}
                 />
                 <ScriptStep 
                   label="The Hook" 
-                  content={aiResponse.hook} 
+                  content={aiResponse.hook ?? ''} 
                   delay={0.2}
                 />
                 <ScriptStep 
                   label="The Disturb" 
-                  content={aiResponse.disturb} 
+                  content={aiResponse.disturb ?? ''} 
                   delay={0.3}
                   accent
                 />
                 <ScriptStep 
                   label="The Close" 
-                  content={aiResponse.close} 
+                  content={aiResponse.close ?? ''} 
                   delay={0.4}
                 />
               </motion.div>

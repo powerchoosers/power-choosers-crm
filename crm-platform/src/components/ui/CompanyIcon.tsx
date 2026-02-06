@@ -12,14 +12,19 @@ interface CompanyIconProps {
   name: string
   size?: number
   className?: string
+  /** Override border radius (e.g. rounded-[8px] for small sizes so squircle is visible) */
+  roundedClassName?: string
 }
+
+const DEFAULT_ROUNDED = 'rounded-[14px]'
 
 export function CompanyIcon({ 
   logoUrl, 
   domain, 
   name, 
   size = 32, 
-  className
+  className,
+  roundedClassName = DEFAULT_ROUNDED
 }: CompanyIconProps) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
@@ -81,7 +86,8 @@ export function CompanyIcon({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         className={cn(
-          "rounded-[14px] nodal-glass bg-zinc-900/80 flex items-center justify-center text-zinc-400 border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)] shrink-0", 
+          "nodal-glass bg-zinc-900/80 flex items-center justify-center text-zinc-400 border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)] shrink-0", 
+          roundedClassName,
           className
         )}
         style={{ width: size, height: size }}
@@ -95,7 +101,8 @@ export function CompanyIcon({
   return (
     <div 
       className={cn(
-        "relative shrink-0 overflow-hidden nodal-glass bg-zinc-900/80 border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)] rounded-[14px]",
+        "relative shrink-0 overflow-hidden nodal-glass bg-zinc-900/80 border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)]",
+        roundedClassName,
         className
       )} 
       style={{ width: size, height: size }}
@@ -125,14 +132,14 @@ export function CompanyIcon({
           src={currentSrc}
           alt={`${name} logo`}
           fill
-          className="object-cover !rounded-[14px]"
+          className={cn("object-cover", roundedClassName)}
           onError={handleError}
           onLoad={handleLoad}
           unoptimized={currentSrc.includes('google.com')} // Don't re-optimize favicon service images
         />
       </motion.div>
 
-      <div className="absolute inset-0 pointer-events-none rounded-[14px] ring-1 ring-white/20" />
+      <div className={cn("absolute inset-0 pointer-events-none ring-1 ring-white/20", roundedClassName)} />
     </div>
   )
 }

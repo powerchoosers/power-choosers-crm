@@ -57,22 +57,35 @@ export default function TargetOverviewPage() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  // STATE: Active Mode (People vs Accounts) — URL on load, then persisted to localStorage
+  // STATE: Active Mode (People vs Accounts) — URL first, then localStorage, then default to 'people'
   const [activeMode, setActiveMode] = useState<'people' | 'account'>(() => {
+    // Priority 1: URL param (explicit navigation)
     const urlMode = searchParams.get('mode') as 'people' | 'account' | null
-    return urlMode === 'people' || urlMode === 'account' ? urlMode : 'people'
+    if (urlMode === 'people' || urlMode === 'account') return urlMode
+    
+    // Priority 2: localStorage (persisted preference when navigating back)
+    try {
+      const stored = localStorage.getItem(TARGETS_MODE_STORAGE_KEY) as 'people' | 'account' | null
+      if (stored === 'people' || stored === 'account') return stored
+    } catch (_) {}
+    
+    // Priority 3: Default to 'people'
+    return 'people'
   })
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '')
 
-  // When on list page with no mode in URL, restore from localStorage (runs on mount and when navigating back)
+  // Sync mode from localStorage when navigating back (if URL doesn't have mode param)
   useEffect(() => {
     const isListPage = pathname === '/network/targets' || pathname?.endsWith('/network/targets')
     if (!isListPage || searchParams.get('mode')) return
+    
     try {
       const stored = localStorage.getItem(TARGETS_MODE_STORAGE_KEY) as 'people' | 'account' | null
-      if (stored === 'people' || stored === 'account') setActiveMode(stored)
+      if ((stored === 'people' || stored === 'account') && stored !== activeMode) {
+        setActiveMode(stored)
+      }
     } catch (_) {}
-  }, [pathname, searchParams])
+  }, [pathname, searchParams, activeMode])
 
   // Update URL and persist mode to localStorage when state changes
   useEffect(() => {

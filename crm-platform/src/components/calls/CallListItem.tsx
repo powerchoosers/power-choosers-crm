@@ -7,7 +7,6 @@ import {
   Play, 
   Pause,
   X,
-  Eye, 
   Loader2, 
   Check, 
   AlertCircle, 
@@ -15,18 +14,30 @@ import {
   ChevronUp, 
   MessageSquare, 
   Sparkles,
-  User,
+  Building2,
   Zap
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { format, isValid } from 'date-fns'
 import { Call } from '@/hooks/useCalls'
 import { useCallProcessor } from '@/hooks/useCallProcessor'
+import { useAuth } from '@/context/AuthContext'
+import { CompanyIcon } from '@/components/ui/CompanyIcon'
+import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { Button } from '@/components/ui/button'
 
 interface CallListItemProps {
   call: Call
   contactId: string
+  accountId?: string
+  /** Account logo/domain/name for customer avatar (logoUrl or favicon fallback) */
+  accountLogoUrl?: string
+  accountDomain?: string
+  accountName?: string
+  /** Contact name for customer avatar when customerAvatar === 'contact' (e.g. contact dossier) */
+  contactName?: string
+  /** Use contact letter glyph for customer in transcript instead of company icon */
+  customerAvatar?: 'company' | 'contact'
   variant?: 'default' | 'minimal'
 }
 
@@ -37,19 +48,24 @@ function formatTime(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-export function CallListItem({ call, contactId, variant = 'default' }: CallListItemProps) {
+const squircleAvatar = "rounded-[14px] shrink-0 overflow-hidden bg-zinc-900/80 border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)]"
+
+export function CallListItem({ call, contactId, accountId, accountLogoUrl, accountDomain, accountName, contactName, customerAvatar = 'company', variant = 'default' }: CallListItemProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [isPlayerOpen, setIsPlayerOpen] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
+  const [hostedAvatarUrl, setHostedAvatarUrl] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const { user } = useAuth()
 
   const { status, error, processCall } = useCallProcessor({
-    callSid: call.id,
+    callSid: call.callSid ?? call.id,
     recordingUrl: call.recordingUrl,
     recordingSid: call.recordingSid,
-    contactId
+    contactId,
+    accountId,
   })
 
   const isProcessed = !!(call.transcript || call.aiInsights)
@@ -93,6 +109,30 @@ export function CallListItem({ call, contactId, variant = 'default' }: CallListI
     }
   }, [isPlayerOpen])
 
+  // Host Google avatar when expanded so transcript can show agent photo (avoids CORS)
+  useEffect(() => {
+    const photoURL = user?.photoURL
+    if (!isExpanded || !photoURL) return
+    if (photoURL.includes('imgur.com') || (!photoURL.includes('googleusercontent.com') && !photoURL.includes('ggpht.com'))) {
+      setHostedAvatarUrl(photoURL)
+      return
+    }
+    let cancelled = false
+    fetch('/api/upload/host-google-avatar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ googlePhotoURL: photoURL }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled && data?.url) setHostedAvatarUrl(data.url)
+      })
+      .catch(() => {
+        if (!cancelled) setHostedAvatarUrl(photoURL)
+      })
+    return () => { cancelled = true }
+  }, [isExpanded, user?.photoURL])
+
   const openPlayerAndPlay = () => {
     if (!call.recordingUrl) return
     setIsPlayerOpen(true)
@@ -134,7 +174,7 @@ export function CallListItem({ call, contactId, variant = 'default' }: CallListI
   return (
     <div className={cn(
       "group rounded-xl border transition-all duration-300 overflow-hidden",
-      isMinimal ? "p-3" : "p-4",
+      isMinimal ? "py-3 px-2" : "p-4",
       isExpanded ? "bg-white/[0.05] border-white/10 shadow-2xl" : "bg-white/[0.02] border-white/5 hover:bg-white/[0.04] hover:border-white/10"
     )}>
       {call.recordingUrl && (
@@ -231,39 +271,50 @@ export function CallListItem({ call, contactId, variant = 'default' }: CallListI
             </Button>
           )}
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "transition-all duration-200 relative overflow-hidden hover:scale-105 text-zinc-500 hover:text-zinc-300",
-              isMinimal ? "w-7 h-7" : "w-8 h-8",
-              currentStatus === 'processing' && "text-amber-500 hover:text-amber-400"
+          <AnimatePresence mode="wait">
+            {!isProcessed && (
+              <motion.div
+                key="process-call"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: 0.2 }}
+                className="shrink-0"
+              >
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "transition-all duration-200 relative overflow-hidden hover:scale-105 text-zinc-500 hover:text-zinc-300",
+                    isMinimal ? "w-7 h-7" : "w-8 h-8",
+                    currentStatus === 'processing' && "text-amber-500 hover:text-amber-400"
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (currentStatus !== 'processing') processCall()
+                  }}
+                  disabled={currentStatus === 'processing'}
+                  title={currentStatus === 'processing' ? 'AI Analysis in Progress...' : 'Start Forensic Analysis'}
+                >
+                  <AnimatePresence>
+                    {currentStatus === 'processing' && (
+                      <motion.div
+                        key="processing-indicator"
+                        className="absolute inset-0 bg-amber-500/5"
+                        animate={{ opacity: [0.2, 0.5, 0.2] }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                      />
+                    )}
+                  </AnimatePresence>
+                  {currentStatus === 'processing' ? (
+                    <Loader2 className={cn("animate-spin", isMinimal ? "w-3.5 h-3.5" : "w-4 h-4")} />
+                  ) : (
+                    <Sparkles className={cn(isMinimal ? "w-3.5 h-3.5" : "w-4 h-4")} />
+                  )}
+                </Button>
+              </motion.div>
             )}
-            onClick={(e) => {
-              e.stopPropagation()
-              if (currentStatus !== 'processing') processCall()
-            }}
-            disabled={currentStatus === 'processing'}
-            title={currentStatus === 'processing' ? 'AI Analysis in Progress...' : 'Start Forensic Analysis'}
-          >
-            <AnimatePresence>
-              {currentStatus === 'processing' && (
-                <motion.div 
-                  key="processing-indicator"
-                  className="absolute inset-0 bg-amber-500/5"
-                  animate={{ opacity: [0.2, 0.5, 0.2] }}
-                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                />
-              )}
-            </AnimatePresence>
-            {currentStatus === 'processing' ? (
-              <Loader2 className={cn("animate-spin", isMinimal ? "w-3.5 h-3.5" : "w-4 h-4")} />
-            ) : currentStatus === 'ready' ? (
-              <Sparkles className={cn(isMinimal ? "w-3.5 h-3.5" : "w-4 h-4")} />
-            ) : (
-              <Eye className={cn(isMinimal ? "w-3.5 h-3.5" : "w-4 h-4")} />
-            )}
-          </Button>
+          </AnimatePresence>
 
           <Button
             variant="ghost"
@@ -288,10 +339,10 @@ export function CallListItem({ call, contactId, variant = 'default' }: CallListI
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="mt-3 pt-3 border-t border-white/5 flex flex-col gap-2 min-w-0 pl-0 pr-4">
-              <div className="flex items-center min-w-0 px-0 py-1 gap-0">
+            <div className="mt-3 pt-3 border-t border-white/5 flex flex-col gap-2 min-w-0">
+              <div className="flex items-center min-w-0 gap-0">
                 {!isMinimal && <div className="w-[2.5rem] shrink-0" aria-hidden />}
-                <span className="text-[10px] font-mono tabular-nums text-zinc-500 uppercase tracking-wider w-10 shrink-0 text-right">
+                <span className="text-[10px] font-mono tabular-nums text-zinc-500 uppercase tracking-wider w-6 shrink-0 text-left flex-shrink-0 pr-0">
                   {formatTime(currentTime)}
                 </span>
                 <input
@@ -301,20 +352,20 @@ export function CallListItem({ call, contactId, variant = 'default' }: CallListI
                   step={0.1}
                   value={currentTime}
                   onChange={handleScrub}
-                  className="flex-1 min-w-[120px] mx-2 min-h-[8px] h-2 rounded-full appearance-none bg-transparent cursor-pointer [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-zinc-700 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:shadow-[0_0_0_2px_rgba(255,255,255,0.3)] [&::-webkit-slider-thumb]:-mt-0.5 [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-zinc-700 [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:-mt-0.5"
+                  className="flex-1 min-w-0 min-w-[72px] mx-1.5 min-h-[8px] h-2 rounded-full appearance-none bg-transparent cursor-pointer [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-zinc-700 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:shadow-[0_0_0_2px_rgba(255,255,255,0.3)] [&::-webkit-slider-thumb]:-mt-0.5 [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-zinc-700 [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:-mt-0.5"
                   style={{ accentColor: 'white' }}
                 />
-                <span className="text-[10px] font-mono tabular-nums text-zinc-500 uppercase tracking-wider w-10 shrink-0 text-left">
+                <span className="text-[10px] font-mono tabular-nums text-zinc-500 uppercase tracking-wider w-7 shrink-0 text-left flex-shrink-0 pl-0">
                   {formatTime(duration)}
                 </span>
                 <button
                   type="button"
                   onClick={closePlayer}
-                  className="w-7 h-7 shrink-0 ml-2 rounded-full bg-zinc-700/80 hover:bg-zinc-600 flex items-center justify-center text-zinc-400 hover:text-zinc-200 transition-colors duration-200 flex-shrink-0 min-w-[28px] min-h-[28px]"
+                  className="w-5 h-5 shrink-0 flex-shrink-0 ml-0.5 rounded-full bg-zinc-700/80 hover:bg-zinc-600 flex items-center justify-center text-zinc-400 hover:text-zinc-200 transition-colors duration-200 min-w-[20px] min-h-[20px] p-0"
                   title="Close player"
                   aria-label="Close player"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-3 h-3" />
                 </button>
               </div>
             </div>
@@ -327,36 +378,25 @@ export function CallListItem({ call, contactId, variant = 'default' }: CallListI
           {/* AI Insights Section */}
           {insights && (
             <div className="space-y-4">
-              <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400 uppercase tracking-widest">
-                <Sparkles className="w-3 h-3 text-[#002FA7]" /> AI Forensic Analysis
+              <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-zinc-400 uppercase tracking-widest">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-3 h-3 text-current" /> AI Forensic Analysis
+                </div>
+                <span className={cn(
+                  "px-2 py-0.5 rounded text-[10px] font-mono uppercase shrink-0",
+                  insights.sentiment === 'Positive' ? "bg-emerald-500/10 text-emerald-500" :
+                  insights.sentiment === 'Negative' ? "bg-rose-500/10 text-rose-500" :
+                  "bg-zinc-500/10 text-zinc-400"
+                )}>
+                  {insights.sentiment || 'Neutral'}
+                </span>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5">
-                  <div className="text-[9px] font-mono text-zinc-500 uppercase mb-2">Executive Summary</div>
-                  <p className="text-xs text-zinc-300 leading-relaxed">
-                    {insights.summary || 'No summary available.'}
-                  </p>
-                </div>
-                
-                <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5">
-                  <div className="text-[9px] font-mono text-zinc-500 uppercase mb-2">Sentiment & Signal</div>
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "px-2 py-1 rounded text-[10px] font-mono uppercase",
-                      insights.sentiment === 'Positive' ? "bg-emerald-500/10 text-emerald-500" :
-                      insights.sentiment === 'Negative' ? "bg-rose-500/10 text-rose-500" :
-                      "bg-zinc-500/10 text-zinc-400"
-                    )}>
-                      {insights.sentiment || 'Neutral'}
-                    </span>
-                    {insights.keyTopics && insights.keyTopics.map((topic: string) => (
-                      <span key={topic} className="px-2 py-1 rounded bg-white/5 text-[10px] font-mono text-zinc-500 uppercase">
-                        {topic}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5">
+                <div className="text-[9px] font-mono text-zinc-500 uppercase mb-2">Executive Summary</div>
+                <p className="text-xs text-zinc-300 leading-relaxed">
+                  {insights.summary || 'No summary available.'}
+                </p>
               </div>
 
               {insights.nextSteps && insights.nextSteps.length > 0 && (
@@ -376,39 +416,98 @@ export function CallListItem({ call, contactId, variant = 'default' }: CallListI
             </div>
           )}
 
-          {/* Transcript Section */}
+          {/* Transcript Section — use CI sentences/speakerTurns (backend channel mapping) like legacy account-detail */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400 uppercase tracking-widest">
-              <MessageSquare className="w-3 h-3 text-[#002FA7]" /> Two-Channel Transcript
+              <MessageSquare className="w-3 h-3 text-current" /> Two-Channel Transcript
             </div>
             
             <div className="max-h-80 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
-              {call.transcript ? (
-                call.transcript.split('\n').map((line, i) => {
-                  if (!line.trim()) return null;
-                  
-                  // Handle various speaker labels
-                  // Twilio: "Speaker 0: ...", "Speaker 1: ..."
-                  // Legacy: "Agent: ...", "Contact: ..."
-                  // Perplexity: "Me: ...", "Client: ..."
-                  const speakerMatch = line.match(/^([^:]+):/);
-                  const speaker = speakerMatch ? speakerMatch[1].trim() : '';
-                  const text = line.replace(/^[^:]+:/, '').trim();
-                  
-                  // Determine if the speaker is internal (Agent/Me/Speaker 0)
-                  const isAgent = /^(Agent|Me|Speaker 0|Internal|User)$/i.test(speaker) || (i % 2 === 0 && !speaker);
-                  
+              {(() => {
+                // 1. Prefer conversationalIntelligence.sentences (backend maps Agent/Customer by channel)
+                const ci = insights?.conversationalIntelligence
+                const sentences = Array.isArray(ci?.sentences) ? ci.sentences : []
+                const speakerTurns = Array.isArray(insights?.speakerTurns) ? insights.speakerTurns : []
+                type Turn = { role: 'agent' | 'customer'; text: string }
+                let turns: Turn[] = []
+                if (sentences.length > 0) {
+                  turns = sentences
+                    .filter((s: { text?: string }) => (s.text || '').trim())
+                    .map((s: { speaker?: string; text?: string }) => ({
+                      role: (s.speaker || '').toLowerCase() === 'customer' ? 'customer' : 'agent',
+                      text: (s.text || '').trim(),
+                    }))
+                } else if (speakerTurns.length > 0) {
+                  turns = speakerTurns
+                    .filter((t: { text?: string }) => (t.text || '').trim())
+                    .map((t: { role?: string; text?: string }) => ({
+                      role: (t.role || 'agent').toLowerCase() === 'customer' ? 'customer' : 'agent',
+                      text: (t.text || '').trim(),
+                    }))
+                } else if (call.transcript) {
+                  // 2. Fallback: parse transcript lines; only trust explicit "Agent:" / "Customer:" (from backend)
+                  turns = call.transcript
+                    .split('\n')
+                    .map((line) => {
+                      const trimmed = line.trim()
+                      if (!trimmed) return null
+                      const match = trimmed.match(/^(Agent|Customer):\s*(.*)$/i)
+                      if (match) {
+                        return {
+                          role: match[1].toLowerCase() as 'agent' | 'customer',
+                          text: match[2].trim(),
+                        }
+                      }
+                      const generic = trimmed.match(/^([^:]+):\s*(.*)$/)
+                      if (generic) return { role: 'customer' as const, text: generic[2].trim() }
+                      return { role: 'customer' as const, text: trimmed }
+                    })
+                    .filter((t): t is Turn => t != null && t.text !== '')
+                }
+                if (turns.length === 0) return null
+                return turns.map((turn, i) => {
+                  const isAgent = turn.role === 'agent'
+                  const agentPhotoUrl = hostedAvatarUrl || (user?.photoURL?.includes('imgur.com') ? user.photoURL : null)
                   return (
                     <div key={i} className={cn(
                       "flex gap-3",
                       isAgent ? "flex-row-reverse" : "flex-row"
                     )}>
-                      <div className={cn(
-                        "w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-1 text-[10px] font-mono",
-                        isAgent ? "bg-[#002FA7]/20 text-[#002FA7] border border-[#002FA7]/30" : "bg-zinc-800 text-zinc-500 border border-white/5"
-                      )}>
-                        {isAgent ? <Zap className="w-3 h-3" /> : <User className="w-3 h-3" />}
-                      </div>
+                      {isAgent ? (
+                        <div className={cn(
+                          "w-6 h-6 flex items-center justify-center mt-1 text-[10px] font-mono",
+                          squircleAvatar,
+                          "bg-[#002FA7]/20 border-[#002FA7]/30"
+                        )}>
+                          {agentPhotoUrl ? (
+                            <img src={agentPhotoUrl} alt="Agent" className="w-full h-full object-cover !rounded-[14px]" />
+                          ) : (
+                            <Zap className="w-3 h-3 text-[#002FA7]" />
+                          )}
+                        </div>
+                      ) : customerAvatar === 'contact' && contactName ? (
+                        <div className="mt-1 shrink-0">
+                          <ContactAvatar name={contactName} size={24} className="rounded-[8px]" />
+                        </div>
+                      ) : (accountLogoUrl || accountDomain) ? (
+                        <div className="mt-1 shrink-0">
+                          <CompanyIcon
+                            logoUrl={accountLogoUrl}
+                            domain={accountDomain}
+                            name={accountName || 'Customer'}
+                            size={24}
+                            roundedClassName="rounded-[8px]"
+                          />
+                        </div>
+                      ) : (
+                        <div className={cn(
+                          "w-6 h-6 flex items-center justify-center mt-1 text-[10px] font-mono",
+                          squircleAvatar,
+                          "bg-zinc-900/80 text-zinc-400 border-white/20"
+                        )}>
+                          <Building2 className="w-3 h-3" />
+                        </div>
+                      )}
                       <div className={cn(
                         "p-3 rounded-2xl text-xs leading-relaxed max-w-[85%] relative group/bubble",
                         isAgent 
@@ -419,25 +518,27 @@ export function CallListItem({ call, contactId, variant = 'default' }: CallListI
                           "text-[9px] font-mono uppercase opacity-40 mb-1",
                           isAgent ? "text-right" : "text-left"
                         )}>
-                          {speaker || (isAgent ? 'AGENT' : 'EXTERNAL')}
+                          {isAgent ? 'AGENT' : 'CUSTOMER'}
                         </div>
-                        {text}
+                        {turn.text}
                       </div>
                     </div>
-                  );
+                  )
                 })
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-zinc-600">
-                  <MessageSquare className="w-8 h-8 mb-2 opacity-20" />
-                  <p className="text-[10px] font-mono uppercase tracking-widest">Transcript_Not_Found</p>
-                  <Button 
-                    variant="link" 
-                    className="text-[#002FA7] text-[10px] font-mono uppercase p-0 h-auto mt-2"
-                    onClick={processCall}
-                  >
-                    Generate Now
-                  </Button>
-                </div>
+              })() ?? (
+                !call.transcript && !insights?.conversationalIntelligence?.sentences?.length && !insights?.speakerTurns?.length ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-zinc-600">
+                    <MessageSquare className="w-8 h-8 mb-2 opacity-20" />
+                    <p className="text-[10px] font-mono uppercase tracking-widest">Transcript_Not_Found</p>
+                    <Button 
+                      variant="link" 
+                      className="text-[#002FA7] text-[10px] font-mono uppercase p-0 h-auto mt-2"
+                      onClick={processCall}
+                    >
+                      Generate Now
+                    </Button>
+                  </div>
+                ) : null
               )}
             </div>
           </div>

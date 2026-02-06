@@ -45,6 +45,13 @@ export function useDeleteAccounts() {
 
   return useMutation({
     mutationFn: async (ids: string[]) => {
+      // Remove list memberships first so targets list counts stay correct
+      await supabase
+        .from('list_members')
+        .delete()
+        .in('targetId', ids)
+        .in('targetType', ['account', 'accounts', 'companies', 'company'])
+
       const { error } = await supabase
         .from('accounts')
         .delete()
@@ -55,6 +62,7 @@ export function useDeleteAccounts() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       queryClient.invalidateQueries({ queryKey: ['accounts-count'] })
+      queryClient.invalidateQueries({ queryKey: ['targets'] })
     }
   })
 }

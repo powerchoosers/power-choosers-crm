@@ -80,28 +80,39 @@ export function useTasks(searchQuery?: string) {
 
   const addTaskMutation = useMutation({
     mutationFn: async (newTask: Omit<Task, 'id' | 'createdAt'>) => {
+      const id = crypto.randomUUID()
+      const now = new Date().toISOString()
+      const row = {
+        id,
+        title: newTask.title ?? 'Task',
+        description: newTask.description ?? null,
+        status: newTask.status ?? 'Pending',
+        priority: newTask.priority ?? 'Medium',
+        dueDate: newTask.dueDate ?? null,
+        contactId: newTask.contactId ?? null,
+        accountId: newTask.accountId ?? null,
+        ownerId: user?.email ?? null,
+        createdAt: now,
+        updatedAt: now,
+        metadata: (newTask.metadata && typeof newTask.metadata === 'object') ? newTask.metadata : {}
+      }
       const { data, error } = await supabase
         .from('tasks')
-        .insert({
-          ...newTask,
-          ownerId: user?.email,
-          createdAt: new Date().toISOString(),
-          status: newTask.status || 'Pending',
-          priority: newTask.priority || 'Medium'
-        })
+        .insert(row)
         .select()
         .single()
       
       if (error) throw error
-      return data as Task
+      return { ...data, relatedTo: newTask.relatedTo, relatedType: newTask.relatedType } as Task
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       toast.success('Task created successfully')
     },
-    onError: (error) => {
+    onError: (error: unknown) => {
+      const msg = error && typeof error === 'object' && 'message' in error ? String((error as { message: string }).message) : 'Failed to create task'
       console.error('Error adding task:', error)
-      toast.error('Failed to create task')
+      toast.error(msg)
     }
   })
 
@@ -158,6 +169,7 @@ export function useTasks(searchQuery?: string) {
     hasNextPage: tasksQuery.hasNextPage,
     isFetchingNextPage: tasksQuery.isFetchingNextPage,
     addTask: addTaskMutation.mutate,
+    addTaskAsync: addTaskMutation.mutateAsync,
     updateTask: updateTaskMutation.mutate,
     deleteTask: deleteTaskMutation.mutate
   }

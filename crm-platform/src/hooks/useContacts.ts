@@ -64,6 +64,13 @@ export function useDeleteContacts() {
 
   return useMutation({
     mutationFn: async (ids: string[]) => {
+      // Remove list memberships first so targets list counts stay correct
+      await supabase
+        .from('list_members')
+        .delete()
+        .in('targetId', ids)
+        .in('targetType', ['people', 'contact', 'contacts'])
+
       const { error } = await supabase
         .from('contacts')
         .delete()
@@ -74,6 +81,7 @@ export function useDeleteContacts() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
       queryClient.invalidateQueries({ queryKey: ['contacts-count'] })
+      queryClient.invalidateQueries({ queryKey: ['targets'] })
     }
   })
 }
