@@ -58,6 +58,21 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   const reconnectAttemptsRef = useRef(0)
   const maxReconnectAttempts = 5
 
+  /** Request microphone permission so the browser prompts the user; release stream immediately. Returns true if granted. */
+  const requestMicrophonePermission = useCallback(async (): Promise<{ granted: boolean; denied: boolean }> => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      return { granted: false, denied: false }
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stream.getTracks().forEach((t) => t.stop())
+      return { granted: true, denied: false }
+    } catch (e: unknown) {
+      const err = e as { name?: string }
+      return { granted: false, denied: err?.name === 'NotAllowedError' }
+    }
+  }, [])
+
   const resolvePhoneMeta = useCallback(async (phoneNumber: string) => {
     try {
       const response = await fetch(`/api/search?phone=${encodeURIComponent(phoneNumber)}`)
@@ -101,6 +116,19 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     // Prevent overlapping initializations
     if (isInitializing.current) {
       console.log('[Voice] Initialization already in progress, skipping...')
+      return
+    }
+
+    // Request microphone permission first so the browser prompts before Twilio needs the device
+    const perm = await requestMicrophonePermission()
+    if (!perm.granted) {
+      isInitializing.current = false
+      if (perm.denied && (currentPath?.startsWith('/network') || currentPath?.startsWith('/dashboard'))) {
+        toast.error('Voice needs microphone access', {
+          description: 'Please allow microphone in your browser settings and try again.',
+          duration: 8000,
+        })
+      }
       return
     }
 
@@ -348,7 +376,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     } finally {
       isInitializing.current = false
     }
-  }, [resolvePhoneMeta, setActive, setStatus, user])
+  }, [requestMicrophonePermission, resolvePhoneMeta, setActive, setStatus, user])
 
   useEffect(() => {
     initDevice()
@@ -390,7 +418,28 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
   const connect = useCallback(async (params: { To: string; From?: string; metadata?: VoiceMetadata }) => {
     if (!device || !isReady) {
-      toast.error('Voice system not ready')
+      // Request microphone permission first so user gets the browser prompt instead of "not ready"
+      const perm = await requestMicrophonePermission()
+      if (!perm.granted) {
+        if (perm.denied) {
+          toast.error('Voice needs microphone access', {
+            description: 'Please allow microphone in your browser settings and try again.',
+            duration: 8000,
+          })
+        } else {
+          toast.error('Voice system not ready', {
+            description: 'Microphone access is required to make calls.',
+            duration: 6000,
+          })
+        }
+        return
+      }
+      // Permission granted; (re-)initialize device so it can find the microphone
+      initDevice()
+      toast.info('Setting up voice...', {
+        description: 'Try your call again in a moment.',
+        duration: 5000,
+      })
       return
     }
 
@@ -494,7 +543,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       })
       setStatus('error')
     }
-  }, [device, isReady, resolvePhoneMeta, setActive, setStatus])
+  }, [device, isReady, initDevice, requestMicrophonePermission, resolvePhoneMeta, setActive, setStatus])
 
   const disconnect = useCallback(() => {
     if (currentCall) {

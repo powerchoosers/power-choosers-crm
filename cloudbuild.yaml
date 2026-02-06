@@ -53,8 +53,8 @@ steps:
     - '10'
     - '--concurrency'
     - '80'
-    # Only non-secret vars here; set Supabase/Twilio etc. in Cloud Run → nodal-point-network → Variables
-    - '--set-env-vars'
+    # Only non-secret vars here; set Supabase/Twilio etc. in Cloud Run → nodal-point-network → Variables (update-env-vars keeps UI-set vars)
+    - '--update-env-vars'
     - 'NODE_ENV=production,API_BASE_URL=https://nodal-point-network-792458658491.us-central1.run.app,PUBLIC_BASE_URL=https://nodalpoint.io'
 
   # ---- Frontend: power-choosers-crm ----
@@ -117,8 +117,8 @@ steps:
     - '10'
     - '--concurrency'
     - '40'
-    # Non-secret URLs only; NEXT_PUBLIC_* are baked at build from trigger. Add rest in Cloud Run → power-choosers-crm → Variables if needed.
-    - '--set-env-vars'
+    # Non-secret URLs only; NEXT_PUBLIC_* baked at build from trigger. update-env-vars keeps UI-set vars.
+    - '--update-env-vars'
     - 'NODE_ENV=production,NEXT_PUBLIC_API_BASE_URL=https://nodal-point-network-792458658491.us-central1.run.app,API_BASE_URL=https://nodal-point-network-792458658491.us-central1.run.app,PUBLIC_BASE_URL=https://nodalpoint.io'
 
 images:
