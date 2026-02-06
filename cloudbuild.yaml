@@ -1,19 +1,32 @@
+# Deploys BOTH:
+#   power-choosers-crm   = frontend (Next.js from crm-platform)
+#   nodal-point-network = backend (Node server.js from root)
+#
+# TRIGGERS (Cloud Build → Triggers → [your trigger] → Substitution variables):
+#   Only needed for power-choosers-crm BUILD (Next.js bakes these at build time):
+#   _NEXT_PUBLIC_SUPABASE_URL, _NEXT_PUBLIC_SUPABASE_ANON_KEY
+#   _NEXT_PUBLIC_FIREBASE_API_KEY, _NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN, _FIREBASE_PROJECT_ID,
+#   _NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET, _NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID, _NEXT_PUBLIC_FIREBASE_APP_ID
+#   _NEXT_PUBLIC_GOOGLE_MAPS_KEY, _NEXT_PUBLIC_GOOGLE_MAPS_API, _NEXT_PUBLIC_GOOGLE_MAP_ID
+#
+# SERVICE ENV VARS (Cloud Run → each service → Edit → Variables):
+#   nodal-point-network: set NODE_ENV, API_BASE_URL, PUBLIC_BASE_URL, NEXT_PUBLIC_SUPABASE_URL,
+#     NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY (and Twilio etc. if backend uses them).
+#   power-choosers-crm: set same non-secret URLs; optional extras. Build gets NEXT_PUBLIC_* from trigger.
+---
 steps:
-  # Build the Backend Node.js server (server.js)
+  # ---- Backend: nodal-point-network ----
   - name: 'gcr.io/cloud-builders/docker'
-    args: 
+    id: build-backend
+    args:
     - 'build'
     - '-t'
     - 'gcr.io/$PROJECT_ID/nodal-point-network:$COMMIT_SHA'
     - '-f'
     - 'Dockerfile'
     - '.'
-  
-  # Push the Backend container image
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/nodal-point-network:$COMMIT_SHA']
-  
-  # Deploy Backend to Cloud Run (nodal-point-network)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -40,13 +53,77 @@ steps:
     - '10'
     - '--concurrency'
     - '80'
+    # Only non-secret vars here; set Supabase/Twilio etc. in Cloud Run → nodal-point-network → Variables
     - '--set-env-vars'
-    - 'NODE_ENV=production,API_BASE_URL=https://nodal-point-network-792458658491.us-central1.run.app,PUBLIC_BASE_URL=https://nodalpoint.io,NEXT_PUBLIC_SUPABASE_URL=https://gfitvnkaevozbcyostez.supabase.co,NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmaXR2bmthZXZvemJjeW9zdGV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyNjI3OTUsImV4cCI6MjA4NDgzODc5NX0.hDnsWEVwZW9vQJTDB_YILCVs1-dJKjj7OkGcrbazEg0,SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmaXR2bmthZXZvemJjeW9zdGV6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTI2Mjc5NSwiZXhwIjoyMDg0ODM4Nzk1fQ.qIWfuParcwPGNphHhqixAk9Pd1dPXTGra57qVRGEYGY'
+    - 'NODE_ENV=production,API_BASE_URL=https://nodal-point-network-792458658491.us-central1.run.app,PUBLIC_BASE_URL=https://nodalpoint.io'
 
-# Store images in Google Container Registry
+  # ---- Frontend: power-choosers-crm ----
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-frontend
+    args:
+    - 'build'
+    - '-t'
+    - 'gcr.io/$PROJECT_ID/power-choosers-crm:$COMMIT_SHA'
+    - '-f'
+    - 'crm-platform/Dockerfile'
+    - '--build-arg'
+    - 'NEXT_PUBLIC_FIREBASE_API_KEY=${_NEXT_PUBLIC_FIREBASE_API_KEY}'
+    - '--build-arg'
+    - 'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${_NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}'
+    - '--build-arg'
+    - 'NEXT_PUBLIC_FIREBASE_PROJECT_ID=${_FIREBASE_PROJECT_ID}'
+    - '--build-arg'
+    - 'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${_NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}'
+    - '--build-arg'
+    - 'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${_NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}'
+    - '--build-arg'
+    - 'NEXT_PUBLIC_FIREBASE_APP_ID=${_NEXT_PUBLIC_FIREBASE_APP_ID}'
+    - '--build-arg'
+    - 'NEXT_PUBLIC_SUPABASE_URL=${_NEXT_PUBLIC_SUPABASE_URL}'
+    - '--build-arg'
+    - 'NEXT_PUBLIC_SUPABASE_ANON_KEY=${_NEXT_PUBLIC_SUPABASE_ANON_KEY}'
+    - '--build-arg'
+    - 'NEXT_PUBLIC_GOOGLE_MAPS_KEY=${_NEXT_PUBLIC_GOOGLE_MAPS_KEY}'
+    - '--build-arg'
+    - 'NEXT_PUBLIC_GOOGLE_MAPS_API=${_NEXT_PUBLIC_GOOGLE_MAPS_API}'
+    - '--build-arg'
+    - 'NEXT_PUBLIC_GOOGLE_MAP_ID=${_NEXT_PUBLIC_GOOGLE_MAP_ID}'
+    - '.'
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/power-choosers-crm:$COMMIT_SHA']
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+    - 'run'
+    - 'deploy'
+    - 'power-choosers-crm'
+    - '--image'
+    - 'gcr.io/$PROJECT_ID/power-choosers-crm:$COMMIT_SHA'
+    - '--region'
+    - 'us-central1'
+    - '--platform'
+    - 'managed'
+    - '--allow-unauthenticated'
+    - '--port'
+    - '3000'
+    - '--memory'
+    - '512Mi'
+    - '--cpu'
+    - '1'
+    - '--cpu-throttling'
+    - '--min-instances'
+    - '0'
+    - '--max-instances'
+    - '10'
+    - '--concurrency'
+    - '40'
+    # Non-secret URLs only; NEXT_PUBLIC_* are baked at build from trigger. Add rest in Cloud Run → power-choosers-crm → Variables if needed.
+    - '--set-env-vars'
+    - 'NODE_ENV=production,NEXT_PUBLIC_API_BASE_URL=https://nodal-point-network-792458658491.us-central1.run.app,API_BASE_URL=https://nodal-point-network-792458658491.us-central1.run.app,PUBLIC_BASE_URL=https://nodalpoint.io'
+
 images:
   - 'gcr.io/$PROJECT_ID/nodal-point-network:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/power-choosers-crm:$COMMIT_SHA'
 
-# Build options
 options:
   logging: CLOUD_LOGGING_ONLY
