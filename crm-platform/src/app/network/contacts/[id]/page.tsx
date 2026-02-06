@@ -667,6 +667,22 @@ export default function ContactDossierPage() {
                   {!hasTasks && (
                     <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Dossier Status</div>
                   )}
+                  {hasTasks && (
+                    <>
+                      <div className={cn(
+                        "h-2 w-2 rounded-full animate-pulse shrink-0",
+                        isEditing ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]" : "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
+                      )} />
+                      <TaskCommandBar
+                        pendingTasks={pendingTasks}
+                        currentIndex={displayTaskIndex}
+                        onPrev={() => setCurrentTaskIndex((p) => Math.max(0, p - 1))}
+                        onNext={() => setCurrentTaskIndex((p) => Math.min(pendingTasks.length - 1, p + 1))}
+                        onSkip={() => setCurrentTaskIndex((p) => Math.min(pendingTasks.length - 1, p + 1))}
+                        onCompleteAndAdvance={handleCompleteAndAdvance}
+                      />
+                    </>
+                  )}
                   <button
                     onClick={toggleEditing}
                     className={cn(
@@ -683,22 +699,6 @@ export default function ContactDossierPage() {
                       <Lock className="w-4 h-4" />
                     )}
                   </button>
-                  {hasTasks && (
-                    <>
-                      <div className={cn(
-                        "h-2 w-2 rounded-full animate-pulse shrink-0",
-                        isEditing ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]" : "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
-                      )} />
-                    <TaskCommandBar
-                      pendingTasks={pendingTasks}
-                      currentIndex={displayTaskIndex}
-                      onPrev={() => setCurrentTaskIndex((p) => Math.max(0, p - 1))}
-                      onNext={() => setCurrentTaskIndex((p) => Math.min(pendingTasks.length - 1, p + 1))}
-                      onSkip={() => setCurrentTaskIndex((p) => Math.min(pendingTasks.length - 1, p + 1))}
-                      onCompleteAndAdvance={handleCompleteAndAdvance}
-                    />
-                    </>
-                  )}
                 </div>
                 {!hasTasks && (
                   <div className="flex items-center gap-2">
