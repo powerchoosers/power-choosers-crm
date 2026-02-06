@@ -109,10 +109,11 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
     }
   }, [isPlayerOpen])
 
-  // Host Google avatar when expanded so transcript can show agent photo (avoids CORS)
+  // Preload logged-in user's avatar for agent icon (host Google photo to avoid CORS)
   useEffect(() => {
     const photoURL = user?.photoURL
-    if (!isExpanded || !photoURL) return
+    if (!photoURL) return
+    // Non-Google URLs (e.g. imgur) can be used directly
     if (photoURL.includes('imgur.com') || (!photoURL.includes('googleusercontent.com') && !photoURL.includes('ggpht.com'))) {
       setHostedAvatarUrl(photoURL)
       return
@@ -125,13 +126,14 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
     })
       .then((res) => res.json())
       .then((data) => {
-        if (!cancelled && data?.url) setHostedAvatarUrl(data.url)
+        const url = data?.imageUrl ?? data?.url
+        if (!cancelled && url) setHostedAvatarUrl(url)
       })
       .catch(() => {
         if (!cancelled) setHostedAvatarUrl(photoURL)
       })
     return () => { cancelled = true }
-  }, [isExpanded, user?.photoURL])
+  }, [user?.photoURL])
 
   const openPlayerAndPlay = () => {
     if (!call.recordingUrl) return

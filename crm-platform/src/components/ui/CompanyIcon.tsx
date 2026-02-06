@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Building2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface CompanyIconProps {
@@ -18,6 +17,15 @@ interface CompanyIconProps {
 
 const DEFAULT_ROUNDED = 'rounded-[14px]'
 
+/** Whether the URL is external (needs native img to avoid Next Image CORS/timeouts). */
+function isExternalUrl(src: string): boolean {
+  try {
+    return /^https?:\/\//i.test(src) || src.startsWith('//')
+  } catch {
+    return true
+  }
+}
+
 export function CompanyIcon({ 
   logoUrl, 
   domain, 
@@ -28,8 +36,8 @@ export function CompanyIcon({
 }: CompanyIconProps) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
-  const [loadTimeout, setLoadTimeout] = useState(false)
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   
   const faviconSrc = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=128` : null
   const currentSrc = (logoUrl && failedSrc !== logoUrl)
@@ -38,23 +46,20 @@ export function CompanyIcon({
         ? faviconSrc
         : null
 
-  // Reset loading state when source changes and set timeout
+  // Reset loading state when source changes; timeout only marks this URL failed so next source (e.g. favicon) is tried
   useEffect(() => {
     setIsLoaded(false)
-    setLoadTimeout(false)
+    setRetryCount(0)
     
-    // Clear any existing timeout
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
     }
     
-    // If we have a source, set a timeout to fallback if loading takes too long
     if (currentSrc) {
       timeoutRef.current = setTimeout(() => {
-        console.warn(`Image load timeout for ${currentSrc}`)
-        setLoadTimeout(true)
         setFailedSrc(currentSrc)
-      }, 5000) // 5 second timeout
+      }, 8000)
     }
     
     return () => {
@@ -67,6 +72,11 @@ export function CompanyIcon({
   const handleError = () => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+    if (retryCount < 1) {
+      setRetryCount((c) => c + 1)
+      return
     }
     if (currentSrc) setFailedSrc(currentSrc)
   }
@@ -74,13 +84,13 @@ export function CompanyIcon({
   const handleLoad = () => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
     }
     setIsLoaded(true)
-    setLoadTimeout(false)
   }
 
-  // Show fallback icon if no source available, or if load timed out
-  if (!currentSrc || loadTimeout) {
+  // Show fallback only when there is no source left to try
+  if (!currentSrc) {
     return (
       <motion.div 
         initial={{ opacity: 0 }}
@@ -96,6 +106,14 @@ export function CompanyIcon({
         <Building2 size={size * 0.5} />
       </motion.div>
     )
+  }
+
+  const imgCommon = {
+    alt: `${name} logo`,
+    className: cn("object-cover", roundedClassName),
+    onError: handleError,
+    onLoad: handleLoad,
+    style: { width: '100%', height: '100%', objectFit: 'cover' as const },
   }
 
   return (
@@ -126,17 +144,24 @@ export function CompanyIcon({
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: isLoaded ? 1 : 0, scale: isLoaded ? 1 : 0.95 }}
         transition={{ duration: 0.3, ease: "easeOut" }}
-        className="w-full h-full"
+        className="absolute inset-0 w-full h-full"
       >
-        <Image
-          src={currentSrc}
-          alt={`${name} logo`}
-          fill
-          className={cn("object-cover", roundedClassName)}
-          onError={handleError}
-          onLoad={handleLoad}
-          unoptimized={currentSrc.includes('google.com')} // Don't re-optimize favicon service images
-        />
+        {isExternalUrl(currentSrc) ? (
+          <img
+            src={currentSrc}
+            {...imgCommon}
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <img
+            src={currentSrc}
+            {...imgCommon}
+            loading="lazy"
+            decoding="async"
+          />
+        )}
       </motion.div>
 
       <div className={cn("absolute inset-0 pointer-events-none ring-1 ring-white/20", roundedClassName)} />
