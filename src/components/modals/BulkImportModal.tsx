@@ -15,6 +15,7 @@ import { useTargets, useCreateTarget } from '@/hooks/useTargets';
 import { Input } from '@/components/ui/input';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatPhoneNumber } from '@/lib/formatPhone';
+import { normalizeWebsiteForImport } from '@/lib/url';
 
 // --- FORENSIC TYPES ---
 type ImportVector = 'CONTACTS' | 'ACCOUNTS';
@@ -109,7 +110,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
           });
 
           if (importVector === 'ACCOUNTS') {
-            const domain = mappedData.website;
+            const domain = normalizeWebsiteForImport(mappedData.website);
             const name = mappedData.name;
 
             // Try domain match
@@ -510,7 +511,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
           const accountData = {
             name: mappedData.name || '',
             industry: mappedData.industry || '',
-            domain: mappedData.website || '',
+            domain: normalizeWebsiteForImport(mappedData.website) || '',
             logoUrl: mappedData.logo_url || '',
             companyPhone: formatPhoneNumber(mappedData.company_phone) || '',
             linkedinUrl: mappedData.linkedin_url || '',

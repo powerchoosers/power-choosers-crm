@@ -22,6 +22,7 @@ import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { domainToClickableUrl } from '@/lib/url'
 import { differenceInCalendarDays, format, isValid, parseISO, formatDistanceToNow } from 'date-fns'
 
 // Components
@@ -406,7 +407,7 @@ export default function AccountDossierPage() {
                           if (isEditing) {
                             setActiveEditField(activeEditField === 'domain' ? null : 'domain')
                           } else {
-                            const url = editDomain ? (editDomain.startsWith('http') ? editDomain : `https://${editDomain}`) : (account.domain ? (account.domain.startsWith('http') ? account.domain : `https://${account.domain}`) : null)
+                            const url = editDomain ? domainToClickableUrl(editDomain) : domainToClickableUrl(account.domain)
                             if (url) window.open(url, '_blank')
                           }
                         }}
