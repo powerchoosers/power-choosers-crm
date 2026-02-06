@@ -6,7 +6,7 @@ Findings from `gcloud` (project: **power-choosers-crm**, project number: **79245
 
 ## 1. Where Places API was being used (key configuration)
 
-**API key “API key 1”** (ID: `4dfb364a-f32f-4831-91a1-b798291a4317`):
+**API key “API key 1”** (ID: use Console or `gcloud services api-keys list` to see your key ID; do not commit key IDs in docs):
 
 - **API restrictions:** Key is restricted to many Maps-related services, including:
   - `places-backend.googleapis.com` (old Places API)
@@ -86,7 +86,7 @@ No `allUsers` or `allAuthenticatedUsers` bindings were found on the project. No 
 ```bash
 gcloud config get-value project
 gcloud services api-keys list --project=power-choosers-crm --format="table(displayName,name,restrictions)"
-gcloud services api-keys describe 4dfb364a-f32f-4831-91a1-b798291a4317 --project=power-choosers-crm --format=yaml
+gcloud services api-keys describe <YOUR_KEY_ID> --project=power-choosers-crm --format=yaml
 gcloud services list --enabled --project=power-choosers-crm --filter="config.name:places OR config.name:maps OR config.name:geocod"
 gcloud logging read "protoPayload.serviceName=places-backend.googleapis.com OR ..." --project=power-choosers-crm --limit=10
 gcloud projects get-iam-policy power-choosers-crm --filter="bindings.members:allUsers OR bindings.members:allAuthenticatedUsers"
