@@ -68,9 +68,9 @@ export function useMarketPulse() {
         }
       }
     },
-    refetchInterval: 60 * 1000, // Refetch every minute
-    staleTime: 30 * 1000, // Consider data stale after 30 seconds
-    retry: 2, // Retry twice before failing
-    retryDelay: (attempt) => Math.min(attempt * 1000, 3000) // Staggered retry
+    refetchInterval: 5 * 60 * 1000, // Refetch every 5 min (price doesn't change that often)
+    staleTime: 4 * 60 * 1000, // Consider data fresh for 4 min
+    retry: 3, // Retry 3 times on transient 500s
+    retryDelay: (attempt) => Math.min(2000 * Math.pow(2, attempt), 15000) // 2s, 4s, 8s then give up
   })
 }
