@@ -97,6 +97,9 @@ type ContactMetadata = {
   lastName?: string
   first_name?: string
   last_name?: string
+  job_title?: string
+  title?: string
+  linkedin_url?: string
   workDirectPhone?: string
   mobile?: string
   otherPhone?: string
@@ -488,7 +491,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
             lastContact: item.lastContactedAt || item.created_at || new Date().toISOString(),
             accountId: item.accountId || undefined,
             industry: account?.industry || undefined,
-            title: item.title || (metadata as any)?.title || (metadata as any)?.jobTitle || (metadata as any)?.general?.title || '',
+            title: item.title || metadata?.title || metadata?.job_title || (metadata as any)?.jobTitle || (metadata as any)?.general?.title || '',
             location: item.city ? `${item.city}, ${item.state || ''}` : (metadata?.city ? `${metadata.city}, ${metadata.state || ''}` : (account?.city ? `${account.city}, ${account.state || ''}` : (metadata?.address || account?.address || ''))),
             website: item.website || account?.domain || metadata?.website || undefined,
             metadata: metadata
@@ -685,16 +688,16 @@ export function useContact(id: string) {
         status: typedData.status || 'Lead',
         lastContact: typedData.lastContactedAt || new Date().toISOString(),
         
-        // Detail fields
+        // Detail fields (title and LinkedIn from contact row or metadata e.g. bulk import)
         firstName: fName,
         lastName: lName,
-        title: typedData.title || undefined,
+        title: typedData.title || metadata?.job_title || metadata?.title || undefined,
         companyName: account?.name,
         city: typedData.city || account?.city,
         state: typedData.state || account?.state,
         location: typedData.city ? `${typedData.city}, ${typedData.state || ''}` : (account?.city ? `${account.city}, ${account.state || ''}` : (account?.address || '')),
         industry: account?.industry,
-        linkedinUrl: typedData.linkedinUrl || undefined,
+        linkedinUrl: typedData.linkedinUrl || metadata?.linkedin_url || undefined,
         website: account?.domain,
         accountId: typedData.accountId || undefined,
         linkedAccountId: typedData.accountId || undefined,
@@ -713,11 +716,11 @@ export function useContact(id: string) {
         // List Membership
         listName: listName,
 
-        // Phone fields
+        // Phone fields (company phone: always prefill from account when account has phone)
         mobile: typedData.mobile || '',
         workDirectPhone: typedData.workPhone || '',
         otherPhone: typedData.otherPhone || '',
-        companyPhone: typedData.companyPhone || '',
+        companyPhone: typedData.companyPhone || account?.phone || '',
         primaryPhoneField: normalizePrimaryPhoneField(typedData.primaryPhoneField)
       } as ContactDetail
     },
@@ -729,6 +732,7 @@ export function useContact(id: string) {
 
 export function useCreateContact() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   return useMutation({
     mutationFn: async (newContact: Omit<Contact, 'id'> & { id?: string }) => {
       // Basic insert - handling linked account is more complex in UI, assuming ID provided if linked
@@ -743,6 +747,7 @@ export function useCreateContact() {
         companyPhone: newContact.companyPhone,
         status: newContact.status,
         accountId: newContact.accountId || null,
+        ownerId: user?.email || null,
         city: (newContact as any).city || null,
         state: (newContact as any).state || null,
         metadata: {
@@ -772,6 +777,7 @@ export function useCreateContact() {
 
 export function useUpsertContact() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   return useMutation({
     mutationFn: async (contact: Omit<Contact, 'id'> & { id?: string }) => {
       // 1. Try to find existing contact by email or name+company if ID is missing
@@ -876,6 +882,7 @@ export function useUpsertContact() {
       
       if (!existingId) {
         dbContact.id = crypto.randomUUID();
+        dbContact.ownerId = user?.email || null;
         dbContact.metadata = {
           company: contact.company,
           domain: contact.companyDomain,

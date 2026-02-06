@@ -57,6 +57,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   const [data, setData] = useState<ApolloContactRow[]>([]);
   const [companySummary, setCompanySummary] = useState<ApolloCompany | null>(null);
   const [scanStatus, setScanStatus] = useState<'idle' | 'scanning' | 'complete'>('idle');
+  const [contactsLoading, setContactsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [acquiringEmail, setAcquiringEmail] = useState<string | null>(null);
@@ -99,6 +100,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       setData([]);
       setCompanySummary(null);
       setScanStatus('idle');
+      setContactsLoading(false);
       setSearchTerm('');
       setCurrentPage(1);
       
@@ -661,169 +663,163 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   };
 
   const handleSearch = async () => {
-    if (!searchTerm) {
-      // If search is empty, just filter local data (or reset to initial scan if we want)
+    const term = searchTerm.trim();
+    if (!term) {
+      setCurrentPage(1);
+      return;
+    }
+    if (!domain && !companyName) {
+      toast.error('No company context. Open an account first so we can scope the search.');
       return;
     }
 
-    setScanStatus('scanning');
+    setContactsLoading(true);
+    const previousData = data;
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
-      const response = await fetch('/api/apollo/contacts', {
+
+      const peopleResp = await fetch('/api/apollo/search-people', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`
         },
         body: JSON.stringify({
-          pages: { page: 0, size: 50 },
-          filters: { 
-            person_name: searchTerm,
-            companies: { 
-              include: domain ? { domains: [domain] } : { names: [companyName] }
-            }
-          }
+          page: 1,
+          per_page: 50,
+          q_keywords: term,
+          q_organization_domains: domain || undefined,
+          q_organization_domains_list: domain ? [domain] : undefined,
+          q_organization_name: companyName || undefined,
+          person_titles: ['owner', 'founder', 'c-level', 'vp', 'director', 'manager']
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to search Apollo');
+      if (!peopleResp.ok) {
+        const errBody = await peopleResp.json().catch(() => ({}));
+        throw new Error(typeof errBody?.error === 'string' ? errBody.error : 'Failed to search Apollo');
       }
 
-      const result: unknown = await response.json();
-      
-      // The search-people endpoint used here (contacts.js) returns { contacts: [...] }
-      // But let's check for both just in case
+      const result: unknown = await peopleResp.json();
       const apolloContacts: unknown[] =
-        isRecord(result) 
-          ? (Array.isArray(result.contacts) ? (result.contacts as unknown[]) : (Array.isArray(result.people) ? (result.people as unknown[]) : []))
-          : []
+        isRecord(result) && Array.isArray(result.people) ? (result.people as unknown[]) : [];
 
-      // Extract all emails to check in Supabase
       const emailsToCheck = apolloContacts
         .map((c) => (isRecord(c) && typeof c.email === 'string' ? c.email : null))
         .filter(Boolean);
 
       let existingEmails = new Set<string>();
-
       if (emailsToCheck.length > 0) {
         const { data: existingContacts, error } = await supabase
           .from('contacts')
           .select('email')
           .in('email', emailsToCheck);
-        
         if (!error && existingContacts) {
           existingEmails = new Set(existingContacts.map(c => c.email));
         }
       }
 
-      // Map Apollo results
       const mappedData: ApolloContactRow[] = apolloContacts
         .map((contact): ApolloContactRow | null => {
-          if (!isRecord(contact)) return null
-          const name = typeof contact.name === 'string' ? contact.name : ''
-          if (!name) return null
-          
-          const id = typeof contact.id === 'string' ? contact.id : 
-                     typeof contact.contactId === 'string' ? contact.contactId : 
-                     typeof contact.person_id === 'string' ? contact.person_id : '';
-          
+          if (!isRecord(contact)) return null;
+          const c = contact as Record<string, unknown>;
+          const name = (typeof c.name === 'string' ? c.name : '') || [c.first_name, c.last_name, c.firstName, c.lastName].filter(Boolean).join(' ').trim();
+          if (!name) return null;
+
+          const id = typeof c.id === 'string' ? c.id :
+            typeof c.contactId === 'string' ? c.contactId :
+              typeof c.person_id === 'string' ? c.person_id : '';
           if (!id) return null;
 
-          const firstName = typeof contact.first_name === 'string' ? contact.first_name : name.split(' ')[0]
-          const lastName = typeof contact.last_name === 'string' ? contact.last_name : name.split(' ').slice(1).join(' ')
-          const title = typeof contact.title === 'string' ? contact.title : undefined
-          const email = typeof contact.email === 'string' ? contact.email : 'N/A'
-          const emailStatus = typeof contact.email_status === 'string' ? contact.email_status : ''
-          const status: ApolloContactRow['status'] = emailStatus === 'verified' ? 'verified' : 'unverified'
-          const isMonitored = email !== 'N/A' && existingEmails.has(email)
-          
-          const location = [
-            typeof contact.city === 'string' ? contact.city : null,
-            typeof contact.state === 'string' ? contact.state : null
-          ].filter(Boolean).join(', ')
+          const firstName = typeof c.first_name === 'string' ? c.first_name : typeof c.firstName === 'string' ? c.firstName : name.split(' ')[0];
+          const lastName = typeof c.last_name === 'string' ? c.last_name : typeof c.lastName === 'string' ? c.lastName : name.split(' ').slice(1).join(' ');
+          const title = typeof c.title === 'string' ? c.title : undefined;
+          const email = typeof c.email === 'string' ? c.email : 'N/A';
+          const emailStatus = typeof c.email_status === 'string' ? c.email_status : '';
+          const status: ApolloContactRow['status'] = emailStatus === 'verified' ? 'verified' : 'unverified';
+          const isMonitored = email !== 'N/A' && existingEmails.has(email);
 
-          const linkedin = typeof contact.linkedin_url === 'string' ? contact.linkedin_url : undefined
-          
-          const phones: string[] = []
-          if (Array.isArray(contact.phones)) {
-            contact.phones.forEach(p => {
-              if (isRecord(p) && typeof p.sanitized_number === 'string') {
-                phones.push(p.sanitized_number)
-              }
-            })
+          const location = [
+            typeof c.city === 'string' ? c.city : null,
+            typeof c.state === 'string' ? c.state : null
+          ].filter(Boolean).join(', ');
+
+          const linkedin = typeof c.linkedin_url === 'string' ? c.linkedin_url : typeof c.linkedin === 'string' ? c.linkedin : undefined;
+
+          const phones: string[] = [];
+          if (Array.isArray(c.phones)) {
+            c.phones.forEach((p: unknown) => {
+              if (isRecord(p) && typeof p.sanitized_number === 'string') phones.push(p.sanitized_number);
+            });
+          } else if (Array.isArray(c.phone_numbers)) {
+            (c.phone_numbers as Array<{ sanitized_number?: string; number?: string }>).forEach(p => {
+              const num = p?.sanitized_number ?? p?.number;
+              if (typeof num === 'string') phones.push(num);
+            });
           }
 
-          return { 
+          return {
             id,
-            name, 
-            firstName, 
-            lastName, 
-            title, 
-            email, 
-            status, 
+            name,
+            firstName,
+            lastName,
+            title,
+            email,
+            status,
             isMonitored,
             location,
             linkedin,
             phones
-          }
+          };
         })
-        .filter((v): v is ApolloContactRow => v !== null)
+        .filter((v): v is ApolloContactRow => v !== null);
 
-      setData(mappedData);
-      setScanStatus('complete');
-      setCurrentPage(1);
-      
-      // MERGE & SAVE STRATEGY
-      // 1. Get current cache (to avoid losing existing contacts)
-      const key = domain || companyName;
-      let existingContacts: ApolloContactRow[] = [];
-      
-      // Try local storage first for speed (since we sync it on load)
-      const cacheKey = `apollo_cache_${key}`;
-      const cached = localStorage.getItem(cacheKey);
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          existingContacts = Array.isArray(parsed.contacts) ? parsed.contacts : [];
-        } catch (e) {}
+      if (mappedData.length > 0) {
+        setData(mappedData);
+        setCurrentPage(1);
+        const key = domain || companyName;
+        if (key && companySummary) {
+          const cacheKey = `apollo_cache_${key}`;
+          let existingContacts: ApolloContactRow[] = [];
+          try {
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              existingContacts = Array.isArray(parsed?.contacts) ? parsed.contacts : [];
+            }
+          } catch (_) {}
+          const existingIds = new Set(existingContacts.map(c => c.id));
+          const newContacts = mappedData.filter(c => !existingIds.has(c.id));
+          if (newContacts.length > 0) {
+            saveToCache(companySummary, [...existingContacts, ...newContacts]);
+          }
+        }
+      } else {
+        if (previousData.length > 0) {
+          toast.info('No additional matches from Apollo. Showing filtered list from current results.');
+        } else {
+          toast.info('No people found for this search.');
+        }
       }
-      
-      // 2. Merge new results into existing
-      const existingIds = new Set(existingContacts.map(c => c.id));
-      const newContacts = mappedData.filter(c => !existingIds.has(c.id));
-      const mergedContacts = [...existingContacts, ...newContacts];
-      
-      // 3. Save merged list
-      if (newContacts.length > 0) {
-        saveToCache(companySummary, mergedContacts);
-      }
-      
     } catch (error) {
       console.error('Apollo Search Error:', error);
-      setScanStatus('complete'); // Go back to complete so user can try again
-      toast.error('Search failed. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Search failed. Please try again.');
+    } finally {
+      setContactsLoading(false);
     }
   };
 
   const filteredData = useMemo(() => {
-    // If we just searched via API, data is already filtered.
-    // But if we are in "browse" mode, we might want to filter locally too?
-    // Actually, if we search via API, `data` contains the search results.
-    // If we haven't searched (browsing), `data` contains the browse results.
-    // The previous logic was ONLY local filtering.
-    // Now we want `searchTerm` to trigger API search on Enter.
-    // So we should probably remove the local filtering if we are using API search.
-    // But for now, let's keep local filtering as a fallback or for refining results?
-    // No, if I search "John", I get Johns. If I type "Director" in the box...
-    // The user expects the search box to SEARCH APOLLO.
-    
-    // So I will remove the local filter dependency on searchTerm if I use it for API search.
-    // OR, I can use a separate state for "local filter" vs "api search term".
-    // Let's assume the input is for API search.
-    return data; 
-  }, [data]);
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return data;
+    return data.filter((p) => {
+      const name = (p.name ?? '').toLowerCase();
+      const first = (p.firstName ?? '').toLowerCase();
+      const last = (p.lastName ?? '').toLowerCase();
+      const title = (p.title ?? '').toLowerCase();
+      return name.includes(term) || first.includes(term) || last.includes(term) || title.includes(term);
+    });
+  }, [data, searchTerm]);
 
   const paginatedData = useMemo(() => {
     const start = (currentPage - 1) * CONTACTS_PER_PAGE;
@@ -847,7 +843,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         <div className="flex items-center gap-2">
           <Users className={cn("w-3.5 h-3.5", scanStatus === 'complete' ? "text-white" : "text-zinc-500")} />
           <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-            {scanStatus === 'scanning' ? 'Scanning...' : `Target_Pool [${filteredData.length}]`}
+            {contactsLoading ? 'Searching...' : scanStatus === 'scanning' ? 'Scanning...' : `Target_Pool [${filteredData.length}]`}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -920,8 +916,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         "flex-1 p-1 relative min-h-0 transition-opacity duration-500",
         scanStatus === 'idle' ? "opacity-50" : "opacity-100"
       )}>
-        {/* Blur Overlay for Enrichment Scanning */}
-        {scanStatus === 'scanning' && data.length > 0 && (
+        {/* Blur Overlay only for initial scan (enrichment); not for search */}
+        {scanStatus === 'scanning' && data.length > 0 && !contactsLoading && (
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/40 backdrop-blur-md animate-in fade-in duration-300 rounded-2xl">
             <div className="flex flex-col items-center gap-3">
               <div className="relative">
@@ -1075,9 +1071,14 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
               </div>
             )}
 
-            {/* CONTACTS LIST */}
+            {/* CONTACTS LIST — loading only here; company block above stays static */}
             <div className="space-y-1 px-1">
-              {paginatedData.length > 0 ? (
+              {contactsLoading ? (
+                <div className="flex flex-col items-center justify-center py-8 px-4">
+                  <Loader2 className="w-6 h-6 animate-spin text-[#002FA7] mb-2" />
+                  <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Searching...</span>
+                </div>
+              ) : paginatedData.length > 0 ? (
                 paginatedData.map((person) => (
                   <div 
                     key={person.id} 

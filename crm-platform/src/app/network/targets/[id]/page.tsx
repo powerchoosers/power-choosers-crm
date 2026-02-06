@@ -254,6 +254,7 @@ export default function TargetDetailPage() {
                 size={36} 
                 className="w-9 h-9 transition-all"
                 textClassName="text-[10px]"
+                showListBadge={isPeopleList}
               />
             <div>
               <div className="font-medium text-zinc-200 group-hover/person:text-white group-hover/person:scale-[1.02] transition-all origin-left">
@@ -353,7 +354,7 @@ export default function TargetDetailPage() {
         )
       }
     }
-  ], [pageIndex, pageSize])
+  ], [pageIndex, pageSize, isPeopleList])
 
   // Column definitions for Accounts
   const accountColumns = useMemo<ColumnDef<Account>[]>(() => [

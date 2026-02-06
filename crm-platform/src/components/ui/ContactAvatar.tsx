@@ -8,7 +8,10 @@ interface ContactAvatarProps {
   size?: number
   className?: string
   textClassName?: string
+  /** @deprecated Use showListBadge for "in a list" indicator (green dot) */
   showTargetBadge?: boolean
+  /** Green dot at top-right when contact belongs to a list (notification-style badge) */
+  showListBadge?: boolean
 }
 
 export function ContactAvatar({ 
@@ -16,7 +19,8 @@ export function ContactAvatar({
   size = 32, 
   className, 
   textClassName,
-  showTargetBadge = false
+  showTargetBadge = false,
+  showListBadge = false
 }: ContactAvatarProps) {
   const initials = name
     .split(' ')
@@ -25,6 +29,8 @@ export function ContactAvatar({
     .join('')
     .slice(0, 2)
     .toUpperCase()
+
+  const showBadge = showListBadge || showTargetBadge
 
   return (
     <div className="relative inline-block">
@@ -47,14 +53,19 @@ export function ContactAvatar({
         </span>
       </motion.div>
       
-      {/* Klein Blue Target Badge */}
-      {showTargetBadge && (
+      {/* Green dot: contact belongs to a list (top-right, notification-style) */}
+      {showBadge && (
         <motion.div
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: "spring", stiffness: 500, damping: 25, delay: 0.1 }}
-          className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-[#002FA7] border-2 border-zinc-900 rounded-full shadow-[0_0_8px_rgba(0,47,167,0.6)]"
-          title="In Target List"
+          className={cn(
+            "absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-zinc-900 shrink-0",
+            showListBadge
+              ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)]"
+              : "bg-[#002FA7] shadow-[0_0_8px_rgba(0,47,167,0.6)]"
+          )}
+          title={showListBadge ? "In list" : "In Target List"}
         />
       )}
     </div>

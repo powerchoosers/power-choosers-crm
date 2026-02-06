@@ -1,10 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Phone, 
   Play, 
+  Pause,
+  X,
   Eye, 
   Loader2, 
   Check, 
@@ -28,8 +30,21 @@ interface CallListItemProps {
   variant?: 'default' | 'minimal'
 }
 
+function formatTime(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return '0:00'
+  const m = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
 export function CallListItem({ call, contactId, variant = 'default' }: CallListItemProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const [isPlayerOpen, setIsPlayerOpen] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
   const { status, error, processCall } = useCallProcessor({
     callSid: call.id,
     recordingUrl: call.recordingUrl,
@@ -45,16 +60,94 @@ export function CallListItem({ call, contactId, variant = 'default' }: CallListI
     ? JSON.parse(call.aiInsights) 
     : call.aiInsights
 
+  // Compact duration for minimal (e.g. "00:00:16" -> "0:16")
+  const compactDuration = variant === 'minimal' && call.duration
+    ? call.duration.replace(/^00:00:/, '0:').replace(/^00:/, '')
+    : call.duration
+
+  const isMinimal = variant === 'minimal'
+
+  // Inline audio player: bind to audio element
+  useEffect(() => {
+    const el = audioRef.current
+    if (!el) return
+    const onTimeUpdate = () => setCurrentTime(el.currentTime)
+    const onLoadedMetadata = () => setDuration(el.duration)
+    const onEnded = () => {
+      setIsPlaying(false)
+      setCurrentTime(0)
+    }
+    const onPlay = () => setIsPlaying(true)
+    const onPause = () => setIsPlaying(false)
+    el.addEventListener('timeupdate', onTimeUpdate)
+    el.addEventListener('loadedmetadata', onLoadedMetadata)
+    el.addEventListener('ended', onEnded)
+    el.addEventListener('play', onPlay)
+    el.addEventListener('pause', onPause)
+    return () => {
+      el.removeEventListener('timeupdate', onTimeUpdate)
+      el.removeEventListener('loadedmetadata', onLoadedMetadata)
+      el.removeEventListener('ended', onEnded)
+      el.removeEventListener('play', onPlay)
+      el.removeEventListener('pause', onPause)
+    }
+  }, [isPlayerOpen])
+
+  const openPlayerAndPlay = () => {
+    if (!call.recordingUrl) return
+    setIsPlayerOpen(true)
+    const el = audioRef.current
+    if (el) {
+      // Use our backend proxy so Twilio auth is applied (direct Twilio URL requires Basic Auth from browser)
+      const proxyUrl = `/api/recording?url=${encodeURIComponent(call.recordingUrl)}`
+      el.src = proxyUrl
+      el.play().catch(() => setIsPlaying(false))
+    }
+  }
+
+  const togglePlayPause = () => {
+    const el = audioRef.current
+    if (!el) return
+    if (isPlaying) el.pause()
+    else el.play().catch(() => setIsPlaying(false))
+  }
+
+  const handleScrub = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const t = Number(e.target.value)
+    setCurrentTime(t)
+    const el = audioRef.current
+    if (el) el.currentTime = t
+  }
+
+  const closePlayer = () => {
+    const el = audioRef.current
+    if (el) {
+      el.pause()
+      el.removeAttribute('src')
+    }
+    setIsPlayerOpen(false)
+    setIsPlaying(false)
+    setCurrentTime(0)
+    setDuration(0)
+  }
+
   return (
     <div className={cn(
-      "group p-4 rounded-xl border transition-all duration-300",
+      "group rounded-xl border transition-all duration-300 overflow-hidden",
+      isMinimal ? "p-3" : "p-4",
       isExpanded ? "bg-white/[0.05] border-white/10 shadow-2xl" : "bg-white/[0.02] border-white/5 hover:bg-white/[0.04] hover:border-white/10"
     )}>
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-4 flex-1">
-          {variant !== 'minimal' && (
+      {call.recordingUrl && (
+        <audio ref={audioRef} preload="metadata" className="hidden" />
+      )}
+      <div className="flex items-center justify-between gap-2">
+        <div className={cn(
+          "flex-1 min-w-0",
+          !isMinimal && "flex items-center gap-4"
+        )}>
+          {!isMinimal && (
             <div className={cn(
-              "p-3 rounded-xl transition-colors duration-300",
+              "p-3 rounded-xl transition-colors duration-300 shrink-0",
               call.type === 'Inbound' 
                 ? "bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500/20" 
                 : "bg-[#002FA7]/10 text-[#002FA7] group-hover:bg-[#002FA7]/20"
@@ -63,37 +156,78 @@ export function CallListItem({ call, contactId, variant = 'default' }: CallListI
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold text-white flex items-center justify-between gap-4 w-full">
-              <div className="flex items-center gap-3">
-                {call.type} {variant === 'minimal' ? '' : 'Call'}
-                {isProcessed && (
-                  <span className="px-2 py-0.5 rounded border border-white/10 text-[9px] font-mono text-zinc-500 uppercase tracking-widest bg-transparent">
-                    [ STATUS: DECRYPTED ]
+            {isMinimal ? (
+              <>
+                <div className="text-[11px] font-semibold text-white flex items-center gap-2 flex-wrap">
+                  <span>{call.type}</span>
+                  <span className="text-zinc-500 font-normal">•</span>
+                  <span className="font-mono tabular-nums text-zinc-400">{compactDuration}</span>
+                  {isProcessed && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 shrink-0" title="Decrypted" />
+                  )}
+                </div>
+                <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider mt-0.5">
+                  {call.date && isValid(new Date(call.date)) 
+                    ? (() => {
+                        const d = new Date(call.date!)
+                        const dateStr = format(d, 'MMM d, yyyy')
+                        const timeStr = d.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true })
+                        return `${dateStr} ${timeStr}`
+                      })()
+                    : 'Unknown Date'}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-sm font-semibold text-white flex items-center justify-between gap-4 w-full">
+                  <div className="flex items-center gap-3">
+                    {call.type} Call
+                    {isProcessed && (
+                      <span className="px-2 py-0.5 rounded border border-white/10 text-[9px] font-mono text-zinc-500 uppercase tracking-widest bg-transparent">
+                        [ STATUS: DECRYPTED ]
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest tabular-nums ml-auto">
+                    {call.duration}
                   </span>
-                )}
-              </div>
-              <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest tabular-nums ml-auto">
-                {call.duration}
-              </span>
-            </div>
-            <div className="text-[10px] font-mono text-zinc-500 uppercase mt-1">
-              {call.date && isValid(new Date(call.date)) 
-                ? format(new Date(call.date), 'MMM dd, yyyy • HH:mm') 
-                : 'Unknown Date'}
-            </div>
+                </div>
+                <div className="text-[10px] font-mono text-zinc-500 uppercase mt-1">
+                  {call.date && isValid(new Date(call.date)) 
+                    ? (() => {
+                        const d = new Date(call.date!)
+                        const dateStr = format(d, 'MMM dd, yyyy')
+                        const timeStr = d.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true })
+                        return `${dateStr} • ${timeStr}`
+                      })()
+                    : 'Unknown Date'}
+                </div>
+              </>
+            )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 shrink-0">
           {call.recordingUrl && (
             <Button
               variant="ghost"
               size="icon"
-              className="w-8 h-8 rounded-lg hover:bg-[#002FA7]/20 hover:text-[#002FA7] text-zinc-500 transition-all"
-              onClick={() => window.open(call.recordingUrl, '_blank')}
-              title="Play Recording"
+              className={cn(
+                "text-zinc-500 hover:text-zinc-300 hover:scale-105 transition-all duration-200",
+                isMinimal ? "w-7 h-7" : "w-8 h-8"
+              )}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (isPlayerOpen) togglePlayPause()
+                else openPlayerAndPlay()
+              }}
+              title={isPlayerOpen ? (isPlaying ? 'Pause' : 'Play') : 'Play Recording'}
             >
-              <Play className="w-4 h-4 fill-current" />
+              {isPlayerOpen && isPlaying ? (
+                <Pause className={cn("fill-current", isMinimal ? "w-3.5 h-3.5" : "w-4 h-4")} />
+              ) : (
+                <Play className={cn("fill-current", isMinimal ? "w-3.5 h-3.5" : "w-4 h-4")} />
+              )}
             </Button>
           )}
 
@@ -101,10 +235,9 @@ export function CallListItem({ call, contactId, variant = 'default' }: CallListI
             variant="ghost"
             size="icon"
             className={cn(
-              "w-8 h-8 rounded-lg transition-all duration-300 relative overflow-hidden",
-              currentStatus === 'processing' ? "bg-amber-500/10 text-amber-500 border border-amber-500/30" :
-              currentStatus === 'ready' ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20" :
-              "text-zinc-500 hover:bg-white/5 hover:text-white"
+              "transition-all duration-200 relative overflow-hidden hover:scale-105 text-zinc-500 hover:text-zinc-300",
+              isMinimal ? "w-7 h-7" : "w-8 h-8",
+              currentStatus === 'processing' && "text-amber-500 hover:text-amber-400"
             )}
             onClick={(e) => {
               e.stopPropagation()
@@ -124,24 +257,70 @@ export function CallListItem({ call, contactId, variant = 'default' }: CallListI
               )}
             </AnimatePresence>
             {currentStatus === 'processing' ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className={cn("animate-spin", isMinimal ? "w-3.5 h-3.5" : "w-4 h-4")} />
             ) : currentStatus === 'ready' ? (
-              <Sparkles className="w-4 h-4" />
+              <Sparkles className={cn(isMinimal ? "w-3.5 h-3.5" : "w-4 h-4")} />
             ) : (
-              <Eye className="w-4 h-4" />
+              <Eye className={cn(isMinimal ? "w-3.5 h-3.5" : "w-4 h-4")} />
             )}
           </Button>
 
           <Button
             variant="ghost"
             size="icon"
-            className="w-8 h-8 rounded-lg hover:bg-white/5 text-zinc-500 transition-all"
+            className={cn(
+              "text-zinc-500 hover:text-zinc-300 hover:scale-105 transition-all duration-200",
+              isMinimal ? "w-7 h-7" : "w-8 h-8"
+            )}
             onClick={() => setIsExpanded(!isExpanded)}
           >
-            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            {isExpanded ? <ChevronUp className={cn(isMinimal ? "w-3.5 h-3.5" : "w-4 h-4")} /> : <ChevronDown className={cn(isMinimal ? "w-3.5 h-3.5" : "w-4 h-4")} />}
           </Button>
         </div>
       </div>
+
+      <AnimatePresence>
+        {isPlayerOpen && call.recordingUrl && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-3 pt-3 border-t border-white/5 flex flex-col gap-2 min-w-0 pl-0 pr-4">
+              <div className="flex items-center min-w-0 px-0 py-1 gap-0">
+                {!isMinimal && <div className="w-[2.5rem] shrink-0" aria-hidden />}
+                <span className="text-[10px] font-mono tabular-nums text-zinc-500 uppercase tracking-wider w-10 shrink-0 text-right">
+                  {formatTime(currentTime)}
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={duration || 100}
+                  step={0.1}
+                  value={currentTime}
+                  onChange={handleScrub}
+                  className="flex-1 min-w-[120px] mx-2 min-h-[8px] h-2 rounded-full appearance-none bg-transparent cursor-pointer [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-zinc-700 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:shadow-[0_0_0_2px_rgba(255,255,255,0.3)] [&::-webkit-slider-thumb]:-mt-0.5 [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-zinc-700 [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:-mt-0.5"
+                  style={{ accentColor: 'white' }}
+                />
+                <span className="text-[10px] font-mono tabular-nums text-zinc-500 uppercase tracking-wider w-10 shrink-0 text-left">
+                  {formatTime(duration)}
+                </span>
+                <button
+                  type="button"
+                  onClick={closePlayer}
+                  className="w-7 h-7 shrink-0 ml-2 rounded-full bg-zinc-700/80 hover:bg-zinc-600 flex items-center justify-center text-zinc-400 hover:text-zinc-200 transition-colors duration-200 flex-shrink-0 min-w-[28px] min-h-[28px]"
+                  title="Close player"
+                  aria-label="Close player"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {isExpanded && (
         <div className="mt-6 pt-6 border-t border-white/5 space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">

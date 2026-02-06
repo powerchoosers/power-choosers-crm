@@ -46,7 +46,7 @@ export const StakeholderMap: React.FC<StakeholderMapProps> = ({ contacts = [], c
                 size={32} 
                 className="w-8 h-8 rounded-[14px]"
                 textClassName="text-[10px]"
-                showTargetBadge={isInTargetList}
+                showListBadge={isInTargetList}
               />
               
               <div className="flex-1 min-w-0">

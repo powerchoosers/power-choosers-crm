@@ -20,6 +20,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
 import { useContacts, useContactsCount, useDeleteContacts, Contact } from '@/hooks/useContacts'
+import { useContactsInTargetLists } from '@/hooks/useListMemberships'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
@@ -90,6 +91,8 @@ export default function PeoplePage() {
   const [composeTarget, setComposeTarget] = useState<{ email: string; name: string; company: string } | null>(null)
 
   const contacts = useMemo(() => data?.pages.flatMap(page => page.contacts) || [], [data])
+  const contactIds = useMemo(() => contacts.map(c => c.id), [contacts])
+  const { data: contactIdsInList } = useContactsInTargetLists(contactIds)
 
   useEffect(() => {
     setIsMounted(true)
@@ -245,6 +248,7 @@ export default function PeoplePage() {
                 name={contact.name} 
                 size={36} 
                 className="w-9 h-9 transition-all"
+                showListBadge={contactIdsInList?.has(contact.id)}
               />
               <div>
                 <div className="font-medium text-zinc-200 group-hover/person:text-white group-hover/person:scale-[1.02] transition-all origin-left">
@@ -417,7 +421,7 @@ export default function PeoplePage() {
         },
       },
     ]
-  }, [router, pageIndex])
+  }, [router, pageIndex, contactIdsInList])
 
   const table = useReactTable({
     data: contacts,

@@ -18,7 +18,7 @@ export function useContactsInTargetLists(contactIds: string[]) {
       const { data, error } = await supabase
         .from('list_members')
         .select('targetId')
-        .eq('targetType', 'CONTACT')
+        .in('targetType', ['people', 'contact', 'contacts'])
         .in('targetId', contactIds)
 
       if (error) {
@@ -46,7 +46,7 @@ export function useIsContactInTargetList(contactId: string | undefined) {
       const { data, error } = await supabase
         .from('list_members')
         .select('id')
-        .eq('targetType', 'CONTACT')
+        .in('targetType', ['people', 'contact', 'contacts'])
         .eq('targetId', contactId)
         .limit(1)
         .maybeSingle()
