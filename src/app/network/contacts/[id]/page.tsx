@@ -722,7 +722,7 @@ export default function ContactDossierPage() {
         <div className="flex-1 flex overflow-hidden relative z-10 group/dossier">
           <div className="grid grid-cols-12 w-full h-full">
             <div className="col-span-12 lg:col-span-4 h-full overflow-y-auto p-6 md:p-8 border-r border-white/5 scrollbar-thin scrollbar-thumb-zinc-800/0 hover:scrollbar-thumb-zinc-800/50 scrollbar-track-transparent transition-all duration-300">
-              <div className="space-y-8">
+              <div className="space-y-8 animate-in fade-in slide-in-from-left-4 duration-700">
                 {contact && (
                   <UplinkCard 
                     contact={{
@@ -889,7 +889,7 @@ export default function ContactDossierPage() {
             </div>
 
             <div className="col-span-12 lg:col-span-8 h-full overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-zinc-700/50 hover:scrollbar-thumb-[#002FA7]/50 scrollbar-track-transparent transition-all duration-300 np-scroll">
-              <div className="space-y-6">
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-700 delay-100">
                 {/* FORENSIC NOTES TERMINAL */}
                 <div 
                   className={`rounded-2xl border transition-all duration-500 bg-zinc-950/80 backdrop-blur-xl p-6 min-h-[500px] relative overflow-hidden shadow-2xl group flex flex-col font-mono ${isEditing ? 'border-[#002FA7]/50 ring-1 ring-[#002FA7]/20 cursor-text' : 'border-white/10'}`}
