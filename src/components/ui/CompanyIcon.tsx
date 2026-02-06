@@ -6,7 +6,9 @@ import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface CompanyIconProps {
+  /** Account/company logo URL. Always prioritized; only when this is blank or fails do we use domain favicon. */
   logoUrl?: string
+  /** Used only for favicon fallback when logoUrl is blank or has failed. */
   domain?: string
   name: string
   size?: number
@@ -39,9 +41,11 @@ export function CompanyIcon({
   const [retryCount, setRetryCount] = useState(0)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   
+  // Only use logoUrl when it's a non-empty string; otherwise treat as "no logo" and allow domain fallback
+  const effectiveLogoUrl = (typeof logoUrl === 'string' && logoUrl.trim()) ? logoUrl.trim() : undefined
   const faviconSrc = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=128` : null
-  const currentSrc = (logoUrl && failedSrc !== logoUrl)
-    ? logoUrl
+  const currentSrc = (effectiveLogoUrl && failedSrc !== effectiveLogoUrl)
+    ? effectiveLogoUrl
     : (faviconSrc && failedSrc !== faviconSrc)
         ? faviconSrc
         : null

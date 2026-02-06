@@ -305,6 +305,8 @@ export function RightPanel() {
                     companyName={contact?.company || account?.name}
                     website={contact?.website || account?.domain}
                     accountId={isContactPage ? contact?.accountId : entityId}
+                    accountLogoUrl={account?.logoUrl}
+                    accountDomain={account?.domain}
                   />
                 </div>
               </motion.div>
