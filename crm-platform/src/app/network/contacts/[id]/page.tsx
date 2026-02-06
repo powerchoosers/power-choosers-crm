@@ -210,8 +210,9 @@ export default function ContactDossierPage() {
           setTimeout(() => setShowSynced(false), 3000)
           toast.success('System Synced')
         } catch (err) {
-          toast.error('Sync failed')
-          console.error(err)
+          const message = err instanceof Error ? err.message : 'Sync failed'
+          toast.error(`Sync failed: ${message}`)
+          console.error('Contact dossier sync error:', err)
         } finally {
           setIsSaving(false)
         }

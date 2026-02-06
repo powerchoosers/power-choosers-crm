@@ -162,11 +162,17 @@ async function fetchFromOfficialApi(type, keys) {
   };
 
   if (type === 'prices') {
-    const [houstonData, northData] = await Promise.all([
+    const [houstonData, northData, southData, westData] = await Promise.all([
       fetchOne('https://api.ercot.com/api/public-reports/np6-905-cd/spp_node_zone_hub?settlementPoint=LZ_HOUSTON&size=5', {
         headers: { 'Ocp-Apim-Subscription-Key': primaryKey, 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
       }),
       fetchOne('https://api.ercot.com/api/public-reports/np6-905-cd/spp_node_zone_hub?settlementPoint=LZ_NORTH&size=5', {
+        headers: { 'Ocp-Apim-Subscription-Key': primaryKey, 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+      }),
+      fetchOne('https://api.ercot.com/api/public-reports/np6-905-cd/spp_node_zone_hub?settlementPoint=LZ_SOUTH&size=5', {
+        headers: { 'Ocp-Apim-Subscription-Key': primaryKey, 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+      }),
+      fetchOne('https://api.ercot.com/api/public-reports/np6-905-cd/spp_node_zone_hub?settlementPoint=LZ_WEST&size=5', {
         headers: { 'Ocp-Apim-Subscription-Key': primaryKey, 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
       })
     ]);
@@ -174,16 +180,23 @@ async function fetchFromOfficialApi(type, keys) {
     // Map data (Indices: 0:date, 1:hour, 2:interval, 3:point, 5:price)
     const h = houstonData.data?.[0] || [];
     const n = northData.data?.[0] || [];
+    const s = southData.data?.[0] || [];
+    const w = westData.data?.[0] || [];
+
+    const houstonPrice = parseFloat(h[5]) || 0;
+    const northPrice = parseFloat(n[5]) || 0;
+    const southPrice = parseFloat(s[5]) || 0;
+    const westPrice = parseFloat(w[5]) || 0;
 
     return {
       source: 'ERCOT Official API',
       timestamp: `${h[0]} ${h[1]}:${(h[2]-1)*15}`, 
       prices: {
-        houston: parseFloat(h[5]) || 0,
-        north: parseFloat(n[5]) || 0,
-        south: 0, 
-        west: 0,
-        hub_avg: 0
+        houston: houstonPrice,
+        north: northPrice,
+        south: southPrice,
+        west: westPrice,
+        hub_avg: (houstonPrice + northPrice + southPrice + westPrice) / 4
       },
       metadata: {
         last_updated: new Date().toISOString(),

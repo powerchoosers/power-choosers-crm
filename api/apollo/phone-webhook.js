@@ -1,12 +1,15 @@
 /**
  * Apollo Phone Number Webhook Endpoint
- * 
+ *
  * Apollo sends phone numbers asynchronously to this webhook URL.
  * We store them temporarily in memory and optionally persist to Firebase.
+ * We also update the linked contact in Supabase so the number appears on the
+ * contact dossier even if the user left the page (background link).
  */
 
-import { cors } from './_utils.js';
+import { cors, formatPhoneForContact } from './_utils.js';
 import { db } from '../_firebase.js';
+import { supabaseAdmin } from '../_supabase.js';
 
 // In-memory fallback (only for local dev without Firestore)
 const memoryStore = new Map();
@@ -86,10 +89,38 @@ export default async function handler(req, res) {
       memoryStore.set(personId, payload);
     }
 
+    // Link phones to contact in Supabase (background: works even if user left the page)
+    if (personId && Array.isArray(phones) && phones.length > 0 && supabaseAdmin) {
+      try {
+        const { data: contactRow } = await supabaseAdmin
+          .from('contacts')
+          .select('id')
+          .eq('metadata->>apollo_person_id', personId)
+          .maybeSingle();
+        if (contactRow?.id) {
+          const numbers = phones
+            .map(p => p.sanitized_number || p.raw_number)
+            .filter(Boolean)
+            .map(formatPhoneForContact)
+            .filter(Boolean);
+          const update = {};
+          if (numbers[0]) update.phone = numbers[0];
+          if (numbers[1]) update.mobile = numbers[1];
+          if (numbers[2]) update.workPhone = numbers[2];
+          if (Object.keys(update).length > 0) {
+            update.updatedAt = new Date().toISOString();
+            await supabaseAdmin.from('contacts').update(update).eq('id', contactRow.id);
+          }
+        }
+      } catch (dbErr) {
+        console.error('[phone-webhook] Supabase contact update failed:', dbErr);
+      }
+    }
+
     // Respond to Apollo
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      success: true, 
+    res.end(JSON.stringify({
+      success: true,
       message: 'Phone numbers received',
       personId
     }));

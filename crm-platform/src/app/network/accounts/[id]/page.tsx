@@ -354,8 +354,8 @@ export default function AccountDossierPage() {
               <div className="relative group/logo">
                 <div onClick={() => isEditing && setActiveEditField(activeEditField === 'logo' ? null : 'logo')}>
                   <CompanyIcon
-                    logoUrl={editLogoUrl || account.logoUrl}
-                    domain={editDomain || account.domain}
+                    logoUrl={(editLogoUrl?.trim() || account.logoUrl?.trim()) || undefined}
+                    domain={(editDomain?.trim() || account.domain?.trim()) || undefined}
                     name={account.name}
                     size={56}
                     className={cn(
