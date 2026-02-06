@@ -85,43 +85,59 @@ export function useCallProcessor({ callSid, recordingUrl, recordingSid, contactI
       if (data.ok) {
         setStatus('processing')
 
-        // Step 2: Poke the background analyzer to ensure processing starts
-        // We'll do this periodically until the status changes to ready
         const transcriptSid = data.transcriptSid
-        
+        let intervalId: ReturnType<typeof setInterval> | null = null
+
+        const onComplete = () => {
+          if (intervalId) clearInterval(intervalId)
+          intervalId = null
+          setStatus('ready')
+          if (contactId) queryClient.invalidateQueries({ queryKey: ['contact-calls', contactId] })
+          queryClient.invalidateQueries({ queryKey: ['calls'] })
+          if (accountId) queryClient.invalidateQueries({ queryKey: ['account-calls', accountId] })
+          toast.success('Insights ready', { description: 'View the call to see AI analysis and transcript.' })
+        }
+
         const pokeAnalyzer = async () => {
           try {
-            await fetch('/api/twilio/poll-ci-analysis', {
+            const pollRes = await fetch('/api/twilio/poll-ci-analysis', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                transcriptSid,
-                callSid 
-              })
+              body: JSON.stringify({ transcriptSid, callSid }),
             })
+            const pollData = await pollRes.json().catch(() => ({}))
+            if (pollData.analysisComplete === true) {
+              onComplete()
+              return
+            }
+            if (pollData.analysisFailed === true) {
+              if (intervalId) clearInterval(intervalId)
+              setStatus('error')
+              setError(pollData.message || 'Analysis failed')
+              toast.error('Processing failed', { description: pollData.message || 'Analysis failed' })
+              return
+            }
           } catch (e) {
-            console.warn('Background poke failed:', e)
+            console.warn('Poll CI analysis failed:', e)
           }
         }
 
-        // Initial poke
         pokeAnalyzer()
 
-        // Set up an interval to keep poking until status is ready or error
-        const interval = setInterval(() => {
+        intervalId = setInterval(() => {
           setStatus(prev => {
-            if (prev === 'ready' || prev === 'error') {
-              clearInterval(interval)
-              return prev
-            }
+            if (prev === 'ready' || prev === 'error') return prev
             pokeAnalyzer()
             return prev
           })
-        }, 5000)
+        }, 4000)
 
-        // Cleanup interval after 5 minutes safety timeout
-        setTimeout(() => clearInterval(interval), 5 * 60 * 1000)
-
+        setTimeout(() => {
+          if (intervalId) {
+            clearInterval(intervalId)
+            intervalId = null
+          }
+        }, 5 * 60 * 1000)
       } else {
         throw new Error(data.message || 'Failed to start processing')
       }
@@ -132,7 +148,7 @@ export function useCallProcessor({ callSid, recordingUrl, recordingSid, contactI
       setStatus('error')
       toast.error('Processing failed', { description: errorMessage })
     }
-  }, [callSid, recordingUrl, recordingSid])
+  }, [callSid, recordingUrl, recordingSid, contactId, accountId, queryClient])
 
   return {
     status,

@@ -104,6 +104,8 @@ export default function AccountDossierPage() {
   const [editLinkedinUrl, setEditLinkedinUrl] = useState('')
   const [editMeters, setEditMeters] = useState<any[]>([])
   const [editContractEnd, setEditContractEnd] = useState('')
+  const [editCompanyPhone, setEditCompanyPhone] = useState('')
+  const [editAddress, setEditAddress] = useState('')
 
   // Refraction Event State (for field glow animations)
   const [glowingFields, setGlowingFields] = useState<Set<string>>(new Set())
@@ -139,6 +141,8 @@ export default function AccountDossierPage() {
       setEditLogoUrl(account.logoUrl || '')
       setEditDomain(account.domain || '')
       setEditLinkedinUrl(account.linkedinUrl || '')
+      setEditCompanyPhone(account.companyPhone || '')
+      setEditAddress(account.address || '')
       // Transform serviceAddresses into meters format for MeterArray component
       const transformedMeters = (account.serviceAddresses || []).map((addr: any, idx: number) => {
         // Handle both string addresses and structured meter objects
@@ -182,7 +186,9 @@ export default function AccountDossierPage() {
             domain: editDomain,
             linkedinUrl: editLinkedinUrl,
             meters: editMeters,
-            contractEnd: editContractEnd
+            contractEnd: editContractEnd,
+            companyPhone: editCompanyPhone,
+            address: editAddress
           })
           setShowSynced(true)
           setTimeout(() => setShowSynced(false), 3000)
@@ -200,16 +206,13 @@ export default function AccountDossierPage() {
       }
       triggerSave()
     }
-  }, [isEditing, id, editNotes, editAnnualUsage, editStrikePrice, editIndustry, editLocation, editLogoUrl, editDomain, editLinkedinUrl, editMeters, editContractEnd, updateAccount])
+  }, [isEditing, id, editNotes, editAnnualUsage, editStrikePrice, editIndustry, editLocation, editLogoUrl, editDomain, editLinkedinUrl, editMeters, editContractEnd, editCompanyPhone, editAddress, updateAccount])
 
-  const handleUpdate = async (updates: any) => {
-    try {
-      await updateAccount.mutateAsync({ id, ...updates })
-      toast.success('Account updated')
-    } catch (err) {
-      console.error(err)
-      toast.error('Failed to update account')
-    }
+  // Uplink fields update local state only; persisted when user locks dossier (padlock)
+  const handleUpdate = (updates: Partial<{ companyPhone: string; domain: string; address: string }>) => {
+    if (updates.companyPhone !== undefined) setEditCompanyPhone(updates.companyPhone)
+    if (updates.domain !== undefined) setEditDomain(updates.domain)
+    if (updates.address !== undefined) setEditAddress(updates.address)
   }
 
   const handleMetersUpdate = (updatedMeters: any[]) => {
@@ -674,7 +677,12 @@ export default function AccountDossierPage() {
                 <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em] mb-4">01 // Physics</div>
                 
                 <AccountUplinkCard 
-                  account={account} 
+                  account={{
+                    ...account,
+                    companyPhone: editCompanyPhone ?? account.companyPhone,
+                    domain: editDomain ?? account.domain,
+                    address: editAddress ?? account.address
+                  }} 
                   isEditing={isEditing}
                   onUpdate={handleUpdate}
                 />

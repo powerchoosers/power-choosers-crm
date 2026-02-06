@@ -180,6 +180,14 @@ export default async function handler(req, res) {
         // Fetch OperatorResults to get the actual Twilio-generated summary
         let twilioSummary = '';
         let operatorResults = [];
+        let operatorResultsData = { 
+            allOperators: [], 
+            sentiment: null, 
+            callTransfer: null, 
+            voicemail: null, 
+            disposition: null, 
+            doNotContact: null 
+        };
         try {
             const opResults = await client.intelligence.v2
                 .transcripts(transcriptSid)
@@ -195,31 +203,55 @@ export default async function handler(req, res) {
                 }))
             });
             
-            // Find summary from operator results - check multiple locations
+            // Extract summary from operator results per Twilio guidance:
+            // Look for operatorType === 'summarization' OR name includes 'summary'/'summarize'
+            // Read from: textGenerationResults.summary (or array), result.summary, result (if string), summary
             for (const op of opResults) {
-                // Check for text_generation type with summary-related names
-                if (op.operatorType === 'text_generation' || 
-                    ['summary', 'conversation_summary', 'call_summary'].includes(op.name?.toLowerCase())) {
-                    // Check multiple possible locations for the summary
-                    const possibleSummary = op.textGenerationResults || 
-                                           op.summary || 
-                                           op.extractionResults?.summary ||
-                                           op.result?.summary ||
-                                           (typeof op.result === 'string' ? op.result : null);
-                    if (possibleSummary) {
-                        twilioSummary = String(possibleSummary).trim();
+                const opNameLower = (op.name || op.friendlyName || '').toLowerCase();
+                const opTypeLower = (op.operatorType || '').toLowerCase();
+                
+                // Check for summarization operator type OR name includes summary/summarize
+                if (opTypeLower === 'summarization' || 
+                    opTypeLower === 'text_generation' ||
+                    opNameLower.includes('summary') || 
+                    opNameLower.includes('summarize')) {
+                    
+                    let summary = null;
+                    
+                    // Primary: textGenerationResults.summary
+                    if (op.textGenerationResults?.summary) {
+                        summary = op.textGenerationResults.summary;
+                    } else if (Array.isArray(op.textGenerationResults) && op.textGenerationResults[0]?.summary) {
+                        summary = op.textGenerationResults[0].summary;
+                    } else if (typeof op.textGenerationResults === 'string') {
+                        summary = op.textGenerationResults;
+                    }
+                    // Fallback: result.summary or result (if string)
+                    else if (typeof op.result === 'string') {
+                        summary = op.result;
+                    } else if (op.result?.summary) {
+                        summary = op.result.summary;
+                    }
+                    // Last resort: direct summary field
+                    else if (op.summary) {
+                        summary = op.summary;
+                    }
+                    
+                    if (summary) {
+                        twilioSummary = String(summary).trim();
                         logger.log('[Poll CI Analysis] Found Twilio summary:', {
-                            operatorName: op.name,
+                            operatorName: op.name || op.friendlyName,
                             operatorType: op.operatorType,
                             summaryLength: twilioSummary.length,
-                            preview: twilioSummary.substring(0, 100)
+                            preview: twilioSummary.substring(0, 100),
+                            source: 'summarization_operator'
                         });
                         break;
                     }
                 }
                 
                 // Also check extraction operators which may contain parsed JSON with summary
-                if (op.operatorType === 'extraction' && op.extractionResults) {
+                if (opTypeLower === 'extraction' && op.extractionResults) {
                     try {
                         const extracted = typeof op.extractionResults === 'string' 
                             ? JSON.parse(op.extractionResults) 
@@ -227,9 +259,10 @@ export default async function handler(req, res) {
                         if (extracted.summary) {
                             twilioSummary = String(extracted.summary).trim();
                             logger.log('[Poll CI Analysis] Found summary from extraction operator:', {
-                                operatorName: op.name,
+                                operatorName: op.name || op.friendlyName,
                                 summaryLength: twilioSummary.length,
-                                preview: twilioSummary.substring(0, 100)
+                                preview: twilioSummary.substring(0, 100),
+                                source: 'extraction_operator'
                             });
                             break;
                         }
@@ -243,8 +276,97 @@ export default async function handler(req, res) {
                 logger.log('[Poll CI Analysis] No summary found in OperatorResults, operators checked:', 
                     opResults.map(op => ({ name: op.name, type: op.operatorType })));
             }
+            
+            // Extract all operator results for storage in conversationalIntelligence
+            // This includes: sentiment, call transfer, voicemail detection, disposition, etc.
+            const extractedOperators = {
+                sentiment: null,
+                callTransfer: null,
+                voicemail: null,
+                disposition: null,
+                doNotContact: null,
+                allOperators: operatorResults.map(op => ({
+                    name: op.name || op.friendlyName,
+                    operatorType: op.operatorType,
+                    result: op.result,
+                    textGenerationResults: op.textGenerationResults,
+                    extractionResults: op.extractionResults,
+                    classificationResults: op.classificationResults,
+                    phraseMatchResults: op.phraseMatchResults
+                }))
+            };
+            
+            // Extract sentiment from Sentiment Analysis operator
+            for (const op of operatorResults) {
+                const opNameLower = (op.name || op.friendlyName || '').toLowerCase();
+                const opTypeLower = (op.operatorType || '').toLowerCase();
+                
+                if (opNameLower.includes('sentiment') && 
+                    (opTypeLower === 'transcript_classification' || opTypeLower === 'classification')) {
+                    const sentiment = op.classificationResults?.label || 
+                                    op.result?.label || 
+                                    op.result || 
+                                    (typeof op.result === 'string' ? op.result : null);
+                    if (sentiment) {
+                        extractedOperators.sentiment = String(sentiment).trim();
+                        logger.log('[Poll CI Analysis] Extracted sentiment:', extractedOperators.sentiment);
+                    }
+                }
+                
+                // Extract call transfer
+                if (opNameLower.includes('transfer') || opNameLower.includes('call transfer')) {
+                    const transfer = op.classificationResults?.label || 
+                                   op.result?.label || 
+                                   op.result || 
+                                   (typeof op.result === 'string' ? op.result : null);
+                    if (transfer) {
+                        extractedOperators.callTransfer = String(transfer).trim();
+                        logger.log('[Poll CI Analysis] Extracted call transfer:', extractedOperators.callTransfer);
+                    }
+                }
+                
+                // Extract voicemail detection
+                if (opNameLower.includes('voicemail')) {
+                    const voicemail = op.classificationResults?.label || 
+                                    op.result?.label || 
+                                    op.result || 
+                                    (typeof op.result === 'string' ? op.result : null);
+                    if (voicemail) {
+                        extractedOperators.voicemail = String(voicemail).trim();
+                        logger.log('[Poll CI Analysis] Extracted voicemail:', extractedOperators.voicemail);
+                    }
+                }
+                
+                // Extract call disposition
+                if (opNameLower.includes('disposition')) {
+                    const disposition = op.classificationResults?.label || 
+                                     op.result?.label || 
+                                     op.result || 
+                                     (typeof op.result === 'string' ? op.result : null);
+                    if (disposition) {
+                        extractedOperators.disposition = String(disposition).trim();
+                        logger.log('[Poll CI Analysis] Extracted disposition:', extractedOperators.disposition);
+                    }
+                }
+                
+                // Extract "Do Not Contact" flag
+                if (opNameLower.includes('do not contact') || opNameLower.includes('dont contact')) {
+                    const doNotContact = op.phraseMatchResults?.label || 
+                                       op.result?.label || 
+                                       op.result || 
+                                       (typeof op.result === 'string' ? op.result : null);
+                    if (doNotContact) {
+                        extractedOperators.doNotContact = String(doNotContact).trim();
+                        logger.log('[Poll CI Analysis] Extracted do not contact:', extractedOperators.doNotContact);
+                    }
+                }
+            }
+            
+            // Store extracted operators for use in conversationalIntelligence
+            operatorResultsData = extractedOperators;
         } catch (opError) {
             logger.warn('[Poll CI Analysis] Error fetching OperatorResults:', opError?.message);
+            operatorResultsData = { allOperators: [], sentiment: null, callTransfer: null, voicemail: null, disposition: null, doNotContact: null };
         }
 
         // Analysis is complete, fetch sentences (reuse if already fetched)
@@ -402,7 +524,7 @@ export default async function handler(req, res) {
                 
                 const ai = {
                     summary: summaryText,
-                    sentiment: 'Neutral',
+                    sentiment: operatorResultsData.sentiment || 'Neutral',
                     keyTopics: [],
                     nextSteps: ['Follow up'],
                     painPoints: [],
@@ -415,6 +537,15 @@ export default async function handler(req, res) {
                         channelRoleMap,
                         operatorResultsCount: operatorResults.length,
                         hasTwilioSummary: !!twilioSummary,
+                        // All operator results from Twilio CI (sentiment, call transfer, voicemail, disposition, etc.)
+                        operatorResults: operatorResultsData.allOperators,
+                        extractedOperators: {
+                            sentiment: operatorResultsData.sentiment,
+                            callTransfer: operatorResultsData.callTransfer,
+                            voicemail: operatorResultsData.voicemail,
+                            disposition: operatorResultsData.disposition,
+                            doNotContact: operatorResultsData.doNotContact
+                        },
                         // CRITICAL: Include sentences with channel info for frontend speaker mapping
                         sentences: sentences.map(s => ({
                             text: s.text || '',
