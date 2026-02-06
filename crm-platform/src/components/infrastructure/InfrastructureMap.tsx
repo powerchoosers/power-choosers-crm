@@ -1,10 +1,11 @@
 'use client'
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { GoogleMap, useLoadScript, MarkerF, CircleF } from '@react-google-maps/api';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { mapLocationToZone, ERCOT_ZONES } from '@/lib/market-mapping';
 import { useAuth } from '@/context/AuthContext';
+import { useMarketPulse } from '@/hooks/useMarketPulse';
 
 // 1. THE NODAL "STEALTH" SKIN
 // This JSON strips away parks, schools, and labels, leaving only the grid geometry.
@@ -54,12 +55,13 @@ export default function InfrastructureMap() {
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY as string,
   });
 
-  const [prices, setPrices] = useState({
-    north: 24.15,
-    houston: 21.80,
-    west: 45.20,
-    south: 22.40
-  });
+  const { data: marketPulse } = useMarketPulse();
+  const prices = useMemo(() => ({
+    north: marketPulse?.prices?.north ?? 24.15,
+    houston: marketPulse?.prices?.houston ?? 21.80,
+    west: marketPulse?.prices?.west ?? 45.20,
+    south: marketPulse?.prices?.south ?? 22.40
+  }), [marketPulse]);
 
   // Fetch real contacts from Supabase
   const { data: contactsData, isLoading: contactsLoading } = useInfiniteQuery({
@@ -163,36 +165,6 @@ export default function InfrastructureMap() {
       };
     });
   }, [contactsData, prices]);
-
-  useEffect(() => {
-    async function fetchMarketData() {
-      try {
-        const res = await fetch('/api/market/ercot?type=prices');
-        if (!res.ok) throw new Error('Failed to fetch prices');
-        
-        const contentType = res.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          throw new Error('Response was not JSON');
-        }
-        
-        const data = await res.json();
-        if (data.prices) {
-          setPrices({
-            north: data.prices.north || prices.north,
-            houston: data.prices.houston || prices.houston,
-            west: data.prices.west || prices.west,
-            south: data.prices.south || prices.south
-          });
-        }
-      } catch (error) {
-        console.error('Failed to fetch grid telemetry:', error);
-      }
-    }
-
-    fetchMarketData();
-    const interval = setInterval(fetchMarketData, 60000); // Update every minute
-    return () => clearInterval(interval);
-  }, []);
 
   const center = useMemo(() => ({ lat: 31.0000, lng: -99.0000 }), []); // Center on Texas
 

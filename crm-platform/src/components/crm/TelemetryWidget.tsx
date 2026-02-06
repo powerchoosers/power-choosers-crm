@@ -1,80 +1,35 @@
 'use client'
-import { Clock, Sun, Activity, AlertCircle } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Clock, Sun, Activity } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
 import { calculateVolatilityIndex } from '@/lib/market-mapping';
+import { useMarketPulse } from '@/hooks/useMarketPulse';
 
 export default function TelemetryWidget({ location = 'LZ_NORTH' }: { location?: string }) {
   const [time, setTime] = useState('');
-  const [metrics, setMetrics] = useState({
-    price: 24.50,
-    reserves: 3450,
-    capacity: 85000,
-    scarcity: 4.2,
-    loading: true,
-    error: false
-  });
-  
+  const { data: marketData, isLoading, isError } = useMarketPulse();
+
+  const metrics = useMemo(() => {
+    const price = marketData?.prices
+      ? (marketData.prices[location.toLowerCase().replace('lz_', '') as keyof typeof marketData.prices] ?? marketData.prices.north ?? 24.50)
+      : 24.50;
+    const reserves = marketData?.grid?.reserves ?? 3450;
+    const capacity = marketData?.grid?.total_capacity ?? 85000;
+    const scarcity = marketData?.grid?.scarcity_prob ?? 4.2;
+    return { price, reserves, capacity, scarcity, loading: isLoading, error: isError };
+  }, [marketData, location, isLoading, isError]);
+
   useEffect(() => {
     const updateTime = () => {
-      setTime(new Date().toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
+      setTime(new Date().toLocaleTimeString('en-US', {
+        hour: '2-digit',
         minute: '2-digit',
-        timeZone: 'America/Chicago' 
+        timeZone: 'America/Chicago'
       }));
     };
     updateTime();
     const interval = setInterval(updateTime, 60000);
     return () => clearInterval(interval);
   }, []);
-
-  useEffect(() => {
-    async function fetchMarketData() {
-      try {
-        // Fetch prices from ERCOT scraper
-        const priceRes = await fetch('/api/market/ercot?type=prices')
-        if (!priceRes.ok) throw new Error(`Price fetch failed: ${priceRes.status}`)
-        
-        const priceContentType = priceRes.headers.get('content-type')
-        if (!priceContentType || !priceContentType.includes('application/json')) {
-          throw new Error('Price response was not JSON')
-        }
-        const priceData = await priceRes.json()
-
-        // Fetch grid conditions for reserves
-        const gridRes = await fetch('/api/market/ercot?type=grid')
-        if (!gridRes.ok) throw new Error(`Grid fetch failed: ${gridRes.status}`)
-
-        const gridContentType = gridRes.headers.get('content-type')
-        if (!gridContentType || !gridContentType.includes('application/json')) {
-          throw new Error('Grid response was not JSON')
-        }
-        const gridData = await gridRes.json()
-
-        // Resolve specific price for the location
-        let zonePrice = 24.50;
-        if (priceData.prices) {
-          const zoneKey = location.toLowerCase().replace('lz_', '') as keyof typeof priceData.prices;
-          zonePrice = priceData.prices[zoneKey] || priceData.prices.north || 24.50;
-        }
-
-        setMetrics({
-          price: zonePrice,
-          reserves: gridData.metrics?.reserves ?? 3450,
-          capacity: gridData.metrics?.total_capacity ?? 85000,
-          scarcity: gridData.metrics?.scarcity_prob ?? 4.2,
-          loading: false,
-          error: false
-        });
-      } catch (error) {
-        console.error('Failed to fetch market telemetry:', error);
-        setMetrics(prev => ({ ...prev, loading: false, error: true }));
-      }
-    }
-
-    fetchMarketData();
-    const interval = setInterval(fetchMarketData, 30000);
-    return () => clearInterval(interval);
-  }, [location]);
 
   const volatilityIndex = calculateVolatilityIndex({
     price: metrics.price,
