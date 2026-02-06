@@ -155,7 +155,8 @@ export default function AccountDossierPage() {
             endDate: account.contractEnd || ''
           }
         }
-        return addr // Already structured
+        // Already structured: ensure stable id for list keys
+        return { ...addr, id: addr?.id ?? `meter_${idx}` }
       })
       setEditMeters(account.meters?.length ? account.meters : transformedMeters)
       setEditContractEnd(account.contractEnd || '')
