@@ -52,9 +52,9 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
   const removeContactFromProtocol = useRemoveContactFromProtocol()
 
   const protocols = protocolsData?.pages?.flatMap(p => p.protocols) ?? []
-  const listKinds = isAccountMode ? ACCOUNT_LIST_KINDS : CONTACT_LIST_KINDS
+  const listKinds: readonly string[] = isAccountMode ? ACCOUNT_LIST_KINDS : CONTACT_LIST_KINDS
   const targetLists = (targetsData ?? []).filter(list =>
-    list.kind && listKinds.includes(list.kind as (typeof listKinds)[number])
+    list.kind && listKinds.includes(list.kind)
   )
   const listMemberships = isAccountMode ? accountListMemberships : contactListMemberships
 

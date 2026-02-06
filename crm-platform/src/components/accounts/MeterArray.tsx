@@ -73,9 +73,9 @@ export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], isEditing =
       <div className="p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {localMeters.length > 0 ? (
-            localMeters.map((meter) => (
+            localMeters.map((meter, index) => (
               <div 
-                key={meter.id} 
+                key={meter.id || `meter-${index}`} 
                 className={cn(
                   "group relative bg-black/40 p-4 rounded-xl border transition-all duration-300",
                   isEditing 
