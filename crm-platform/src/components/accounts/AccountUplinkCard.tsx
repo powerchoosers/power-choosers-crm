@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { formatPhoneNumber } from '@/lib/formatPhone'
+import { domainToClickableUrl } from '@/lib/url'
 
 interface AccountUplinkCardProps {
   account: Account
@@ -192,7 +193,7 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
             <button
               type="button"
               className="w-full group flex items-center justify-between p-3 nodal-glass nodal-glass-hover rounded-xl transition-all border border-white/5"
-              onClick={() => account.domain && window.open(`https://${account.domain}`, '_blank')}
+              onClick={() => { const url = domainToClickableUrl(account.domain); url && window.open(url, '_blank') }}
               disabled={!account.domain}
             >
               <div className="flex items-center gap-3 min-w-0">

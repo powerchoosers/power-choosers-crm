@@ -28,10 +28,15 @@ export default function MarketPulseWidget() {
     )
   }
 
+  const isLastSaved = marketData?.metadata?.source === 'market_telemetry'
+
   return (
     <div className="space-y-4">
-      {isError && (
-        <p className="text-[10px] font-mono text-amber-500/80 uppercase tracking-wider">Telemetry delayed — showing last known</p>
+      {isLastSaved && (
+        <p className="text-[10px] font-mono text-amber-500/80 uppercase tracking-wider">Last saved telemetry (live API unavailable)</p>
+      )}
+      {isError && !marketData && (
+        <p className="text-[10px] font-mono text-rose-500/80 uppercase tracking-wider">Unable to load telemetry</p>
       )}
       <div className="grid grid-cols-2 gap-3">
         <div className="px-3 !pt-[3px] !pb-[12px] rounded-2xl bg-zinc-900/40 border border-white/5 backdrop-blur-xl space-y-0.5">
