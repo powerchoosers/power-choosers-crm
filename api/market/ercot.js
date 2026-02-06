@@ -31,14 +31,28 @@ export default async function handler(req, res) {
 
 let cachedToken = null;
 let tokenExpiry = 0;
+/** Single-flight: concurrent requests share one token refresh instead of hammering B2C */
+let tokenPromise = null;
 
 /**
- * Generates a Bearer Token using OAuth2 ROPC Flow
+ * Sleep helper for retry backoff
+ */
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Generates a Bearer Token using OAuth2 ROPC Flow.
+ * Uses single-flight so concurrent callers get the same token refresh.
  */
 async function getBearerToken() {
   const now = Date.now();
   if (cachedToken && now < tokenExpiry) {
     return cachedToken;
+  }
+
+  if (tokenPromise) {
+    return tokenPromise;
   }
 
   const username = process.env.ERCOT_USERNAME;
@@ -48,48 +62,66 @@ async function getBearerToken() {
     throw new Error('ERCOT_USERNAME or ERCOT_PASSWORD not set in .env');
   }
 
-  logger.info('[ERCOT] Requesting new Bearer token...', 'MarketData');
+  const maxRetries = 2;
+  tokenPromise = (async () => {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          const delay = 1000 * Math.pow(2, attempt - 1);
+          logger.info(`[ERCOT] Token retry ${attempt}/${maxRetries} in ${delay}ms...`, 'MarketData');
+          await sleep(delay);
+        } else {
+          logger.info('[ERCOT] Requesting new Bearer token...', 'MarketData');
+        }
 
-  const tokenUrl = 'https://ercotb2c.b2clogin.com/ercotb2c.onmicrosoft.com/B2C_1_PUBAPI-ROPC-FLOW/oauth2/v2.0/token';
-  const params = new URLSearchParams({
-    grant_type: 'password',
-    client_id: 'fec253ea-0d06-4272-a5e6-b478baeecd70', // Correct client_id for ERCOT Public API
-    scope: 'openid fec253ea-0d06-4272-a5e6-b478baeecd70 offline_access',
-    username: username,
-    password: password,
-    response_type: 'token id_token'
-  });
+        const tokenUrl = 'https://ercotb2c.b2clogin.com/ercotb2c.onmicrosoft.com/B2C_1_PUBAPI-ROPC-FLOW/oauth2/v2.0/token';
+        const params = new URLSearchParams({
+          grant_type: 'password',
+          client_id: 'fec253ea-0d06-4272-a5e6-b478baeecd70',
+          scope: 'openid fec253ea-0d06-4272-a5e6-b478baeecd70 offline_access',
+          username: username,
+          password: password,
+          response_type: 'token id_token'
+        });
+
+        const response = await fetch(tokenUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: params
+        });
+
+        const data = await response.text();
+        let parsedData;
+        try {
+          parsedData = JSON.parse(data);
+        } catch (e) {
+          logger.error('[ERCOT] Token response not valid JSON:', 'MarketData', data.substring(0, 100));
+          throw new Error('ERCOT Token endpoint returned non-JSON response');
+        }
+
+        if (!response.ok) {
+          logger.error('[ERCOT] Token request failed:', 'MarketData', parsedData.error_description || parsedData.error || data.substring(0, 100));
+          throw new Error(`Token request failed: ${parsedData.error_description || parsedData.error || 'Unknown error'}`);
+        }
+
+        cachedToken = parsedData.id_token || parsedData.access_token;
+        tokenExpiry = Date.now() + (parsedData.expires_in * 1000) - (5 * 60 * 1000);
+        logger.info('[ERCOT] Bearer token acquired successfully.', 'MarketData');
+        return cachedToken;
+      } catch (error) {
+        logger.error('[ERCOT] Failed to get Bearer token:', 'MarketData', error.message);
+        if (attempt === maxRetries) {
+          throw error;
+        }
+      }
+    }
+  })();
 
   try {
-    const response = await fetch(tokenUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params
-    });
-
-    const data = await response.text();
-    let parsedData;
-    try {
-      parsedData = JSON.parse(data);
-    } catch (e) {
-      logger.error('[ERCOT] Token response not valid JSON:', 'MarketData', data.substring(0, 100));
-      throw new Error('ERCOT Token endpoint returned non-JSON response');
-    }
-
-    if (!response.ok) {
-      logger.error('[ERCOT] Token request failed:', 'MarketData', parsedData.error_description || parsedData.error || data.substring(0, 100));
-      throw new Error(`Token request failed: ${parsedData.error_description || parsedData.error || 'Unknown error'}`);
-    }
-
-    cachedToken = parsedData.id_token || parsedData.access_token;
-    // Set expiry 5 minutes before actual expiry (usually 1 hour)
-    tokenExpiry = now + (parsedData.expires_in * 1000) - (5 * 60 * 1000);
-    
-    logger.info('[ERCOT] Bearer token acquired successfully.', 'MarketData');
-    return cachedToken;
-  } catch (error) {
-    logger.error('[ERCOT] Failed to get Bearer token:', 'MarketData', error.message);
-    throw error;
+    const token = await tokenPromise;
+    return token;
+  } finally {
+    tokenPromise = null;
   }
 }
 
@@ -134,8 +166,11 @@ export async function getErcotMarketData(type = 'prices', forceScraper = false) 
   }
 }
 
+/** Max retries for ERCOT API calls (transient 5xx/rate limits) */
+const API_RETRIES = 2;
+
 /**
- * Fetches data from the official ERCOT API
+ * Fetches data from the official ERCOT API with retry on transient failures.
  */
 async function fetchFromOfficialApi(type, keys) {
   const keysToTry = Array.isArray(keys) ? keys : [keys];
@@ -145,27 +180,41 @@ async function fetchFromOfficialApi(type, keys) {
   const primaryKey = keysToTry[0]; 
 
   const fetchWithLogging = async (url, options) => {
-    try {
-      const res = await fetch(url, options);
-      const contentType = res.headers.get('content-type');
-      
-      if (!res.ok) {
-        const text = await res.text();
-        logger.error(`[ERCOT] API Error (${res.status}): ${text.substring(0, 100)}...`, 'MarketData');
-        throw new Error(`ERCOT API returned ${res.status}: ${text.substring(0, 50)}`);
-      }
+    let lastError;
+    for (let attempt = 0; attempt <= API_RETRIES; attempt++) {
+      try {
+        if (attempt > 0) {
+          const delay = 1000 * Math.pow(2, attempt - 1);
+          logger.info(`[ERCOT] API retry ${attempt}/${API_RETRIES} in ${delay}ms for ${url}`, 'MarketData');
+          await sleep(delay);
+        }
+        const res = await fetch(url, options);
+        const contentType = res.headers.get('content-type');
+        
+        if (!res.ok) {
+          const text = await res.text();
+          logger.error(`[ERCOT] API Error (${res.status}): ${text.substring(0, 100)}...`, 'MarketData');
+          const err = new Error(`ERCOT API returned ${res.status}: ${text.substring(0, 50)}`);
+          lastError = err;
+          if (res.status >= 500 || res.status === 429) continue;
+          throw err;
+        }
 
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await res.text();
-        logger.error(`[ERCOT] Non-JSON response from ${url}: ${text.substring(0, 100)}...`, 'MarketData');
-        throw new Error('ERCOT API returned non-JSON response');
-      }
+        if (!contentType || !contentType.includes('application/json')) {
+          const text = await res.text();
+          logger.error(`[ERCOT] Non-JSON response from ${url}: ${text.substring(0, 100)}...`, 'MarketData');
+          throw new Error('ERCOT API returned non-JSON response');
+        }
 
-      return res.json();
-    } catch (error) {
-      logger.error(`[ERCOT] Fetch failed for ${url}:`, 'MarketData', error.message);
-      throw error;
+        return res.json();
+      } catch (error) {
+        lastError = error;
+        if (attempt < API_RETRIES) continue;
+        logger.error(`[ERCOT] Fetch failed for ${url}:`, 'MarketData', error.message);
+        throw error;
+      }
     }
+    throw lastError;
   };
   
   if (type === 'prices') {
