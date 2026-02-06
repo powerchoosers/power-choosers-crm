@@ -17,6 +17,10 @@ interface OrgIntelligenceProps {
   companyName?: string;
   website?: string;
   accountId?: string;
+  /** CRM account logo URL – always prioritized over Apollo companySummary.logoUrl */
+  accountLogoUrl?: string;
+  /** CRM account domain – used for favicon fallback when logo is blank; preferred over Apollo domain for icon */
+  accountDomain?: string;
 }
 
 interface ApolloContactRow {
@@ -53,7 +57,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-export default function OrgIntelligence({ domain: initialDomain, companyName, website, accountId }: OrgIntelligenceProps) {
+export default function OrgIntelligence({ domain: initialDomain, companyName, website, accountId, accountLogoUrl, accountDomain }: OrgIntelligenceProps) {
   const [data, setData] = useState<ApolloContactRow[]>([]);
   const [companySummary, setCompanySummary] = useState<ApolloCompany | null>(null);
   const [scanStatus, setScanStatus] = useState<'idle' | 'scanning' | 'complete'>('idle');
@@ -366,9 +370,12 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       }
 
       // 2. Insert or Update Supabase
-      // Note: Before reveal we only have first name, last initial, title; full name/email come from enriched.
+      // Use contact's own city/state (person location), not company location. LinkedIn from enriched or person.
       let crmId = person.crmId;
-      
+      const contactCity = (enriched as { city?: string }).city ?? person.location?.split(',')[0]?.trim() ?? null;
+      const contactState = (enriched as { state?: string }).state ?? (person.location?.includes(',') ? person.location.split(',')[1]?.trim() : null) ?? null;
+      const linkedinUrl = (enriched as { linkedin?: string }).linkedin || person.linkedin || null;
+
       const contactData: Record<string, unknown> = {
         name: enriched.fullName || person.name,
         firstName: enriched.firstName || person.firstName,
@@ -377,58 +384,70 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         email: enriched.email || person.email,
         accountId: accountId,
         status: 'Active',
+        ...(linkedinUrl ? { linkedinUrl } : {}),
+        ...(contactCity ? { city: contactCity } : {}),
+        ...(contactState ? { state: contactState } : {}),
         metadata: {
           source: 'Apollo Organizational Intelligence',
           acquired_at: new Date().toISOString(),
           company: companySummary?.name || companyName || domain,
+          apollo_person_id: person.id,
           original_apollo_data: enriched
         }
       };
 
       if (crmId) {
-        // Update existing
         const { error } = await supabase
           .from('contacts')
           .update(contactData)
           .eq('id', crmId);
         if (error) throw error;
       } else {
-        // Check if email exists to avoid duplicates if not monitored
-        if (contactData.email && contactData.email !== 'N/A') {
-             const { data: existing } = await supabase
-               .from('contacts')
-               .select('id')
-               .eq('email', contactData.email)
-               .single();
-             
-             if (existing) {
-                crmId = existing.id;
-                const { error } = await supabase
-                  .from('contacts')
-                  .update(contactData)
-                  .eq('id', crmId);
-                if (error) throw error;
-             } else {
-                // Insert new: contacts.id is required (text primary key, no default)
-                contactData.id = crypto.randomUUID();
-                const { data: newContact, error } = await supabase
-                  .from('contacts')
-                  .insert(contactData)
-                  .select()
-                  .single();
-                if (error) throw error;
-                crmId = newContact.id;
-             }
+        // Try to find existing contact by Apollo person id (from a previous reveal) or by email
+        const { data: byApolloId } = await supabase
+          .from('contacts')
+          .select('id')
+          .eq('metadata->>apollo_person_id', person.id)
+          .maybeSingle();
+        if (byApolloId?.id) {
+          crmId = byApolloId.id;
+          const { error } = await supabase
+            .from('contacts')
+            .update(contactData)
+            .eq('id', crmId);
+          if (error) throw error;
+        } else if (contactData.email && contactData.email !== 'N/A') {
+          const { data: existing } = await supabase
+            .from('contacts')
+            .select('id')
+            .eq('email', contactData.email)
+            .maybeSingle();
+          if (existing?.id) {
+            crmId = existing.id;
+            const { error } = await supabase
+              .from('contacts')
+              .update(contactData)
+              .eq('id', crmId);
+            if (error) throw error;
+          } else {
+            contactData.id = crypto.randomUUID();
+            const { data: newContact, error } = await supabase
+              .from('contacts')
+              .insert(contactData)
+              .select()
+              .single();
+            if (error) throw error;
+            crmId = newContact.id;
+          }
         } else {
-             // Fallback insert if no email (e.g. reveal returned no email)
-             contactData.id = crypto.randomUUID();
-             const { data: newContact, error } = await supabase
-               .from('contacts')
-               .insert(contactData)
-               .select()
-               .single();
-             if (error) throw error;
-             crmId = newContact.id;
+          contactData.id = crypto.randomUUID();
+          const { data: newContact, error } = await supabase
+            .from('contacts')
+            .insert(contactData)
+            .select()
+            .single();
+          if (error) throw error;
+          crmId = newContact.id;
         }
       }
 
@@ -693,6 +712,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     try {
       const { data: { session } } = await supabase.auth.getSession();
 
+      // Search Apollo by keyword + org only (no person_titles) so we can find employees
+      // outside the initial scan's decision-maker filter (e.g. engineers, coordinators).
       const peopleResp = await fetch('/api/apollo/search-people', {
         method: 'POST',
         headers: {
@@ -705,8 +726,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           q_keywords: term,
           q_organization_domains: domain || undefined,
           q_organization_domains_list: domain ? [domain] : undefined,
-          q_organization_name: companyName || undefined,
-          person_titles: ['owner', 'founder', 'c-level', 'vp', 'director', 'manager']
+          q_organization_name: companyName || undefined
+          // Intentionally omit person_titles so search returns anyone at the org matching the term
         }),
       });
 
@@ -1005,9 +1026,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                 <div className="flex items-start gap-3">
                   <div className="relative group/logo">
                     <CompanyIcon
-                      logoUrl={companySummary.logoUrl}
-                      domain={companySummary.domain}
-                      name={companySummary.name}
+                      logoUrl={accountLogoUrl && accountLogoUrl.trim() ? accountLogoUrl.trim() : companySummary.logoUrl}
+                      domain={accountDomain && accountDomain.trim() ? accountDomain.trim() : companySummary.domain}
+                      name={companySummary.name || companyName || ''}
                       size={40}
                       className="w-10 h-10 transition-all"
                     />

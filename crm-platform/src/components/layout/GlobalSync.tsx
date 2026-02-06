@@ -1,57 +1,49 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useGmailSync } from '@/hooks/useGmailSync'
+
+const OPEN_SYNC_DELAY_MS = 1200
+const BACKGROUND_SYNC_INTERVAL_MS = 3 * 60 * 1000 // 3 minutes
 
 export function GlobalSync() {
   const { user, loading } = useAuth()
   const { syncGmail, isSyncing } = useGmailSync()
-  const hasInitialSynced = useRef(false)
-  const [hasGmailToken, setHasGmailToken] = useState(false)
+  const hasTriggeredOpenSync = useRef(false)
 
-  // Check for existing Gmail token on mount
+  // As soon as user opens /network: prompt Net Sync with auth if no token, else sync silently
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const token = sessionStorage.getItem('gmail_oauth_token')
-      setHasGmailToken(!!token)
-    }
-  }, [])
+    if (loading || !user || hasTriggeredOpenSync.current) return
 
-  // Initial sync on app load - ONLY after auth is fully loaded
-  useEffect(() => {
-    // Critical: Wait for Firebase auth to be fully initialized
-    if (loading || !user || isSyncing || hasInitialSynced.current) return
-    
-    hasInitialSynced.current = true
-    
+    hasTriggeredOpenSync.current = true
+    const hasCachedToken = typeof window !== 'undefined' && !!sessionStorage.getItem('gmail_oauth_token')
+
     const timer = setTimeout(() => {
-      const hasCachedToken = sessionStorage.getItem('gmail_oauth_token')
-      
       if (hasCachedToken) {
-        // We have a token, sync silently in the background
         syncGmail(user, { silent: true })
-        setHasGmailToken(true)
+      } else {
+        // No token: trigger sync so auth popup runs and user can connect Gmail
+        syncGmail(user, { silent: false })
       }
-      // If no token, user needs to manually connect from /network/emails
-    }, 3000) // 3 second delay - wait for everything to load
+    }, OPEN_SYNC_DELAY_MS)
 
     return () => clearTimeout(timer)
-  }, [loading, user, syncGmail, isSyncing])
+  }, [loading, user, syncGmail])
 
-  // Background interval sync (every 3 minutes) - ONLY if we have a token
+  // Background interval: keep syncing every 3 min while on /network (check token at interval time)
   useEffect(() => {
-    if (!user || !hasGmailToken || loading) return
+    if (!user || loading) return
 
     const interval = setInterval(() => {
       const hasCachedToken = sessionStorage.getItem('gmail_oauth_token')
       if (hasCachedToken) {
         syncGmail(user, { silent: true })
       }
-    }, 3 * 60 * 1000) // Every 3 minutes
+    }, BACKGROUND_SYNC_INTERVAL_MS)
 
     return () => clearInterval(interval)
-  }, [user, syncGmail, hasGmailToken, loading])
+  }, [user, syncGmail, loading])
 
   return null
 }

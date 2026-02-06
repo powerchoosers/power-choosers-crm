@@ -147,5 +147,18 @@ export function formatRevenue(revenuePrinted) {
   return revenuePrinted || '';
 }
 
+/**
+ * Format phone for contact record (US: +1 (XXX) XXX-XXXX)
+ * @param {string} raw - sanitized_number or raw_number from Apollo
+ * @returns {string}
+ */
+export function formatPhoneForContact(raw) {
+  if (!raw || typeof raw !== 'string') return '';
+  const digits = raw.replace(/\D/g, '');
+  const ten = digits.length >= 10 ? digits.slice(-10) : digits;
+  if (ten.length === 0) return '';
+  return `+1 (${ten.slice(0, 3)}) ${ten.slice(3, 6)}-${ten.slice(6)}`;
+}
+
 
 

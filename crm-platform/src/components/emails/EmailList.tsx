@@ -58,9 +58,8 @@ export function EmailList({
     if (filter === 'all') return true
     if (filter === 'received') return email.type === 'received'
     if (filter === 'sent') {
-      // Only show emails sent through CRM (with tracking IDs)
-      const isCrmSent = email.id.startsWith('gmail_') // CRM tracking ID format
-      return email.type === 'sent' && isCrmSent
+      // Uplink out: only emails you sent personally (Gmail synced + CRM-sent)
+      return email.type === 'sent'
     }
     return email.type === filter
   })

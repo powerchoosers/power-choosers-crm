@@ -70,10 +70,12 @@ export default function InfrastructureMap() {
     queryFn: async ({ pageParam = 0 }) => {
       if (!user) return { contacts: [], nextCursor: null };
       
+      // Include ACTIVE_LOAD, CUSTOMER, and legacy 'active' so all load/customer accounts show.
+      // Select latitude, longitude from accounts so we can use account coords when contact has none.
       let query = supabase
         .from('contacts')
-        .select('*, accounts!inner(name, city, state, industry, annual_usage, status)', { count: 'exact' })
-        .in('accounts.status', ['ACTIVE_LOAD', 'CUSTOMER']);
+        .select('*, accounts!inner(name, city, state, industry, annual_usage, status, latitude, longitude)', { count: 'exact' })
+        .in('accounts.status', ['ACTIVE_LOAD', 'CUSTOMER', 'active']);
 
       if (role !== 'admin' && user?.email) {
         query = query.eq('ownerId', user.email);
@@ -127,17 +129,22 @@ export default function InfrastructureMap() {
         status = 'protected';
       }
 
-      // Geocoding fallback: If no lat/lng, use approximate city coordinates
-      // In a real app, you'd have these stored. For now, we'll use the cached columns, 
-      // or approximate Texas center with slight jitter
-      let lat = contact.latitude ?? contact.lat;
-      let lng = contact.longitude ?? contact.lng;
+      // DB columns are latitude/longitude (both contacts and accounts). Use contact first, then account.
+      const toNum = (v: unknown): number | null => {
+        if (v == null || v === '') return null;
+        const n = typeof v === 'number' ? v : Number(v);
+        return Number.isFinite(n) ? n : null;
+      };
+      let lat = toNum(contact.latitude);
+      let lng = toNum(contact.longitude);
 
-      // Inherit from account if contact has no direct coordinates
+      // Inherit from account if contact has no coordinates (accounts often have geocoded lat/long)
       if (lat == null || lng == null) {
-        if (account?.latitude && account?.longitude) {
-          lat = account.latitude;
-          lng = account.longitude;
+        const aLat = toNum(account?.latitude);
+        const aLng = toNum(account?.longitude);
+        if (aLat != null && aLng != null) {
+          lat = aLat;
+          lng = aLng;
         }
       }
 
@@ -154,6 +161,11 @@ export default function InfrastructureMap() {
         else { lat = 32.7767 + jitterLat; lng = -96.7970 + jitterLng; }
       }
 
+      // Account status for marker: ACTIVE_LOAD/active = blue (active load), CUSTOMER = green
+      const accountStatus = (account?.status ?? '').toUpperCase();
+      const isCustomer = accountStatus === 'CUSTOMER';
+      const isActiveLoad = accountStatus === 'ACTIVE_LOAD' || (account?.status ?? '').toLowerCase() === 'active';
+
       return {
         id: contact.id,
         name: contact.name || account?.name || 'Unknown Asset',
@@ -161,7 +173,8 @@ export default function InfrastructureMap() {
         lng,
         status,
         load,
-        zone
+        zone,
+        accountStatus: isCustomer ? 'CUSTOMER' : isActiveLoad ? 'ACTIVE_LOAD' : account?.status ?? 'PROSPECT'
       };
     });
   }, [contactsData, prices]);
@@ -217,13 +230,13 @@ export default function InfrastructureMap() {
               />
             )}
             
-            {/* The Hard Node */}
+            {/* The Hard Node: blue = active load, green = customer */}
             <MarkerF 
               position={{ lat: node.lat, lng: node.lng }}
               icon={{
                 path: google.maps.SymbolPath.CIRCLE,
                 scale: node.load === "HIGH" ? 6 : 4,
-                fillColor: node.status === 'protected' ? '#002FA7' : node.status === 'risk' ? '#ef4444' : '#ffffff',
+                fillColor: node.accountStatus === 'CUSTOMER' ? '#22c55e' : node.accountStatus === 'ACTIVE_LOAD' ? '#002FA7' : node.status === 'risk' ? '#ef4444' : '#ffffff',
                 fillOpacity: 1,
                 strokeWeight: 0,
               }}
@@ -251,12 +264,16 @@ export default function InfrastructureMap() {
             </div>
             <div className="flex items-center justify-between gap-8">
               <span className="text-xs text-zinc-400 font-mono">LZ_WEST</span>
-              <span className="text-xs text-amber-500 font-mono">${prices.west.toFixed(2)}</span>
+              <span className="text-xs text-amber-500 font-mono">${(prices.west ?? 0).toFixed(2)}</span>
             </div>
             <div className="flex items-center justify-between gap-8">
               <span className="text-xs text-zinc-400 font-mono">LZ_SOUTH</span>
-              <span className="text-xs text-rose-500 font-mono">${prices.south.toFixed(2)}</span>
+              <span className="text-xs text-rose-500 font-mono">${(prices.south ?? 0).toFixed(2)}</span>
             </div>
+          </div>
+          <div className="mt-3 pt-2 border-t border-white/10 flex gap-4 text-[10px] font-mono text-zinc-500">
+            <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#002FA7]" /> Active load</span>
+            <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#22c55e]" /> Customer</span>
           </div>
         </div>
       </div>
