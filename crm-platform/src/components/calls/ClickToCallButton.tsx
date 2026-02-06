@@ -11,6 +11,7 @@ interface ClickToCallButtonProps {
   account?: string
   title?: string
   logoUrl?: string
+  domain?: string
   variant?: 'ghost' | 'outline' | 'default' | 'secondary'
   size?: 'icon' | 'sm' | 'default' | 'lg'
   className?: string
@@ -26,6 +27,7 @@ export const ClickToCallButton: React.FC<ClickToCallButtonProps> = ({
   account,
   title,
   logoUrl,
+  domain,
   variant = 'ghost',
   size = 'icon',
   className,
@@ -46,6 +48,8 @@ export const ClickToCallButton: React.FC<ClickToCallButtonProps> = ({
       ? { 
           name: account || name,
           accountId,
+          logoUrl,
+          domain,
           isAccountOnly: true
         }
       : { 
@@ -53,6 +57,7 @@ export const ClickToCallButton: React.FC<ClickToCallButtonProps> = ({
           account,
           title,
           logoUrl,
+          domain,
           contactId,
           accountId
         }

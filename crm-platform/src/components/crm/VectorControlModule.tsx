@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plus, Radar, GitMerge } from 'lucide-react'
 import { useContactListMemberships, useAddContactToList, useRemoveContactFromList } from '@/hooks/useContactListMemberships'
 import { useContactProtocolMemberships, useAddContactToProtocol, useRemoveContactFromProtocol } from '@/hooks/useContactProtocolMemberships'
+import { useAccountListMemberships, useAddAccountToList, useRemoveAccountFromList } from '@/hooks/useAccountListMemberships'
 import { useTargets } from '@/hooks/useTargets'
 import { useProtocols } from '@/hooks/useProtocols'
 import { useCreateTarget } from '@/hooks/useTargets'
@@ -15,69 +16,89 @@ import { useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
 
 interface VectorControlModuleProps {
-  contactId: string
+  /** Contact dossier: protocols + targets (contact lists) */
+  contactId?: string
+  /** Account dossier: targets only (account lists), no protocols */
+  accountId?: string
 }
 
-type VectorChip = 
+type VectorChip =
   | { type: 'target'; id: string; membershipId: string; name: string }
   | { type: 'protocol'; id: string; membershipId: string; name: string }
 
-export function VectorControlModule({ contactId }: VectorControlModuleProps) {
+const CONTACT_LIST_KINDS = ['people', 'person', 'contact', 'contacts'] as const
+const ACCOUNT_LIST_KINDS = ['account', 'accounts', 'company', 'companies'] as const
+
+export function VectorControlModule({ contactId, accountId }: VectorControlModuleProps) {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const { user } = useAuth()
 
-  const { data: listMemberships = [], isLoading: isLoadingListMemberships } = useContactListMemberships(contactId)
-  const { data: protocolMemberships = [], isLoading: isLoadingProtocolMemberships } = useContactProtocolMemberships(contactId)
+  const isAccountMode = !!accountId
+  const entityId = isAccountMode ? accountId : contactId
+
+  const { data: contactListMemberships = [], isLoading: isLoadingContactLists } = useContactListMemberships(isAccountMode ? undefined : contactId)
+  const { data: accountListMemberships = [], isLoading: isLoadingAccountLists } = useAccountListMemberships(accountId)
+  const { data: protocolMemberships = [], isLoading: isLoadingProtocolMemberships } = useContactProtocolMemberships(isAccountMode ? undefined : contactId)
+
   const { data: targetsData, isLoading: isLoadingTargets } = useTargets()
   const { data: protocolsData, createProtocolAsync, isLoading: isLoadingProtocols } = useProtocols()
   const createTarget = useCreateTarget()
   const addContactToList = useAddContactToList()
+  const addAccountToList = useAddAccountToList()
   const addContactToProtocol = useAddContactToProtocol()
   const removeContactFromList = useRemoveContactFromList()
+  const removeAccountFromList = useRemoveAccountFromList()
   const removeContactFromProtocol = useRemoveContactFromProtocol()
 
   const protocols = protocolsData?.pages?.flatMap(p => p.protocols) ?? []
-  const contactListKinds = ['people', 'person', 'contact', 'contacts'] as const
+  const listKinds = isAccountMode ? ACCOUNT_LIST_KINDS : CONTACT_LIST_KINDS
   const targetLists = (targetsData ?? []).filter(list =>
-    list.kind && contactListKinds.includes(list.kind as (typeof contactListKinds)[number])
+    list.kind && listKinds.includes(list.kind as (typeof listKinds)[number])
   )
+  const listMemberships = isAccountMode ? accountListMemberships : contactListMemberships
 
   const searchLower = searchQuery.trim().toLowerCase()
-  const matchingProtocols = protocols.filter(p =>
-    p.name.toLowerCase().includes(searchLower)
-  )
-  const matchingTargets = targetLists.filter(t =>
-    t.name.toLowerCase().includes(searchLower)
-  )
-  const availableProtocols = matchingProtocols.filter(p =>
+  const matchingProtocols = protocols.filter(p => p.name.toLowerCase().includes(searchLower))
+  const matchingTargets = targetLists.filter(t => t.name.toLowerCase().includes(searchLower))
+  const availableProtocols = isAccountMode ? [] : matchingProtocols.filter(p =>
     !protocolMemberships.some(m => m.sequenceId === p.id)
   )
   const availableTargets = matchingTargets.filter(t =>
     !listMemberships.some(m => m.listId === t.id)
   )
   const hasExactMatch = searchLower && (
-    protocols.some(p => p.name.toLowerCase() === searchLower) ||
+    (!isAccountMode && protocols.some(p => p.name.toLowerCase() === searchLower)) ||
     targetLists.some(t => t.name.toLowerCase() === searchLower)
   )
   const showCreateOptions = searchLower && !hasExactMatch
 
-  const chips: VectorChip[] = [
-    ...listMemberships.map(m => ({ type: 'target' as const, id: m.listId, membershipId: m.id, name: m.listName })),
-    ...protocolMemberships.map(m => ({ type: 'protocol' as const, id: m.sequenceId, membershipId: m.id, name: m.sequenceName }))
-  ]
+  const chips: VectorChip[] = isAccountMode
+    ? listMemberships.map(m => ({ type: 'target' as const, id: m.listId, membershipId: m.id, name: m.listName }))
+    : [
+        ...listMemberships.map(m => ({ type: 'target' as const, id: m.listId, membershipId: m.id, name: m.listName })),
+        ...protocolMemberships.map(m => ({ type: 'protocol' as const, id: m.sequenceId, membershipId: m.id, name: m.sequenceName }))
+      ]
   const hasAnyAssignments = chips.length > 0
-  const isLoading = isLoadingListMemberships || isLoadingProtocolMemberships
+  const isLoading = isAccountMode
+    ? (isLoadingAccountLists || isLoadingTargets)
+    : (isLoadingContactLists || isLoadingProtocolMemberships || isLoadingTargets || isLoadingProtocols)
 
   const handleAddToList = async (listId: string) => {
+    if (!entityId) return
     try {
-      await addContactToList.mutateAsync({ contactId, listId })
+      if (isAccountMode) {
+        await addAccountToList.mutateAsync({ accountId: entityId, listId })
+      } else {
+        await addContactToList.mutateAsync({ contactId: entityId, listId })
+      }
       setIsPopoverOpen(false)
       setSearchQuery('')
     } catch (_) {}
   }
 
   const handleAddToProtocol = async (sequenceId: string) => {
+    if (!contactId) return
     try {
       await addContactToProtocol.mutateAsync({ contactId, sequenceId })
       setIsPopoverOpen(false)
@@ -86,12 +107,18 @@ export function VectorControlModule({ contactId }: VectorControlModuleProps) {
   }
 
   const handleRemoveList = async (membershipId: string) => {
+    if (!entityId) return
     try {
-      await removeContactFromList.mutateAsync({ contactId, membershipId })
+      if (isAccountMode) {
+        await removeAccountFromList.mutateAsync({ accountId: entityId, membershipId })
+      } else {
+        await removeContactFromList.mutateAsync({ contactId: entityId, membershipId })
+      }
     } catch (_) {}
   }
 
   const handleRemoveProtocol = async (membershipId: string) => {
+    if (!contactId) return
     try {
       await removeContactFromProtocol.mutateAsync({ contactId, membershipId })
     } catch (_) {}
@@ -99,11 +126,17 @@ export function VectorControlModule({ contactId }: VectorControlModuleProps) {
 
   const handleCreateTarget = async () => {
     const name = searchQuery.trim()
-    if (!name || !user) return
+    if (!name || !user || !entityId) return
     try {
-      const newList = await createTarget.mutateAsync({ name, kind: 'contact' })
-      await addContactToList.mutateAsync({ contactId, listId: newList.id })
-      toast.success(`Target list "${name}" created and contact added`)
+      const kind = isAccountMode ? 'account' : 'contact'
+      const newList = await createTarget.mutateAsync({ name, kind })
+      if (isAccountMode) {
+        await addAccountToList.mutateAsync({ accountId: entityId, listId: newList.id })
+        toast.success(`Target list "${name}" created and account added`)
+      } else {
+        await addContactToList.mutateAsync({ contactId: entityId, listId: newList.id })
+        toast.success(`Target list "${name}" created and contact added`)
+      }
       setIsPopoverOpen(false)
       setSearchQuery('')
     } catch (_) {}
@@ -111,7 +144,7 @@ export function VectorControlModule({ contactId }: VectorControlModuleProps) {
 
   const handleCreateProtocol = async () => {
     const name = searchQuery.trim()
-    if (!name || !user) return
+    if (!name || !user || !contactId) return
     try {
       const newProtocol = await createProtocolAsync({
         name,
@@ -125,6 +158,8 @@ export function VectorControlModule({ contactId }: VectorControlModuleProps) {
       setSearchQuery('')
     } catch (_) {}
   }
+
+  if (!contactId && !accountId) return null
 
   const renderPopoverContent = () => {
     const hasResults = availableProtocols.length > 0 || availableTargets.length > 0
@@ -147,13 +182,13 @@ export function VectorControlModule({ contactId }: VectorControlModuleProps) {
           className="max-h-[320px] overflow-y-auto"
           transition={{ duration: 0.2, ease: 'easeOut' }}
         >
-          {isLoadingTargets || isLoadingProtocols ? (
+          {isLoadingTargets || (!isAccountMode && isLoadingProtocols) ? (
             <div className="p-4 text-center text-zinc-500 font-mono text-xs">Loading...</div>
           ) : (
             <>
               {showSections && (
                 <>
-                  {availableProtocols.length > 0 && (
+                  {!isAccountMode && availableProtocols.length > 0 && (
                     <div className="p-2">
                       <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-500 px-2 py-1.5 flex items-center gap-1.5">
                         <GitMerge className="w-3 h-3 text-blue-400" /> PROTOCOLS
@@ -170,7 +205,7 @@ export function VectorControlModule({ contactId }: VectorControlModuleProps) {
                     </div>
                   )}
                   {availableTargets.length > 0 && (
-                    <div className={`p-2 ${availableProtocols.length > 0 ? 'border-t border-white/5' : ''}`}>
+                    <div className={cn('p-2', !isAccountMode && availableProtocols.length > 0 && 'border-t border-white/5')}>
                       <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-500 px-2 py-1.5 flex items-center gap-1.5">
                         <Radar className="w-3 h-3 text-emerald-400" /> TARGETS
                       </div>
@@ -188,13 +223,15 @@ export function VectorControlModule({ contactId }: VectorControlModuleProps) {
                 </>
               )}
               {showCreateOptions && (
-                <div className={`p-2 ${showSections ? 'border-t border-white/10' : ''} space-y-1`}>
-                  <button
-                    onClick={handleCreateProtocol}
-                    className="w-full text-left px-3 py-2 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 transition-colors text-xs font-mono flex items-center gap-2"
-                  >
-                    <Plus className="w-3 h-3" /> Create New Protocol: &quot;{searchQuery.trim()}&quot;
-                  </button>
+                <div className={cn('p-2', showSections && 'border-t border-white/10', 'space-y-1')}>
+                  {!isAccountMode && (
+                    <button
+                      onClick={handleCreateProtocol}
+                      className="w-full text-left px-3 py-2 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 transition-colors text-xs font-mono flex items-center gap-2"
+                    >
+                      <Plus className="w-3 h-3" /> Create New Protocol: &quot;{searchQuery.trim()}&quot;
+                    </button>
+                  )}
                   <button
                     onClick={handleCreateTarget}
                     className="w-full text-left px-3 py-2 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-colors text-xs font-mono flex items-center gap-2"

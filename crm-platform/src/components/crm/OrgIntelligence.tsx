@@ -91,6 +91,21 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     }
   }, [initialDomain, website, companyName]);
 
+  /** Normalize cache key to hostname only; full URLs can cause Supabase 406. */
+  const cacheKeyFromDomainOrName = (d: string | undefined, name: string | undefined) => {
+    const raw = d || name;
+    if (!raw) return undefined;
+    try {
+      if (/^https?:\/\//i.test(raw)) {
+        const u = new URL(raw);
+        return (u.hostname || '').replace(/^www\./i, '') || raw;
+      }
+      return raw;
+    } catch {
+      return raw;
+    }
+  };
+
   // Load cache on mount or when domain/company changes
   useEffect(() => {
     async function loadCache() {
@@ -104,7 +119,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       setSearchTerm('');
       setCurrentPage(1);
       
-      const key = domain || companyName;
+      const key = cacheKeyFromDomainOrName(domain, companyName);
       if (!key) return;
 
       // 1. Try Supabase first (Persistent Cloud Cache)
@@ -278,7 +293,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   const saveToCache = (company: ApolloCompany | null, contacts: ApolloContactRow[]) => {
     if (typeof window === 'undefined') return;
     
-    const key = domain || companyName;
+    const key = cacheKeyFromDomainOrName(domain, companyName);
     if (!key) return;
 
     const cacheData = {
@@ -777,7 +792,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       if (mappedData.length > 0) {
         setData(mappedData);
         setCurrentPage(1);
-        const key = domain || companyName;
+        const key = cacheKeyFromDomainOrName(domain, companyName);
         if (key && companySummary) {
           const cacheKey = `apollo_cache_${key}`;
           let existingContacts: ApolloContactRow[] = [];

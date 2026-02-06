@@ -63,12 +63,10 @@ export default async function handler(req, res) {
 
     const APOLLO_API_KEY = getApiKey();
 
-    // Apollo mixed_people/api_search: prefer domains as list when available
-    const orgDomainsList = Array.isArray(q_organization_domains_list) && q_organization_domains_list.length > 0
-      ? q_organization_domains_list
-      : (q_organization_domains ? [q_organization_domains] : undefined);
-    
-    // Build Apollo search request (mixed people search)
+    // Apollo mixed_people/api_search: send EITHER q_organization_domains_list (array) OR q_organization_domains (single), not both (422 if both sent)
+    const hasDomainsList = Array.isArray(q_organization_domains_list) && q_organization_domains_list.length > 0;
+    const singleDomain = q_organization_domains && typeof q_organization_domains === 'string' ? q_organization_domains : undefined;
+
     const searchBody = {
       page,
       per_page: Math.min(per_page, 100), // Apollo max is 100
@@ -76,15 +74,18 @@ export default async function handler(req, res) {
       person_titles,
       person_locations,
       organization_ids,
-      q_organization_domains,
-      q_organization_domains_list: orgDomainsList,
       q_organization_name,
       organization_num_employees_ranges,
       revenue_range,
     };
+    if (hasDomainsList) {
+      searchBody.q_organization_domains_list = q_organization_domains_list;
+    } else if (singleDomain) {
+      searchBody.q_organization_domains = singleDomain;
+    }
 
     // Remove undefined keys
-    Object.keys(searchBody).forEach(key => 
+    Object.keys(searchBody).forEach(key =>
       searchBody[key] === undefined && delete searchBody[key]
     );
     const searchUrl = `${APOLLO_BASE_URL}/mixed_people/api_search`;

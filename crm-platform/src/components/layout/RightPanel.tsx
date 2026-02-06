@@ -240,10 +240,12 @@ export function RightPanel() {
                 transition={{ type: "tween", duration: 0.25, ease: "easeInOut" }}
                 className="flex flex-col gap-4 mt-1"
               >
-                {/* 0. TARGET VECTOR ASSIGNMENT (Protocol/List Selector) - Only for Contacts */}
-                {isContactPage && entityId && (
-                  <VectorControlModule contactId={entityId} />
-                )}
+                {/* 0. ASSIGN OPERATIONAL VECTOR — Contacts: protocols + lists; Accounts: lists only (account-filtered) */}
+                {isContactPage && entityId ? (
+                  <VectorControlModule key={`vector-contact-${entityId}`} contactId={entityId} />
+                ) : isAccountPage && entityId ? (
+                  <VectorControlModule key={`vector-account-${entityId}`} accountId={entityId} />
+                ) : null}
 
                 {/* 1. NODE TASKS (Execution) */}
                 <div className="space-y-3">

@@ -54,6 +54,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
           account: contact.companyName || contact.company,
           title: contact.title,
           logoUrl: contact.logoUrl,
+          domain: contact.companyDomain,
           // Expanded Context for AI Script Generation
           industry: contact.industry,
           description: contact.accountDescription,
