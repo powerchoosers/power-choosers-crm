@@ -611,22 +611,6 @@ export default function AccountDossierPage() {
                     {!hasTasks && (
                       <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Dossier Status</div>
                     )}
-                    <button
-                      onClick={toggleEditing}
-                      className={cn(
-                         "w-7 h-7 flex items-center justify-center transition-all duration-300",
-                         isEditing 
-                           ? "text-blue-400 bg-blue-400/10 border border-blue-400/30 rounded-lg shadow-[0_0_15px_rgba(59,130,246,0.2)] scale-110" 
-                           : "text-zinc-500 hover:text-white bg-transparent border border-transparent"
-                       )}
-                      title={isEditing ? "Lock Dossier" : "Unlock Dossier"}
-                    >
-                      {isEditing ? (
-                        <Unlock className="w-4 h-4" />
-                      ) : (
-                        <Lock className="w-4 h-4" />
-                      )}
-                    </button>
                     {hasTasks && (
                       <>
                         <div className={cn(
@@ -643,6 +627,22 @@ export default function AccountDossierPage() {
                         />
                       </>
                     )}
+                    <button
+                      onClick={toggleEditing}
+                      className={cn(
+                         "w-7 h-7 flex items-center justify-center transition-all duration-300",
+                         isEditing 
+                           ? "text-blue-400 bg-blue-400/10 border border-blue-400/30 rounded-lg shadow-[0_0_15px_rgba(59,130,246,0.2)] scale-110" 
+                           : "text-zinc-500 hover:text-white bg-transparent border border-transparent"
+                       )}
+                      title={isEditing ? "Lock Dossier" : "Unlock Dossier"}
+                    >
+                      {isEditing ? (
+                        <Unlock className="w-4 h-4" />
+                      ) : (
+                        <Lock className="w-4 h-4" />
+                      )}
+                    </button>
                   </div>
                   {!hasTasks && (
                     <div className="flex items-center gap-2">
