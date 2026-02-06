@@ -1,5 +1,57 @@
 import { useState, useCallback } from 'react'
 
+/** Script result shape expected by Call Intelligence / ActiveCallInterface */
+export interface ScriptResult {
+  opener: string
+  hook: string
+  disturb: string
+  close: string
+}
+
+/** Strip markdown code fences and parse JSON; normalize to ScriptResult. */
+function parseScriptContent(raw: unknown, riskVector: string): ScriptResult {
+  const fallback: ScriptResult = {
+    opener: "I'm not sure if you're the right person to speak with...",
+    hook: `I noticed some ${riskVector} that might be impacting your operations.`,
+    disturb: "Usually, when that happens, it leads to waste that nobody's tracking.",
+    close: "Would you be opposed to a brief look at the data to see if that's the case?"
+  }
+  if (raw == null) return fallback
+  let str: string
+  if (typeof raw === 'string') {
+    str = raw.trim()
+  } else if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+    const o = raw as Record<string, unknown>
+    return {
+      opener: String(o.opener ?? o.Opener ?? fallback.opener),
+      hook: String(o.hook ?? o.Hook ?? fallback.hook),
+      disturb: String(o.disturb ?? o.Disturb ?? fallback.disturb),
+      close: String(o.close ?? o.Close ?? fallback.close)
+    }
+  } else {
+    return fallback
+  }
+  if (!str) return fallback
+  const stripped = str
+    .replace(/^```(?:json)?\s*\n?/i, '')
+    .replace(/\n?```\s*$/i, '')
+    .trim()
+  try {
+    const parsed = JSON.parse(stripped) as Record<string, unknown>
+    if (parsed && typeof parsed === 'object') {
+      return {
+        opener: String(parsed.opener ?? parsed.Opener ?? fallback.opener),
+        hook: String(parsed.hook ?? parsed.Hook ?? fallback.hook),
+        disturb: String(parsed.disturb ?? parsed.Disturb ?? fallback.disturb),
+        close: String(parsed.close ?? parsed.Close ?? fallback.close)
+      }
+    }
+  } catch {
+    // ignore parse error
+  }
+  return fallback
+}
+
 export interface AIPayload {
   vector_type: string
   contact_context: {
@@ -199,30 +251,19 @@ Current Vector Type: ${payload.vector_type}`
       }
 
       const data = await response.json()
-      
-      // Handle potential stringified JSON in content
-      try {
-        const content = typeof data.content === 'string' ? JSON.parse(data.content) : data.content
-        return content
-      } catch (e) {
-        console.error('Failed to parse AI JSON output:', data.content)
-        return {
-          opener: "I'm not sure if you're the right person to speak with...",
-          hook: `I noticed some ${riskVector} that might be impacting your operations.`,
-          disturb: "Usually, when that happens, it leads to waste that nobody's tracking.",
-          close: "Would you be opposed to a brief look at the data to see if that's the case?"
-        }
+
+      if (data.error) {
+        setError(typeof data.message === 'string' ? data.message : data.error)
+        return parseScriptContent(null, riskVector)
       }
+
+      const content = parseScriptContent(data.content, riskVector)
+      return content
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown AI error'
       setError(msg)
       console.error('AI Generation Error:', err)
-      return {
-        opener: "I'm not sure if you're the right person to speak with...",
-        hook: `I noticed some phantom charges that might be impacting your operations.`,
-        disturb: "Usually, when that happens, it leads to waste that nobody's tracking.",
-        close: "Would you be opposed to a brief look at the data to see if that's the case?"
-      }
+      return parseScriptContent(null, 'phantom charges')
     } finally {
       setIsLoading(false)
     }

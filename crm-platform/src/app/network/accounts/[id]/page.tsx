@@ -12,6 +12,9 @@ import {
 import { useAccount, useUpdateAccount } from '@/hooks/useAccounts'
 import { useAccountContacts, Contact } from '@/hooks/useContacts'
 import { useAccountCalls } from '@/hooks/useCalls'
+import { useEntityTasks } from '@/hooks/useEntityTasks'
+import { useTasks } from '@/hooks/useTasks'
+import { TaskCommandBar } from '@/components/crm/TaskCommandBar'
 import { useUIStore } from '@/store/uiStore'
 import { useGeminiStore } from '@/store/geminiStore'
 import { Button } from '@/components/ui/button'
@@ -70,6 +73,23 @@ export default function AccountDossierPage() {
   const [showSynced, setShowSynced] = useState(false)
   const [activeEditField, setActiveEditField] = useState<'logo' | 'domain' | 'linkedin' | null>(null)
   const prevIsEditing = useRef(isEditing)
+
+  const { pendingTasks } = useEntityTasks(id, account?.name)
+  const { updateTask } = useTasks()
+  const [currentTaskIndex, setCurrentTaskIndex] = useState(0)
+  const hasTasks = pendingTasks.length > 0
+  const displayTaskIndex = Math.min(currentTaskIndex, Math.max(0, pendingTasks.length - 1))
+
+  useEffect(() => {
+    setCurrentTaskIndex((prev) => Math.min(prev, Math.max(0, pendingTasks.length - 1)))
+  }, [pendingTasks.length])
+
+  const handleCompleteAndAdvance = () => {
+    const task = pendingTasks[displayTaskIndex]
+    if (!task) return
+    updateTask({ id: task.id, status: 'Completed' })
+    if (pendingTasks.length <= 1) toast.success('Mission complete')
+  }
 
   // Terminal State
   const [isTyping, setIsTyping] = useState(false)
@@ -588,36 +608,56 @@ export default function AccountDossierPage() {
               <div className="text-right">
                 <div className="flex flex-col items-end gap-0.5">
                   <div className="flex items-center gap-2">
+                    {!hasTasks && (
                       <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Dossier Status</div>
-                      <button
-                        onClick={toggleEditing}
-                        className={cn(
-                           "w-7 h-7 flex items-center justify-center transition-all duration-300",
-                           isEditing 
-                             ? "text-blue-400 bg-blue-400/10 border border-blue-400/30 rounded-lg shadow-[0_0_15px_rgba(59,130,246,0.2)] scale-110" 
-                             : "text-zinc-500 hover:text-white bg-transparent border border-transparent"
-                         )}
-                        title={isEditing ? "Lock Dossier" : "Unlock Dossier"}
-                      >
-                        {isEditing ? (
-                          <Unlock className="w-4 h-4" />
-                        ) : (
-                          <Lock className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  <div className="flex items-center gap-2">
-                    <div className={cn(
-                      "h-2 w-2 rounded-full animate-pulse",
-                      isEditing ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]" : "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
-                    )} />
-                    <span className={cn(
-                      "text-xs font-mono uppercase tracking-widest transition-colors duration-300",
-                      isEditing ? "text-blue-400" : "text-green-500"
-                    )}>
-                      {isEditing ? "SECURE_FIELD_OVERRIDE" : "ACTIVE_INTELLIGENCE"}
-                    </span>
+                    )}
+                    <button
+                      onClick={toggleEditing}
+                      className={cn(
+                         "w-7 h-7 flex items-center justify-center transition-all duration-300",
+                         isEditing 
+                           ? "text-blue-400 bg-blue-400/10 border border-blue-400/30 rounded-lg shadow-[0_0_15px_rgba(59,130,246,0.2)] scale-110" 
+                           : "text-zinc-500 hover:text-white bg-transparent border border-transparent"
+                       )}
+                      title={isEditing ? "Lock Dossier" : "Unlock Dossier"}
+                    >
+                      {isEditing ? (
+                        <Unlock className="w-4 h-4" />
+                      ) : (
+                        <Lock className="w-4 h-4" />
+                      )}
+                    </button>
+                    {hasTasks && (
+                      <>
+                        <div className={cn(
+                          "h-2 w-2 rounded-full animate-pulse shrink-0",
+                          isEditing ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]" : "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
+                        )} />
+                        <TaskCommandBar
+                          pendingTasks={pendingTasks}
+                          currentIndex={displayTaskIndex}
+                          onPrev={() => setCurrentTaskIndex((p) => Math.max(0, p - 1))}
+                          onNext={() => setCurrentTaskIndex((p) => Math.min(pendingTasks.length - 1, p + 1))}
+                          onSkip={() => setCurrentTaskIndex((p) => Math.min(pendingTasks.length - 1, p + 1))}
+                          onCompleteAndAdvance={handleCompleteAndAdvance}
+                        />
+                      </>
+                    )}
                   </div>
+                  {!hasTasks && (
+                    <div className="flex items-center gap-2">
+                      <div className={cn(
+                        "h-2 w-2 rounded-full animate-pulse",
+                        isEditing ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]" : "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
+                      )} />
+                      <span className={cn(
+                        "text-xs font-mono uppercase tracking-widest transition-colors duration-300",
+                        isEditing ? "text-blue-400" : "text-green-500"
+                      )}>
+                        {isEditing ? "SECURE_FIELD_OVERRIDE" : "ACTIVE_INTELLIGENCE"}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -965,7 +1005,15 @@ export default function AccountDossierPage() {
                               }}
                               className="hover:translate-x-1 transition-transform"
                             >
-                              <CallListItem call={call} contactId={call.contactId || ''} variant="minimal" />
+                              <CallListItem
+                                call={call}
+                                contactId={call.contactId || ''}
+                                accountId={id}
+                                accountLogoUrl={account?.logoUrl}
+                                accountDomain={account?.domain}
+                                accountName={account?.name}
+                                variant="minimal"
+                              />
                             </motion.div>
                           ))}
                         </AnimatePresence>

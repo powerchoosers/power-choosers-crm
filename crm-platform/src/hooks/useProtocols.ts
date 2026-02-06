@@ -158,6 +158,7 @@ export function useProtocols(searchQuery?: string) {
     hasNextPage: protocolsQuery.hasNextPage,
     isFetchingNextPage: protocolsQuery.isFetchingNextPage,
     addProtocol: addProtocolMutation.mutate,
+    createProtocolAsync: addProtocolMutation.mutateAsync,
     updateProtocol: updateProtocolMutation.mutate,
     deleteProtocol: deleteProtocolMutation.mutate
   }

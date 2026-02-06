@@ -18,6 +18,7 @@ export interface Call {
   transcript?: string
   aiInsights?: Record<string, unknown> | null
   contactId?: string
+  accountId?: string
 }
 
 export function useSearchCalls(queryTerm: string) {
@@ -114,6 +115,8 @@ type CallContact = {
 
 type CallRow = {
   id: string
+  callSid?: string | null
+  call_sid?: string | null
   direction?: string | null
   status?: string | null
   duration?: number | null
@@ -298,6 +301,7 @@ export function useAccountCalls(accountId: string) {
 
         return {
           id: item.id,
+          callSid: item.callSid ?? item.call_sid ?? item.id,
           contactName: contact?.name || 'Unknown',
           phoneNumber: (item.from_phone ?? item.from) || (item.to_phone ?? item.to) || '',
           type: type as Call['type'],
@@ -359,8 +363,8 @@ export function useContactCalls(contactId: string) {
         .from('calls')
         .select('*')
         .eq('contactId', contactId)
-        .order('createdAt', { ascending: false })
-        .limit(20) // Increased from 10 to 20 for better coverage
+        .order('timestamp', { ascending: false })
+        .limit(50)
 
       if (error) {
         console.error('Error fetching contact calls:', error)
@@ -370,25 +374,30 @@ export function useContactCalls(contactId: string) {
       return (data as CallRow[]).map(item => {
         const type = item.direction === 'inbound' ? 'Inbound' : 'Outbound'
         const status = item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1) : 'Completed'
-        const hours = Math.floor((item.duration || 0) / 3600)
-        const minutes = Math.floor(((item.duration || 0) % 3600) / 60)
-        const seconds = (item.duration || 0) % 60
+        const durationNum = typeof item.duration === 'number' ? item.duration : 0
+        const hours = Math.floor(durationNum / 3600)
+        const minutes = Math.floor((durationNum % 3600) / 60)
+        const seconds = durationNum % 60
         const durationStr = [hours, minutes, seconds].map(v => String(v).padStart(2, '0')).join(':')
+        const fromVal = item.from_phone ?? item.from
+        const toVal = item.to_phone ?? item.to
 
         return {
           id: item.id,
-          contactName: '', // Not needed for single contact view
-          phoneNumber: item.from_phone === user.email ? item.to_phone : item.from_phone,
+          callSid: item.callSid ?? item.call_sid ?? item.id,
+          contactName: '',
+          phoneNumber: fromVal === user.email ? toVal : fromVal,
           type: type as Call['type'],
           status: status as Call['status'],
           duration: durationStr,
-          date: item.timestamp || item.created_at,
-          note: item.ai_summary || item.summary,
-          recordingUrl: item.recording_url,
-          recordingSid: item.recording_sid,
+          date: item.timestamp ?? item.createdAt ?? item.created_at ?? '',
+          note: item.ai_summary ?? item.summary,
+          recordingUrl: item.recordingUrl ?? item.recording_url,
+          recordingSid: item.recordingSid ?? item.recording_sid,
           transcript: item.transcript,
-          aiInsights: item.ai_insights,
-          contactId: item.contact_id
+          aiInsights: item.aiInsights ?? item.ai_insights,
+          contactId: item.contactId ?? item.contact_id,
+          accountId: item.accountId ?? item.account_id
         }
       }) as Call[]
     },

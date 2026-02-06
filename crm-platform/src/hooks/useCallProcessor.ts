@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 
 export type ProcessingStatus = 'idle' | 'processing' | 'ready' | 'error'
 
@@ -9,14 +10,15 @@ interface UseCallProcessorProps {
   recordingUrl?: string
   recordingSid?: string
   contactId?: string
+  accountId?: string
 }
 
-export function useCallProcessor({ callSid, recordingUrl, recordingSid, contactId }: UseCallProcessorProps) {
+export function useCallProcessor({ callSid, recordingUrl, recordingSid, contactId, accountId }: UseCallProcessorProps) {
   const [status, setStatus] = useState<ProcessingStatus>('idle')
   const [error, setError] = useState<string | null>(null)
   const queryClient = useQueryClient()
 
-  // Subscribe to changes for this specific call
+  // Subscribe to changes for this specific call (calls table uses camelCase: callSid, aiInsights)
   useEffect(() => {
     if (!callSid) return
 
@@ -28,16 +30,20 @@ export function useCallProcessor({ callSid, recordingUrl, recordingSid, contactI
           event: 'UPDATE',
           schema: 'public',
           table: 'calls',
-          filter: `call_sid=eq.${callSid}`,
+          filter: `callSid=eq.${callSid}`,
         },
-        (payload) => {
-          console.log('Call record updated:', payload.new)
-          // If we have ai_insights or transcript, we are ready
-          if (payload.new.ai_insights || payload.new.transcript) {
+        (payload: { new: Record<string, unknown> }) => {
+          const row = payload.new || {}
+          const hasInsights = !!(row.aiInsights ?? row.ai_insights)
+          const hasTranscript = !!(row.transcript)
+          if (hasInsights || hasTranscript) {
             setStatus('ready')
-            // Invalidate queries to refresh UI
             queryClient.invalidateQueries({ queryKey: ['contact-calls', contactId] })
             queryClient.invalidateQueries({ queryKey: ['calls'] })
+            if (accountId) {
+              queryClient.invalidateQueries({ queryKey: ['account-calls', accountId] })
+            }
+            toast.success('Insights ready', { description: 'Click the eye icon to view call insights.' })
           }
         }
       )
@@ -46,13 +52,14 @@ export function useCallProcessor({ callSid, recordingUrl, recordingSid, contactI
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [callSid, contactId, queryClient])
+  }, [callSid, contactId, accountId, queryClient])
 
   const processCall = useCallback(async () => {
     if (!callSid) return
 
     setStatus('processing')
     setError(null)
+    toast.info('Processing call', { description: 'Starting AI analysis...' })
 
     try {
       // Step 1: Request CI processing
@@ -123,6 +130,7 @@ export function useCallProcessor({ callSid, recordingUrl, recordingSid, contactI
       const errorMessage = err instanceof Error ? err.message : 'Failed to start processing'
       setError(errorMessage)
       setStatus('error')
+      toast.error('Processing failed', { description: errorMessage })
     }
   }, [callSid, recordingUrl, recordingSid])
 
