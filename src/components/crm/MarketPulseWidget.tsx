@@ -4,19 +4,19 @@ import { Activity, TrendingUp, AlertTriangle } from 'lucide-react'
 import { useMarketPulse } from '@/hooks/useMarketPulse'
 
 export default function MarketPulseWidget() {
-  const { data: marketData, isLoading } = useMarketPulse()
+  const { data: marketData, isLoading, isError } = useMarketPulse()
 
   const prices = {
-    houston: marketData?.prices.houston ?? 24.50,
-    north: marketData?.prices.north ?? 21.20,
-    reserves: marketData?.grid.reserves ?? 3450,
-    scarcity: marketData?.grid.scarcity_prob ?? 4.2,
-    capacity: marketData?.grid.total_capacity ?? 0
+    houston: marketData?.prices?.houston ?? 24.50,
+    north: marketData?.prices?.north ?? 21.20,
+    reserves: marketData?.grid?.reserves ?? 3450,
+    scarcity: marketData?.grid?.scarcity_prob ?? 4.2,
+    capacity: marketData?.grid?.total_capacity ?? 0
   }
 
   const reservePercentage = prices.capacity ? Math.min(100, Math.max(0, (prices.reserves / prices.capacity) * 100)) : 65;
 
-  if (isLoading) {
+  if (isLoading && !marketData) {
     return (
       <div className="space-y-4 animate-pulse">
         <div className="grid grid-cols-2 gap-3">
@@ -30,6 +30,9 @@ export default function MarketPulseWidget() {
 
   return (
     <div className="space-y-4">
+      {isError && (
+        <p className="text-[10px] font-mono text-amber-500/80 uppercase tracking-wider">Telemetry delayed — showing last known</p>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <div className="px-3 !pt-[3px] !pb-[12px] rounded-2xl bg-zinc-900/40 border border-white/5 backdrop-blur-xl space-y-0.5">
           <span className="text-[9px] font-mono text-zinc-500 uppercase leading-none">LZ_HOUSTON</span>
