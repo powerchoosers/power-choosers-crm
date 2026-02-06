@@ -278,10 +278,10 @@ export function useAccountCalls(accountId: string) {
     queryFn: async () => {
       if (!accountId || loading || !user) return []
 
-      // Fetch calls directly by accountId (use camelCase column name)
+      // Fetch calls by accountId. Use explicit FK for contacts (calls has duplicate FKs to contacts).
       const { data, error } = await supabase
         .from('calls')
-        .select('*, contacts(name)')
+        .select('*, contacts!calls_contactId_fkey(name)')
         .eq('accountId', accountId)
         .order('timestamp', { ascending: false })
 
@@ -299,18 +299,18 @@ export function useAccountCalls(accountId: string) {
         return {
           id: item.id,
           contactName: contact?.name || 'Unknown',
-          phoneNumber: item.from_phone || item.to_phone || '',
+          phoneNumber: (item.from_phone ?? item.from) || (item.to_phone ?? item.to) || '',
           type: type as Call['type'],
           status: status as Call['status'],
           duration: durationStr,
-          date: item.timestamp || item.created_at,
-          note: item.ai_summary || item.summary,
-          recordingUrl: item.recording_url,
-          recordingSid: item.recording_sid,
+          date: item.timestamp ?? item.createdAt ?? item.created_at ?? '',
+          note: item.ai_summary ?? item.summary,
+          recordingUrl: item.recordingUrl ?? item.recording_url,
+          recordingSid: item.recordingSid ?? item.recording_sid,
           transcript: item.transcript,
-          aiInsights: item.ai_insights,
-          contactId: item.contact_id,
-          accountId: item.account_id
+          aiInsights: item.aiInsights ?? item.ai_insights,
+          contactId: item.contactId ?? item.contact_id,
+          accountId: item.accountId ?? item.account_id
         }
       }) as Call[]
     },

@@ -293,7 +293,7 @@ export default function AccountDossierPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center">
+      <div className="flex flex-col h-[calc(100vh-8rem)] items-center justify-center space-y-4 animate-in fade-in duration-500">
         <LoadingOrb label="LOADING ASSET DATA..." />
       </div>
     )
@@ -301,7 +301,7 @@ export default function AccountDossierPage() {
 
   if (!account) {
     return (
-      <div className="flex h-full items-center justify-center flex-col gap-4">
+      <div className="flex flex-col h-[calc(100vh-8rem)] items-center justify-center gap-4 animate-in fade-in duration-500">
         <div className="font-mono text-zinc-500">ACCOUNT NOT FOUND</div>
         <Button onClick={() => router.back()}>Return to Grid</Button>
       </div>

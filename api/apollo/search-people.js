@@ -55,14 +55,20 @@ export default async function handler(req, res) {
       person_locations,
       organization_ids,
       q_organization_domains,
+      q_organization_domains_list,
       q_organization_name,
       organization_num_employees_ranges,
       revenue_range
     } = req.body || {};
 
     const APOLLO_API_KEY = getApiKey();
+
+    // Apollo mixed_people/api_search: prefer domains as list when available
+    const orgDomainsList = Array.isArray(q_organization_domains_list) && q_organization_domains_list.length > 0
+      ? q_organization_domains_list
+      : (q_organization_domains ? [q_organization_domains] : undefined);
     
-    // Build Apollo search request
+    // Build Apollo search request (mixed people search)
     const searchBody = {
       page,
       per_page: Math.min(per_page, 100), // Apollo max is 100
@@ -71,11 +77,10 @@ export default async function handler(req, res) {
       person_locations,
       organization_ids,
       q_organization_domains,
+      q_organization_domains_list: orgDomainsList,
       q_organization_name,
       organization_num_employees_ranges,
       revenue_range,
-      // Default to finding emails if possible, but don't filter strictly by it unless requested
-      // contact_email_status: ["verified"] // Optional: Uncomment to only show verified emails
     };
 
     // Remove undefined keys

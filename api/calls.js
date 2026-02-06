@@ -225,6 +225,9 @@ async function upsertCallInSupabase(payload) {
     } catch (_) {}
   }
   if (!isCallSid(callId)) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calls.js:upsertCallInSupabase',message:'Upsert skipped invalid callSid',data:{callId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+    // #endregion
     // No valid Call SID → do not persist
     return null;
   }
@@ -329,6 +332,9 @@ async function upsertCallInSupabase(payload) {
     .from('calls')
     .upsert(dbRow);
 
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calls.js:supabaseUpsert',message:'Supabase upsert result',data:{error:error?String(error.message):null,code:error&&error.code},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
+  // #endregion
   if (error) {
     logger.error('Supabase upsert error:', error);
     return null;
@@ -429,6 +435,9 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       const payload = (req.body && typeof req.body === 'object') ? req.body : await readJson(req);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calls.js:POST entry',message:'POST /api/calls received',data:{callSid:payload&&payload.callSid,contactId:payload&&payload.contactId,accountId:payload&&payload.accountId,source:payload&&payload.source},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
 
       let callId = (payload.callSid && String(payload.callSid)) || '';
       if (!isCallSid(callId)) {
@@ -440,9 +449,15 @@ export default async function handler(req, res) {
           });
         } catch (_) {}
       }
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calls.js:afterResolve',message:'Call SID resolution',data:{callId,isValid:isCallSid(callId),isSupabaseEnabled},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
 
       if (isSupabaseEnabled) {
         const saved = await upsertCallInSupabase({ ...payload, callSid: callId || payload.callSid });
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calls.js:afterUpsert',message:'Upsert result',data:{saved:!!saved},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4,H5'})}).catch(()=>{});
+        // #endregion
         if (!saved) {
           res.statusCode = 202;
           res.setHeader('Content-Type', 'application/json');

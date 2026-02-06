@@ -51,6 +51,9 @@ export default async function handler(req, res) {
         // Extract CRM context from query params
         const contactId = req.query.contactId || '';
         const accountId = req.query.accountId || '';
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'recording.js:entry',message:'Recording webhook received',data:{RecordingStatus,CallSid:CallSid||'',contactId,accountId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+        // #endregion
         
         // Use shared logger for Cloud Run cost optimization
         try {
@@ -93,6 +96,9 @@ export default async function handler(req, res) {
             }
         }
 
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'recording.js:beforeCompletedBlock',message:'Recording status and URL check',data:{RecordingStatus,effectiveRecordingUrl:!!effectiveRecordingUrl,RecordingUrl:!!RecordingUrl,willEnterBlock:!!(RecordingStatus==='completed'&&(effectiveRecordingUrl||RecordingUrl))},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
+        // #endregion
         if (RecordingStatus === 'completed' && (effectiveRecordingUrl || RecordingUrl)) {
             // Resolve a reliable Call SID to avoid duplicate rows keyed by recording/transcript IDs
             let finalCallSid = (CallSid && isCallSid(CallSid)) ? CallSid : null;
@@ -141,6 +147,9 @@ export default async function handler(req, res) {
             const host = req.headers['x-forwarded-host'] || req.headers.host;
             const envBase = process.env.PUBLIC_BASE_URL || process.env.API_BASE_URL || '';
             const baseUrl = host ? `${proto}://${host}` : (envBase || 'https://nodalpoint.io');
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'recording.js:baseUrl',message:'Base URL for /api/calls',data:{baseUrl,host:host||'',envBase:envBase||''},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+            // #endregion
 
             // Upsert into central /api/calls so the UI can see the recording immediately
             try {
@@ -169,7 +178,8 @@ export default async function handler(req, res) {
 
                 if (finalCallSid) {
                     // Initial upsert with best-known fields (may be refined later)
-                    await fetch(`${baseUrl}/api/calls`, {
+                    // #region agent log
+                    const callApiRes = await fetch(`${baseUrl}/api/calls`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -190,7 +200,9 @@ export default async function handler(req, res) {
                             contactId: contactId || undefined,
                             accountId: accountId || undefined
                         })
-                    }).catch(() => {});
+                    }).then(r => ({ ok: r.ok, status: r.status })).catch(e => ({ ok: false, status: 0, error: String(e && e.message) }));
+                    fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'recording.js:fetchApiCalls',message:'POST /api/calls result',data:{finalCallSid,baseUrl,...callApiRes},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+                    // #endregion
 
                     // If duration is 0 or metadata looked incomplete, schedule a follow-up refresh
                     try {
