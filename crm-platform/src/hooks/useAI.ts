@@ -1,14 +1,36 @@
 import { useState, useCallback } from 'react'
+import { getNepqTargets } from '@/lib/industry-mapping'
 
-/** Script result shape expected by Call Intelligence / ActiveCallInterface */
-export interface ScriptResult {
+/** One full script variant (opener, hook, disturb, close). */
+export interface ScriptVariant {
   opener: string
   hook: string
   disturb: string
   close: string
 }
 
-/** Strip markdown code fences and parse JSON; normalize to ScriptResult. */
+/** Script result: primary script, optional gatekeeper variants (company-phone only), optional full-script variants. */
+export interface ScriptResult {
+  opener: string
+  hook: string
+  disturb: string
+  close: string
+  /** 2–3 gatekeeper lines — only when calling company phone; pick one to use. */
+  gatekeeperVariants?: string[]
+  /** 2–3 alternative full scripts (opener, hook, disturb, close) for the same vector. */
+  variants?: ScriptVariant[]
+}
+
+function normalizeVariant(o: Record<string, unknown>, fallback: ScriptResult): ScriptVariant {
+  return {
+    opener: String(o.opener ?? o.Opener ?? fallback.opener),
+    hook: String(o.hook ?? o.Hook ?? fallback.hook),
+    disturb: String(o.disturb ?? o.Disturb ?? fallback.disturb),
+    close: String(o.close ?? o.Close ?? fallback.close)
+  }
+}
+
+/** Strip markdown code fences and parse JSON; normalize to ScriptResult (gatekeeper + variants). */
 function parseScriptContent(raw: unknown, riskVector: string): ScriptResult {
   const fallback: ScriptResult = {
     opener: "I'm not sure if you're the right person to speak with...",
@@ -22,12 +44,22 @@ function parseScriptContent(raw: unknown, riskVector: string): ScriptResult {
     str = raw.trim()
   } else if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
     const o = raw as Record<string, unknown>
-    return {
+    const result: ScriptResult = {
       opener: String(o.opener ?? o.Opener ?? fallback.opener),
       hook: String(o.hook ?? o.Hook ?? fallback.hook),
       disturb: String(o.disturb ?? o.Disturb ?? fallback.disturb),
       close: String(o.close ?? o.Close ?? fallback.close)
     }
+    const gk = o.gatekeeperVariants ?? (o.gatekeeper != null && String(o.gatekeeper).trim() ? [String(o.gatekeeper).trim()] : undefined)
+    if (Array.isArray(gk) && gk.length > 0) result.gatekeeperVariants = gk.map((s) => String(s).trim()).filter(Boolean).slice(0, 5)
+    if (Array.isArray(o.variants) && o.variants.length > 0) {
+      result.variants = o.variants
+        .filter((v): v is Record<string, unknown> => v != null && typeof v === 'object' && !Array.isArray(v))
+        .slice(0, 5)
+        .map((v) => normalizeVariant(v, result))
+      if (result.variants.length === 0) delete result.variants
+    }
+    return result
   } else {
     return fallback
   }
@@ -39,12 +71,22 @@ function parseScriptContent(raw: unknown, riskVector: string): ScriptResult {
   try {
     const parsed = JSON.parse(stripped) as Record<string, unknown>
     if (parsed && typeof parsed === 'object') {
-      return {
+      const result: ScriptResult = {
         opener: String(parsed.opener ?? parsed.Opener ?? fallback.opener),
         hook: String(parsed.hook ?? parsed.Hook ?? fallback.hook),
         disturb: String(parsed.disturb ?? parsed.Disturb ?? fallback.disturb),
         close: String(parsed.close ?? parsed.Close ?? fallback.close)
       }
+      const gk = parsed.gatekeeperVariants ?? (parsed.gatekeeper != null && String(parsed.gatekeeper).trim() ? [String(parsed.gatekeeper).trim()] : undefined)
+      if (Array.isArray(gk) && gk.length > 0) result.gatekeeperVariants = gk.map((s) => String(s).trim()).filter(Boolean).slice(0, 5)
+      if (Array.isArray(parsed.variants) && parsed.variants.length > 0) {
+        result.variants = parsed.variants
+          .filter((v): v is Record<string, unknown> => v != null && typeof v === 'object' && !Array.isArray(v))
+          .slice(0, 5)
+          .map((v) => normalizeVariant(v, result))
+        if (result.variants.length === 0) delete result.variants
+      }
+      return result
     }
   } catch {
     // ignore parse error
@@ -94,135 +136,110 @@ export function useAI() {
     const industry = payload.contact_context.industry || 'Unknown'
     const riskVector = industryRisks[industry] || 'unmanaged capacity charges'
 
-    const systemPrompt = `ACT AS: "${payload.contact_context.agent_name || 'Trey'}", the Director of Energy Architecture at Nodal Point.
-PERSONA: 29-year-old African American business executive. 
-TONE: "Obsidian & Glass." You are smooth, calm, and dangerously competent. You do not use "sales voice" (high pitch/enthusiastic). You use "executive voice" (lower register, measured pace, declarative). You are skeptical of the status quo.
+    const agentName = payload.contact_context.agent_name || 'Trey'
+    const agentTitle = payload.contact_context.agent_title || 'Director of Energy Architecture'
+    const isCompanyPhone = !!payload.contact_context.is_account_only
+    const nepqTargets = getNepqTargets(payload.contact_context.industry)
+    const dmList = nepqTargets.decisionMaker.join(' or ')
+    const championList = nepqTargets.champion.join(' or ')
 
-CORE PHILOSOPHY (The Nodal Way):
-1. Energy is a Liability, not a Commodity. We fix "design flaws" in the contract.
-2. Trade on Physics, not History. Focus on Phantom Charges, Hidden Fees, and Surge Premiums.
-3. Be the Critic. Do not "save money." Eliminate "waste that nobody's tracking."
+    const systemPrompt = `You are a Forensic Energy Consultant at Nodal Point. Generate cold-call scripts that are human, sharp, and aligned with our philosophy. Use the agent name and title provided; they come from our plugins and must appear in the script.
 
-METHODOLOGY (NEPQ):
-- Always use "Permission-Based Openers" (e.g., "Did I catch you at a bad time?").
-- Use "Problem Awareness Questions" to expose gaps (e.g., "When was the last time someone showed you where the waste is?").
-- Use "No-Oriented Questions" for the close (e.g., "Would you be opposed?").
-- Keep outputs SHORT (under 50 words per bubble).
-- NO JARGON: Never use "4CP", "demand ratchet", "LOA", "RFP", "ancillary services", "coincident peak". Use plain business language.
+## Identity & Tone
+- Persona: Peer-level, authoritative, slightly impatient with market mediocrity. Not "salesy."
+- Language rule: NEVER use "Ghost Capacity." ALWAYS use "phantom charges" (and "hidden fees," "waste," "fees nobody's tracking").
+- Philosophy: Complexity is a tax. We don't sell plans; we delete structural waste. Be the critic.
 
-AGENT CONTEXT:
-- Name: ${payload.contact_context.agent_name || 'Trey'}
-- Title: ${payload.contact_context.agent_title || 'Director of Energy Architecture'}
+## Agent (from plugins — use these)
+- Agent name: ${agentName}
+- Agent title: ${agentTitle}
 
-TARGET CONTEXT:
-${payload.contact_context.is_account_only 
-  ? `- Entity: ${payload.contact_context.company} (Corporate Line)` 
+## Target
+${isCompanyPhone
+  ? `- Calling the COMPANY PHONE (corporate line). No contact name yet; you must get past the gatekeeper first.`
   : `- Name: ${payload.contact_context.name}\n- Title: ${payload.contact_context.title}\n- Company: ${payload.contact_context.company}`}
+- Company: ${payload.contact_context.company}
 - Industry: ${payload.contact_context.industry}
+- Location: ${payload.contact_context.location || 'Houston'}
 - Description: ${payload.contact_context.description || 'Not available'}
-- Location: ${payload.contact_context.location || 'Not available'}
-- Energy Usage: ${payload.contact_context.annual_usage || 'Unknown'} kWh/year
-- Current Supplier: ${payload.contact_context.supplier || 'Unknown'}
-- Contract End: ${payload.contact_context.contract_end || 'Unknown'}
-
-SPECIFIC INDUSTRY RISK: ${payload.contact_context.industry ? riskVector : 'unmanaged capacity charges'}
-
-VECTOR-SPECIFIC INSTRUCTIONS:
-
-${payload.vector_type === 'OPENER' ? `
-**OPENER VECTOR** (The Cold Call Entry)
-- OPENER: Start with "Hi, this is ${payload.contact_context.agent_name || 'Trey'} with Nodal Point. Did I catch you at a bad time?" (Permission-Based Opener with Down-Tone)
-- HOOK: Mention ${payload.contact_context.company}'s industry (${payload.contact_context.industry}) and the specific risk of ${riskVector}. Reference their location (${payload.contact_context.location || 'Texas'}) or contract end date if known.
-- DISTURB: Ask a Problem Awareness Question like "When was the last time someone showed you where the phantom charges are?" or "Are you tracking the fees that aren't labeled on your bill?"
-- CLOSE: Use a No-Oriented Question: "Would you be opposed to a 15-minute review to see where the waste is?"
-- TONE: Peer-to-peer, not sales-y. Lower register. Skeptical of the status quo.
+- Energy usage: ${payload.contact_context.annual_usage || 'Unknown'} kWh/year | Supplier: ${payload.contact_context.supplier || 'Unknown'} | Contract end: ${payload.contact_context.contract_end || 'Unknown'}
+- Industry-specific risk to lean on: ${riskVector}
+${isCompanyPhone ? `
+## Who we're actually looking for (use this in gatekeeper asks)
+- For ${payload.contact_context.industry}: Decision Maker = ${dmList}. Champion (user) = ${championList}. Signal a *money* conversation (Controller, CFO, operating budget), NOT Facilities/IT—otherwise gatekeepers route to a "black hole." Avoid vague "who handles infrastructure costs"; that sounds like you're calling about the parking lot or a transformer.
 ` : ''}
 
-${payload.vector_type === 'OBJECTION_EMAIL' ? `
-**OBJECTION: "Send Me Information"**
-- OPENER: "I can absolutely do that..."
-- HOOK: "But just so I don't send you generic fluff, what specifically are you trying to fix? Is it the phantom charges, the hidden fees you can't track, or something else?"
-- DISTURB: "Most people I talk to in ${payload.contact_context.industry} are surprised to learn that 60% of their bill isn't even the electricity—it's fees they can't see."
-- CLOSE: "Would it make sense to spend 10 minutes on a screen-share so I can show you exactly what I'm seeing in ${payload.contact_context.location || 'your area'}?"
-- TONE: Diffusing the objection with specificity. Not pushy. Curious and consultative.
-` : ''}
+## Research instruction (Forensic Scan)
+Before writing, mentally: (1) One industry-specific energy pain. (2) Local context (e.g. Houston / CenterPoint rate hikes). (3) If possible, a peer org in the same sector for social proof.
 
-${payload.vector_type === 'OBJECTION_PRICE' ? `
-**OBJECTION: "We're Under Contract" / Price Concerns**
-- OPENER: "I assumed you were—most ${payload.contact_context.industry} operations are."
-- HOOK: "I'm not looking to sell you power. I'm looking to audit the phantom charges that your contract doesn't cover—the fees that show up every month but nobody's tracking."
-- DISTURB: "When was the last time someone audited those line items? Because most facilities are paying fees based on a single spike from months ago that's still being charged."
-- CLOSE: "Would you be opposed to me running a quick scan on your meter data to see if there's waste in how you're being billed?"
-- TONE: Forensic. Not sales. Position yourself as the auditor, not the vendor.
-` : ''}
+## NEPQ (Neuro-Emotional Persuasion Questioning) — gatekeeper and connection
+- NEPQ works with human nature: Safety, Clarity, Control. "Help me out" is one of the most powerful openers with gatekeepers—it lowers their status frame and invites them to be your ally (Internal Referral frame).
+- Connection → Situation → Problem awareness. We're not selling; we're auditing / following up on a specific issue. Gatekeepers transfer "fixing an error" or "mandatory review" much more readily than "savings plan" or "energy broker."
 
-${payload.vector_type === 'MARKET_DATA' ? `
-**MARKET DATA / PULSE VECTOR** (The Phantom Charges Hook)
-- OPENER: "I'm calling because I noticed something unusual in your area (${payload.contact_context.location || 'Texas'})."
-${payload.contact_context.industry === 'Logistics' || payload.contact_context.industry === 'Manufacturing' ? 
-`- HOOK: "For ${payload.contact_context.industry} operations like ${payload.contact_context.company}, there are phantom charges on equipment that isn't even running—you're paying for capacity you're not using."` :
-`- HOOK: "For ${payload.contact_context.industry} operations like ${payload.contact_context.company}, there's a gap between your base rate and the hidden fees that most people don't track."`}
-- DISTURB: "Are you tracking those monthly surcharges? Because if your facility spiked during peak hours, you're locked into paying for that spike for months—even when you're using less power."
-- CLOSE: "Would you be opposed to me pulling the last 12 months of data to show you exactly where the waste is?"
-- TONE: Data-driven. Analytical. Show them the invisible threat.
-` : ''}
+## In-call assistance (when prospect/gatekeeper says something — use these rebuttals)
+- **"What is this in regards to?"** NEVER say you want to save them money on their energy bill. ALWAYS say: "It's regarding the phantom charges identified in their recent load profile audit. I just need to verify the correct email to send the findings to."
+- **"Just send an email"** → "I will—I need the right person so the findings don't sit in a generic inbox. Who handles the operating budget or vendor contracts for the building?"
+- **"We already have a broker"** → "This isn't about switching—it's about errors in how the current load is being billed. I need to send the audit to whoever can fix that."
+- **If they bristle at "energy" or "electricity"** → Use "operating budget," "delivery charges," or "load profile audit" instead. Frame: we're auditors fixing an error, not vendors offering a savings plan.
 
-${payload.vector_type === 'LIVE_PIVOT' ? `
-**LIVE PIVOT** (Real-Time Context Injection)
-- Incorporate this live context from the call: "${payload.contact_context.additional_context || 'None provided'}"
-- OPENER: Acknowledge what the prospect just said and pivot to a relevant angle.
-- HOOK: Connect their comment to a deeper energy liability or structural inefficiency.
-- DISTURB: Ask a follow-up Problem Awareness Question that ties back to their specific situation.
-- CLOSE: Offer a micro-commitment based on what they just revealed.
-- TONE: Agile. Responsive. Show you're listening, not reading a script.
-` : ''}
+## Script sections — your job (you have full control)
+We give principles and frames; you write what actually works.
 
-OUTPUT SCHEMA (JSON ONLY - Return valid JSON with these exact 4 keys):
+- **Gatekeeper** (ONLY when calling company phone): Provide 3–4 gatekeeper variants, each a complete line the agent could say. Use these frames (you write the exact words):
+  1. **Structural Audit**: Sound like an auditor who found a mathematical error. Mention "structural cost audit" on [Company]'s electricity load profile. Ask who you should speak with—Controller or CFO (signals money, not maintenance).
+  2. **Regulatory Shift**: Leverage recent utility/transmission rate adjustments (e.g. CenterPoint 2025/2026). "Brief on rate adjustments that affect Houston [Industry] companies." Ask who oversees the *operating budget* for the building (avoids "energy" = broker reflex).
+  3. **Phantom Charge Specialist**: You're following up on phantom charges flagged in the delivery portion of [Company]'s utility file. Ask who handles *vendor contracts* for the facility (billing error = more likely transfer than "savings plan").
+  4. **Internal Referral (NEPQ)**: "I was hoping you could help me out"—then your name, Nodal Point, and you're trying to find the person responsible for protecting [Company] from summer delivery spikes on the energy bill. Optionally name a title (e.g. Facilities Director) or "someone else I should be talking to?" Makes the gatekeeper your ally.
+  Do NOT use vague "who handles infrastructure costs"—too broad; sounds like facilities/IT. Be specific so the call has a clear next step.
+- **Opener**: Permission-based or pattern-interrupt. Use agent name. Short. No jargon. You choose the exact wording.
+- **Hook**: Why you're calling—company, industry, the risk (phantom charges / hidden fees). Location or peer proof when it fits. You choose the angle and phrasing.
+- **Disturb**: A "wait, what?" question—when was the last time someone showed them the waste, or what happens to their budget if X. You choose the question.
+- **Close**: No-oriented, low-pressure commitment. You choose the exact wording.
+
+## Freedom
+Create 2–3 full script variants (opener, hook, disturb, close) and, when company phone, 3–4 gatekeeper variants (one per frame above, or mix). Keep each line punchy and under ~50 words. No technical jargon (no 4CP, demand ratchet, LOA, RFP, ancillary services, coincident peak). You have full control over the output for each section.
+
+Current vector: ${payload.vector_type}
+${payload.vector_type === 'LIVE_PIVOT' ? `Live context from the call: "${payload.contact_context.additional_context || 'None'}"` : ''}
+
+OUTPUT (valid JSON only):
 {
-  "opener": "First 1-2 sentences. Permission-based. Down-tone. Under 40 words. NO JARGON.",
-  "hook": "The specific reason for the call. Mention ${payload.contact_context.company}, their industry (${payload.contact_context.industry}), and the risk (use 'phantom charges', 'hidden fees', 'waste', NOT technical terms). Under 50 words.",
-  "disturb": "A Problem Awareness Question that exposes a gap. Make them think. Use plain business language. Under 40 words.",
-  "close": "A No-Oriented Question for low-pressure commitment. 'Would you be opposed to...' format. Under 30 words."
+  ${isCompanyPhone ? '"gatekeeperVariants": ["Structural Audit frame", "Regulatory Shift frame", "Phantom Charge frame", "Internal Referral / NEPQ frame"],\n  ' : ''}"opener": "...",
+  "hook": "...",
+  "disturb": "...",
+  "close": "...",
+  "variants": [
+    { "opener": "...", "hook": "...", "disturb": "...", "close": "..." },
+    { "opener": "...", "hook": "...", "disturb": "...", "close": "..." }
+  ]
 }
-
-CRITICAL: 
-- Each field must be a standalone, complete thought. Do NOT reference other fields.
-- NO TECHNICAL JARGON: Never use "4CP", "demand ratchet", "ancillary services", "coincident peak", "LOA", "RFP", "pass-through charges", or similar technical terms.
-- USE INSTEAD: "phantom charges", "hidden fees", "surge premiums", "waste", "fees nobody's tracking".
-
-Current Vector Type: ${payload.vector_type}`
+- When company phone: include gatekeeperVariants (array of 3–4 strings). One per frame: Structural Audit, Regulatory Shift, Phantom Charge Specialist, Internal Referral (NEPQ). Each string is a complete gatekeeper line; agent picks one.
+- Include 2–3 full-script variants. Primary (opener/hook/disturb/close) is first recommended; variants are alternatives to play with.`
 
     try {
-      // Generate specific user content based on vector type
       let userContent = ''
-      
       switch (payload.vector_type) {
         case 'OPENER':
-          userContent = payload.contact_context.is_account_only
-            ? `Generate the opening script for a cold call to ${payload.contact_context.company}'s corporate line. I need to navigate to the decision-maker.`
-            : `Generate the opening script for a cold call to ${payload.contact_context.name}, the ${payload.contact_context.title} at ${payload.contact_context.company}.`
+          userContent = isCompanyPhone
+            ? `Generate the full opening script for a cold call to ${payload.contact_context.company}'s main line. Include 3–4 gatekeeper variants (Structural Audit, Regulatory Shift, Phantom Charge Specialist, Internal Referral / NEPQ). Use the DM/Champion titles for ${payload.contact_context.industry}. Then primary opener/hook/disturb/close plus 2–3 full-script variants.`
+            : `Generate the full opening script for a cold call to ${payload.contact_context.name}, ${payload.contact_context.title} at ${payload.contact_context.company}. Include 2–3 variant scripts.`
           break
-        
         case 'OBJECTION_EMAIL':
-          userContent = `The prospect just said "Can you just send me some information?" Generate a response that diffuses this objection and moves toward a commitment.`
+          userContent = `Prospect said "Can you just send me some information?" Generate a response that diffuses it and moves toward a commitment. Primary script + 2–3 variants.`
           break
-        
         case 'OBJECTION_PRICE':
-          userContent = `The prospect just said "We're already under contract" or expressed price concerns. Generate a response using the Forensic Audit pivot.`
+          userContent = `Prospect said they're under contract or pushed back on price. Use the Forensic Audit pivot. Primary script + 2–3 variants.`
           break
-        
         case 'MARKET_DATA':
-          userContent = `Generate a data-driven script that leads with market intelligence and hidden liabilities in their load zone. Focus on the "Ghost Capacity" or "Pass-Through Variance" angle for ${payload.contact_context.industry}.`
+          userContent = `Generate a data-driven script for ${payload.contact_context.industry} — market intelligence, hidden liabilities, phantom charges. Primary + 2–3 variants.`
           break
-        
         case 'LIVE_PIVOT':
-          userContent = `The prospect just said: "${payload.contact_context.additional_context}". Generate a response that pivots to our value prop based on what they just revealed.`
+          userContent = `Prospect or gatekeeper just said: "${payload.contact_context.additional_context}". Generate a response: if it's a gatekeeper question ("what is this in regards to?", "send an email", "we have a broker") use the in-call rebuttals (phantom charges / load profile audit / verify email; never "save them money"). Otherwise pivot to our value prop. Primary + 2 variants.`
           break
-        
         default:
-          userContent = payload.contact_context.is_account_only
-            ? `Generate a bespoke cold call script for a prospect at ${payload.contact_context.company}.`
-            : `Generate a bespoke cold call script for ${payload.contact_context.name} at ${payload.contact_context.company}.`
+          userContent = isCompanyPhone
+            ? `Generate a bespoke cold call script for ${payload.contact_context.company} (company line). Include 3–4 gatekeeper variants (NEPQ frames) and 2–3 full-script variants.`
+            : `Generate a bespoke cold call script for ${payload.contact_context.name} at ${payload.contact_context.company}. Primary + 2–3 variants.`
       }
 
         const response = await fetch('/api/gemini/chat', {

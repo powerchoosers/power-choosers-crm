@@ -11,37 +11,55 @@ interface DestructModalProps {
   count: number;
 }
 
+const HOLD_DURATION_MS = 1500;
+const TICK_MS = 16; // ~60fps for smooth progress
+
 export default function DestructModal({ isOpen, onClose, onConfirm, count }: DestructModalProps) {
   const [progress, setProgress] = useState(0);
   const [isHolding, setIsHolding] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
-  const duration = 1500; // 1.5 seconds
+  const onConfirmRef = useRef(onConfirm);
+
+  onConfirmRef.current = onConfirm;
 
   useEffect(() => {
-    if (isHolding) {
-      startTimeRef.current = Date.now();
-      timerRef.current = setInterval(() => {
-        const elapsed = Date.now() - startTimeRef.current;
-        const newProgress = Math.min((elapsed / duration) * 100, 100);
-        setProgress(newProgress);
-
-        if (newProgress >= 100) {
-          if (timerRef.current) clearInterval(timerRef.current);
-          onConfirm();
-          setIsHolding(false);
-          setProgress(0);
-        }
-      }, 10);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
+    if (isOpen) {
       setProgress(0);
+      setIsHolding(false);
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = null;
     }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isHolding) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = null;
+      setProgress(0);
+      return;
+    }
+
+    startTimeRef.current = Date.now();
+    timerRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTimeRef.current;
+      const newProgress = Math.min((elapsed / HOLD_DURATION_MS) * 100, 100);
+      setProgress(newProgress);
+
+      if (newProgress >= 100) {
+        if (timerRef.current) clearInterval(timerRef.current);
+        timerRef.current = null;
+        onConfirmRef.current();
+        setIsHolding(false);
+        setProgress(0);
+      }
+    }, TICK_MS);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = null;
     };
-  }, [isHolding, onConfirm]);
+  }, [isHolding]);
 
   return (
     <AnimatePresence>
@@ -98,18 +116,18 @@ export default function DestructModal({ isOpen, onClose, onConfirm, count }: Des
                   onMouseLeave={() => setIsHolding(false)}
                   onTouchStart={() => setIsHolding(true)}
                   onTouchEnd={() => setIsHolding(false)}
-                  className="w-full relative h-14 bg-red-500/5 border border-red-500/20 rounded-xl overflow-hidden group transition-all active:scale-[0.98]"
+                  onTouchCancel={() => setIsHolding(false)}
+                  className="w-full relative h-14 bg-red-500/5 border border-red-500/20 rounded-xl overflow-hidden group transition-all active:scale-[0.98] select-none"
                 >
-                  {/* Progress Bar Background */}
-                  <div 
-                    className="absolute inset-0 bg-red-500/20 transition-all duration-75"
+                  {/* Progress fill: left-to-right, pointer-events-none so button still receives events */}
+                  <div
+                    className="absolute left-0 top-0 bottom-0 bg-red-500/30 pointer-events-none transition-[width] duration-75 ease-linear"
                     style={{ width: `${progress}%` }}
                   />
-                  
-                  {/* Button Content */}
-                  <div className="absolute inset-0 flex items-center justify-center gap-3">
+                  {/* Button content */}
+                  <div className="absolute inset-0 flex items-center justify-center gap-3 pointer-events-none">
                     <span className="text-red-500 font-mono text-xs font-bold tracking-widest uppercase">
-                      {progress > 0 ? 'Authorizing...' : 'Hold to Execute'}
+                      {progress > 0 ? `Authorizing... ${Math.round(progress)}%` : 'Hold to Execute'}
                     </span>
                   </div>
                 </button>

@@ -16,13 +16,7 @@ import {
   Sparkles
 } from 'lucide-react'
 
-interface ScriptResult {
-  opener: string;
-  hook: string;
-  disturb: string;
-  close: string;
-}
-import { useAI } from '@/hooks/useAI'
+import { useAI, type ScriptResult, type ScriptVariant } from '@/hooks/useAI'
 import { useCallStore } from '@/store/callStore'
 import { useVoice } from '@/context/VoiceContext'
 import { useAuth } from '@/context/AuthContext'
@@ -36,6 +30,8 @@ interface ActiveCallInterfaceProps {
 
 export function ActiveCallInterface({ contact, account }: ActiveCallInterfaceProps) {
   const [aiResponse, setAiResponse] = useState<ScriptResult | null>(null)
+  const [selectedVariantIndex, setSelectedVariantIndex] = useState(0) // 0 = primary, 1+ = variants[n-1]
+  const [selectedGatekeeperIndex, setSelectedGatekeeperIndex] = useState(0)
   const [loadingVector, setLoadingVector] = useState<string | null>(null)
   const [liveInput, setLiveInput] = useState('')
   const { generateScript, isLoading } = useAI()
@@ -98,6 +94,8 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
     const response = await generateScript(payload)
     if (response) {
       setAiResponse(response)
+      setSelectedVariantIndex(0)
+      setSelectedGatekeeperIndex(0)
     }
     setLoadingVector(null)
     if (vector === 'LIVE_PIVOT') setLiveInput('')
@@ -161,27 +159,81 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
                 animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 className="flex flex-col gap-4"
               >
-                <ScriptStep 
-                  label="The Opener" 
-                  content={aiResponse.opener ?? ''} 
-                  delay={0.1}
-                />
-                <ScriptStep 
-                  label="The Hook" 
-                  content={aiResponse.hook ?? ''} 
-                  delay={0.2}
-                />
-                <ScriptStep 
-                  label="The Disturb" 
-                  content={aiResponse.disturb ?? ''} 
-                  delay={0.3}
-                  accent
-                />
-                <ScriptStep 
-                  label="The Close" 
-                  content={aiResponse.close ?? ''} 
-                  delay={0.4}
-                />
+                {aiResponse.gatekeeperVariants && aiResponse.gatekeeperVariants.length > 0 && selectedVariantIndex === 0 && (
+                  <>
+                    <ScriptStep 
+                      label="Gatekeeper (company line)" 
+                      content={aiResponse.gatekeeperVariants[selectedGatekeeperIndex] ?? aiResponse.gatekeeperVariants[0]} 
+                      delay={0}
+                      accent
+                    />
+                    {aiResponse.gatekeeperVariants.length > 1 && (
+                      <div className="flex flex-wrap gap-2">
+                        <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Gate</span>
+                        {aiResponse.gatekeeperVariants.map((_, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setSelectedGatekeeperIndex(i)}
+                            className={cn(
+                              'px-3 py-1.5 rounded-xl text-[10px] font-mono uppercase tracking-wider transition-colors',
+                              selectedGatekeeperIndex === i
+                                ? 'bg-amber-500/20 border border-amber-500/40 text-amber-400'
+                                : 'bg-white/5 border border-white/10 text-zinc-500 hover:text-zinc-300'
+                            )}
+                          >
+                            {i + 1}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+                {(() => {
+                  const script: ScriptVariant = selectedVariantIndex === 0
+                    ? { opener: aiResponse.opener, hook: aiResponse.hook, disturb: aiResponse.disturb, close: aiResponse.close }
+                    : (aiResponse.variants?.[selectedVariantIndex - 1] ?? { opener: aiResponse.opener, hook: aiResponse.hook, disturb: aiResponse.disturb, close: aiResponse.close })
+                  return (
+                    <>
+                      <ScriptStep label="The Opener" content={script.opener ?? ''} delay={0.1} />
+                      <ScriptStep label="The Hook" content={script.hook ?? ''} delay={0.2} />
+                      <ScriptStep label="The Disturb" content={script.disturb ?? ''} delay={0.3} accent />
+                      <ScriptStep label="The Close" content={script.close ?? ''} delay={0.4} />
+                    </>
+                  )
+                })()}
+                {aiResponse.variants && aiResponse.variants.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-white/5">
+                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest w-full">Variants</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedVariantIndex(0)}
+                      className={cn(
+                        'px-3 py-1.5 rounded-xl text-[10px] font-mono uppercase tracking-wider transition-colors',
+                        selectedVariantIndex === 0
+                          ? 'bg-[#002FA7]/30 border border-[#002FA7]/50 text-[#002FA7]'
+                          : 'bg-white/5 border border-white/10 text-zinc-500 hover:text-zinc-300'
+                      )}
+                    >
+                      Primary
+                    </button>
+                    {aiResponse.variants.map((_, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setSelectedVariantIndex(i + 1)}
+                        className={cn(
+                          'px-3 py-1.5 rounded-xl text-[10px] font-mono uppercase tracking-wider transition-colors',
+                          selectedVariantIndex === i + 1
+                            ? 'bg-[#002FA7]/30 border border-[#002FA7]/50 text-[#002FA7]'
+                            : 'bg-white/5 border border-white/10 text-zinc-500 hover:text-zinc-300'
+                        )}
+                      >
+                        Variant {i + 2}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </motion.div>
             ) : (
               <div key="empty" className="py-20 flex flex-col items-center justify-center text-center opacity-40">

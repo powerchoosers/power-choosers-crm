@@ -26,6 +26,7 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
       name: account.name,
       account: account.name,
       logoUrl: account.logoUrl,
+      domain: account.domain,
       industry: account.industry,
       description: account.description,
       location: account.location || account.city,

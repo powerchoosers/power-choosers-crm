@@ -10,7 +10,7 @@ import { useEffect, useState, useRef, useMemo, useCallback } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useVoice } from '@/context/VoiceContext'
 import { toast } from 'sonner'
-import Image from 'next/image'
+import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { usePathname, useParams } from 'next/navigation'
 import { GeminiChatTrigger, GeminiChatPanel } from '@/components/chat/GeminiChat'
 import { useGeminiStore } from '@/store/geminiStore'
@@ -409,19 +409,13 @@ export function TopBar() {
                     >
                         <div className="w-full max-w-2xl h-[50px] nodal-glass border-signal/50 rounded-2xl shadow-[0_10px_30px_-10px_rgba(0,47,167,0.5)] flex items-center justify-between px-6">
                             <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-[14px] bg-zinc-800 flex items-center justify-center border border-white/5 overflow-hidden shadow-[0_0_10px_rgba(0,0,0,0.5)]">
-                                    {displayMetadata?.logoUrl ? (
-                                        <Image 
-                                            src={displayMetadata.logoUrl} 
-                                            alt={displayMetadata.name || "Caller"} 
-                                            width={32}
-                                            height={32}
-                                            className="w-full h-full object-cover rounded-[14px]" 
-                                        />
-                                    ) : (
-                                        <span className="text-zinc-400 font-mono text-[10px]">ID</span>
-                                    )}
-                                </div>
+                                <CompanyIcon
+                                    logoUrl={displayMetadata?.logoUrl}
+                                    domain={displayMetadata?.domain}
+                                    name={displayMetadata?.name || phoneNumber || 'Caller'}
+                                    size={32}
+                                    className="rounded-[14px]"
+                                />
                                 <div>
                                     <div className="text-sm font-medium text-white leading-none mb-1">{displayMetadata?.name || phoneNumber || "Unknown Caller"}</div>
                                     <div className="text-[10px] text-signal font-mono uppercase tracking-tighter flex items-center gap-2">

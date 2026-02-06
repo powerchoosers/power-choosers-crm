@@ -9,6 +9,7 @@ interface CallState {
     account?: string
     title?: string
     logoUrl?: string
+    domain?: string
     industry?: string
     description?: string
     linkedinUrl?: string

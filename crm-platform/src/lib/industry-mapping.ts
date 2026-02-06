@@ -229,3 +229,44 @@ export const INDUSTRY_VECTORS: Record<string, string[]> = {
 export function getIndustryFilters(selectedVectors: string[]): string[] {
   return selectedVectors.flatMap(vector => INDUSTRY_VECTORS[vector] || [vector]);
 }
+
+/**
+ * NEPQ-style: who is the Decision Maker (DM) vs Champion by industry.
+ * Used for gatekeeper scripts so we ask for the right title (money conversation, not Facilities/IT).
+ * Based on B2B research (SalesHive, RAIN Group) and NEPQ "Expert Guide" frame.
+ */
+export const NEPQ_DM_CHAMPION: Record<string, { decisionMaker: string[]; champion: string[] }> = {
+  Manufacturing: { decisionMaker: ['COO', 'Controller'], champion: ['Plant Manager'] },
+  Nonprofits: { decisionMaker: ['Executive Director', 'CFO'], champion: ['Facilities Director'] },
+  'Retail': { decisionMaker: ['Owner', 'VP of Operations'], champion: ['General Manager'] },
+  'Real Estate': { decisionMaker: ['Asset Manager'], champion: ['Property Manager'] },
+  Healthcare: { decisionMaker: ['CFO', 'VP Operations'], champion: ['Facilities Director'] },
+  Education: { decisionMaker: ['CFO', 'Business Director'], champion: ['Facilities Director'] },
+  Technology: { decisionMaker: ['CFO', 'VP Operations'], champion: ['Facilities Manager'] },
+  'Logistics & Warehouse': { decisionMaker: ['COO', 'VP Operations'], champion: ['Operations Manager'] },
+  Services: { decisionMaker: ['CFO', 'VP Operations', 'Owner'], champion: ['Facilities Director', 'General Manager'] },
+  'Food & Beverage': { decisionMaker: ['Owner', 'COO'], champion: ['General Manager'] },
+  Energy: { decisionMaker: ['CFO', 'VP Operations'], champion: ['Facilities Manager'] },
+};
+
+/** Resolve raw industry string to NEPQ DM/Champion. Uses first matching vector. */
+export function getNepqTargets(industry: string | null | undefined): { decisionMaker: string[]; champion: string[] } {
+  const defaultTargets = { decisionMaker: ['CFO', 'VP Operations', 'Owner'], champion: ['Facilities Director', 'General Manager'] };
+  if (!industry || typeof industry !== 'string') return defaultTargets;
+  const normalized = industry.trim().toLowerCase();
+  if (!normalized) return defaultTargets;
+  // Nonprofit check first (often under "Services" in our vectors; we want NEPQ Nonprofits targets)
+  if (normalized.includes('nonprofit') || normalized.includes('non-profit') || normalized.includes('non profit')) {
+    return NEPQ_DM_CHAMPION.Nonprofits ?? defaultTargets;
+  }
+  // Find which INDUSTRY_VECTORS bucket this industry belongs to
+  for (const [vector, values] of Object.entries(INDUSTRY_VECTORS)) {
+    const match = values.some(v => v.toLowerCase() === normalized || normalized.includes(v.toLowerCase()));
+    if (match && NEPQ_DM_CHAMPION[vector]) return NEPQ_DM_CHAMPION[vector];
+  }
+  // Fallback: direct key match (e.g. "Manufacturing", "Real Estate")
+  for (const key of Object.keys(NEPQ_DM_CHAMPION)) {
+    if (normalized.includes(key.toLowerCase())) return NEPQ_DM_CHAMPION[key];
+  }
+  return defaultTargets;
+}

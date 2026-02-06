@@ -8,21 +8,22 @@ Welcome to the **Nodal Point CRM Platform**, a modern, scalable, and high-perfor
 
 ## 🚀 Tech Stack
 
-- **Framework:** [Next.js 16+](https://nextjs.org/) (App Router, Turbopack)
+- **Framework:** [Next.js 16+](https://nextjs.org/) (App Router, Turbopack) — current: 16.1.4
+- **Runtime:** React 19
 - **Language:** TypeScript
-- **Styling:** [Tailwind CSS](https://tailwindcss.com/)
+- **Styling:** [Tailwind CSS](https://tailwindcss.com/) v4
 - **State Management:**
-  - [Zustand](https://github.com/pmndrs/zustand) (Global Client State)
-  - [TanStack Query](https://tanstack.com/query/latest) (Server State / Async Data)
+  - [Zustand](https://github.com/pmndrs/zustand) (Global Client State: callStore, geminiStore, syncStore, uiStore)
+  - [TanStack Query](https://tanstack.com/query/latest) (Server State / Async Data), persisted to IndexedDB via `lib/persister.ts` for calls, energy-plans, scripts
 - **Database:**
-  - **Supabase** (PostgreSQL) - Primary Data & Vector Store
-  - **Firestore** (Legacy/Deprecating) - Read-only reference
+  - **Supabase** (PostgreSQL) — Primary Data & Vector Store
+  - **Firestore** (Legacy/Deprecating) — Read-only reference
 - **UI Components:**
   - [Radix UI](https://www.radix-ui.com/) (Headless Primitives)
   - [Lucide React](https://lucide.dev/) (Icons)
   - [Framer Motion](https://www.framer.com/motion/) (Animations)
-- **Authentication:** Firebase Auth & Firestore
-- **Backend/API:** Node.js (Legacy Server & API Proxy)
+- **Authentication:** Firebase Auth (login); Supabase `users` table (profile: role, name, Twilio settings, etc.)
+- **Backend/API:** Node.js (Legacy Server & API Proxy at root)
 
 ## 🛠️ Project Structure
 
@@ -36,22 +37,32 @@ Power Choosers CRM/
 ├── crm-platform/           # New Next.js Application (MAIN ENTRY POINT)
 │   ├── src/
 │   │   ├── app/            # App Router (Pages & Layouts)
-│   │   ├── components/     # Reusable UI Components
-│   │   ├── context/        # React Context Providers
-│   │   ├── lib/            # Utilities & Firebase Config
-│   │   └── store/          # Zustand Stores
-│   ├── public/             # Static Assets (Images)
-│   │   └── images/         # Image assets
+│   │   ├── components/     # Reusable UI (modals, layout, ui, crm, calls, etc.)
+│   │   ├── context/        # AuthContext, VoiceContext
+│   │   ├── hooks/          # Data & UI hooks (useContacts, useCalls, useAccounts, etc.)
+│   │   ├── lib/            # supabase, firebase, persister, market-mapping, utils
+│   │   ├── store/          # Zustand: callStore, geminiStore, syncStore, uiStore
+│   │   └── types/          # TypeScript interfaces
+│   ├── public/             # Static Assets (images, scripts)
 │   └── package.json        # Frontend Dependencies
-├── api/                    # Backend API Endpoints
+├── api/                    # Backend API Endpoints (Twilio, etc.)
 ├── backups/                # Legacy HTML Dashboard (Reference Only)
-├── server.js               # Node.js Server (API & Legacy Support)
-└── feature-tracking.md     # Migration Status Log
+├── server.js               # Node.js Backend (API & Legacy Support)
+├── scripts/dev-all.js      # Starts Next.js + backend (npm run dev:all)
+└── feature-tracking.md    # Migration Status Log
 ```
+
+### Key Routes (App Router)
+
+- **Public**: `/`, `/login`, `/philosophy`, `/technical-docs`
+- **Protected** (`/network`): `/network` (dashboard), `/network/accounts`, `/network/accounts/[id]`, `/network/people`, `/network/contacts/[id]` (contact dossier), `/network/calls`, `/network/emails`, `/network/emails/[id]`, `/network/tasks`, `/network/targets`, `/network/targets/[id]` (list detail), `/network/protocols`, `/network/protocols/[id]/builder`, `/network/scripts`, `/network/settings`, `/network/infrastructure`, `/network/energy`
+- **Other**: `/bill-debugger`, `/market-data`, `/contact`, `/debug/connectivity`
+
+Providers (`src/app/providers.tsx`): `PersistQueryClientProvider` (TanStack Query + IndexedDB), `AuthProvider`, `VoiceProvider`, `ChunkLoadErrorHandler`.
 
 ## 🗄️ Database & Migration
 
-The platform has transitioned from **Firebase/Firestore** to **Supabase (PostgreSQL)**.
+The platform has transitioned from **Firebase/Firestore** to **Supabase (PostgreSQL)**. For relationship or schema errors (e.g. "more than one relationship found"), inspect the live schema (foreign key names, column casing) and use **exact** constraint names in queries—see `SUPABASE DOCS/` and the project MCP tools for `supabase_execute_sql` when debugging.
 
 ### 1. Supabase Schema Strategy
 - **Relational Integrity**: We use foreign keys (e.g., `contacts.accountId` -> `accounts.id`) to maintain data consistency.
@@ -59,21 +70,21 @@ The platform has transitioned from **Firebase/Firestore** to **Supabase (Postgre
 - **Unified Contacts**: The legacy `people` and `contacts` collections have been merged into a single `contacts` table in Supabase.
 - **Location Data**: `city` and `state` are now top-level columns in the `contacts` table, indexed for performance.
 
-### 3. Data Mapping & Normalization
+### 2. Data Mapping & Normalization
 Due to varying structures in legacy data, we use a normalization layer in our hooks (see `useContacts.ts`):
 - **Name Resolution**: We prioritize `firstName`/`lastName` columns, then fall back to `first_name`/`last_name` (underscore format), and finally check nested paths in `metadata` (e.g., `metadata.general.firstName`).
 - **Location Resolution**: We prioritize the specific `city`/`state` columns on the contact record. If absent, we fall back to the linked Account's location to ensure no "Unknown" gaps.
 - **Metadata Parsing**: In some cases, Supabase returns the `metadata` column as a stringified JSON string. We use `normalizeMetadata` to safely parse these values.
 - **Energy Data**: Account-level energy metrics (Strike Price, Annual Usage, etc.) are promoted to top-level columns in the `accounts` table for performance.
 
-### 4. Bulk Data Ingestion (BulkImportModal)
+### 3. Bulk Data Ingestion (BulkImportModal)
 The platform features a high-performance CSV ingestion system with intelligent field mapping:
 - **Persistent Mapping Caching**: Field mappings are cached in `localStorage` using vector-specific keys (`nodal_import_mapping_CONTACTS` vs. `nodal_import_mapping_ACCOUNTS`). This ensures that re-uploading similar CSV structures requires zero reconfiguration.
 - **Forensic Log Integration**: The `description` field for accounts is mapped as "Forensic Log / Description" to align with the `FORENSIC_LOG_STREAM` component on Account Dossier pages.
 - **Automated Mapping Recovery**: The system prioritizes user-defined cached mappings over automated field detection to maintain consistency across batches.
-- **Schema Parity Rule**: When adding new fields to the CRM (Accounts or Contacts), they **MUST** be added to the `ACCOUNT_FIELDS` or `CONTACT_FIELDS` arrays in `BulkImportModal.tsx` and the corresponding ingestion logic to maintain parity.
+- **Schema Parity Rule**: When adding new fields to the CRM (Accounts or Contacts), they **MUST** be added to the `ACCOUNT_FIELDS` or `CONTACT_FIELDS` arrays in `src/components/modals/BulkImportModal.tsx` and the corresponding ingestion logic to maintain parity.
 
-### 5. Market Telemetry & Forensic Analysis
+### 4. Market Telemetry & Forensic Analysis
 - **Telemetry Storage**: We store real-time ERCOT market data in the `market_telemetry` table, throttled to 2x daily (AM/PM) to preserve storage.
 - **Vector Search**: The table includes a `vector(768)` embedding column (`embedding`) generated from the market summary string.
 - **Market Zone Resolution**: We use `market-mapping.ts` to resolve a contact or account's physical location (City/State) to its respective ERCOT Load Zone (North, Houston, West, South). This allows for context-aware market analysis.
@@ -100,12 +111,13 @@ The platform operates using a **Three-Server Architecture**:
 ### 1. Frontend (Next.js)
 The modern UI for users.
 - **Local**: `http://localhost:3000`
-- **Command**: `cd crm-platform; npm run dev -- --port 3000`
+- **Command (frontend only)**: `cd crm-platform && npm run dev` (Next.js with Turbopack; port 3000 default)
+- **Command (both)**: From repo root, `npm run dev:all` — starts Next.js and backend in one terminal via `scripts/dev-all.js`
 
 ### 2. Local Backend (Node.js)
 Handles API requests and legacy logic during development.
 - **Local**: `http://127.0.0.1:3001`
-- **Command**: `node server.js` (Root Directory)
+- **Command**: From repo root, `node server.js` or `npm run dev` (nodemon). Use `npm run dev:all` to run both.
 
 ### 3. Production Environment (Cloud Run)
 The live platform operates across two distinct Cloud Run services in the **`us-central1`** region (optimized for cost and custom domain mapping):
@@ -116,9 +128,8 @@ The live platform operates across two distinct Cloud Run services in the **`us-c
   - **Domain Mapping**: We use native Cloud Run Domain Mapping (Free) instead of a Global Load Balancer ($18+/mo).
   - **Storage**: Artifact Registry uses a cleanup policy (`policy.json`) to delete images older than 30 days and keep only the 5 most recent versions.
 - **Deployment Strategy (Docker)**:
-  - **Context**: Build runs from root (`.`) to access all files.
-  - **Structure**: `server.js` is located at `/app/crm-platform/server.js`, while `node_modules` are at `/app/node_modules`.
-  - **Resolution**: Node.js native module resolution (looking in parent directories) ensures `crm-platform/server.js` finds dependencies in `/app/node_modules`.
+  - **Frontend image** (`crm-platform/Dockerfile`): Build context is repo root (`.` in Cloud Build). Next.js standalone output is copied to `/app`; **`server.js` is at `/app/server.js`** (Next.js standalone places it at the root of the output). No separate `node_modules` at runtime; dependencies are bundled.
+  - **Backend image** (root `Dockerfile`): `server.js` at `/app/server.js`; port 8080. Used for the `nodal-point-network` Cloud Run service.
 
 ### 📞 Twilio Webhook Configuration
 When configuring Twilio phone numbers or TwiML Apps, ALWAYS use the canonical domain to ensure reliability and valid SSL verification:
@@ -130,10 +141,10 @@ When configuring Twilio phone numbers or TwiML Apps, ALWAYS use the canonical do
 
 We use **Next.js Rewrites** (`next.config.ts`) to handle seamless communication between the frontend and the correct backend:
 
-- **In Development**: All `/api/*` requests are proxied to the **Local Backend** (`127.0.0.1:3001`).
-- **In Production**: All `/api/*` requests are proxied to the **Network/API Service** in `us-central1`.
+- **In Development**: `/api/*` is proxied to the **Local Backend** (`127.0.0.1:3001`); `/crm-dashboard.html` is also proxied to the backend.
+- **In Production**: `/api/*` is proxied to the **Network/API Service** (`nodal-point-network-792458658491.us-central1.run.app`).
 
-This ensures that code remains environment-agnostic while maintaining full functionality across `localhost` and `nodalpoint.io`.
+Redirects: `www.nodalpoint.io` → `https://nodalpoint.io/:path*` (permanent). Code remains environment-agnostic across `localhost` and `nodalpoint.io`.
 
 ## 🧠 Nodal Point Philosophy & Methodology
 
@@ -165,10 +176,11 @@ We do not guess. We measure. Our software is designed to mitigate three specific
 
 ## 🔑 Authentication
 
-The platform uses **Firebase Authentication**.
-- **Login**: Users must authenticate via the `/login` page.
-- **Protection**: Routes under `/network` are protected by Next.js Middleware.
-- **Session**: A session cookie (`np_session`) is used to persist login state across the application.
+The platform uses **Firebase Authentication** for sign-in and **Supabase** for user profile data.
+- **Login**: Users authenticate via the `/login` page (Firebase Auth).
+- **Profile**: Role, name, Twilio numbers, and settings are stored in the Supabase `users` table; `AuthContext` fetches via `supabase.from('users').select('*').eq('email', ...)` after auth.
+- **Protection**: Routes under `/network` are protected by Next.js Middleware (matcher: `/network/:path*`). Unauthenticated requests redirect to `/login`.
+- **Session**: A session cookie (`np_session=1`) persists login state. In development, the presence of this cookie can bypass Firebase for a mock user.
 
 ## 📝 Development Workflow
 
@@ -180,7 +192,7 @@ The platform uses **Firebase Authentication**.
     - Build modular components in `src/components/`.
     - Use React Query for data fetching.
     - Verify against the legacy behavior.
-4.  **Schema Parity**: When adding new fields to Account or Contact models for future edits, you **MUST** also update the field mapping schemas in `BulkImportModal.tsx` to ensure new data can be ingested via CSV.
+4.  **Schema Parity**: When adding new fields to Account or Contact models for future edits, you **MUST** also update the field mapping schemas in `src/components/modals/BulkImportModal.tsx` (ACCOUNT_FIELDS / CONTACT_FIELDS and ingestion logic) to ensure new data can be ingested via CSV.
 
 ## ⚛️ React & Next.js Development Standards
 
@@ -252,9 +264,9 @@ The platform includes a native forensic dialer:
 - **AI Integration**: Use the "Sparkles" icon (`lucide-react/Sparkles`) for all AI-powered features.
 - **Contact Avatars**: **STRICT RULE**: Use letter glyphs (initials) instead of company logos for contact avatars.
   - **Styles**: `rounded-2xl` or `rounded-[14px]` (Squircle), `nodal-glass`, `text-white/90`, `border-white/20`, `shadow-[0_0_10px_rgba(0,0,0,0.5)]`.
-  - **Squircle Logic**: Use `rounded-[14px]` for small sizes (e.g., 36px) to avoid circular appearance; `rounded-2xl` for larger sizes.
+  - **Squircle Logic**: Use `rounded-[14px]` for small sizes (e.g., ≤36px) to avoid circular appearance; `rounded-2xl` for larger sizes. **Never** use `rounded-full` for contact or company icons.
   - **Shadows**: Must use `shadow-[0_0_10px_rgba(0,0,0,0.5)]` to match container shape.
-  - Applies to both `PeoplePage` table rows and the `ContactDossierPage` header.
+  - Applies to both `PeoplePage` table rows and the Contact Dossier header. Use `ContactAvatar` and `CompanyIcon` (`src/components/ui/`) for consistency.
 - **Company Icons**: Standardized to `rounded-2xl` or `rounded-[14px]` (Squircle) across Accounts, People, Target ID, and Global Search pages to match the forensic instrument aesthetic.
   - **Shadows**: Must use `shadow-[0_0_10px_rgba(0,0,0,0.5)]` (Subtle Centered Glow).
 - **Layout**: Sidebar (Left), Top Bar (Header), Right Panel (Contextual Widgets).
@@ -274,7 +286,7 @@ The platform includes a native forensic dialer:
 
 ## 📐 Standardized Page Layout
 
-All main application pages (Accounts, People, Sequences, Lists, etc.) must follow this standardized layout structure to ensure a consistent UX:
+All main application pages (Accounts, People, Protocols, Targets, Calls, Emails, etc.) must follow this standardized layout structure to ensure a consistent UX:
 
 1.  **Container**: Fixed height with entry animation.
     ```tsx
