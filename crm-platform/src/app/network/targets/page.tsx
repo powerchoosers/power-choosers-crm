@@ -72,11 +72,11 @@ export default function TargetOverviewPage() {
     
     try {
       const stored = localStorage.getItem(TARGETS_MODE_STORAGE_KEY) as 'people' | 'account' | null
-      if ((stored === 'people' || stored === 'account') && stored !== activeMode) {
+      if (stored === 'people' || stored === 'account') {
         setActiveMode(stored)
       }
     } catch (_) {}
-  }, [pathname, searchParams, activeMode])
+  }, [pathname, searchParams])
 
   // Update URL and persist mode to localStorage when state changes
   useEffect(() => {
