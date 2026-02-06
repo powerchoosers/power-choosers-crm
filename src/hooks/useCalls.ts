@@ -319,7 +319,10 @@ export function useAccountCalls(accountId: string) {
       }) as Call[]
     },
     enabled: !!accountId && !loading && !!user,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 2, // 2 min – refetch + realtime keep list fresh
+    refetchOnWindowFocus: true,
+    refetchInterval: 20_000, // Poll every 20s so new calls show without refresh (fallback if Realtime misses)
+    refetchIntervalInBackground: false,
   })
 }
 
@@ -402,7 +405,10 @@ export function useContactCalls(contactId: string) {
       }) as Call[]
     },
     enabled: !!contactId && !loading && !!user,
-    staleTime: 1000 * 60 * 10, // 10 minutes - Rely on real-time updates for freshness
+    staleTime: 1000 * 60 * 2, // 2 min – refetch + realtime keep list fresh
+    refetchOnWindowFocus: true,
+    refetchInterval: 20_000, // Poll every 20s so new calls show without refresh (fallback if Realtime misses)
+    refetchIntervalInBackground: false,
     gcTime: 1000 * 60 * 60, // 1 hour
   })
 }
