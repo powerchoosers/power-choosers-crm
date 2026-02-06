@@ -110,7 +110,7 @@ export function TopBar() {
     }
 
     return { strategy, statusColor, pulseColor, windowText };
-  }, [marketPulse])
+  }, [marketPulse, isMarketError])
 
   // Use voiceMetadata if active, otherwise use storeMetadata if it exists (for dialer display)
   const displayMetadata = isActive ? voiceMetadata : storeMetadata

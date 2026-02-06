@@ -26,13 +26,21 @@ export interface MarketPulseData {
   }
 }
 
+const FETCH_TIMEOUT_MS = 15000 // 15s so we don't hang if backend is down or slow
+
+function fetchWithTimeout(url: string): Promise<Response> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timeoutId))
+}
+
 export function useMarketPulse() {
   return useQuery<MarketPulseData>({
     queryKey: ['market-pulse'],
     queryFn: async () => {
       const [priceRes, gridRes] = await Promise.all([
-        fetch('/api/market/ercot?type=prices'),
-        fetch('/api/market/ercot?type=grid')
+        fetchWithTimeout('/api/market/ercot?type=prices'),
+        fetchWithTimeout('/api/market/ercot?type=grid')
       ])
       
       if (!priceRes.ok || !gridRes.ok) {
@@ -58,9 +66,9 @@ export function useMarketPulse() {
       const gridData = await gridRes.json()
       
       return {
-        prices: priceData.prices,
-        grid: gridData.metrics,
-        timestamp: priceData.timestamp || gridData.timestamp,
+        prices: priceData.prices ?? {},
+        grid: gridData.metrics ?? {},
+        timestamp: priceData.timestamp || gridData.timestamp || new Date().toISOString(),
         metadata: {
           price_source: priceData.source || priceData.metadata?.source,
           grid_source: gridData.source || gridData.metadata?.source,
