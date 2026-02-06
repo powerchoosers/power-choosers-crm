@@ -57,19 +57,10 @@ export default function TargetOverviewPage() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  // STATE: Active Mode (People vs Accounts) — URL first, then localStorage, then default to 'people'
+  // STATE: Active Mode (People vs Accounts) — URL only for initial render (avoids hydration mismatch; localStorage is synced in useEffect)
   const [activeMode, setActiveMode] = useState<'people' | 'account'>(() => {
-    // Priority 1: URL param (explicit navigation)
     const urlMode = searchParams.get('mode') as 'people' | 'account' | null
     if (urlMode === 'people' || urlMode === 'account') return urlMode
-    
-    // Priority 2: localStorage (persisted preference when navigating back)
-    try {
-      const stored = localStorage.getItem(TARGETS_MODE_STORAGE_KEY) as 'people' | 'account' | null
-      if (stored === 'people' || stored === 'account') return stored
-    } catch (_) {}
-    
-    // Priority 3: Default to 'people'
     return 'people'
   })
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '')
@@ -282,7 +273,7 @@ export default function TargetOverviewPage() {
         </div>
 
         {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-auto p-6 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll relative z-0">
+        <div className="flex-1 min-h-0 overflow-y-auto p-6 scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll relative z-0">
           {isLoading ? (
             <TargetSkeleton />
           ) : (
