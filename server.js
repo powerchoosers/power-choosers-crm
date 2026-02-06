@@ -309,6 +309,10 @@ async function handleApiTwilioRecording(req, res) {
     }
   }
 
+  // Parse URL for query parameters (required for recording handler to access contactId/accountId)
+  const parsedUrl = url.parse(req.url, true);
+  req.query = { ...parsedUrl.query };
+
   try {
     await twilioRecordingHandler(req, res);
   } catch (error) {
