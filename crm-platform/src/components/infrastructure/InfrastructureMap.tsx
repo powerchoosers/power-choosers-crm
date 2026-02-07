@@ -2,13 +2,16 @@
 import React, { useMemo, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { GoogleMap, useLoadScript, MarkerF, CircleF } from '@react-google-maps/api';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { mapLocationToZone, ERCOT_ZONES } from '@/lib/market-mapping';
 import { useAuth } from '@/context/AuthContext';
 import { useMarketPulse } from '@/hooks/useMarketPulse';
+import { CompanyIcon } from '@/components/ui/CompanyIcon';
 
 const HOVER_DELAY_MS = 3000;
+/** Time to keep card open after leaving marker so user can move to card and click Open dossier */
+const CARD_CLOSE_DELAY_MS = 2000;
 
 type MapNode = {
   id: string;
@@ -24,6 +27,8 @@ type MapNode = {
   industry: string;
   city: string;
   state: string;
+  logoUrl: string | null;
+  domain: string | null;
 };
 
 // 1. THE NODAL "STEALTH" SKIN
@@ -85,46 +90,48 @@ export default function InfrastructureMap() {
     south: marketPulse?.prices?.south ?? 22.40
   }), [marketPulse]);
 
-  // Fetch real contacts from Supabase
+  const STATUS_LIST = ['ACTIVE_LOAD', 'CUSTOMER', 'active', 'customer', 'Customer'];
+
+  // Fetch contacts whose accounts are load/customer (org-wide, no owner filter so customers show)
   const { data: contactsData, isLoading: contactsLoading } = useInfiniteQuery({
     queryKey: ['contacts-infrastructure', user?.email],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       if (!user) return { contacts: [], nextCursor: null };
-      
-      // Include ACTIVE_LOAD, CUSTOMER, and legacy 'active'/'customer' so all load/customer accounts show.
-      // Select id, latitude, longitude from accounts for dossier link and coords.
-      let query = supabase
+      const q = supabase
         .from('contacts')
-        .select('*, accounts!inner(id, name, city, state, industry, annual_usage, status, latitude, longitude)', { count: 'exact' })
-        .in('accounts.status', ['ACTIVE_LOAD', 'CUSTOMER', 'active', 'customer']);
-
-      if (role !== 'admin' && user?.email) {
-        query = query.eq('ownerId', user.email);
-      }
-
-      const PAGE_SIZE = 1000; // Get as many as possible for the map
+        .select('*, accounts!inner(id, name, city, state, industry, annual_usage, status, latitude, longitude, logo_url, domain)', { count: 'exact' })
+        .in('accounts.status', STATUS_LIST);
+      const PAGE_SIZE = 1000;
       const from = pageParam * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
-
-      const { data, error, count } = await query.range(from, to);
-
+      const { data, error, count } = await q.range(from, to);
       if (error) throw error;
-
-      return {
-        contacts: data || [],
-        nextCursor: count && from + PAGE_SIZE < count ? pageParam + 1 : null
-      };
+      return { contacts: data || [], nextCursor: count && from + PAGE_SIZE < count ? pageParam + 1 : null };
     },
     enabled: !!user && !authLoading,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
   });
 
-  // Flatten contacts and map to nodes
+  // Fetch load/customer accounts that may have no contacts (so customers still show on map)
+  const { data: accountsData } = useQuery({
+    queryKey: ['accounts-infrastructure-map'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('id, name, city, state, industry, annual_usage, status, latitude, longitude, logo_url, domain')
+        .in('status', STATUS_LIST)
+        .limit(2000);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user && !authLoading,
+  });
+
+  // Flatten contacts and map to nodes; then add account-only nodes for accounts not already represented
   const nodes = useMemo(() => {
     if (!contactsData) return [];
-    
-    return contactsData.pages.flatMap(page => page.contacts).map(contact => {
+    const contactNodes = contactsData.pages.flatMap(page => page.contacts).map(contact => {
       const account = Array.isArray(contact.accounts) ? contact.accounts[0] : contact.accounts;
       
       // Determine location - prioritizing metadata/direct fields if available
@@ -184,10 +191,14 @@ export default function InfrastructureMap() {
       }
 
       // Account status for marker: ACTIVE_LOAD/active = blue (active load), CUSTOMER/customer = green
-      const accountStatus = (account?.status ?? '').toUpperCase();
-      const rawStatus = (account?.status ?? '').toLowerCase();
-      const isCustomer = accountStatus === 'CUSTOMER' || rawStatus === 'customer';
-      const isActiveLoad = accountStatus === 'ACTIVE_LOAD' || rawStatus === 'active';
+      const rawStatus = (account?.status ?? '').toString().trim();
+      const upper = rawStatus.toUpperCase();
+      const lower = rawStatus.toLowerCase();
+      const isCustomer = upper === 'CUSTOMER' || lower === 'customer';
+      const isActiveLoad = upper === 'ACTIVE_LOAD' || lower === 'active';
+
+      const logoUrl = (account as { logo_url?: string; logoUrl?: string })?.logo_url ?? (account as { logoUrl?: string })?.logoUrl ?? null;
+      const domain = (account as { domain?: string })?.domain ?? null;
 
       return {
         id: contact.id,
@@ -197,15 +208,65 @@ export default function InfrastructureMap() {
         status,
         load,
         zone,
-        accountStatus: isCustomer ? 'CUSTOMER' : isActiveLoad ? 'ACTIVE_LOAD' : account?.status ?? 'PROSPECT',
+        accountStatus: isCustomer ? 'CUSTOMER' : isActiveLoad ? 'ACTIVE_LOAD' : (account?.status ?? 'PROSPECT'),
         accountId: account?.id ?? null,
         accountName: account?.name ?? 'Unknown Company',
         industry: account?.industry ?? '',
         city: account?.city ?? city ?? '',
         state: account?.state ?? state ?? '',
+        logoUrl: logoUrl && typeof logoUrl === 'string' ? logoUrl.trim() || null : null,
+        domain: domain && typeof domain === 'string' ? domain.trim() || null : null,
       } as MapNode;
     });
-  }, [contactsData, prices]);
+    const accountIdsFromContacts = new Set(contactNodes.map(n => n.accountId).filter(Boolean));
+    const accountsOnly = (accountsData || []).filter((a: { id: string }) => !accountIdsFromContacts.has(a.id));
+    const toNum = (v: unknown): number | null => {
+      if (v == null || v === '') return null;
+      const n = typeof v === 'number' ? v : Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+    const accountNodes: MapNode[] = accountsOnly.map((acc: Record<string, unknown>) => {
+      const city = (acc.city ?? '') as string;
+      const state = (acc.state ?? '') as string;
+      const zone = mapLocationToZone(city, state);
+      const rawStatus = (acc.status ?? '').toString().trim();
+      const upper = rawStatus.toUpperCase();
+      const lower = rawStatus.toLowerCase();
+      const isCustomer = upper === 'CUSTOMER' || lower === 'customer';
+      const isActiveLoad = upper === 'ACTIVE_LOAD' || lower === 'active';
+      let lat = toNum(acc.latitude);
+      let lng = toNum(acc.longitude);
+      if (lat == null || lng == null) {
+        const hash = (acc.id || '').toString().split('').reduce((a: number, b: string) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0);
+        const jitterLat = (hash % 100) / 100;
+        const jitterLng = ((hash >> 4) % 100) / 100;
+        if (zone === ERCOT_ZONES.HOUSTON) { lat = 29.7604 + jitterLat; lng = -95.3698 + jitterLng; }
+        else if (zone === ERCOT_ZONES.WEST) { lat = 31.8460 + jitterLat; lng = -102.3680 + jitterLng; }
+        else if (zone === ERCOT_ZONES.SOUTH) { lat = 29.4241 + jitterLat; lng = -98.4936 + jitterLng; }
+        else { lat = 32.7767 + jitterLat; lng = -96.7970 + jitterLng; }
+      }
+      const logoUrl = (acc.logo_url ?? acc.logoUrl) as string | null;
+      const domain = acc.domain as string | null;
+      return {
+        id: `account-${acc.id}`,
+        name: (acc.name ?? 'Unknown') as string,
+        lat: lat as number,
+        lng: lng as number,
+        status: 'prospect',
+        load: 'LOW',
+        zone,
+        accountStatus: isCustomer ? 'CUSTOMER' : isActiveLoad ? 'ACTIVE_LOAD' : (acc.status as string) ?? 'PROSPECT',
+        accountId: acc.id as string,
+        accountName: (acc.name ?? 'Unknown Company') as string,
+        industry: (acc.industry ?? '') as string,
+        city,
+        state,
+        logoUrl: logoUrl && typeof logoUrl === 'string' ? logoUrl.trim() || null : null,
+        domain: domain && typeof domain === 'string' ? domain.trim() || null : null,
+      } as MapNode;
+    });
+    return [...contactNodes, ...accountNodes];
+  }, [contactsData, accountsData, prices]);
 
   const center = useMemo(() => ({ lat: 31.0000, lng: -99.0000 }), []); // Center on Texas
 
@@ -219,9 +280,9 @@ export default function InfrastructureMap() {
       clearTimeout(hoverTimerRef.current);
       hoverTimerRef.current = null;
     }
-    // Delay closing so moving from marker to card keeps the card open
+    // Keep card open long enough for user to move from marker to card and click Open dossier
     if (closeCardTimeoutRef.current) clearTimeout(closeCardTimeoutRef.current);
-    closeCardTimeoutRef.current = setTimeout(() => setHoveredNode(null), 300);
+    closeCardTimeoutRef.current = setTimeout(() => setHoveredNode(null), CARD_CLOSE_DELAY_MS);
   }, []);
 
   const handleCardMouseEnter = useCallback(() => {
@@ -232,7 +293,8 @@ export default function InfrastructureMap() {
   }, []);
 
   const handleCardMouseLeave = useCallback(() => {
-    setHoveredNode(null);
+    if (closeCardTimeoutRef.current) clearTimeout(closeCardTimeoutRef.current);
+    closeCardTimeoutRef.current = setTimeout(() => setHoveredNode(null), 400);
   }, []);
 
   if (!isLoaded || authLoading || contactsLoading) return (
@@ -334,15 +396,24 @@ export default function InfrastructureMap() {
         </div>
       </div>
 
-      {/* Company card after ~3s hover on a dot — click to open dossier */}
+      {/* Company card after ~3s hover on a dot — stays open so you can click Open dossier */}
       {hoveredNode && (
         <div
           className="absolute bottom-6 left-6 right-6 sm:right-auto sm:max-w-sm pointer-events-auto bg-black/70 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-4 z-10"
           onMouseEnter={handleCardMouseEnter}
           onMouseLeave={handleCardMouseLeave}
         >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
+          <div className="flex items-start gap-3">
+            <CompanyIcon
+              logoUrl={hoveredNode.logoUrl ?? undefined}
+              domain={hoveredNode.domain ?? undefined}
+              name={hoveredNode.accountName}
+              size={40}
+              className="shrink-0 w-10 h-10"
+              roundedClassName="rounded-[14px]"
+            />
+            <div className="min-w-0 flex-1 flex flex-col justify-between gap-1">
+              <div>
               <p className="text-sm font-mono font-medium text-zinc-100 truncate">{hoveredNode.accountName}</p>
               {hoveredNode.industry && (
                 <p className="text-xs font-mono text-zinc-500 mt-0.5">{hoveredNode.industry}</p>
@@ -355,15 +426,16 @@ export default function InfrastructureMap() {
               <p className="text-[10px] font-mono text-zinc-600 mt-1 uppercase tracking-wider">
                 {hoveredNode.accountStatus === 'CUSTOMER' ? 'Customer' : hoveredNode.accountStatus === 'ACTIVE_LOAD' ? 'Active load' : hoveredNode.accountStatus}
               </p>
+              </div>
+              {hoveredNode.accountId && (
+                <Link
+                  href={`/network/accounts/${hoveredNode.accountId}`}
+                  className="shrink-0 self-start text-xs font-mono text-[#002FA7] hover:text-blue-400 underline mt-1"
+                >
+                  Open dossier →
+                </Link>
+              )}
             </div>
-            {hoveredNode.accountId && (
-              <Link
-                href={`/network/accounts/${hoveredNode.accountId}`}
-                className="shrink-0 text-xs font-mono text-[#002FA7] hover:text-blue-400 underline"
-              >
-                Open dossier →
-              </Link>
-            )}
           </div>
         </div>
       )}
