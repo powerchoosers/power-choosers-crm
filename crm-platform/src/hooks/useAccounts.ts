@@ -172,7 +172,11 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
           query = query.in('industry', filters.industry);
         }
         if (filters?.status && filters.status.length > 0) {
-          query = query.in('status', filters.status);
+          // DB may store 'active' for Active Load and 'CUSTOMER' for Customer; expand filter to match both
+          const statusValues = filters.status.flatMap((s: string) =>
+            s === 'ACTIVE_LOAD' ? ['ACTIVE_LOAD', 'active'] : s === 'CUSTOMER' ? ['CUSTOMER', 'customer'] : [s]
+          );
+          query = query.in('status', statusValues);
         }
         if (filters?.location && filters.location.length > 0) {
           const locConditions = filters.location.map(loc => `city.ilike.%${loc}%,state.ilike.%${loc}%,address.ilike.%${loc}%`).join(',');
@@ -275,8 +279,28 @@ export function useAccount(id: string) {
 
       if (!data) return null
 
-      return { 
-        id: data.id, 
+      // Fetch meters from dedicated table (bill-extracted ESIDs) and merge with metadata
+      let meters: Account['meters'] = []
+      const { data: meterRows } = await supabase
+        .from('meters')
+        .select('id, esid, service_address, rate, end_date')
+        .eq('account_id', data.id)
+        .order('created_at', { ascending: true })
+
+      if (meterRows?.length) {
+        meters = meterRows.map((m) => ({
+          id: m.id,
+          esiId: m.esid ?? '',
+          address: m.service_address ?? '',
+          rate: m.rate ?? '',
+          endDate: m.end_date ?? ''
+        }))
+      } else {
+        meters = data.metadata?.meters || []
+      }
+
+      return {
+        id: data.id,
         name: data.name || 'Unknown Account',
         industry: data.industry || '',
         domain: data.domain || '',
@@ -301,8 +325,7 @@ export function useAccount(id: string) {
         electricitySupplier: data.electricity_supplier || '',
         currentRate: data.current_rate || '',
         status: data.status || 'PROSPECT',
-        // Read meters from metadata if available, otherwise empty array
-        meters: data.metadata?.meters || [],
+        meters,
         metadata: data.metadata || {}
       } as Account
     },
@@ -355,7 +378,10 @@ export function useAccountsCount(searchQuery?: string, filters?: AccountFilters,
         query = query.in('industry', filters.industry);
       }
       if (filters?.status && filters.status.length > 0) {
-        query = query.in('status', filters.status);
+        const statusValues = filters.status.flatMap((s: string) =>
+          s === 'ACTIVE_LOAD' ? ['ACTIVE_LOAD', 'active'] : s === 'CUSTOMER' ? ['CUSTOMER', 'customer'] : [s]
+        );
+        query = query.in('status', statusValues);
       }
       if (filters?.location && filters.location.length > 0) {
         const locConditions = filters.location.map(loc => `city.ilike.%${loc}%,state.ilike.%${loc}%,address.ilike.%${loc}%`).join(',');

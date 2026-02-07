@@ -3,114 +3,137 @@ import { cors } from './_cors.js';
 import { db } from './_firebase.js';
 import logger from './_logger.js';
 
-// Cache duration: 6 hours (21600000 ms)
-const CACHE_DURATION = 6 * 60 * 60 * 1000;
+// Only refresh (RSS + Gemini) at 10 AM and 3 PM America/Chicago. Saves Gemini credits.
+const REFRESH_WINDOW_HOURS = [10, 15]; // 10 AM and 3 PM
+const WINDOW_COOLDOWN_MS = 55 * 60 * 1000; // Within same window, don't refetch for 55 min
+
+function isInRefreshWindow() {
+  const chicago = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }));
+  return REFRESH_WINDOW_HOURS.includes(chicago.getHours());
+}
+
+function sendCache(res, cacheData) {
+  const cacheAge = Date.now() - (cacheData.timestamp || 0);
+  res.writeHead(200, {
+    'Content-Type': 'application/json',
+    'X-Cache': 'HIT',
+    'X-Cache-Age': Math.floor(cacheAge / 1000),
+  });
+  return res.end(JSON.stringify(cacheData.data));
+}
 
 export default async function handler(req, res) {
-  if (cors(req, res)) return; // handle OPTIONS centrally
+  if (cors(req, res)) return;
   if (req.method !== 'GET') {
-    return res.writeHead(405, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ error: 'Method not allowed' }));
-return;
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ error: 'Method not allowed' }));
   }
 
   try {
-    // Check cache first
     let cacheData = null;
-    let cacheValid = false;
-    
     if (db) {
       try {
         const cacheDoc = await db.collection('cache').doc('energy-news').get();
-        if (cacheDoc.exists) {
-          cacheData = cacheDoc.data();
-          const cacheAge = Date.now() - (cacheData.timestamp || 0);
-          cacheValid = cacheAge < CACHE_DURATION;
-          
-          if (cacheValid) {
-            // Return cached data
-            res.writeHead(200, { 
-              'Content-Type': 'application/json',
-              'X-Cache': 'HIT',
-              'X-Cache-Age': Math.floor(cacheAge / 1000) // Age in seconds
-            });
-            return res.end(JSON.stringify(cacheData.data));
-          }
-        }
+        if (cacheDoc.exists) cacheData = cacheDoc.data();
       } catch (cacheError) {
-        // If cache read fails, continue with fresh fetch
-        logger.warn('[Energy News] Cache read failed, fetching fresh:', cacheError.message);
+        logger.warn('[Energy News] Cache read failed:', cacheError.message);
       }
     }
 
-    // Cache miss or expired - fetch fresh data
-    const rssUrl = 'https://news.google.com/rss/search?q=%28Texas+energy%29+OR+ERCOT+OR+%22Texas+electricity%22&hl=en-US&gl=US&ceid=US:en';
-    const response = await fetch(rssUrl, { headers: { 'User-Agent': 'PowerChoosersCRM/1.0' } });
-    const xml = await response.text();
+    const inWindow = isInRefreshWindow();
+    const cacheAge = cacheData ? Date.now() - (cacheData.timestamp || 0) : Infinity;
 
-    const rawItems = [];
-    const itemRegex = /<item>([\s\S]*?)<\/item>/g;
-    let match;
-    while ((match = itemRegex.exec(xml)) && rawItems.length < 4) {
-      const block = match[1];
-      const getTag = (name) => {
-        const r = new RegExp(`<${name}>([\\s\\S]*?)<\\/${name}>`, 'i');
-        const m = r.exec(block);
-        return m ? m[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim() : '';
-      };
-      const title = getTag('title');
-      const link = getTag('link');
-      const pubDate = getTag('pubDate');
-      let publishedAt = '';
-      try { publishedAt = new Date(pubDate).toISOString(); } catch (_) { publishedAt = ''; }
-      if (!title || !link) continue;
-      rawItems.push({ title, url: link, publishedAt });
+    // Outside 10 AM / 3 PM: never fetch or call Gemini. Return cache if we have it.
+    if (!inWindow) {
+      if (cacheData?.data) return sendCache(res, cacheData);
+      // No cache (first run): fetch RSS only, no Gemini
+      logger.info('[Energy News] Outside refresh window; no cache — fetching RSS only (no Gemini)', 'EnergyNews');
+    } else {
+      // Inside window: one refresh per window
+      if (cacheData?.data && cacheAge < WINDOW_COOLDOWN_MS) return sendCache(res, cacheData);
     }
 
-    // Reformat headlines using Gemini to fit exactly 3 lines
-    const items = [];
+    // Fetch fresh RSS (Google News + EIA)
+    const userAgent = 'PowerChoosersCRM/1.0';
+    const headers = { 'User-Agent': userAgent };
+
+    function parseRssItems(xml, maxItems, sourceLabel) {
+      const out = [];
+      const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+      let match;
+      while ((match = itemRegex.exec(xml)) && out.length < maxItems) {
+        const block = match[1];
+        const getTag = (name) => {
+          const r = new RegExp(`<${name}>([\\s\\S]*?)<\\/${name}>`, 'i');
+          const m = r.exec(block);
+          return m ? m[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim() : '';
+        };
+        const title = getTag('title');
+        const link = getTag('link');
+        const pubDate = getTag('pubDate');
+        let publishedAt = '';
+        try { publishedAt = new Date(pubDate).toISOString(); } catch (_) { publishedAt = ''; }
+        if (!title || !link) continue;
+        out.push({ title, url: link, publishedAt, source: sourceLabel });
+      }
+      return out;
+    }
+
+    let rawItems = [];
     try {
-      const { GoogleGenerativeAI } = await import('@google/generative-ai');
-      const apiKey = process.env.GEMINI_API_KEY || process.env.FREE_GEMINI_KEY;
-      
-      if (apiKey) {
-        if (!process.env.GEMINI_API_KEY && process.env.FREE_GEMINI_KEY) {
-          logger.info('[Energy News] Using FREE_GEMINI_KEY fallback', 'Gemini');
-        }
+      const [googleRes, eiaRes] = await Promise.all([
+        fetch('https://news.google.com/rss/search?q=%28Texas+energy%29+OR+ERCOT+OR+%22Texas+electricity%22&hl=en-US&gl=US&ceid=US:en', { headers }),
+        fetch('https://www.eia.gov/rss/todayinenergy.xml', { headers }).catch(() => null)
+      ]);
+      const googleXml = await googleRes.text();
+      rawItems = parseRssItems(googleXml, 4, 'Energy Intel');
+      if (eiaRes && eiaRes.ok) {
+        const eiaXml = await eiaRes.text();
+        const eiaItems = parseRssItems(eiaXml, 2, 'EIA Today in Energy');
+        rawItems = [...rawItems, ...eiaItems].sort((a, b) => (b.publishedAt || '').localeCompare(a.publishedAt || '')).slice(0, 6);
+      }
+    } catch (fetchErr) {
+      logger.warn('[Energy News] RSS fetch failed, using Google only:', fetchErr.message);
+      const response = await fetch('https://news.google.com/rss/search?q=%28Texas+energy%29+OR+ERCOT+OR+%22Texas+electricity%22&hl=en-US&gl=US&ceid=US:en', { headers: { 'User-Agent': userAgent } });
+      const xml = await response.text();
+      rawItems = parseRssItems(xml, 4, 'Energy Intel');
+    }
+
+    // Use Gemini only during 10 AM / 3 PM refresh window to save credits. Otherwise use raw headlines.
+    const items = [];
+    const useGemini = inWindow && (process.env.GEMINI_API_KEY || process.env.FREE_GEMINI_KEY);
+
+    if (useGemini) {
+      try {
+        const { GoogleGenerativeAI } = await import('@google/generative-ai');
+        const apiKey = process.env.GEMINI_API_KEY || process.env.FREE_GEMINI_KEY;
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-        
-        // Process headlines in parallel for better performance
+
         const reformattedItems = await Promise.all(rawItems.map(async (item) => {
           try {
             const prompt = `Rewrite this energy news headline to be approximately 150-180 characters long (must fill exactly 3 lines in a widget display). Make it detailed and comprehensive while remaining clear and scannable. Include the key facts and context. Remove source attribution (like "- CBS News", "- The Hill", etc.) from the end. Return ONLY the rewritten headline with no quotes or extra text:
 
 "${item.title}"`;
-            
+
             const result = await model.generateContent(prompt);
             const response = await result.response;
-            const reformattedTitle = response.text().trim().replace(/^["']|["']$/g, ''); // Remove quotes if any
-            
-            return {
-              ...item,
-              title: reformattedTitle || item.title // Fallback to original if Gemini fails
-            };
+            const reformattedTitle = response.text().trim().replace(/^["']|["']$/g, '');
+
+            return { ...item, title: reformattedTitle || item.title };
           } catch (err) {
             logger.error('[Energy News] Gemini reformatting failed for headline:', err);
-            return item; // Fallback to original headline
+            return item;
           }
         }));
-        
         items.push(...reformattedItems);
-      } else {
-        // No Gemini key - use original headlines
-        logger.warn('[Energy News] GEMINI_API_KEY not set, using original headlines');
+      } catch (error) {
+        logger.error('[Energy News] Gemini processing failed:', error);
         items.push(...rawItems);
       }
-    } catch (error) {
-      // Gemini import or processing failed - use original headlines
-      logger.error('[Energy News] Gemini processing failed:', error);
+    } else {
       items.push(...rawItems);
+      if (inWindow) logger.info('[Energy News] In window but no Gemini key — using raw headlines', 'EnergyNews');
     }
 
     // Prepare response data

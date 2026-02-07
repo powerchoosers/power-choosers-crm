@@ -98,6 +98,10 @@ export default function ContactDossierPage() {
   // Refraction Event State (for field glow animations)
   const [glowingFields, setGlowingFields] = useState<Set<string>>(new Set())
   const [isRecalibrating, setIsRecalibrating] = useState(false)
+  // Blur-in for fields updated by Org Intelligence enrich/acquire
+  const [recentlyUpdatedFields, setRecentlyUpdatedFields] = useState<Set<string>>(new Set())
+  const prevContactRef = useRef<typeof contact>(undefined)
+  const lastEnrichedContactId = useUIStore((s) => s.lastEnrichedContactId)
 
   const { pendingTasks } = useEntityTasks(id, contact?.name)
   const { updateTask } = useTasks()
@@ -158,6 +162,33 @@ export default function ContactDossierPage() {
       )
     }
   }, [contact, isEditing])
+
+  // Detect which contact fields changed after Org Intelligence enrich and mark for blur-in
+  useEffect(() => {
+    if (!contact) return
+    if (lastEnrichedContactId !== contact.id) {
+      prevContactRef.current = contact
+      return
+    }
+    const prev = prevContactRef.current
+    const changed = new Set<string>()
+    if (prev) {
+      if ((prev.name ?? '') !== (contact.name ?? '')) changed.add('name')
+      if ((prev.title ?? '') !== (contact.title ?? '')) changed.add('title')
+      if ((prev.companyName ?? prev.company ?? '') !== (contact.companyName ?? contact.company ?? '')) changed.add('company')
+      if ((prev.location ?? '') !== (contact.location ?? '')) changed.add('location')
+      if ((prev.email ?? '') !== (contact.email ?? '')) changed.add('email')
+      if ((prev.phone ?? '') !== (contact.phone ?? '')) changed.add('phone')
+      if ((prev.linkedinUrl ?? '') !== (contact.linkedinUrl ?? '')) changed.add('linkedinUrl')
+      if ((prev.logoUrl ?? (prev as any).avatarUrl ?? '') !== (contact.logoUrl ?? (contact as any).avatarUrl ?? '')) changed.add('logoUrl')
+    }
+    prevContactRef.current = contact
+    if (changed.size) {
+      setRecentlyUpdatedFields(changed)
+      const t = setTimeout(() => setRecentlyUpdatedFields(new Set()), 1600)
+      return () => clearTimeout(t)
+    }
+  }, [contact, lastEnrichedContactId])
 
   // Set Gemini Context
   useEffect(() => {
@@ -404,14 +435,31 @@ export default function ContactDossierPage() {
 
               <div className="flex items-center gap-3 relative group/avatar">
                 <div onClick={() => isEditing && setActiveEditField(activeEditField === 'logo' ? null : 'logo')}>
-                  <ContactAvatar 
-                    name={contactName} 
-                    size={56} 
-                    className={cn(
-                      "w-14 h-14 transition-all",
-                      isEditing && "cursor-pointer hover:border-[#002FA7]/50 hover:shadow-[0_0_20px_rgba(0,47,167,0.2)]"
-                    )}
-                  />
+                  {recentlyUpdatedFields.has('logoUrl') ? (
+                    <motion.div
+                      initial={{ filter: 'blur(6px)', opacity: 0.6 }}
+                      animate={{ filter: 'blur(0px)', opacity: 1 }}
+                      transition={{ duration: 0.4, ease: 'easeOut' }}
+                    >
+                      <ContactAvatar
+                        name={contactName}
+                        size={56}
+                        className={cn(
+                          "w-14 h-14 transition-all",
+                          isEditing && "cursor-pointer hover:border-[#002FA7]/50 hover:shadow-[0_0_20px_rgba(0,47,167,0.2)]"
+                        )}
+                      />
+                    </motion.div>
+                  ) : (
+                    <ContactAvatar 
+                      name={contactName} 
+                      size={56} 
+                      className={cn(
+                        "w-14 h-14 transition-all",
+                        isEditing && "cursor-pointer hover:border-[#002FA7]/50 hover:shadow-[0_0_20px_rgba(0,47,167,0.2)]"
+                      )}
+                    />
+                  )}
                 </div>
 
                 <AnimatePresence>
@@ -454,7 +502,18 @@ export default function ContactDossierPage() {
                       />
                     ) : (
                       <>
-                        <h1 className="text-2xl font-semibold tracking-tighter text-white">{editName || contactName}</h1>
+                        {recentlyUpdatedFields.has('name') ? (
+                          <motion.h1
+                            initial={{ filter: 'blur(6px)', opacity: 0.6 }}
+                            animate={{ filter: 'blur(0px)', opacity: 1 }}
+                            transition={{ duration: 0.4, ease: 'easeOut' }}
+                            className="text-2xl font-semibold tracking-tighter text-white"
+                          >
+                            {editName || contactName}
+                          </motion.h1>
+                        ) : (
+                          <h1 className="text-2xl font-semibold tracking-tighter text-white">{editName || contactName}</h1>
+                        )}
                         
                         {/* THE SIGNAL ARRAY */}
                         <div className="flex items-center gap-1 bg-white/[0.02] rounded-full p-1 border border-white/5 ml-2 relative group/links">
@@ -632,29 +691,67 @@ export default function ContactDossierPage() {
                       </div>
                     ) : (
                       <>
-                        <span className="flex items-center gap-1.5 uppercase tracking-widest text-zinc-400">
-                          {editTitle && (
-                            <>
-                              <span>{editTitle}</span>
-                              <span className="text-zinc-600 lowercase mx-1">at</span>
-                            </>
-                          )}
-                          {contact?.linkedAccountId ? (
-                            <Link 
-                              href={`/network/accounts/${contact.linkedAccountId}`}
-                              className="hover:text-white transition-colors cursor-pointer"
-                            >
-                              {editCompany || 'Unknown Entity'}
-                            </Link>
-                          ) : (
-                            <span>{editCompany || 'Unknown Entity'}</span>
-                          )}
-                        </span>
+                        {(recentlyUpdatedFields.has('title') || recentlyUpdatedFields.has('company')) ? (
+                          <motion.span
+                            initial={{ filter: 'blur(6px)', opacity: 0.6 }}
+                            animate={{ filter: 'blur(0px)', opacity: 1 }}
+                            transition={{ duration: 0.4, ease: 'easeOut' }}
+                            className="flex items-center gap-1.5 uppercase tracking-widest text-zinc-400"
+                          >
+                            {editTitle && (
+                              <>
+                                <span>{editTitle}</span>
+                                <span className="text-zinc-600 lowercase mx-1">at</span>
+                              </>
+                            )}
+                            {contact?.linkedAccountId ? (
+                              <Link 
+                                href={`/network/accounts/${contact.linkedAccountId}`}
+                                className="hover:text-white transition-colors cursor-pointer"
+                              >
+                                {editCompany || 'Unknown Entity'}
+                              </Link>
+                            ) : (
+                              <span>{editCompany || 'Unknown Entity'}</span>
+                            )}
+                          </motion.span>
+                        ) : (
+                          <span className="flex items-center gap-1.5 uppercase tracking-widest text-zinc-400">
+                            {editTitle && (
+                              <>
+                                <span>{editTitle}</span>
+                                <span className="text-zinc-600 lowercase mx-1">at</span>
+                              </>
+                            )}
+                            {contact?.linkedAccountId ? (
+                              <Link 
+                                href={`/network/accounts/${contact.linkedAccountId}`}
+                                className="hover:text-white transition-colors cursor-pointer"
+                              >
+                                {editCompany || 'Unknown Entity'}
+                              </Link>
+                            ) : (
+                              <span>{editCompany || 'Unknown Entity'}</span>
+                            )}
+                          </span>
+                        )}
                         <span className="w-1 h-1 rounded-full bg-zinc-800" />
-                        <span className="flex items-center gap-1.5 text-zinc-400">
-                          <MapPin className="w-3.5 h-3.5 text-white" />
-                          {editLocation || 'Unknown Location'}
-                        </span>
+                        {recentlyUpdatedFields.has('location') ? (
+                          <motion.span
+                            initial={{ filter: 'blur(6px)', opacity: 0.6 }}
+                            animate={{ filter: 'blur(0px)', opacity: 1 }}
+                            transition={{ duration: 0.4, ease: 'easeOut' }}
+                            className="flex items-center gap-1.5 text-zinc-400"
+                          >
+                            <MapPin className="w-3.5 h-3.5 text-white" />
+                            {editLocation || 'Unknown Location'}
+                          </motion.span>
+                        ) : (
+                          <span className="flex items-center gap-1.5 text-zinc-400">
+                            <MapPin className="w-3.5 h-3.5 text-white" />
+                            {editLocation || 'Unknown Location'}
+                          </span>
+                        )}
                       </>
                     )}
                   </div>
@@ -725,6 +822,50 @@ export default function ContactDossierPage() {
             <div className="col-span-12 lg:col-span-4 h-full overflow-y-auto p-6 md:p-8 border-r border-white/5 scrollbar-thin scrollbar-thumb-zinc-800/0 hover:scrollbar-thumb-zinc-800/50 scrollbar-track-transparent transition-all duration-300">
               <div className="space-y-8 animate-in fade-in slide-in-from-left-4 duration-700">
                 {contact && (
+                  (recentlyUpdatedFields.has('email') || recentlyUpdatedFields.has('phone')) ? (
+                    <motion.div
+                      initial={{ filter: 'blur(6px)', opacity: 0.6 }}
+                      animate={{ filter: 'blur(0px)', opacity: 1 }}
+                      transition={{ duration: 0.4, ease: 'easeOut' }}
+                    >
+                      <UplinkCard
+                        contact={{
+                          ...contact,
+                          email: editEmail,
+                          phone: editPhone,
+                          mobile: editMobile,
+                          workDirectPhone: editWorkDirect,
+                          otherPhone: editOther,
+                          companyPhone: editCompanyPhone,
+                          primaryPhoneField: editPrimaryField
+                        }}
+                        isEditing={isEditing}
+                        onEmailClick={() => setIsComposeOpen(true)}
+                        onUpdate={(updates) => {
+                      if (updates.email !== undefined) setEditEmail(updates.email)
+                      if (updates.mobile !== undefined) {
+                        setEditMobile(updates.mobile)
+                        if (editPrimaryField === 'mobile') setEditPhone(updates.mobile)
+                      }
+                      if (updates.workDirectPhone !== undefined) {
+                        setEditWorkDirect(updates.workDirectPhone)
+                        if (editPrimaryField === 'workDirectPhone') setEditPhone(updates.workDirectPhone)
+                      }
+                      if (updates.otherPhone !== undefined) {
+                        setEditOther(updates.otherPhone)
+                        if (editPrimaryField === 'otherPhone') setEditPhone(updates.otherPhone)
+                      }
+                      if (updates.companyPhone !== undefined) setEditCompanyPhone(updates.companyPhone)
+                      if (updates.primaryPhoneField !== undefined) {
+                        setEditPrimaryField(updates.primaryPhoneField)
+                        if (updates.primaryPhoneField === 'mobile') setEditPhone(editMobile)
+                        else if (updates.primaryPhoneField === 'workDirectPhone') setEditPhone(editWorkDirect)
+                        else if (updates.primaryPhoneField === 'otherPhone') setEditPhone(editOther)
+                      }
+                    }}
+                  />
+                    </motion.div>
+                  ) : (
                   <UplinkCard 
                     contact={{
                       ...contact,
@@ -762,6 +903,7 @@ export default function ContactDossierPage() {
                       }
                     }}
                   />
+                  )
                 )}
 
                 {/* Contract & Supplier Intelligence */}

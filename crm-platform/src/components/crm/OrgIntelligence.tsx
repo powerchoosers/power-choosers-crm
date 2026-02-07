@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { formatPhoneNumber } from '@/lib/formatPhone';
 import { useQueryClient } from '@tanstack/react-query';
+import { useUIStore } from '@/store/uiStore';
 
 interface OrgIntelligenceProps {
   domain?: string;
@@ -68,6 +69,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const { initiateCall } = useCallStore();
   const queryClient = useQueryClient();
+  const setLastEnrichedAccountId = useUIStore((s) => s.setLastEnrichedAccountId);
+  const setLastEnrichedContactId = useUIStore((s) => s.setLastEnrichedContactId);
   const CONTACTS_PER_PAGE = 5;
 
   const handleCompanyCall = (phone: string, name: string) => {
@@ -267,11 +270,16 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
 
       console.log('Enrichment successful:', data);
       toast.success('DEEP_ENRICHMENT complete. Node profile updated.');
-      
-      // We don't have a direct way to trigger a refetch of useAccount from here 
-      // without passing down a refetch function, but the user will see the 
-      // success and can refresh or navigate. For now, we just show the success.
-      
+
+      // Invalidate and refetch so dossier, people, accounts, targets see changes immediately
+      await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'account' && q.queryKey[1] === accountId });
+      await queryClient.refetchQueries({ predicate: (q) => q.queryKey[0] === 'account' && q.queryKey[1] === accountId });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['targets'] });
+
+      // Trigger blur-in on account dossier for enriched fields
+      setLastEnrichedAccountId(accountId);
+      setTimeout(() => setLastEnrichedAccountId(null), 3500);
     } catch (err) {
       console.error('Enrichment Error:', err);
       toast.error(`Enrichment failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -453,12 +461,22 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
 
       const typeLabel = type === 'both' ? 'details' : type === 'email' ? 'email' : 'phone';
       toast.success(`${person.name} ${typeLabel} revealed & synced`);
-      
-      // Invalidate queries to refresh the contacts list immediately
+
+      // Invalidate and refetch so dossier, people, accounts, targets see changes immediately
+      await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'contact' && q.queryKey[2] === crmId });
+      await queryClient.refetchQueries({ predicate: (q) => q.queryKey[0] === 'contact' && q.queryKey[2] === crmId });
       if (accountId) {
-        queryClient.invalidateQueries({ queryKey: ['account-contacts', accountId] });
-        queryClient.invalidateQueries({ queryKey: ['contacts'] });
+        await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'account-contacts' && q.queryKey[1] === accountId });
+        await queryClient.refetchQueries({ predicate: (q) => q.queryKey[0] === 'account-contacts' && q.queryKey[1] === accountId });
+        queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'account' && q.queryKey[1] === accountId });
+        queryClient.refetchQueries({ predicate: (q) => q.queryKey[0] === 'account' && q.queryKey[1] === accountId });
       }
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['targets'] });
+
+      // Trigger blur-in on contact dossier for enriched fields
+      setLastEnrichedContactId(crmId);
+      setTimeout(() => setLastEnrichedContactId(null), 3500);
       
       // 3. Update local state (phones from immediate response; may be empty when reveal_phone_number=true)
       const newPhones = enriched.phones?.map((ph: { number: string }) => ph.number) || [];
