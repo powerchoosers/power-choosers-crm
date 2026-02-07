@@ -53,3 +53,7 @@ Power Choosers CRM - Local Development.ini
 # Vendor / toolchain (avoid false-positive secret scans; keep repo smaller)
 usr/
 mingw64/
+
+# Personal / agent rules (keep local only; may contain personal workflow)
+.trae/rules/nodalpoint.md
+builder-agent-instructions.md
