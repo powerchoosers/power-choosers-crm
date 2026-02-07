@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useGmailSync } from '@/hooks/useGmailSync'
+import { useEmailTrackingNotifications } from '@/hooks/useEmailTrackingNotifications'
 
 const OPEN_SYNC_DELAY_MS = 2000
 const BACKGROUND_SYNC_INTERVAL_MS = 3 * 60 * 1000 // 3 minutes
@@ -11,6 +12,9 @@ export function GlobalSync() {
   const { user, loading } = useAuth()
   const { syncGmail, isSyncing } = useGmailSync()
   const hasTriggeredOpenSync = useRef(false)
+
+  // Real-time email tracking notifications (opens/clicks)
+  useEmailTrackingNotifications()
 
   // On page open: only attempt silent sync (no auth popup - browsers block non-click popups)
   // User must click Net_Sync button once to auth; after that, silent syncs work forever
