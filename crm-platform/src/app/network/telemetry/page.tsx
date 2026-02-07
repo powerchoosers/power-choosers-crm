@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
-import { useMarketPulse } from '@/hooks/useMarketPulse'
+import { useMarketPulse, type MarketPulseData } from '@/hooks/useMarketPulse'
 import { useEIARetailTexas, type EIARetailRow } from '@/hooks/useEIA'
 import { cn } from '@/lib/utils'
 
@@ -23,8 +23,8 @@ export default function TelemetryPage() {
   const { data: marketData, isLoading: marketLoading, isError: marketError } = useMarketPulse()
   const { data: eiaData, isLoading: eiaLoading, isError: eiaError } = useEIARetailTexas()
 
-  const prices = marketData?.prices ?? {}
-  const grid = marketData?.grid ?? {}
+  const prices: MarketPulseData['prices'] = marketData?.prices ?? ({} as MarketPulseData['prices'])
+  const grid: MarketPulseData['grid'] = marketData?.grid ?? ({} as MarketPulseData['grid'])
   const timestamp = marketData?.timestamp ?? ''
 
   const eiaRows = useMemo(() => {
