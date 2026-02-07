@@ -16,7 +16,7 @@ export function useEmailTrackingNotifications() {
   useEffect(() => {
     if (!user?.email) return
 
-    // Track only CRM-sent emails (IDs starting with 'gmail_')
+    // Listen to all email UPDATEs (Realtime doesn't support LIKE filter); filter in callback
     const channel = supabase
       .channel('email-tracking-notifications')
       .on(
@@ -25,25 +25,32 @@ export function useEmailTrackingNotifications() {
           event: 'UPDATE',
           schema: 'public',
           table: 'emails',
-          filter: `id=like.gmail_%`, // Only CRM-sent emails
         },
         (payload) => {
           const email = payload.new as {
             id: string
             subject?: string
             to?: string[]
+            from?: string
             openCount?: number
             clickCount?: number
             metadata?: { ownerId?: string }
           }
+          // Only CRM-sent emails have IDs like gmail_*
+          if (!email.id || !email.id.startsWith('gmail_')) return
+
           const oldEmail = payload.old as {
             openCount?: number
             clickCount?: number
           } | null
 
-          // Only notify for current user's emails
+          // Only notify for current user's emails (ownerId from metadata, or from address as fallback if metadata was wiped)
           const ownerEmail = email.metadata?.ownerId?.toLowerCase()
-          if (ownerEmail !== user.email?.toLowerCase()) return
+          const fromEmail = typeof email.from === 'string' && email.from.includes('@')
+            ? email.from.replace(/^.*<([^>]+)>.*$/, '$1').trim().toLowerCase()
+            : ''
+          const isOwner = ownerEmail === user.email?.toLowerCase() || fromEmail === user.email?.toLowerCase()
+          if (!isOwner) return
 
           // Dedupe: max 1 notification per email per 5 seconds
           const now = Date.now()
