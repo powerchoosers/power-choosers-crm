@@ -1203,10 +1203,14 @@ export default async function handler(req, res) {
     };
 
     const parseYear = (text) => {
-      const m = String(text || '').match(/\b(19|20)\d{2}\b/);
-      if (!m) return null;
-      const year = Number(m[0]);
-      return Number.isFinite(year) ? year : null;
+      const s = String(text || '');
+      const m = s.match(/\b(19|20)\d{2}\b/);
+      if (m) {
+        const year = Number(m[0]);
+        return Number.isFinite(year) ? year : null;
+      }
+      if (/\bthis\s+year\b/i.test(s)) return new Date().getFullYear();
+      return null;
     };
 
     const stripSearchPreamble = (text) => {
@@ -1304,6 +1308,13 @@ export default async function handler(req, res) {
       if (!p) return false;
 
       const lower = p.toLowerCase();
+      // Do NOT handle as account-only search: let the LLM use list_contacts, get_contact_details, search_interactions
+      const isPersonRequest = /(\bfind\s+(?:a\s+)?(?:person\s+named\s+)?\w+|person\s+named\b|someone\s+named\b|contact\s+named\b|who\s+works\s+at\b|(?:a\s+)?\w+\s+that\s+works\s+for)/.test(lower);
+      const isPhoneRequest = /(phone\s*number|phone\s+for|number\s+for|call\s+them|dial\s+)/.test(lower);
+      const isCallsRequest = /(what\s+calls|call\s+history|recent\s+call|my\s+calls|do\s+you\s+have\s+access\s+to\s+my\s+(?:most\s+recent\s+)?call)/.test(lower);
+      const isEmailRequest = /(important\s+emails?|any\s+emails?|emails?\s+(?:in\s+)?(?:my\s+)?(?:inbox|crm)|unread\s+emails?|show\s+me\s+emails?|check\s+emails?)/.test(lower);
+      if (isPersonRequest || isPhoneRequest || isCallsRequest || isEmailRequest) return false;
+
       const isExpirationQuery = /(expir|expire|expires|expiration)\b/.test(lower) && !!parseYear(p);
       const isContractQuery = /(contract|position maturity|strike price|annual usage|supplier|current supplier|current rate)\b/.test(lower);
       const isDirectContractQuestion = isContractQuery && /(what is|when does|show me|get|find)\b/.test(lower);
@@ -1688,6 +1699,12 @@ export default async function handler(req, res) {
         - TODAY'S DATE: ${new Date().toISOString().split('T')[0]} (Year: ${new Date().getFullYear()})
         - CURRENT CONTEXT: "This year" means ${new Date().getFullYear()}.
 
+        PERSON vs COMPANY (CRITICAL):
+        - If the user asks to find a PERSON (e.g. "find a Louis", "someone named X", "who works at this company", "a person that works for this company"), you MUST use \`list_contacts\` with the person's name in \`search\` and, when the user is on an account page, \`accountId\` from context. Do NOT use \`list_accounts\` for person names.
+        - If the user asks for "phone number", "contact info", or "number for the [X] location" for "this company" or the current account: use the context \`account_id\` (when on an account page), then \`get_account_details\` and \`list_contacts({ accountId })\`; then \`get_contact_details\` for contacts that have phone data. Return the actual phone from the CRM; if none, say so.
+        - If the user asks "what calls do you see", "my recent calls", "do you have access to my call", or similar: use \`search_interactions({ query: "calls" })\` or \`search_transcripts\` to find call data. Do NOT run \`list_accounts\` for call-related queries.
+        - If the user asks about "important emails", "any emails", "my inbox", or "unread emails": use \`search_emails\` or \`search_interactions({ query: "email" })\` to find email data. Do NOT run \`list_accounts\` for email-related queries.
+
         TOOL_USAGE_PROTOCOL:
         - **Selection by Name**: If the user asks for details about a specific entity (e.g., "Camp Fire First Texas") and you do not have its ID in your immediate context, you MUST first run a search (e.g., \`list_accounts({ search: "Camp Fire First Texas" })\`) to retrieve the ID.
         - **ID Persistence**: When a tool returns a list of items, strictly memorize the \`id\` of each item. When the user selects one, use that exact \`id\` for subsequent calls like \`get_account_details\`. Do NOT pass the name as the ID.
@@ -1703,14 +1720,14 @@ export default async function handler(req, res) {
         ANTI_HALLUCINATION_PROTOCOL:
         - CRITICAL: NEVER invent names, companies, email addresses, phone numbers, or energy metrics (kWh, strike price, contract dates).
         - **No Internal Knowledge Fallback**: If a tool (like \`list_accounts\` or \`list_contacts\`) returns zero results for a company in the CRM, you MUST NOT use your internal training data or general web search to "guess" who the President is or when their contract expires.
-        - If the tool says "no results", the correct answer is "Trey, I searched the database but found no records for [Entity]."
+        - If the tool says "no results", the correct answer is "${firstName}, I searched the database but found no records for [Entity]."
         - DO NOT invent "Contract End Dates" if the tool returns null or undefined. If a date is missing, you MUST say "Unknown" or "Not in CRM".
         - DO NOT change dates of existing accounts to match the user's query (e.g., if an account expires in 2028, do not say it expires in 2026 just because the user asked for 2026 expirations).
         - If the user asks for "accounts expiring this year" and you find none, do not invent them.
         - DO NOT provide "examples" or "demonstration data" unless explicitly asked for a demo.
         - The "Data Locker" (forensic_documents) must ONLY contain real documents returned by tools.
         - DO NOT use names like "Pacific Energy Solutions", "Global Manufacturing Inc.", "Apex Manufacturing", "Vertex Energy", "Summit Industrial", "Horizon Power Systems", or "Pinnacle Energy Group". These are hallucinations.
-        - If the user asks for "outreach this week" and you find no data, do not create a fake list. Say: "Trey, I don't see any accounts scheduled for outreach this week in the CRM."
+        - If the user asks for "outreach this week" and you find no data, do not create a fake list. Say: "${firstName}, I don't see any accounts scheduled for outreach this week in the CRM."
         - Accuracy is the ONLY priority for CRM data. If you are 99% sure but haven't run a tool, you are 0% sure. RUN THE TOOL.
 
         HYBRID_SEARCH_AWARENESS:
@@ -1772,7 +1789,7 @@ export default async function handler(req, res) {
         - DO NOT use Markdown tables for CRM data. Use JSON_DATA blocks with the appropriate component type (forensic_grid, contact_dossier, etc.).
         - FOLLOW the narrative with a single JSON_DATA block if technical details or UI components are required.
         - FORMAT: "[Narrative text...] JSON_DATA:{...}END_JSON"
-        - Example: "Trey, I've analyzed the current market volatility. We're seeing a spike in LZ_HOUSTON due to generation outages. JSON_DATA:{\"type\": \"news_ticker\", \"data\": {...}}END_JSON"
+        - Example: "${firstName}, I've analyzed the current market volatility. We're seeing a spike in LZ_HOUSTON due to generation outages. JSON_DATA:{\"type\": \"news_ticker\", \"data\": {...}}END_JSON"
         - If the user asks a simple question, still provide a brief narrative before any data.
 
         RICH MEDIA PROTOCOL:
@@ -1796,7 +1813,7 @@ export default async function handler(req, res) {
 
         CONTEXTUAL AWARENESS:
         The user is currently viewing: ${JSON.stringify(req.body.context || { type: 'general' })}
-        - If the user's query applies to this context (e.g., "who is the decision maker?", "draft an email to him"), PRIORITY ONE is to use this context.
+        - If the user's query applies to this context (e.g., "who is the decision maker?", "draft an email to him", "find a Louis at this company", "phone number for the Allen location"), PRIORITY ONE is to use this context. When context has \`type: 'account'\` and \`id\`, use that \`id\` as \`accountId\` for \`list_contacts\` and as \`account_id\` for \`get_account_details\`.
         - If the user's query is unrelated (e.g., "general market trends", "new search"), IGNORE the current screen context and answer broadly.
         - Use this to offer proactive, zero-click insights ONLY when relevant.
       `;
