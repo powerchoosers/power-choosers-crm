@@ -31,6 +31,7 @@ export function useEmailTrackingNotifications() {
           const email = payload.new as {
             id: string
             subject?: string
+            to?: string[]
             openCount?: number
             clickCount?: number
             metadata?: { ownerId?: string }
@@ -42,7 +43,7 @@ export function useEmailTrackingNotifications() {
 
           // Only notify for current user's emails
           const ownerEmail = email.metadata?.ownerId?.toLowerCase()
-          if (ownerEmail !== user.email.toLowerCase()) return
+          if (ownerEmail !== user.email?.toLowerCase()) return
 
           // Dedupe: max 1 notification per email per 5 seconds
           const now = Date.now()
@@ -61,28 +62,32 @@ export function useEmailTrackingNotifications() {
 
           if (!opened && !clicked) return
 
-          const subject = email.subject?.slice(0, 40) || 'your email'
-          const truncated = email.subject && email.subject.length > 40 ? '...' : ''
+          // Format recipient info
+          const recipient = Array.isArray(email.to) ? email.to[0] : 'recipient'
+          const subject = email.subject?.slice(0, 35) || 'your email'
+          const subjectTruncated = email.subject && email.subject.length > 35 ? '...' : ''
 
           if (clicked) {
             toast.success(
               <div className="flex items-center gap-2">
                 <MousePointer2 className="w-4 h-4 text-[#002FA7]" />
-                <span>
-                  <strong>Link clicked</strong> — {subject}{truncated}
-                </span>
+                <div className="flex flex-col">
+                  <span className="font-medium">Link clicked by {recipient}</span>
+                  <span className="text-xs text-zinc-400">{subject}{subjectTruncated}</span>
+                </div>
               </div>,
-              { duration: 4000 }
+              { duration: 5000 }
             )
           } else if (opened) {
             toast.success(
               <div className="flex items-center gap-2">
                 <Eye className="w-4 h-4 text-emerald-400" />
-                <span>
-                  <strong>Email opened</strong> — {subject}{truncated}
-                </span>
+                <div className="flex flex-col">
+                  <span className="font-medium">Email opened by {recipient}</span>
+                  <span className="text-xs text-zinc-400">{subject}{subjectTruncated}</span>
+                </div>
               </div>,
-              { duration: 4000 }
+              { duration: 5000 }
             )
           }
         }
