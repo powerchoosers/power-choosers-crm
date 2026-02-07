@@ -278,7 +278,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       queryClient.invalidateQueries({ queryKey: ['targets'] });
 
       // Trigger blur-in on account dossier for enriched fields
-      setLastEnrichedAccountId(accountId);
+      setLastEnrichedAccountId(accountId ?? null);
       setTimeout(() => setLastEnrichedAccountId(null), 3500);
     } catch (err) {
       console.error('Enrichment Error:', err);
@@ -475,7 +475,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       queryClient.invalidateQueries({ queryKey: ['targets'] });
 
       // Trigger blur-in on contact dossier for enriched fields
-      setLastEnrichedContactId(crmId);
+      setLastEnrichedContactId(crmId ?? null);
       setTimeout(() => setLastEnrichedContactId(null), 3500);
       
       // 3. Update local state (phones from immediate response; may be empty when reveal_phone_number=true)
