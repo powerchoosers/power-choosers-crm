@@ -25,8 +25,8 @@ interface CollapsiblePageHeaderProps {
     icon?: React.ReactNode
     disabled?: boolean
   }
-  globalFilter: string
-  onSearchChange: (value: string) => void
+  globalFilter?: string
+  onSearchChange?: (value: string) => void
   onFilterToggle?: () => void
   isFilterActive?: boolean
   placeholder?: string
@@ -78,7 +78,7 @@ export function CollapsiblePageHeader({
         </div>
         <div className={cn("flex items-center gap-3 shrink-0", hideTitle && "w-full justify-end")}>
           <AnimatePresence mode="wait">
-            {!isSearchVisible && (
+            {onSearchChange != null && !isSearchVisible && (
               <motion.div
                 key="search-button"
                 initial={{ opacity: 0, x: 20, scale: 0.8 }}
@@ -120,7 +120,7 @@ export function CollapsiblePageHeader({
       </div>
 
       <AnimatePresence>
-        {isSearchVisible && (
+        {onSearchChange != null && isSearchVisible && (
           <motion.div
             key="search-bar-container"
             initial={{ height: 0, opacity: 0, y: -10 }}
@@ -135,7 +135,7 @@ export function CollapsiblePageHeader({
                 <Input 
                   placeholder={placeholder}
                   value={globalFilter ?? ""}
-                  onChange={(event) => onSearchChange(event.target.value)}
+                  onChange={(event) => onSearchChange?.(event.target.value)}
                   className="pl-10 bg-transparent border-none text-white placeholder:text-zinc-600 focus-visible:ring-0 h-9"
                 />
               </div>
