@@ -55,11 +55,20 @@ export function EmailList({
   const itemsPerPage = 15
 
   const filteredEmails = emails.filter(email => {
-    if (filter === 'all') return true
+    if (filter === 'all') {
+      // All nodes: show received + CRM-sent only (exclude Gmail-synced sent)
+      // CRM-sent IDs start with 'gmail_', Gmail-synced sent IDs are plain like '19c34a3c149e256b'
+      if (email.type === 'sent') {
+        return email.id.startsWith('gmail_')
+      }
+      return true
+    }
     if (filter === 'received') return email.type === 'received'
     if (filter === 'sent') {
-      // Uplink out: only emails you sent personally (Gmail synced + CRM-sent)
-      return email.type === 'sent'
+      // Uplink out: only emails sent through CRM (tracking IDs start with 'gmail_')
+      // Gmail-synced sent emails have plain IDs like '19c34a3c149e256b'
+      // CRM-sent emails have IDs like 'gmail_1738881234567_abc123def'
+      return email.type === 'sent' && email.id.startsWith('gmail_')
     }
     return email.type === filter
   })
