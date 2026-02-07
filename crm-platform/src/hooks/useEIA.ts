@@ -19,12 +19,12 @@ export interface EIARetailResponse {
   metadata: { frequency?: string; total?: string }
 }
 
-/** Texas retail sales (COM + IND) last 12 months for Macro Trend Log. */
+/** Texas retail sales (COM + IND) last 12 months for Macro Variance chart. */
 export function useEIARetailTexas() {
   const params = new URLSearchParams({
     route: 'electricity/retail-sales',
     data: '1',
-    length: '12',
+    length: '72', // 12 months × 6 sectors per month so we get full 12 months
     frequency: 'monthly',
     'facets[stateid][]': 'TX',
     'data[]': 'price',

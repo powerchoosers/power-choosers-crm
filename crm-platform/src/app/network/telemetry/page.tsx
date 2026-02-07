@@ -1,10 +1,52 @@
 'use client'
 
 import { useMemo } from 'react'
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from 'recharts'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { useMarketPulse, type MarketPulseData } from '@/hooks/useMarketPulse'
 import { useEIARetailTexas, type EIARetailRow } from '@/hooks/useEIA'
 import { cn } from '@/lib/utils'
+
+/** Chart data point for EIA Commercial vs Industrial rates */
+type EIAChartPoint = { period: string; commercial: number; industrial: number }
+
+/** Glass tooltip for MACRO_VARIANCE_CHART */
+function MacroVarianceTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean
+  payload?: Array<{ name?: string; value?: number; dataKey?: string }>
+  label?: string
+}) {
+  if (!active || !payload?.length || !label) return null
+  const com = payload.find((p) => p.dataKey === 'commercial')?.value as number | undefined
+  const ind = payload.find((p) => p.dataKey === 'industrial')?.value as number | undefined
+  const variance = com != null && ind != null ? com - ind : null
+  return (
+    <div className="rounded-xl border border-white/10 bg-zinc-900/90 px-3 py-2 backdrop-blur-md shadow-xl">
+      <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{label}</div>
+      <div className="mt-1 flex gap-4 text-sm font-mono tabular-nums">
+        <span className="text-[#002FA7]">COM {com != null ? com.toFixed(2) : '—'}¢</span>
+        <span className="text-emerald-500">IND {ind != null ? ind.toFixed(2) : '—'}¢</span>
+      </div>
+      {variance != null && (
+        <div className="mt-0.5 text-[10px] font-mono text-zinc-400">
+          Variance: {variance >= 0 ? '+' : ''}{variance.toFixed(2)}¢
+        </div>
+      )}
+    </div>
+  )
+}
 
 const ZONES = [
   { id: 'houston', label: 'LZ_HOUSTON' },
@@ -46,6 +88,18 @@ export default function TelemetryPage() {
       return { ...row, comVar, indVar }
     })
   }, [eiaData?.catalog])
+
+  /** Chart-ready: oldest first for AreaChart */
+  const eiaChartData: EIAChartPoint[] = useMemo(() => {
+    return eiaRows
+      .filter((r) => r.COM != null || r.IND != null)
+      .map((r) => ({
+        period: r.period,
+        commercial: r.COM ?? 0,
+        industrial: r.IND ?? 0,
+      }))
+      .reverse()
+  }, [eiaRows])
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-8rem)] space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -108,127 +162,123 @@ export default function TelemetryPage() {
         </div>
       </section>
 
-      {/* ROW 2: Grid Physics Monitor */}
+      {/* ROW 2: Grid Physics Visualizer (Capacity Gauge) */}
       <section className="space-y-3">
         <h2 className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
           Grid Physics Monitor
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl p-4">
-            <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
-              LOAD_VELOCITY
-            </div>
-            <div className="mt-2 font-mono tabular-nums text-zinc-200">
-              {marketLoading ? '—' : `${Math.round(grid.actual_load ?? 0).toLocaleString()} MW`}
-            </div>
-            <div className="text-[9px] font-mono text-zinc-600">Actual Load</div>
-            <div className="mt-1 font-mono tabular-nums text-zinc-400 text-sm">
-              {marketLoading ? '—' : `${Math.round(grid.total_capacity ?? 0).toLocaleString()} MW`} capacity
-            </div>
-          </div>
+        {marketLoading ? (
+          <div className="h-24 rounded-2xl border border-white/10 bg-zinc-900/40 animate-pulse bg-zinc-800/50" />
+        ) : (
           <div
             className={cn(
-              'rounded-2xl border backdrop-blur-xl p-4',
-              grid.reserves != null && grid.reserves < 3000
-                ? 'border-rose-500/30 bg-rose-500/10'
-                : 'border-white/10 bg-zinc-900/40'
+              'rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl p-4',
+              grid.reserves != null && grid.reserves < 3000 && 'border-rose-500/30 shadow-[0_0_20px_rgba(244,63,94,0.15)]'
             )}
           >
-            <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
-              RESERVE_GAP
+            <div className="flex items-center justify-between gap-4 mb-2">
+              <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
+                Capacity Gauge
+              </span>
+              <span className="text-[10px] font-mono text-zinc-400 tabular-nums">
+                Load {Math.round(grid.actual_load ?? 0).toLocaleString()} / Capacity{' '}
+                {Math.round(grid.total_capacity ?? 0).toLocaleString()} MW · Reserve{' '}
+                {Math.round(grid.reserves ?? 0).toLocaleString()} MW
+              </span>
             </div>
-            <div className="text-[9px] font-mono text-zinc-600 mt-0.5">Physical Headroom</div>
-            <div className="mt-1 text-xl font-mono tabular-nums text-zinc-200">
-              {marketLoading ? '—' : `${Math.round(grid.reserves ?? 0).toLocaleString()} MW`}
+            <div className="relative h-10 w-full rounded-xl bg-zinc-800 overflow-hidden">
+              {/* Fill: load as % of capacity (gradient blue → rose) */}
+              <div
+                className="absolute inset-y-0 left-0 rounded-xl bg-gradient-to-r from-[#002FA7] to-rose-500/80 transition-all duration-500"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    (grid.total_capacity ?? 0) > 0
+                      ? ((grid.actual_load ?? 0) / (grid.total_capacity ?? 1)) * 100
+                      : 0
+                  )}%`,
+                }}
+              />
+              {/* Reserve threshold marker (capacity - 3000 MW) */}
+              {(grid.total_capacity ?? 0) > 3000 && (
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-amber-500/90 z-10"
+                  style={{
+                    left: `${((Math.max(0, (grid.total_capacity ?? 0) - 3000)) / (grid.total_capacity ?? 1)) * 100}%`,
+                  }}
+                  title="Reserve threshold (Capacity - 3000 MW)"
+                />
+              )}
+            </div>
+            <div className="mt-2 flex justify-between text-[9px] font-mono text-zinc-600">
+              <span>0</span>
+              <span className="text-amber-500/80">Reserve threshold</span>
+              <span>Capacity</span>
+            </div>
+            <div className="mt-3 flex gap-6 text-sm font-mono tabular-nums text-zinc-400">
+              <span>Wind: {Math.round(grid.wind_gen ?? 0).toLocaleString()} MW</span>
+              <span>PV: {Math.round(grid.pv_gen ?? 0).toLocaleString()} MW</span>
             </div>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl p-4">
-            <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
-              RENEWABLE_VECTOR
-            </div>
-            <div className="text-[9px] font-mono text-zinc-600 mt-0.5">Intermittent Generation</div>
-            <div className="mt-1 font-mono tabular-nums text-zinc-200">
-              Wind: {marketLoading ? '—' : `${Math.round(grid.wind_gen ?? 0).toLocaleString()} MW`}
-            </div>
-            <div className="font-mono tabular-nums text-zinc-400 text-sm">
-              PV: {marketLoading ? '—' : `${Math.round(grid.pv_gen ?? 0).toLocaleString()} MW`}
-            </div>
-          </div>
-        </div>
+        )}
       </section>
 
-      {/* ROW 3: Macro Trend Log (EIA) */}
+      {/* ROW 3: MACRO_VARIANCE_CHART (EIA Commercial vs Industrial) */}
       <section className="space-y-3">
         <h2 className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
-          Macro Trend Log
+          Macro Variance (TX Retail ¢/kWh)
         </h2>
         <div className="rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl overflow-hidden">
           {eiaError ? (
             <div className="p-6 text-center font-mono text-amber-500 text-sm">CONNECTION_LOST</div>
           ) : eiaLoading ? (
-            <div className="p-6 text-center font-mono text-zinc-500 text-sm">Loading…</div>
-          ) : eiaRows.length === 0 ? (
+            <div className="h-64 rounded-2xl animate-pulse bg-zinc-800/50" />
+          ) : eiaChartData.length === 0 ? (
             <div className="p-6 text-center font-mono text-zinc-500 text-sm">No data</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="border-b border-white/5">
-                    <th className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider py-3 px-4">
-                      PERIOD
-                    </th>
-                    <th className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider py-3 px-4">
-                      SECTOR
-                    </th>
-                    <th className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider py-3 px-4">
-                      RATE (¢/kWh)
-                    </th>
-                    <th className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider py-3 px-4">
-                      VARIANCE
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {eiaRows.flatMap((row) => [
-                    <tr key={`${row.period}-COM`} className="border-b border-white/5">
-                      <td className="py-2 px-4 font-mono text-zinc-300 tabular-nums text-sm">
-                        {row.period}
-                      </td>
-                      <td className="py-2 px-4 font-mono text-zinc-400 text-sm">Commercial</td>
-                      <td className="py-2 px-4 font-mono tabular-nums text-zinc-200">
-                        {row.COM != null ? row.COM.toFixed(2) : '—'}
-                      </td>
-                      <td className="py-2 px-4 font-mono tabular-nums text-sm">
-                        {row.comVar != null ? (
-                          <span className={row.comVar >= 0 ? 'text-amber-500' : 'text-emerald-500'}>
-                            {row.comVar >= 0 ? '+' : ''}{row.comVar.toFixed(2)}
-                          </span>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                    </tr>,
-                    <tr key={`${row.period}-IND`} className="border-b border-white/5">
-                      <td className="py-2 px-4 font-mono text-zinc-300 tabular-nums text-sm">
-                        {row.period}
-                      </td>
-                      <td className="py-2 px-4 font-mono text-zinc-400 text-sm">Industrial</td>
-                      <td className="py-2 px-4 font-mono tabular-nums text-zinc-200">
-                        {row.IND != null ? row.IND.toFixed(2) : '—'}
-                      </td>
-                      <td className="py-2 px-4 font-mono tabular-nums text-sm">
-                        {row.indVar != null ? (
-                          <span className={row.indVar >= 0 ? 'text-amber-500' : 'text-emerald-500'}>
-                            {row.indVar >= 0 ? '+' : ''}{row.indVar.toFixed(2)}
-                          </span>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                    </tr>,
-                  ])}
-                </tbody>
-              </table>
+            <div className="p-4 h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={eiaChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorBlue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#002FA7" stopOpacity={0.4} />
+                      <stop offset="100%" stopColor="#002FA7" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="colorGreen" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.4} />
+                      <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="none" />
+                  <XAxis
+                    dataKey="period"
+                    tick={{ fill: 'rgb(113 113 122)', fontSize: 10, fontFamily: 'monospace' }}
+                    tickLine={false}
+                    axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  />
+                  <YAxis
+                    tick={{ fill: 'rgb(113 113 122)', fontSize: 10, fontFamily: 'monospace' }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => `${v}¢`}
+                  />
+                  <Tooltip content={<MacroVarianceTooltip />} />
+                  <Area
+                    type="monotone"
+                    dataKey="commercial"
+                    stroke="#002FA7"
+                    strokeWidth={2}
+                    fill="url(#colorBlue)"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="industrial"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    fill="url(#colorGreen)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
           )}
         </div>
