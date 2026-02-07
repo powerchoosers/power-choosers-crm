@@ -14,7 +14,7 @@ Welcome to the **Nodal Point CRM Platform**, a modern, scalable, and high-perfor
 - **Styling:** [Tailwind CSS](https://tailwindcss.com/) v4
 - **State Management:**
   - [Zustand](https://github.com/pmndrs/zustand) (Global Client State: callStore, geminiStore, syncStore, uiStore)
-  - [TanStack Query](https://tanstack.com/query/latest) (Server State / Async Data), persisted to IndexedDB via `lib/persister.ts` for calls, energy-plans, scripts
+  - [TanStack Query](https://tanstack.com/query/latest) (Server State / Async Data), persisted to IndexedDB via `lib/persister.ts` for calls, market-pulse, eia-retail-tx, scripts
 - **Database:**
   - **Supabase** (PostgreSQL) — Primary Data & Vector Store
   - **Firestore** (Legacy/Deprecating) — Read-only reference
@@ -23,7 +23,7 @@ Welcome to the **Nodal Point CRM Platform**, a modern, scalable, and high-perfor
   - [Lucide React](https://lucide.dev/) (Icons)
   - [Framer Motion](https://www.framer.com/motion/) (Animations)
 - **Authentication:** Firebase Auth (login); Supabase `users` table (profile: role, name, Twilio settings, etc.)
-- **Backend/API:** Node.js (Legacy Server & API Proxy at root)
+- **Backend/API:** Node.js (Legacy Server & API Proxy at root). Key API routes include `/api/market/ercot`, `/api/market/eia`, `/api/weather` (Google Weather API; lat/lng or geocode from address/city+state), `/api/maps/geocode`.
 
 ## 🛠️ Project Structure
 
@@ -55,7 +55,7 @@ Power Choosers CRM/
 ### Key Routes (App Router)
 
 - **Public**: `/`, `/login`, `/philosophy`, `/technical-docs`
-- **Protected** (`/network`): `/network` (dashboard), `/network/accounts`, `/network/accounts/[id]`, `/network/people`, `/network/contacts/[id]` (contact dossier), `/network/calls`, `/network/emails`, `/network/emails/[id]`, `/network/tasks`, `/network/targets`, `/network/targets/[id]` (list detail), `/network/protocols`, `/network/protocols/[id]/builder`, `/network/scripts`, `/network/settings`, `/network/infrastructure`, `/network/energy`
+- **Protected** (`/network`): `/network` (dashboard), `/network/accounts`, `/network/accounts/[id]`, `/network/people`, `/network/contacts/[id]` (contact dossier), `/network/calls`, `/network/emails`, `/network/emails/[id]`, `/network/tasks`, `/network/targets`, `/network/targets/[id]` (list detail), `/network/protocols`, `/network/protocols/[id]/builder`, `/network/scripts`, `/network/settings`, `/network/infrastructure`, `/network/telemetry` (Market Telemetry), `/network/vault`
 - **Other**: `/bill-debugger`, `/market-data`, `/contact`, `/debug/connectivity`
 
 Providers (`src/app/providers.tsx`): `PersistQueryClientProvider` (TanStack Query + IndexedDB), `AuthProvider`, `VoiceProvider`, `ChunkLoadErrorHandler`.
@@ -93,6 +93,20 @@ The platform features a high-performance CSV ingestion system with intelligent f
   - **Grid Reserves (40%)**: Available capacity vs. critical thresholds (e.g., < 3000 MW).
   - **Scarcity Risk (20%)**: Weighted by DAM/RTM spreads and extreme weather events.
 - **Data Resilience**: Frontend widgets (`MarketPulseWidget`, `TelemetryWidget`) and the Infrastructure Map MUST validate API responses for `content-type: application/json` to handle non-JSON error pages (e.g., ERCOT 500 Internal Server Error) gracefully.
+
+#### Market Telemetry Page (`/network/telemetry`)
+- **Route**: Replaced the former `/network/energy` (Energy Plans table) with a single **Market Telemetry** dashboard at `/network/telemetry`. Sidebar "Telemetry" link points here.
+- **Data Sources**: `useMarketPulse()` (ERCOT prices + grid via `/api/market/ercot`), `useEIARetailTexas()` (EIA Texas retail sales via `/api/market/eia`; COM/IND sectors, 12 months). Persisted query keys: `market-pulse`, `eia-retail-tx`.
+- **UI Layers** (per build.md):
+  - **Zonal Settlement Array**: Four cards (LZ_HOUSTON, LZ_NORTH, LZ_SOUTH, LZ_WEST) + HUB_AVG; conditional styling (e.g. &lt;$50 white, &gt;$100 amber, &gt;$1000 rose).
+  - **Grid Physics Monitor**: LOAD_VELOCITY (actual load vs capacity), RESERVE_GAP (reserves MW; rose if &lt;3000), RENEWABLE_VECTOR (wind + PV).
+  - **Macro Trend Log**: EIA table (PERIOD | SECTOR | RATE | VARIANCE vs prior month); shows "CONNECTION_LOST" on EIA failure.
+- **Design**: Obsidian & Glass; no generic charts; data blocks and table only.
+
+#### Weather in Active Context (Right Panel)
+- **API**: Backend `/api/weather` (Google Maps Platform Weather API). Accepts `lat`/`lng` or `address` or `city`+`state`; geocodes via `/api/maps/geocode` when needed. Uses `GOOGLE_MAPS_API_KEY` (or equivalent env).
+- **Location Rule**: Weather is **always** driven by the **account** location, not the contact. On a contact dossier (e.g. contact in Plano, account in Dallas), the Right Panel shows weather for the account's city (Dallas).
+- **Implementation**: `useWeather(location)` hook; `account` from `useAccount()` provides `latitude`, `longitude`, `address`, `city`, `state`. `TelemetryWidget` receives optional `weather` and `weatherLocationLabel`; when present, displays live temp + condition and location label. Account type and `useAccount` include `latitude`/`longitude` for map and weather.
 
 ## 🗺️ Infrastructure & Asset Mapping
 
@@ -208,6 +222,7 @@ To prevent hydration mismatches, unique key warnings, and infinite render loops:
 ### 2. Hydration Integrity
 - Avoid using browser-only globals (`window`, `localStorage`) during initial render.
 - Wrap browser-only logic in `useEffect` or use a `mounted` state to ensure server/client HTML match.
+- **Sidebar**: The sidebar root uses `suppressHydrationWarning` because browser extensions (e.g. Cursor) can inject attributes such as `data-cursor-ref` onto `<a>` tags after SSR, causing server/client attribute mismatch. Do not rely on this for app logic; use only to silence extension-induced warnings in that subtree.
 
 ### 3. Effect & Performance Safety
 - Always provide a dependency array to `useEffect`.
@@ -270,6 +285,7 @@ The platform includes a native forensic dialer:
 - **Company Icons**: Standardized to `rounded-2xl` or `rounded-[14px]` (Squircle) across Accounts, People, Target ID, and Global Search pages to match the forensic instrument aesthetic.
   - **Shadows**: Must use `shadow-[0_0_10px_rgba(0,0,0,0.5)]` (Subtle Centered Glow).
 - **Layout**: Sidebar (Left), Top Bar (Header), Right Panel (Contextual Widgets).
+- **CollapsiblePageHeader**: `globalFilter` and `onSearchChange` are optional. Pages that do not need search (e.g. Telemetry) may pass only `title` and `description`; the search icon and expandable search bar render only when `onSearchChange` is provided.
 - **Animations**:
   - **Page Entry**: Public pages use a standard "Blur In" effect (`filter: blur(10px)` → `blur(0px)`) combined with opacity fade.
   - **Staggered Elements**: Lists and grids should use staggered entry delays.
