@@ -172,9 +172,16 @@ export default async function handler(req, res) {
     const analysis = JSON.parse(jsonMatch[0]);
     logger.log('[Analyze Document] Gemini Analysis Result:', analysis);
 
+    const { type, data } = analysis || {};
+    if (!data || typeof data !== 'object') {
+      logger.warn('[Analyze Document] No data object in analysis, skipping DB updates');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, analysis }));
+      return;
+    }
+
     // 5. Update Database based on findings
     const updates = {};
-    const { type, data } = analysis;
 
     if (data.contract_end_date) updates.contract_end_date = data.contract_end_date;
     if (data.strike_price) updates.current_rate = String(data.strike_price);
@@ -201,8 +208,9 @@ export default async function handler(req, res) {
       });
     }
 
-    if (type === 'SIGNED_CONTRACT') {
-      updates.status = 'CUSTOMER'; // Actual customer once contract is in Data Locker
+    // When a bill or signed contract lands in Data Locker, mark account (and linked contacts) as customer
+    if (type === 'SIGNED_CONTRACT' || type === 'BILL') {
+      updates.status = 'CUSTOMER';
     }
 
     if (Object.keys(updates).length > 0) {
@@ -212,34 +220,47 @@ export default async function handler(req, res) {
         .eq('id', accountId);
 
       if (updateError) logger.error('[Analyze Document] Account Update Error:', updateError);
+
+      // Sync linked contacts to Customer so People list shows "Client" immediately
+      if (updates.status === 'CUSTOMER') {
+        const { error: contactsError } = await supabaseAdmin
+          .from('contacts')
+          .update({ status: 'Customer' })
+          .eq('accountId', accountId);
+        if (contactsError) logger.error('[Analyze Document] Contacts status sync error:', contactsError);
+      }
     }
 
-    // Insert Meters (ESIDs)
-    if (data.esids && data.esids.length > 0) {
+    // Insert Meters (ESIDs) – requires unique constraint on meters(esid); see migration 20260202175056
+    if (data.esids && Array.isArray(data.esids) && data.esids.length > 0) {
       logger.log('[Analyze Document] Processing ESIDs:', data.esids.length);
-      
-      const metersToInsert = data.esids.map((m) => ({
-        account_id: accountId,
-        esid: m.id,
-        service_address: m.address,
-        rate: m.rate || null,
-        end_date: m.end_date || null,
-        status: 'Active',
-        metadata: { 
-          source: 'ai_extraction', 
-          document: fileName,
-          extracted_at: new Date().toISOString()
-        }
-      }));
 
-      const { error: meterError } = await supabaseAdmin
-        .from('meters')
-        .upsert(metersToInsert, { onConflict: 'esid' });
-      
-      if (meterError) {
-        logger.error('[Analyze Document] Meter Insert Error:', meterError);
-      } else {
-        logger.log('[Analyze Document] Successfully inserted/updated', metersToInsert.length, 'meters');
+      const metersToInsert = data.esids
+        .filter((m) => m && (m.id != null && String(m.id).trim() !== ''))
+        .map((m) => ({
+          account_id: accountId,
+          esid: String(m.id).trim(),
+          service_address: m.address != null ? String(m.address).trim() : null,
+          rate: m.rate != null ? String(m.rate) : null,
+          end_date: m.end_date != null ? String(m.end_date) : null,
+          status: 'Active',
+          metadata: {
+            source: 'ai_extraction',
+            document: fileName,
+            extracted_at: new Date().toISOString()
+          }
+        }));
+
+      if (metersToInsert.length > 0) {
+        const { error: meterError } = await supabaseAdmin
+          .from('meters')
+          .upsert(metersToInsert, { onConflict: 'esid' });
+
+        if (meterError) {
+          logger.error('[Analyze Document] Meter Insert Error:', meterError);
+        } else {
+          logger.log('[Analyze Document] Successfully inserted/updated', metersToInsert.length, 'meters');
+        }
       }
     }
 

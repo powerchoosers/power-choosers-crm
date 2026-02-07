@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react';
-import { UploadCloud, FileText, X, Loader2, Download } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { UploadCloud, FileText, X, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
@@ -39,34 +40,32 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
   const [scanProgress, setScanProgress] = useState(0);
   const queryClient = useQueryClient();
 
-  // Fetch Documents
+  const fetchDocuments = useCallback(async () => {
+    if (!accountId) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('account_id', accountId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching documents:', error);
+    } else {
+      setFiles(data || []);
+    }
+    setLoading(false);
+  }, [accountId]);
+
   useEffect(() => {
     if (!accountId) return;
-    
-    const fetchDocuments = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('documents')
-        .select('*')
-        .eq('account_id', accountId)
-        .order('created_at', { ascending: false });
-        
-      if (error) {
-        console.error('Error fetching documents:', error);
-      } else {
-        setFiles(data || []);
-      }
-      setLoading(false);
-    };
-
     fetchDocuments();
-    
-    // Realtime subscription
+
     const channel = supabase
       .channel('documents_changes')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
         table: 'documents',
         filter: `account_id=eq.${accountId}`
       }, () => {
@@ -77,7 +76,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [accountId]);
+  }, [accountId, fetchDocuments]);
 
   // Drag Handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -135,6 +134,9 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
 
         if (dbError) throw dbError;
 
+        // Refresh document list immediately so the new file appears
+        await fetchDocuments();
+
         // 3. AI Analysis
         toast.loading('Neuro-Processing Document...', { id: toastId });
 
@@ -187,13 +189,21 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
               }
             }, scanInterval);
             
-            // 3. Invalidate AND refetch queries immediately
-            await queryClient.invalidateQueries({ queryKey: ['account', accountId] });
-            await queryClient.refetchQueries({ queryKey: ['account', accountId] });
-            
+            // 3. Invalidate AND refetch account so dossier (meters, energy, docs, status) updates immediately
+            await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'account' && q.queryKey[1] === accountId });
+            await queryClient.refetchQueries({ predicate: (q) => q.queryKey[0] === 'account' && q.queryKey[1] === accountId });
+
+            // Refresh lists so Accounts and People tables show Customer/Client immediately
+            queryClient.invalidateQueries({ queryKey: ['accounts'] });
+            queryClient.invalidateQueries({ queryKey: ['contacts'] });
+            queryClient.invalidateQueries({ queryKey: ['targets'] });
+
+            // Refresh document list again after AI (in case realtime was slow)
+            await fetchDocuments();
+
             // 4. Callback to trigger parent component animations
             onIngestionComplete?.();
-            
+
             // 5. Clear refraction state after animation completes
             setTimeout(() => {
               setIsRecalibrating(false);
@@ -213,7 +223,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
     } finally {
       setUploading(false);
     }
-  }, [accountId]);
+  }, [accountId, onIngestionComplete, queryClient, fetchDocuments]);
 
   const handleDelete = async (doc: Document) => {
     try {
@@ -354,8 +364,14 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
             </div>
           ) : (
             files.map((file) => (
-              <div key={file.id} className="group flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer border border-transparent hover:border-white/5">
-                <div 
+              <motion.div
+                key={file.id}
+                initial={{ filter: 'blur(6px)', opacity: 0.6 }}
+                animate={{ filter: 'blur(0px)', opacity: 1 }}
+                transition={{ duration: 0.35, ease: 'easeOut' }}
+                className="group flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer border border-transparent hover:border-white/5"
+              >
+                <div
                   className="flex items-center gap-3 overflow-hidden flex-1"
                   onClick={() => handleDownload(file)}
                 >
@@ -369,8 +385,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
                     </span>
                   </div>
                 </div>
-                {/* Hover Action */}
-                <button 
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDelete(file);
@@ -379,7 +394,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
                 >
                   <X className="w-3 h-3" />
                 </button>
-              </div>
+              </motion.div>
             ))
           )}
         </div>

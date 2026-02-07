@@ -102,6 +102,10 @@ export function useAddContactToList() {
       queryClient.invalidateQueries({ queryKey: ['contact-list-memberships', variables.contactId] })
       queryClient.invalidateQueries({ queryKey: ['targets'] })
       queryClient.invalidateQueries({ queryKey: ['target', variables.listId] })
+      // People page orbs (useContactsInTargetLists) and StakeholderMap
+      queryClient.invalidateQueries({ queryKey: ['list-memberships'] })
+      // Contact dossier header badge (listName)
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'contact' && q.queryKey[2] === variables.contactId })
     },
     onError: (error: Error) => {
       console.error('Error adding contact to list:', error)
@@ -128,6 +132,9 @@ export function useRemoveContactFromList() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['contact-list-memberships', variables.contactId] })
       queryClient.invalidateQueries({ queryKey: ['targets'] })
+      queryClient.invalidateQueries({ queryKey: ['list-memberships'] })
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'contact' && q.queryKey[2] === variables.contactId })
+      queryClient.invalidateQueries({ queryKey: ['target'] })
     },
     onError: (error: Error) => {
       console.error('Error removing contact from list:', error)

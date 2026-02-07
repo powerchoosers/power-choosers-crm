@@ -67,7 +67,7 @@ export default function AccountDossierPage() {
   const { data: calls, isLoading: isLoadingCalls } = useAccountCalls(id)
   const updateAccount = useUpdateAccount()
   
-  const { isEditing, setIsEditing, toggleEditing, setRightPanelMode, setIngestionContext } = useUIStore()
+  const { isEditing, setIsEditing, toggleEditing, setRightPanelMode, setIngestionContext, lastEnrichedAccountId } = useUIStore()
   const setContext = useGeminiStore((state) => state.setContext)
 
   const [isSaving, setIsSaving] = useState(false)
@@ -111,6 +111,10 @@ export default function AccountDossierPage() {
   // Refraction Event State (for field glow animations)
   const [glowingFields, setGlowingFields] = useState<Set<string>>(new Set())
   const [isRecalibrating, setIsRecalibrating] = useState(false)
+  // Blur-in for fields that update after ingestion (so data doesn't just pop in)
+  const [recentlyUpdatedFields, setRecentlyUpdatedFields] = useState<Set<string>>(new Set())
+  const prevAccountRef = useRef<typeof account>(undefined)
+  const justIngestedRef = useRef(false)
 
   // Set Gemini Context
   useEffect(() => {
@@ -221,12 +225,50 @@ export default function AccountDossierPage() {
     setEditMeters(updatedMeters)
   }
 
+  // Detect which fields changed after ingestion or Org Intelligence enrich and mark for blur-in animation
+  useEffect(() => {
+    if (!account) return
+    const fromEnrich = lastEnrichedAccountId === account.id
+    if (!justIngestedRef.current && !isRecalibrating && !fromEnrich) {
+      prevAccountRef.current = account
+      return
+    }
+    const prev = prevAccountRef.current
+    const changed = new Set<string>()
+    if (prev) {
+      if ((prev.contractEnd ?? '') !== (account.contractEnd ?? '')) changed.add('contractEnd')
+      if ((prev.electricitySupplier ?? '') !== (account.electricitySupplier ?? '')) changed.add('currentSupplier')
+      if ((prev.currentRate ?? '') !== (account.currentRate ?? '')) changed.add('strikePrice')
+      if ((prev.annualUsage ?? '') !== (account.annualUsage ?? '')) {
+        changed.add('annualVolume')
+        changed.add('revenue')
+      }
+      const prevMeters = prev.meters ?? []
+      const currMeters = account.meters ?? []
+      if (prevMeters.length !== currMeters.length || JSON.stringify(prevMeters.map((m) => m.esiId)) !== JSON.stringify(currMeters.map((m) => m.esiId))) changed.add('meters')
+      // Apollo/Org Intelligence enriched fields
+      if ((prev.industry ?? '') !== (account.industry ?? '')) changed.add('industry')
+      if ((prev.location ?? '') !== (account.location ?? '')) changed.add('location')
+      if ((prev.logoUrl ?? '') !== (account.logoUrl ?? '')) changed.add('logoUrl')
+      if ((prev.description ?? '') !== (account.description ?? '')) changed.add('description')
+      if ((prev.companyPhone ?? '') !== (account.companyPhone ?? '')) changed.add('companyPhone')
+      if ((prev.address ?? '') !== (account.address ?? '')) changed.add('address')
+      if ((prev.linkedinUrl ?? '') !== (account.linkedinUrl ?? '')) changed.add('linkedinUrl')
+      if ((prev.domain ?? '') !== (account.domain ?? '')) changed.add('domain')
+    }
+    prevAccountRef.current = account
+    if (changed.size) {
+      setRecentlyUpdatedFields(changed)
+      const t = setTimeout(() => setRecentlyUpdatedFields(new Set()), 1600)
+      return () => clearTimeout(t)
+    }
+  }, [account, isRecalibrating, lastEnrichedAccountId])
+
   // Handle Document Ingestion Complete (Refraction Event)
   const handleIngestionComplete = () => {
-    // Trigger the container blur/desaturation
+    justIngestedRef.current = true
+    setTimeout(() => { justIngestedRef.current = false }, 2500)
     setIsRecalibrating(true)
-    
-    // Mark all key fields as "glowing" for the reveal animation
     const fieldsToGlow = new Set([
       'contractEnd',
       'daysRemaining',
@@ -236,8 +278,6 @@ export default function AccountDossierPage() {
       'revenue'
     ])
     setGlowingFields(fieldsToGlow)
-    
-    // Clear effects after animation duration
     setTimeout(() => {
       setIsRecalibrating(false)
       setGlowingFields(new Set())
@@ -353,16 +393,35 @@ export default function AccountDossierPage() {
               {/* Logo/Icon */}
               <div className="relative group/logo">
                 <div onClick={() => isEditing && setActiveEditField(activeEditField === 'logo' ? null : 'logo')}>
-                  <CompanyIcon
-                    logoUrl={(editLogoUrl?.trim() || account.logoUrl?.trim()) || undefined}
-                    domain={(editDomain?.trim() || account.domain?.trim()) || undefined}
-                    name={account.name}
-                    size={56}
-                    className={cn(
-                      "w-14 h-14 transition-all",
-                      isEditing && "cursor-pointer hover:border-[#002FA7]/50 hover:shadow-[0_0_20px_rgba(0,47,167,0.3)]"
-                    )}
-                  />
+                  {recentlyUpdatedFields.has('logoUrl') ? (
+                    <motion.div
+                      initial={{ filter: 'blur(6px)', opacity: 0.6 }}
+                      animate={{ filter: 'blur(0px)', opacity: 1 }}
+                      transition={{ duration: 0.4, ease: 'easeOut' }}
+                    >
+                      <CompanyIcon
+                        logoUrl={(editLogoUrl?.trim() || account.logoUrl?.trim()) || undefined}
+                        domain={(editDomain?.trim() || account.domain?.trim()) || undefined}
+                        name={account.name}
+                        size={56}
+                        className={cn(
+                          "w-14 h-14 transition-all",
+                          isEditing && "cursor-pointer hover:border-[#002FA7]/50 hover:shadow-[0_0_20px_rgba(0,47,167,0.3)]"
+                        )}
+                      />
+                    </motion.div>
+                  ) : (
+                    <CompanyIcon
+                      logoUrl={(editLogoUrl?.trim() || account.logoUrl?.trim()) || undefined}
+                      domain={(editDomain?.trim() || account.domain?.trim()) || undefined}
+                      name={account.name}
+                      size={56}
+                      className={cn(
+                        "w-14 h-14 transition-all",
+                        isEditing && "cursor-pointer hover:border-[#002FA7]/50 hover:shadow-[0_0_20px_rgba(0,47,167,0.3)]"
+                      )}
+                    />
+                  )}
                 </div>
                 
                 <AnimatePresence>
@@ -594,15 +653,39 @@ export default function AccountDossierPage() {
                     </div>
                   ) : (
                     <>
-                      <span className="flex items-center gap-1.5 uppercase tracking-widest text-zinc-400">
-                        <Activity className="w-3.5 h-3.5 text-white" />
-                        {account.industry || 'Unknown Sector'}
-                      </span>
+                      {recentlyUpdatedFields.has('industry') ? (
+                        <motion.span
+                          initial={{ filter: 'blur(6px)', opacity: 0.6 }}
+                          animate={{ filter: 'blur(0px)', opacity: 1 }}
+                          transition={{ duration: 0.4, ease: 'easeOut' }}
+                          className="flex items-center gap-1.5 uppercase tracking-widest text-zinc-400"
+                        >
+                          <Activity className="w-3.5 h-3.5 text-white" />
+                          {account.industry || 'Unknown Sector'}
+                        </motion.span>
+                      ) : (
+                        <span className="flex items-center gap-1.5 uppercase tracking-widest text-zinc-400">
+                          <Activity className="w-3.5 h-3.5 text-white" />
+                          {account.industry || 'Unknown Sector'}
+                        </span>
+                      )}
                       <span className="w-1 h-1 rounded-full bg-zinc-800" />
-                      <span className="flex items-center gap-1.5 text-zinc-400">
-                        <MapPin className="w-3.5 h-3.5 text-white" />
-                        {account.location || 'Unknown Location'}
-                      </span>
+                      {recentlyUpdatedFields.has('location') ? (
+                        <motion.span
+                          initial={{ filter: 'blur(6px)', opacity: 0.6 }}
+                          animate={{ filter: 'blur(0px)', opacity: 1 }}
+                          transition={{ duration: 0.4, ease: 'easeOut' }}
+                          className="flex items-center gap-1.5 text-zinc-400"
+                        >
+                          <MapPin className="w-3.5 h-3.5 text-white" />
+                          {account.location || 'Unknown Location'}
+                        </motion.span>
+                      ) : (
+                        <span className="flex items-center gap-1.5 text-zinc-400">
+                          <MapPin className="w-3.5 h-3.5 text-white" />
+                          {account.location || 'Unknown Location'}
+                        </span>
+                      )}
                     </>
                   )}
                 </div>
@@ -678,6 +761,24 @@ export default function AccountDossierPage() {
               <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-700">
                 <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em] mb-4">01 // Physics</div>
                 
+                {(recentlyUpdatedFields.has('companyPhone') || recentlyUpdatedFields.has('address') || recentlyUpdatedFields.has('domain')) ? (
+                  <motion.div
+                    initial={{ filter: 'blur(6px)', opacity: 0.6 }}
+                    animate={{ filter: 'blur(0px)', opacity: 1 }}
+                    transition={{ duration: 0.4, ease: 'easeOut' }}
+                  >
+                    <AccountUplinkCard
+                      account={{
+                        ...account,
+                        companyPhone: editCompanyPhone ?? account.companyPhone,
+                        domain: editDomain ?? account.domain,
+                        address: editAddress ?? account.address
+                      }}
+                      isEditing={isEditing}
+                      onUpdate={handleUpdate}
+                    />
+                  </motion.div>
+                ) : (
                 <AccountUplinkCard 
                   account={{
                     ...account,
@@ -688,6 +789,7 @@ export default function AccountDossierPage() {
                   isEditing={isEditing}
                   onUpdate={handleUpdate}
                 />
+                )}
 
                 {/* Position Maturity (Ported Style) */}
                 <div className={cn(
@@ -710,12 +812,26 @@ export default function AccountDossierPage() {
                             className="bg-black/40 border border-white/5 rounded-lg px-2 py-1 text-xs font-mono text-white tabular-nums focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
                           />
                         ) : (
-                          <span className={cn(
-                            "text-white font-mono font-bold tabular-nums transition-all duration-800",
-                            glowingFields.has('contractEnd') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)] animate-in fade-in duration-500"
-                          )}>
-                            {contractEndDate ? format(contractEndDate, 'MMM dd, yyyy') : 'TBD'}
-                          </span>
+                          recentlyUpdatedFields.has('contractEnd') ? (
+                            <motion.span
+                              initial={{ filter: 'blur(6px)', opacity: 0.6 }}
+                              animate={{ filter: 'blur(0px)', opacity: 1 }}
+                              transition={{ duration: 0.4, ease: 'easeOut' }}
+                              className={cn(
+                                "text-white font-mono font-bold tabular-nums inline-block",
+                                glowingFields.has('contractEnd') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)]"
+                              )}
+                            >
+                              {contractEndDate ? format(contractEndDate, 'MMM dd, yyyy') : 'TBD'}
+                            </motion.span>
+                          ) : (
+                            <span className={cn(
+                              "text-white font-mono font-bold tabular-nums transition-all duration-800",
+                              glowingFields.has('contractEnd') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)] animate-in fade-in duration-500"
+                            )}>
+                              {contractEndDate ? format(contractEndDate, 'MMM dd, yyyy') : 'TBD'}
+                            </span>
+                          )
                         )}
                       </div>
                     </div>
@@ -727,23 +843,51 @@ export default function AccountDossierPage() {
                     </div>
                     
                     <div className="flex justify-between mt-2">
-                      <span className={cn(
-                        "text-xs text-[#002FA7] font-mono tabular-nums ml-auto transition-all duration-800",
-                        glowingFields.has('daysRemaining') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-in fade-in duration-500"
-                      )}>
-                        {daysRemaining != null ? `${Math.max(daysRemaining, 0)} Days Remaining` : '-- Days Remaining'}
-                      </span>
+                      {recentlyUpdatedFields.has('contractEnd') ? (
+                        <motion.span
+                          initial={{ filter: 'blur(6px)', opacity: 0.6 }}
+                          animate={{ filter: 'blur(0px)', opacity: 1 }}
+                          transition={{ duration: 0.4, ease: 'easeOut' }}
+                          className={cn(
+                            "text-xs text-[#002FA7] font-mono tabular-nums ml-auto inline-block",
+                            glowingFields.has('daysRemaining') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]"
+                          )}
+                        >
+                          {daysRemaining != null ? `${Math.max(daysRemaining, 0)} Days Remaining` : '-- Days Remaining'}
+                        </motion.span>
+                      ) : (
+                        <span className={cn(
+                          "text-xs text-[#002FA7] font-mono tabular-nums ml-auto transition-all duration-800",
+                          glowingFields.has('daysRemaining') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-in fade-in duration-500"
+                        )}>
+                          {daysRemaining != null ? `${Math.max(daysRemaining, 0)} Days Remaining` : '-- Days Remaining'}
+                        </span>
+                      )}
                     </div>
                   </div>
 
                   <div>
                     <div className="text-zinc-500 text-[10px] font-mono uppercase tracking-[0.2em] mb-2">Current Supplier</div>
-                    <div className={cn(
-                      "text-xl font-semibold tracking-tighter text-white transition-all duration-800",
-                      glowingFields.has('currentSupplier') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)] animate-in fade-in duration-500"
-                    )}>
-                      {account.electricitySupplier || '--'}
-                    </div>
+                    {recentlyUpdatedFields.has('currentSupplier') ? (
+                      <motion.div
+                        initial={{ filter: 'blur(6px)', opacity: 0.6 }}
+                        animate={{ filter: 'blur(0px)', opacity: 1 }}
+                        transition={{ duration: 0.4, ease: 'easeOut' }}
+                        className={cn(
+                          "text-xl font-semibold tracking-tighter text-white",
+                          glowingFields.has('currentSupplier') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)]"
+                        )}
+                      >
+                        {account.electricitySupplier || '--'}
+                      </motion.div>
+                    ) : (
+                      <div className={cn(
+                        "text-xl font-semibold tracking-tighter text-white transition-all duration-800",
+                        glowingFields.has('currentSupplier') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)] animate-in fade-in duration-500"
+                      )}>
+                        {account.electricitySupplier || '--'}
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -758,12 +902,26 @@ export default function AccountDossierPage() {
                           placeholder="0.000"
                         />
                       ) : (
-                        <div className={cn(
-                          "text-xl font-mono tabular-nums tracking-tighter text-[#002FA7] transition-all duration-800",
-                          glowingFields.has('strikePrice') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-in fade-in duration-500"
-                        )}>
-                          {editStrikePrice ? `${editStrikePrice}¢` : '--'}
-                        </div>
+                        recentlyUpdatedFields.has('strikePrice') ? (
+                          <motion.div
+                            initial={{ filter: 'blur(6px)', opacity: 0.6 }}
+                            animate={{ filter: 'blur(0px)', opacity: 1 }}
+                            transition={{ duration: 0.4, ease: 'easeOut' }}
+                            className={cn(
+                              "text-xl font-mono tabular-nums tracking-tighter text-[#002FA7]",
+                              glowingFields.has('strikePrice') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]"
+                            )}
+                          >
+                            {editStrikePrice ? `${editStrikePrice}¢` : '--'}
+                          </motion.div>
+                        ) : (
+                          <div className={cn(
+                            "text-xl font-mono tabular-nums tracking-tighter text-[#002FA7] transition-all duration-800",
+                            glowingFields.has('strikePrice') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-in fade-in duration-500"
+                          )}>
+                            {editStrikePrice ? `${editStrikePrice}¢` : '--'}
+                          </div>
+                        )
                       )}
                     </div>
                     <div>
@@ -786,27 +944,59 @@ export default function AccountDossierPage() {
                         placeholder="0"
                       />
                     ) : (
-                      <div className={cn(
-                        "text-3xl font-mono tabular-nums tracking-tighter text-white font-semibold transition-all duration-800",
-                        glowingFields.has('annualVolume') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)] animate-in fade-in duration-500"
-                      )}>
-                        {account.annualUsage ? `${parseInt(account.annualUsage).toLocaleString()} kWh` : '--'}
-                      </div>
+                      recentlyUpdatedFields.has('annualVolume') ? (
+                        <motion.div
+                          initial={{ filter: 'blur(6px)', opacity: 0.6 }}
+                          animate={{ filter: 'blur(0px)', opacity: 1 }}
+                          transition={{ duration: 0.4, ease: 'easeOut' }}
+                          className={cn(
+                            "text-3xl font-mono tabular-nums tracking-tighter text-white font-semibold",
+                            glowingFields.has('annualVolume') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)]"
+                          )}
+                        >
+                          {account.annualUsage ? `${parseInt(account.annualUsage).toLocaleString()} kWh` : '--'}
+                        </motion.div>
+                      ) : (
+                        <div className={cn(
+                          "text-3xl font-mono tabular-nums tracking-tighter text-white font-semibold transition-all duration-800",
+                          glowingFields.has('annualVolume') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)] animate-in fade-in duration-500"
+                        )}>
+                          {account.annualUsage ? `${parseInt(account.annualUsage).toLocaleString()} kWh` : '--'}
+                        </div>
+                      )
                     )}
                   </div>
 
                   <div className="pt-4 border-t border-white/5">
                     <div className="text-zinc-500 text-[10px] font-mono uppercase tracking-[0.2em] mb-2">Estimated Annual Revenue</div>
-                    <div className={cn(
-                      "text-3xl font-mono tabular-nums tracking-tighter text-green-500/80 transition-all duration-800",
-                      glowingFields.has('revenue') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-in fade-in duration-500"
-                    )}>
-                      {(() => {
-                        const usageStr = isEditing ? editAnnualUsage : (account.annualUsage || '0');
-                        const usage = parseInt(usageStr.toString().replace(/[^0-9]/g, '')) || 0;
-                        return (usage * 0.003).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-                      })()}
-                    </div>
+                    {recentlyUpdatedFields.has('revenue') ? (
+                      <motion.div
+                        initial={{ filter: 'blur(6px)', opacity: 0.6 }}
+                        animate={{ filter: 'blur(0px)', opacity: 1 }}
+                        transition={{ duration: 0.4, ease: 'easeOut' }}
+                        className={cn(
+                          "text-3xl font-mono tabular-nums tracking-tighter text-green-500/80",
+                          glowingFields.has('revenue') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]"
+                        )}
+                      >
+                        {(() => {
+                          const usageStr = isEditing ? editAnnualUsage : (account.annualUsage || '0');
+                          const usage = parseInt(usageStr.toString().replace(/[^0-9]/g, '')) || 0;
+                          return (usage * 0.003).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+                        })()}
+                      </motion.div>
+                    ) : (
+                      <div className={cn(
+                        "text-3xl font-mono tabular-nums tracking-tighter text-green-500/80 transition-all duration-800",
+                        glowingFields.has('revenue') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-in fade-in duration-500"
+                      )}>
+                        {(() => {
+                          const usageStr = isEditing ? editAnnualUsage : (account.annualUsage || '0');
+                          const usage = parseInt(usageStr.toString().replace(/[^0-9]/g, '')) || 0;
+                          return (usage * 0.003).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+                        })()}
+                      </div>
+                    )}
                     <div className="text-[9px] font-mono text-zinc-600 mt-1 uppercase tracking-widest">Calculated at 0.003 margin base</div>
                   </div>
                 </div>
@@ -950,11 +1140,25 @@ export default function AccountDossierPage() {
                 </div>
 
                 {/* Meter Array */}
-                <MeterArray 
-                  meters={editMeters} 
-                  isEditing={isEditing}
-                  onUpdate={handleMetersUpdate}
-                />
+                {recentlyUpdatedFields.has('meters') ? (
+                  <motion.div
+                    initial={{ filter: 'blur(6px)', opacity: 0.6 }}
+                    animate={{ filter: 'blur(0px)', opacity: 1 }}
+                    transition={{ duration: 0.4, ease: 'easeOut' }}
+                  >
+                    <MeterArray
+                      meters={editMeters}
+                      isEditing={isEditing}
+                      onUpdate={handleMetersUpdate}
+                    />
+                  </motion.div>
+                ) : (
+                  <MeterArray
+                    meters={editMeters}
+                    isEditing={isEditing}
+                    onUpdate={handleMetersUpdate}
+                  />
+                )}
                 
                 {/* Data Locker */}
                 <DataIngestionCard 

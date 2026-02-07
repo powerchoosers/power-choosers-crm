@@ -93,6 +93,7 @@ export function useAddContactToProtocol() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['contact-protocol-memberships', variables.contactId] })
       queryClient.invalidateQueries({ queryKey: ['protocols'] })
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'contact' && q.queryKey[2] === variables.contactId })
     },
     onError: (error: Error) => {
       console.error('Error adding contact to protocol:', error)
@@ -119,6 +120,7 @@ export function useRemoveContactFromProtocol() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['contact-protocol-memberships', variables.contactId] })
       queryClient.invalidateQueries({ queryKey: ['protocols'] })
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'contact' && q.queryKey[2] === variables.contactId })
     },
     onError: (error: Error) => {
       console.error('Error removing contact from protocol:', error)

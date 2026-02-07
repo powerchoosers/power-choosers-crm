@@ -1,11 +1,30 @@
 'use client'
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useRef, useCallback } from 'react';
+import Link from 'next/link';
 import { GoogleMap, useLoadScript, MarkerF, CircleF } from '@react-google-maps/api';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { mapLocationToZone, ERCOT_ZONES } from '@/lib/market-mapping';
 import { useAuth } from '@/context/AuthContext';
 import { useMarketPulse } from '@/hooks/useMarketPulse';
+
+const HOVER_DELAY_MS = 3000;
+
+type MapNode = {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  status: string;
+  load: string;
+  zone: string;
+  accountStatus: string;
+  accountId: string | null;
+  accountName: string;
+  industry: string;
+  city: string;
+  state: string;
+};
 
 // 1. THE NODAL "STEALTH" SKIN
 // This JSON strips away parks, schools, and labels, leaving only the grid geometry.
@@ -54,6 +73,9 @@ export default function InfrastructureMap() {
   const { isLoaded } = useLoadScript({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY as string,
   });
+  const [hoveredNode, setHoveredNode] = useState<MapNode | null>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeCardTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: marketPulse } = useMarketPulse();
   const prices = useMemo(() => ({
@@ -70,12 +92,12 @@ export default function InfrastructureMap() {
     queryFn: async ({ pageParam = 0 }) => {
       if (!user) return { contacts: [], nextCursor: null };
       
-      // Include ACTIVE_LOAD, CUSTOMER, and legacy 'active' so all load/customer accounts show.
-      // Select latitude, longitude from accounts so we can use account coords when contact has none.
+      // Include ACTIVE_LOAD, CUSTOMER, and legacy 'active'/'customer' so all load/customer accounts show.
+      // Select id, latitude, longitude from accounts for dossier link and coords.
       let query = supabase
         .from('contacts')
-        .select('*, accounts!inner(name, city, state, industry, annual_usage, status, latitude, longitude)', { count: 'exact' })
-        .in('accounts.status', ['ACTIVE_LOAD', 'CUSTOMER', 'active']);
+        .select('*, accounts!inner(id, name, city, state, industry, annual_usage, status, latitude, longitude)', { count: 'exact' })
+        .in('accounts.status', ['ACTIVE_LOAD', 'CUSTOMER', 'active', 'customer']);
 
       if (role !== 'admin' && user?.email) {
         query = query.eq('ownerId', user.email);
@@ -161,10 +183,11 @@ export default function InfrastructureMap() {
         else { lat = 32.7767 + jitterLat; lng = -96.7970 + jitterLng; }
       }
 
-      // Account status for marker: ACTIVE_LOAD/active = blue (active load), CUSTOMER = green
+      // Account status for marker: ACTIVE_LOAD/active = blue (active load), CUSTOMER/customer = green
       const accountStatus = (account?.status ?? '').toUpperCase();
-      const isCustomer = accountStatus === 'CUSTOMER';
-      const isActiveLoad = accountStatus === 'ACTIVE_LOAD' || (account?.status ?? '').toLowerCase() === 'active';
+      const rawStatus = (account?.status ?? '').toLowerCase();
+      const isCustomer = accountStatus === 'CUSTOMER' || rawStatus === 'customer';
+      const isActiveLoad = accountStatus === 'ACTIVE_LOAD' || rawStatus === 'active';
 
       return {
         id: contact.id,
@@ -174,12 +197,43 @@ export default function InfrastructureMap() {
         status,
         load,
         zone,
-        accountStatus: isCustomer ? 'CUSTOMER' : isActiveLoad ? 'ACTIVE_LOAD' : account?.status ?? 'PROSPECT'
-      };
+        accountStatus: isCustomer ? 'CUSTOMER' : isActiveLoad ? 'ACTIVE_LOAD' : account?.status ?? 'PROSPECT',
+        accountId: account?.id ?? null,
+        accountName: account?.name ?? 'Unknown Company',
+        industry: account?.industry ?? '',
+        city: account?.city ?? city ?? '',
+        state: account?.state ?? state ?? '',
+      } as MapNode;
     });
   }, [contactsData, prices]);
 
   const center = useMemo(() => ({ lat: 31.0000, lng: -99.0000 }), []); // Center on Texas
+
+  const handleMarkerMouseOver = useCallback((node: MapNode) => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => setHoveredNode(node), HOVER_DELAY_MS);
+  }, []);
+
+  const handleMarkerMouseOut = useCallback(() => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    // Delay closing so moving from marker to card keeps the card open
+    if (closeCardTimeoutRef.current) clearTimeout(closeCardTimeoutRef.current);
+    closeCardTimeoutRef.current = setTimeout(() => setHoveredNode(null), 300);
+  }, []);
+
+  const handleCardMouseEnter = useCallback(() => {
+    if (closeCardTimeoutRef.current) {
+      clearTimeout(closeCardTimeoutRef.current);
+      closeCardTimeoutRef.current = null;
+    }
+  }, []);
+
+  const handleCardMouseLeave = useCallback(() => {
+    setHoveredNode(null);
+  }, []);
 
   if (!isLoaded || authLoading || contactsLoading) return (
     <div className="h-full w-full flex items-center justify-center bg-zinc-900/10 backdrop-blur-sm">
@@ -231,7 +285,7 @@ export default function InfrastructureMap() {
             )}
             
             {/* The Hard Node: blue = active load, green = customer */}
-            <MarkerF 
+            <MarkerF
               position={{ lat: node.lat, lng: node.lng }}
               icon={{
                 path: google.maps.SymbolPath.CIRCLE,
@@ -240,6 +294,8 @@ export default function InfrastructureMap() {
                 fillOpacity: 1,
                 strokeWeight: 0,
               }}
+              onMouseOver={() => handleMarkerMouseOver(node)}
+              onMouseOut={handleMarkerMouseOut}
             />
           </React.Fragment>
         ))}
@@ -277,6 +333,40 @@ export default function InfrastructureMap() {
           </div>
         </div>
       </div>
+
+      {/* Company card after ~3s hover on a dot — click to open dossier */}
+      {hoveredNode && (
+        <div
+          className="absolute bottom-6 left-6 right-6 sm:right-auto sm:max-w-sm pointer-events-auto bg-black/70 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-4 z-10"
+          onMouseEnter={handleCardMouseEnter}
+          onMouseLeave={handleCardMouseLeave}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-mono font-medium text-zinc-100 truncate">{hoveredNode.accountName}</p>
+              {hoveredNode.industry && (
+                <p className="text-xs font-mono text-zinc-500 mt-0.5">{hoveredNode.industry}</p>
+              )}
+              {(hoveredNode.city || hoveredNode.state) && (
+                <p className="text-xs font-mono text-zinc-500 mt-0.5">
+                  {[hoveredNode.city, hoveredNode.state].filter(Boolean).join(', ')}
+                </p>
+              )}
+              <p className="text-[10px] font-mono text-zinc-600 mt-1 uppercase tracking-wider">
+                {hoveredNode.accountStatus === 'CUSTOMER' ? 'Customer' : hoveredNode.accountStatus === 'ACTIVE_LOAD' ? 'Active load' : hoveredNode.accountStatus}
+              </p>
+            </div>
+            {hoveredNode.accountId && (
+              <Link
+                href={`/network/accounts/${hoveredNode.accountId}`}
+                className="shrink-0 text-xs font-mono text-[#002FA7] hover:text-blue-400 underline"
+              >
+                Open dossier →
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
 
     </div>
   );
