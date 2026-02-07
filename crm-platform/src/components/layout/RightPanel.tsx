@@ -49,6 +49,7 @@ export function RightPanel() {
   
   const [isReady, setIsReady] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
+  const [currentTime, setCurrentTime] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const scrollRafRef = useRef<number | null>(null)
   const lastScrolledRef = useRef<boolean | null>(null)
@@ -109,6 +110,16 @@ export function RightPanel() {
 
   useEffect(() => {
     setIsReady(true)
+  }, [])
+
+  // Update time every second (client-side only to avoid hydration mismatch)
+  useEffect(() => {
+    const updateTime = () => {
+      setCurrentTime(format(new Date(), 'HH:mm:ss'))
+    }
+    updateTime()
+    const interval = setInterval(updateTime, 1000)
+    return () => clearInterval(interval)
   }, [])
 
   if (!isReady) return <aside className="fixed right-0 top-0 bottom-0 z-30 w-80 bg-zinc-950 border-l border-white/5 hidden lg:flex" />
@@ -197,7 +208,7 @@ export function RightPanel() {
 
         {/* 2. THE SYSTEM CLOCK (Forensic Detail) */}
         <div className="text-[10px] font-mono text-zinc-600 hidden md:block tabular-nums">
-          {effectiveView === 'context' ? 'T-MINUS 14 D' : format(new Date(), 'HH:mm:ss')}
+          {effectiveView === 'context' ? 'T-MINUS 14 D' : (currentTime || '--:--:--')}
         </div>
 
         {/* 3. THE CONTROL (Minimize) */}

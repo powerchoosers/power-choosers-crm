@@ -30,6 +30,17 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
   const [phones, setPhones] = useState<PhoneEntry[]>([])
   const [primaryField, setPrimaryField] = useState<PrimaryPhoneType>(contact.primaryPhoneField || 'mobile')
   const [email, setEmail] = useState(contact.email || '')
+  const [localTime, setLocalTime] = useState('')
+
+  // Update local time every minute (client-side only to avoid hydration mismatch)
+  useEffect(() => {
+    const updateTime = () => {
+      setLocalTime(format(new Date(), 'h:mm a'))
+    }
+    updateTime()
+    const interval = setInterval(updateTime, 60000)
+    return () => clearInterval(interval)
+  }, [])
 
   const handleCallClick = (phone: PhoneEntry) => {
     if (!phone.value || isEditing) return
@@ -294,7 +305,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
                 <div className="text-[10px] font-mono text-zinc-500 flex items-center gap-1.5">
                   <Clock className="w-3 h-3" />
                   <span className="uppercase tracking-wider">Local Time:</span>
-                  <span className="text-zinc-400 font-mono tabular-nums">{format(new Date(), 'h:mm a')}</span>
+                  <span className="text-zinc-400 font-mono tabular-nums">{localTime || '--:-- --'}</span>
                 </div>
               </div>
             </div>
