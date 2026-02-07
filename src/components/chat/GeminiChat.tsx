@@ -1248,7 +1248,7 @@ SELECT * FROM hybrid_search_accounts(
           <AnimatePresence initial={false}>
             {messages.map((m: GeminiMessage, i) => (
               <motion.div 
-                key={m.id || `msg-${i}-${m.timestamp || Date.now()}`} 
+                key={m.id || `msg-${i}`} 
                 initial={{ 
                   opacity: 0, 
                   x: m.role === 'user' ? 20 : -20,
