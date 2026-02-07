@@ -118,10 +118,10 @@ export default async function handler(req, res) {
         // Update in-memory cache first (fast path)
         trackingDedupeCache.set(dedupeKey, now);
         
-        // Fetch current email data from Supabase
+        // Fetch current email data from Supabase (include metadata so we preserve ownerId for Realtime notifications)
         const { data: currentData, error: fetchError } = await supabaseAdmin
           .from('emails')
-          .select('opens, openCount')
+          .select('opens, openCount, metadata')
           .eq('id', trackingId)
           .single();
 
@@ -149,6 +149,14 @@ export default async function handler(req, res) {
               isBotFlagged: deviceType === 'bot'
             };
 
+            // Merge metadata so ownerId is preserved (needed for Realtime open notifications)
+            const existingMeta = currentData.metadata && typeof currentData.metadata === 'object' ? currentData.metadata : {};
+            const metadata = {
+              ...existingMeta,
+              lastOpened: openedAt,
+              ...(deviceType === 'bot' ? { botFlagged: true } : {})
+            };
+
             // Update Supabase record
             await supabaseAdmin
               .from('emails')
@@ -156,10 +164,7 @@ export default async function handler(req, res) {
                 openCount: (currentData.openCount || 0) + 1,
                 opens: [...existingOpens, openEvent],
                 updatedAt: openedAt,
-                metadata: {
-                  lastOpened: openedAt,
-                  ...(deviceType === 'bot' ? { botFlagged: true } : {})
-                }
+                metadata
               })
               .eq('id', trackingId);
 
