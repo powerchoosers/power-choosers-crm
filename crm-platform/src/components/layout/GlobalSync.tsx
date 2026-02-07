@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useGmailSync } from '@/hooks/useGmailSync'
 
-const OPEN_SYNC_DELAY_MS = 1200
+const OPEN_SYNC_DELAY_MS = 2000
 const BACKGROUND_SYNC_INTERVAL_MS = 3 * 60 * 1000 // 3 minutes
 
 export function GlobalSync() {
@@ -12,26 +12,24 @@ export function GlobalSync() {
   const { syncGmail, isSyncing } = useGmailSync()
   const hasTriggeredOpenSync = useRef(false)
 
-  // As soon as user opens /network: prompt Net Sync with auth if no token, else sync silently
+  // On page open: only attempt silent sync (no auth popup - browsers block non-click popups)
+  // User must click Net_Sync button once to auth; after that, silent syncs work forever
   useEffect(() => {
     if (loading || !user || hasTriggeredOpenSync.current) return
 
     hasTriggeredOpenSync.current = true
     const hasCachedToken = typeof window !== 'undefined' && !!sessionStorage.getItem('gmail_oauth_token')
 
-    const timer = setTimeout(() => {
-      if (hasCachedToken) {
+    // Only sync if we already have a token; skip if no token (user hasn't connected Gmail yet)
+    if (hasCachedToken) {
+      const timer = setTimeout(() => {
         syncGmail(user, { silent: true })
-      } else {
-        // No token: trigger sync so auth popup runs and user can connect Gmail
-        syncGmail(user, { silent: false })
-      }
-    }, OPEN_SYNC_DELAY_MS)
-
-    return () => clearTimeout(timer)
+      }, OPEN_SYNC_DELAY_MS)
+      return () => clearTimeout(timer)
+    }
   }, [loading, user, syncGmail])
 
-  // Background interval: keep syncing every 3 min while on /network (check token at interval time)
+  // Background interval: keep syncing every 3 min while on /network (only if token exists)
   useEffect(() => {
     if (!user || loading) return
 
