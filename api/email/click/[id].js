@@ -38,10 +38,10 @@ export default async function handler(req, res) {
     // Best-effort: record click event if Supabase is available
     try {
       if (supabaseAdmin && trackingId && trackingId.length > 0) {
-        // Fetch current email data
+        // Fetch current email data (include metadata to preserve ownerId for Realtime notifications)
         const { data: currentData, error: fetchError } = await supabaseAdmin
           .from('emails')
-          .select('clicks, clickCount')
+          .select('clicks, clickCount, metadata')
           .eq('id', trackingId)
           .single();
 
@@ -63,6 +63,8 @@ export default async function handler(req, res) {
           };
 
           const existingClicks = Array.isArray(currentData.clicks) ? currentData.clicks : [];
+          const existingMeta = currentData.metadata && typeof currentData.metadata === 'object' ? currentData.metadata : {};
+          const metadata = { ...existingMeta, lastClicked: clickedAt };
 
           // Update Supabase record
           await supabaseAdmin
@@ -71,9 +73,7 @@ export default async function handler(req, res) {
               clickCount: (currentData.clickCount || 0) + 1,
               clicks: [...existingClicks, clickEvent],
               updatedAt: clickedAt,
-              metadata: {
-                lastClicked: clickedAt
-              }
+              metadata
             })
             .eq('id', trackingId);
 
