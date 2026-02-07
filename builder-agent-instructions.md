@@ -75,6 +75,34 @@ Migrate all legacy CRM features to the new Next.js application, ensuring a moder
 6.  **Squircle Enforcement**: Never use `rounded-full` for contact or company icons. Always verify that small icons (36px) use `rounded-[14px]` to maintain the squircle shape.
 7.  **Schema Extensions**: When adding new fields to Accounts or Contacts for future edits, you **MUST** also add these fields to the `BulkImportModal.tsx` mapping schemas to maintain ingestion parity.
 
+### Company logo (logoUrl) priority and fallback
+
+We use a **single priority system** for company/account logos so icons are consistent and reliable across the app.
+
+1.  **Always prioritize the account’s `logoUrl`**
+    - The CRM account’s `logo_url` (mapped as `logoUrl` in hooks) is the **primary** source. Use it whenever the account (or contact’s account) is available.
+    - Only when `logoUrl` is **blank** (null, undefined, or empty/whitespace string) should we fall back to another source.
+
+2.  **Fallback order**
+    - **First**: Account/company `logoUrl` from the CRM (Supabase `accounts.logo_url`).
+    - **Second**: Domain-based favicon (e.g. Google favicon service) using the account/company `domain` — used only when there is no logo URL or the logo URL fails to load.
+    - **Last**: Generic fallback icon (`Building2` from `lucide-react`) when there is no logo and no domain, or when both logo and favicon fail.
+
+3.  **Use `CompanyIcon` everywhere**
+    - All company/account logos must go through `crm-platform/src/components/ui/CompanyIcon.tsx`.
+    - Pass `logoUrl` and `domain` (and `name`) so the component can apply the priority and fallback internally. Do **not** render raw `<img>` or Next.js `<Image>` for account logos.
+
+4.  **Passing account logo into context-dependent UI**
+    - When a component can show company info from **multiple sources** (e.g. Apollo/organization scan vs. CRM account), **prefer the CRM account**:
+      - **OrgIntelligence**: Receives `accountLogoUrl` and `accountDomain` from the Right Panel (from `account`). Use these first; only use Apollo `companySummary.logoUrl` / `companySummary.domain` when the account has no logo/domain.
+    - **RightPanel** must pass `accountLogoUrl={account?.logoUrl}` and `accountDomain={account?.domain}` into `OrgIntelligence` so the org header uses the account logo when available.
+
+5.  **Call/card metadata**
+    - When setting call or card metadata (e.g. for Top Bar active call, click-to-call, uplink cards), always include the account’s `logoUrl` and `domain` when available so the call display and cards use the same logo priority and fallback as the rest of the app.
+
+6.  **Empty and invalid values**
+    - Treat empty or whitespace-only `logoUrl` as “no logo” and fall back to domain/favicon. `CompanyIcon` already normalizes this; callers should pass `undefined` or a trimmed non-empty string when possible (e.g. `(account.logoUrl?.trim()) || undefined`).
+
 ## ⚛️ React & Next.js Development Standards
 
 To prevent hydration mismatches, unique key warnings, and infinite render loops:
