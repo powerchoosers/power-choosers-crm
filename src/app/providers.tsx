@@ -35,7 +35,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             if (typeof key0 !== 'string') return false
             return [
               'calls',
-              'energy-plans',
+              'market-pulse',
+              'eia-retail-tx',
               'scripts',
             ].includes(key0)
           },
