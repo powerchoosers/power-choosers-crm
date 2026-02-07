@@ -102,9 +102,12 @@ export function Sidebar() {
     }
   }
 
+  // suppressHydrationWarning: browser extensions (e.g. Cursor) can inject data-cursor-ref onto <a> tags
+  // after SSR, causing server/client attribute mismatch. Suppress only for this sidebar subtree.
   return (
     <motion.aside 
       layout
+      suppressHydrationWarning
       className={cn(
         "fixed left-0 top-0 bottom-0 z-40 bg-zinc-950 border-r border-white/5 flex flex-col shadow-2xl transition-shadow duration-500"
       )}
