@@ -32,6 +32,7 @@ import OrgIntelligence from '../crm/OrgIntelligence'
 import { VectorControlModule } from '../crm/VectorControlModule'
 import { TaskInjectionPopover } from '../crm/TaskInjectionPopover'
 import { mapLocationToZone } from '@/lib/market-mapping'
+import { useWeather } from '@/hooks/useWeather'
 
 export function RightPanel() {
   const { rightPanelMode } = useUIStore()
@@ -79,6 +80,20 @@ export function RightPanel() {
   // Always use account address for the map, fall back to contact address only if no account
   const entityAddress = account?.address || contact?.address || ''
   const entityName = contact?.name || account?.name
+
+  // Weather: always use account location (not contact). On contact dossier we still show weather for the account's city.
+  const accountLocationForWeather = useMemo(() => {
+    if (!account) return null
+    return {
+      latitude: account.latitude ?? undefined,
+      longitude: account.longitude ?? undefined,
+      address: account.address || undefined,
+      city: account.city || undefined,
+      state: account.state || undefined,
+    }
+  }, [account?.id, account?.latitude, account?.longitude, account?.address, account?.city, account?.state])
+  const { data: weatherData } = useWeather(accountLocationForWeather)
+  const weatherLocationLabel = account?.location || (account?.city && account?.state ? `${account.city}, ${account.state}` : account?.address || '')
 
   /** Effective panel content mode: on dossier use dossierPanelView, else always scanning. */
   const effectiveView: DossierPanelView = isActiveContext ? dossierPanelView : 'scanning'
@@ -287,7 +302,7 @@ export function RightPanel() {
                       <span className="text-[9px] font-mono uppercase tracking-widest">Live</span>
                     </div>
                   </div>
-                  <TelemetryWidget location={entityZone} />
+                  <TelemetryWidget location={entityZone} weather={weatherData} weatherLocationLabel={weatherLocationLabel} />
                 </div>
 
                 {/* 3. SATELLITE (Infrastructure) */}

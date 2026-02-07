@@ -3,8 +3,17 @@ import { Clock, Sun, Activity } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { calculateVolatilityIndex } from '@/lib/market-mapping';
 import { useMarketPulse } from '@/hooks/useMarketPulse';
+import type { WeatherData } from '@/hooks/useWeather';
 
-export default function TelemetryWidget({ location = 'LZ_NORTH' }: { location?: string }) {
+type TelemetryWidgetProps = {
+  location?: string
+  /** Live weather from account location (always account, not contact). */
+  weather?: WeatherData | null
+  /** Label for weather location (e.g. "Dallas, TX"). */
+  weatherLocationLabel?: string
+}
+
+export default function TelemetryWidget({ location = 'LZ_NORTH', weather, weatherLocationLabel }: TelemetryWidgetProps) {
   const [time, setTime] = useState('');
   const { data: marketData, isLoading, isError } = useMarketPulse();
 
@@ -53,7 +62,18 @@ export default function TelemetryWidget({ location = 'LZ_NORTH' }: { location?: 
             <Sun size={12} />
             <span className="text-[10px] font-mono uppercase">Weather</span>
           </div>
-          <div className="text-sm font-mono font-medium text-zinc-200">72°F Clear</div>
+          {weather?.temp != null ? (
+            <div className="text-sm font-mono font-medium text-zinc-200 tabular-nums">
+              {Math.round(weather.temp)}° {weather.condition}
+            </div>
+          ) : (
+            <div className="text-sm font-mono text-zinc-500">—</div>
+          )}
+          {weatherLocationLabel ? (
+            <div className="text-[9px] font-mono text-zinc-600 truncate" title={weatherLocationLabel}>
+              {weatherLocationLabel}
+            </div>
+          ) : null}
         </div>
       </div>
 

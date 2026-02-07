@@ -18,6 +18,9 @@ export interface Account {
   location: string
   city?: string
   state?: string
+  /** Account HQ coords for map/weather; may be null if not set */
+  latitude?: number | null
+  longitude?: number | null
   serviceAddresses?: any[]
   address?: string
   updated: string
@@ -311,6 +314,8 @@ export function useAccount(id: string) {
         employees: data.employees?.toString() || '',
         revenue: data.revenue || '',
         location: data.city ? `${data.city}, ${data.state || ''}` : (data.address || ''),
+        latitude: data.latitude != null ? Number(data.latitude) : null,
+        longitude: data.longitude != null ? Number(data.longitude) : null,
         serviceAddresses: data.service_addresses || [],
         address: data.address || '',
         updated: data.updatedAt || new Date().toISOString(),

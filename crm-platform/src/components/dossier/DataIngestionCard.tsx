@@ -161,8 +161,9 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
             console.error('AI Error:', result);
             toast.error('AI Extraction Failed', { id: toastId });
           } else {
-            const type = result.analysis?.type === 'SIGNED_CONTRACT' ? 'CONTRACT SECURED' : 'BILL ANALYZED';
-            toast.success(`${type}: Data Nodes Updated`, { id: toastId });
+            const t = result.analysis?.type;
+            const label = t === 'SIGNED_CONTRACT' ? 'CONTRACT SECURED' : t === 'BILL' ? 'BILL ANALYZED' : t === 'USAGE_DATA' ? 'TELEMETRY LABELED' : t === 'PROPOSAL' ? 'PROPOSAL LABELED' : 'DATA NODES UPDATED';
+            toast.success(`${label}: Data Nodes Updated`, { id: toastId });
             
             // ============================================
             // THE REFRACTION EVENT (from build.md)
@@ -197,6 +198,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
             queryClient.invalidateQueries({ queryKey: ['accounts'] });
             queryClient.invalidateQueries({ queryKey: ['contacts'] });
             queryClient.invalidateQueries({ queryKey: ['targets'] });
+            queryClient.invalidateQueries({ queryKey: ['vault-documents'] });
 
             // Refresh document list again after AI (in case realtime was slow)
             await fetchDocuments();
