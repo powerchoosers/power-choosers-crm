@@ -109,27 +109,37 @@ export default async function handler(req, res) {
     
     logger.log('[Analyze Document] File downloaded successfully, size:', fileData.size);
 
-    // 2. Prepare file for Gemini
+    // 2. Prepare file for Gemini (support PDF and CSV/usage files)
     const arrayBuffer = await fileData.arrayBuffer();
     const base64Data = Buffer.from(arrayBuffer).toString('base64');
-    
+    let mimeType = fileData.type || 'application/pdf';
+    if (mimeType === 'application/octet-stream' && typeof fileName === 'string') {
+      if (/\.csv$/i.test(fileName)) mimeType = 'text/csv';
+      else if (/\.(txt|usage)$/i.test(fileName)) mimeType = 'text/plain';
+    }
     const filePart = {
       inlineData: {
         data: base64Data,
-        mimeType: fileData.type || 'application/pdf',
+        mimeType,
       },
     };
 
-    // 3. Construct Prompt
+    // 3. Construct Prompt (filename helps classify usage/telemetry)
+    const safeFileName = typeof fileName === 'string' ? fileName : '';
     const prompt = `
     You are an expert energy analyst for Nodal Point CRM. Analyze this document.
+    
+    The original filename is: "${safeFileName}"
+    Use the filename as a strong signal for classification (e.g. "OncorSummaryUsageData", "annual usage", "12 month usage", "usage data" → USAGE_DATA).
     
     Task 1: Classify the document type.
     - "SIGNED_CONTRACT": A signed Energy Service Agreement (ESA) or similar binding contract.
     - "BILL": A standard utility bill or invoice.
+    - "USAGE_DATA": Usage/telemetry: ERCOT or utility usage summaries, OncorSummaryUsageData, annual usage, 12-month usage, CSV usage data. Filenames like "OncorSummaryUsageDataFor_...", "annual usage data", "12 month usage" are USAGE_DATA.
+    - "PROPOSAL": Sales proposals, RFP responses, quotes, pricing proposals.
     - "OTHER": Anything else.
 
-    Task 2: Extract key data fields.
+    Task 2: Extract key data fields (use null when not applicable for USAGE_DATA/PROPOSAL).
     - contract_end_date: The specific expiration date. If not found, estimate based on term length or service end date.
     - strike_price: The energy rate (in cents/kWh or $/MWh). Convert to cents (e.g., 0.045).
     - supplier: The name of the retail electricity provider (REP).
@@ -143,7 +153,7 @@ export default async function handler(req, res) {
 
     Return ONLY a JSON object with this structure:
     {
-      "type": "SIGNED_CONTRACT" | "BILL" | "OTHER",
+      "type": "SIGNED_CONTRACT" | "BILL" | "USAGE_DATA" | "PROPOSAL" | "OTHER",
       "data": {
         "contract_end_date": "YYYY-MM-DD" or null,
         "strike_price": number (e.g., 0.045) or null,
@@ -178,6 +188,28 @@ export default async function handler(req, res) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, analysis }));
       return;
+    }
+
+    // 4b. Persist document_type on the documents row so Vault tabs (Contracts/Invoices/Telemetry) can filter
+    const documentTypeMap = {
+      SIGNED_CONTRACT: 'CONTRACT',
+      BILL: 'INVOICE',
+      USAGE_DATA: 'USAGE_DATA',
+      PROPOSAL: 'PROPOSAL',
+      OTHER: null,
+    };
+    const documentType = documentTypeMap[type] ?? null;
+    if (documentType) {
+      const { error: docUpdateError } = await supabaseAdmin
+        .from('documents')
+        .update({ document_type: documentType })
+        .eq('account_id', accountId)
+        .eq('storage_path', filePath);
+      if (docUpdateError) {
+        logger.warn('[Analyze Document] documents.document_type update failed (column may not exist yet):', docUpdateError.message);
+      } else {
+        logger.log('[Analyze Document] Set document_type to', documentType, 'for', filePath);
+      }
     }
 
     // 5. Update Database based on findings

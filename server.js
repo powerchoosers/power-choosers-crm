@@ -121,6 +121,7 @@ import algoliaReindexHandler from './api/algolia/reindex.js';
 import mapsConfigHandler from './api/maps/config.js';
 import mapsSearchHandler from './api/maps/search.js';
 import mapsGeocodeHandler from './api/maps/geocode.js';
+import weatherHandler from './api/weather.js';
 import debugCallHandler from './api/debug/call.js';
 import debugHealthHandler from './api/debug/health.js';
 import debugLogHandler from './api/debug/log.js';
@@ -698,6 +699,7 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/maps/config' ||
     pathname === '/api/maps/search' ||
     pathname === '/api/maps/geocode' ||
+    pathname === '/api/weather' ||
     pathname === '/api/debug/call' ||
     pathname === '/api/debug/health' ||
     pathname === '/api/debug/log' ||
@@ -960,6 +962,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/maps/geocode') {
     return handleApiMapsGeocode(req, res);
+  }
+  if (pathname === '/api/weather') {
+    return handleApiWeather(req, res);
   }
   if (pathname === '/api/debug/call') {
     return handleApiDebugCall(req, res);
@@ -1517,6 +1522,10 @@ async function handleApiMapsSearch(req, res) {
 
 async function handleApiMapsGeocode(req, res) {
   return await mapsGeocodeHandler(req, res);
+}
+
+async function handleApiWeather(req, res) {
+  return await weatherHandler(req, res);
 }
 
 // Debug handlers
