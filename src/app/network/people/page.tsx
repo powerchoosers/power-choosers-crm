@@ -336,7 +336,7 @@ export default function PeoplePage() {
                 isLead ? "text-blue-500/80" : 
                 "text-zinc-500"
               )}>
-                {isCustomer ? 'Active' : status}
+                {isCustomer ? 'Client' : status}
               </span>
             </div>
           )

@@ -588,6 +588,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
     queryClient.invalidateQueries({ queryKey: ['targets'] });
     queryClient.invalidateQueries({ queryKey: ['contacts'] });
     queryClient.invalidateQueries({ queryKey: ['accounts'] });
+    queryClient.invalidateQueries({ queryKey: ['list-memberships'] });
 
     // Show success toasts
     toast.success(`Import complete: ${successCount} ${importVector === 'CONTACTS' ? 'contacts' : 'accounts'} processed${errorCount > 0 ? `, ${errorCount} failed` : ''}.`);
