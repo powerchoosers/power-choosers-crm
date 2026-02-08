@@ -218,6 +218,7 @@ function ComposePanel({
   const [aiError, setAiError] = useState<string | null>(null)
   const [pendingAiContent, setPendingAiContent] = useState<string | null>(null)
   const [contentBeforeAi, setContentBeforeAi] = useState('')
+  const [subjectAnimationKey, setSubjectAnimationKey] = useState(0)
 
   const signatureHtml = profile ? generateNodalSignature(profile, user, true) : ''
   const outgoingSignatureHtml = profile ? generateNodalSignature(profile, user, false) : ''
@@ -226,8 +227,12 @@ function ComposePanel({
   const isRefinementMode = content.trim().length > 0
   const emailTypeConfig = EMAIL_TYPES.find((t) => t.id === emailTypeId) ?? EMAIL_TYPES[0]
 
+  /** Subject suggests a meeting recap; use Professional tone so we don't apply cold outreach refinement. */
+  const subjectSuggestsMeetingRecap = (s: string) => /meeting\s+recap/i.test((s || '').trim())
+
   const buildEmailSystemPrompt = useCallback(() => {
-    let base = emailTypeConfig.getSystemPrompt({ signerName, to: to || '', subject: subject || '' })
+    const effectiveConfig = subjectSuggestsMeetingRecap(subject) ? (EMAIL_TYPES.find((t) => t.id === 'professional') ?? emailTypeConfig) : emailTypeConfig
+    let base = effectiveConfig.getSystemPrompt({ signerName, to: to || '', subject: subject || '' })
     if (context && (context.contactName || context.companyName || context.contactTitle || context.accountName || context.contextForAi)) {
       const lines: string[] = []
       if (context.contactName || context.contactTitle || context.companyName || context.accountName) {
@@ -244,13 +249,30 @@ function ComposePanel({
       if (lines.length) base += '\n\n' + lines.join('\n')
     }
     if (isRefinementMode) {
-      base += '\n\n' + emailTypeConfig.getRefinementInstruction()
+      base += '\n\n' + effectiveConfig.getRefinementInstruction()
+    } else {
+      base += `
+
+OUTPUT FORMAT (generation only):
+- When generating a new email, output on the first line: SUBJECT: <one-line subject>
+- Then a blank line, then the email body.
+- If the directive is body-only (e.g. "just the intro paragraph"), output only the body with no SUBJECT line.
+
+CRITICAL: You are writing draft content only. The app handles To/Sender/recipient. Never say you cannot send, cannot use the email address, or ask to verify the sender. Output ONLY the requested content (subject line + body or body only). No meta-commentary, no apologies, no verification requests.`
     }
     return base
   }, [emailTypeConfig, signerName, to, subject, isRefinementMode, context])
 
   const generateEmailWithAi = useCallback(async (directive: string) => {
-    const effectiveDirective = directive.trim() || (isRefinementMode ? 'Rewrite to be forensic, direct, and minimalist. Remove corporate jargon.' : '')
+    const refinementFallbackByType: Record<EmailTypeId, string> = {
+      cold: 'Rewrite to be forensic, direct, and minimalist. Remove corporate jargon.',
+      professional: 'Tighten and clarify this email. Keep the same intent and tone. Remove redundancy. Output only the revised body.',
+      followup: 'Make this follow-up clearer and more concise. Keep it polite and professional. Output only the revised body.',
+      internal: 'Make this internal email clearer and shorter. Keep the same information. Output only the revised body.',
+      support: 'Make this support email clearer and more helpful. Keep empathy and accuracy. Output only the revised body.',
+    }
+    const effectiveTypeForRecap = subjectSuggestsMeetingRecap(subject) ? 'professional' : emailTypeId
+    const effectiveDirective = directive.trim() || (isRefinementMode ? refinementFallbackByType[effectiveTypeForRecap] : '')
     if (!effectiveDirective && !isRefinementMode) return
     if (isRefinementMode && !content.trim()) return
     setAiError(null)
@@ -275,7 +297,26 @@ function ComposePanel({
       })
       const data = await response.json()
       if (data.error) throw new Error(data.message || data.error)
-      const newBody = typeof data.content === 'string' ? data.content.trim() : ''
+      let raw = typeof data.content === 'string' ? data.content.trim() : ''
+      // Reject meta-commentary about sending/sender (model sometimes ignores instructions)
+      const noSend = /^(I (?:am |')?(?:sorry|cannot|can't|won't)|Could you please|Please verify).+$/im
+      if (noSend.test(raw)) {
+        toast.error('AI returned a verification message instead of draft content. Try again or pick a different model.')
+        setAiError('Model declined to generate; try another model or rephrase.')
+        return
+      }
+      let newBody = raw
+      let parsedSubject: string | null = null
+      const subjectMatch = raw.match(/^\s*SUBJECT:\s*(.+?)(?:\n|$)/i)
+      if (subjectMatch) {
+        parsedSubject = subjectMatch[1].trim()
+        const afterFirstLine = raw.slice(raw.indexOf('\n')).trim()
+        newBody = afterFirstLine.startsWith('\n') ? afterFirstLine.trim() : afterFirstLine
+      }
+      if (parsedSubject) {
+        setSubject(parsedSubject)
+        setSubjectAnimationKey((k) => k + 1)
+      }
       setContent(newBody)
       setPendingAiContent(newBody)
       setAiPrompt('')
@@ -286,7 +327,7 @@ function ComposePanel({
     } finally {
       setIsAiLoading(false)
     }
-  }, [buildEmailSystemPrompt, content, isRefinementMode, selectedModel, profile?.firstName])
+  }, [buildEmailSystemPrompt, content, isRefinementMode, selectedModel, profile?.firstName, subject, emailTypeId])
 
   const acceptAiContent = useCallback(() => {
     setPendingAiContent(null)
@@ -376,12 +417,19 @@ function ComposePanel({
           </div>
 
           <div className="space-y-2">
-            <Input
-              placeholder="Subject"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className="bg-transparent border-0 border-b border-white/10 rounded-none px-0 focus-visible:ring-0 focus-visible:border-white/20 font-medium"
-            />
+            <motion.div
+              key={subjectAnimationKey}
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+            >
+              <Input
+                placeholder="Subject"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                className="bg-transparent border-0 border-b border-white/10 rounded-none px-0 focus-visible:ring-0 focus-visible:border-white/20 font-medium"
+              />
+            </motion.div>
           </div>
 
           <div className="flex flex-col relative">
@@ -442,7 +490,7 @@ function ComposePanel({
                     <SelectTrigger className="h-8 w-auto min-w-[120px] bg-white/5 border-white/10 text-[10px] font-sans text-zinc-400 tracking-wider rounded-lg">
                       <SelectValue placeholder="Type" />
                     </SelectTrigger>
-                    <SelectContent className="bg-zinc-950 border-white/10">
+                    <SelectContent className="bg-zinc-950 border-white/10 z-[200]">
                       {EMAIL_TYPES.map((t) => (
                         <SelectItem key={t.id} value={t.id} className="text-[10px] font-sans focus:bg-[#002FA7]/20">
                           {t.label}
@@ -455,7 +503,7 @@ function ComposePanel({
                       <Cpu className="w-3.5 h-3.5 text-[#002FA7]" />
                       <SelectValue placeholder="Model" />
                     </SelectTrigger>
-                    <SelectContent className="bg-zinc-950 border-white/10">
+                    <SelectContent className="bg-zinc-950 border-white/10 z-[200]">
                       {EMAIL_AI_MODELS.map((m) => (
                         <SelectItem key={m.value} value={m.value} className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                           {m.label}
