@@ -134,12 +134,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-/** Renders prose with **text** as High-Contrast Data Artifacts (Obsidian & Glass). Optionally use DecryptionText for first segment. */
-function ProseWithArtifacts({ text, decryptFirstChars }: { text: string; decryptFirstChars?: number }) {
+/** Renders prose with **text** as High-Contrast Data Artifacts (Obsidian & Glass). Optionally use DecryptionText (word-stagger reveal) for first segment. */
+function ProseWithArtifacts({ text, revealFirstWords }: { text: string; revealFirstWords?: number }) {
   const parts = text.split(/(\*\*[^*]+\*\*)/g)
   const firstTextPart = parts.find((s) => s && !s.match(/^\*\*(.+)\*\*$/))
-  const firstLen = firstTextPart ? firstTextPart.length : 0
-  const useDecrypt = typeof decryptFirstChars === 'number' && decryptFirstChars > 0 && firstLen > 0
+  const useReveal = typeof revealFirstWords === 'number' && revealFirstWords > 0 && firstTextPart && firstTextPart.length > 0
 
   return (
     <p className="whitespace-pre-wrap text-zinc-400 text-sm leading-7 break-words [overflow-wrap:anywhere]">
@@ -155,10 +154,10 @@ function ProseWithArtifacts({ text, decryptFirstChars }: { text: string; decrypt
             </span>
           )
         }
-        if (useDecrypt && segment === firstTextPart) {
+        if (useReveal && segment === firstTextPart) {
           return (
             <span key={i}>
-              <DecryptionText text={segment} maxDecryptChars={decryptFirstChars} />
+              <DecryptionText text={segment} maxRevealWords={revealFirstWords} />
             </span>
           )
         }
@@ -1526,7 +1525,7 @@ SELECT * FROM hybrid_search_accounts(
                             const isLastMessage = i === messages.length - 1
                             return (
                               <div key={partKey} className="max-w-none break-words [word-break:break-word] [overflow-wrap:anywhere]">
-                                <ProseWithArtifacts text={text} decryptFirstChars={isLastMessage ? 80 : undefined} />
+                                <ProseWithArtifacts text={text} revealFirstWords={isLastMessage ? 18 : undefined} />
                               </div>
                             )
                           }
