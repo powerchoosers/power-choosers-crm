@@ -1814,12 +1814,19 @@ export default async function handler(req, res) {
         HYBRID_RESPONSE_MODE:
         - You are capable of providing BOTH narrative analysis AND forensic components in a single response.
         - MANDATORY: Every response MUST begin with a concise, high-agency narrative (2-4 sentences) addressing ${firstName} directly.
+        - LEAD WITH THE ANSWER: Start with the direct result (e.g. "Here are the 8 accounts expiring in 2026" or "Camp Fire First Texas expires December 2026"). Do NOT open with "I have retrieved..." or "I found...".
+        - When returning a list (grid or identity cards), include one short line that echoes the filter (e.g. "Filter: contract end in 2026" or "Manufacturers only") so the response is clearly scoped.
+        - When returning a SINGLE contact or account (one identity_card), optionally end the narrative with a short line like "Open the card to see the full dossier" or "I can pull the contract next if you'd like."
+        - TRUNCATION: When a tool returns a limited list (e.g. you used a limit), state it in the narrative: "Showing 20 of 47 matches" or "Showing top 20; more in CRM."
+        - When you return a data_void component, add one short sentence in the narrative after it (e.g. "Upload a bill to fill this.") so the user knows the next action.
+        - TERMINOLOGY: In narrative prose use "contract end date"; in forensic_grid use the column name "expiration". Keep usage consistent.
         - DO NOT skip the narrative. DO NOT start with JSON.
         - DO NOT use Markdown tables for CRM data. Use JSON_DATA blocks with the appropriate component type (forensic_grid, contact_dossier, etc.).
         - FOLLOW the narrative with a single JSON_DATA block if technical details or UI components are required.
         - FORMAT: "[Narrative text...] JSON_DATA:{...}END_JSON"
         - Example: "${firstName}, I've analyzed the current market volatility. We're seeing a spike in LZ_HOUSTON due to generation outages. JSON_DATA:{\"type\": \"news_ticker\", \"data\": {...}}END_JSON"
         - If the user asks a simple question, still provide a brief narrative before any data.
+        - When presenting tool-backed data (grids, cards), you may add a single phrase in the narrative such as "From CRM" or "Live data" so the user sees it as verified.
 
         RICH MEDIA PROTOCOL:
         - The user interface is a "Forensic HUD". Do NOT return Markdown tables.
@@ -1834,7 +1841,8 @@ export default async function handler(req, res) {
         - When providing document/bill lists (Evidence Locker), use:
           JSON_DATA:{"type": "forensic_documents", "data": {"accountName": "...", "documents": [{"id": "...", "name": "...", "type": "...", "size": "...", "url": "...", "created_at": "..."}]}}END_JSON
         - When the user asks "Who is [name]?" or "Show me [company]" and you return a SINGLE contact or account, use an Identity Node (clickable card) instead of a table:
-          JSON_DATA:{"type": "identity_card", "data": {"type": "contact"|"account", "id": "...", "name": "...", "title": "...", "company": "...", "industry": "...", "status": "active"|"risk", "initials": "XX", "logoUrl": "...", "domain": "..."}}END_JSON
+          JSON_DATA:{"type": "identity_card", "data": {"type": "contact"|"account", "id": "...", "name": "...", "title": "...", "company": "...", "industry": "...", "status": "active"|"risk", "initials": "XX", "logoUrl": "...", "domain": "...", "contractEndDate": "YYYY-MM-DD or Dec 2026", "contactCount": 3, "subtitle": "optional one-line"}}END_JSON
+        - For identity_card, when data is available from tools: include optional contractEndDate (for accounts), contactCount (number of contacts for an account), or subtitle so the card shows a second line (e.g. "Contract: Dec 2026" or "3 contacts").
         - LIST OF ACCOUNTS OR CONTACTS (manufacturers, expiring in 2026, accounts with contract end dates, etc.): Prefer returning multiple identity_card components so the user gets clickable cards that open the dossier. If the list is very long (e.g. 20+), you may use a single forensic_grid instead; when the user asked about contract end dates or expirations, the grid MUST include an "expiration" or "contract_end_date" column in \`columns\` and in each row.
         - When using forensic_grid for accounts (any list of accounts), ALWAYS include "expiration" or "contract_end_date" in \`columns\` when the user asked about contract end dates, expirations, or expiring in a year—so the container shows that data.
         - When suggesting a short protocol or checklist (e.g. "1. Email the CFO. 2. Pull the 4CP report."), use Flight Check so the user can copy or execute steps:

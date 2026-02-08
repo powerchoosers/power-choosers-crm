@@ -71,6 +71,8 @@ The interface is built using a **Stacked Command Deck** architecture for maximum
         - Houses the `Cpu` model selector and the **Contextual Intel Pill**.
         - Displays `TARGET: [NAME]` or `ACTIVE_CONTEXT: [SCOPE]` using `font-mono tabular-nums`.
     - **Tier 2: Action Deck**: `min-h-[44px] bg-zinc-950/60 border-white/10`
+        - **Dynamic placeholder**: Input placeholder changes by context (e.g. account → "Ask about this account, contracts, or contacts..."; general → "Input forensic command...").
+        - **Try suggestions**: When the message list is empty, clickable chips appear above the input (e.g. "Accounts expiring in 2026", "Who's at this company?", "Market volatility") to fill the input.
         - An auto-expanding forensic input field (`textarea`) with a `44px` baseline and `112px` ceiling.
         - Integrates the **Klein Blue Execute Button** (`bg-[#002FA7]`).
 - **Intelligence Block (AI Transmission)**:
@@ -83,16 +85,16 @@ The interface is built using a **Stacked Command Deck** architecture for maximum
 
 ### 2. Forensic Visualization Components
 The Architect can inject specialized data modules directly into the chat stream. Components are rendered when the model (or backend) includes a `JSON_DATA:{ "type": "<component_type>", "data": {...} }END_JSON` block in the response. **The `type` value must be lowercase** (e.g. `contact_dossier`, `identity_card`). **Markdown `**text**`** in prose is rendered as High-Contrast Data Artifacts (glass-encased, font-mono, white on dark) instead of plain bold.
-- **Identity_Card**: Clickable "Identity Node" for a single contact or account. Use when the user asks "Who is [name]?" or "Show me [company]." Data: type (`contact`|`account`), id, name, title?, company?, industry?, status? (`active`|`risk`), initials?, logoUrl?, domain?. Card shows letter glyph or company logo (squircle), status LED, name, subtitle; click navigates to `/network/people/{id}` or `/network/accounts/{id}`.
+- **Identity_Card**: Clickable "Identity Node" for a single contact or account. Use when the user asks "Who is [name]?" or "Show me [company]." Data: type (`contact`|`account`), id, name, title?, company?, industry?, status? (`active`|`risk`), initials?, logoUrl?, domain?, and optional contractEndDate?, contactCount?, subtitle? so the card can show a second line (e.g. "Contract: Dec 2026" or "3 contacts"). Card shows letter glyph or company logo (squircle), status LED, name, subtitle; click navigates to `/network/people/{id}` or `/network/accounts/{id}`.
 - **News_Ticker**: Real-time scrolling grid intelligence (Market_Volatility_Feed; items with title, source, trend, volatility).
 - **Contact_Dossier**: Detailed node profile (name, title, company, initials, energyMaturity, contractStatus, contractExpiration, id) with INITIATE action and Data Locker void state.
-- **Position_Maturity**: Visualization of contract and pricing status (expiration, daysRemaining, currentSupplier, strikePrice, annualUsage, estimatedRevenue, margin; optional isSimulation).
+- **Position_Maturity**: Visualization of contract and pricing status (expiration, daysRemaining, currentSupplier, strikePrice, annualUsage, estimatedRevenue, margin; optional isSimulation). Displays a subtle "From account record" label when data is tool-backed (non-simulation).
 - **Market_Pulse**: Live ERCOT telemetry card—**all four zones** (LZ_NORTH, LZ_HOUSTON, LZ_WEST, LZ_SOUTH) with colors matching Telemetry/Infrastructure, volatility banner, HUB_AVG, scarcity %, and **Scarcity Gauge** (Voltage Bar: left=scarcity/red, right=stable/green, glowing needle = reserve margin). Injected by the **backend** when `get_market_pulse` is called.
-- **Forensic_Grid**: High-density tabular data for account analysis (title, columns, rows, optional highlights).
+- **Forensic_Grid**: High-density tabular data for account analysis (title, columns, rows, optional highlights, optional sourceLabel). Table body scrolls within max height with a sticky header; header can show a "From CRM" (or custom sourceLabel) pill for verified data.
 - **Forensic_Documents (Evidence Locker)**: Grid of **glass tiles** per document: PDF icon (red/white), truncated filename, date; hover reveals Download, Open, and **Analyze** (links to `/bill-debugger` for bill analysis). Data: accountName, documents (id, name, type, size, url, created_at).
 - **Flight_Check**: Protocol checklist (e.g. "1. Email the CFO. 2. Pull the 4CP report."). Data: items array with `label`, `status` (`pending`|`done`). Renders as slim glass bars: left = circle/check, center = instruction, **"+" button** (adds row as task via `create_task`), **[ QUEUED ]** when queued (row turns green), right = copy icon; click row copies label to clipboard.
 - **Interaction_Snippet**: Call/search result snippet. Data: contactName?, callDate?, snippet (text), highlight? (phrase to highlight in Klein Blue). Renders as "Waveform Card" with audio-wave visual and context line (e.g. "Call with Billy Ragland · Oct 14, 2025"). Use when answering "Did [X] mention [Y]?" from search_interactions.
-- **Data_Void**: Empty state placeholders for missing intelligence (field, action e.g. REQUIRE_BILL_UPLOAD).
+- **Data_Void**: Empty state placeholders for missing intelligence (field, action e.g. REQUIRE_BILL_UPLOAD). When action is REQUIRE_BILL_UPLOAD, the UI shows actionable micro-copy: "Upload a bill to fill this."
 - **Mini_Profile**: Compact list of prospects (profiles array: name, company?, title?).
 
 ### 3. Context & Session Handling
@@ -104,6 +106,7 @@ The Architect can inject specialized data modules directly into the chat stream.
 - **Proactive Situation Report ("Pre-Strike")**: When the chat opens on an **Account** or **Contact** page with **empty message history**, the agent automatically sends a synthetic request and posts a one-paragraph **Situation Report** as the first AI message (e.g. contract status, key risks, next steps). No user prompt required.
 - **DecryptionText**: The first segment of the latest AI prose can render with a "decryption" effect (characters cycle through glyphs then lock). Optional `decryptFirstChars` limits animation length.
 - **NeuralLoader (Neural Uplink)**: While the agent is loading, a horizontal Klein Blue line expands and oscillates (waveform); status messages cycle every 800ms: `ESTABLISHING_SECURE_UPLINK...`, `PARSING_GRID_TELEMETRY...`, `VERIFYING_SOURCE_INTEGRITY...`, `[ SIGNAL_LOCKED ]`.
+- **Premium narrative**: The agent is instructed to lead with the direct answer (e.g. "Here are the 8 accounts expiring in 2026"), echo filters when listing, state truncation when results are capped ("Showing top 20; more in CRM"), and add a short actionable line when returning a data_void (e.g. "Upload a bill to fill this."). Terminology: "contract end date" in prose, "expiration" as grid column name.
 - **Anti-Hallucination Protocol (v2)**: Strict enforcement against inventing names, metrics, or dates. If data is not in the CRM, the agent is hard-coded to report it as "Unknown" or "Data Void".
 - **Neural Line Response**: Every AI transmission is anchored by a glowing vertical "Neural Line" spine in International Klein Blue.
 - **Message parsing**: Assistant content is split on `JSON_DATA:`; each block is parsed as `{ type, data }` and rendered via `ComponentRenderer`. Trailing text after `END_JSON` is shown as prose.
@@ -193,4 +196,4 @@ Use these to verify the Nodal Architect and Build Gemini v2 behavior. **Context*
 
 ---
 *Last Updated: 2026-02-06*
-*Status: Nodal Architect v2.0 — Grounded path disabled (full LLM for all queries); list responses use identity_card or forensic_grid with expiration when relevant; single-container UI (no outer wrapper border). DecryptionText, NeuralLoader, Proactive Situation Report, Flight Check → create_task, Evidence Locker Analyze → Bill Debugger; Identity Cards, Scarcity Gauge, Conversation Snippet, High-Contrast ** Artifacts.*
+*Status: Nodal Architect v2.0 — Premium response: lead-with-answer narrative, truncation hint, data void actionable line, identity_card optional contract/contact line, forensic_grid sticky header + "From CRM", position_maturity "From account record" label, dynamic placeholder, Try suggestions when empty. Grounded path disabled; list responses use identity_card or forensic_grid with expiration when relevant; single-container UI. DecryptionText, NeuralLoader, Proactive Situation Report, Flight Check → create_task, Evidence Locker Analyze → Bill Debugger; Identity Cards, Scarcity Gauge, Conversation Snippet, High-Contrast ** Artifacts.*
