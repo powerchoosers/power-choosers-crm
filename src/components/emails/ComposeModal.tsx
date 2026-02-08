@@ -171,24 +171,39 @@ Output ONLY the email body. Plain text, no markdown.`,
   },
 ]
 
+/** Optional context passed when opening from a contact/account dossier. Shown in UI and injected into AI prompt. */
+export interface ComposeContext {
+  contactName?: string
+  contactTitle?: string
+  companyName?: string
+  accountName?: string
+  /** Notes + call/transcript summary for AI. Injected into system prompt when present. */
+  contextForAi?: string
+}
+
 interface ComposeModalProps {
   isOpen: boolean
   onClose: () => void
   to?: string
   subject?: string
+  /** Optional contact/account context (e.g. from Contact Dossier). Used for display and AI. */
+  context?: ComposeContext | null
 }
 
 function ComposePanel({
   initialTo,
   initialSubject,
+  initialContext,
   onClose,
 }: {
   initialTo: string
   initialSubject: string
+  initialContext: ComposeContext | null
   onClose: () => void
 }) {
   const [to, setTo] = useState(initialTo)
   const [subject, setSubject] = useState(initialSubject)
+  const context = initialContext
   const [content, setContent] = useState('')
   const [isMinimized, setIsMinimized] = useState(false)
   const { user, profile } = useAuth()
@@ -212,12 +227,27 @@ function ComposePanel({
   const emailTypeConfig = EMAIL_TYPES.find((t) => t.id === emailTypeId) ?? EMAIL_TYPES[0]
 
   const buildEmailSystemPrompt = useCallback(() => {
-    const base = emailTypeConfig.getSystemPrompt({ signerName, to: to || '', subject: subject || '' })
+    let base = emailTypeConfig.getSystemPrompt({ signerName, to: to || '', subject: subject || '' })
+    if (context && (context.contactName || context.companyName || context.contactTitle || context.accountName || context.contextForAi)) {
+      const lines: string[] = []
+      if (context.contactName || context.contactTitle || context.companyName || context.accountName) {
+        lines.push('RECIPIENT CONTEXT (use for personalization):')
+        if (context.contactName) lines.push(`- Name: ${context.contactName}`)
+        if (context.contactTitle) lines.push(`- Title: ${context.contactTitle}`)
+        if (context.companyName) lines.push(`- Company: ${context.companyName}`)
+        if (context.accountName && context.accountName !== context.companyName) lines.push(`- Account: ${context.accountName}`)
+      }
+      if (context.contextForAi?.trim()) {
+        lines.push('NOTES / CALL CONTEXT (use to personalize and reference prior touchpoints):')
+        lines.push(context.contextForAi.trim())
+      }
+      if (lines.length) base += '\n\n' + lines.join('\n')
+    }
     if (isRefinementMode) {
-      return `${base}\n\n${emailTypeConfig.getRefinementInstruction()}`
+      base += '\n\n' + emailTypeConfig.getRefinementInstruction()
     }
     return base
-  }, [emailTypeConfig, signerName, to, subject, isRefinementMode])
+  }, [emailTypeConfig, signerName, to, subject, isRefinementMode, context])
 
   const generateEmailWithAi = useCallback(async (directive: string) => {
     const effectiveDirective = directive.trim() || (isRefinementMode ? 'Rewrite to be forensic, direct, and minimalist. Remove corporate jargon.' : '')
@@ -526,14 +556,14 @@ function ComposePanel({
   )
 }
 
-export function ComposeModal({ isOpen, onClose, to: initialTo = '', subject: initialSubject = '' }: ComposeModalProps) {
+export function ComposeModal({ isOpen, onClose, to: initialTo = '', subject: initialSubject = '', context: initialContext = null }: ComposeModalProps) {
 
   if (typeof document === 'undefined') return null
 
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <ComposePanel initialTo={initialTo} initialSubject={initialSubject} onClose={onClose} />
+        <ComposePanel initialTo={initialTo} initialSubject={initialSubject} initialContext={initialContext ?? null} onClose={onClose} />
       )}
     </AnimatePresence>,
     document.body
