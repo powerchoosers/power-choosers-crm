@@ -1,47 +1,70 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
+import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 
-const GLYPHS = 'X7#@9'
-const LOCK_MS = 110
-const GLYPH_TICK_MS = 35
+const STAGGER_MS = 28
+const FADE_DURATION = 0.12
+const MAX_WORDS_STAGGER = 18
 
 interface DecryptionTextProps {
   text: string
   className?: string
-  /** Max characters to animate; rest renders immediately. Omit for full decrypt. */
-  maxDecryptChars?: number
+  /** Max words to reveal with stagger; rest appear at once. Default 18. */
+  maxRevealWords?: number
 }
 
-export function DecryptionText({ text, className, maxDecryptChars }: DecryptionTextProps) {
-  const chars = useMemo(() => Array.from(text), [text])
-  const [lockedCount, setLockedCount] = useState(0)
-  const [glyphFrame, setGlyphFrame] = useState(0)
-  const limit = maxDecryptChars ?? chars.length
+/**
+ * Modern computer-inspired text reveal: words fade in with a short stagger.
+ * Fast, readable, no slow glyph cycle.
+ */
+export function DecryptionText({ text, className, maxRevealWords = MAX_WORDS_STAGGER }: DecryptionTextProps) {
+  const tokens = useMemo(() => {
+    const parts: string[] = []
+    const re = /\s+/g
+    let lastIndex = 0
+    let m: RegExpExecArray | null
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > lastIndex) parts.push(text.slice(lastIndex, m.index))
+      parts.push(m[0])
+      lastIndex = m.index + m[0].length
+    }
+    if (lastIndex < text.length) parts.push(text.slice(lastIndex))
+    return parts
+  }, [text])
 
-  useEffect(() => {
-    if (lockedCount >= limit) return
-    const t = setInterval(() => setLockedCount((c) => Math.min(c + 1, limit)), LOCK_MS)
-    return () => clearInterval(t)
-  }, [limit, lockedCount])
-
-  useEffect(() => {
-    if (lockedCount >= limit) return
-    const t = setInterval(() => setGlyphFrame((f) => f + 1), GLYPH_TICK_MS)
-    return () => clearInterval(t)
-  }, [limit, lockedCount])
+  const wordIndexByToken = useMemo(() => {
+    const out: number[] = []
+    let wi = 0
+    for (const t of tokens) {
+      out.push(/\S/.test(t) ? wi++ : -1)
+    }
+    return out
+  }, [tokens])
 
   return (
     <span className={cn('font-mono text-sm text-zinc-300', className)}>
-      {chars.map((char, i) => {
-        const isLocked = i < lockedCount
-        const glyph = GLYPHS[(glyphFrame + i) % GLYPHS.length]
-        return (
-          <span key={`${i}-${char}`} className="inline-block tabular-nums">
-            {isLocked ? char : glyph}
-          </span>
-        )
+      {tokens.map((token, i) => {
+        const wordIndex = wordIndexByToken[i]
+        const isWord = wordIndex >= 0
+        const shouldStagger = isWord && wordIndex < maxRevealWords
+        const delay = shouldStagger ? (wordIndex * STAGGER_MS) / 1000 : 0
+
+        if (shouldStagger) {
+          return (
+            <motion.span
+              key={i}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: FADE_DURATION, delay }}
+              className="inline"
+            >
+              {token}
+            </motion.span>
+          )
+        }
+        return <span key={i}>{token}</span>
       })}
     </span>
   )
