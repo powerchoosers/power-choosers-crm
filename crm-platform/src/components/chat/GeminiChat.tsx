@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Copy, Send, X, Loader2, User, Bot, Mic, Activity, AlertTriangle, ArrowRight, History, RefreshCw, Phone, Plus, Sparkles, Cpu, Zap, FileText, CheckCircle, Circle, ClipboardCopy } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -13,6 +13,9 @@ import { usePathname, useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
+import { NeuralLoader } from '@/components/chat/NeuralLoader'
+import { DecryptionText } from '@/components/chat/DecryptionText'
+import { useTasks } from '@/hooks/useTasks'
 
 interface Diagnostic {
   model: string
@@ -131,9 +134,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-/** Renders prose with **text** as High-Contrast Data Artifacts (Obsidian & Glass). */
-function ProseWithArtifacts({ text }: { text: string }) {
+/** Renders prose with **text** as High-Contrast Data Artifacts (Obsidian & Glass). Optionally use DecryptionText for first segment. */
+function ProseWithArtifacts({ text, decryptFirstChars }: { text: string; decryptFirstChars?: number }) {
   const parts = text.split(/(\*\*[^*]+\*\*)/g)
+  const firstTextPart = parts.find((s) => s && !s.match(/^\*\*(.+)\*\*$/))
+  const firstLen = firstTextPart ? firstTextPart.length : 0
+  const useDecrypt = typeof decryptFirstChars === 'number' && decryptFirstChars > 0 && firstLen > 0
+
   return (
     <p className="whitespace-pre-wrap text-zinc-400 text-sm leading-7 break-words [overflow-wrap:anywhere]">
       {parts.map((segment, i) => {
@@ -145,6 +152,13 @@ function ProseWithArtifacts({ text }: { text: string }) {
               className="font-mono font-bold text-white bg-white/10 px-1 rounded-sm border border-white/5 tracking-tight tabular-nums shadow-[0_0_10px_-2px_rgba(255,255,255,0.2)]"
             >
               {match[1]}
+            </span>
+          )
+        }
+        if (useDecrypt && segment === firstTextPart) {
+          return (
+            <span key={i}>
+              <DecryptionText text={segment} maxDecryptChars={decryptFirstChars} />
             </span>
           )
         }
@@ -210,7 +224,71 @@ function ImageWithSkeleton({ src, alt, className, isLoading: isExternalLoading }
   )
 }
 
-function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
+type ContextInfo = { type: string; id?: string | string[]; displayLabel?: string }
+
+function FlightCheckBlock({
+  items,
+  onCreateTask,
+}: {
+  items: { label?: string; status?: string }[]
+  onCreateTask?: (opts: { title: string; description?: string }) => Promise<unknown>
+}) {
+  const [queuedSet, setQueuedSet] = useState<Set<number>>(new Set())
+
+  const handleAddTask = async (idx: number, label: string) => {
+    if (!onCreateTask) return
+    try {
+      await onCreateTask({ title: label, description: label })
+      setQueuedSet((prev) => new Set(prev).add(idx))
+    } catch (_) {
+      // toast handled by useTasks
+    }
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-2xl border border-white/10 bg-zinc-900/40 overflow-hidden w-full">
+      <div className="px-3 py-2 border-b border-white/5">
+        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Protocol Checklist</span>
+      </div>
+      <div className="divide-y divide-white/5">
+        {items.map((item: { label?: string; status?: string }, idx: number) => {
+          const label = typeof item.label === 'string' ? item.label : `Step ${idx + 1}`
+          const done = item.status === 'done'
+          const queued = queuedSet.has(idx)
+          return (
+            <div
+              key={idx}
+              className={cn(
+                'flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors group cursor-pointer',
+                queued && 'bg-emerald-950/30 border-l-2 border-l-emerald-500/50'
+              )}
+              onClick={() => !queued && navigator.clipboard?.writeText(label)}
+            >
+              <div className="shrink-0 w-5 h-5 flex items-center justify-center">
+                {done ? <CheckCircle size={18} className="text-emerald-500" /> : <Circle size={18} className="text-zinc-500" />}
+              </div>
+              <span className="flex-1 text-sm text-zinc-200 font-mono">{label}</span>
+              {onCreateTask && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); handleAddTask(idx, label); }}
+                  className="shrink-0 w-7 h-7 rounded-[14px] bg-[#002FA7]/20 border border-[#002FA7]/40 flex items-center justify-center text-[#002FA7] hover:bg-[#002FA7]/30 transition-colors"
+                  title="Add to tasks"
+                >
+                  <Plus size={14} />
+                </button>
+              )}
+              {queued && <span className="text-[9px] font-mono text-emerald-400 uppercase tracking-wider">[ QUEUED ]</span>}
+              {!queued && <ClipboardCopy size={14} className="text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity" />}
+            </div>
+          )
+        })}
+      </div>
+    </motion.div>
+  )
+}
+
+function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: string; data: unknown; onCreateTask?: (opts: { title: string; description?: string }) => Promise<unknown>; contextInfo?: ContextInfo }) {
   const router = useRouter()
 
   switch (type) {
@@ -262,32 +340,7 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
     case 'flight_check': {
       if (!isRecord(data)) return null
       const items = Array.isArray(data.items) ? data.items : []
-      return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-2xl border border-white/10 bg-zinc-900/40 overflow-hidden w-full">
-          <div className="px-3 py-2 border-b border-white/5">
-            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Protocol Checklist</span>
-          </div>
-          <div className="divide-y divide-white/5">
-            {items.map((item: { label?: string; status?: string }, idx: number) => {
-              const label = typeof item.label === 'string' ? item.label : `Step ${idx + 1}`
-              const done = item.status === 'done'
-              return (
-                <div
-                  key={idx}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors group cursor-pointer"
-                  onClick={() => navigator.clipboard?.writeText(label)}
-                >
-                  <div className="shrink-0 w-5 h-5 flex items-center justify-center">
-                    {done ? <CheckCircle size={18} className="text-emerald-500" /> : <Circle size={18} className="text-zinc-500" />}
-                  </div>
-                  <span className="flex-1 text-sm text-zinc-200 font-mono">{label}</span>
-                  <ClipboardCopy size={14} className="text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-              )
-            })}
-          </div>
-        </motion.div>
-      )
+      return <FlightCheckBlock items={items} onCreateTask={onCreateTask} />
     }
     case 'interaction_snippet': {
       if (!isRecord(data)) return null
@@ -347,7 +400,11 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
                 )}
               </div>
             </div>
-            <Button size="sm" className="bg-[#002FA7] hover:bg-blue-600 text-white font-mono text-[10px] uppercase tracking-widest border border-blue-400/30 shadow-[0_0_15px_rgba(0,47,167,0.4)] h-8">
+            <Button
+              size="sm"
+              className="bg-[#002FA7] hover:bg-blue-600 text-white font-mono text-[10px] uppercase tracking-widest border border-blue-400/30 shadow-[0_0_15px_rgba(0,47,167,0.4)] h-8"
+              onClick={(e) => { e.stopPropagation(); dossier.id && router.push(`/network/people/${dossier.id}`); }}
+            >
               INITIATE
             </Button>
           </div>
@@ -626,6 +683,7 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
                       <>
                         <button className="px-2 py-1 rounded-lg bg-[#002FA7]/20 border border-[#002FA7]/40 text-[#002FA7] font-mono text-[9px] uppercase hover:bg-[#002FA7]/30" onClick={(e) => { e.stopPropagation(); window.open(doc.url!, '_blank'); }}>Download</button>
                         <a href={doc.url} target="_blank" rel="noopener noreferrer" className="px-2 py-1 rounded-lg bg-white/10 border border-white/20 text-zinc-300 font-mono text-[9px] uppercase hover:bg-white/20" onClick={(e) => e.stopPropagation()}>Open</a>
+                        <a href="/bill-debugger" className="px-2 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono text-[9px] uppercase hover:bg-emerald-500/30" onClick={(e) => e.stopPropagation()}>Analyze</a>
                       </>
                     )}
                   </div>
@@ -796,6 +854,8 @@ export function GeminiChatPanel() {
   const resetCounter = useGeminiStore((state) => state.resetCounter)
   const resetSession = useGeminiStore((state) => state.resetSession)
 
+  const proactiveReportTriggered = useRef(false)
+
   const setIsHistoryOpen = (open: boolean) => {
     if (open !== isHistoryOpen) toggleHistory()
   }
@@ -805,6 +865,7 @@ export function GeminiChatPanel() {
     if (resetCounter > 0) {
       setMessages([])
       setCurrentSessionId(null)
+      proactiveReportTriggered.current = false
     }
   }, [resetCounter])
   const [historySessions, setHistorySessions] = useState<ChatSession[]>([])
@@ -956,24 +1017,36 @@ export function GeminiChatPanel() {
     }
   }, [isOpen, user?.photoURL])
 
-  // Initialize with Contextual Greeting
+  // Initialize with Contextual Greeting (skip when account/contact – proactive report will run instead)
+  const isAccountOrContact = contextInfo.type === 'account' || contextInfo.type === 'contact'
+  const hasContextId = typeof contextInfo.id === 'string' && contextInfo.id.length > 0
   useEffect(() => {
-    if (isOpen && messages.length === 0) {
-      const firstName = profile?.firstName || 'Trey'
-      setMessages([
-        { 
-          role: 'assistant', 
-          id: 'greeting',
-          timestamp: Date.now(),
-          content: contextInfo.type === 'contact' 
-            ? `System ready, ${firstName}. I see you're viewing contact ${params.id}. Scanning Gmail for recent threads and Apollo for firmographics...`
-            : contextInfo.type === 'account'
+    if (!isOpen || messages.length !== 0) return
+    if (isAccountOrContact && hasContextId) return // Proactive report will send first message
+    const firstName = profile?.firstName || 'Trey'
+    setMessages([
+      {
+        role: 'assistant',
+        id: 'greeting',
+        timestamp: Date.now(),
+        content: contextInfo.type === 'contact'
+          ? `System ready, ${firstName}. I see you're viewing contact ${params.id}. Scanning Gmail for recent threads and Apollo for firmographics...`
+          : contextInfo.type === 'account'
             ? `System ready, ${firstName}. Analyzing account data for ${params.id}. Checking energy market conditions for this node...`
             : `System ready, ${firstName}. Awaiting command for Nodal Point intelligence network.`
-        }
-      ])
-    }
-  }, [isOpen, contextInfo, params.id, profile?.firstName])
+      }
+    ])
+  }, [isOpen, messages.length, contextInfo.type, contextInfo.id, hasContextId, isAccountOrContact, params.id, profile?.firstName])
+
+  useEffect(() => {
+    if (!isOpen || messages.length !== 0 || !isAccountOrContact || !hasContextId || proactiveReportTriggered.current) return
+    proactiveReportTriggered.current = true
+    const syntheticPrompt =
+      contextInfo.type === 'contact'
+        ? `Give a one-paragraph situation report for this contact. Include contract status, key risks, and next steps. Be concise.`
+        : `Give a one-paragraph situation report for this account. Include contract status, key risks, and next steps. Be concise.`
+    void sendWithMessage(syntheticPrompt)
+  }, [isOpen, messages.length, isAccountOrContact, hasContextId, contextInfo.type, sendWithMessage])
 
   const getProvider = (model: string) => {
     if (model.startsWith('openai/') || model.startsWith('anthropic/')) return 'OpenRouter'
@@ -981,6 +1054,19 @@ export function GeminiChatPanel() {
     if (model.startsWith('sonar')) return 'Perplexity'
     return 'AI_NODE'
   }
+
+  const { addTaskAsync } = useTasks()
+  const handleCreateTask = useCallback(
+    async (opts: { title: string; description?: string }) => {
+      await addTaskAsync({
+        title: opts.title,
+        description: opts.description ?? opts.title,
+        contactId: contextInfo.type === 'contact' && typeof contextInfo.id === 'string' ? contextInfo.id : undefined,
+        accountId: contextInfo.type === 'account' && typeof contextInfo.id === 'string' ? contextInfo.id : undefined,
+      })
+    },
+    [addTaskAsync, contextInfo]
+  )
 
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -1088,110 +1174,77 @@ SELECT * FROM hybrid_search_accounts(
     scrollToBottom()
   }, [messages, isLoading])
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return
+  const messagesRef = useRef<GeminiMessage[]>([])
+  useEffect(() => { messagesRef.current = messages }, [messages])
 
-    const userMessage: GeminiMessage = { role: 'user', content: input, id: crypto.randomUUID(), timestamp: Date.now() }
-    saveMessageToDb('user', input)
-    const updatedMessages = [...messages, userMessage]
-    
-    // Ensure history starts with a user message and is trimmed to last 10 for performance
+  const sendWithMessage = useCallback(async (messageText: string) => {
+    if (!messageText.trim()) return
+    const current = messagesRef.current
+    const userMessage: GeminiMessage = { role: 'user', content: messageText.trim(), id: crypto.randomUUID(), timestamp: Date.now() }
+    saveMessageToDb('user', messageText.trim())
+    const updatedMessages = [...current, userMessage]
     const firstUserIndex = updatedMessages.findIndex((m) => m.role === 'user')
     const relevantHistory = firstUserIndex >= 0 ? updatedMessages.slice(firstUserIndex) : updatedMessages
-    
-    // Take last 10, but verify we don't start with an assistant message after slicing
     let messagesForApi = relevantHistory.slice(-10)
-    if (messagesForApi.length > 0 && messagesForApi[0].role === 'assistant') {
-      messagesForApi = messagesForApi.slice(1)
-    }
+    if (messagesForApi.length > 0 && messagesForApi[0].role === 'assistant') messagesForApi = messagesForApi.slice(1)
 
     setMessages(updatedMessages)
-    setInput('')
     setIsLoading(true)
     setError(null)
-    
-    // Set initial routing state for Trey
-    setDiagnostics([{ 
-      model: 'ROUTER', 
-      provider: 'NETWORK', 
-      status: 'attempting', 
-      reason: 'INITIATING_NEURAL_ROUTING' 
-    }])
+    setDiagnostics([{ model: 'ROUTER', provider: 'NETWORK', status: 'attempting', reason: 'INITIATING_NEURAL_ROUTING' }])
 
     try {
       const response = await fetch('/api/gemini/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           messages: messagesForApi,
           context: contextInfo,
           model: selectedModel,
-          userProfile: {
-            firstName: profile?.firstName || 'Trey'
-          }
+          userProfile: { firstName: profile?.firstName || 'Trey' }
         })
       })
-
       const data = await response.json()
-      
-      // Temporary Routing Diagnostics for Trey
       if (data.diagnostics) {
         setDiagnostics(data.diagnostics as Diagnostic[])
         console.group('%c AI_ROUTER_DIAGNOSTICS ', 'background: #002FA7; color: white; font-weight: bold; border-radius: 4px; padding: 2px 4px;')
         console.table(data.diagnostics)
         console.groupEnd()
       }
-
       if (data.error) throw new Error(data.message || data.error)
-
       setLastProvider(typeof data.provider === 'string' ? data.provider : 'gemini')
       setLastModel(typeof data.model === 'string' ? data.model : '')
-
-      // Sync dropdown to actual model used (backend may have fallen back)
-      if (typeof data.model === 'string' && data.model.trim()) {
-        setSelectedModel(data.model)
-      }
-
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: data.content,
-        id: crypto.randomUUID(),
-        timestamp: Date.now()
-      }])
+      if (typeof data.model === 'string' && data.model.trim()) setSelectedModel(data.model)
+      setMessages((prev) => [...prev, { role: 'assistant', content: data.content, id: crypto.randomUUID(), timestamp: Date.now() }])
       saveMessageToDb('model', data.content)
     } catch (err: unknown) {
       console.error('Chat error:', err)
-      
-      // Try to extract diagnostics from error if available
-      const errorWithDiagnostics = err as { diagnostics?: Diagnostic[] };
+      const errorWithDiagnostics = err as { diagnostics?: Diagnostic[] }
       if (err instanceof Error && 'diagnostics' in err) {
         setDiagnostics((err as unknown as { diagnostics: Diagnostic[] }).diagnostics)
       } else if (typeof err === 'object' && err !== null && 'diagnostics' in err) {
         setDiagnostics(errorWithDiagnostics.diagnostics || null)
       } else {
-        // If no diagnostics in error, mark the router attempt as failed
-        setDiagnostics(prev => {
-          if (!prev) return null
-          return prev.map(d => d.model === 'ROUTER' ? { ...d, status: 'failed' as const, error: err instanceof Error ? err.message : 'Network failure' } : d)
-        })
+        setDiagnostics((prev) =>
+          prev ? prev.map((d) => (d.model === 'ROUTER' ? { ...d, status: 'failed' as const, error: err instanceof Error ? err.message : 'Network failure' } : d)) : null
+        )
       }
-
       const errorMessage = err instanceof Error ? err.message : 'Internal server error'
       setError(errorMessage)
-      
       const assistantFallback = errorMessage.includes('overloaded') || errorMessage.includes('503')
         ? "The intelligence network is currently under heavy load. I'm initiating a localized retry protocol, but if this persists, please try again in a moment."
         : "Sorry, I encountered an error. Please try again."
-        
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: assistantFallback,
-        id: crypto.randomUUID(),
-        timestamp: Date.now()
-      }])
+      setMessages((prev) => [...prev, { role: 'assistant', content: assistantFallback, id: crypto.randomUUID(), timestamp: Date.now() }])
     } finally {
       setIsLoading(false)
     }
+  }, [contextInfo, selectedModel, profile?.firstName])
+
+  const handleSend = async () => {
+    const messageText = input.trim()
+    if (!messageText || isLoading) return
+    setInput('')
+    await sendWithMessage(messageText)
   }
 
   return (
@@ -1466,9 +1519,10 @@ SELECT * FROM hybrid_search_accounts(
                           if (index === 0) {
                             const text = part.trim()
                             if (!text) return null
+                            const isLastMessage = i === messages.length - 1
                             return (
                               <div key={partKey} className="max-w-none break-words [word-break:break-word] [overflow-wrap:anywhere]">
-                                <ProseWithArtifacts text={text} />
+                                <ProseWithArtifacts text={text} decryptFirstChars={isLastMessage ? 80 : undefined} />
                               </div>
                             )
                           }
@@ -1480,7 +1534,7 @@ SELECT * FROM hybrid_search_accounts(
                             return (
                               <div key={partKey} className="flex flex-col gap-4 w-full min-w-0 max-w-full overflow-hidden">
                                 <div className="w-full overflow-hidden rounded-lg border border-white/5 bg-black/20 grid grid-cols-1">
-                                  <ComponentRenderer type={data.type} data={data.data} />
+                                  <ComponentRenderer type={data.type} data={data.data} onCreateTask={handleCreateTask} contextInfo={contextInfo} />
                                 </div>
                                 {trailingText && (
                                   <div className="max-w-none break-words [word-break:break-word] [overflow-wrap:anywhere]">
@@ -1523,14 +1577,9 @@ SELECT * FROM hybrid_search_accounts(
             ))}
           </AnimatePresence>
           {isLoading && (
-            <div className="flex justify-start relative w-full">
+            <div className="flex justify-start relative w-full pl-6">
               <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-[#002FA7] to-transparent" />
-              <div className="pl-6 flex items-center gap-2">
-                <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-widest opacity-50 animate-pulse">
-                  {'>'} PARSING_INTENT...
-                </span>
-                <Loader2 size={12} className="text-[#002FA7] animate-spin" />
-              </div>
+              <NeuralLoader />
             </div>
           )}
           <div ref={messagesEndRef} className="h-px" />
