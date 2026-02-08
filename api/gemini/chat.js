@@ -1188,6 +1188,77 @@ export default async function handler(req, res) {
 
     const firstName = userProfile?.firstName || 'Trey';
 
+    // Pre-fetch dossier context (notes + recent calls) when user is viewing a contact or account
+    let dossierContextBlock = '';
+    const requestContext = req.body?.context;
+    if (requestContext?.type === 'contact' && requestContext?.id) {
+      try {
+        const contactId = String(requestContext.id).trim();
+        const [contactRes, callsRes] = await Promise.all([
+          supabaseAdmin.from('contacts').select('*').eq('id', contactId).single(),
+          supabaseAdmin.from('calls').select('id, transcript, summary, ai_summary, timestamp').eq('contactId', contactId).order('timestamp', { ascending: false }).limit(2)
+        ]);
+        const contact = contactRes?.data;
+        const calls = callsRes?.data || [];
+        const lines = [];
+        if (contact) {
+          const name = contact.name || [contact.firstName ?? contact.first_name, contact.lastName ?? contact.last_name].filter(Boolean).join(' ') || 'Unknown';
+          lines.push(`CURRENT CONTACT (Log_Stream / dossier): ${name}`);
+          const title = contact.title ?? contact.jobTitle;
+          if (title) lines.push(`Title: ${title}`);
+          const company = contact.companyName ?? contact.company ?? contact.company_name ?? contact.accounts?.name;
+          if (company) lines.push(`Company: ${company}`);
+          const notes = String(contact.notes ?? contact.metadata?.notes ?? '').trim();
+          if (notes) lines.push(`Notes (Log_Stream): ${notes.slice(0, 800)}${notes.length > 800 ? '…' : ''}`);
+        }
+        if (calls.length) {
+          lines.push('RECENT CALLS (transmission log):');
+          calls.forEach((c, i) => {
+            const date = c.timestamp ? new Date(c.timestamp).toISOString().split('T')[0] : '';
+            const sum = String(c.ai_summary ?? c.summary ?? '').trim();
+            const trans = String(c.transcript ?? '').trim();
+            if (sum) lines.push(`  Call ${i + 1} (${date}): ${sum.slice(0, 400)}${sum.length > 400 ? '…' : ''}`);
+            if (trans) lines.push(`  Transcript excerpt: ${trans.slice(0, 600)}${trans.length > 600 ? '…' : ''}`);
+          });
+        }
+        if (lines.length) dossierContextBlock = '\n\n' + lines.join('\n');
+      } catch (e) {
+        console.error('[Gemini Chat] Dossier context fetch (contact):', e?.message || e);
+      }
+    } else if (requestContext?.type === 'account' && requestContext?.id) {
+      try {
+        const accountId = String(requestContext.id).trim();
+        const [accountRes, callsRes] = await Promise.all([
+          supabaseAdmin.from('accounts').select('*').eq('id', accountId).single(),
+          supabaseAdmin.from('calls').select('id, transcript, summary, ai_summary, timestamp').eq('accountId', accountId).order('timestamp', { ascending: false }).limit(2)
+        ]);
+        const account = accountRes?.data;
+        const calls = callsRes?.data || [];
+        const lines = [];
+        if (account) {
+          lines.push(`CURRENT ACCOUNT: ${account.name || 'Unknown'}`);
+          if (account.industry) lines.push(`Industry: ${account.industry}`);
+          if (account.contract_end_date) lines.push(`Contract end: ${account.contract_end_date}`);
+          if (account.electricity_supplier) lines.push(`Supplier: ${account.electricity_supplier}`);
+          const notes = String(account.notes ?? account.description ?? '').trim();
+          if (notes) lines.push(`Notes: ${notes.slice(0, 600)}${notes.length > 600 ? '…' : ''}`);
+        }
+        if (calls.length) {
+          lines.push('RECENT CALLS (this account):');
+          calls.forEach((c, i) => {
+            const date = c.timestamp ? new Date(c.timestamp).toISOString().split('T')[0] : '';
+            const sum = String(c.ai_summary ?? c.summary ?? '').trim();
+            const trans = String(c.transcript ?? '').trim();
+            if (sum) lines.push(`  Call ${i + 1} (${date}): ${sum.slice(0, 400)}${sum.length > 400 ? '…' : ''}`);
+            if (trans) lines.push(`  Transcript excerpt: ${trans.slice(0, 600)}${trans.length > 600 ? '…' : ''}`);
+          });
+        }
+        if (lines.length) dossierContextBlock = '\n\n' + lines.join('\n');
+      } catch (e) {
+        console.error('[Gemini Chat] Dossier context fetch (account):', e?.message || e);
+      }
+    }
+
     const extractJsonBlocks = (text) => {
       if (typeof text !== 'string' || !text.includes('JSON_DATA:')) return [];
       const blocks = [];
@@ -1872,6 +1943,10 @@ export default async function handler(req, res) {
         - If the user's query applies to this context (e.g., "who is the decision maker?", "draft an email to him", "find a Louis at this company", "phone number for the Allen location"), PRIORITY ONE is to use this context. When context has \`type: 'account'\` and \`id\`, use that \`id\` as \`accountId\` for \`list_contacts\` and as \`account_id\` for \`get_account_details\`.
         - If the user's query is unrelated (e.g., "general market trends", "new search"), IGNORE the current screen context and answer broadly.
         - Use this to offer proactive, zero-click insights ONLY when relevant.
+        ${dossierContextBlock ? `
+        PRELOADED DOSSIER CONTEXT (notes + transmission log — use this instead of calling tools for quick answers):
+        ${dossierContextBlock}
+        ` : ''}
       `;
     };
 
