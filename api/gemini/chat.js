@@ -936,7 +936,8 @@ const toolHandlers = {
     return data;
   },
   list_tasks: async ({ status = 'all', limit = 10 }) => {
-    let query = supabaseAdmin.from('tasks').select('*, contacts(name)').limit(limit);
+    // Use explicit FK: tasks has duplicate FKs to contacts (contactId/contactid), so specify one
+    let query = supabaseAdmin.from('tasks').select('*, contacts!tasks_contactId_fkey(name)').order('createdAt', { ascending: false }).limit(limit);
     if (status !== 'all') {
       query = query.eq('status', status);
     }
@@ -1313,6 +1314,10 @@ export default async function handler(req, res) {
       const p = String(prompt || '').trim();
       if (!p) return false;
 
+      // Grounded path DISABLED: user wants full LLM so they get identity_card (clickable dossier links),
+      // contract end dates in containers, and rich components—not the backend-built table-only response.
+      return false;
+
       const lower = p.toLowerCase();
       // Intent locking: force full LLM for who/phone/email/call/said so grounded path does not return generic company info
       const forceFullLLM = /\b(who|phone|email|call|said)\b/.test(lower);
@@ -1322,6 +1327,14 @@ export default async function handler(req, res) {
       const isReportOrDocumentsIntent = /\b(situation report|one-paragraph|one page|summary for|show me documents|documents for|evidence locker|data locker|account context|contract status|key risks|next steps)\b/.test(lower)
         || (/\b(report|documents)\b/.test(lower) && /\b(for |on |about )?(this account|camp fire|account)\b/i.test(p));
       if (isReportOrDocumentsIntent) return false;
+
+      // Task list: let full LLM call list_tasks instead of grounded account search
+      const isTasksIntent = /\b(tasks|task list|my tasks|current tasks|pending tasks|list of tasks|what tasks)\b/.test(lower);
+      if (isTasksIntent) return false;
+
+      // Checklist / protocol / deal-closing: let full LLM return flight_check component, not account list
+      const isChecklistIntent = /\b(check\s*list|checklist|protocol|steps?\s+to\s+close|closing\s+this\s+deal|deal\s+checklist)\b/.test(lower);
+      if (isChecklistIntent) return false;
 
       // Do NOT handle as account-only search: let the LLM use list_contacts, get_contact_details, search_interactions
       const isPersonRequest = /(\bfind\s+(?:a\s+)?(?:person\s+named\s+)?\w+|person\s+named\b|someone\s+named\b|contact\s+named\b|who\s+works\s+at\b|(?:a\s+)?\w+\s+that\s+works\s+for)/.test(lower);
@@ -1822,6 +1835,8 @@ export default async function handler(req, res) {
           JSON_DATA:{"type": "forensic_documents", "data": {"accountName": "...", "documents": [{"id": "...", "name": "...", "type": "...", "size": "...", "url": "...", "created_at": "..."}]}}END_JSON
         - When the user asks "Who is [name]?" or "Show me [company]" and you return a SINGLE contact or account, use an Identity Node (clickable card) instead of a table:
           JSON_DATA:{"type": "identity_card", "data": {"type": "contact"|"account", "id": "...", "name": "...", "title": "...", "company": "...", "industry": "...", "status": "active"|"risk", "initials": "XX", "logoUrl": "...", "domain": "..."}}END_JSON
+        - LIST OF ACCOUNTS OR CONTACTS (manufacturers, expiring in 2026, accounts with contract end dates, etc.): Prefer returning multiple identity_card components so the user gets clickable cards that open the dossier. If the list is very long (e.g. 20+), you may use a single forensic_grid instead; when the user asked about contract end dates or expirations, the grid MUST include an "expiration" or "contract_end_date" column in \`columns\` and in each row.
+        - When using forensic_grid for accounts (any list of accounts), ALWAYS include "expiration" or "contract_end_date" in \`columns\` when the user asked about contract end dates, expirations, or expiring in a year—so the container shows that data.
         - When suggesting a short protocol or checklist (e.g. "1. Email the CFO. 2. Pull the 4CP report."), use Flight Check so the user can copy or execute steps:
           JSON_DATA:{"type": "flight_check", "data": {"items": [{"label": "Request Interval Data from Oncor", "status": "pending"}, {"label": "Pull the 4CP report", "status": "pending"}]}}END_JSON
         - When search_interactions finds a transcript snippet (e.g. "Did Billy mention a contract end date?"), return the exact quote in a Conversation Snippet so the user sees the highlighted phrase:

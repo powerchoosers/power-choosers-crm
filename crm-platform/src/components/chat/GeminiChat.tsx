@@ -1536,7 +1536,7 @@ SELECT * FROM hybrid_search_accounts(
                             
                             return (
                               <div key={partKey} className="flex flex-col gap-4 w-full min-w-0 max-w-full overflow-hidden">
-                                <div className="w-full overflow-hidden rounded-lg border border-white/5 bg-black/20 grid grid-cols-1">
+                                <div className="w-full overflow-hidden grid grid-cols-1">
                                   <ComponentRenderer type={data.type} data={data.data} onCreateTask={handleCreateTask} contextInfo={contextInfo} />
                                 </div>
                                 {trailingText && (
@@ -1605,7 +1605,7 @@ SELECT * FROM hybrid_search_accounts(
           <motion.div layout className="h-9 bg-black/40 border-b border-white/5 flex items-center justify-between px-3">
             <div className="flex items-center gap-3">
               <Select value={selectedModel} onValueChange={setSelectedModel}>
-                <SelectTrigger className="h-full bg-transparent border-none text-[10px] font-mono text-zinc-400 hover:text-white transition-colors uppercase tracking-wider p-0 focus:ring-0 focus:ring-offset-0 w-auto gap-2 flex items-center">
+                <SelectTrigger className="h-full bg-transparent border-none text-[10px] font-mono text-zinc-400 hover:text-white transition-colors uppercase tracking-wider p-0 focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-transparent focus-visible:outline-none w-auto gap-2 flex items-center">
                   <Cpu className="w-3.5 h-3.5 text-white" />
                   <SelectValue placeholder="Select Model" className="leading-none" />
                 </SelectTrigger>
