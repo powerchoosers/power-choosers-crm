@@ -50,7 +50,8 @@ The agent is currently equipped with the following "Tools" and UI protocols whic
 - **Date Normalization Engine**: Real-time conversion of legacy formats (e.g., `MM/DD/YYYY`) to forensic ISO standards (`YYYY-MM-DD`) during data retrieval.
 - **Enhanced Industry Logic**: Intelligent search expansion for "Manufacturing" and other broad sectors to ensure complete node discovery across related sub-industries.
 - **Reliable Model Routing**: Strict pipeline separation between OpenRouter and Gemini providers to eliminate `404` errors and ensure seamless fallback.
-- **Intent Routing (Grounded Path)**: The backend has a fast "grounded" path for account-only operations (expiration year, location, contract follow-up). Queries containing **who**, **phone**, **email**, **call**, or **said** (whole-word) are **intent-locked**: they are excluded from the grounded path and sent to the full LLM so it can call `list_contacts`, `get_contact_details`, `search_interactions`, `search_emails`, or `search_transcripts` and return the correct data instead of an account list.
+- **Full LLM Routing (No Grounded Path)**: The previous "grounded" fast path is **disabled**. All queries go to the full LLM with tools so the agent can return **identity_card** components (clickable cards to dossiers), **forensic_grid** with contract end dates when relevant, and other rich components—not a backend-built table-only response.
+- **List-of-Accounts / Contract Dates**: For lists (e.g. manufacturers, expiring in 2026, accounts with contract end dates), the system prompt instructs the model to prefer **identity_card** per item so the user gets clickable cards; when using **forensic_grid** for accounts, the grid **must** include an `expiration` or `contract_end_date` column when the user asked about contract end dates or expirations.
 - **Person vs Company**: The system prompt instructs the agent to use `list_contacts` (with context `accountId` when on an account page) for finding people by name; use `get_account_details` and `list_contacts` for phone/contact info for "this company"; use `search_interactions` or `search_transcripts` for call-related questions; and use `search_emails` or `search_interactions` for email-related questions. The user is always addressed by their first name from auth (`firstName`).
 - **"This Year" Expiration**: Expiration queries that say "this year" (e.g. "accounts that expire this year") are resolved to the current calendar year so the grounded path returns the same data as "expire in 2026" (when applicable).
 
@@ -75,7 +76,7 @@ The interface is built using a **Stacked Command Deck** architecture for maximum
 - **Intelligence Block (AI Transmission)**:
     - **Neural Spine**: Left-aligned gradient spine (`from-[#002FA7] via-blue-500/20 to-transparent`).
     - **Narrative Container**: `prose-invert prose-p:text-zinc-400` for conversational flow.
-    - **JSON_DATA Wrapper**: `bg-black/20 border-white/5 rounded-lg` for rendering forensic components.
+    - **JSON_DATA Wrapper**: No outer border; components (identity_card, forensic_grid, etc.) render with their own single border so there is no double-container look.
 - **Stealth Command Block (User Input)**:
     - `bg-zinc-900/50 border-white/10 backdrop-blur-md rounded-lg`
     - Right-aligned with `gap-8` immersion spacing and `> COMMAND_INPUT` metadata.
@@ -177,8 +178,10 @@ Use these to verify the Nodal Architect and Build Gemini v2 behavior. **Context*
 | **Find Camp Fire First Texas** | Any | `list_accounts` → Identity card or account details; exact name should rank #1 (hybrid search). |
 | **Who works at this company?** / **Find a person named Louis** | Account page preferred | `list_contacts` with accountId; returns people, not company list. Identity cards for contacts. |
 | **What's the phone number for this company?** | Account page | `get_account_details` + `list_contacts`; agent returns actual phone from CRM or says none found. |
-| **Accounts expiring in 2026** | Any | `list_accounts({ expiration_year: 2026 })`; list of accounts with contract end in 2026. |
-| **Accounts in Houston, Texas** | Any | `list_accounts` with city/state; location-aware results. |
+| **Accounts expiring in 2026** | Any | Full LLM; `list_accounts({ expiration_year: 2026 })`; expect **identity_card**s (clickable to dossier) or **forensic_grid** with an **expiration** column. |
+| **List accounts that are manufacturers** | Any | Full LLM; `list_accounts` (industry/search); expect **identity_card**s or grid; no plain id/name-only table. |
+| **Accounts with contract end dates** | Any | Full LLM; `list_accounts`; response must show contract end dates—**forensic_grid** should have **expiration** or **contract_end_date** in columns and rows. |
+| **Accounts in Houston, Texas** | Any | `list_accounts` with city/state; location-aware results; identity cards or grid. |
 | **How's the market?** / **Is the market volatile?** | Any | `get_market_pulse` → **Market_Pulse** card with zones, scarcity gauge, volatility. |
 | **Show me documents for [account name]** | Any | `list_account_documents` → **Forensic_Documents** (Evidence Locker) with Download, Open, **Analyze** (→ Bill Debugger). |
 | **Give me a protocol checklist for closing this deal** | Account/Contact | Agent returns **Flight_Check** with items; each row has **+** button; click **+** → task created, row shows **[ QUEUED ]** and turns green; task appears in Right Panel / Tasks. |
@@ -189,5 +192,5 @@ Use these to verify the Nodal Architect and Build Gemini v2 behavior. **Context*
 **Key tables** (agent reads via tools): `accounts` (name, domain, industry, city, state, contract_end_date, metadata, etc.), `contacts` (name, email, phone, title, accountId, etc.), `documents`, `tasks`, `emails`, `call_details` / transcripts, `market_telemetry`.
 
 ---
-*Last Updated: 2026-02-08*
-*Status: Nodal Architect v2.0 (Build Gemini v2: DecryptionText, NeuralLoader, Proactive Situation Report, Flight Check → create_task with [ QUEUED ], Evidence Locker Analyze → Bill Debugger, Intent locking who/phone/email/call/said; Identity Cards, Scarcity Gauge, Conversation Snippet, High-Contrast ** Artifacts)*
+*Last Updated: 2026-02-06*
+*Status: Nodal Architect v2.0 — Grounded path disabled (full LLM for all queries); list responses use identity_card or forensic_grid with expiration when relevant; single-container UI (no outer wrapper border). DecryptionText, NeuralLoader, Proactive Situation Report, Flight Check → create_task, Evidence Locker Analyze → Bill Debugger; Identity Cards, Scarcity Gauge, Conversation Snippet, High-Contrast ** Artifacts.*
