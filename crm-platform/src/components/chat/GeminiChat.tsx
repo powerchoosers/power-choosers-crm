@@ -1062,6 +1062,8 @@ export function GeminiChatPanel() {
       await addTaskAsync({
         title: opts.title,
         description: opts.description ?? opts.title,
+        status: 'Pending',
+        priority: 'Medium',
         contactId: contextInfo.type === 'contact' && typeof contextInfo.id === 'string' ? contextInfo.id : undefined,
         accountId: contextInfo.type === 'account' && typeof contextInfo.id === 'string' ? contextInfo.id : undefined,
       })
