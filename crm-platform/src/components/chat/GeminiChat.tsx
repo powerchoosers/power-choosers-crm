@@ -150,7 +150,7 @@ function ProseWithArtifacts({ text, revealFirstWords }: { text: string; revealFi
           return (
             <span
               key={i}
-              className="font-mono font-bold text-white bg-white/10 px-1 rounded-sm border border-white/5 tracking-tight tabular-nums shadow-[0_0_10px_-2px_rgba(255,255,255,0.2)]"
+              className="font-sans font-bold text-white bg-white/10 px-1 rounded-sm border border-white/5 tracking-tight tabular-nums shadow-[0_0_10px_-2px_rgba(255,255,255,0.2)]"
             >
               {match[1]}
             </span>
@@ -959,14 +959,6 @@ export function GeminiChatPanel() {
     "Market volatility",
   ], [])
 
-  const isBackupFallback = useMemo(() => {
-    if (!diagnostics || diagnostics.length < 2) return false
-    const hasFailed = diagnostics.some((d) => d.status === 'failed')
-    const hasSuccess = diagnostics.some((d) => d.status === 'success')
-    const hasFallbackReason = diagnostics.some((d) => d.reason === 'FALLBACK_TO_DEFAULT')
-    return (hasFailed && hasSuccess) || !!hasFallbackReason
-  }, [diagnostics])
-
   // Fetch History
   useEffect(() => {
     if (isHistoryOpen) {
@@ -1025,10 +1017,18 @@ export function GeminiChatPanel() {
 
   const [messages, setMessages] = useState<GeminiMessage[]>([])
   const [lastProvider, setLastProvider] = useState<string>('openrouter')
-  const [lastModel, setLastModel] = useState<string>('gemini-3-flash-preview')
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-3-flash-preview')
+  const [lastModel, setLastModel] = useState<string>('gemini-2.5-flash')
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-flash')
   const [diagnostics, setDiagnostics] = useState<Diagnostic[] | null>(null)
   const [showDiagnostics, setShowDiagnostics] = useState(false)
+
+  const isBackupFallback = useMemo(() => {
+    if (!diagnostics || diagnostics.length < 2) return false
+    const hasFailed = diagnostics.some((d) => d.status === 'failed')
+    const hasSuccess = diagnostics.some((d) => d.status === 'success')
+    const hasFallbackReason = diagnostics.some((d) => d.reason === 'FALLBACK_TO_DEFAULT')
+    return (hasFailed && hasSuccess) || !!hasFallbackReason
+  }, [diagnostics])
   
   // Host Google Avatar if needed
   useEffect(() => {
@@ -1278,7 +1278,9 @@ SELECT * FROM hybrid_search_accounts(
       if (data.error) throw new Error(data.message || data.error)
       setLastProvider(typeof data.provider === 'string' ? data.provider : 'gemini')
       setLastModel(typeof data.model === 'string' ? data.model : '')
-      if (typeof data.model === 'string' && data.model.trim()) setSelectedModel(data.model)
+      // Only update dropdown if the returned model is one we show (avoids "no model selected" when backend fallback used)
+      const allowedGemini = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3-flash-preview', 'gemini-2.0-flash']
+      if (typeof data.model === 'string' && data.model.trim() && (allowedGemini.includes(data.model) || data.model.startsWith('sonar') || data.model.includes('/'))) setSelectedModel(data.model)
       setMessages((prev) => [...prev, { role: 'assistant', content: data.content, id: crypto.randomUUID(), timestamp: Date.now() }])
       saveMessageToDb('model', data.content)
     } catch (err: unknown) {
@@ -1355,10 +1357,10 @@ SELECT * FROM hybrid_search_accounts(
             />
           </div>
           <div>
-            <h3 className="text-xs font-mono font-bold text-zinc-100 tracking-widest uppercase">Nodal Architect v2.0</h3>
+            <h3 className="text-xs font-sans font-bold text-zinc-100 tracking-widest uppercase">Nodal Architect v2.0</h3>
             <div className="flex items-center gap-2">
               <Waveform />
-              <span className="text-[10px] font-mono text-emerald-500/70 uppercase tracking-tighter font-bold">LIVE_FEED</span>
+              <span className="text-[10px] font-sans text-emerald-500/70 uppercase tracking-tighter font-bold">LIVE_FEED</span>
             </div>
           </div>
         </div>
@@ -1542,10 +1544,10 @@ SELECT * FROM hybrid_search_accounts(
                   <div className="flex justify-end mb-2 group w-full gap-8">
                     <div className="max-w-[85%] relative">
                       <div className="bg-zinc-900/50 border border-white/10 backdrop-blur-md rounded-lg p-4 text-right shadow-xl">
-                        <p className="font-mono text-[10px] text-[#002FA7] mb-1 uppercase tracking-widest opacity-70">
+                        <p className="font-sans text-[10px] text-[#002FA7] mb-1 uppercase tracking-widest opacity-70">
                           {'>'} COMMAND_INPUT
                         </p>
-                        <p className="text-sm text-zinc-100 font-medium leading-relaxed">
+                        <p className="font-sans text-sm text-zinc-100 font-medium leading-relaxed">
                           {m.content}
                         </p>
                       </div>
@@ -1560,7 +1562,7 @@ SELECT * FROM hybrid_search_accounts(
                           className="w-full h-full" 
                         />
                       ) : (
-                        <span className="font-mono text-xs text-zinc-500">YOU</span>
+                        <span className="font-sans text-xs text-zinc-500">YOU</span>
                       )}
                     </div>
                   </div>
@@ -1572,13 +1574,13 @@ SELECT * FROM hybrid_search_accounts(
                     
                     <div className="pl-6 w-full">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-widest font-bold">
+                        <span className="text-[10px] font-sans text-[#002FA7] uppercase tracking-widest font-bold">
                           NODAL_ARCHITECT // v2.0
                         </span>
                         {isLoading && i === messages.length - 1 && <Waveform />}
                       </div>
-                      {i === messages.length - 1 && isBackupFallback && (
-                        <p className="text-[9px] font-mono text-zinc-500 mb-1">Using backup model</p>
+                        {i === messages.length - 1 && isBackupFallback && (
+                        <p className="text-[9px] font-sans text-zinc-500 mb-1">Using backup model</p>
                       )}
                       <div className="flex flex-col gap-4 w-full min-w-0 max-w-full overflow-hidden">
                         {m.content.split('JSON_DATA:').map((part, index) => {
@@ -1688,19 +1690,19 @@ SELECT * FROM hybrid_search_accounts(
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-950 border-white/10 text-white">
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 mb-1">
-                    Gemini Intelligence Stack
+                    Gemini Intelligence Stack (2.5 preferred)
                   </div>
+                  <SelectItem value="gemini-2.5-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GEMINI-2.5-FLASH
+                  </SelectItem>
+                  <SelectItem value="gemini-2.5-flash-lite" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GEMINI-2.5-FLASH-LITE
+                  </SelectItem>
                   <SelectItem value="gemini-3-flash-preview" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                     GEMINI-3.0-FLASH-PREVIEW
                   </SelectItem>
                   <SelectItem value="gemini-2.0-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                     GEMINI-2.0-FLASH
-                  </SelectItem>
-                  <SelectItem value="gemini-2.0-flash-thinking-exp-01-21" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GEMINI-2.0-THINKING
-                  </SelectItem>
-                  <SelectItem value="gemini-2.0-pro-exp-02-05" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GEMINI-2.0-PRO-PREVIEW
                   </SelectItem>
 
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
@@ -1728,7 +1730,7 @@ SELECT * FROM hybrid_search_accounts(
 
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
-              <span className="text-[10px] font-mono text-emerald-500/80 uppercase tracking-tighter leading-none">
+              <span className="text-[10px] font-sans text-emerald-500/80 uppercase tracking-tighter leading-none">
                 {contextInfo.displayLabel}
               </span>
             </div>
@@ -1737,13 +1739,13 @@ SELECT * FROM hybrid_search_accounts(
           {/* Try suggestions when empty */}
           {messages.length === 0 && (
             <div className="px-3 pt-1 pb-0 flex flex-wrap items-center gap-1.5">
-              <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-wider shrink-0">Try:</span>
+              <span className="text-[9px] font-sans text-zinc-600 uppercase tracking-wider shrink-0">Try:</span>
               {trySuggestions.map((s) => (
                 <button
                   key={s}
                   type="button"
                   onClick={() => setInput(s)}
-                  className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 border border-white/10 hover:border-white/20 px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                  className="text-[10px] font-sans text-zinc-500 hover:text-zinc-300 border border-white/10 hover:border-white/20 px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
                 >
                   {s}
                 </button>
@@ -1768,7 +1770,7 @@ SELECT * FROM hybrid_search_accounts(
                     handleSend();
                   }
                 }}
-                className="w-full bg-transparent border-none focus:ring-0 focus:outline-none text-sm text-zinc-100 placeholder:text-zinc-600 font-medium resize-none py-3 pl-2 max-h-[112px] min-h-[44px] custom-scrollbar"
+                className="w-full bg-transparent border-none focus:ring-0 focus:outline-none font-sans text-sm text-zinc-100 placeholder:text-zinc-600 font-medium resize-none py-3 pl-2 max-h-[112px] min-h-[44px] custom-scrollbar"
                 style={{ height: '44px' }}
                 placeholder={inputPlaceholder}
                 rows={1}
@@ -1800,7 +1802,7 @@ SELECT * FROM hybrid_search_accounts(
         </motion.form>
         
         <div className="text-center mt-3">
-          <span className="text-[9px] text-zinc-700 font-mono uppercase tracking-[0.2em]">Nodal Point Neural Engine v2.0</span>
+          <span className="text-[9px] text-zinc-700 font-sans uppercase tracking-[0.2em]">Nodal Point Neural Engine v2.0</span>
         </div>
       </motion.div>
     </motion.div>
