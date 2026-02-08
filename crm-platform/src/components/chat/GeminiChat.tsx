@@ -963,8 +963,8 @@ export function GeminiChatPanel() {
 
   const [messages, setMessages] = useState<GeminiMessage[]>([])
   const [lastProvider, setLastProvider] = useState<string>('openrouter')
-  const [lastModel, setLastModel] = useState<string>('openai/gpt-oss-120b:free')
-  const [selectedModel, setSelectedModel] = useState<string>('openai/gpt-oss-120b:free')
+  const [lastModel, setLastModel] = useState<string>('gemini-3-flash-preview')
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-3-flash-preview')
   const [diagnostics, setDiagnostics] = useState<Diagnostic[] | null>(null)
   const [showDiagnostics, setShowDiagnostics] = useState(false)
   
@@ -1611,16 +1611,6 @@ SELECT * FROM hybrid_search_accounts(
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-950 border-white/10 text-white">
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 mb-1">
-                Priority Agents (Free)
-              </div>
-              <SelectItem value="openai/gpt-oss-120b:free" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                GPT-OSS-120B (FREE)
-              </SelectItem>
-              <SelectItem value="nvidia/nemotron-3-nano-30b-a3b:free" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                NEMOTRON-30B
-              </SelectItem>
-                  
-                  <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
                     Gemini Intelligence Stack
                   </div>
                   <SelectItem value="gemini-3-flash-preview" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
@@ -1635,15 +1625,25 @@ SELECT * FROM hybrid_search_accounts(
                   <SelectItem value="gemini-2.0-pro-exp-02-05" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                     GEMINI-2.0-PRO-PREVIEW
                   </SelectItem>
-                  
+
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
-                    Perplexity (Paid)
+                    Perplexity
                   </div>
                   <SelectItem value="sonar-pro" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                     SONAR-PRO
                   </SelectItem>
                   <SelectItem value="sonar" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                     SONAR-STANDARD
+                  </SelectItem>
+
+                  <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
+                    OpenRouter
+                  </div>
+                  <SelectItem value="openai/gpt-oss-120b:free" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GPT-OSS-120B
+                  </SelectItem>
+                  <SelectItem value="nvidia/nemotron-3-nano-30b-a3b:free" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    NEMOTRON-30B
                   </SelectItem>
                 </SelectContent>
               </Select>

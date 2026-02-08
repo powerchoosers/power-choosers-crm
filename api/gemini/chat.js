@@ -1318,6 +1318,11 @@ export default async function handler(req, res) {
       const forceFullLLM = /\b(who|phone|email|call|said)\b/.test(lower);
       if (forceFullLLM) return false;
 
+      // Report / documents / meta: let full LLM use tools and context so we get narrative + components, not just account list
+      const isReportOrDocumentsIntent = /\b(situation report|one-paragraph|one page|summary for|show me documents|documents for|evidence locker|data locker|account context|contract status|key risks|next steps)\b/.test(lower)
+        || (/\b(report|documents)\b/.test(lower) && /\b(for |on |about )?(this account|camp fire|account)\b/i.test(p));
+      if (isReportOrDocumentsIntent) return false;
+
       // Do NOT handle as account-only search: let the LLM use list_contacts, get_contact_details, search_interactions
       const isPersonRequest = /(\bfind\s+(?:a\s+)?(?:person\s+named\s+)?\w+|person\s+named\b|someone\s+named\b|contact\s+named\b|who\s+works\s+at\b|(?:a\s+)?\w+\s+that\s+works\s+for)/.test(lower);
       const isPhoneRequest = /(phone\s*number|phone\s+for|number\s+for|call\s+them|dial\s+)/.test(lower);
@@ -1607,8 +1612,12 @@ export default async function handler(req, res) {
       }
 
       if (isContractQuery && !isSearchQuery) {
+        const requestContext = req.body?.context;
+        const contextAccountId = requestContext?.type === 'account' && requestContext?.id
+          ? String(requestContext.id)
+          : null;
         const inferred = inferLastAccountFromHistory();
-        let accountId = inferred?.id || null;
+        let accountId = contextAccountId || inferred?.id || null;
 
         if (!accountId) {
           const q = stripSearchPreamble(p);
