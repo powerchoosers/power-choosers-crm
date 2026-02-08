@@ -48,6 +48,9 @@ The agent is currently equipped with the following "Tools" and UI protocols whic
 - **Date Normalization Engine**: Real-time conversion of legacy formats (e.g., `MM/DD/YYYY`) to forensic ISO standards (`YYYY-MM-DD`) during data retrieval.
 - **Enhanced Industry Logic**: Intelligent search expansion for "Manufacturing" and other broad sectors to ensure complete node discovery across related sub-industries.
 - **Reliable Model Routing**: Strict pipeline separation between OpenRouter and Gemini providers to eliminate `404` errors and ensure seamless fallback.
+- **Intent Routing (Grounded Path)**: The backend has a fast "grounded" path for account-only operations (expiration year, location, contract follow-up). Queries that are clearly about **people** (e.g. "find a Louis at this company", "who works here"), **phone numbers** ("phone for the Allen location"), **calls** ("what calls do you see", "my recent call"), or **emails** ("any important emails", "emails in my inbox") are **excluded** from that path and sent to the full LLM so it can call `list_contacts`, `get_contact_details`, `search_interactions`, `search_emails`, or `search_transcripts` and return the correct data instead of an account list.
+- **Person vs Company**: The system prompt instructs the agent to use `list_contacts` (with context `accountId` when on an account page) for finding people by name; use `get_account_details` and `list_contacts` for phone/contact info for "this company"; use `search_interactions` or `search_transcripts` for call-related questions; and use `search_emails` or `search_interactions` for email-related questions. The user is always addressed by their first name from auth (`firstName`).
+- **"This Year" Expiration**: Expiration queries that say "this year" (e.g. "accounts that expire this year") are resolved to the current calendar year so the grounded path returns the same data as "expire in 2026" (when applicable).
 
 ---
 
@@ -153,4 +156,4 @@ We are actively expanding the Architect's "Brain" to include these forensic ener
 
 ---
 *Last Updated: 2026-02-07*
-*Status: Nodal Architect v1.3 Operational (Build Gemini: Identity Cards, Flight Check, Evidence Locker tiles, Scarcity Gauge, Conversation Snippet, High-Contrast ** Artifacts)*
+*Status: Nodal Architect v1.3 Operational (Build Gemini: Identity Cards, Flight Check, Evidence Locker tiles, Scarcity Gauge, Conversation Snippet, High-Contrast ** Artifacts; Intent Routing: person/phone/calls/emails excluded from grounded path, "this year" expiration, PERSON vs COMPANY prompt)*
