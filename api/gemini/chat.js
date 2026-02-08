@@ -377,7 +377,8 @@ const toolHandlers = {
       );
     }
 
-    return data;
+    const total = data.length;
+    return { data, total };
   },
   list_deals: async ({ account_id, status = 'all' }) => {
     let query = supabaseAdmin.from('deals').select('*, accounts(name)');
@@ -896,15 +897,16 @@ const toolHandlers = {
       data = withScores.map((x) => x.r);
     }
 
+    const total = data.length;
     data = data.slice(0, limit);
-    
-    console.log(`[list_accounts] Found ${data?.length || 0} precision records (Vector: ${usedVector}, Year: ${expiration_year})`);
 
-    return data.map(record => {
+    console.log(`[list_accounts] Found ${data?.length || 0} precision records (total: ${total}, Vector: ${usedVector}, Year: ${expiration_year})`);
+
+    const mapped = data.map(record => {
       const metadata = record.metadata || {};
-      let contract_end_date = record.contract_end_date || 
-                             metadata.contract_end_date || 
-                             metadata.contractEndDate || 
+      let contract_end_date = record.contract_end_date ||
+                             metadata.contract_end_date ||
+                             metadata.contractEndDate ||
                              metadata.general?.contractEndDate;
 
       if (contract_end_date && contract_end_date.includes('/')) {
@@ -924,6 +926,7 @@ const toolHandlers = {
         state: record.state || metadata.state || metadata.general?.state
       };
     });
+    return { data: mapped, total };
   },
   list_account_documents: async ({ account_id }) => {
     const { data, error } = await supabaseAdmin.from('documents').select('*').eq('account_id', account_id).order('created_at', { ascending: false });
@@ -1381,7 +1384,8 @@ export default async function handler(req, res) {
           city = tokens[0];
         }
 
-          const records = await toolHandlers.list_accounts({ city, state, limit: 20 });
+          const locRes = await toolHandlers.list_accounts({ city, state, limit: 20 });
+        const records = locRes?.data ?? locRes ?? [];
         diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
 
         // Check for single result to promote to Position Maturity
@@ -1435,7 +1439,8 @@ export default async function handler(req, res) {
 
       if (isExpirationQuery) {
         const year = parseYear(p);
-        const records = await toolHandlers.list_accounts({ expiration_year: year, limit: 50 });
+        const expRes = await toolHandlers.list_accounts({ expiration_year: year, limit: 50 });
+        const records = expRes?.data ?? expRes ?? [];
         diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
 
         const rows = (records || []).map((r) => ({
@@ -1529,8 +1534,9 @@ export default async function handler(req, res) {
         let usedQuery = q0;
         for (const q of variations) {
           const r = await toolHandlers.list_accounts({ search: q, limit: 10 });
-          if (Array.isArray(r) && r.length > 0) {
-            records = r;
+          const list = r?.data ?? r;
+          if (Array.isArray(list) && list.length > 0) {
+            records = list;
             usedQuery = q;
             break;
           }
@@ -1634,7 +1640,8 @@ export default async function handler(req, res) {
 
         if (!accountId) {
           const q = stripSearchPreamble(p);
-          const candidates = await toolHandlers.list_accounts({ search: q, limit: 3 });
+          const candRes = await toolHandlers.list_accounts({ search: q, limit: 3 });
+          const candidates = candRes?.data ?? candRes ?? [];
           if (Array.isArray(candidates) && candidates.length === 1) {
             accountId = String(candidates[0].id);
           }
@@ -1689,8 +1696,9 @@ export default async function handler(req, res) {
         let usedQuery = q0;
         for (const q of variations) {
           const r = await toolHandlers.list_accounts({ search: q, limit: 10 });
-          if (Array.isArray(r) && r.length > 0) {
-            records = r;
+          const list = r?.data ?? r;
+          if (Array.isArray(list) && list.length > 0) {
+            records = list;
             usedQuery = q;
             break;
           }
@@ -1817,7 +1825,7 @@ export default async function handler(req, res) {
         - LEAD WITH THE ANSWER: Start with the direct result (e.g. "Here are the 8 accounts expiring in 2026" or "Camp Fire First Texas expires December 2026"). Do NOT open with "I have retrieved..." or "I found...".
         - When returning a list (grid or identity cards), include one short line that echoes the filter (e.g. "Filter: contract end in 2026" or "Manufacturers only") so the response is clearly scoped.
         - When returning a SINGLE contact or account (one identity_card), optionally end the narrative with a short line like "Open the card to see the full dossier" or "I can pull the contract next if you'd like."
-        - TRUNCATION: When a tool returns a limited list (e.g. you used a limit), state it in the narrative: "Showing 20 of 47 matches" or "Showing top 20; more in CRM."
+        - TRUNCATION: List tools (\`list_accounts\`, \`list_contacts\`) return \`{ data, total }\`. When \`total > data.length\`, state it in the narrative: "Showing N of M" (e.g. "Showing 20 of 47") or "Showing top N of M." Use the \`total\` and \`data.length\` from the tool result.
         - When you return a data_void component, add one short sentence in the narrative after it (e.g. "Upload a bill to fill this.") so the user knows the next action.
         - TERMINOLOGY: In narrative prose use "contract end date"; in forensic_grid use the column name "expiration". Keep usage consistent.
         - DO NOT skip the narrative. DO NOT start with JSON.
@@ -1835,7 +1843,8 @@ export default async function handler(req, res) {
         - When providing prospect/person details (Dossier), use:
           JSON_DATA:{"type": "contact_dossier", "data": {"name": "...", "title": "...", "company": "...", "initials": "...", "energyMaturity": "...", "contractStatus": "active|expired|negotiating", "contractExpiration": "YYYY-MM-DD", "id": "..."}}END_JSON
         - When providing Account/Position data (Maturity), use:
-          JSON_DATA:{"type": "position_maturity", "data": {"expiration": "...", "daysRemaining": 123, "currentSupplier": "...", "strikePrice": "$0.0000", "annualUsage": "...", "estimatedRevenue": "...", "margin": "...", "isSimulation": false}}END_JSON
+          JSON_DATA:{"type": "position_maturity", "data": {"expiration": "...", "daysRemaining": 123, "currentSupplier": "...", "strikePrice": "$0.0000", "annualUsage": "...", "estimatedRevenue": "...", "margin": "...", "isSimulation": false, "accountId": "optional-account-uuid"}}END_JSON
+        - When returning position_maturity from \`get_account_details\`, include \`accountId\` (the account id from the tool result) in the data so the UI can show an "Open account" link to the dossier.
         - When providing lists of data (Grids), use:
           JSON_DATA:{"type": "forensic_grid", "data": {"title": "...", "columns": ["..."], "rows": [{"col1": "...", "col2": "..."}], "highlights": ["col_name_to_highlight"]}}END_JSON
         - When providing document/bill lists (Evidence Locker), use:

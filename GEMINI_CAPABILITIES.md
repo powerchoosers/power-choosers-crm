@@ -88,7 +88,7 @@ The Architect can inject specialized data modules directly into the chat stream.
 - **Identity_Card**: Clickable "Identity Node" for a single contact or account. Use when the user asks "Who is [name]?" or "Show me [company]." Data: type (`contact`|`account`), id, name, title?, company?, industry?, status? (`active`|`risk`), initials?, logoUrl?, domain?, and optional contractEndDate?, contactCount?, subtitle? so the card can show a second line (e.g. "Contract: Dec 2026" or "3 contacts"). Card shows letter glyph or company logo (squircle), status LED, name, subtitle; click navigates to `/network/people/{id}` or `/network/accounts/{id}`.
 - **News_Ticker**: Real-time scrolling grid intelligence (Market_Volatility_Feed; items with title, source, trend, volatility).
 - **Contact_Dossier**: Detailed node profile (name, title, company, initials, energyMaturity, contractStatus, contractExpiration, id) with INITIATE action and Data Locker void state.
-- **Position_Maturity**: Visualization of contract and pricing status (expiration, daysRemaining, currentSupplier, strikePrice, annualUsage, estimatedRevenue, margin; optional isSimulation). Displays a subtle "From account record" label when data is tool-backed (non-simulation).
+- **Position_Maturity**: Visualization of contract and pricing status (expiration, daysRemaining, currentSupplier, strikePrice, annualUsage, estimatedRevenue, margin; optional isSimulation, optional accountId). Displays a subtle "From account record" label when data is tool-backed (non-simulation). When `accountId` is present, an "Open account →" link navigates to the account dossier.
 - **Market_Pulse**: Live ERCOT telemetry card—**all four zones** (LZ_NORTH, LZ_HOUSTON, LZ_WEST, LZ_SOUTH) with colors matching Telemetry/Infrastructure, volatility banner, HUB_AVG, scarcity %, and **Scarcity Gauge** (Voltage Bar: left=scarcity/red, right=stable/green, glowing needle = reserve margin). Injected by the **backend** when `get_market_pulse` is called.
 - **Forensic_Grid**: High-density tabular data for account analysis (title, columns, rows, optional highlights, optional sourceLabel). Table body scrolls within max height with a sticky header; header can show a "From CRM" (or custom sourceLabel) pill for verified data.
 - **Forensic_Documents (Evidence Locker)**: Grid of **glass tiles** per document: PDF icon (red/white), truncated filename, date; hover reveals Download, Open, and **Analyze** (links to `/bill-debugger` for bill analysis). Data: accountName, documents (id, name, type, size, url, created_at).
@@ -102,7 +102,10 @@ The Architect can inject specialized data modules directly into the chat stream.
 - **Chat sessions**: Messages are persisted in Supabase (`chat_sessions`, `chat_messages`). Each session has `context_type` and `context_id`. History panel loads past sessions and restores message list for a selected session.
 
 ### 4. Interaction Protocols
-- **Router HUD (Diagnostics)**: Toggling the Bot icon shows **AI_ROUTER_HUD // LIVE_DIAGNOSTICS** with model/provider status, tool names when tools are invoked, and buttons to copy the Supabase debug prompt or the AI troubleshooting prompt.
+- **Router HUD (Diagnostics)**: Toggling the Bot icon shows **AI_ROUTER_HUD // LIVE_DIAGNOSTICS** with model/provider status, tool names when tools are invoked, and buttons to copy the Supabase debug prompt or the AI troubleshooting prompt. When the router falls back to a backup model (e.g. primary failed), a subtle "Using backup model" note appears on the last assistant message.
+- **List tools**: `list_accounts` and `list_contacts` return `{ data, total }` so the model can say "Showing N of M" in the narrative when results are truncated.
+- **Unknown component type**: Unknown `type` values render a small "Unknown component: {type}" block with optional data preview for debugging.
+- **Malformed JSON_DATA**: When a JSON_DATA block fails to parse, the UI shows "[System_Error: Data_Corruption]" and a **Copy raw** button to copy the raw segment for debugging.
 - **Proactive Situation Report ("Pre-Strike")**: When the chat opens on an **Account** or **Contact** page with **empty message history**, the agent automatically sends a synthetic request and posts a one-paragraph **Situation Report** as the first AI message (e.g. contract status, key risks, next steps). No user prompt required.
 - **DecryptionText**: The first segment of the latest AI prose can render with a "decryption" effect (characters cycle through glyphs then lock). Optional `decryptFirstChars` limits animation length.
 - **NeuralLoader (Neural Uplink)**: While the agent is loading, a horizontal Klein Blue line expands and oscillates (waveform); status messages cycle every 800ms: `ESTABLISHING_SECURE_UPLINK...`, `PARSING_GRID_TELEMETRY...`, `VERIFYING_SOURCE_INTEGRITY...`, `[ SIGNAL_LOCKED ]`.
@@ -165,9 +168,6 @@ We are actively expanding the Architect's "Brain" to include these forensic ener
 
 ---
 ## 📋 Recommended Follow-Ups (Backlog)
-- **Position Maturity card**: Add "Open account" link/button using account id when available so the user can jump to the account dossier.
-- **ProseWithArtifacts**: Support multi-line or nested `**` (e.g. `**line1** **line2**`) more robustly if the model emits it.
-- **Unknown component type**: Today unknown `type` returns `null`; optional dev-only fallback (e.g. "Unknown: {type}") could help when adding new components.
 - **Streaming**: If the backend ever streams tool calls or partial content, the frontend would need to handle incremental JSON_DATA or append content.
 
 ---
@@ -191,9 +191,10 @@ Use these to verify the Nodal Architect and Build Gemini v2 behavior. **Context*
 | **What did [name] say about the contract?** | Any | **Intent lock**: full LLM; `search_transcripts` or `search_interactions`; **Interaction_Snippet** or prose with call/email snippets, not generic account info. |
 | **Any important emails from this account?** | Account page | `search_emails` or `search_interactions`; email results, not account-only response. |
 | **When does their contract expire?** (after "Find X") | Any | Uses memorized account id; `get_account_details`; returns date or **[ DATA_VOID ]** / unknown if not in CRM. |
+| **List-style queries** (e.g. accounts/contacts) | Any | When the tool returns `{ data, total }` with `total > data.length`, narrative should say "Showing N of M" (e.g. "Showing 20 of 47"). |
 
 **Key tables** (agent reads via tools): `accounts` (name, domain, industry, city, state, contract_end_date, metadata, etc.), `contacts` (name, email, phone, title, accountId, etc.), `documents`, `tasks`, `emails`, `call_details` / transcripts, `market_telemetry`.
 
 ---
 *Last Updated: 2026-02-06*
-*Status: Nodal Architect v2.0 — Premium response: lead-with-answer narrative, truncation hint, data void actionable line, identity_card optional contract/contact line, forensic_grid sticky header + "From CRM", position_maturity "From account record" label, dynamic placeholder, Try suggestions when empty. Grounded path disabled; list responses use identity_card or forensic_grid with expiration when relevant; single-container UI. DecryptionText, NeuralLoader, Proactive Situation Report, Flight Check → create_task, Evidence Locker Analyze → Bill Debugger; Identity Cards, Scarcity Gauge, Conversation Snippet, High-Contrast ** Artifacts.*
+*Status: Nodal Architect v2.0 — List tools return { data, total }; position_maturity optional accountId + "Open account" link; unknown component fallback; ProseWithArtifacts multi-artifact **; malformed JSON "Copy raw"; "Using backup model" when diagnostics show fallback. Premium response: lead-with-answer narrative, truncation hint, data void actionable line, identity_card optional contract/contact line, forensic_grid sticky header + "From CRM", position_maturity "From account record" label, dynamic placeholder, Try suggestions when empty. Grounded path disabled; list responses use identity_card or forensic_grid with expiration when relevant; single-container UI. DecryptionText, NeuralLoader, Proactive Situation Report, Flight Check → create_task, Evidence Locker Analyze → Bill Debugger; Identity Cards, Scarcity Gauge, Conversation Snippet, High-Contrast ** Artifacts.*
