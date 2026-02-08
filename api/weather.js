@@ -96,10 +96,13 @@ export default async function handler(req, res) {
 
     const temp = data.temperature;
     const feelsLike = data.feelsLikeTemperature;
+    // Google returns weatherCondition.description as { text, languageCode }; extract string
+    const rawDesc = data.weatherCondition?.description;
     const condition =
       (typeof data.weatherCondition === 'string' && data.weatherCondition) ||
+      (typeof rawDesc === 'object' && rawDesc !== null && typeof rawDesc.text === 'string' ? rawDesc.text : null) ||
+      (typeof rawDesc === 'string' && rawDesc ? rawDesc : null) ||
       data.weatherCondition?.text ||
-      data.weatherCondition?.description ||
       data.weatherCondition?.code ||
       '—';
     const humidity = data.relativeHumidity ?? null;

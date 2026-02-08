@@ -246,8 +246,11 @@ These samples were captured with the server running via `node scripts/dump-api-r
 - **route:** `electricity/retail-sales/data`, **mode:** data_sample.
 - **catalog:** Array of rows. Each row: `period` (e.g. "2025-11", "2025-10"), `stateid`, `stateDescription`, `sectorid`, `sectorName`, `price` (cents/kWh, string), `price-units`.
 - **Sectors:** ALL, COM (commercial), IND (industrial), OTH (other), RES (residential), TRA (transportation). Some sectors can have `price: null`.
-- **metadata:** `frequency`: "monthly", `total`: "1794" (total rows matching the query). So we have **real historical monthly data**; we can request more months with `length=24` (or use `start`/`end`) and paginate with `offset`/`length` (max 5000 per request).
-- **Use on telemetry:** Texas retail price trend by month and by sector (residential, commercial, industrial, etc.) — all from this one route.
+- **metadata:** `frequency`: "monthly", `total`: "1794" (total rows matching the query). So we have **real historical monthly data**; we can request more months with `length=72` (12 months × 6 sectors) and paginate with `offset`/`length` (max 5000 per request).
+- **Sort:** Use `sort[0][column]=period&sort[0][direction]=desc` to get **most recent months first**. Without sort, default order can vary (per EIA v2.1.9).
+- **Date range / 2026:** EIA publishes with a lag (often 1–2 months). The same request returns the newest available data each time; there is no “2026” until EIA releases those months. The chart therefore **updates as months go on** (newest 12 months of published data).
+- **What the “price” is:** State-level **average price to ultimate customers** (cents/kWh), blended across utilities and customers. So it is **smoother** than ERCOT wholesale or single-bill summer spikes; the series is accurate but reflects statewide averages, not real-time or load-zone spikes.
+- **Use on telemetry:** Texas retail price trend by month and by sector (COM vs IND) — all from this one route.
 
 ### What we do NOT get from the endpoints (avoid suggesting these)
 

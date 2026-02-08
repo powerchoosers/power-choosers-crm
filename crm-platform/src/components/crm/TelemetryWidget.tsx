@@ -64,7 +64,7 @@ export default function TelemetryWidget({ location = 'LZ_NORTH', weather, weathe
           </div>
           {weather?.temp != null ? (
             <div className="text-sm font-mono font-medium text-zinc-200 tabular-nums">
-              {Math.round(weather.temp)}° {weather.condition}
+              {Math.round(weather.temp)}° {typeof weather.condition === 'string' ? weather.condition : (weather.condition as { text?: string } | null)?.text ?? '—'}
             </div>
           ) : (
             <div className="text-sm font-mono text-zinc-500">—</div>
