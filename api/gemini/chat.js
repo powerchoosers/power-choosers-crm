@@ -1837,7 +1837,7 @@ export default async function handler(req, res) {
         - When presenting tool-backed data (grids, cards), you may add a single phrase in the narrative such as "From CRM" or "Live data" so the user sees it as verified.
 
         RICH MEDIA PROTOCOL:
-        - The user interface is a "Forensic HUD". Do NOT return Markdown tables.
+        - The user interface is a "Forensic HUD". Do NOT return Markdown tables. Do NOT respond to list-style queries (e.g. "accounts expiring in 2026", "manufacturers", "accounts with contract end dates", "list accounts") with ONLY a bulleted or numbered list in the narrative. You MUST include at least one JSON_DATA block: either multiple identity_card components (one per account/contact) or one forensic_grid. The user needs clickable cards or a grid to open dossiers.
         - When providing energy news, use:
           JSON_DATA:{"type": "news_ticker", "data": {"items": [{"title": "...", "source": "...", "trend": "up|down", "volatility": "..."}]}}END_JSON
         - When providing prospect/person details (Dossier), use:
@@ -1852,8 +1852,8 @@ export default async function handler(req, res) {
         - When the user asks "Who is [name]?" or "Show me [company]" and you return a SINGLE contact or account, use an Identity Node (clickable card) instead of a table:
           JSON_DATA:{"type": "identity_card", "data": {"type": "contact"|"account", "id": "...", "name": "...", "title": "...", "company": "...", "industry": "...", "status": "active"|"risk", "initials": "XX", "logoUrl": "...", "domain": "...", "contractEndDate": "YYYY-MM-DD or Dec 2026", "contactCount": 3, "subtitle": "optional one-line"}}END_JSON
         - For identity_card, when data is available from tools: include optional contractEndDate (for accounts), contactCount (number of contacts for an account), or subtitle so the card shows a second line (e.g. "Contract: Dec 2026" or "3 contacts").
-        - LIST OF ACCOUNTS OR CONTACTS (manufacturers, expiring in 2026, accounts with contract end dates, etc.): Prefer returning multiple identity_card components so the user gets clickable cards that open the dossier. If the list is very long (e.g. 20+), you may use a single forensic_grid instead; when the user asked about contract end dates or expirations, the grid MUST include an "expiration" or "contract_end_date" column in \`columns\` and in each row.
-        - When using forensic_grid for accounts (any list of accounts), ALWAYS include "expiration" or "contract_end_date" in \`columns\` when the user asked about contract end dates, expirations, or expiring in a year—so the container shows that data.
+        - LIST OF ACCOUNTS OR CONTACTS (manufacturers, expiring in 2026, accounts with contract end dates, list accounts, etc.): You MUST return structured data, not only prose bullets. Either: (A) Emit one identity_card per account/contact (up to a reasonable limit, e.g. 15–20) so the user gets clickable cards that open the dossier, or (B) Emit one forensic_grid with one row per item so every result is visible and clickable. Never respond with only a bullet list in the narrative—always include a JSON_DATA block. If the list is very long (e.g. 20+), use a single forensic_grid. When the user asked about contract end dates or expirations, the grid MUST include an "expiration" or "contract_end_date" column in \`columns\` and in each row.
+        - When using forensic_grid for accounts (any list of accounts), ALWAYS include "expiration" or "contract_end_date" in \`columns\` when the user asked about contract end dates, expirations, or expiring in a year—so the container shows that data. Put every account/contact from the tool result into \`rows\` (do not summarize to fewer items); the grid will scroll if needed.
         - When suggesting a short protocol or checklist (e.g. "1. Email the CFO. 2. Pull the 4CP report."), use Flight Check so the user can copy or execute steps:
           JSON_DATA:{"type": "flight_check", "data": {"items": [{"label": "Request Interval Data from Oncor", "status": "pending"}, {"label": "Pull the 4CP report", "status": "pending"}]}}END_JSON
         - When search_interactions finds a transcript snippet (e.g. "Did Billy mention a contract end date?"), return the exact quote in a Conversation Snippet so the user sees the highlighted phrase:
@@ -2265,22 +2265,19 @@ export default async function handler(req, res) {
     }
 
     const genAI = new GoogleGenerativeAI(geminiApiKey);
+    // Only use Gemini models that exist in the frontend dropdown and that have been verified working (see scripts/test-gemini-models.js).
+    // Prefer 2.5 over 2.0 (2.0 deprecated soon). Order: 2.5 first, then 3, then 2.0.
+    const ALLOWED_GEMINI_MODELS = [
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-3-flash-preview',
+      'gemini-2.0-flash',
+    ];
     const envPreferredModel = (process.env.GEMINI_MODEL || '').trim();
-    const preferredModel = (bodyModel && !bodyModel.includes('/') && !bodyModel.startsWith('sonar')) ? bodyModel : (envPreferredModel || 'gemini-2.0-flash');
+    const requested = (bodyModel && !bodyModel.includes('/') && !bodyModel.startsWith('sonar')) ? bodyModel : (envPreferredModel || '');
+    const preferredModel = ALLOWED_GEMINI_MODELS.includes(requested) ? requested : (ALLOWED_GEMINI_MODELS.includes(envPreferredModel) ? envPreferredModel : 'gemini-2.5-flash');
     const modelCandidates = Array.from(
-      new Set(
-        [
-          preferredModel,
-          'gemini-3-flash-preview',
-          'gemini-2.5-flash-lite',
-          'gemini-2.5-flash',
-          'gemini-2.0-flash-lite-preview-02-05',
-          'gemini-2.0-flash',
-          'gemini-2.0-flash-thinking-exp-01-21',
-          'gemini-2.0-pro-exp-02-05',
-          'gemini-2.0-flash-exp'
-        ].filter(m => m && typeof m === 'string' && (m.startsWith('gemini-2.') || m.startsWith('gemini-3.')))
-      )
+      new Set([preferredModel, ...ALLOWED_GEMINI_MODELS].filter(m => m && typeof m === 'string'))
     );
 
     const isModelNotFoundError = (error) => {
