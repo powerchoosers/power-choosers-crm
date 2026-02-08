@@ -24,7 +24,7 @@ import { useGeminiStore } from '@/store/geminiStore'
 import { Button } from '@/components/ui/button'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
-import { ComposeModal } from '@/components/emails/ComposeModal'
+import { ComposeModal, type ComposeContext } from '@/components/emails/ComposeModal'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
@@ -296,6 +296,26 @@ export default function ContactDossierPage() {
   }
 
   const forensicNotes = contact?.notes || contact?.accountDescription || ''
+
+  const composeContext = useMemo((): ComposeContext | null => {
+    if (!contact) return null
+    const parts: string[] = []
+    if (forensicNotes?.trim()) parts.push(`Notes (Log_Stream): ${forensicNotes.trim().slice(0, 800)}${forensicNotes.length > 800 ? '…' : ''}`)
+    const lastCall = recentCalls?.[0]
+    if (lastCall) {
+      const note = (lastCall as { note?: string }).note
+      if (note?.trim()) parts.push(`Last call summary: ${note.trim().slice(0, 400)}${note.length > 400 ? '…' : ''}`)
+      const transcript = (lastCall as { transcript?: string }).transcript
+      if (transcript?.trim()) parts.push(`Last call transcript (excerpt): ${transcript.trim().slice(0, 600)}${transcript.length > 600 ? '…' : ''}`)
+    }
+    return {
+      contactName: contact.name ?? undefined,
+      contactTitle: contact.title ?? contact.jobTitle ?? undefined,
+      companyName: (contact.companyName || contact.company) ?? undefined,
+      accountName: (contact as { accountName?: string }).accountName ?? undefined,
+      contextForAi: parts.length ? parts.join('\n\n') : undefined,
+    }
+  }, [contact, forensicNotes, recentCalls])
 
   const handleTerminalSubmit = async () => {
     if (!terminalInput.trim()) {
@@ -1270,11 +1290,12 @@ export default function ContactDossierPage() {
         </div>
       </div>
 
-      <ComposeModal 
-        isOpen={isComposeOpen} 
-        onClose={() => setIsComposeOpen(false)} 
+      <ComposeModal
+        isOpen={isComposeOpen}
+        onClose={() => setIsComposeOpen(false)}
         to={editEmail}
         subject=""
+        context={composeContext}
       />
     </div>
   )

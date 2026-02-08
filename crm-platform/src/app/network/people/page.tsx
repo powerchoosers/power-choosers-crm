@@ -26,7 +26,7 @@ import { Input } from '@/components/ui/input'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { Badge } from '@/components/ui/badge'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
-import { ComposeModal } from '@/components/emails/ComposeModal'
+import { ComposeModal, type ComposeContext } from '@/components/emails/ComposeModal'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
 import DestructModal from '@/components/network/DestructModal'
 import FilterCommandDeck from '@/components/network/FilterCommandDeck'
@@ -637,6 +637,7 @@ export default function PeoplePage() {
         }}
         to={composeTarget?.email}
         subject=""
+        context={composeTarget ? { contactName: composeTarget.name, companyName: composeTarget.company || undefined } : null}
       />
     </div>
   )
