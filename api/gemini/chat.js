@@ -1314,6 +1314,10 @@ export default async function handler(req, res) {
       if (!p) return false;
 
       const lower = p.toLowerCase();
+      // Intent locking: force full LLM for who/phone/email/call/said so grounded path does not return generic company info
+      const forceFullLLM = /\b(who|phone|email|call|said)\b/.test(lower);
+      if (forceFullLLM) return false;
+
       // Do NOT handle as account-only search: let the LLM use list_contacts, get_contact_details, search_interactions
       const isPersonRequest = /(\bfind\s+(?:a\s+)?(?:person\s+named\s+)?\w+|person\s+named\b|someone\s+named\b|contact\s+named\b|who\s+works\s+at\b|(?:a\s+)?\w+\s+that\s+works\s+for)/.test(lower);
       const isPhoneRequest = /(phone\s*number|phone\s+for|number\s+for|call\s+them|dial\s+)/.test(lower);
@@ -1760,10 +1764,7 @@ export default async function handler(req, res) {
         UI_COMPONENT_PROTOCOL:
         - You can trigger UI components by wrapping a valid JSON block between \`JSON_DATA:\` and \`END_JSON\`.
         - EXTREMELY IMPORTANT: The JSON MUST be perfectly valid. No trailing commas, no missing quotes, no unescaped newlines inside strings.
-        - STRUCTURE:
-          \`\`\`
-          JSON_DATA:{"type": "Contact_Dossier", "data": {...}}END_JSON
-          \`\`\`
+        - The \`type\` value MUST be lowercase (e.g. contact_dossier, identity_card, forensic_grid). Example: JSON_DATA:{"type": "contact_dossier", "data": {...}}END_JSON
         - If you are unsure of the data, DO NOT trigger a component. Provide a text summary instead.
         - DO NOT put conversational text INSIDE the JSON block.
 
