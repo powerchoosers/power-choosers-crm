@@ -1038,6 +1038,7 @@ export function GeminiChatPanel() {
     ])
   }, [isOpen, messages.length, contextInfo.type, contextInfo.id, hasContextId, isAccountOrContact, params.id, profile?.firstName])
 
+  const sendWithMessageRef = useRef<(text: string) => Promise<void>>(null as unknown as (text: string) => Promise<void>)
   useEffect(() => {
     if (!isOpen || messages.length !== 0 || !isAccountOrContact || !hasContextId || proactiveReportTriggered.current) return
     proactiveReportTriggered.current = true
@@ -1045,8 +1046,8 @@ export function GeminiChatPanel() {
       contextInfo.type === 'contact'
         ? `Give a one-paragraph situation report for this contact. Include contract status, key risks, and next steps. Be concise.`
         : `Give a one-paragraph situation report for this account. Include contract status, key risks, and next steps. Be concise.`
-    void sendWithMessage(syntheticPrompt)
-  }, [isOpen, messages.length, isAccountOrContact, hasContextId, contextInfo.type, sendWithMessage])
+    sendWithMessageRef.current?.(syntheticPrompt)
+  }, [isOpen, messages.length, isAccountOrContact, hasContextId, contextInfo.type])
 
   const getProvider = (model: string) => {
     if (model.startsWith('openai/') || model.startsWith('anthropic/')) return 'OpenRouter'
@@ -1239,6 +1240,7 @@ SELECT * FROM hybrid_search_accounts(
       setIsLoading(false)
     }
   }, [contextInfo, selectedModel, profile?.firstName])
+  sendWithMessageRef.current = sendWithMessage
 
   const handleSend = async () => {
     const messageText = input.trim()
