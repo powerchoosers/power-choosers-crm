@@ -2,16 +2,17 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Copy, Send, X, Loader2, User, Bot, Mic, Activity, AlertTriangle, ArrowRight, History, RefreshCw, Phone, Plus, Sparkles, Cpu, Zap } from 'lucide-react'
+import { Copy, Send, X, Loader2, User, Bot, Mic, Activity, AlertTriangle, ArrowRight, History, RefreshCw, Phone, Plus, Sparkles, Cpu, Zap, FileText, CheckCircle, Circle, ClipboardCopy } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGeminiStore } from '@/store/geminiStore'
-import { usePathname, useParams } from 'next/navigation'
+import { usePathname, useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
+import { CompanyIcon } from '@/components/ui/CompanyIcon'
 
 interface Diagnostic {
   model: string
@@ -130,6 +131,29 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
+/** Renders prose with **text** as High-Contrast Data Artifacts (Obsidian & Glass). */
+function ProseWithArtifacts({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g)
+  return (
+    <p className="whitespace-pre-wrap text-zinc-400 text-sm leading-7 break-words [overflow-wrap:anywhere]">
+      {parts.map((segment, i) => {
+        const match = segment.match(/^\*\*(.+)\*\*$/)
+        if (match) {
+          return (
+            <span
+              key={i}
+              className="font-mono font-bold text-white bg-white/10 px-1 rounded-sm border border-white/5 tracking-tight tabular-nums shadow-[0_0_10px_-2px_rgba(255,255,255,0.2)]"
+            >
+              {match[1]}
+            </span>
+          )
+        }
+        return <span key={i}>{segment}</span>
+      })}
+    </p>
+  )
+}
+
 function Waveform() {
   return (
     <div className="flex items-center gap-[2px] h-3">
@@ -187,7 +211,114 @@ function ImageWithSkeleton({ src, alt, className, isLoading: isExternalLoading }
 }
 
 function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
+  const router = useRouter()
+
   switch (type) {
+    case 'identity_card': {
+      if (!isRecord(data)) return null
+      const card = data as {
+        type: 'contact' | 'account'
+        id: string
+        name: string
+        title?: string
+        company?: string
+        industry?: string
+        status?: 'active' | 'risk'
+        initials?: string
+        logoUrl?: string
+        domain?: string
+      }
+      const path = card.type === 'contact' ? '/network/people' : '/network/accounts'
+      const initials = card.initials ?? card.name.split(/\s+/).map((n) => n[0]).join('').slice(0, 2).toUpperCase() || '?'
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md bg-zinc-900/80 border border-white/10 backdrop-blur-xl rounded-2xl overflow-hidden hover:border-[#002FA7]/50 transition-colors cursor-pointer group"
+          onClick={() => router.push(`${path}/${card.id}`)}
+        >
+          <div className="p-4 flex items-center gap-4">
+            <div className="shrink-0 w-14 h-14 rounded-[14px] bg-zinc-800 border border-white/10 flex items-center justify-center overflow-hidden">
+              {card.type === 'account' && (card.logoUrl || card.domain) ? (
+                <CompanyIcon logoUrl={card.logoUrl} domain={card.domain} name={card.name} size={56} roundedClassName="rounded-[14px]" />
+              ) : (
+                <span className="font-mono font-bold text-lg text-zinc-300">{initials}</span>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-white font-semibold text-base truncate">{card.name}</h3>
+                <span className={cn('w-2 h-2 rounded-full shrink-0', card.status === 'risk' ? 'bg-red-500' : 'bg-emerald-500')} />
+              </div>
+              <p className="text-zinc-500 text-xs font-mono truncate mt-0.5">{[card.title, card.company ?? card.industry].filter(Boolean).join(' · ')}</p>
+            </div>
+          </div>
+          <div className="px-4 py-2 border-t border-white/5 group-hover:bg-[#002FA7]/10 transition-colors">
+            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Open dossier →</span>
+          </div>
+        </motion.div>
+      )
+    }
+    case 'flight_check': {
+      if (!isRecord(data)) return null
+      const items = Array.isArray(data.items) ? data.items : []
+      return (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-2xl border border-white/10 bg-zinc-900/40 overflow-hidden w-full">
+          <div className="px-3 py-2 border-b border-white/5">
+            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Protocol Checklist</span>
+          </div>
+          <div className="divide-y divide-white/5">
+            {items.map((item: { label?: string; status?: string }, idx: number) => {
+              const label = typeof item.label === 'string' ? item.label : `Step ${idx + 1}`
+              const done = item.status === 'done'
+              return (
+                <div
+                  key={idx}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors group cursor-pointer"
+                  onClick={() => navigator.clipboard?.writeText(label)}
+                >
+                  <div className="shrink-0 w-5 h-5 flex items-center justify-center">
+                    {done ? <CheckCircle size={18} className="text-emerald-500" /> : <Circle size={18} className="text-zinc-500" />}
+                  </div>
+                  <span className="flex-1 text-sm text-zinc-200 font-mono">{label}</span>
+                  <ClipboardCopy size={14} className="text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              )
+            })}
+          </div>
+        </motion.div>
+      )
+    }
+    case 'interaction_snippet': {
+      if (!isRecord(data)) return null
+      const snip = data as { contactName?: string; callDate?: string; snippet: string; highlight?: string; callId?: string }
+      const snippet = typeof snip.snippet === 'string' ? snip.snippet : ''
+      const highlight = typeof snip.highlight === 'string' ? snip.highlight : ''
+      const context = [snip.contactName, snip.callDate].filter(Boolean).join(' · ')
+      const parts = highlight ? snippet.split(highlight) : [snippet]
+      return (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-2xl border border-white/10 bg-zinc-900/40 overflow-hidden w-full">
+          <div className="p-3 border-b border-white/5 flex items-center gap-2">
+            <div className="flex gap-[2px] h-3 items-end">
+              {[8, 14, 10, 16, 8, 12, 10].map((h, i) => (
+                <motion.div key={i} className="w-[3px] bg-[#002FA7]/60 rounded-full" style={{ height: h }} animate={{ height: [h, h + 4, h] }} transition={{ duration: 2, repeat: Infinity, delay: i * 0.1 }} />
+              ))}
+            </div>
+            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Call Snippet</span>
+          </div>
+          <div className="p-4">
+            {context && <p className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider mb-2">{context}</p>}
+            <p className="text-sm text-zinc-300 leading-relaxed">
+              {highlight && parts.length === 2 ? (
+                <> {parts[0]} <span className="text-[#002FA7] font-semibold bg-[#002FA7]/10 px-0.5 rounded">{highlight}</span> {parts[1]} </>
+              ) : (
+                snippet
+              )}
+            </p>
+          </div>
+        </motion.div>
+      )
+    }
     case 'contact_dossier': {
       if (!isRecord(data)) return null
       const dossier = data as unknown as ContactDossier
@@ -297,27 +428,52 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
     }
     case 'market_pulse': {
       const pulse = data as MarketPulse
-      const reservePercentage = (pulse.grid.reserves / pulse.grid.total_capacity) * 100
-      const scarcityColor = pulse.grid.scarcity_prob > 30 ? 'text-red-500' : pulse.grid.scarcity_prob > 10 ? 'text-amber-500' : 'text-emerald-500'
-      
+      const reservePercentage = (pulse.grid?.total_capacity ?? 0) > 0
+        ? (pulse.grid.reserves / pulse.grid.total_capacity) * 100
+        : 0
+      const scarcityColor = (pulse.grid?.scarcity_prob ?? 0) > 30 ? 'text-red-500' : (pulse.grid?.scarcity_prob ?? 0) > 10 ? 'text-amber-500' : 'text-emerald-500'
+      const north = pulse.prices?.north ?? 0
+      const houston = pulse.prices?.houston ?? 0
+      const west = pulse.prices?.west ?? 0
+      const south = pulse.prices?.south ?? 0
+      const hubAvg = pulse.prices?.hub_avg ?? (north + houston + west + south) / 4
+      const anyHigh = [north, houston, west, south].some((p) => p >= 100)
+      const scarcityHigh = (pulse.grid?.scarcity_prob ?? 0) >= 20
+      const isVolatile = anyHigh || scarcityHigh
+      const zones = [
+        { id: 'north', label: 'LZ_NORTH', value: north, color: '#002FA7' },
+        { id: 'houston', label: 'LZ_HOUSTON', value: houston, color: '#22c55e' },
+        { id: 'west', label: 'LZ_WEST', value: west, color: '#f59e0b' },
+        { id: 'south', label: 'LZ_SOUTH', value: south, color: '#ef4444' },
+      ] as const
+
       return (
         <div className="mt-4 space-y-4 font-mono">
+          {/* Volatility banner */}
+          <div className={cn(
+            'rounded-xl border px-3 py-2 flex items-center gap-2',
+            isVolatile ? 'border-amber-500/50 bg-amber-500/10' : 'border-white/10 bg-black/20'
+          )}>
+            <div className={cn('w-1.5 h-1.5 rounded-full', isVolatile ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500')} />
+            <span className={cn('text-[10px] uppercase tracking-widest', isVolatile ? 'text-amber-400' : 'text-zinc-400')}>
+              {isVolatile ? 'Elevated volatility' : 'Normal conditions'} · HUB_AVG ${hubAvg.toFixed(2)}/MWh
+            </span>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
-            {/* Price HUD */}
-            <div className="rounded-2xl border border-white/10 bg-black/40 p-4 relative overflow-hidden group">
+            {/* Zonal prices (match Telemetry/Infrastructure colors) */}
+            <div className="rounded-2xl border border-white/10 bg-black/40 p-4 relative overflow-hidden group col-span-2">
               <div className="absolute top-0 right-0 p-2 opacity-20 group-hover:opacity-100 transition-opacity">
                 <Zap size={14} className="text-amber-400" />
               </div>
-              <h4 className="text-[10px] uppercase tracking-widest text-zinc-500 mb-3">REAL_TIME_PRICES</h4>
-              <div className="space-y-3">
-                <div className="flex justify-between items-end">
-                  <span className="text-[10px] text-zinc-400 uppercase">LZ_HOUSTON</span>
-                  <span className="text-lg font-bold tabular-nums text-white">${pulse.prices.houston.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between items-end">
-                  <span className="text-[10px] text-zinc-400 uppercase">LZ_NORTH</span>
-                  <span className="text-lg font-bold tabular-nums text-white">${pulse.prices.north.toFixed(2)}</span>
-                </div>
+              <h4 className="text-[10px] uppercase tracking-widest text-zinc-500 mb-3">ZONAL_SETTLEMENT (Telemetry)</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {zones.map((z) => (
+                  <div key={z.id} className="flex justify-between items-center gap-2 border-l-4 pl-2" style={{ borderLeftColor: z.color }}>
+                    <span className="text-[10px] text-zinc-400 uppercase truncate">{z.label}</span>
+                    <span className="text-sm font-bold tabular-nums text-white shrink-0">${z.value.toFixed(2)}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -329,7 +485,7 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
               <h4 className="text-[10px] uppercase tracking-widest text-zinc-500 mb-3">SCARCITY_PROB</h4>
               <div className="flex flex-col items-center justify-center py-1">
                 <span className={cn("text-4xl font-black tabular-nums tracking-tighter", scarcityColor)}>
-                  {pulse.grid.scarcity_prob}%
+                  {pulse.grid?.scarcity_prob ?? 0}%
                 </span>
                 <span className="text-[8px] uppercase tracking-widest text-zinc-500 mt-1">Probability Index</span>
               </div>
@@ -340,40 +496,40 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
           <div className="rounded-2xl border border-white/10 bg-black/40 p-4">
             <h4 className="text-[10px] uppercase tracking-widest text-zinc-500 mb-4 flex justify-between">
               <span>SYSTEM_GRID_METRICS</span>
-              <span className="text-[8px] opacity-50">TS: {pulse.timestamp}</span>
+              <span className="text-[8px] opacity-50">TS: {pulse.timestamp ?? '—'}</span>
             </h4>
             
             <div className="grid grid-cols-3 gap-4 mb-6">
               <div className="space-y-1">
                 <div className="text-[9px] text-zinc-500 uppercase">Actual Load</div>
-                <div className="text-sm font-bold tabular-nums text-white">{Math.floor(pulse.grid.actual_load).toLocaleString()} MW</div>
+                <div className="text-sm font-bold tabular-nums text-white">{Math.floor(pulse.grid?.actual_load ?? 0).toLocaleString()} MW</div>
               </div>
               <div className="space-y-1">
                 <div className="text-[9px] text-zinc-500 uppercase">Forecast</div>
-                <div className="text-sm font-bold tabular-nums text-zinc-300">{Math.floor(pulse.grid.forecast_load).toLocaleString()} MW</div>
+                <div className="text-sm font-bold tabular-nums text-zinc-300">{Math.floor(pulse.grid?.forecast_load ?? 0).toLocaleString()} MW</div>
               </div>
               <div className="space-y-1">
                 <div className="text-[9px] text-zinc-500 uppercase">Reserves</div>
-                <div className="text-sm font-bold tabular-nums text-[#002FA7]">{Math.floor(pulse.grid.reserves).toLocaleString()} MW</div>
+                <div className="text-sm font-bold tabular-nums text-[#002FA7]">{Math.floor(pulse.grid?.reserves ?? 0).toLocaleString()} MW</div>
               </div>
             </div>
 
-            {/* Reserve Meter */}
+            {/* Scarcity Gauge (Voltage Bar): left = scarcity (red), right = stable (green), needle = reserve margin */}
             <div className="space-y-2">
               <div className="flex justify-between text-[8px] uppercase tracking-widest text-zinc-500">
-                <span>Operational Capacity</span>
-                <span>{reservePercentage.toFixed(1)}% Reserves</span>
+                <span>Scarcity</span>
+                <span className="tabular-nums">Reserve margin {reservePercentage.toFixed(1)}%</span>
               </div>
-              <div className="h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden border border-white/5">
-                <motion.div 
-                  initial={{ width: 0 }}
-                  animate={{ width: `${Math.max(100 - reservePercentage, 10)}%` }}
-                  className="h-full bg-gradient-to-r from-emerald-500 via-[#002FA7] to-amber-500"
+              <div className="relative h-3 w-full rounded-full overflow-visible border border-white/5 bg-zinc-900">
+                <div className="absolute inset-0 h-full rounded-full bg-gradient-to-r from-rose-500 via-amber-500 to-emerald-500" />
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_8px_2px_rgba(255,255,255,0.8)] z-10 rounded-full transition-all duration-500"
+                  style={{ left: `${Math.min(100, Math.max(0, reservePercentage))}%`, transform: 'translateX(-50%)' }}
                 />
               </div>
               <div className="flex justify-between text-[7px] text-zinc-600 uppercase tracking-tighter">
-                <span>Min_Load</span>
-                <span>Total_Cap: {Math.floor(pulse.grid.total_capacity).toLocaleString()} MW</span>
+                <span>Low reserves</span>
+                <span>Total_Cap: {Math.floor(pulse.grid?.total_capacity ?? 0).toLocaleString()} MW</span>
               </div>
             </div>
           </div>
@@ -382,7 +538,7 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
           <div className="flex items-center gap-2 px-1">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-[8px] text-zinc-500 uppercase tracking-widest">
-              Data_Nodes: {pulse.metadata.price_source} + {pulse.metadata.grid_source}
+              Data_Nodes: {pulse.metadata?.price_source ?? '—'} + {pulse.metadata?.grid_source ?? '—'}
             </span>
           </div>
         </div>
@@ -446,40 +602,38 @@ function ComponentRenderer({ type, data }: { type: string, data: unknown }) {
         <motion.div 
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
-          className="rounded-xl border border-white/10 bg-zinc-900/40 overflow-hidden w-full"
+          className="rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl overflow-hidden w-full"
         >
-          <div className="px-4 py-2 border-b border-white/5 bg-white/5 flex justify-between items-center">
-            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest font-semibold">Data_Locker // {docData.accountName}</span>
-            <span className="text-[10px] font-mono text-zinc-500">{docData.documents.length} Files</span>
+          <div className="px-4 py-2 border-b border-white/5 flex justify-between items-center">
+            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest font-semibold">Evidence_Locker // {docData.accountName}</span>
+            <span className="text-[10px] font-mono text-zinc-500 tabular-nums">{docData.documents.length} Files</span>
           </div>
-          <div className="p-2 space-y-1">
+          <div className="p-3 grid grid-cols-2 gap-2">
             {docData.documents.length > 0 ? (
               docData.documents.map((doc, i) => (
-                <div key={i} className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-colors group">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-[14px] bg-zinc-800 flex items-center justify-center text-zinc-500 border border-white/5">
-                      <Cpu size={14} />
+                <div key={doc.id ?? i} className="rounded-2xl border border-white/10 bg-black/20 p-3 hover:border-[#002FA7]/30 hover:bg-white/5 transition-all group relative overflow-hidden">
+                  <div className="flex flex-col items-center gap-2 min-w-0">
+                    <div className="w-12 h-12 rounded-[14px] bg-zinc-800/80 border border-white/10 flex items-center justify-center text-red-400/90 group-hover:text-red-300">
+                      <FileText size={24} />
                     </div>
-                    <div className="min-w-0">
-                      <div className="text-xs font-medium text-zinc-200 truncate">{doc.name}</div>
-                      <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-tighter">
-                        {doc.type} • {doc.size || 'N/A'} • {new Date(doc.created_at).toLocaleDateString()}
-                      </div>
+                    <div className="w-full min-w-0 text-center">
+                      <div className="text-[11px] font-medium text-zinc-200 truncate" title={doc.name}>{doc.name}</div>
+                      <div className="text-[9px] font-mono text-zinc-500 tabular-nums">{new Date(doc.created_at).toLocaleDateString()}</div>
                     </div>
                   </div>
-                  {doc.url && (
-                    <button 
-                      className="icon-button-forensic h-8 w-8 flex items-center justify-center text-zinc-500"
-                      onClick={() => window.open(doc.url, '_blank')}
-                    >
-                      <ArrowRight size={14} />
-                    </button>
-                  )}
+                  <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-900/80">
+                    {doc.url && (
+                      <>
+                        <button className="px-2 py-1 rounded-lg bg-[#002FA7]/20 border border-[#002FA7]/40 text-[#002FA7] font-mono text-[9px] uppercase hover:bg-[#002FA7]/30" onClick={(e) => { e.stopPropagation(); window.open(doc.url!, '_blank'); }}>Download</button>
+                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="px-2 py-1 rounded-lg bg-white/10 border border-white/20 text-zinc-300 font-mono text-[9px] uppercase hover:bg-white/20" onClick={(e) => e.stopPropagation()}>Open</a>
+                      </>
+                    )}
+                  </div>
                 </div>
               ))
             ) : (
-              <div className="p-4 text-center text-zinc-500 font-mono text-[10px] uppercase tracking-widest">
-                No documents found in locker
+              <div className="col-span-2 p-4 text-center text-zinc-500 font-mono text-[10px] uppercase tracking-widest">
+                No documents in locker
               </div>
             )}
           </div>
@@ -1313,8 +1467,8 @@ SELECT * FROM hybrid_search_accounts(
                             const text = part.trim()
                             if (!text) return null
                             return (
-                              <div key={partKey} className="prose prose-invert prose-p:text-zinc-400 prose-headings:font-mono prose-headings:text-zinc-200 prose-headings:tracking-tighter prose-strong:text-white prose-code:text-[#002FA7] text-sm leading-7 max-w-none break-words [word-break:break-word] [overflow-wrap:anywhere]">
-                                <p className="whitespace-pre-wrap">{text}</p>
+                              <div key={partKey} className="max-w-none break-words [word-break:break-word] [overflow-wrap:anywhere]">
+                                <ProseWithArtifacts text={text} />
                               </div>
                             )
                           }
@@ -1329,8 +1483,8 @@ SELECT * FROM hybrid_search_accounts(
                                   <ComponentRenderer type={data.type} data={data.data} />
                                 </div>
                                 {trailingText && (
-                                  <div className="prose prose-invert prose-p:text-zinc-400 prose-headings:font-mono prose-headings:text-zinc-200 prose-headings:tracking-tighter prose-strong:text-white prose-code:text-[#002FA7] text-sm leading-7 max-w-none break-words [word-break:break-word] [overflow-wrap:anywhere]">
-                                    <p className="whitespace-pre-wrap">{trailingText}</p>
+                                  <div className="max-w-none break-words [word-break:break-word] [overflow-wrap:anywhere]">
+                                    <ProseWithArtifacts text={trailingText} />
                                   </div>
                                 )}
                               </div>

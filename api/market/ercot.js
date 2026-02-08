@@ -266,14 +266,21 @@ async function scrapeRealTimePrices() {
   const lastRow = dataRows[dataRows.length - 1];
   const cells = lastRow.match(/<td[^>]*>([\s\S]*?)<\/td>/g)?.map(td => td.replace(/<[^>]*>/g, '').trim()) || [];
 
+  const houston = parseFloat(cells[11]) || 0;
+  const north = parseFloat(cells[13]) || 0;
+  const south = parseFloat(cells[15]) || 0;
+  const west = parseFloat(cells[16]) || 0;
+  const hubFromCell = parseFloat(cells[4]) || 0;
+  const hub_avg = hubFromCell > 0 ? hubFromCell : (houston + north + south + west) / 4;
+
   return {
     timestamp: (cells[0] || '') + ' ' + (cells[1] || ''),
     prices: {
-      houston: parseFloat(cells[11]) || 0,
-      north: parseFloat(cells[13]) || 0,
-      south: parseFloat(cells[15]) || 0,
-      west: parseFloat(cells[16]) || 0,
-      hub_avg: parseFloat(cells[4]) || 0
+      houston,
+      north,
+      south,
+      west,
+      hub_avg
     },
     metadata: {
       source: 'ERCOT Public CDR (Scraper)',
