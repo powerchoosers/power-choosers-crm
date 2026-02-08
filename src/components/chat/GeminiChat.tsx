@@ -83,6 +83,7 @@ type ForensicGrid = {
   columns: string[]
   rows: Record<string, string | number>[]
   highlights?: string[] // Columns to check for volatility
+  sourceLabel?: string
 }
 
 type ForensicDocument = {
@@ -304,9 +305,13 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
         initials?: string
         logoUrl?: string
         domain?: string
+        contractEndDate?: string
+        contactCount?: number
+        subtitle?: string
       }
       const path = card.type === 'contact' ? '/network/people' : '/network/accounts'
       const initials = card.initials ?? (card.name.split(/\s+/).map((n) => n[0]).join('').slice(0, 2).toUpperCase() || '?')
+      const secondLine = card.subtitle ?? (card.contractEndDate ? `Contract: ${card.contractEndDate}` : (typeof card.contactCount === 'number' ? `${card.contactCount} contacts` : null))
       return (
         <motion.div
           initial={{ opacity: 0, y: 4 }}
@@ -330,7 +335,8 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
               <p className="text-zinc-500 text-xs font-mono truncate mt-0.5">{[card.title, card.company ?? card.industry].filter(Boolean).join(' · ')}</p>
             </div>
           </div>
-          <div className="px-4 py-2 border-t border-white/5 group-hover:bg-[#002FA7]/10 transition-colors">
+          <div className="px-4 py-2 border-t border-white/5 group-hover:bg-[#002FA7]/10 transition-colors flex flex-col gap-0.5">
+            {secondLine && <span className="text-[10px] font-mono text-zinc-500 truncate">{secondLine}</span>}
             <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Open dossier →</span>
           </div>
         </motion.div>
@@ -479,6 +485,11 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
             <div className="text-3xl font-mono tabular-nums tracking-tighter text-green-500/80">{pos.estimatedRevenue}</div>
             <div className="text-[9px] font-mono text-zinc-600 mt-1 uppercase tracking-widest">Calculated at {pos.margin || '0.003'} margin base</div>
           </div>
+          {!pos.isSimulation && (
+            <div className="flex justify-end pt-1">
+              <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-wider">From account record</span>
+            </div>
+          )}
         </motion.div>
       )
     }
@@ -603,7 +614,8 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
     case 'forensic_grid': {
       if (!isRecord(data)) return null
       const grid = data as unknown as ForensicGrid
-      
+      const sourceLabel = grid.sourceLabel ?? 'From CRM'
+
       const isVolatile = (val: string | number) => {
         if (typeof val === 'number') return val > 50
         if (typeof val === 'string') {
@@ -619,12 +631,13 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
           animate={{ height: 'auto', opacity: 1 }}
           className="rounded-xl border border-white/10 bg-zinc-900/40 overflow-hidden w-full"
         >
-          <div className="px-4 py-2 border-b border-white/5 bg-white/5 flex justify-between items-center">
+          <div className="px-4 py-2 border-b border-white/5 bg-white/5 flex justify-between items-center gap-2">
             <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest font-semibold">{grid.title}</span>
+            <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-wider shrink-0">{sourceLabel}</span>
           </div>
-          <div className="overflow-x-auto w-full">
+          <div className="overflow-auto max-h-[40vh] w-full">
             <table className="w-full text-left text-xs min-w-[300px]">
-              <thead>
+              <thead className="sticky top-0 z-10 bg-zinc-900/95 backdrop-blur-sm">
                 <tr className="border-b border-white/5">
                   {grid.columns.map((col: string, i: number) => (
                     <th key={i} className="px-4 py-2 font-mono text-zinc-500 font-normal uppercase tracking-widest text-[9px] whitespace-nowrap">{col}</th>
@@ -717,6 +730,9 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
             <div className="flex-1 min-w-0">
               <div className="text-red-200/90 text-[10px] font-mono uppercase tracking-widest truncate">ACTION</div>
               <div className="text-red-300/70 text-[10px] font-mono mt-1 uppercase tracking-widest truncate">{voidData.action}</div>
+              {voidData.action === 'REQUIRE_BILL_UPLOAD' && (
+                <p className="text-red-200/80 text-xs font-sans mt-2">Upload a bill to fill this.</p>
+              )}
             </div>
           </div>
         </motion.div>
@@ -904,6 +920,25 @@ export function GeminiChatPanel() {
 
     return { ...baseContext, displayLabel };
   }, [pathname, params, storeContext])
+
+  const inputPlaceholder = useMemo(() => {
+    switch (contextInfo.type) {
+      case 'account':
+        return "Ask about this account, contracts, or contacts..."
+      case 'contact':
+        return "Ask about this contact or their account..."
+      case 'dashboard':
+        return "Accounts expiring in 2026 · Who's at this company? · Market..."
+      default:
+        return "Input forensic command..."
+    }
+  }, [contextInfo.type])
+
+  const trySuggestions = useMemo(() => [
+    "Accounts expiring in 2026",
+    "Who's at this company?",
+    "Market volatility",
+  ], [])
 
   // Fetch History
   useEffect(() => {
@@ -1657,6 +1692,23 @@ SELECT * FROM hybrid_search_accounts(
             </div>
           </motion.div>
 
+          {/* Try suggestions when empty */}
+          {messages.length === 0 && (
+            <div className="px-3 pt-1 pb-0 flex flex-wrap items-center gap-1.5">
+              <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-wider shrink-0">Try:</span>
+              {trySuggestions.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setInput(s)}
+                  className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 border border-white/10 hover:border-white/20 px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* TIER 2: INPUT DECK (Action) */}
           <motion.div 
             layout
@@ -1676,7 +1728,7 @@ SELECT * FROM hybrid_search_accounts(
                 }}
                 className="w-full bg-transparent border-none focus:ring-0 focus:outline-none text-sm text-zinc-100 placeholder:text-zinc-600 font-medium resize-none py-3 pl-2 max-h-[112px] min-h-[44px] custom-scrollbar"
                 style={{ height: '44px' }}
-                placeholder="Input forensic command..."
+                placeholder={inputPlaceholder}
                 rows={1}
               />
             </div>
