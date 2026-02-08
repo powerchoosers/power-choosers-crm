@@ -15,10 +15,12 @@ The agent is currently equipped with the following "Tools" and UI protocols whic
 - **Account Intelligence**:
     - `list_accounts`: Semantic & Keyword search for companies and organizations. 100% vector coverage.
     - `get_account_details`: Retrieve full firmographic data, energy metrics, and corporate hierarchy.
-    - `list_account_documents`: Access the "Data Locker" to view filenames of bills, contracts, and LOAs.
+    - `list_account_documents`: Access the "Data Locker" (Evidence Locker) for a specific account—bills, contracts, LOAs.
+    - `list_all_documents`: List documents across all accounts, newest first (optional limit). Use when the user asks for "recent bills" or "latest uploads" without naming an account.
     - `list_deals`: Monitor sales opportunities and deal stages for specific accounts.
 - **Interaction Forensics (Deep Search)**:
     - `search_interactions`: Semantic search across ALL history. Scans call summaries, raw transcripts (call_details), and email content. 100% vector coverage.
+    - `search_transcripts`: Hybrid search (FTS + vector) over call transcripts and summaries; use for "what did X say about Y?" or call-specific queries. Supports account_id, contact_id, limit.
     - `search_emails`: Dedicated semantic search for email history with contact/account joining.
 - **Task Orchestration**:
     - `list_tasks`: Monitor pending actions and follow-ups.
@@ -48,7 +50,7 @@ The agent is currently equipped with the following "Tools" and UI protocols whic
 - **Date Normalization Engine**: Real-time conversion of legacy formats (e.g., `MM/DD/YYYY`) to forensic ISO standards (`YYYY-MM-DD`) during data retrieval.
 - **Enhanced Industry Logic**: Intelligent search expansion for "Manufacturing" and other broad sectors to ensure complete node discovery across related sub-industries.
 - **Reliable Model Routing**: Strict pipeline separation between OpenRouter and Gemini providers to eliminate `404` errors and ensure seamless fallback.
-- **Intent Routing (Grounded Path)**: The backend has a fast "grounded" path for account-only operations (expiration year, location, contract follow-up). Queries that are clearly about **people** (e.g. "find a Louis at this company", "who works here"), **phone numbers** ("phone for the Allen location"), **calls** ("what calls do you see", "my recent call"), or **emails** ("any important emails", "emails in my inbox") are **excluded** from that path and sent to the full LLM so it can call `list_contacts`, `get_contact_details`, `search_interactions`, `search_emails`, or `search_transcripts` and return the correct data instead of an account list.
+- **Intent Routing (Grounded Path)**: The backend has a fast "grounded" path for account-only operations (expiration year, location, contract follow-up). Queries containing **who**, **phone**, **email**, **call**, or **said** (whole-word) are **intent-locked**: they are excluded from the grounded path and sent to the full LLM so it can call `list_contacts`, `get_contact_details`, `search_interactions`, `search_emails`, or `search_transcripts` and return the correct data instead of an account list.
 - **Person vs Company**: The system prompt instructs the agent to use `list_contacts` (with context `accountId` when on an account page) for finding people by name; use `get_account_details` and `list_contacts` for phone/contact info for "this company"; use `search_interactions` or `search_transcripts` for call-related questions; and use `search_emails` or `search_interactions` for email-related questions. The user is always addressed by their first name from auth (`firstName`).
 - **"This Year" Expiration**: Expiration queries that say "this year" (e.g. "accounts that expire this year") are resolved to the current calendar year so the grounded path returns the same data as "expire in 2026" (when applicable).
 
@@ -79,15 +81,15 @@ The interface is built using a **Stacked Command Deck** architecture for maximum
     - Right-aligned with `gap-8` immersion spacing and `> COMMAND_INPUT` metadata.
 
 ### 2. Forensic Visualization Components
-The Architect can inject specialized data modules directly into the chat stream. Components are rendered when the model (or backend) includes a `JSON_DATA:{ "type": "<component_type>", "data": {...} }END_JSON` block in the response. **Markdown `**text**`** in prose is rendered as High-Contrast Data Artifacts (glass-encased, font-mono, white on dark) instead of plain bold.
+The Architect can inject specialized data modules directly into the chat stream. Components are rendered when the model (or backend) includes a `JSON_DATA:{ "type": "<component_type>", "data": {...} }END_JSON` block in the response. **The `type` value must be lowercase** (e.g. `contact_dossier`, `identity_card`). **Markdown `**text**`** in prose is rendered as High-Contrast Data Artifacts (glass-encased, font-mono, white on dark) instead of plain bold.
 - **Identity_Card**: Clickable "Identity Node" for a single contact or account. Use when the user asks "Who is [name]?" or "Show me [company]." Data: type (`contact`|`account`), id, name, title?, company?, industry?, status? (`active`|`risk`), initials?, logoUrl?, domain?. Card shows letter glyph or company logo (squircle), status LED, name, subtitle; click navigates to `/network/people/{id}` or `/network/accounts/{id}`.
 - **News_Ticker**: Real-time scrolling grid intelligence (Market_Volatility_Feed; items with title, source, trend, volatility).
 - **Contact_Dossier**: Detailed node profile (name, title, company, initials, energyMaturity, contractStatus, contractExpiration, id) with INITIATE action and Data Locker void state.
 - **Position_Maturity**: Visualization of contract and pricing status (expiration, daysRemaining, currentSupplier, strikePrice, annualUsage, estimatedRevenue, margin; optional isSimulation).
 - **Market_Pulse**: Live ERCOT telemetry card—**all four zones** (LZ_NORTH, LZ_HOUSTON, LZ_WEST, LZ_SOUTH) with colors matching Telemetry/Infrastructure, volatility banner, HUB_AVG, scarcity %, and **Scarcity Gauge** (Voltage Bar: left=scarcity/red, right=stable/green, glowing needle = reserve margin). Injected by the **backend** when `get_market_pulse` is called.
 - **Forensic_Grid**: High-density tabular data for account analysis (title, columns, rows, optional highlights).
-- **Forensic_Documents (Evidence Locker)**: Grid of **glass tiles** per document: PDF icon (red/white), truncated filename, date; hover reveals Download/Open. Data: accountName, documents (id, name, type, size, url, created_at).
-- **Flight_Check**: Protocol checklist (e.g. "1. Email the CFO. 2. Pull the 4CP report."). Data: items array with `label`, `status` (`pending`|`done`). Renders as slim glass bars: left = circle/check, center = instruction, right = copy icon; click row copies label to clipboard.
+- **Forensic_Documents (Evidence Locker)**: Grid of **glass tiles** per document: PDF icon (red/white), truncated filename, date; hover reveals Download, Open, and **Analyze** (links to `/bill-debugger` for bill analysis). Data: accountName, documents (id, name, type, size, url, created_at).
+- **Flight_Check**: Protocol checklist (e.g. "1. Email the CFO. 2. Pull the 4CP report."). Data: items array with `label`, `status` (`pending`|`done`). Renders as slim glass bars: left = circle/check, center = instruction, **"+" button** (adds row as task via `create_task`), **[ QUEUED ]** when queued (row turns green), right = copy icon; click row copies label to clipboard.
 - **Interaction_Snippet**: Call/search result snippet. Data: contactName?, callDate?, snippet (text), highlight? (phrase to highlight in Klein Blue). Renders as "Waveform Card" with audio-wave visual and context line (e.g. "Call with Billy Ragland · Oct 14, 2025"). Use when answering "Did [X] mention [Y]?" from search_interactions.
 - **Data_Void**: Empty state placeholders for missing intelligence (field, action e.g. REQUIRE_BILL_UPLOAD).
 - **Mini_Profile**: Compact list of prospects (profiles array: name, company?, title?).
@@ -98,7 +100,9 @@ The Architect can inject specialized data modules directly into the chat stream.
 
 ### 4. Interaction Protocols
 - **Router HUD (Diagnostics)**: Toggling the Bot icon shows **AI_ROUTER_HUD // LIVE_DIAGNOSTICS** with model/provider status, tool names when tools are invoked, and buttons to copy the Supabase debug prompt or the AI troubleshooting prompt.
-- **Proactive intel**: The agent can offer proactive insights when the panel opens, based on current context (e.g. contact or account page).
+- **Proactive Situation Report ("Pre-Strike")**: When the chat opens on an **Account** or **Contact** page with **empty message history**, the agent automatically sends a synthetic request and posts a one-paragraph **Situation Report** as the first AI message (e.g. contract status, key risks, next steps). No user prompt required.
+- **DecryptionText**: The first segment of the latest AI prose can render with a "decryption" effect (characters cycle through glyphs then lock). Optional `decryptFirstChars` limits animation length.
+- **NeuralLoader (Neural Uplink)**: While the agent is loading, a horizontal Klein Blue line expands and oscillates (waveform); status messages cycle every 800ms: `ESTABLISHING_SECURE_UPLINK...`, `PARSING_GRID_TELEMETRY...`, `VERIFYING_SOURCE_INTEGRITY...`, `[ SIGNAL_LOCKED ]`.
 - **Anti-Hallucination Protocol (v2)**: Strict enforcement against inventing names, metrics, or dates. If data is not in the CRM, the agent is hard-coded to report it as "Unknown" or "Data Void".
 - **Neural Line Response**: Every AI transmission is anchored by a glowing vertical "Neural Line" spine in International Klein Blue.
 - **Message parsing**: Assistant content is split on `JSON_DATA:`; each block is parsed as `{ type, data }` and rendered via `ComponentRenderer`. Trailing text after `END_JSON` is shown as prose.
@@ -107,6 +111,7 @@ The Architect can inject specialized data modules directly into the chat stream.
 - **Visual Status**:
     - **Live Waveform**: A dynamic bar animation that visualizes the AI's "thinking" process next to "Nodal Architect v1.3" and "LIVE_FEED".
     - **LED Pulsing**: A subtle emerald glow signifying active background monitoring.
+- **File-reading models**: Only **Gemini** and **Sonar** can read uploaded documents. Any future "analyze this file" flow must be gated to those models; others show an upgrade message.
 
 ---
 
@@ -155,5 +160,34 @@ We are actively expanding the Architect's "Brain" to include these forensic ener
 - **Security**: All tool calls are gated by Supabase RLS and server-side validation.
 
 ---
-*Last Updated: 2026-02-07*
-*Status: Nodal Architect v1.3 Operational (Build Gemini: Identity Cards, Flight Check, Evidence Locker tiles, Scarcity Gauge, Conversation Snippet, High-Contrast ** Artifacts; Intent Routing: person/phone/calls/emails excluded from grounded path, "this year" expiration, PERSON vs COMPANY prompt)*
+## 📋 Recommended Follow-Ups (Backlog)
+- **Position Maturity card**: Add "Open account" link/button using account id when available so the user can jump to the account dossier.
+- **ProseWithArtifacts**: Support multi-line or nested `**` (e.g. `**line1** **line2**`) more robustly if the model emits it.
+- **Unknown component type**: Today unknown `type` returns `null`; optional dev-only fallback (e.g. "Unknown: {type}") could help when adding new components.
+- **Streaming**: If the backend ever streams tool calls or partial content, the frontend would need to handle incremental JSON_DATA or append content.
+
+---
+## 🧪 Test Prompts & Expected Results
+
+Use these to verify the Nodal Architect and Build Gemini v2 behavior. **Context** = where you open the chat (e.g. account page, contact page, or global).
+
+| Prompt | Context | Expected behavior / result |
+|--------|--------|----------------------------|
+| *(Open chat, do nothing)* | Account or Contact page | **Proactive report**: First AI message is a one-paragraph situation report (contract status, risks, next steps). NeuralLoader shows during request. |
+| **Find Camp Fire First Texas** | Any | `list_accounts` → Identity card or account details; exact name should rank #1 (hybrid search). |
+| **Who works at this company?** / **Find a person named Louis** | Account page preferred | `list_contacts` with accountId; returns people, not company list. Identity cards for contacts. |
+| **What's the phone number for this company?** | Account page | `get_account_details` + `list_contacts`; agent returns actual phone from CRM or says none found. |
+| **Accounts expiring in 2026** | Any | `list_accounts({ expiration_year: 2026 })`; list of accounts with contract end in 2026. |
+| **Accounts in Houston, Texas** | Any | `list_accounts` with city/state; location-aware results. |
+| **How's the market?** / **Is the market volatile?** | Any | `get_market_pulse` → **Market_Pulse** card with zones, scarcity gauge, volatility. |
+| **Show me documents for [account name]** | Any | `list_account_documents` → **Forensic_Documents** (Evidence Locker) with Download, Open, **Analyze** (→ Bill Debugger). |
+| **Give me a protocol checklist for closing this deal** | Account/Contact | Agent returns **Flight_Check** with items; each row has **+** button; click **+** → task created, row shows **[ QUEUED ]** and turns green; task appears in Right Panel / Tasks. |
+| **What did [name] say about the contract?** | Any | **Intent lock**: full LLM; `search_transcripts` or `search_interactions`; **Interaction_Snippet** or prose with call/email snippets, not generic account info. |
+| **Any important emails from this account?** | Account page | `search_emails` or `search_interactions`; email results, not account-only response. |
+| **When does their contract expire?** (after "Find X") | Any | Uses memorized account id; `get_account_details`; returns date or **[ DATA_VOID ]** / unknown if not in CRM. |
+
+**Key tables** (agent reads via tools): `accounts` (name, domain, industry, city, state, contract_end_date, metadata, etc.), `contacts` (name, email, phone, title, accountId, etc.), `documents`, `tasks`, `emails`, `call_details` / transcripts, `market_telemetry`.
+
+---
+*Last Updated: 2026-02-08*
+*Status: Nodal Architect v2.0 (Build Gemini v2: DecryptionText, NeuralLoader, Proactive Situation Report, Flight Check → create_task with [ QUEUED ], Evidence Locker Analyze → Bill Debugger, Intent locking who/phone/email/call/said; Identity Cards, Scarcity Gauge, Conversation Snippet, High-Contrast ** Artifacts)*
