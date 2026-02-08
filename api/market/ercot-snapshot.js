@@ -3,9 +3,9 @@
  * Fetches current ERCOT prices + grid and saves to market_telemetry (throttled 2x/day: AM/PM).
  * Called by the Telemetry page so we get history even when Gemini chat isn't used.
  */
-import { cors } from '../../_cors.js';
-import logger from '../../_logger.js';
-import { supabaseAdmin } from '../../_supabase.js';
+import { cors } from '../_cors.js';
+import logger from '../_logger.js';
+import { supabaseAdmin } from '../_supabase.js';
 import { getErcotMarketData } from './ercot.js';
 
 export default async function handler(req, res) {
