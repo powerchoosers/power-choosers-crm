@@ -44,7 +44,7 @@ export function DecryptionText({ text, className, maxRevealWords = MAX_WORDS_STA
   }, [tokens])
 
   return (
-    <span className={cn('font-mono text-sm text-zinc-300', className)}>
+    <span className={cn('font-sans text-sm text-zinc-300', className)}>
       {tokens.map((token, i) => {
         const wordIndex = wordIndexByToken[i]
         const isWord = wordIndex >= 0
