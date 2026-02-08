@@ -19,15 +19,18 @@ export interface EIARetailResponse {
   metadata: { frequency?: string; total?: string }
 }
 
-/** Texas retail sales (COM + IND) last 12 months for Macro Variance chart. */
+/** Texas retail sales (COM + IND) last 3 years for Macro Variance chart. */
 export function useEIARetailTexas() {
   const params = new URLSearchParams({
     route: 'electricity/retail-sales',
     data: '1',
-    length: '72', // 12 months × 6 sectors per month so we get full 12 months
+    length: '216', // 36 months × 6 sectors per month (3 years)
     frequency: 'monthly',
     'facets[stateid][]': 'TX',
     'data[]': 'price',
+    // Most recent first so "last 36 months" are the first 216 rows returned
+    'sort[0][column]': 'period',
+    'sort[0][direction]': 'desc',
   })
   return useQuery<EIARetailResponse>({
     queryKey: ['eia-retail-tx'],

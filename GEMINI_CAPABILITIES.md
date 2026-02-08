@@ -36,7 +36,7 @@ The agent is currently equipped with the following "Tools" and UI protocols whic
 ### ⚡ Energy Market Intelligence
 - **Real-time Awareness**:
     - `get_energy_news`: Fetches the latest Texas energy market and ERCOT news via RSS, providing the agent with current context on grid volatility.
-    - `get_market_pulse`: Retrieves live ERCOT data including real-time prices (LZ_HOUSTON, LZ_NORTH) and system grid metrics (Load, Capacity, Reserves). This data is logged to the `market_telemetry` table for forensic analysis.
+    - `get_market_pulse`: Retrieves live ERCOT data: **all four zonal settlement prices** (LZ_HOUSTON, LZ_NORTH, LZ_SOUTH, LZ_WEST), hub average, and system grid metrics (Load, Capacity, Reserves, Scarcity). The agent is instructed to call this when the user asks about **market prices**, **volatility** (“is the market volatile?”), or conditions in a **specific load zone** (e.g. “how is LZ_WEST?”). When the tool is called, the **backend automatically appends the live telemetry card** to the response so the user sees the same zonal/volatility/grid UI as on the Telemetry page (colors aligned with Infrastructure). Data is logged to the `market_telemetry` table (throttled) for forensic analysis.
 
 ### 🧠 Advanced Intelligence & Accuracy (Updated)
 - **100% Semantic Coverage**: Every Account, Contact, Email, Call, and Transcript in the database is indexed with 768-dimensional vectors for semantic search.
@@ -76,22 +76,33 @@ The interface is built using a **Stacked Command Deck** architecture for maximum
     - Right-aligned with `gap-8` immersion spacing and `> COMMAND_INPUT` metadata.
 
 ### 2. Forensic Visualization Components
-The Architect can inject specialized data modules directly into the chat stream:
-- **News_Ticker**: Real-time scrolling grid intelligence.
-- **Contact_Dossier**: Detailed node profile summaries.
-- **Position_Maturity**: Visualization of contract and pricing status.
-- **Forensic_Grid**: High-density tabular data for account analysis.
-- **Data_Void**: Empty state placeholders for missing intelligence.
-- **Forensic_Documents**: Visual list of files in the Data Locker.
+The Architect can inject specialized data modules directly into the chat stream. Components are rendered when the model (or backend) includes a `JSON_DATA:{ "type": "<component_type>", "data": {...} }END_JSON` block in the response. **Markdown `**text**`** in prose is rendered as High-Contrast Data Artifacts (glass-encased, font-mono, white on dark) instead of plain bold.
+- **Identity_Card**: Clickable "Identity Node" for a single contact or account. Use when the user asks "Who is [name]?" or "Show me [company]." Data: type (`contact`|`account`), id, name, title?, company?, industry?, status? (`active`|`risk`), initials?, logoUrl?, domain?. Card shows letter glyph or company logo (squircle), status LED, name, subtitle; click navigates to `/network/people/{id}` or `/network/accounts/{id}`.
+- **News_Ticker**: Real-time scrolling grid intelligence (Market_Volatility_Feed; items with title, source, trend, volatility).
+- **Contact_Dossier**: Detailed node profile (name, title, company, initials, energyMaturity, contractStatus, contractExpiration, id) with INITIATE action and Data Locker void state.
+- **Position_Maturity**: Visualization of contract and pricing status (expiration, daysRemaining, currentSupplier, strikePrice, annualUsage, estimatedRevenue, margin; optional isSimulation).
+- **Market_Pulse**: Live ERCOT telemetry card—**all four zones** (LZ_NORTH, LZ_HOUSTON, LZ_WEST, LZ_SOUTH) with colors matching Telemetry/Infrastructure, volatility banner, HUB_AVG, scarcity %, and **Scarcity Gauge** (Voltage Bar: left=scarcity/red, right=stable/green, glowing needle = reserve margin). Injected by the **backend** when `get_market_pulse` is called.
+- **Forensic_Grid**: High-density tabular data for account analysis (title, columns, rows, optional highlights).
+- **Forensic_Documents (Evidence Locker)**: Grid of **glass tiles** per document: PDF icon (red/white), truncated filename, date; hover reveals Download/Open. Data: accountName, documents (id, name, type, size, url, created_at).
+- **Flight_Check**: Protocol checklist (e.g. "1. Email the CFO. 2. Pull the 4CP report."). Data: items array with `label`, `status` (`pending`|`done`). Renders as slim glass bars: left = circle/check, center = instruction, right = copy icon; click row copies label to clipboard.
+- **Interaction_Snippet**: Call/search result snippet. Data: contactName?, callDate?, snippet (text), highlight? (phrase to highlight in Klein Blue). Renders as "Waveform Card" with audio-wave visual and context line (e.g. "Call with Billy Ragland · Oct 14, 2025"). Use when answering "Did [X] mention [Y]?" from search_interactions.
+- **Data_Void**: Empty state placeholders for missing intelligence (field, action e.g. REQUIRE_BILL_UPLOAD).
+- **Mini_Profile**: Compact list of prospects (profiles array: name, company?, title?).
 
-### 3. Interaction Protocols
-- **Contextual Awareness**: The agent automatically detects the user's current route (Contact, Account, Dashboard) and offers proactive insights upon opening without a single click.
+### 3. Context & Session Handling
+- **Contextual Awareness**: The agent receives **context** from the current page: `contact` (with id from `/people/[id]`), `account` (from `/accounts/[id]`), `dashboard`, or `general`. Context can also be overridden via the Gemini store (`activeContext`). The footer displays `TARGET: [label]` or `ACTIVE_CONTEXT: [scope]`. Context is sent with each request so the model can use `accountId` / `context_id` for `list_contacts`, `get_account_details`, etc.
+- **Chat sessions**: Messages are persisted in Supabase (`chat_sessions`, `chat_messages`). Each session has `context_type` and `context_id`. History panel loads past sessions and restores message list for a selected session.
+
+### 4. Interaction Protocols
+- **Router HUD (Diagnostics)**: Toggling the Bot icon shows **AI_ROUTER_HUD // LIVE_DIAGNOSTICS** with model/provider status, tool names when tools are invoked, and buttons to copy the Supabase debug prompt or the AI troubleshooting prompt.
+- **Proactive intel**: The agent can offer proactive insights when the panel opens, based on current context (e.g. contact or account page).
 - **Anti-Hallucination Protocol (v2)**: Strict enforcement against inventing names, metrics, or dates. If data is not in the CRM, the agent is hard-coded to report it as "Unknown" or "Data Void".
 - **Neural Line Response**: Every AI transmission is anchored by a glowing vertical "Neural Line" spine in International Klein Blue.
-- **Dynamic Scaling**: Header icons (Bot, Dialer, Refresh) are precision-scaled to `22px-24px` for professional visibility.
+- **Message parsing**: Assistant content is split on `JSON_DATA:`; each block is parsed as `{ type, data }` and rendered via `ComponentRenderer`. Trailing text after `END_JSON` is shown as prose.
+- **Dynamic Scaling**: Header icons (Bot, History, Plus, etc.) use the forensic icon set; Bot icon shows an ambient pulse when diagnostics are open.
 - **Haptic Animations**: `framer-motion` layout orchestration with `spring` transitions (bounce: 0, duration: 0.4) for organic UI movement.
-- **Visual Status**: 
-    - **Live Waveform**: A dynamic bar animation that visualizes the AI's "thinking" process.
+- **Visual Status**:
+    - **Live Waveform**: A dynamic bar animation that visualizes the AI's "thinking" process next to "Nodal Architect v1.3" and "LIVE_FEED".
     - **LED Pulsing**: A subtle emerald glow signifying active background monitoring.
 
 ---
@@ -141,5 +152,5 @@ We are actively expanding the Architect's "Brain" to include these forensic ener
 - **Security**: All tool calls are gated by Supabase RLS and server-side validation.
 
 ---
-*Last Updated: 2026-02-01*
-*Status: Nodal Architect v1.3.0 Operational (Guaranteed Exact Matches & Location Awareness)*
+*Last Updated: 2026-02-07*
+*Status: Nodal Architect v1.3 Operational (Build Gemini: Identity Cards, Flight Check, Evidence Locker tiles, Scarcity Gauge, Conversation Snippet, High-Contrast ** Artifacts)*

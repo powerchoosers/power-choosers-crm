@@ -245,7 +245,7 @@ const tools = [
       },
       {
         name: 'get_market_pulse',
-        description: 'Get real-time ERCOT market data, including current prices (LZ_HOUSTON, LZ_NORTH) and grid conditions (Load, Capacity, Reserves). ALWAYS use this when the user asks about market conditions, pricing, or the grid.',
+        description: 'Get real-time ERCOT market data: zonal settlement prices (LZ_HOUSTON, LZ_NORTH, LZ_SOUTH, LZ_WEST), hub average, grid load/capacity/reserves, and scarcity. ALWAYS call this when the user asks about market prices, volatility, whether the market is volatile, or conditions in a specific load zone (e.g. "how is LZ_WEST?", "volatility in Houston"). The UI will show the live telemetry card.',
         parameters: {
           type: 'OBJECT',
           properties: {}
@@ -397,9 +397,15 @@ const toolHandlers = {
         getErcotMarketData('grid')
       ]);
 
+      const rawPrices = priceData.prices || {};
+      const h = rawPrices.houston ?? 0, n = rawPrices.north ?? 0, s = rawPrices.south ?? 0, w = rawPrices.west ?? 0;
+      let hub_avg = rawPrices.hub_avg;
+      if (hub_avg == null || hub_avg === 0) hub_avg = (h + n + s + w) / 4;
+      const prices = { houston: h, north: n, south: s, west: w, hub_avg };
+
       const combinedData = {
         timestamp: priceData.timestamp || gridData.timestamp,
-        prices: priceData.prices,
+        prices,
         grid: gridData.metrics,
         metadata: {
           price_source: priceData.source || priceData.metadata?.source,
@@ -1802,10 +1808,18 @@ export default async function handler(req, res) {
           JSON_DATA:{"type": "position_maturity", "data": {"expiration": "...", "daysRemaining": 123, "currentSupplier": "...", "strikePrice": "$0.0000", "annualUsage": "...", "estimatedRevenue": "...", "margin": "...", "isSimulation": false}}END_JSON
         - When providing lists of data (Grids), use:
           JSON_DATA:{"type": "forensic_grid", "data": {"title": "...", "columns": ["..."], "rows": [{"col1": "...", "col2": "..."}], "highlights": ["col_name_to_highlight"]}}END_JSON
-        - When providing document/bill lists (Data Locker), use:
+        - When providing document/bill lists (Evidence Locker), use:
           JSON_DATA:{"type": "forensic_documents", "data": {"accountName": "...", "documents": [{"id": "...", "name": "...", "type": "...", "size": "...", "url": "...", "created_at": "..."}]}}END_JSON
+        - When the user asks "Who is [name]?" or "Show me [company]" and you return a SINGLE contact or account, use an Identity Node (clickable card) instead of a table:
+          JSON_DATA:{"type": "identity_card", "data": {"type": "contact"|"account", "id": "...", "name": "...", "title": "...", "company": "...", "industry": "...", "status": "active"|"risk", "initials": "XX", "logoUrl": "...", "domain": "..."}}END_JSON
+        - When suggesting a short protocol or checklist (e.g. "1. Email the CFO. 2. Pull the 4CP report."), use Flight Check so the user can copy or execute steps:
+          JSON_DATA:{"type": "flight_check", "data": {"items": [{"label": "Request Interval Data from Oncor", "status": "pending"}, {"label": "Pull the 4CP report", "status": "pending"}]}}END_JSON
+        - When search_interactions finds a transcript snippet (e.g. "Did Billy mention a contract end date?"), return the exact quote in a Conversation Snippet so the user sees the highlighted phrase:
+          JSON_DATA:{"type": "interaction_snippet", "data": {"contactName": "...", "callDate": "...", "snippet": "The 2 sentences from the transcript.", "highlight": "exact phrase to highlight in blue"}}END_JSON
         - If data is missing for a critical field (like contract expiration), explicitly return:
           JSON_DATA:{"type": "data_void", "data": {"field": "Contract Expiration", "action": "REQUIRE_BILL_UPLOAD"}}END_JSON
+        - For ERCOT market prices, volatility, or a specific load zone (e.g. "how is LZ_WEST?", "is the market volatile?"): call get_market_pulse. The system will attach the live telemetry card automatically. Summarize in text (e.g. whether it is volatile, which zone is highest, scarcity).
+        - Use **value** in narrative text for key numbers or terms; the UI renders them as high-contrast data artifacts (e.g. **$0.042** for strike price).
 
         CONFIDENCE GATING:
         - If you are presenting a real database record, ensure id and name match.
@@ -2345,6 +2359,7 @@ export default async function handler(req, res) {
 
         let result = await callGeminiWithRetry(prompt);
         let response = result.response;
+        let lastMarketPulseData = null;
 
         while (response.functionCalls()) {
           const calls = response.functionCalls();
@@ -2360,6 +2375,9 @@ export default async function handler(req, res) {
             if (handler) {
               try {
                 const result = await handler(call.args);
+                if (call.name === 'get_market_pulse' && result && result.type === 'market_pulse' && result.data) {
+                  lastMarketPulseData = result.data;
+                }
                 console.log(`[Gemini Tool] ${call.name} returned ${Array.isArray(result) ? result.length : '1'} results`);
                 return {
                   functionResponse: {
@@ -2389,11 +2407,15 @@ export default async function handler(req, res) {
           response = result.response;
         }
 
-        const text = response.text();
+        let text = response.text();
         console.log(`[Gemini Chat] Final response text from ${modelName}:`, text);
         
         if (!text || text.trim().length === 0) {
           throw new Error('Empty response from model');
+        }
+
+        if (lastMarketPulseData) {
+          text = text + '\n\nJSON_DATA:' + JSON.stringify({ type: 'market_pulse', data: lastMarketPulseData }) + 'END_JSON';
         }
 
         const currentDiagnostic = routingDiagnostics.find(d => d.model === modelName && d.status === 'attempting');

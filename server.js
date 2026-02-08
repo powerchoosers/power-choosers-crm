@@ -136,6 +136,7 @@ import twilioProcessExistingTranscriptsHandler from './api/twilio/process-existi
 import energyNewsHandler from './api/energy-news.js';
 import eiaHandler from './api/market/eia.js';
 import ercotHandler from './api/market/ercot.js';
+import ercotSnapshotHandler from './api/market/ercot-snapshot.js';
 import geminiChatHandler from './api/gemini/chat.js';
 import logoHandler from './api/logo.js';
 import twilioBridgeHandler from './api/twilio/bridge.js';
@@ -801,6 +802,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/market/ercot') {
     return handleApiMarketErcot(req, res, parsedUrl);
+  }
+  if (pathname === '/api/market/ercot/snapshot') {
+    return ercotSnapshotHandler(req, res);
   }
   if (pathname === '/api/search') {
     return handleApiSearch(req, res, parsedUrl);
