@@ -1,10 +1,12 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import {
   ResponsiveContainer,
   AreaChart,
   Area,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
@@ -12,6 +14,7 @@ import {
 } from 'recharts'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { useMarketPulse, type MarketPulseData } from '@/hooks/useMarketPulse'
+import { useMarketTelemetryHistory } from '@/hooks/useMarketTelemetryHistory'
 import { useEIARetailTexas, type EIARetailRow } from '@/hooks/useEIA'
 import { cn } from '@/lib/utils'
 
@@ -48,11 +51,42 @@ function MacroVarianceTooltip({
   )
 }
 
+/** Tooltip for ERCOT history chart */
+function ERCOTHistoryTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean
+  payload?: Array<{ name?: string; value?: number; dataKey?: string }>
+  label?: string
+}) {
+  if (!active || !payload?.length || !label) return null
+  return (
+    <div className="rounded-xl border border-white/10 bg-zinc-900/90 px-3 py-2 backdrop-blur-md shadow-xl">
+      <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{label}</div>
+      <div className="mt-1 flex flex-col gap-0.5 text-sm font-mono tabular-nums">
+        {payload.map((p) => (
+          <span key={p.dataKey}>
+            {p.dataKey === 'hub_avg' && 'HUB_AVG '}
+            {p.dataKey === 'north' && 'LZ_NORTH '}
+            {p.dataKey === 'houston' && 'LZ_HOUSTON '}
+            {p.dataKey === 'west' && 'LZ_WEST '}
+            {p.dataKey === 'south' && 'LZ_SOUTH '}
+            {p.value != null ? `$${Math.round(p.value)}` : '—'} $/MWh
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Zone order and colors match Infrastructure page (Grid Telemetry panel). */
 const ZONES = [
-  { id: 'houston', label: 'LZ_HOUSTON' },
-  { id: 'north', label: 'LZ_NORTH' },
-  { id: 'south', label: 'LZ_SOUTH' },
-  { id: 'west', label: 'LZ_WEST' },
+  { id: 'north', label: 'LZ_NORTH', color: '#002FA7' },
+  { id: 'houston', label: 'LZ_HOUSTON', color: '#22c55e' },
+  { id: 'west', label: 'LZ_WEST', color: '#f59e0b' },
+  { id: 'south', label: 'LZ_SOUTH', color: '#ef4444' },
 ] as const
 
 function priceColor(price: number) {
@@ -63,7 +97,15 @@ function priceColor(price: number) {
 
 export default function TelemetryPage() {
   const { data: marketData, isLoading: marketLoading, isError: marketError } = useMarketPulse()
+  const { chartData: ercotHistoryChart, isLoading: ercotHistoryLoading, isError: ercotHistoryError, refetch: refetchHistory } = useMarketTelemetryHistory()
   const { data: eiaData, isLoading: eiaLoading, isError: eiaError } = useEIARetailTexas()
+
+  // Request a snapshot save on mount (server throttles to 2x/day so we get today's data)
+  useEffect(() => {
+    fetch('/api/market/ercot/snapshot', { method: 'POST' })
+      .then((r) => r.ok && r.json().then((body) => body.saved && refetchHistory()))
+      .catch(() => {})
+  }, [refetchHistory])
 
   const prices: MarketPulseData['prices'] = marketData?.prices ?? ({} as MarketPulseData['prices'])
   const grid: MarketPulseData['grid'] = marketData?.grid ?? ({} as MarketPulseData['grid'])
@@ -133,9 +175,10 @@ export default function TelemetryPage() {
               <div
                 key={z.id}
                 className={cn(
-                  'rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl p-4',
+                  'rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl p-4 border-l-4',
                   price != null && price >= 1000 && 'border-rose-500/50 animate-pulse'
                 )}
+                style={{ borderLeftColor: z.color }}
               >
                 <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
                   {z.label}
@@ -159,6 +202,54 @@ export default function TelemetryPage() {
             {marketLoading || prices.hub_avg == null ? '—' : `$${Math.round(prices.hub_avg)}`}
           </span>
           <span className="text-[9px] font-mono text-zinc-600">$/MWh</span>
+        </div>
+      </section>
+
+      {/* ERCOT Price History (stored snapshots from market_telemetry) */}
+      <section className="space-y-3">
+        <h2 className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
+          ERCOT Price History
+        </h2>
+        <p className="text-[9px] font-mono text-zinc-600 max-w-xl">
+          Historic settlement prices from stored snapshots. Data is logged when market pulse is saved (e.g. via Gemini, up to 2× per day). More points appear as snapshots accumulate.
+        </p>
+        <div className="rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl overflow-hidden">
+          {ercotHistoryError ? (
+            <div className="p-6 text-center font-mono text-amber-500 text-sm">CONNECTION_LOST</div>
+          ) : ercotHistoryLoading ? (
+            <div className="h-64 rounded-2xl animate-pulse bg-zinc-800/50" />
+          ) : ercotHistoryChart.length === 0 ? (
+            <div className="p-6 text-center font-mono text-zinc-500 text-sm">
+              No history yet. Data is logged when market snapshots are saved (e.g. via Gemini).
+            </div>
+          ) : (
+            <div className="p-4 h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={ercotHistoryChart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fill: 'rgb(113 113 122)', fontSize: 9, fontFamily: 'monospace' }}
+                    tickLine={false}
+                    axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    tick={{ fill: 'rgb(113 113 122)', fontSize: 10, fontFamily: 'monospace' }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => `$${v}`}
+                  />
+                  <Tooltip content={<ERCOTHistoryTooltip />} />
+                  <Line type="monotone" dataKey="hub_avg" stroke="#64748b" strokeWidth={2} dot={false} connectNulls name="HUB_AVG" />
+                  <Line type="monotone" dataKey="north" stroke="#002FA7" strokeWidth={1.5} dot={false} connectNulls name="LZ_NORTH" />
+                  <Line type="monotone" dataKey="houston" stroke="#22c55e" strokeWidth={1.5} dot={false} connectNulls name="LZ_HOUSTON" />
+                  <Line type="monotone" dataKey="west" stroke="#f59e0b" strokeWidth={1.5} dot={false} connectNulls name="LZ_WEST" />
+                  <Line type="monotone" dataKey="south" stroke="#ef4444" strokeWidth={1.5} dot={false} connectNulls name="LZ_SOUTH" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
       </section>
 
@@ -225,9 +316,14 @@ export default function TelemetryPage() {
 
       {/* ROW 3: MACRO_VARIANCE_CHART (EIA Commercial vs Industrial) */}
       <section className="space-y-3">
-        <h2 className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
-          Macro Variance (TX Retail ¢/kWh)
-        </h2>
+        <div>
+          <h2 className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
+            Macro Variance (TX Retail ¢/kWh)
+          </h2>
+          <p className="mt-1 text-[9px] font-mono text-zinc-600 max-w-xl">
+            EIA state-level average price (cents/kWh). Updates as EIA publishes; latest month may lag 1–2 months. This series is blended across utilities, so it is smoother than wholesale or single-bill summer spikes.
+          </p>
+        </div>
         <div className="rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl overflow-hidden">
           {eiaError ? (
             <div className="p-6 text-center font-mono text-amber-500 text-sm">CONNECTION_LOST</div>
