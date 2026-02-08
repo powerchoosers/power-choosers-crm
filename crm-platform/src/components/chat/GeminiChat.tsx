@@ -76,6 +76,7 @@ type PositionMaturity = {
   estimatedRevenue: string
   margin?: string
   isSimulation?: boolean
+  accountId?: string
 }
 
 type ForensicGrid = {
@@ -135,14 +136,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-/** Renders prose with **text** as High-Contrast Data Artifacts (Obsidian & Glass). Optionally use DecryptionText (word-stagger reveal) for first segment. */
+/** Renders prose with **text** as High-Contrast Data Artifacts (Obsidian & Glass). Optionally use DecryptionText (word-stagger reveal) for first segment. Supports multiple artifacts per line and content with asterisks (non-greedy match). */
 function ProseWithArtifacts({ text, revealFirstWords }: { text: string; revealFirstWords?: number }) {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g)
+  const parts = text.split(/(\*\*(?:.+?)\*\*)/g)
   const firstTextPart = parts.find((s) => s && !s.match(/^\*\*(.+)\*\*$/))
   const useReveal = typeof revealFirstWords === 'number' && revealFirstWords > 0 && firstTextPart && firstTextPart.length > 0
 
   return (
-    <p className="whitespace-pre-wrap text-zinc-400 text-sm leading-7 break-words [overflow-wrap:anywhere]">
+    <p className="font-sans whitespace-pre-wrap text-zinc-400 text-sm leading-7 break-words [overflow-wrap:anywhere]">
       {parts.map((segment, i) => {
         const match = segment.match(/^\*\*(.+)\*\*$/)
         if (match) {
@@ -158,7 +159,7 @@ function ProseWithArtifacts({ text, revealFirstWords }: { text: string; revealFi
         if (useReveal && segment === firstTextPart) {
           return (
             <span key={i}>
-              <DecryptionText text={segment} maxRevealWords={revealFirstWords} />
+              <DecryptionText text={segment} maxRevealWords={revealFirstWords} className="font-sans" />
             </span>
           )
         }
@@ -486,8 +487,17 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
             <div className="text-[9px] font-mono text-zinc-600 mt-1 uppercase tracking-widest">Calculated at {pos.margin || '0.003'} margin base</div>
           </div>
           {!pos.isSimulation && (
-            <div className="flex justify-end pt-1">
+            <div className="flex justify-between items-center pt-1 gap-2">
               <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-wider">From account record</span>
+              {pos.accountId && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); router.push(`/network/accounts/${pos.accountId}`); }}
+                  className="text-[9px] font-mono text-[#002FA7] hover:text-blue-400 uppercase tracking-wider"
+                >
+                  Open account →
+                </button>
+              )}
             </div>
           )}
         </motion.div>
@@ -815,7 +825,16 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
       )
       }
     default:
-      return null
+      return (
+        <div className="rounded-lg border border-white/10 bg-zinc-900/30 px-3 py-2 font-mono text-[10px] text-zinc-500">
+          Unknown component: {type}
+          {isRecord(data) && Object.keys(data).length > 0 && (
+            <pre className="mt-1 text-[9px] text-zinc-600 truncate max-w-full overflow-hidden">
+              {JSON.stringify(data).slice(0, 120)}…
+            </pre>
+          )}
+        </div>
+      )
   }
 }
 
@@ -939,6 +958,14 @@ export function GeminiChatPanel() {
     "Who's at this company?",
     "Market volatility",
   ], [])
+
+  const isBackupFallback = useMemo(() => {
+    if (!diagnostics || diagnostics.length < 2) return false
+    const hasFailed = diagnostics.some((d) => d.status === 'failed')
+    const hasSuccess = diagnostics.some((d) => d.status === 'success')
+    const hasFallbackReason = diagnostics.some((d) => d.reason === 'FALLBACK_TO_DEFAULT')
+    return (hasFailed && hasSuccess) || !!hasFallbackReason
+  }, [diagnostics])
 
   // Fetch History
   useEffect(() => {
@@ -1550,7 +1577,9 @@ SELECT * FROM hybrid_search_accounts(
                         </span>
                         {isLoading && i === messages.length - 1 && <Waveform />}
                       </div>
-                      
+                      {i === messages.length - 1 && isBackupFallback && (
+                        <p className="text-[9px] font-mono text-zinc-500 mb-1">Using backup model</p>
+                      )}
                       <div className="flex flex-col gap-4 w-full min-w-0 max-w-full overflow-hidden">
                         {m.content.split('JSON_DATA:').map((part, index) => {
                           const partKey = `${m.id || i}-part-${index}`;
@@ -1582,7 +1611,20 @@ SELECT * FROM hybrid_search_accounts(
                               </div>
                             )
                           } catch (e) {
-                            return <div key={partKey} className="text-[10px] text-red-400 font-mono p-2 bg-red-500/10 rounded">[System_Error: Data_Corruption]</div>
+                            const rawSegment = part.split('END_JSON')[0] ?? part
+                            const rawToCopy = `JSON_DATA:${rawSegment}END_JSON`
+                            return (
+                              <div key={partKey} className="text-[10px] font-mono p-2 bg-red-500/10 rounded flex flex-wrap items-center gap-2">
+                                <span className="text-red-400">[System_Error: Data_Corruption]</span>
+                                <button
+                                  type="button"
+                                  onClick={() => navigator.clipboard.writeText(rawToCopy)}
+                                  className="text-zinc-400 hover:text-zinc-300 border border-white/10 hover:border-white/20 px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider"
+                                >
+                                  Copy raw
+                                </button>
+                              </div>
+                            )
                           }
                         })}
                       </div>
