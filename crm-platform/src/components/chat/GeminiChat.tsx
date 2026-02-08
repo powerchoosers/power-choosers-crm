@@ -1294,7 +1294,7 @@ SELECT * FROM hybrid_search_accounts(
             />
           </div>
           <div>
-            <h3 className="text-xs font-mono font-bold text-zinc-100 tracking-widest uppercase">Nodal Architect v1.3</h3>
+            <h3 className="text-xs font-mono font-bold text-zinc-100 tracking-widest uppercase">Nodal Architect v2.0</h3>
             <div className="flex items-center gap-2">
               <Waveform />
               <span className="text-[10px] font-mono text-emerald-500/70 uppercase tracking-tighter font-bold">LIVE_FEED</span>
@@ -1512,7 +1512,7 @@ SELECT * FROM hybrid_search_accounts(
                     <div className="pl-6 w-full">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-widest font-bold">
-                          NODAL_ARCHITECT // v1.3.0
+                          NODAL_ARCHITECT // v2.0
                         </span>
                         {isLoading && i === messages.length - 1 && <Waveform />}
                       </div>
@@ -1707,7 +1707,7 @@ SELECT * FROM hybrid_search_accounts(
         </motion.form>
         
         <div className="text-center mt-3">
-          <span className="text-[9px] text-zinc-700 font-mono uppercase tracking-[0.2em]">Nodal Point Neural Engine v1.3.0</span>
+          <span className="text-[9px] text-zinc-700 font-mono uppercase tracking-[0.2em]">Nodal Point Neural Engine v2.0</span>
         </div>
       </motion.div>
     </motion.div>
