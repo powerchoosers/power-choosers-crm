@@ -307,7 +307,7 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
         domain?: string
       }
       const path = card.type === 'contact' ? '/network/people' : '/network/accounts'
-      const initials = card.initials ?? card.name.split(/\s+/).map((n) => n[0]).join('').slice(0, 2).toUpperCase() || '?'
+      const initials = card.initials ?? (card.name.split(/\s+/).map((n) => n[0]).join('').slice(0, 2).toUpperCase() || '?')
       return (
         <motion.div
           initial={{ opacity: 0, y: 4 }}
