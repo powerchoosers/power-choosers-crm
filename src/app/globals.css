@@ -71,6 +71,11 @@
     @apply bg-black/20 backdrop-blur-md;
   }
 
+  /* Sticky table headers - enhanced glassmorphism for scrolling content */
+  .nodal-table-header {
+    @apply bg-black/40 backdrop-blur-xl;
+  }
+
   /* Level 3 active module glass - darker Void for Right Panel (matches Target Signals) */
   .nodal-module-glass {
     @apply bg-black/20 backdrop-blur-sm border-l border-white/5 border-r border-white/5;
