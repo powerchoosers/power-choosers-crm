@@ -14,7 +14,9 @@ import {
 import { UplinkCard } from '@/components/dossier/UplinkCard'
 import DataIngestionCard from '@/components/dossier/DataIngestionCard'
 import { useContact, useUpdateContact } from '@/hooks/useContacts'
+import { useAccount } from '@/hooks/useAccounts'
 import { useContactCalls } from '@/hooks/useCalls'
+import { useApolloNews } from '@/hooks/useApolloNews'
 import { useEntityTasks } from '@/hooks/useEntityTasks'
 import { useTasks } from '@/hooks/useTasks'
 import { TaskCommandBar } from '@/components/crm/TaskCommandBar'
@@ -58,6 +60,18 @@ export default function ContactDossierPage() {
   const id = (params?.id as string) || ''
 
   const { data: contact, isLoading, isFetched } = useContact(id)
+  const { data: account } = useAccount((contact as { linkedAccountId?: string })?.linkedAccountId ?? '')
+  const domain = account?.domain?.trim() || (() => {
+    try {
+      const w = (contact as { website?: string })?.website?.trim()
+      if (!w) return undefined
+      const u = new URL(w.startsWith('http') ? w : `https://${w}`)
+      return u.hostname.replace(/^www\./, '') || undefined
+    } catch {
+      return undefined
+    }
+  })()
+  const { data: apolloNewsSignals } = useApolloNews(domain)
   const { data: recentCalls, isLoading: isLoadingCalls } = useContactCalls(id)
   const updateContact = useUpdateContact()
   const { isEditing, setIsEditing, toggleEditing } = useUIStore()
@@ -308,6 +322,10 @@ export default function ContactDossierPage() {
       const transcript = (lastCall as { transcript?: string }).transcript
       if (transcript?.trim()) parts.push(`Last call transcript (excerpt): ${transcript.trim().slice(0, 600)}${transcript.length > 600 ? '…' : ''}`)
     }
+    if (apolloNewsSignals?.length) {
+      const newsLines = apolloNewsSignals.slice(0, 5).map((a) => `- ${a.title}${a.snippet ? `: ${a.snippet.slice(0, 120)}${a.snippet.length > 120 ? '…' : ''}` : ''}`)
+      parts.push(`Recent company news (for first-line personalization if relevant):\n${newsLines.join('\n')}`)
+    }
     const titleStr = typeof contact.title === 'string' ? contact.title : typeof contact.jobTitle === 'string' ? contact.jobTitle : undefined
     return {
       contactName: typeof contact.name === 'string' ? contact.name : undefined,
@@ -316,7 +334,7 @@ export default function ContactDossierPage() {
       accountName: typeof (contact as { accountName?: string }).accountName === 'string' ? (contact as { accountName?: string }).accountName : undefined,
       contextForAi: parts.length ? parts.join('\n\n') : undefined,
     }
-  }, [contact, forensicNotes, recentCalls])
+  }, [contact, forensicNotes, recentCalls, apolloNewsSignals])
 
   const handleTerminalSubmit = async () => {
     if (!terminalInput.trim()) {

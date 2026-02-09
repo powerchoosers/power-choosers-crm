@@ -25,7 +25,13 @@ const EMAIL_AI_MODELS = [
   { value: 'nvidia/nemotron-3-nano-30b-a3b:free', label: 'NEMOTRON-30B' },
 ] as const
 
-export type EmailTypeId = 'cold' | 'professional' | 'followup' | 'internal' | 'support'
+export type EmailTypeId = 'cold_first_touch' | 'cold_followup' | 'professional' | 'followup' | 'internal' | 'support'
+
+const DELIVERABILITY_RULES = `
+DELIVERABILITY RULES:
+- Avoid promotional spam language ("free", "act now", "discount", "save big", "limited time offer", "urgent", "money-back guarantee").
+- Avoid overuse of dollar signs, percentages, and ALL CAPS in subject/body.
+- For cold first-touch: do not include any links. Plain text only.`
 
 interface EmailTypeConfig {
   id: EmailTypeId
@@ -42,30 +48,74 @@ interface EmailTypeConfig {
 
 const EMAIL_TYPES: EmailTypeConfig[] = [
   {
-    id: 'cold',
-    label: 'Cold / Outreach',
+    id: 'cold_first_touch',
+    label: 'Cold (first touch)',
     getSystemPrompt: ({ signerName, to, subject }) =>
-      `You are the Director of Energy Architecture at Nodal Point. You write COLD OUTREACH emails that are forensic, direct, and minimal.
+      `You are the Director of Energy Architecture at Nodal Point. You write FIRST-TOUCH COLD emails that are short, trigger-led, and plain text only.
 
-VOICE: Forensic, direct, minimal. Expert auditor tone, not salesperson.
-RULES: Reject sales fluff. Use active voice. Focus on financial liability and structural cost. No corporate jargon. 2-4 sentences for cold. Question-based CTAs work best. No urgency tricks, no "We" language. One idea per email.
-
+STRUCTURE: TRIGGER (one observable: summer peak, tariff change, expansion) → PAIN (one sentence, in plain English: e.g. summer peaks locking in next year's costs, one winter spike setting demand charges for 12 months, delivery charges buried in the bill) → PROOF (brief peer/similar facility) → One question as CTA.
+WORD COUNT: Entire email 40–80 words (first-touch sweet spot for reply rates).
+LANGUAGE: Use plain English that ops, finance, and facility managers understand. Do NOT use jargon (4CP, ratchet, TDU, pass-through, demand charge, coincident peak, non-commodity) unless RECIPIENT CONTEXT explicitly indicates the recipient is an energy manager, director of energy, or similar. When in doubt, describe the mechanism in plain language (e.g. "summer peaks that lock in next year's transmission costs", "one winter spike that can set your delivery charges for the next 12 months", "charges from your utility that aren't the energy commodity").
 SENDER: ${signerName}
 RECIPIENT: ${to || '(not specified)'}
 SUBJECT: ${subject || '(no subject)'}
 
-Output ONLY the email body. Plain text, no markdown. No "Hi X," unless the user asks.`,
+GREETING: Optional. If used, use only "Hi {firstName}," — no "Dear" or long openings. You may jump straight into the diagnostic line (no greeting) for a more architect/internal note tone.
+CLOSING: Minimal sign-off: "Best," or "Thanks," followed by the SENDER name from above (first name only for cold, e.g. "Best,\\n[SENDER first name]" or "– [SENDER first name]"). Always use the actual SENDER name from the prompt, not a placeholder. No formal sign-offs.
+
+SUBJECT LINE (when generating): 4–7 words, clear and specific. Do NOT put the recipient's first name in the subject (it looks automated). Use plain-English subject; you may reference company or location when it adds clarity (e.g. "Summer transmission charges in Dallas", "Summer peak risk at your Dallas DC", "Transmission costs on your DFW sites"). Reserve jargon like "4CP exposure" for when the recipient is clearly an energy manager. Match body honestly; no clickbait. Avoid all caps and excessive punctuation.
+CTA: Always end with one clear question in plain English. Do not use "4CP exposure", "modeling", "mitigating", or "on your radar" in the closing question unless the recipient is an energy manager. Use natural phrasing instead (e.g. "Is anyone on your team looking at how those summer peaks affect next year's costs?", "Does anyone track those peak intervals against your budget?", "Is that something you're already looking at?"). Do not combine multiple asks in one email.
+
+PERSONALIZATION (use RECIPIENT CONTEXT when provided): You may mention the recipient's title or company **once** in the first sentence, but only if you tie it directly to a concrete responsibility or pain (e.g. "As VP of Operations at [Company], you're the one who feels it when summer peaks lock in next year's transmission charges."). If contextForAi includes recent activity (new warehouse, expansion, cost-focus, locations like DFW), you may reference **one** of those in the first sentence. Do not spend more than one sentence on personalization; move quickly to the cost problem and question.
+GUARDRAILS: Do not over-praise (no "esteemed", "renowned"). Do not write long clauses about their job description; use title only to anchor a specific outcome ("you feel it when…", "you're the one who sees…"). If no meaningful personalization data is provided, skip title and start directly with the business problem.
+
+${DELIVERABILITY_RULES}
+- No links, no images, no bullets, no HTML. Plain text only.
+- Output ONLY the email body (or SUBJECT: + body when generating). No meta-commentary.`,
     getRefinementInstruction: () =>
-      'REFINEMENT: Make this email SHARPER. Remove hedging ("might", "could"). Remove soft openings. Tighten 20%+ words. Active voice. Highlight financial impact. One specific CTA question. 80-120 words max for cold. Output only the refined body.',
+      'REFINEMENT: Sharpen to 40–80 words. Remove hedging. Active voice. One question CTA. Output only the refined body.',
     generationChips: [
-      { label: '4CP_RISK', directive: 'Draft cold email about Q2-Q3 demand charges and 4CP exposure for warehouse/logistics. Lead with a diagnostic question. 3-4 sentences.' },
-      { label: 'INTRO_AUDIT', directive: 'Draft short intro for audit follow-up. Warm, low-pressure. Lead with finding, not pitch. "Happy to share the math."' },
-      { label: 'RATCHET_WARNING', directive: 'Draft brief warning about ratchet clause exposure (winter peak locking summer bills). 2-3 sentences. Diagnostic question as CTA.' },
-      { label: 'PASS_THROUGH', directive: 'Draft cold email about hidden pass-through / non-commodity charges. Reference TDU. Question about % non-commodity on their bill.' },
+      { label: '4CP_RISK', directive: 'Write a 40–70 word first-touch cold email to a warehouse/logistics operator in ERCOT. Avoid jargon in the first sentence; describe the business problem in plain language (e.g. summer peaks locking in next year\'s transmission charges). You may mention "4CP" once in the body if needed, but only after the problem is clear. End with one plain-English question only — e.g. "Is anyone on your team looking at how those summer peaks affect next year\'s costs?", "Does anyone track those peak intervals against your budget?", or "Is that something you\'re already looking at?" Do NOT end with "modeling or mitigating 4CP exposure" or "4CP exposure on your radar." No links, plain text, minimal sign-off using the SENDER name from the system prompt. (Use RECIPIENT CONTEXT / Audience above: plain English for general, precise terms only if Audience says energy manager.)' },
+      { label: 'TITLE_INTRO', directive: 'Use RECIPIENT CONTEXT: open with one sentence that ties their title and/or company to the cost pain (e.g. "As [title] at [company], you\'re the one who feels it when summer peaks lock in next year\'s transmission charges."). Then one sentence proof, one question. No flattery. 40–70 words. Plain text.' },
+      { label: 'INTRO_AUDIT', directive: 'Warm follow-up: quick reminder of prior interaction, one key finding, soft CTA "Want to see the numbers?" 40–60 words. Plain text.' },
+      { label: 'RATCHET_WARNING', directive: 'Write a 40–70 word first-touch cold email. Describe in plain English: one winter peak can set a large part of next year\'s delivery charges for 12 months (do not say "ratchet" unless RECIPIENT CONTEXT / Audience says energy manager). One sentence proof (similar facility). End with one plain-English question (e.g. "Is anyone on your team looking at how that winter peak affects next year\'s costs?" or "Is that something you\'re already tracking?"). No links, plain text, minimal sign-off. (Use Audience above: plain English for general, "ratchet"/TDU only if energy manager.)' },
+      { label: 'PASS_THROUGH', directive: 'Write a 40–70 word first-touch cold email. Describe in plain English: charges from the utility that aren\'t the energy commodity (delivery/utility fees on the bill). Do not say "TDU" or "pass-through" unless RECIPIENT CONTEXT / Audience says energy manager. One question about what share of their bill is those delivery/utility charges. No links, plain text. (Use Audience above: plain English for general, TDU/pass-through only if energy manager.)' },
     ],
     refinementChips: [
-      { label: 'FORENSIC_OPTIMIZE', directive: 'FORENSIC_OPTIMIZE: Rewrite to be concise and direct. Remove filler. Expose financial impact.' },
-      { label: 'EXPAND_TECHNICAL', directive: 'EXPAND_TECHNICAL: Add regulatory/ERCOT context where helpful; keep tone direct. Under 150 words.' },
+      { label: 'FORENSIC_OPTIMIZE', directive: 'Rewrite to 40–80 words. Concise, direct. One question CTA. Output only the refined body.' },
+      { label: 'EXPAND_TECHNICAL', directive: 'Add one plain-English detail about how the local market or utility rules affect their costs; keep under 80 words. No jargon unless recipient is an energy manager. Output only the refined body.' },
+    ],
+  },
+  {
+    id: 'cold_followup',
+    label: 'Cold (follow-up)',
+    getSystemPrompt: ({ signerName, to, subject }) =>
+      `You are the Director of Energy Architecture at Nodal Point. You write COLD FOLLOW-UP emails (second+ touch). Slightly longer allowed; still forensic and direct.
+
+STRUCTURE: Brief reminder of prior touch → one concrete finding or proof → soft CTA (question or "want to see the math?"). Up to ~120–150 words. One link or calendar URL allowed only if the directive asks.
+LANGUAGE: Use plain English. Do NOT use jargon (4CP, ratchet, TDU, pass-through, demand charge, non-commodity) unless RECIPIENT CONTEXT indicates the recipient is an energy manager, director of energy, or similar. Describe mechanisms in plain language.
+SENDER: ${signerName}
+RECIPIENT: ${to || '(not specified)'}
+SUBJECT: ${subject || '(no subject)'}
+
+GREETING: Use a short greeting with the recipient's first name: "Hi Sarah," or "Hello Sarah," so it feels like normal 1:1 business communication.
+CLOSING: Use a standard sign-off: "Best," or "Thanks," followed by the SENDER's full name from the prompt above. Always use the actual SENDER name, not a placeholder.
+SUBJECT: Do NOT put the recipient's first name in the subject. You MAY include company/facility name when relevant (e.g. "Summer peak risk at your Dallas DC", "Transmission costs on your DFW sites"). 4–7 words, honest and specific.
+CTA: One clear question or ask. Do not combine multiple asks in one email.
+PERSONALIZATION: If RECIPIENT CONTEXT gives title/company/contextForAi, you may use it once in the first sentence tied to a concrete pain. No flattery; no long job-description clauses. If no personalization data, start with the business problem.
+${DELIVERABILITY_RULES}
+- Plain text preferred. No hype. Output ONLY the email body (or SUBJECT: + body when generating).`,
+    getRefinementInstruction: () =>
+      'REFINEMENT: Sharpen. Remove filler. One clear CTA. Up to 120–150 words. Output only the refined body.',
+    generationChips: [
+      { label: 'No-reply follow-up', directive: 'Gentle second touch after no reply. One sentence on prior email, one finding or question. Soft CTA. 50–80 words.' },
+      { label: 'Audit follow-up', directive: 'Follow-up after sending audit: one key number or finding, "Want to see the math?" 40–60 words.' },
+      { label: 'RATCHET_WARNING', directive: 'Follow-up in plain English: one winter peak setting next year\'s delivery charges for 12 months (use "ratchet" only if recipient is energy manager). One finding, one question. 40–60 words.' },
+      { label: 'PASS_THROUGH', directive: 'Follow-up in plain English: utility/delivery charges that aren\'t the commodity (use "pass-through" only if recipient is energy manager). One finding, one question. 40–60 words.' },
+    ],
+    refinementChips: [
+      { label: 'FORENSIC_OPTIMIZE', directive: 'Tighten. One CTA. Output only the refined body.' },
+      { label: 'Softer', directive: 'Soften tone; keep ask clear. Output only the refined body.' },
     ],
   },
   {
@@ -79,7 +129,10 @@ TONE: Professional, clear, respectful. Adapt to the recipient and subject. Use a
 RECIPIENT: ${to || '(not specified)'}
 SUBJECT: ${subject || '(no subject)'}
 
-Output ONLY the email body. Plain text, no markdown. Use appropriate greeting and sign-off if the directive implies a full email.`,
+GREETING: Use a short greeting with the recipient's first name when drafting a full email (e.g. "Hi Sarah," or "Hello Sarah,").
+CLOSING: Use a standard business sign-off: "Best," or "Thanks," or "Regards," followed by the SENDER's full name from the prompt above.
+
+Output ONLY the email body. Plain text, no markdown.`,
     getRefinementInstruction: () =>
       'REFINEMENT: Tighten and clarify this email. Keep the same intent and tone. Remove redundancy. Improve flow. Output only the revised body.',
     generationChips: [
@@ -104,6 +157,9 @@ TONE: Polite, brief, clear. Acknowledge they may be busy. Restate the ask or con
 
 RECIPIENT: ${to || '(not specified)'}
 SUBJECT: ${subject || '(no subject)'}
+
+GREETING: Use a short greeting with the recipient's first name (e.g. "Hi Sarah," or "Hello Sarah,").
+CLOSING: Use a standard sign-off: "Best," or "Thanks," followed by the SENDER's full name from the prompt above.
 
 Output ONLY the email body. Plain text, no markdown.`,
     getRefinementInstruction: () =>
@@ -130,7 +186,10 @@ TONE: Clear, concise, collegial. Can be slightly casual. Get to the point. Bulle
 RECIPIENT: ${to || '(not specified)'}
 SUBJECT: ${subject || '(no subject)'}
 
-Output ONLY the email body. Plain text. No need for formal greeting/sign-off unless the directive asks for it.`,
+GREETING: Optional. Use when it fits the relationship.
+CLOSING: Flexible; often just the SENDER's name from the prompt on the last line, or "Thanks," + SENDER name.
+
+Output ONLY the email body. Plain text.`,
     getRefinementInstruction: () =>
       'REFINEMENT: Make this internal email clearer and shorter. Keep the same information. Output only the revised body.',
     generationChips: [
@@ -154,6 +213,9 @@ TONE: Professional, warm, clear. Acknowledge the recipient's situation or questi
 
 RECIPIENT: ${to || '(not specified)'}
 SUBJECT: ${subject || '(no subject)'}
+
+GREETING: Use a short greeting with the recipient's first name (e.g. "Hi Sarah,").
+CLOSING: Use a standard sign-off: "Best," or "Thanks," followed by the SENDER's full name from the prompt above.
 
 Output ONLY the email body. Plain text, no markdown.`,
     getRefinementInstruction: () =>
@@ -179,6 +241,8 @@ export interface ComposeContext {
   accountName?: string
   /** Notes + call/transcript summary for AI. Injected into system prompt when present. */
   contextForAi?: string
+  /** When 'cold_plaintext', send first-touch cold as plain text only (no HTML/signature) for deliverability. */
+  deliverabilityMode?: 'cold_plaintext' | 'normal'
 }
 
 interface ComposeModalProps {
@@ -212,13 +276,16 @@ function ComposePanel({
   // AI Command Rail state
   const [aiRailOpen, setAiRailOpen] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
-  const [emailTypeId, setEmailTypeId] = useState<EmailTypeId>('cold')
+  const [emailTypeId, setEmailTypeId] = useState<EmailTypeId>('cold_first_touch')
   const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-flash-lite')
   const [isAiLoading, setIsAiLoading] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
   const [pendingAiContent, setPendingAiContent] = useState<string | null>(null)
+  const [pendingSubjectFromAi, setPendingSubjectFromAi] = useState<string | null>(null)
   const [contentBeforeAi, setContentBeforeAi] = useState('')
   const [subjectAnimationKey, setSubjectAnimationKey] = useState(0)
+  /** In-modal toggle: when true and type is cold, send as plain text with minimal signature (Option B). */
+  const [sendAsPlainText, setSendAsPlainText] = useState(false)
 
   const signatureHtml = profile ? generateNodalSignature(profile, user, true) : ''
   const outgoingSignatureHtml = profile ? generateNodalSignature(profile, user, false) : ''
@@ -241,6 +308,10 @@ function ComposePanel({
         if (context.contactTitle) lines.push(`- Title: ${context.contactTitle}`)
         if (context.companyName) lines.push(`- Company: ${context.companyName}`)
         if (context.accountName && context.accountName !== context.companyName) lines.push(`- Account: ${context.accountName}`)
+        const title = (context.contactTitle || '').toLowerCase()
+        const isEnergyManager = /energy\s*manager|director\s*of\s*energy|energy\s*director|sustainability\s*manager|facility\s*energy|utility\s*manager/.test(title)
+        if (isEnergyManager) lines.push('- Audience: energy manager / energy-focused role — you may use precise terms (4CP, ratchet, TDU, pass-through) when helpful.')
+        else lines.push('- Audience: general (ops, finance, facility) — use plain English only; avoid industry jargon.')
       }
       if (context.contextForAi?.trim()) {
         lines.push('NOTES / CALL CONTEXT (use to personalize and reference prior touchpoints):')
@@ -265,7 +336,8 @@ CRITICAL: You are writing draft content only. The app handles To/Sender/recipien
 
   const generateEmailWithAi = useCallback(async (directive: string) => {
     const refinementFallbackByType: Record<EmailTypeId, string> = {
-      cold: 'Rewrite to be forensic, direct, and minimalist. Remove corporate jargon.',
+      cold_first_touch: 'Rewrite to be forensic, direct, 40–80 words. One question CTA. Output only the revised body.',
+      cold_followup: 'Sharpen this follow-up. Remove filler. One clear CTA. Up to 120–150 words. Output only the revised body.',
       professional: 'Tighten and clarify this email. Keep the same intent and tone. Remove redundancy. Output only the revised body.',
       followup: 'Make this follow-up clearer and more concise. Keep it polite and professional. Output only the revised body.',
       internal: 'Make this internal email clearer and shorter. Keep the same information. Output only the revised body.',
@@ -298,26 +370,27 @@ CRITICAL: You are writing draft content only. The app handles To/Sender/recipien
       const data = await response.json()
       if (data.error) throw new Error(data.message || data.error)
       let raw = typeof data.content === 'string' ? data.content.trim() : ''
-      // Reject meta-commentary about sending/sender (model sometimes ignores instructions)
-      const noSend = /^(I (?:am |')?(?:sorry|cannot|can't|won't)|Could you please|Please verify).+$/im
-      if (noSend.test(raw)) {
+      const metaCommentary = /^(I (?:am |')?(?:sorry|cannot|can't|won't|unable to)|Could you please|Please verify|as an AI|I am an AI|I do not have access|I don't have access|I can't browse|I cannot (?:send|access|use)|I'm unable to)/im
+      if (metaCommentary.test(raw)) {
         toast.error('AI returned a verification message instead of draft content. Try again or pick a different model.')
         setAiError('Model declined to generate; try another model or rephrase.')
         return
       }
       let newBody = raw
       let parsedSubject: string | null = null
-      const subjectMatch = raw.match(/^\s*SUBJECT:\s*(.+?)(?:\n|$)/i)
-      if (subjectMatch) {
-        parsedSubject = subjectMatch[1].trim()
-        const afterFirstLine = raw.slice(raw.indexOf('\n')).trim()
-        newBody = afterFirstLine.startsWith('\n') ? afterFirstLine.trim() : afterFirstLine
+      const lines = raw.split(/\r?\n/)
+      const subjectLineIndex = lines.findIndex((line) => /^\s*SUBJECT:\s*.+/.test(line))
+      if (subjectLineIndex >= 0) {
+        const subjectLine = lines[subjectLineIndex]
+        const subMatch = subjectLine.match(/^\s*SUBJECT:\s*(.+)$/i)
+        if (subMatch) parsedSubject = subMatch[1].trim()
+        newBody = lines
+          .slice(subjectLineIndex + 1)
+          .join('\n')
+          .replace(/^\s*\n+/, '')
+          .trim()
       }
-      if (parsedSubject) {
-        setSubject(parsedSubject)
-        setSubjectAnimationKey((k) => k + 1)
-      }
-      setContent(newBody)
+      setPendingSubjectFromAi(parsedSubject)
       setPendingAiContent(newBody)
       setAiPrompt('')
     } catch (err) {
@@ -330,13 +403,21 @@ CRITICAL: You are writing draft content only. The app handles To/Sender/recipien
   }, [buildEmailSystemPrompt, content, isRefinementMode, selectedModel, profile?.firstName, subject, emailTypeId])
 
   const acceptAiContent = useCallback(() => {
+    const body = pendingAiContent ?? ''
+    const subj = pendingSubjectFromAi
+    setContent(body)
+    if (subj != null && subj.trim() !== '') {
+      setSubject(subj.trim())
+      setSubjectAnimationKey((k) => k + 1)
+    }
     setPendingAiContent(null)
-  }, [])
+    setPendingSubjectFromAi(null)
+  }, [pendingAiContent, pendingSubjectFromAi])
 
   const discardAiContent = useCallback(() => {
-    setContent(contentBeforeAi)
     setPendingAiContent(null)
-  }, [contentBeforeAi])
+    setPendingSubjectFromAi(null)
+  }, [])
 
   const handleSend = () => {
     if (!to || !subject || !content) {
@@ -344,15 +425,33 @@ CRITICAL: You are writing draft content only. The app handles To/Sender/recipien
       return
     }
 
-    // Combine content with signature for the HTML version
-    // Use the outgoing (light-mode) signature for the actual email
-    const fullHtml = `
+    const isColdType = emailTypeId === 'cold_first_touch' || emailTypeId === 'cold_followup'
+    const isColdPlaintext =
+      isColdType &&
+      (context?.deliverabilityMode === 'cold_plaintext' || sendAsPlainText)
+
+    const fullHtml = isColdPlaintext
+      ? undefined
+      : `
       <div style="font-family: sans-serif; white-space: pre-wrap; margin-bottom: 24px; color: #18181b;">${content}</div>
       ${outgoingSignatureHtml}
     `
 
+    const titleLine = profile?.jobTitle
+      ? `${profile.jobTitle}, Nodal Point`
+      : 'Director of Energy Architecture, Nodal Point'
+    const COLD_PLAINTEXT_BRAND_LINE = 'You have seen the math. Now see your data.'
+    const coldPlaintextBody = isColdPlaintext
+      ? `${content.trim()}\n\nBest,\n${signerName}\n${titleLine}\nhttps://nodalpoint.io\n\n${COLD_PLAINTEXT_BRAND_LINE}`
+      : null
+
     sendEmail(
-      { to, subject, content, html: fullHtml },
+      {
+        to,
+        subject,
+        content: coldPlaintextBody ?? content,
+        html: fullHtml ?? (coldPlaintextBody ?? content),
+      },
       {
         onSuccess: () => {
           onClose()
@@ -407,6 +506,40 @@ CRITICAL: You are writing draft content only. The app handles To/Sender/recipien
         )}
       >
         <div className="flex-1 overflow-y-auto np-scroll px-6 py-4 space-y-4">
+          {pendingAiContent !== null && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="rounded-lg border border-[#002FA7]/30 bg-[#002FA7]/5 overflow-hidden"
+            >
+              <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
+                <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-wider">AI suggestion — preview</span>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" onClick={acceptAiContent} className="h-7 text-[10px] text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 gap-1">
+                    <Check className="w-3 h-3" /> Replace with this
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={discardAiContent} className="h-7 text-[10px] text-zinc-400 hover:text-red-400 hover:bg-red-500/10 gap-1">
+                    <RotateCcw className="w-3 h-3" /> Discard
+                  </Button>
+                </div>
+              </div>
+              <div className="p-3 space-y-2 max-h-[200px] overflow-y-auto np-scroll">
+                {pendingSubjectFromAi != null && pendingSubjectFromAi.trim() !== '' && (
+                  <div>
+                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Subject</span>
+                    <p className="text-sm font-medium text-zinc-200 mt-0.5">{pendingSubjectFromAi}</p>
+                  </div>
+                )}
+                <div>
+                  <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Body</span>
+                  <pre className="mt-0.5 text-sm text-zinc-300 font-sans whitespace-pre-wrap break-words leading-relaxed">
+                    {pendingAiContent}
+                  </pre>
+                </div>
+              </div>
+            </motion.div>
+          )}
           <div className="space-y-2">
             <Input
               placeholder="To"
@@ -439,7 +572,10 @@ CRITICAL: You are writing draft content only. The app handles To/Sender/recipien
                 value={content}
                 onChange={(e) => {
                   setContent(e.target.value)
-                  if (pendingAiContent) setPendingAiContent(null)
+                  if (pendingAiContent) {
+                    setPendingAiContent(null)
+                    setPendingSubjectFromAi(null)
+                  }
                 }}
                 className="w-full min-h-[150px] bg-transparent border-0 resize-none focus:outline-none text-zinc-300 placeholder:text-zinc-600 font-sans leading-relaxed"
               />
@@ -449,17 +585,6 @@ CRITICAL: You are writing draft content only. The app handles To/Sender/recipien
                 </div>
               )}
             </div>
-            {pendingAiContent !== null && (
-              <div className="mt-2 flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-wider">AI generated</span>
-                <Button variant="ghost" size="sm" onClick={acceptAiContent} className="h-7 text-[10px] text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 gap-1">
-                  <Check className="w-3 h-3" /> Accept
-                </Button>
-                <Button variant="ghost" size="sm" onClick={discardAiContent} className="h-7 text-[10px] text-zinc-400 hover:text-red-400 hover:bg-red-500/10 gap-1">
-                  <RotateCcw className="w-3 h-3" /> Discard
-                </Button>
-              </div>
-            )}
             {aiError && (
               <p className="mt-1 text-[10px] font-mono text-red-400">{aiError}</p>
             )}
@@ -470,6 +595,17 @@ CRITICAL: You are writing draft content only. The app handles To/Sender/recipien
                   dangerouslySetInnerHTML={{ __html: signatureHtml }} 
                 />
               </div>
+            )}
+            {(emailTypeId === 'cold_first_touch' || emailTypeId === 'cold_followup') && (
+              <label className="mt-4 flex items-center gap-2 cursor-pointer select-none text-[10px] font-mono text-zinc-400 hover:text-zinc-200 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={sendAsPlainText}
+                  onChange={(e) => setSendAsPlainText(e.target.checked)}
+                  className="rounded border-white/20 bg-white/5 text-[#002FA7] focus:ring-[#002FA7]/50"
+                />
+                Send as plain text (cold deliverability)
+              </label>
             )}
           </div>
         </div>
@@ -569,7 +705,7 @@ CRITICAL: You are writing draft content only. The app handles To/Sender/recipien
           )}
         </AnimatePresence>
 
-        <div className="flex-none px-6 py-4 border-t border-white/5 bg-zinc-900/50 flex items-center justify-between">
+        <div className="flex-none px-6 py-4 border-t border-white/5 bg-zinc-900/50 flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <button className="icon-button-forensic h-8 w-8 flex items-center justify-center">
               <Paperclip className="w-4 h-4" />

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Copy, Send, X, Loader2, User, Bot, Mic, Activity, AlertTriangle, ArrowRight, History, RefreshCw, Phone, Plus, Sparkles, Cpu, Zap, FileText, CheckCircle, Circle, ClipboardCopy } from 'lucide-react'
+import { Copy, Send, X, Loader2, User, Bot, Mic, Activity, AlertTriangle, ArrowRight, History, RefreshCw, Phone, Plus, Sparkles, Cpu, Zap, FileText, CheckCircle, Circle, ClipboardCopy, Newspaper, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,6 +11,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGeminiStore } from '@/store/geminiStore'
 import { usePathname, useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
+import { useContact } from '@/hooks/useContacts'
+import { useAccount } from '@/hooks/useAccounts'
+import { useApolloNews, type ApolloNewsSignal } from '@/hooks/useApolloNews'
 import { supabase } from '@/lib/supabase'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { NeuralLoader } from '@/components/chat/NeuralLoader'
@@ -940,6 +943,14 @@ export function GeminiChatPanel() {
     return { ...baseContext, displayLabel };
   }, [pathname, params, storeContext])
 
+  const contactId = contextInfo.type === 'contact' && typeof contextInfo.id === 'string' ? contextInfo.id : ''
+  const accountIdForAccount = contextInfo.type === 'account' && typeof contextInfo.id === 'string' ? contextInfo.id : ''
+  const { data: contactForNews } = useContact(contactId)
+  const linkedAccountId = (contactForNews as { linkedAccountId?: string })?.linkedAccountId
+  const { data: accountForNews } = useAccount(accountIdForAccount || linkedAccountId || '')
+  const domainForNews = accountForNews?.domain?.trim()
+  const { data: apolloNewsSignals } = useApolloNews(domainForNews)
+
   const inputPlaceholder = useMemo(() => {
     switch (contextInfo.type) {
       case 'account':
@@ -1735,6 +1746,40 @@ SELECT * FROM hybrid_search_accounts(
               </span>
             </div>
           </motion.div>
+
+          {/* Company news (Apollo) when on contact/account dossier */}
+          {(contextInfo.type === 'contact' || contextInfo.type === 'account') && apolloNewsSignals && apolloNewsSignals.length > 0 && (
+            <div className="mx-2 mb-2 rounded-lg border border-[#002FA7]/20 bg-[#002FA7]/5 overflow-hidden">
+              <div className="px-3 py-2 border-b border-white/10 flex items-center gap-2">
+                <Newspaper className="w-3.5 h-3.5 text-[#002FA7]" />
+                <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-widest">Company news</span>
+              </div>
+              <div className="p-2 space-y-1.5 max-h-[180px] overflow-y-auto np-scroll">
+                {apolloNewsSignals.slice(0, 5).map((a: ApolloNewsSignal) => (
+                  <a
+                    key={a.id}
+                    href={a.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block p-2 rounded border border-transparent hover:border-white/10 hover:bg-white/5 transition-colors group"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-[11px] font-medium text-zinc-200 group-hover:text-white line-clamp-2 flex-1">{a.title}</span>
+                      <ExternalLink className="w-3 h-3 shrink-0 text-zinc-500 group-hover:text-[#002FA7]" />
+                    </div>
+                    {a.snippet && (
+                      <p className="mt-0.5 text-[10px] text-zinc-500 line-clamp-2">{a.snippet}</p>
+                    )}
+                    {a.published_at && (
+                      <p className="mt-1 text-[9px] font-mono text-zinc-600">
+                        {new Date(a.published_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                    )}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Try suggestions when empty */}
           {messages.length === 0 && (
