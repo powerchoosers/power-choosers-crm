@@ -29,6 +29,7 @@ import NewsFeedWidget from '../crm/NewsFeedWidget'
 import GlobalTasksWidget from '../crm/GlobalTasksWidget'
 import ContextTasksWidget from '../crm/ContextTasksWidget'
 import OrgIntelligence from '../crm/OrgIntelligence'
+import SignalStream from '../crm/SignalStream'
 import { VectorControlModule } from '../crm/VectorControlModule'
 import { TaskInjectionPopover } from '../crm/TaskInjectionPopover'
 import { mapLocationToZone } from '@/lib/market-mapping'
@@ -254,7 +255,7 @@ export function RightPanel() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="flex-1 flex flex-col gap-4 overflow-y-auto px-6 pt-[93px] pb-32 np-scroll scroll-smooth"
+          className="flex-1 flex flex-col gap-4 overflow-y-auto px-6 pt-[93px] pb-4 np-scroll scroll-smooth"
         >
           <AnimatePresence mode="wait" initial={false}>
           {effectiveView === 'context' ? (
@@ -303,6 +304,11 @@ export function RightPanel() {
                     </div>
                   </div>
                   <TelemetryWidget location={entityZone} weather={weatherData} weatherLocationLabel={weatherLocationLabel} />
+                </div>
+
+                {/* 2b. TARGET SIGNAL STREAM (Apollo news/signals for account) */}
+                <div className="space-y-3">
+                  <SignalStream accountId={isAccountPage ? entityId : contact?.accountId} />
                 </div>
 
                 {/* 3. SATELLITE (Infrastructure) */}

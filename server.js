@@ -108,6 +108,9 @@ import apolloSearchPeopleHandler from './api/apollo/search-people.js';
 import apolloSearchOrganizationsHandler from './api/apollo/search-organizations.js';
 import apolloPhoneWebhookHandler from './api/apollo/phone-webhook.js';
 import apolloPhoneRetrieveHandler from './api/apollo/phone-retrieve.js';
+import apolloNewsHandler from './api/apollo/news.js';
+import analyzeSignalHandler from './api/ai/analyze-signal.js';
+import refreshApolloNewsCronHandler from './api/cron/refresh-apollo-news.js';
 import uploadHostGoogleAvatarHandler from './api/upload/host-google-avatar.js';
 import uploadSignatureImageHandler from './api/upload/signature-image.js';
 import generateStaticPostHandler from './api/posts/generate-static.js';
@@ -485,6 +488,29 @@ async function handleApiApolloPhoneWebhook(req, res) {
 async function handleApiApolloPhoneRetrieve(req, res, parsedUrl) {
   req.query = { ...parsedUrl.query };
   return await apolloPhoneRetrieveHandler(req, res);
+}
+
+async function handleApiApolloNews(req, res, parsedUrl) {
+  req.query = { ...parsedUrl.query };
+  return await apolloNewsHandler(req, res);
+}
+
+async function handleApiAnalyzeSignal(req, res) {
+  if (req.method === 'POST') {
+    try {
+      req.body = await parseRequestBody(req);
+    } catch (error) {
+      console.error('[Server] Analyze Signal - Body Parse Error:', error.message);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid request body' }));
+      return;
+    }
+  }
+  return await analyzeSignalHandler(req, res);
+}
+
+async function handleRefreshApolloNewsCron(req, res) {
+  return await refreshApolloNewsCronHandler(req, res);
 }
 
 async function handleApiTwilioToken(req, res, parsedUrl) {
@@ -936,6 +962,15 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/apollo/phone-retrieve') {
     return handleApiApolloPhoneRetrieve(req, res, parsedUrl);
+  }
+  if (pathname === '/api/apollo/news') {
+    return handleApiApolloNews(req, res, parsedUrl);
+  }
+  if (pathname === '/api/ai/analyze-signal') {
+    return handleApiAnalyzeSignal(req, res);
+  }
+  if (pathname === '/api/cron/refresh-apollo-news') {
+    return handleRefreshApolloNewsCron(req, res);
   }
   if (pathname === '/api/upload/host-google-avatar') {
     return handleApiUploadHostGoogleAvatar(req, res);

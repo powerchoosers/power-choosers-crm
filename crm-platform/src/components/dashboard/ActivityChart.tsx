@@ -1,63 +1,109 @@
-'use client'
+'use client';
 
-import { ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Area, AreaChart } from "recharts"
+import {
+  ResponsiveContainer,
+  ComposedChart,
+  Bar,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+} from 'recharts';
 
-const data = [
-  { time: "09:00", calls: 40 },
-  { time: "10:00", calls: 30 },
-  { time: "11:00", calls: 45 },
-  { time: "12:00", calls: 25 },
-  { time: "13:00", calls: 55 },
-  { time: "14:00", calls: 60 },
-  { time: "15:00", calls: 40 },
-  { time: "16:00", calls: 35 },
-  { time: "17:00", calls: 20 },
-]
+const DATA = [
+  { time: '06:00', volume: 4, price: 32 },
+  { time: '08:00', volume: 12, price: 28 },
+  { time: '10:00', volume: 28, price: 85 },
+  { time: '12:00', volume: 18, price: 45 },
+  { time: '14:00', volume: 42, price: 120 },
+  { time: '16:00', volume: 38, price: 95 },
+  { time: '18:00', volume: 14, price: 52 },
+  { time: '20:00', volume: 8, price: 38 },
+];
 
 export function ActivityChart() {
   return (
-    <div className="nodal-glass p-6 h-[400px] rounded-2xl">
-      <div className="mb-6">
-        <h3 className="text-lg font-medium text-white">Call Activity</h3>
-        <p className="text-sm text-zinc-400">Live call volume tracking</p>
+    <div className="bg-zinc-950/50 backdrop-blur-xl border border-white/5 rounded-2xl p-6 h-full min-h-[380px] relative overflow-hidden">
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h3 className="text-[11px] font-mono text-zinc-400 uppercase tracking-[0.2em]">
+            RESPONSE_PHYSICS
+          </h3>
+          <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider mt-0.5">
+            Activity vs. ERCOT volatility (placeholder)
+          </p>
+        </div>
+        <div className="flex items-center gap-4 text-[9px] font-mono uppercase tracking-widest text-zinc-500">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-sm bg-[#002FA7]" />
+            Volume
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-0.5 bg-rose-500 rounded" />
+            Price
+          </span>
+        </div>
       </div>
-      <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={data}>
-          <defs>
-            <linearGradient id="colorCalls" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#002FA7" stopOpacity={0.3}/>
-              <stop offset="95%" stopColor="#002FA7" stopOpacity={0}/>
-            </linearGradient>
-          </defs>
+      <ResponsiveContainer width="100%" height={280}>
+        <ComposedChart data={DATA} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-          <XAxis 
-            dataKey="time" 
-            stroke="#52525b" 
-            fontSize={12} 
-            tickLine={false} 
-            axisLine={false} 
-          />
-          <YAxis 
-            stroke="#52525b" 
-            fontSize={12} 
-            tickLine={false} 
+          <XAxis
+            dataKey="time"
+            stroke="#52525b"
+            fontSize={10}
+            tickLine={false}
             axisLine={false}
-            tickFormatter={(value) => `${value}`} 
           />
-          <Tooltip 
-            contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', borderRadius: '12px', color: '#fff' }}
-            itemStyle={{ color: '#fff' }}
+          <YAxis
+            yAxisId="left"
+            stroke="#52525b"
+            fontSize={10}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(v) => `${v}`}
           />
-          <Area 
-            type="monotone" 
-            dataKey="calls" 
-            stroke="#002FA7" 
-            strokeWidth={3}
-            fillOpacity={1} 
-            fill="url(#colorCalls)" 
+          <YAxis
+            yAxisId="right"
+            orientation="right"
+            stroke="#52525b"
+            fontSize={10}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(v) => `$${v}`}
           />
-        </AreaChart>
+          <Tooltip
+            contentStyle={{
+              backgroundColor: '#09090b',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '12px',
+              fontSize: '10px',
+            }}
+            formatter={(value: number, name: string) => [
+              name === 'volume' ? value : `$${value}`,
+              name === 'volume' ? 'Volume' : 'Avg price',
+            ]}
+          />
+          <Bar
+            yAxisId="left"
+            dataKey="volume"
+            fill="#002FA7"
+            radius={[4, 4, 0, 0]}
+            maxBarSize={32}
+            name="volume"
+          />
+          <Line
+            yAxisId="right"
+            type="monotone"
+            dataKey="price"
+            stroke="#ef4444"
+            strokeWidth={2}
+            dot={false}
+            name="price"
+          />
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
-  )
+  );
 }
