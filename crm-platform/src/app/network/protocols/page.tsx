@@ -257,7 +257,7 @@ export default function ProtocolsPage() {
             </div>
             ) : (
             <Table>
-                <TableHeader className="sticky top-0 nodal-recessed z-20 border-b border-white/5">
+                <TableHeader className="sticky top-0 z-20 border-b border-white/5">
                 <TableRow className="border-none hover:bg-transparent">
                     <TableHead className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3 w-12">
                       <div className="flex items-center justify-center px-2">

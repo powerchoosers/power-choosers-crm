@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { MapPin, Satellite, Wifi, Loader2, Search } from 'lucide-react';
 import { GoogleMap, useLoadScript, MarkerF } from '@react-google-maps/api';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -39,10 +39,12 @@ export default function SatelliteUplink({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY as string,
   });
 
-  // Update local address when prop changes
+  // Update local address when prop changes (only if different to prevent unnecessary re-renders)
   useEffect(() => {
-    setActiveAddress(address);
-  }, [address]);
+    if (address !== activeAddress) {
+      setActiveAddress(address);
+    }
+  }, [address, activeAddress]);
 
   // Geocode address to coordinates – use server API (works in production + localhost)
   const geocodeAddress = async (addressToGeocode: string): Promise<{ lat: number; lng: number } | null> => {
@@ -229,6 +231,19 @@ export default function SatelliteUplink({
 
   const mapExpanded = isActive && !!coordinates;
 
+  // Memoize map options to prevent unnecessary re-renders and flickering
+  const mapOptions = useMemo(() => ({
+    mapTypeId: 'hybrid' as const, // Hybrid shows satellite with labels by default
+    zoomControl: true,
+    streetViewControl: true,
+    mapTypeControl: true,
+    fullscreenControl: true,
+    styles: [],
+  }), []);
+
+  // Memoize coordinates to prevent map re-renders when they haven't changed
+  const stableCoordinates = useMemo(() => coordinates, [coordinates?.lat, coordinates?.lng]);
+
   return (
     <div className="nodal-module-glass nodal-monolith-edge rounded-3xl overflow-hidden relative group">
       
@@ -308,7 +323,7 @@ export default function SatelliteUplink({
             <Loader2 className="w-6 h-6 text-[#002FA7] animate-spin" />
             <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Negotiating Uplink...</span>
           </div>
-        ) : !isActive || !coordinates ? (
+        ) : !isActive || !stableCoordinates ? (
           <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-30 flex flex-col items-center justify-center">
             {/* The "Locked" State */}
             <div className="z-10 text-center px-6">
@@ -327,19 +342,13 @@ export default function SatelliteUplink({
         ) : (
           /* The "Unlocked" State - Full Interactive Google Map */
           <GoogleMap
+            key={`map-${stableCoordinates.lat}-${stableCoordinates.lng}`}
             zoom={18}
-            center={coordinates}
+            center={stableCoordinates}
             mapContainerClassName="w-full h-full min-h-[384px]"
-            options={{
-              mapTypeId: 'satellite',
-              zoomControl: true,
-              streetViewControl: true,
-              mapTypeControl: true,
-              fullscreenControl: true,
-              styles: [],
-            }}
+            options={mapOptions}
           >
-            <MarkerF position={coordinates} />
+            <MarkerF position={stableCoordinates} />
           </GoogleMap>
         )}
       </motion.div>
