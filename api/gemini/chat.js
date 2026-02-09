@@ -1221,6 +1221,29 @@ export default async function handler(req, res) {
             if (trans) lines.push(`  Transcript excerpt: ${trans.slice(0, 600)}${trans.length > 600 ? '…' : ''}`);
           });
         }
+        // Apollo company news for contact's account domain (or contact website-derived domain)
+        let contactDomain = null;
+        const linkedAccountId = contact.linked_account_id ?? contact.linkedAccountId;
+        if (linkedAccountId) {
+          const { data: acc } = await supabaseAdmin.from('accounts').select('domain').eq('id', linkedAccountId).single();
+          contactDomain = acc?.domain?.trim() || null;
+        }
+        if (!contactDomain && contact.website) {
+          try {
+            const u = new URL(contact.website.startsWith('http') ? contact.website : `https://${contact.website}`);
+            contactDomain = u.hostname.replace(/^www\./, '') || null;
+          } catch (_) {}
+        }
+        if (contactDomain) {
+          const { data: articles } = await supabaseAdmin.from('apollo_news_articles').select('title, snippet, published_at').eq('domain', contactDomain).order('published_at', { ascending: false }).limit(5);
+          if (articles?.length) {
+            lines.push('RECENT COMPANY NEWS (for first-line personalization if relevant):');
+            articles.forEach((a) => {
+              const snip = (a.snippet || '').slice(0, 120);
+              lines.push(`  - ${a.title || 'Untitled'}${snip ? `: ${snip}${(a.snippet || '').length > 120 ? '…' : ''}` : ''}`);
+            });
+          }
+        }
         if (lines.length) dossierContextBlock = '\n\n' + lines.join('\n');
       } catch (e) {
         console.error('[Gemini Chat] Dossier context fetch (contact):', e?.message || e);
@@ -1252,6 +1275,17 @@ export default async function handler(req, res) {
             if (sum) lines.push(`  Call ${i + 1} (${date}): ${sum.slice(0, 400)}${sum.length > 400 ? '…' : ''}`);
             if (trans) lines.push(`  Transcript excerpt: ${trans.slice(0, 600)}${trans.length > 600 ? '…' : ''}`);
           });
+        }
+        const accountDomain = account.domain?.trim();
+        if (accountDomain) {
+          const { data: articles } = await supabaseAdmin.from('apollo_news_articles').select('title, snippet, published_at').eq('domain', accountDomain).order('published_at', { ascending: false }).limit(5);
+          if (articles?.length) {
+            lines.push('RECENT COMPANY NEWS (for first-line personalization if relevant):');
+            articles.forEach((a) => {
+              const snip = (a.snippet || '').slice(0, 120);
+              lines.push(`  - ${a.title || 'Untitled'}${snip ? `: ${snip}${(a.snippet || '').length > 120 ? '…' : ''}` : ''}`);
+            });
+          }
         }
         if (lines.length) dossierContextBlock = '\n\n' + lines.join('\n');
       } catch (e) {
