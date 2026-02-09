@@ -481,7 +481,7 @@ CRITICAL OUTPUT RULES:
       const industryAngle = getIndustryAngle(context.industry)
       if (industryAngle) {
         // Extract angle guidance from the industry angle block
-        const angleMatch = industryAngle.match(/ANGLES:\s*(.+?)(?:\n|$)/s)
+        const angleMatch = industryAngle.match(/ANGLES:\s*([\s\S]+?)(?:\n|$)/)
         if (angleMatch) {
           effectiveDirective = `Write a 40–70 word first-touch cold email using the VERTICAL-SPECIFIC ANGLE provided above. ${angleMatch[1].trim()} Focus on the operational pain specific to this vertical. Plain text, minimal sign-off.`
         } else {
