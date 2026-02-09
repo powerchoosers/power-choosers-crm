@@ -1,57 +1,102 @@
-import { ArrowUpRight, ArrowDownRight, Activity, Users, PhoneCall, Zap } from 'lucide-react'
+'use client';
 
-const stats = [
+import { Gauge, Layers, Zap, Activity } from 'lucide-react';
+
+// Placeholder — wire to useDashboardMetrics later
+const METRICS = [
   {
-    title: 'Total Revenue',
-    value: '$45,231.89',
-    change: '+20.1%',
-    trend: 'up',
-    icon: Activity,
+    key: 'liability',
+    label: 'LIABILITY_UNDER_MGMT',
+    value: '45.2 GWh',
+    sub: 'Annual volume protected',
+    icon: Layers,
+    pulse: false,
   },
   {
-    title: 'Active Calls',
+    key: 'positions',
+    label: 'OPEN_POSITIONS',
+    value: '7',
+    sub: 'Contracts expiring in 90d',
+    icon: Gauge,
+    pulse: true, // Amber/rose when > 0
+  },
+  {
+    key: 'velocity',
+    label: 'OPERATIONAL_VELOCITY',
     value: '24',
-    change: '+180.1%',
-    trend: 'up',
-    icon: PhoneCall,
+    sub: 'Calls + emails (24h)',
+    icon: Activity,
+    pulse: false,
   },
   {
-    title: 'New Clients',
-    value: '573',
-    change: '+19%',
-    trend: 'up',
-    icon: Users,
-  },
-  {
-    title: 'Energy Saved',
-    value: '2.4 GWh',
-    change: '-4%',
-    trend: 'down',
+    key: 'volatility',
+    label: 'GRID_VOLATILITY_INDEX',
+    value: '42',
+    sub: '0–100 market stress',
     icon: Zap,
+    pulse: false,
+    gauge: true, // < 30 green, > 70 red
   },
-]
+];
 
 export function KPIGrid() {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      {stats.map((stat) => (
-        <div
-          key={stat.title}
-          className="nodal-glass p-6 nodal-glass-hover group rounded-2xl"
-        >
-          <div className="flex items-center justify-between space-y-0 pb-2">
-            <span className="text-sm font-medium text-zinc-400 group-hover:text-zinc-300 transition-colors">{stat.title}</span>
-            <stat.icon className="h-4 w-4 text-zinc-500 group-hover:text-signal transition-colors" />
+      {METRICS.map((m) => {
+        const num = m.gauge ? parseInt(m.value, 10) : 0;
+        const gaugeLow = m.gauge && num < 30;
+        const gaugeHigh = m.gauge && num > 70;
+        const Icon = m.icon;
+        return (
+          <div
+            key={m.key}
+            className="bg-zinc-950/50 backdrop-blur-xl border border-white/5 rounded-2xl p-5 hover:border-white/10 transition-colors relative overflow-hidden group"
+          >
+            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+            <div className="flex items-start justify-between">
+              <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.15em]">
+                {m.label}
+              </span>
+              <div className="h-8 w-8 rounded-[14px] bg-white/5 border border-white/10 flex items-center justify-center">
+                <Icon className="h-4 w-4 text-zinc-400" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-end justify-between gap-2">
+              <div className="flex flex-col gap-0.5">
+                <span
+                  className={`text-2xl font-mono font-semibold tabular-nums tracking-tight ${
+                    m.pulse && parseInt(m.value, 10) > 0
+                      ? 'text-amber-400'
+                      : gaugeHigh
+                        ? 'text-rose-400'
+                        : gaugeLow
+                          ? 'text-emerald-400'
+                          : 'text-white'
+                  }`}
+                >
+                  {m.value}
+                </span>
+                <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
+                  {m.sub}
+                </span>
+              </div>
+              {m.pulse && parseInt(m.value, 10) > 0 && (
+                <span className="flex h-2 w-2 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
+              )}
+              {m.gauge && (
+                <div className="w-12 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      gaugeHigh ? 'bg-rose-500' : gaugeLow ? 'bg-emerald-500' : 'bg-amber-500/80'
+                    }`}
+                    style={{ width: `${Math.min(100, num)}%` }}
+                  />
+                </div>
+              )}
+            </div>
           </div>
-          <div className="flex items-center justify-between pt-4">
-             <div className="text-3xl font-semibold text-white tracking-tighter font-mono tabular-nums">{stat.value}</div>
-             <div className={`text-xs flex items-center font-mono tabular-nums ${stat.trend === 'up' ? 'text-green-500' : 'text-red-500'}`}>
-                {stat.trend === 'up' ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
-                <span className="ml-1">{stat.change}</span>
-             </div>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
-  )
+  );
 }
