@@ -80,8 +80,10 @@ export function ActivityChart() {
               borderRadius: '12px',
               fontSize: '10px',
             }}
-            formatter={(value: number, name: string) => [
-              name === 'volume' ? value : `$${value}`,
+            formatter={(value: number | undefined, name: string) => [
+              name === 'volume'
+                ? (value ?? 0)
+                : `$${value ?? 0}`,
               name === 'volume' ? 'Volume' : 'Avg price',
             ]}
           />
