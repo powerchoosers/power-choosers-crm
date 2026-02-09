@@ -22,7 +22,11 @@ export function GlobalSync() {
     if (loading || !user || hasTriggeredOpenSync.current) return
 
     hasTriggeredOpenSync.current = true
-    const hasCachedToken = typeof window !== 'undefined' && !!sessionStorage.getItem('gmail_oauth_token')
+    const hasCachedToken = typeof window !== 'undefined' && !!(
+      sessionStorage.getItem('gmail_oauth_token') ||
+      localStorage.getItem('gmail_oauth_token') ||
+      localStorage.getItem('pc:googleAccessToken')
+    )
 
     // Only sync if we already have a token; skip if no token (user hasn't connected Gmail yet)
     if (hasCachedToken) {
@@ -38,7 +42,9 @@ export function GlobalSync() {
     if (!user || loading) return
 
     const interval = setInterval(() => {
-      const hasCachedToken = sessionStorage.getItem('gmail_oauth_token')
+      const hasCachedToken = sessionStorage.getItem('gmail_oauth_token') ||
+        localStorage.getItem('gmail_oauth_token') ||
+        localStorage.getItem('pc:googleAccessToken')
       if (hasCachedToken) {
         syncGmail(user, { silent: true })
       }

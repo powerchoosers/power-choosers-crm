@@ -55,23 +55,19 @@ export default function SatelliteUplink({
     }
   }, [address, activeAddress]);
 
-  // Initialize coordinates from saved props if available (saves API costs!)
+  // Sync coordinates from saved props (saves API cost when user later clicks Establish Uplink).
+  // Map stays gated until user clicks Establish Uplink — no auto-open on dossier load.
   useEffect(() => {
     if (latitude != null && longitude != null) {
       const newCoords = { lat: latitude, lng: longitude };
-      // Only update if coordinates changed
       setCoordinates(prev => {
         if (!prev || prev.lat !== newCoords.lat || prev.lng !== newCoords.lng) {
           return newCoords;
         }
         return prev;
       });
-      // Auto-activate if we have saved coordinates and address
-      if (address) {
-        setIsActive(true);
-      }
     }
-  }, [latitude, longitude, address]);
+  }, [latitude, longitude]);
 
   // Geocode address to coordinates – use server API (works in production + localhost)
   const geocodeAddress = async (addressToGeocode: string): Promise<{ lat: number; lng: number } | null> => {

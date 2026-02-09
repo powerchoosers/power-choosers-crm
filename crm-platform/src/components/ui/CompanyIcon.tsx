@@ -1,14 +1,14 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, memo } from 'react'
 import { Building2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface CompanyIconProps {
-  /** Account/company logo URL. Always prioritized; only when this is blank or fails do we use domain favicon. */
+  /** Account/company logo URL. Always prioritized; only when this is blank or fails do we use fallbacks. */
   logoUrl?: string
-  /** Used only for favicon fallback when logoUrl is blank or has failed. */
+  /** Used for favicon/logo fallbacks when logoUrl is blank or has failed. */
   domain?: string
   name: string
   size?: number
@@ -19,7 +19,7 @@ interface CompanyIconProps {
 
 const DEFAULT_ROUNDED = 'rounded-[14px]'
 
-/** Whether the URL is external (needs native img to avoid Next Image CORS/timeouts). */
+/** Whether the URL is external (use native img to avoid Next Image CORS/timeouts). */
 function isExternalUrl(src: string): boolean {
   try {
     return /^https?:\/\//i.test(src) || src.startsWith('//')
@@ -28,7 +28,29 @@ function isExternalUrl(src: string): boolean {
   }
 }
 
-export function CompanyIcon({ 
+/** Build ordered list of candidate URLs: logoUrl first, then domain-based fallbacks. */
+function buildCandidateUrls(logoUrl: string | undefined, domain: string | undefined): string[] {
+  const candidates: string[] = []
+  if (logoUrl && logoUrl.trim()) {
+    candidates.push(logoUrl.trim())
+  }
+  if (domain && domain.trim()) {
+    const d = domain.trim().replace(/^https?:\/\//i, '').split('/')[0].toLowerCase()
+    if (d) {
+      // Clearbit company logos (often higher quality than favicons)
+      candidates.push(`https://logo.clearbit.com/${d}`)
+      // Google favicons
+      candidates.push(`https://www.google.com/s2/favicons?domain=${d}&sz=128`)
+      // DuckDuckGo favicons (reliable fallback when Google 404s)
+      candidates.push(`https://icons.duckduckgo.com/ip3/${encodeURIComponent(d)}.ico`)
+    }
+  }
+  return candidates
+}
+
+const LOAD_TIMEOUT_MS = 4500
+
+function CompanyIconInner({ 
   logoUrl, 
   domain, 
   name, 
@@ -36,36 +58,54 @@ export function CompanyIcon({
   className,
   roundedClassName = DEFAULT_ROUNDED
 }: CompanyIconProps) {
-  const [failedSrc, setFailedSrc] = useState<string | null>(null)
+  const effectiveLogoUrl = (typeof logoUrl === 'string' && logoUrl.trim()) ? logoUrl.trim() : undefined
+  const effectiveDomain = (typeof domain === 'string' && domain.trim()) ? domain.trim() : undefined
+
+  const candidates = useMemo(
+    () => buildCandidateUrls(effectiveLogoUrl, effectiveDomain),
+    [effectiveLogoUrl, effectiveDomain]
+  )
+
+  const [failedSet, setFailedSet] = useState<Set<string>>(() => new Set())
   const [isLoaded, setIsLoaded] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  
-  // Only use logoUrl when it's a non-empty string; otherwise treat as "no logo" and allow domain fallback
-  const effectiveLogoUrl = (typeof logoUrl === 'string' && logoUrl.trim()) ? logoUrl.trim() : undefined
-  const faviconSrc = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=128` : null
-  const currentSrc = (effectiveLogoUrl && failedSrc !== effectiveLogoUrl)
-    ? effectiveLogoUrl
-    : (faviconSrc && failedSrc !== faviconSrc)
-        ? faviconSrc
-        : null
+  const lastSrcRef = useRef<string | null>(null)
+  const propsKeyRef = useRef<string>('')
 
-  // Reset loading state when source changes; timeout only marks this URL failed so next source (e.g. favicon) is tried
+  const currentSrc = useMemo(() => {
+    const next = candidates.find((url) => !failedSet.has(url)) ?? null
+    return next
+  }, [candidates, failedSet])
+
+  const propsKey = `${effectiveLogoUrl ?? ''}|${effectiveDomain ?? ''}`
+
   useEffect(() => {
-    setIsLoaded(false)
-    setRetryCount(0)
-    
+    if (propsKey !== propsKeyRef.current) {
+      propsKeyRef.current = propsKey
+      setFailedSet(new Set())
+    }
+  }, [propsKey])
+
+  useEffect(() => {
+    if (currentSrc === null) return
+
+    const srcChanged = lastSrcRef.current !== currentSrc
+    if (srcChanged) {
+      lastSrcRef.current = currentSrc
+      setIsLoaded(false)
+      setRetryCount(0)
+    }
+
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
       timeoutRef.current = null
     }
-    
-    if (currentSrc) {
-      timeoutRef.current = setTimeout(() => {
-        setFailedSrc(currentSrc)
-      }, 8000)
-    }
-    
+
+    timeoutRef.current = setTimeout(() => {
+      setFailedSet((prev) => new Set(prev).add(currentSrc))
+    }, LOAD_TIMEOUT_MS)
+
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
@@ -82,9 +122,11 @@ export function CompanyIcon({
       setRetryCount((c) => c + 1)
       return
     }
-    if (currentSrc) setFailedSrc(currentSrc)
+    if (currentSrc) {
+      setFailedSet((prev) => new Set(prev).add(currentSrc))
+    }
   }
-  
+
   const handleLoad = () => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
@@ -93,14 +135,13 @@ export function CompanyIcon({
     setIsLoaded(true)
   }
 
-  // Show fallback only when there is no source left to try
   if (!currentSrc) {
     return (
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         className={cn(
-          "nodal-glass bg-zinc-900/80 flex items-center justify-center text-zinc-400 border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)] shrink-0", 
+          'nodal-glass bg-zinc-900/80 flex items-center justify-center text-zinc-400 border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)] shrink-0',
           roundedClassName,
           className
         )}
@@ -114,19 +155,19 @@ export function CompanyIcon({
 
   const imgCommon = {
     alt: `${name} logo`,
-    className: cn("object-cover", roundedClassName),
+    className: cn('object-cover', roundedClassName),
     onError: handleError,
     onLoad: handleLoad,
     style: { width: '100%', height: '100%', objectFit: 'cover' as const },
   }
 
   return (
-    <div 
+    <div
       className={cn(
-        "relative shrink-0 overflow-hidden nodal-glass bg-zinc-900/80 border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)]",
+        'relative shrink-0 overflow-hidden nodal-glass bg-zinc-900/80 border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)]',
         roundedClassName,
         className
-      )} 
+      )}
       style={{ width: size, height: size }}
       title={name}
     >
@@ -137,17 +178,17 @@ export function CompanyIcon({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="absolute inset-0 bg-white/5 animate-pulse flex items-center justify-center"
+            transition={{ duration: 0.15 }}
+            className="absolute inset-0 bg-white/5 flex items-center justify-center"
           >
             <Building2 size={size * 0.4} className="text-zinc-700" />
           </motion.div>
         )}
       </AnimatePresence>
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: isLoaded ? 1 : 0, scale: isLoaded ? 1 : 0.95 }}
-        transition={{ duration: 0.3, ease: "easeOut" }}
+        initial={false}
+        animate={{ opacity: isLoaded ? 1 : 0, scale: isLoaded ? 1 : 0.98 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
         className="absolute inset-0 w-full h-full"
       >
         {isExternalUrl(currentSrc) ? (
@@ -159,16 +200,13 @@ export function CompanyIcon({
             referrerPolicy="no-referrer"
           />
         ) : (
-          <img
-            src={currentSrc}
-            {...imgCommon}
-            loading="lazy"
-            decoding="async"
-          />
+          <img src={currentSrc} {...imgCommon} loading="lazy" decoding="async" />
         )}
       </motion.div>
 
-      <div className={cn("absolute inset-0 pointer-events-none ring-1 ring-white/20", roundedClassName)} />
+      <div className={cn('absolute inset-0 pointer-events-none ring-1 ring-white/20', roundedClassName)} />
     </div>
   )
 }
+
+export const CompanyIcon = memo(CompanyIconInner)

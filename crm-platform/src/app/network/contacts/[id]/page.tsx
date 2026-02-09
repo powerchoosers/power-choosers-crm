@@ -648,21 +648,36 @@ export default function ContactDossierPage() {
                           </div>
                         </div>
 
-                        {/* Status/Sync Indicators */}
-                        <div className="flex items-center gap-2 ml-2">
-                          {/* List Membership Badge (Swapped to first position) */}
-                          {contact.listName && (
-                            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 backdrop-blur-sm">
-                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                              <span className="text-[10px] font-mono uppercase tracking-widest font-medium text-emerald-500">
-                                {contact.listName}
-                              </span>
-                            </div>
-                          )}
+                        {/* Status/Sync Indicators — layout so siblings slide when badge appears */}
+                        <motion.div layout className="flex items-center gap-2 ml-2 overflow-visible">
+                          {/* List Membership Badge — animates in and pushes others right */}
+                          <AnimatePresence>
+                            {contact.listName && (
+                              <motion.div
+                                key="list-membership-badge"
+                                layout
+                                initial={{ opacity: 0, width: 0, minWidth: 0, scale: 0.92 }}
+                                animate={{
+                                  opacity: 1,
+                                  width: 'auto',
+                                  minWidth: 'auto',
+                                  scale: 1,
+                                }}
+                                exit={{ opacity: 0, width: 0, minWidth: 0, scale: 0.92 }}
+                                transition={{ duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] }}
+                                className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 backdrop-blur-sm overflow-hidden shrink-0 origin-left"
+                              >
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                                <span className="text-[10px] font-mono uppercase tracking-widest font-medium text-emerald-500 whitespace-nowrap">
+                                  {contact.listName}
+                                </span>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
 
-                          {/* Last Sync */}
+                          {/* Last Sync — layout so it slides over when badge appears */}
                           {contact.lastContact && (
-                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full nodal-module-glass border border-white/5">
+                            <motion.div layout className="flex items-center gap-1.5 px-2 py-0.5 rounded-full nodal-module-glass border border-white/5 shrink-0">
                               <Clock className="w-2.5 h-2.5 text-zinc-600" />
                               <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
                                 Last_Sync: {(() => {
@@ -673,9 +688,9 @@ export default function ContactDossierPage() {
                                   }
                                 })()}
                               </span>
-                            </div>
+                            </motion.div>
                           )}
-                        </div>
+                        </motion.div>
                       </>
                     )}
                     
