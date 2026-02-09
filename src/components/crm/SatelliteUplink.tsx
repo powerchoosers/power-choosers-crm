@@ -327,28 +327,16 @@ export default function SatelliteUplink({
             transition={{ duration: 0.3, ease: 'easeInOut' }}
             className="overflow-hidden border-b border-white/5 nodal-recessed"
           >
-            <div className="p-3 flex gap-2">
+            <div className="p-3">
               <input
                 type="text"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                 placeholder="Enter address or location..."
-                className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
+                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
                 autoFocus
               />
-              <button
-                onClick={handleSearch}
-                disabled={!searchInput.trim() || isLoading}
-                className="px-4 py-2 rounded-xl bg-[#002FA7] text-white font-mono text-xs uppercase tracking-widest hover:bg-[#002FA7]/90 hover:scale-105 hover:brightness-125 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:brightness-100 flex items-center gap-2"
-              >
-                {isLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Search className="w-4 h-4" />
-                )}
-                Locate
-              </button>
             </div>
           </motion.div>
         )}
