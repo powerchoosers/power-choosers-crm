@@ -19,12 +19,22 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
+# Runtime data (not needed in container)
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage (not needed in container)
+coverage/
+
 # Logs (we want to control logging via our logger)
 *.log
 
 # Build outputs
 dist/
 build/
+crm-platform/.next/
 
 # Temporary files
 *.tmp
@@ -36,10 +46,28 @@ private.key
 *.key
 *.pem
 client_secret_*.json
+# INI files (often contain keys)
+*.ini
 
 # Git
 .git/
 .gitignore
+
+# Large/unused dirs (not needed for Docker build; reduces upload size and Windows temp-file issues)
+backups/
+Apollo/
+SUPABASE DOCS/
+.trae/
+.kiro/
+.cursor/
+.gemini/
+docs/
+Twilio Voice Insights/
+# Vendor / toolchain (Git Bash etc. – keep repo smaller)
+usr/
+mingw64/
+# Local-only agent/personal files
+builder-agent-instructions.md
 
 # Documentation (optional - remove if you want docs in container)
 *.md
