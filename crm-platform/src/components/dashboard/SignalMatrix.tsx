@@ -25,7 +25,7 @@ interface MonitorSignal {
 const RECON_PLACEHOLDER: ReconSignal[] = [
   { id: '1', time: '10:42:01', label: 'INTENT_DETECTED', message: 'Acme Corp is hiring Energy Manager (LZ_NORTH).', entity: 'Acme Corp' },
   { id: '2', time: '10:38:22', label: 'GROWTH_EVENT', message: 'Nexus Logistics secured Series B — load expansion likely.', entity: 'Nexus Logistics' },
-  { id: '3', time: '10:31:15', label: 'PHYSICS_ANOMALY', message: 'Unidentified large load detected in LZ_WEST near wind farm.', entity: null },
+  { id: '3', time: '10:31:15', label: 'PHYSICS_ANOMALY', message: 'Unidentified large load detected in LZ_WEST near wind farm.' },
   { id: '4', time: '10:18:44', label: 'INTENT_DETECTED', message: 'Big Steel Inc posted Facilities Director role.', entity: 'Big Steel Inc' },
 ];
 
@@ -40,7 +40,7 @@ export function SignalMatrix() {
   const [activeTab, setActiveTab] = useState<TabId>('recon');
 
   return (
-    <div className="nodal-glass rounded-2xl flex flex-col h-full min-h-[420px] border border-white/5 relative overflow-hidden">
+    <div className="nodal-void-card flex flex-col h-full min-h-[420px] relative overflow-hidden">
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
       <div className="p-4 pb-3 border-b border-white/5 flex items-center justify-between flex-shrink-0">
