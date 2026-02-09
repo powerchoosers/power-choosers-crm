@@ -649,10 +649,10 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
           </div>
           <div className="overflow-auto max-h-[40vh] w-full">
             <table className="w-full text-left text-xs min-w-[300px]">
-              <thead className="sticky top-0 z-10 nodal-recessed">
+              <thead className="sticky top-0 z-10">
                 <tr className="border-b border-white/5">
                   {grid.columns.map((col: string, i: number) => (
-                    <th key={i} className="px-4 py-2 font-mono text-zinc-500 font-normal uppercase tracking-widest text-[9px] whitespace-nowrap">{col}</th>
+                    <th key={i} className="px-4 py-2 font-mono text-zinc-500 font-normal uppercase tracking-widest text-[9px] whitespace-nowrap nodal-table-header">{col}</th>
                   ))}
                 </tr>
               </thead>

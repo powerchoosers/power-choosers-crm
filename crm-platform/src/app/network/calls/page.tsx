@@ -310,7 +310,7 @@ export default function CallsPage() {
       <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
         <div className="flex-1 overflow-auto relative scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
             <Table>
-            <TableHeader className="sticky top-0 nodal-recessed z-20 border-b border-white/5">
+            <TableHeader className="sticky top-0 z-20 border-b border-white/5">
                 {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
                     {headerGroup.headers.map((header) => {
