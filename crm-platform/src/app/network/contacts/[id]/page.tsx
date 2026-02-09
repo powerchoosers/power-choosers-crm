@@ -332,9 +332,11 @@ export default function ContactDossierPage() {
       contactTitle: titleStr,
       companyName: typeof contact.companyName === 'string' ? contact.companyName : typeof contact.company === 'string' ? contact.company : undefined,
       accountName: typeof (contact as { accountName?: string }).accountName === 'string' ? (contact as { accountName?: string }).accountName : undefined,
+      industry: typeof account?.industry === 'string' ? account.industry : undefined,
+      accountDescription: typeof account?.description === 'string' ? account.description : undefined,
       contextForAi: parts.length ? parts.join('\n\n') : undefined,
     }
-  }, [contact, forensicNotes, recentCalls, apolloNewsSignals])
+  }, [contact, account, forensicNotes, recentCalls, apolloNewsSignals])
 
   const handleTerminalSubmit = async () => {
     if (!terminalInput.trim()) {
