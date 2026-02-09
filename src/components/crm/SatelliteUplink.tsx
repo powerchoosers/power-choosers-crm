@@ -270,17 +270,8 @@ export default function SatelliteUplink({
     }
   };
 
-  if (!isLoaded) {
-    return (
-      <div className="nodal-module-glass nodal-monolith-edge rounded-3xl overflow-hidden relative h-48 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-[#002FA7] animate-spin" />
-      </div>
-    );
-  }
-
+  // All hooks must run before any conditional return (Rules of Hooks)
   const mapExpanded = isActive && !!coordinates;
-
-  // Memoize map options to prevent unnecessary re-renders and flickering
   const mapOptions = useMemo(() => ({
     mapTypeId: 'hybrid' as const, // Hybrid shows satellite with labels by default
     zoomControl: true,
@@ -289,9 +280,15 @@ export default function SatelliteUplink({
     fullscreenControl: true,
     styles: [],
   }), []);
-
-  // Memoize coordinates to prevent map re-renders when they haven't changed
   const stableCoordinates = useMemo(() => coordinates, [coordinates?.lat, coordinates?.lng]);
+
+  if (!isLoaded) {
+    return (
+      <div className="nodal-module-glass nodal-monolith-edge rounded-3xl overflow-hidden relative h-48 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-[#002FA7] animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="nodal-module-glass nodal-monolith-edge rounded-3xl overflow-hidden relative group">

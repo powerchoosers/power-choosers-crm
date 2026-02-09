@@ -97,11 +97,11 @@ export function useDashboardMetrics() {
           console.error('Error fetching calls count:', callsError)
         }
 
-        // Count emails in last 24h
+        // Count emails in last 24h (emails table uses camelCase: createdAt)
         let emailsQuery = supabase
           .from('emails')
           .select('id', { count: 'exact', head: true })
-          .gte('created_at', twentyFourHoursAgo)
+          .gte('createdAt', twentyFourHoursAgo)
           .not('subject', 'ilike', '%mailwarming%')
           .not('subject', 'ilike', '%mail warming%')
           .not('subject', 'ilike', '%test email%')
@@ -116,7 +116,12 @@ export function useDashboardMetrics() {
 
         const { count: emailsCount = 0, error: emailsError } = await emailsQuery
         if (emailsError) {
-          console.error('Error fetching emails count:', emailsError)
+          console.error('Error fetching emails count:', {
+            message: emailsError.message,
+            details: emailsError.details,
+            hint: emailsError.hint,
+            code: emailsError.code,
+          })
         }
 
         const operationalVelocity = (callsCount || 0) + (emailsCount || 0)
