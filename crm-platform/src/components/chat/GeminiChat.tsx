@@ -1700,16 +1700,21 @@ SELECT * FROM hybrid_search_accounts(
                           }
                         })}
                       </div>
-                      {m.componentData && isRecord(m.componentData) && typeof (m.componentData as { type?: string }).type === 'string' && (
-                        <div className="w-full overflow-hidden grid grid-cols-1 mt-3">
-                          <ComponentRenderer
-                            type={(m.componentData as { type: string }).type}
-                            data={m.componentData as Record<string, unknown>}
-                            onCreateTask={handleCreateTask}
-                            contextInfo={contextInfo}
-                          />
-                        </div>
-                      )}
+                      {(() => {
+                        if (!m.componentData || !isRecord(m.componentData)) return null
+                        const componentType = (m.componentData as { type?: string }).type
+                        if (typeof componentType !== 'string') return null
+                        return (
+                          <div className="w-full overflow-hidden grid grid-cols-1 mt-3">
+                            <ComponentRenderer
+                              type={componentType}
+                              data={m.componentData as Record<string, unknown>}
+                              onCreateTask={handleCreateTask}
+                              contextInfo={contextInfo}
+                            />
+                          </div>
+                        )
+                      })()}
                       {i === messages.length - 1 && error && (
                         <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-2">
                           <p className="text-[10px] text-red-400 font-mono leading-tight flex-1">
