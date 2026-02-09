@@ -177,7 +177,7 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
     <div className={cn(
       "group rounded-xl border transition-all duration-300 overflow-hidden",
       isMinimal ? "py-3 px-2" : "p-4",
-      isExpanded ? "bg-white/[0.05] border-white/10 shadow-2xl" : "bg-white/[0.02] border-white/5 hover:bg-white/[0.04] hover:border-white/10"
+      isExpanded ? "bg-black/30 border-white/5 shadow-2xl" : "bg-black/20 border-white/5 hover:bg-black/30 hover:border-white/10"
     )}>
       {call.recordingUrl && (
         <audio ref={audioRef} preload="metadata" className="hidden" />

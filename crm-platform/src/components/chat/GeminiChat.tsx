@@ -199,14 +199,14 @@ function ImageWithSkeleton({ src, alt, className, isLoading: isExternalLoading }
   const showSkeleton = isExternalLoading || !src || !isImageLoaded
 
   return (
-    <div className={cn("relative overflow-hidden bg-zinc-800", className)}>
+    <div className={cn("relative overflow-hidden bg-black/40", className)}>
       <AnimatePresence>
         {showSkeleton && (
           <motion.div
             key="skeleton"
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 flex items-center justify-center overflow-hidden z-10 bg-zinc-800"
+            className="absolute inset-0 flex items-center justify-center overflow-hidden z-10 bg-black/40"
           >
             <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
             <User size={14} className="text-zinc-700" />
@@ -250,8 +250,8 @@ function FlightCheckBlock({
   }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-2xl border border-white/10 bg-zinc-900/40 overflow-hidden w-full">
-      <div className="px-3 py-2 border-b border-white/5">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-2xl nodal-module-glass nodal-monolith-edge overflow-hidden w-full">
+      <div className="px-3 py-2 border-b border-white/5 nodal-recessed">
         <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Protocol Checklist</span>
       </div>
       <div className="divide-y divide-white/5">
@@ -320,11 +320,11 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
         <motion.div
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md bg-zinc-900/80 border border-white/10 backdrop-blur-xl rounded-2xl overflow-hidden hover:border-[#002FA7]/50 transition-colors cursor-pointer group"
+          className="w-full max-w-md bg-zinc-950/80 nodal-monolith-edge backdrop-blur-xl rounded-2xl overflow-hidden hover:border-[#002FA7]/50 transition-colors cursor-pointer group"
           onClick={() => router.push(`${path}/${card.id}`)}
         >
           <div className="p-4 flex items-center gap-4">
-            <div className="shrink-0 w-14 h-14 rounded-[14px] bg-zinc-800 border border-white/10 flex items-center justify-center overflow-hidden">
+            <div className="shrink-0 w-14 h-14 rounded-[14px] bg-black/40 border border-white/10 flex items-center justify-center overflow-hidden">
               {card.type === 'account' && (card.logoUrl || card.domain) ? (
                 <CompanyIcon logoUrl={card.logoUrl} domain={card.domain} name={card.name} size={56} roundedClassName="rounded-[14px]" />
               ) : (
@@ -359,7 +359,7 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
       const context = [snip.contactName, snip.callDate].filter(Boolean).join(' · ')
       const parts = highlight ? snippet.split(highlight) : [snippet]
       return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-2xl border border-white/10 bg-zinc-900/40 overflow-hidden w-full">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-2xl nodal-module-glass nodal-monolith-edge overflow-hidden w-full">
           <div className="p-3 border-b border-white/5 flex items-center gap-2">
             <div className="flex gap-[2px] h-3 items-end">
               {[8, 14, 10, 16, 8, 12, 10].map((h, i) => (
@@ -395,7 +395,7 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
           <div className="absolute inset-0 bg-gradient-to-r from-[#002FA7]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           
           <div className="flex items-center gap-4 relative z-10">
-            <div className="w-12 h-12 rounded-2xl bg-zinc-800 flex items-center justify-center border border-white/10 text-zinc-400 font-bold text-lg shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-black/40 flex items-center justify-center border border-white/10 text-zinc-400 font-bold text-lg shrink-0">
               {dossier.initials || dossier.name.charAt(0)}
             </div>
             <div className="flex-1 min-w-0">
@@ -441,9 +441,8 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
         <motion.div 
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
-          className="rounded-2xl border transition-all duration-500 bg-zinc-900/30 backdrop-blur-xl p-6 relative overflow-hidden shadow-lg space-y-6 border-white/10 w-full"
+          className="nodal-void-card transition-all duration-500 p-6 relative overflow-hidden shadow-lg space-y-6 w-full"
         >
-          <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none"></div>
           
           {pos.isSimulation && (
             <div className="absolute top-3 right-4">
@@ -461,7 +460,7 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
                 <span className="text-white font-mono font-bold tabular-nums">{pos.expiration || 'TBD'}</span>
               </div>
             </div>
-            <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden relative">
+            <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden relative">
               <div className="h-full bg-zinc-700 transition-all duration-1000 ease-out relative" style={{ width: `${Math.min(100, (pos.daysRemaining / 365) * 100)}%` }}>
                 <div className="absolute right-0 top-0 bottom-0 w-1 bg-white/50 shadow-[0_0_10px_white]"></div>
               </div>
@@ -600,7 +599,7 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
                 <span>Scarcity</span>
                 <span className="tabular-nums">Reserve margin {reservePercentage.toFixed(1)}%</span>
               </div>
-              <div className="relative h-3 w-full rounded-full overflow-visible border border-white/5 bg-zinc-900">
+              <div className="relative h-3 w-full rounded-full overflow-visible border border-white/5 bg-black/40">
                 <div className="absolute inset-0 h-full rounded-full bg-gradient-to-r from-rose-500 via-amber-500 to-emerald-500" />
                 <div
                   className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_8px_2px_rgba(255,255,255,0.8)] z-10 rounded-full transition-all duration-500"
@@ -642,15 +641,15 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
         <motion.div 
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
-          className="rounded-xl border border-white/10 bg-zinc-900/40 overflow-hidden w-full"
+          className="rounded-xl nodal-module-glass nodal-monolith-edge overflow-hidden w-full"
         >
-          <div className="px-4 py-2 border-b border-white/5 bg-white/5 flex justify-between items-center gap-2">
+          <div className="px-4 py-2 border-b border-white/5 nodal-recessed flex justify-between items-center gap-2">
             <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest font-semibold">{grid.title}</span>
             <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-wider shrink-0">{sourceLabel}</span>
           </div>
           <div className="overflow-auto max-h-[40vh] w-full">
             <table className="w-full text-left text-xs min-w-[300px]">
-              <thead className="sticky top-0 z-10 bg-zinc-900/95 backdrop-blur-sm">
+              <thead className="sticky top-0 z-10 nodal-recessed">
                 <tr className="border-b border-white/5">
                   {grid.columns.map((col: string, i: number) => (
                     <th key={i} className="px-4 py-2 font-mono text-zinc-500 font-normal uppercase tracking-widest text-[9px] whitespace-nowrap">{col}</th>
@@ -684,7 +683,7 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
         <motion.div 
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
-          className="rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl overflow-hidden w-full"
+          className="rounded-2xl nodal-module-glass nodal-monolith-edge overflow-hidden w-full"
         >
           <div className="px-4 py-2 border-b border-white/5 flex justify-between items-center">
             <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest font-semibold">Evidence_Locker // {docData.accountName}</span>
@@ -695,7 +694,7 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
               docData.documents.map((doc, i) => (
                 <div key={doc.id ?? i} className="rounded-2xl border border-white/10 bg-black/20 p-3 hover:border-[#002FA7]/30 hover:bg-white/5 transition-all group relative overflow-hidden">
                   <div className="flex flex-col items-center gap-2 min-w-0">
-                    <div className="w-12 h-12 rounded-[14px] bg-zinc-800/80 border border-white/10 flex items-center justify-center text-red-400/90 group-hover:text-red-300">
+                    <div className="w-12 h-12 rounded-[14px] bg-black/40 border border-white/10 flex items-center justify-center text-red-400/90 group-hover:text-red-300">
                       <FileText size={24} />
                     </div>
                     <div className="w-full min-w-0 text-center">
@@ -703,7 +702,7 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
                       <div className="text-[9px] font-mono text-zinc-500 tabular-nums">{new Date(doc.created_at).toLocaleDateString()}</div>
                     </div>
                   </div>
-                  <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-900/80">
+                  <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60">
                     {doc.url && (
                       <>
                         <button className="px-2 py-1 rounded-lg bg-[#002FA7]/20 border border-[#002FA7]/40 text-[#002FA7] font-mono text-[9px] uppercase hover:bg-[#002FA7]/30" onClick={(e) => { e.stopPropagation(); window.open(doc.url!, '_blank'); }}>Download</button>
@@ -812,7 +811,7 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
         <div className="grid grid-cols-1 gap-2 w-full min-w-0 overflow-hidden">
           {profiles.map((profile, i) => (
             <div key={i} className="flex items-center gap-3 p-2 sm:p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group min-w-0">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-[14px] sm:rounded-2xl bg-zinc-800 flex items-center justify-center text-zinc-400 font-bold border border-white/5 group-hover:border-blue-500/50 transition-colors shrink-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-[14px] sm:rounded-2xl bg-black/40 flex items-center justify-center text-zinc-400 font-bold border border-white/5 group-hover:border-blue-500/50 transition-colors shrink-0">
                 {profile.name?.charAt(0)}
               </div>
               <div className="flex-1 min-w-0 overflow-hidden">
@@ -879,7 +878,7 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
     }
     default:
       return (
-        <div className="rounded-lg border border-white/10 bg-zinc-900/30 px-3 py-2 font-mono text-[10px] text-zinc-500">
+        <div className="rounded-lg nodal-module-glass nodal-monolith-edge px-3 py-2 font-mono text-[10px] text-zinc-500">
           Unknown component: {type}
           {isRecord(data) && Object.keys(data).length > 0 && (
             <pre className="mt-1 text-[9px] text-zinc-600 truncate max-w-full overflow-hidden">
@@ -1393,19 +1392,18 @@ SELECT * FROM hybrid_search_accounts(
       exit={{ opacity: 0, y: 4, scaleY: 0.98, transition: { duration: 0.12 } }}
       transition={{ duration: 0.18, delay: 0.05 }}
       style={{ transformOrigin: 'top' }}
-      className="absolute top-12 right-2 mt-2 w-[calc(100%-1rem)] max-w-[480px] flex flex-col h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl bg-zinc-950/80 backdrop-blur-3xl border border-white/10 shadow-2xl overflow-hidden z-50"
+      className="absolute top-12 right-2 mt-2 w-[calc(100%-1rem)] max-w-[480px] flex flex-col h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl bg-zinc-950/80 backdrop-blur-3xl nodal-monolith-edge shadow-2xl overflow-hidden z-50"
     >
       {/* Nodal Point Glass Highlight */}
-      <div className="absolute inset-0 bg-gradient-to-tr from-[#002FA7]/5 via-transparent to-white/5 pointer-events-none" />
       
       {/* Header */}
-      <div className="p-4 border-b border-white/10 flex items-center justify-between bg-zinc-900/50 relative z-10">
+      <div className="p-4 border-b border-white/10 flex items-center justify-between nodal-recessed relative z-10">
         <div className="flex items-center gap-3">
           <div className="relative">
             <button
               onClick={() => setShowDiagnostics(!showDiagnostics)}
               className={cn(
-                "w-8 h-8 rounded-2xl bg-zinc-800 border border-white/10 flex items-center justify-center relative z-10 overflow-hidden transition-all",
+                "w-8 h-8 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-center relative z-10 overflow-hidden transition-all",
                 showDiagnostics ? "border-[#002FA7]/50 shadow-[0_0_15px_rgba(0,47,167,0.4)]" : "hover:border-white/20"
               )}
               title="Toggle Routing HUD"
@@ -1464,7 +1462,7 @@ SELECT * FROM hybrid_search_accounts(
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="bg-zinc-900/95 border-b border-white/10 overflow-hidden relative z-20"
+            className="nodal-recessed border-b border-white/10 overflow-hidden relative z-20"
           >
             <div className="p-3 font-mono text-[10px] space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar">
               <div className="flex items-center justify-between border-b border-white/5 pb-1 mb-2">
@@ -1613,7 +1611,7 @@ SELECT * FROM hybrid_search_accounts(
                   /* "Stealth" User Command */
                   <div className="flex justify-end mb-2 group w-full gap-8">
                     <div className="max-w-[85%] relative">
-                      <div className="bg-zinc-900/50 border border-white/10 backdrop-blur-md rounded-lg p-4 text-right shadow-xl">
+                      <div className="nodal-module-glass nodal-monolith-edge backdrop-blur-md rounded-lg p-4 text-right shadow-xl">
                         <p className="font-sans text-[10px] text-[#002FA7] mb-1 uppercase tracking-widest opacity-70">
                           {'>'} COMMAND_INPUT
                         </p>
@@ -1623,7 +1621,7 @@ SELECT * FROM hybrid_search_accounts(
                       </div>
                     </div>
                     {/* User Initials/Avatar */}
-                    <div className="shrink-0 h-10 w-10 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center overflow-hidden">
+                    <div className="shrink-0 h-10 w-10 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-center overflow-hidden">
                       {isAvatarLoading || hostedAvatarUrl ? (
                         <ImageWithSkeleton 
                           src={hostedAvatarUrl} 
@@ -1755,14 +1753,14 @@ SELECT * FROM hybrid_search_accounts(
       {/* Control Module (Stacked Command Deck) */}
       <motion.div 
         layout
-        className="p-4 border-t border-white/10 bg-zinc-900/40 backdrop-blur-md relative z-10"
+        className="p-4 border-t border-white/10 nodal-recessed relative z-10"
       >
         <motion.form 
           layout
           initial={false}
           transition={{ type: "spring", bounce: 0, duration: 0.4 }}
           onSubmit={(e) => { e.preventDefault(); handleSend(); }}
-          className="bg-zinc-950/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 focus-within:border-white/20 focus-within:ring-1 focus-within:ring-white/5"
+          className="bg-zinc-950/60 backdrop-blur-xl nodal-monolith-edge rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 focus-within:border-white/20 focus-within:ring-1 focus-within:ring-white/5"
         >
           {/* TIER 1: CONFIGURATION DECK (Metadata) */}
           <motion.div layout className="h-9 bg-black/40 border-b border-white/5 flex items-center justify-between px-3">

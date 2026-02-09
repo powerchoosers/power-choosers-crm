@@ -64,7 +64,7 @@ export default function SignalStream({ accountId }: SignalStreamProps) {
   }, [])
 
   return (
-    <div className="w-full bg-black/20 border-y border-white/5 backdrop-blur-sm mb-4 rounded-xl overflow-hidden">
+    <div className="w-full bg-black/20 border-t border-white/5 border-b border-white/5 border-l border-white/5 border-r border-white/5 backdrop-blur-sm mb-4 rounded-xl overflow-hidden">
       <div className="flex items-center justify-between px-3 py-2 border-b border-white/5">
         <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
           TARGET_SIGNALS
@@ -88,14 +88,14 @@ export default function SignalStream({ accountId }: SignalStreamProps) {
             NO_ACTIVE_SIGNALS_DETECTED
           </div>
         ) : signals.length === 0 ? (
-          <div className="py-4 px-3 text-[10px] font-mono text-zinc-700 uppercase tracking-widest">
+          <div className="py-4 px-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
             NO_ACTIVE_SIGNALS_DETECTED
           </div>
         ) : (
           signals.map((item) => (
             <div
               key={item.id}
-              className="group flex items-center justify-between p-3 hover:bg-white/5 transition-colors cursor-default border-b border-white/5 last:border-0"
+              className="group flex items-center justify-between p-3 hover:bg-black/30 transition-colors cursor-default border-b border-white/5 last:border-0"
             >
               <div className="flex items-center min-w-0 flex-1 gap-3">
                 {signalIcon(item.event_categories)}

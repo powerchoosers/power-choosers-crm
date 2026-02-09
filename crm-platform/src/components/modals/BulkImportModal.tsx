@@ -603,14 +603,14 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent showCloseButton={false} className="max-w-5xl w-full max-h-[90vh] flex flex-col bg-zinc-950/95 border-white/10 backdrop-blur-2xl text-white p-0 overflow-hidden shadow-2xl">
+      <DialogContent showCloseButton={false} className="max-w-5xl w-full max-h-[90vh] flex flex-col bg-zinc-950/95 nodal-monolith-edge backdrop-blur-2xl text-white p-0 overflow-hidden shadow-2xl">
         <DialogTitle className="sr-only">Bulk Data Ingestion</DialogTitle>
         <DialogDescription className="sr-only">
           Map and import CSV data into the Nodal Point CRM.
         </DialogDescription>
         
         {/* HEADER: OBSIDIAN & GLASS */}
-        <div className="h-14 border-b border-white/5 flex-none flex items-center justify-between px-6 bg-white/5">
+        <div className="h-14 border-b border-white/5 flex-none flex items-center justify-between px-6 nodal-recessed">
           <div className="flex items-center gap-2">
             <Database className="w-4 h-4 text-white" />
             <span className="font-mono text-sm tracking-wider text-zinc-300 uppercase">
@@ -645,9 +645,9 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
               >
                 <button
                   onClick={() => { setImportVector('CONTACTS'); setStep('UPLOAD'); }}
-                  className="group relative py-12 px-8 rounded-xl border border-white/10 bg-zinc-900/50 hover:bg-zinc-900 hover:border-[#002FA7]/50 transition-all flex flex-col items-center justify-center gap-4"
+                  className="group relative py-12 px-8 rounded-xl nodal-monolith-edge nodal-module-glass hover:bg-black/30 hover:border-[#002FA7]/50 transition-all flex flex-col items-center justify-center gap-4"
                 >
-                  <div className="w-16 h-16 rounded-2xl bg-zinc-800 flex items-center justify-center group-hover:bg-[#002FA7]/20 transition-colors">
+                  <div className="w-16 h-16 rounded-2xl bg-black/40 flex items-center justify-center group-hover:bg-[#002FA7]/20 transition-colors">
                     <User className="w-8 h-8 text-white" />
                   </div>
                   <div className="text-center">
@@ -658,9 +658,9 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
 
                 <button
                   onClick={() => { setImportVector('ACCOUNTS'); setStep('UPLOAD'); }}
-                  className="group relative py-12 px-8 rounded-xl border border-white/10 bg-zinc-900/50 hover:bg-zinc-900 hover:border-[#002FA7]/50 transition-all flex flex-col items-center justify-center gap-4"
+                  className="group relative py-12 px-8 rounded-xl nodal-monolith-edge nodal-module-glass hover:bg-black/30 hover:border-[#002FA7]/50 transition-all flex flex-col items-center justify-center gap-4"
                 >
-                  <div className="w-16 h-16 rounded-2xl bg-zinc-800 flex items-center justify-center group-hover:bg-[#002FA7]/20 transition-colors">
+                  <div className="w-16 h-16 rounded-2xl bg-black/40 flex items-center justify-center group-hover:bg-[#002FA7]/20 transition-colors">
                     <Building2 className="w-8 h-8 text-white" />
                   </div>
                   <div className="text-center">
@@ -688,7 +688,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                     className={`w-full flex flex-col items-center justify-center border-2 border-dashed rounded-xl transition-all duration-300 py-12 ${
                       isDragging 
                         ? 'border-[#002FA7] bg-[#002FA7]/10 scale-[1.02]' 
-                        : 'border-zinc-800 bg-zinc-900/20 hover:bg-zinc-900/40 hover:border-zinc-700'
+                        : 'border-white/10 bg-black/20 hover:bg-black/40 hover:border-white/20'
                     }`}
                   >
                     <input 
@@ -700,7 +700,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                     />
                     <label htmlFor="csv-upload" className="flex flex-col items-center cursor-pointer">
                       <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 transition-all duration-300 ${
-                        isDragging ? 'bg-[#002FA7] text-white' : 'bg-zinc-900 border border-white/10 text-zinc-400'
+                        isDragging ? 'bg-[#002FA7] text-white' : 'bg-black/40 nodal-monolith-edge text-zinc-400'
                       }`}>
                         <Upload className={`w-6 h-6 ${isDragging ? 'animate-bounce' : ''}`} />
                       </div>
@@ -712,7 +712,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                   </div>
                 ) : (
                   <div className="w-full flex flex-col items-center justify-center py-12">
-                    <div className="w-64 h-1 bg-zinc-900 rounded-full overflow-hidden relative mb-6">
+                    <div className="w-64 h-1 bg-black/40 rounded-full overflow-hidden relative mb-6">
                       <motion.div 
                         initial={{ left: "-100%" }}
                         animate={{ left: "100%" }}
@@ -784,7 +784,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                       {csvHeaders.map((header, idx) => (
                         <div 
                           key={idx} 
-                          className="group grid grid-cols-[1fr_48px_1fr] items-center gap-4 p-2.5 rounded-lg bg-zinc-900/40 border border-white/5 hover:border-white/20 hover:bg-zinc-900/60 transition-all duration-300"
+                          className="group grid grid-cols-[1fr_48px_1fr] items-center gap-4 p-2.5 rounded-lg nodal-module-glass border border-white/5 hover:border-white/20 hover:bg-black/30 transition-all duration-300"
                         >
                           {/* LEFT: SOURCE (CSV) */}
                           <div className="flex flex-col min-w-0">
@@ -802,7 +802,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                           
                           {/* CENTER: ARROW (The Nodal Point) */}
                           <div className="flex justify-center">
-                            <div className="w-8 h-8 rounded-full bg-zinc-800/50 flex items-center justify-center border border-white/5 group-hover:border-[#002FA7]/50 group-hover:bg-[#002FA7]/10 transition-all">
+                            <div className="w-8 h-8 rounded-full bg-black/40 flex items-center justify-center border border-white/5 group-hover:border-[#002FA7]/50 group-hover:bg-[#002FA7]/10 transition-all">
                               <ArrowRight className="w-4 h-4 text-[#002FA7] opacity-40 group-hover:opacity-100 transition-opacity" />
                             </div>
                           </div>
@@ -823,7 +823,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                               <SelectTrigger className="h-9 w-full max-w-[240px] bg-black/40 border-white/10 text-xs font-mono focus:ring-1 focus:ring-[#002FA7] focus:border-[#002FA7] text-right">
                                 <SelectValue placeholder="-- SKIP --" />
                               </SelectTrigger>
-                              <SelectContent className="bg-zinc-950 border-white/10 text-zinc-200">
+                              <SelectContent className="bg-zinc-950 nodal-monolith-edge text-zinc-200">
                                 <SelectItem value="skip" className="text-zinc-500 font-mono text-[10px]">-- SKIP COLUMN --</SelectItem>
                                 {(importVector === 'CONTACTS' ? CONTACT_FIELDS : ACCOUNT_FIELDS).map(field => (
                                   <SelectItem key={field.id} value={field.id} className="font-mono text-xs">
@@ -864,7 +864,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                 
                 <div className="space-y-6 overflow-y-auto custom-scrollbar pr-2 flex-1">
                   {/* ENRICHMENT TOGGLE */}
-                  <div className="flex items-center justify-between p-4 rounded bg-zinc-900/50 border border-white/5">
+                  <div className="flex items-center justify-between p-4 rounded nodal-module-glass border border-white/5">
                     <div>
                       <div className="text-sm font-medium text-white">Apollo Enrichment</div>
                       <div className="text-xs text-zinc-500 max-w-sm mt-1">
@@ -872,7 +872,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                       </div>
                     </div>
                     <div 
-                      className={`h-5 w-9 rounded-full relative cursor-pointer transition-colors duration-200 ${isEnriching ? 'bg-[#002FA7]' : 'bg-zinc-800'}`}
+                      className={`h-5 w-9 rounded-full relative cursor-pointer transition-colors duration-200 ${isEnriching ? 'bg-[#002FA7]' : 'bg-black/40'}`}
                       onClick={() => setIsEnriching(!isEnriching)}
                     >
                       <motion.div 
@@ -908,7 +908,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                             value={newListName}
                             onChange={(e) => setNewListName(e.target.value)}
                             placeholder="Enter list name..."
-                            className="bg-zinc-900/50 border-white/10 text-white h-9 text-xs font-mono focus-visible:ring-0 focus-visible:border-white/40 transition-colors"
+                            className="bg-black/40 nodal-monolith-edge text-white h-9 text-xs font-mono focus-visible:ring-0 focus-visible:border-white/40 transition-colors"
                             onKeyDown={(e) => e.key === 'Enter' && handleCreateList()}
                             autoFocus
                           />
@@ -928,10 +928,10 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                           exit={{ opacity: 0, y: 10 }}
                         >
                           <Select value={selectedListId} onValueChange={setSelectedListId}>
-                            <SelectTrigger className="bg-zinc-900/50 border-white/10 text-white focus:ring-0 focus:border-white/40 transition-colors">
+                            <SelectTrigger className="bg-black/40 nodal-monolith-edge text-white focus:ring-0 focus:border-white/40 transition-colors">
                               <SelectValue placeholder="Select Target List..." />
                             </SelectTrigger>
-                            <SelectContent className="bg-zinc-900 border-white/10">
+                            <SelectContent className="bg-zinc-950 nodal-monolith-edge">
                               {targets?.filter(t => {
                                 const kind = (t.kind || '').toLowerCase();
                                 if (importVector === 'CONTACTS') {
@@ -971,10 +971,10 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                     <div className="space-y-2">
                       <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest text-[#002FA7]">Activate Protocol (Sequence)</label>
                       <Select>
-                        <SelectTrigger className="bg-zinc-900/50 border-[#002FA7]/30 text-white focus:ring-0 focus:border-[#002FA7]/60 transition-colors">
+                        <SelectTrigger className="bg-black/40 nodal-monolith-edge border-[#002FA7]/30 text-white focus:ring-0 focus:border-[#002FA7]/60 transition-colors">
                           <SelectValue placeholder="Do Not Enroll" />
                         </SelectTrigger>
-                        <SelectContent className="bg-zinc-900 border-white/10">
+                        <SelectContent className="bg-zinc-950 nodal-monolith-edge">
                           <SelectItem value="seq_4cp">Sequence: 4CP Defense</SelectItem>
                           <SelectItem value="seq_ratchet">Sequence: Ratchet Audit</SelectItem>
                         </SelectContent>
@@ -1025,7 +1025,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
               >
                 <Loader2 className="w-12 h-12 text-[#002FA7] animate-spin mb-6" />
                 <div className="text-xl font-bold mb-2">Processing Ingestion...</div>
-                <div className="w-full max-w-md bg-zinc-900 rounded-full h-2 mb-4 overflow-hidden">
+                <div className="w-full max-w-md bg-black/40 rounded-full h-2 mb-4 overflow-hidden">
                   <motion.div 
                     initial={{ width: 0 }}
                     animate={{ width: `${progress}%` }}

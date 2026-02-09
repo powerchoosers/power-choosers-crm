@@ -1,0 +1,122 @@
+{
+  "route": "electricity/retail-sales/data",
+  "mode": "data_sample",
+  "description": "Electricity sales to ultimate customer by state and sector (number of customers, average price, revenue, and megawatthours of sales).  \n    Sources: Forms EIA-826, EIA-861, EIA-861M",
+  "catalog": [
+    {
+      "period": "2025-11",
+      "stateid": "TX",
+      "stateDescription": "Texas",
+      "sectorid": "ALL",
+      "sectorName": "all sectors",
+      "price": "9.77",
+      "price-units": "cents per kilowatt-hour"
+    },
+    {
+      "period": "2025-11",
+      "stateid": "TX",
+      "stateDescription": "Texas",
+      "sectorid": "COM",
+      "sectorName": "commercial",
+      "price": "8.19",
+      "price-units": "cents per kilowatt-hour"
+    },
+    {
+      "period": "2025-11",
+      "stateid": "TX",
+      "stateDescription": "Texas",
+      "sectorid": "IND",
+      "sectorName": "industrial",
+      "price": "6.63",
+      "price-units": "cents per kilowatt-hour"
+    },
+    {
+      "period": "2025-11",
+      "stateid": "TX",
+      "stateDescription": "Texas",
+      "sectorid": "OTH",
+      "sectorName": "other",
+      "price": null,
+      "price-units": "cents per kilowatt-hour"
+    },
+    {
+      "period": "2025-11",
+      "stateid": "TX",
+      "stateDescription": "Texas",
+      "sectorid": "RES",
+      "sectorName": "residential",
+      "price": "16.04",
+      "price-units": "cents per kilowatt-hour"
+    },
+    {
+      "period": "2025-11",
+      "stateid": "TX",
+      "stateDescription": "Texas",
+      "sectorid": "TRA",
+      "sectorName": "transportation",
+      "price": "3.74",
+      "price-units": "cents per kilowatt-hour"
+    },
+    {
+      "period": "2025-10",
+      "stateid": "TX",
+      "stateDescription": "Texas",
+      "sectorid": "ALL",
+      "sectorName": "all sectors",
+      "price": "10.15",
+      "price-units": "cents per kilowatt-hour"
+    },
+    {
+      "period": "2025-10",
+      "stateid": "TX",
+      "stateDescription": "Texas",
+      "sectorid": "COM",
+      "sectorName": "commercial",
+      "price": "8.3",
+      "price-units": "cents per kilowatt-hour"
+    },
+    {
+      "period": "2025-10",
+      "stateid": "TX",
+      "stateDescription": "Texas",
+      "sectorid": "IND",
+      "sectorName": "industrial",
+      "price": "6.66",
+      "price-units": "cents per kilowatt-hour"
+    },
+    {
+      "period": "2025-10",
+      "stateid": "TX",
+      "stateDescription": "Texas",
+      "sectorid": "OTH",
+      "sectorName": "other",
+      "price": null,
+      "price-units": "cents per kilowatt-hour"
+    },
+    {
+      "period": "2025-10",
+      "stateid": "TX",
+      "stateDescription": "Texas",
+      "sectorid": "RES",
+      "sectorName": "residential",
+      "price": "16.11",
+      "price-units": "cents per kilowatt-hour"
+    },
+    {
+      "period": "2025-10",
+      "stateid": "TX",
+      "stateDescription": "Texas",
+      "sectorid": "TRA",
+      "sectorName": "transportation",
+      "price": "3.76",
+      "price-units": "cents per kilowatt-hour"
+    }
+  ],
+  "metadata": {
+    "frequency": "monthly",
+    "total": "1794"
+  },
+  "debug": {
+    "url": "https://api.eia.gov/v2/electricity/retail-sales/data?api_key=REDACTED&length=12&frequency=monthly&facets%5Bstateid%5D%5B%5D=TX&data%5B%5D=price"
+  }
+}

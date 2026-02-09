@@ -173,7 +173,7 @@ export default function TargetOverviewPage() {
       </div>
 
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="bg-zinc-950 border-white/10 text-zinc-100">
+        <DialogContent className="bg-zinc-950 nodal-monolith-edge text-zinc-100">
           <DialogHeader>
             <DialogTitle>Initialize New Target</DialogTitle>
           </DialogHeader>
@@ -185,7 +185,7 @@ export default function TargetOverviewPage() {
                 value={newTargetName} 
                 onChange={(e) => setNewTargetName(e.target.value)} 
                 placeholder={`e.g. ${activeMode === 'people' ? 'Q1 Contacts' : 'Enterprise Accounts'}`}
-                className="bg-zinc-900 border-white/10"
+                className="bg-black/40 nodal-monolith-edge"
               />
             </div>
           </div>
@@ -199,11 +199,10 @@ export default function TargetOverviewPage() {
       </Dialog>
 
       {/* 2. THE DATA CONTAINER (Contained & Scrollable) */}
-      <div className="flex-1 rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl overflow-hidden flex flex-col relative">
-        <div className="absolute inset-0 border border-white/5 rounded-2xl pointer-events-none bg-gradient-to-b from-white/5 to-transparent z-10" />
+      <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
         
         {/* INNER HEADER: Houses Search & Switcher */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-zinc-900/80 backdrop-blur-md sticky top-0 z-20">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 nodal-recessed sticky top-0 z-20">
           <div className="flex items-center gap-6">
             {/* Search Bar Div */}
             <div className="relative w-80">
@@ -293,7 +292,7 @@ export default function TargetOverviewPage() {
                   >
                     <Link 
                       href={`/network/targets/${target.id}`}
-                      className="group relative bg-white/[0.02] backdrop-blur-md border border-white/5 rounded-2xl p-6 hover:bg-white/[0.05] hover:border-white/10 transition-all cursor-pointer flex flex-col justify-between h-44"
+                      className="group relative nodal-module-glass nodal-monolith-edge rounded-2xl p-6 hover:bg-zinc-950/90 hover:border-white/10 transition-all cursor-pointer flex flex-col justify-between h-44"
                     >
                       {/* Card Header */}
                       <div className="flex justify-between items-start">
@@ -329,7 +328,6 @@ export default function TargetOverviewPage() {
                       </div>
 
                       {/* Hover Bloom Effect */}
-                      <div className="absolute bottom-0 right-0 w-8 h-8 bg-gradient-to-tl from-[#002FA7]/20 to-transparent rounded-br-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
                     </Link>
                   </motion.div>
                 ))}
@@ -339,9 +337,9 @@ export default function TargetOverviewPage() {
               <button 
                 type="button"
                 onClick={() => setIsCreateOpen(true)}
-                className="border border-dashed border-zinc-800 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 text-zinc-600 hover:text-zinc-400 hover:border-zinc-700 hover:bg-white/[0.02] transition-all h-44"
+                className="nodal-monolith-edge border border-dashed border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 text-zinc-500 hover:text-zinc-400 hover:border-white/20 hover:bg-black/20 transition-all h-44"
               >
-                <div className="w-10 h-10 rounded-2xl bg-zinc-900 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-2xl bg-black/40 flex items-center justify-center">
                   <Plus className="w-5 h-5" />
                 </div>
                 <span className="text-[10px] font-mono uppercase tracking-widest">Initialize_New_Target</span>
@@ -358,11 +356,11 @@ export default function TargetOverviewPage() {
         </div>
 
         {/* Sync_Block Footer */}
-        <div className="flex-none border-t border-white/5 bg-zinc-900/90 p-4 flex items-center justify-between backdrop-blur-sm z-10">
+        <div className="flex-none border-t border-white/5 nodal-recessed p-4 flex items-center justify-between z-10">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
               <span>Sync_Block 01–{filteredTargets.length.toString().padStart(2, '0')}</span>
-              <div className="h-1 w-1 rounded-full bg-zinc-800" />
+              <div className="h-1 w-1 rounded-full bg-black/40" />
               <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{filteredTargets.length}</span></span>
             </div>
           </div>

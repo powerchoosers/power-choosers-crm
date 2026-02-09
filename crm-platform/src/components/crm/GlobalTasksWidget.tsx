@@ -25,7 +25,7 @@ export default function GlobalTasksWidget() {
           <span>Velocity</span>
           <span className="text-zinc-400">{velocity.toFixed(0)}%</span>
         </div>
-        <div className="h-1 w-full bg-zinc-800/50 rounded-full overflow-hidden">
+        <div className="h-1 w-full bg-black/40 rounded-full overflow-hidden">
           <div 
             className="h-full bg-white transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(255,255,255,0.5)]" 
             style={{ width: `${velocity}%` }}
@@ -39,7 +39,7 @@ export default function GlobalTasksWidget() {
           pendingTasks.map((task) => (
             <div 
               key={task.id}
-              className="group flex items-start gap-3 p-3 rounded-xl bg-zinc-900/40 border border-white/5 hover:bg-white/5 transition-all"
+              className="group flex items-start gap-3 p-3 rounded-xl nodal-module-glass nodal-monolith-edge hover:bg-white/5 transition-all"
             >
               <Circle size={14} className="mt-0.5 text-zinc-600 group-hover:text-zinc-400" />
               <div className="flex-1 min-w-0">

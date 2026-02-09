@@ -1,0 +1,15 @@
+{
+  "source": "ERCOT Official API",
+  "timestamp": "2026-02-07 1:0",
+  "prices": {
+    "houston": 23.04,
+    "north": 21.9,
+    "south": 25,
+    "west": 67.2,
+    "hub_avg": 34.285
+  },
+  "metadata": {
+    "last_updated": "2026-02-07T15:19:40.538Z",
+    "report_id": "NP6-905-CD"
+  }
+}

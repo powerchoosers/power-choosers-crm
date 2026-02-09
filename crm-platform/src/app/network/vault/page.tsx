@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import Link from 'next/link'
 import {
   FileText,
   FolderOpen,
@@ -280,7 +281,7 @@ export default function VaultPage() {
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         className={cn(
-          'rounded-2xl border border-dashed border-white/10 bg-zinc-900/30 backdrop-blur-xl p-4 transition-colors',
+          'nodal-void-card border border-dashed border-white/10 p-4 transition-colors',
           'hover:border-[#002FA7]/40 hover:bg-[#002FA7]/5'
         )}
       >
@@ -297,7 +298,7 @@ export default function VaultPage() {
 
       <div className="flex flex-1 min-h-0 gap-4">
         {/* Sidebar: sliding pill + white text/icon when selected */}
-        <aside className="w-48 flex-shrink-0 rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl p-2 space-y-0.5 relative">
+        <aside className="w-48 flex-shrink-0 nodal-void-card p-2 space-y-0.5 relative">
           {VAULT_FILTERS.map((f) => {
             const Icon = f.icon
             const isSelected = filter === f.id
@@ -322,10 +323,10 @@ export default function VaultPage() {
         </aside>
 
         {/* Main: grid or folder + list */}
-        <main className="flex-1 min-w-0 rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl overflow-hidden flex flex-col">
+        <main className="flex-1 min-w-0 nodal-void-card overflow-hidden flex flex-col">
           {selectedAccountId ? (
             <>
-              <div className="flex items-center gap-2 p-3 border-b border-white/5 bg-white/[0.02]">
+              <div className="flex items-center gap-2 p-3 border-b border-white/5 nodal-recessed">
                 <button
                   onClick={() => { setSelectedAccountId(null); setSelectedDoc(null) }}
                   className="icon-button-forensic w-8 h-8 flex items-center justify-center"
@@ -337,9 +338,18 @@ export default function VaultPage() {
                   domain={currentAccount?.domain}
                   name={currentAccount?.name ?? selectedAccountId}
                   size={28}
+                  roundedClassName="rounded-[10px]"
                   className="flex-shrink-0"
                 />
-                <span className="font-mono text-sm text-zinc-200 truncate">{currentAccount?.name ?? selectedAccountId}</span>
+                <Link
+                  href={`/network/accounts/${selectedAccountId}`}
+                  className="group/company"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="font-mono text-sm text-zinc-200 group-hover/company:text-white group-hover/company:scale-[1.02] transition-all origin-left truncate inline-block">
+                    {currentAccount?.name ?? selectedAccountId}
+                  </span>
+                </Link>
                 <span className="text-[10px] font-mono text-zinc-600 tabular-nums">{currentFolderDocs.length} docs</span>
               </div>
               <div className="flex flex-1 min-h-0">
@@ -356,7 +366,7 @@ export default function VaultPage() {
                     ) : (
                       <table className="w-full text-left">
                         <thead>
-                          <tr className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5">
+                          <tr className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 nodal-recessed">
                             <th className="pb-2 pr-2 w-8">Type</th>
                             <th className="pb-2 pr-2">Filename</th>
                             <th className="pb-2 pr-2">Date</th>
@@ -410,7 +420,7 @@ export default function VaultPage() {
                       initial={{ width: 0, opacity: 0 }}
                       animate={{ width: 280, opacity: 1 }}
                       exit={{ width: 0, opacity: 0 }}
-                      className="flex-shrink-0 border-l border-white/10 bg-zinc-950/80 backdrop-blur-xl overflow-hidden flex flex-col"
+                      className="flex-shrink-0 border-l border-white/10 bg-zinc-950/80 backdrop-blur-xl overflow-hidden flex flex-col nodal-monolith-edge"
                     >
                       <div className="p-3 border-b border-white/5 flex items-center justify-between">
                         <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Inspector</span>
@@ -471,7 +481,7 @@ export default function VaultPage() {
             </>
           ) : (
             <>
-              <div className="p-3 border-b border-white/5 bg-white/[0.02]">
+              <div className="p-3 border-b border-white/5 nodal-recessed">
                 <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Account containers</p>
               </div>
               <div className="flex-1 overflow-auto p-4">
@@ -490,7 +500,7 @@ export default function VaultPage() {
                           key={folder.accountId}
                           type="button"
                           onClick={() => setSelectedAccountId(folder.accountId)}
-                          className="rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl p-4 text-left transition-all hover:border-[#002FA7]/30 hover:bg-[#002FA7]/10 group"
+                          className="nodal-void-card p-4 text-left transition-all hover:border-[#002FA7]/30 hover:bg-[#002FA7]/10 group"
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
                         >
@@ -539,7 +549,7 @@ export default function VaultPage() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950 backdrop-blur-xl shadow-xl overflow-hidden"
+              className="w-full max-w-md nodal-void-card shadow-xl overflow-hidden"
             >
               <div className="p-4 border-b border-white/5 flex items-center justify-between">
                 <h3 className="text-sm font-mono text-zinc-200 uppercase tracking-widest">Ingest evidence</h3>
@@ -556,9 +566,9 @@ export default function VaultPage() {
                     placeholder="Search accounts..."
                     value={ingestionAccountSearch}
                     onChange={(e) => setIngestionAccountSearch(e.target.value)}
-                    className="font-mono text-sm bg-zinc-900 border-white/10"
+                    className="font-mono text-sm bg-black/40 border-white/10"
                   />
-                  <div className="mt-1 max-h-40 overflow-auto rounded-xl border border-white/5 bg-zinc-900/50">
+                  <div className="mt-1 max-h-40 overflow-auto rounded-xl border border-white/5 nodal-module-glass">
                     {searchAccountsLoading && ingestionAccountSearch.length >= 2 ? (
                       <div className="p-3 flex items-center gap-2 text-zinc-500 font-mono text-xs">
                         <Loader2 className="w-4 h-4 animate-spin" /> Searching...
@@ -587,7 +597,7 @@ export default function VaultPage() {
                   <select
                     value={ingestionDocType}
                     onChange={(e) => setIngestionDocType(e.target.value as DocumentTypeFilter)}
-                    className="w-full rounded-xl border border-white/10 bg-zinc-900 text-zinc-200 font-mono text-sm px-3 py-2"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 text-zinc-200 font-mono text-sm px-3 py-2"
                   >
                     {DOC_TYPES.map((t) => (
                       <option key={t.value} value={t.value}>

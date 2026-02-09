@@ -99,11 +99,11 @@ export default function EmailDetailPage() {
 
       {/* Email Content */}
       <div className="flex-1 bg-zinc-950 border border-white/10 rounded-2xl overflow-hidden flex flex-col relative shadow-2xl">
-        <div className="flex-none p-8 border-b border-white/5 space-y-6 bg-zinc-900/30">
+        <div className="flex-none p-8 border-b border-white/5 space-y-6 nodal-module-glass">
           <div className="space-y-1">
             <h1 className="text-3xl font-semibold text-white tracking-tighter leading-tight">{email.subject}</h1>
             <div className="flex items-center gap-2">
-                <span className="inline-flex items-center rounded-md bg-zinc-800 px-2 py-1 text-xs font-medium text-zinc-400 ring-1 ring-inset ring-white/10">
+                <span className="inline-flex items-center rounded-md bg-black/40 px-2 py-1 text-xs font-medium text-zinc-400 ring-1 ring-inset ring-white/10">
                     {email.type === 'sent' ? 'Sent' : 'Inbox'}
                 </span>
             </div>
@@ -149,7 +149,7 @@ export default function EmailDetailPage() {
            />
           </div>
 
-        <div className="p-4 border-t border-white/5 bg-zinc-900/80 backdrop-blur-sm">
+        <div className="p-4 border-t border-white/5 nodal-recessed">
             <button 
           onClick={() => setIsComposeOpen(true)}
           className="icon-button-forensic bg-white !text-zinc-950 hover:!bg-zinc-200 font-medium h-9 px-4 rounded-xl flex items-center gap-2 transition-all shadow-[0_0_30px_-5px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.4)]"
