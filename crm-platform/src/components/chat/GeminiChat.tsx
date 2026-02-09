@@ -827,6 +827,56 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
         </div>
       )
       }
+    case 'company_news': {
+      const articles: ApolloNewsSignal[] = (() => {
+        if (!isRecord(data) || !Array.isArray(data.articles)) return []
+        return data.articles
+          .map((a): ApolloNewsSignal | null => {
+            if (!isRecord(a)) return null
+            const id = typeof a.id === 'string' ? a.id : ''
+            const title = typeof a.title === 'string' ? a.title : ''
+            const url = typeof a.url === 'string' ? a.url : ''
+            const domain = typeof a.domain === 'string' ? a.domain : ''
+            const snippet = typeof a.snippet === 'string' ? a.snippet : ''
+            const published_at = a.published_at != null ? String(a.published_at) : null
+            if (!title) return null
+            return { id, title, url, domain, snippet, published_at, event_categories: Array.isArray(a.event_categories) ? a.event_categories as string[] : undefined }
+          })
+          .filter((v): v is ApolloNewsSignal => v !== null)
+      })()
+      return (
+        <div className="grid grid-cols-1 gap-3 min-w-0 w-full max-w-full">
+          <div className="flex items-center justify-between px-1 mb-1">
+            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Company_News // target_signals</span>
+            <Newspaper size={12} className="text-[#002FA7]" />
+          </div>
+          <div className="space-y-2 max-h-[280px] overflow-y-auto custom-scrollbar pr-1">
+            {articles.map((art) => (
+              <motion.a
+                key={art.id || art.title}
+                href={art.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="block p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-[#002FA7]/30 transition-all group"
+              >
+                <p className="text-[11px] font-medium text-zinc-100 line-clamp-2 leading-snug group-hover:text-white">
+                  {art.title}
+                </p>
+                {art.snippet && (
+                  <p className="text-[10px] text-zinc-500 mt-1 line-clamp-2">{art.snippet}</p>
+                )}
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-wider truncate">{art.domain || 'News'}</span>
+                  <ExternalLink size={10} className="text-zinc-500 group-hover:text-[#002FA7] shrink-0 ml-1" />
+                </div>
+              </motion.a>
+            ))}
+          </div>
+        </div>
+      )
+    }
     default:
       return (
         <div className="rounded-lg border border-white/10 bg-zinc-900/30 px-3 py-2 font-mono text-[10px] text-zinc-500">
@@ -1292,7 +1342,16 @@ SELECT * FROM hybrid_search_accounts(
       // Only update dropdown if the returned model is one we show (avoids "no model selected" when backend fallback used)
       const allowedGemini = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3-flash-preview', 'gemini-2.0-flash']
       if (typeof data.model === 'string' && data.model.trim() && (allowedGemini.includes(data.model) || data.model.startsWith('sonar') || data.model.includes('/'))) setSelectedModel(data.model)
-      setMessages((prev) => [...prev, { role: 'assistant', content: data.content, id: crypto.randomUUID(), timestamp: Date.now() }])
+      const isNewsRequest = /news|company news|give me the news|what'?s the news|latest news|news on|any news|news about|reports? about/i.test(messageText.trim())
+      const isFirstExchange = messagesForApi.length <= 1
+      const showNewsCard = (contextInfo.type === 'contact' || contextInfo.type === 'account') && (isNewsRequest || isFirstExchange) && apolloNewsSignals && apolloNewsSignals.length > 0
+      setMessages((prev) => [...prev, {
+        role: 'assistant',
+        content: data.content,
+        id: crypto.randomUUID(),
+        timestamp: Date.now(),
+        ...(showNewsCard ? { componentData: { type: 'company_news', articles: apolloNewsSignals } } : {})
+      }])
       saveMessageToDb('model', data.content)
     } catch (err: unknown) {
       console.error('Chat error:', err)
@@ -1315,7 +1374,7 @@ SELECT * FROM hybrid_search_accounts(
     } finally {
       setIsLoading(false)
     }
-  }, [contextInfo, selectedModel, profile?.firstName])
+  }, [contextInfo, selectedModel, profile?.firstName, apolloNewsSignals])
   sendWithMessageRef.current = sendWithMessage
 
   const handleSend = async () => {
@@ -1641,7 +1700,16 @@ SELECT * FROM hybrid_search_accounts(
                           }
                         })}
                       </div>
-                      
+                      {m.componentData && isRecord(m.componentData) && typeof (m.componentData as { type?: string }).type === 'string' && (
+                        <div className="w-full overflow-hidden grid grid-cols-1 mt-3">
+                          <ComponentRenderer
+                            type={(m.componentData as { type: string }).type}
+                            data={m.componentData as Record<string, unknown>}
+                            onCreateTask={handleCreateTask}
+                            contextInfo={contextInfo}
+                          />
+                        </div>
+                      )}
                       {i === messages.length - 1 && error && (
                         <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-2">
                           <p className="text-[10px] text-red-400 font-mono leading-tight flex-1">
@@ -1746,40 +1814,6 @@ SELECT * FROM hybrid_search_accounts(
               </span>
             </div>
           </motion.div>
-
-          {/* Company news (Apollo) when on contact/account dossier */}
-          {(contextInfo.type === 'contact' || contextInfo.type === 'account') && apolloNewsSignals && apolloNewsSignals.length > 0 && (
-            <div className="mx-2 mb-2 rounded-lg border border-[#002FA7]/20 bg-[#002FA7]/5 overflow-hidden">
-              <div className="px-3 py-2 border-b border-white/10 flex items-center gap-2">
-                <Newspaper className="w-3.5 h-3.5 text-[#002FA7]" />
-                <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-widest">Company news</span>
-              </div>
-              <div className="p-2 space-y-1.5 max-h-[180px] overflow-y-auto np-scroll">
-                {apolloNewsSignals.slice(0, 5).map((a: ApolloNewsSignal) => (
-                  <a
-                    key={a.id}
-                    href={a.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block p-2 rounded border border-transparent hover:border-white/10 hover:bg-white/5 transition-colors group"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-[11px] font-medium text-zinc-200 group-hover:text-white line-clamp-2 flex-1">{a.title}</span>
-                      <ExternalLink className="w-3 h-3 shrink-0 text-zinc-500 group-hover:text-[#002FA7]" />
-                    </div>
-                    {a.snippet && (
-                      <p className="mt-0.5 text-[10px] text-zinc-500 line-clamp-2">{a.snippet}</p>
-                    )}
-                    {a.published_at && (
-                      <p className="mt-1 text-[9px] font-mono text-zinc-600">
-                        {new Date(a.published_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </p>
-                    )}
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Try suggestions when empty */}
           {messages.length === 0 && (
