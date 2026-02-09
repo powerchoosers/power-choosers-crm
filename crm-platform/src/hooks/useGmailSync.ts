@@ -1,10 +1,31 @@
 import { useState, useCallback } from 'react';
 import { auth } from '@/lib/firebase';
 import { supabase } from '@/lib/supabase';
-import { GoogleAuthProvider, signInWithPopup, User } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, User } from 'firebase/auth';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSyncStore } from '@/store/syncStore';
+
+const GMAIL_TOKEN_KEY = 'gmail_oauth_token';
+const GMAIL_TOKEN_LEGACY_KEY = 'pc:googleAccessToken';
+
+function getStoredToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return (
+    sessionStorage.getItem(GMAIL_TOKEN_KEY) ||
+    localStorage.getItem(GMAIL_TOKEN_KEY) ||
+    localStorage.getItem(GMAIL_TOKEN_LEGACY_KEY)
+  ) || null;
+}
+
+function setStoredToken(token: string) {
+  sessionStorage.setItem(GMAIL_TOKEN_KEY, token);
+  try {
+    localStorage.setItem(GMAIL_TOKEN_KEY, token);
+  } catch {
+    // ignore quota or private mode
+  }
+}
 
 // Gmail API Types
 interface GmailHeader {
@@ -51,24 +72,43 @@ export function useGmailSync() {
     try {
       const provider = new GoogleAuthProvider();
       provider.addScope('https://www.googleapis.com/auth/gmail.readonly');
-      
+
       if (!silent) {
-        // Force account selection only if not silent
-        provider.setCustomParameters({
-          prompt: 'select_account'
-        });
+        provider.setCustomParameters({ prompt: 'select_account' });
       }
-      
+
       const result = await signInWithPopup(auth, provider);
       const credential = GoogleAuthProvider.credentialFromResult(result);
-      const token = credential?.accessToken;
-      
+      const token = credential?.accessToken ?? null;
+
       if (token) {
-        sessionStorage.setItem('gmail_oauth_token', token);
+        setStoredToken(token);
+        return token;
       }
-      
-      return token;
-    } catch (error) {
+      return null;
+    } catch (error: unknown) {
+      const err = error as { code?: string; message?: string };
+      const isPopupBlocked =
+        err?.code === 'auth/popup-blocked' ||
+        err?.code === 'auth/popup-closed-by-user' ||
+        err?.code === 'auth/cancelled-popup-request' ||
+        (err?.message && /popup|Cross-Origin-Opener-Policy/i.test(err.message));
+
+      if (isPopupBlocked && !silent) {
+        toast.info('Opening Gmail connection in a new tab…');
+        try {
+          const provider = new GoogleAuthProvider();
+          provider.addScope('https://www.googleapis.com/auth/gmail.readonly');
+          provider.setCustomParameters({ prompt: 'select_account' });
+          await signInWithRedirect(auth, provider);
+          return null;
+        } catch (redirectErr) {
+          console.error('Redirect failed:', redirectErr);
+          toast.error('Gmail connection failed. Please allow popups or try again.');
+        }
+        return null;
+      }
+
       if (!silent) {
         console.error('Re-auth failed:', error);
         toast.error('Failed to connect to Gmail. Please try again.');
@@ -77,13 +117,27 @@ export function useGmailSync() {
     }
   }, []);
 
+  /** Call once on emails page mount to capture token after redirect from Gmail connect. */
+  const processRedirectResult = useCallback(async (): Promise<string | null> => {
+    try {
+      const result = await getRedirectResult(auth);
+      if (!result) return null;
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      const token = credential?.accessToken ?? null;
+      if (token) {
+        setStoredToken(token);
+        return token;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   // Get Access Token
   const getAccessToken = useCallback(async () => {
-    // Check session storage first
-    const cachedToken = sessionStorage.getItem('gmail_oauth_token');
-    if (cachedToken) return cachedToken;
-    
-    // Fallback: Re-auth silently first
+    const cached = getStoredToken();
+    if (cached) return cached;
     return await reauthenticateWithGmailScope(true);
   }, [reauthenticateWithGmailScope]);
 
@@ -164,7 +218,7 @@ export function useGmailSync() {
     
     // For background/silent sync, only proceed if we already have a token
     if (options.silent) {
-        const cachedToken = sessionStorage.getItem('gmail_oauth_token');
+        const cachedToken = getStoredToken();
         if (!cachedToken) {
           return; // Skip background sync if no token
         }
@@ -202,11 +256,12 @@ export function useGmailSync() {
 
       if (!listRes.ok) {
         if (listRes.status === 401) {
-             // Token expired
-             if (options.silent) {
-                 sessionStorage.removeItem('gmail_oauth_token');
-                 return; // Don't trigger popup in silent mode
+             // Token expired – clear so next manual sync can re-auth
+             if (typeof window !== 'undefined') {
+               sessionStorage.removeItem(GMAIL_TOKEN_KEY);
+               localStorage.removeItem(GMAIL_TOKEN_KEY);
              }
+             if (options.silent) return;
              // Token expired, try once more (non-silent)
              accessToken = await reauthenticateWithGmailScope(false);
              if (!accessToken) throw new Error('Re-auth failed');
@@ -351,5 +406,5 @@ export function useGmailSync() {
     }
   }, [isSyncing, getAccessToken, reauthenticateWithGmailScope, parseGmailMessage, queryClient]);
 
-  return { syncGmail, isSyncing, syncStatus };
+  return { syncGmail, isSyncing, syncStatus, processRedirectResult };
 }

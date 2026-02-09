@@ -22,6 +22,7 @@ import { useVoice } from '@/context/VoiceContext'
 import { useAuth } from '@/context/AuthContext'
 import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { CompanyIcon } from '@/components/ui/CompanyIcon'
 
 interface ActiveCallInterfaceProps {
   contact?: any
@@ -118,13 +119,14 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
       {/* 1. COMPACT LEVERAGE HUD */}
       <div className="px-6 py-4 border-b border-white/5 bg-white/5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-4 min-w-0">
-          <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center font-mono text-white shadow-[0_0_15px_rgba(0,0,0,0.5)] overflow-hidden shrink-0">
-            {metadata?.logoUrl ? (
-              <img src={metadata.logoUrl} alt={displayContact.name} className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-sm font-bold">{displayContact.name?.charAt(0) || 'N'}</span>
-            )}
-          </div>
+          <CompanyIcon
+            logoUrl={metadata?.logoUrl}
+            domain={metadata?.domain}
+            name={displayContact.company || displayContact.name || 'Caller'}
+            size={48}
+            roundedClassName="rounded-[14px]"
+            className="shrink-0"
+          />
           <div className="min-w-0">
             <div className="font-bold text-white truncate text-base leading-tight">{displayContact.name}</div>
             <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest truncate mt-0.5">

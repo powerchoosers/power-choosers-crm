@@ -412,9 +412,9 @@ export function TopBar() {
                                 <CompanyIcon
                                     logoUrl={displayMetadata?.logoUrl}
                                     domain={displayMetadata?.domain}
-                                    name={displayMetadata?.name || phoneNumber || 'Caller'}
+                                    name={displayMetadata?.account || displayMetadata?.name || phoneNumber || 'Caller'}
                                     size={32}
-                                    className="rounded-[14px]"
+                                    roundedClassName="rounded-[14px]"
                                 />
                                 <div>
                                     <div className="text-sm font-medium text-white leading-none mb-1">{displayMetadata?.name || phoneNumber || "Unknown Caller"}</div>

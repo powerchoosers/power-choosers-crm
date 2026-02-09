@@ -57,6 +57,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   const isInitializing = useRef(false)
   const reconnectAttemptsRef = useRef(0)
   const maxReconnectAttempts = 5
+  const wasOfflineRef = useRef(false)
 
   /** Request microphone permission so the browser prompts the user; release stream immediately. Returns true if granted. */
   const requestMicrophonePermission = useCallback(async (): Promise<{ granted: boolean; denied: boolean }> => {
@@ -415,6 +416,49 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [initDevice])
+
+  // Harden against network drops (e.g. WiFi blip, VPN switch): recover when browser comes back online
+  useEffect(() => {
+    const handleOffline = () => {
+      wasOfflineRef.current = true
+      console.log('[Voice] Browser offline – call may drop; will recover when back online.')
+    }
+
+    const handleOnline = () => {
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : ''
+      const isPlatform = currentPath?.startsWith('/network') || currentPath?.startsWith('/dashboard')
+      if (!isPlatform || !user) return
+
+      const hadBeenOffline = wasOfflineRef.current
+      wasOfflineRef.current = false
+
+      // Clear phantom call state (actual call already dropped when network was lost)
+      setCurrentCall(null)
+      setActive(false)
+      setStatus('ended')
+      setMetadata(null)
+      setIsReady(false)
+      reconnectAttemptsRef.current = 0
+
+      console.log('[Voice] Browser back online – re-initializing device...')
+      initDevice()
+
+      if (hadBeenOffline) {
+        toast.info('Connection restored', {
+          description: 'You can place new calls.',
+          duration: 5000,
+        })
+      }
+    }
+
+    if (typeof window === 'undefined') return
+    window.addEventListener('offline', handleOffline)
+    window.addEventListener('online', handleOnline)
+    return () => {
+      window.removeEventListener('offline', handleOffline)
+      window.removeEventListener('online', handleOnline)
+    }
+  }, [initDevice, setActive, setStatus, user])
 
   const connect = useCallback(async (params: { To: string; From?: string; metadata?: VoiceMetadata }) => {
     if (!device || !isReady) {

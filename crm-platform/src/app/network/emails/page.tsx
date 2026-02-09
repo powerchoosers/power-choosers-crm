@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEmails, useEmailsCount, Email } from '@/hooks/useEmails'
 import { useGmailSync } from '@/hooks/useGmailSync'
@@ -17,13 +17,16 @@ import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { useTableState } from '@/hooks/useTableState'
 
+const AUTO_SYNC_DELAY_MS = 5 * 1000 // 5 seconds after load
+
 export default function EmailsPage() {
   const { user } = useAuth()
   const { pageIndex, setPage, searchQuery, setSearch } = useTableState({ pageSize: 15 })
-  
+
   const [searchTerm, setSearchTerm] = useState(searchQuery)
   const [debouncedSearch, setDebouncedSearch] = useState(searchQuery)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const hasRunAutoSync = useRef(false)
 
   // Debounce search query
   useEffect(() => {
@@ -36,8 +39,31 @@ export default function EmailsPage() {
 
   const { data, isLoading: isLoadingEmails, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useEmails(debouncedSearch)
   const { data: totalEmails } = useEmailsCount(debouncedSearch)
-  const { syncGmail, isSyncing, syncStatus } = useGmailSync()
+  const { syncGmail, isSyncing, syncStatus, processRedirectResult } = useGmailSync()
   const router = useRouter()
+
+  // On load: capture Gmail token if we just returned from redirect, then run sync once after 5s
+  useEffect(() => {
+    if (!user) return
+
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | null = null
+
+    const run = async () => {
+      await processRedirectResult()
+      if (cancelled || hasRunAutoSync.current) return
+      hasRunAutoSync.current = true
+      timer = setTimeout(() => {
+        if (!cancelled && user) syncGmail(user, { silent: true })
+      }, AUTO_SYNC_DELAY_MS)
+    }
+
+    run()
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+    }
+  }, [user?.uid])
   
   const [isComposeOpen, setIsComposeOpen] = useState(false)
 
