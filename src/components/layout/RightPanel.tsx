@@ -322,6 +322,10 @@ export function RightPanel() {
                     currentPhone={contact?.phone || account?.companyPhone}
                     city={city}
                     state={state}
+                    // Contacts always use account location (business location, not personal address)
+                    latitude={account?.latitude ?? null}
+                    longitude={account?.longitude ?? null}
+                    accountId={account?.id || contact?.accountId}
                     onSyncComplete={() => {
                       if (isContactPage) refetchContact()
                       else refetchAccount()
