@@ -17,7 +17,7 @@ const LOG_ENTRIES = [
 
 export function ForensicLogStream() {
   return (
-    <div className="bg-zinc-950/80 backdrop-blur-xl border border-white/5 rounded-2xl overflow-hidden">
+    <div className="nodal-void-card overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
         <div className="flex items-center gap-2">
           <Terminal className="w-4 h-4 text-emerald-500" />

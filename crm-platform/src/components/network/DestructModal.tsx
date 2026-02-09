@@ -76,7 +76,7 @@ export default function DestructModal({ isOpen, onClose, onConfirm, count }: Des
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
-            className="w-full max-w-md bg-zinc-950 border border-red-500/20 rounded-2xl shadow-2xl overflow-hidden"
+            className="w-full max-w-md bg-zinc-950 nodal-monolith-edge border border-red-500/20 rounded-2xl shadow-2xl overflow-hidden"
           >
           {/* Header */}
           <div className="p-6 border-b border-white/5 flex items-center justify-between">

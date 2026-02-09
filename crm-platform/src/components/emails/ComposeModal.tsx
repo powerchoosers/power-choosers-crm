@@ -468,12 +468,12 @@ CRITICAL: You are writing draft content only. The app handles To/Sender/recipien
       exit={{ y: "100%", opacity: 0 }}
       transition={{ type: "spring", damping: 25, stiffness: 300 }}
       className={cn(
-        "fixed bottom-0 right-4 sm:right-10 z-[100] w-full sm:w-[500px] bg-zinc-950 border border-white/10 rounded-t-xl shadow-2xl flex flex-col overflow-hidden",
+        "fixed bottom-0 right-4 sm:right-10 z-[100] w-full sm:w-[500px] bg-zinc-950 nodal-monolith-edge rounded-t-xl shadow-2xl flex flex-col overflow-hidden",
         isMinimized ? "h-[60px]" : "h-[500px]"
       )}
     >
       <div
-        className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-zinc-900/95 backdrop-blur-sm cursor-pointer hover:bg-zinc-900 transition-colors"
+        className="flex items-center justify-between px-6 py-4 border-b border-white/5 nodal-recessed cursor-pointer hover:bg-black/30 transition-colors"
         onClick={() => isMinimized && setIsMinimized(false)}
       >
         <h3 className="text-lg font-semibold text-white">New Message</h3>
@@ -626,7 +626,7 @@ CRITICAL: You are writing draft content only. The app handles To/Sender/recipien
                     <SelectTrigger className="h-8 w-auto min-w-[120px] bg-white/5 border-white/10 text-[10px] font-sans text-zinc-400 tracking-wider rounded-lg">
                       <SelectValue placeholder="Type" />
                     </SelectTrigger>
-                    <SelectContent className="bg-zinc-950 border-white/10 z-[200]">
+                    <SelectContent className="bg-zinc-950 nodal-monolith-edge z-[200]">
                       {EMAIL_TYPES.map((t) => (
                         <SelectItem key={t.id} value={t.id} className="text-[10px] font-sans focus:bg-[#002FA7]/20">
                           {t.label}
@@ -639,7 +639,7 @@ CRITICAL: You are writing draft content only. The app handles To/Sender/recipien
                       <Cpu className="w-3.5 h-3.5 text-[#002FA7]" />
                       <SelectValue placeholder="Model" />
                     </SelectTrigger>
-                    <SelectContent className="bg-zinc-950 border-white/10 z-[200]">
+                    <SelectContent className="bg-zinc-950 nodal-monolith-edge z-[200]">
                       {EMAIL_AI_MODELS.map((m) => (
                         <SelectItem key={m.value} value={m.value} className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                           {m.label}
@@ -705,7 +705,7 @@ CRITICAL: You are writing draft content only. The app handles To/Sender/recipien
           )}
         </AnimatePresence>
 
-        <div className="flex-none px-6 py-4 border-t border-white/5 bg-zinc-900/50 flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex-none px-6 py-4 border-t border-white/5 nodal-recessed flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <button className="icon-button-forensic h-8 w-8 flex items-center justify-center">
               <Paperclip className="w-4 h-4" />

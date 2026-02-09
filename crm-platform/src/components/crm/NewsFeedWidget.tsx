@@ -79,7 +79,7 @@ export default function NewsFeedWidget() {
             href={item.url ?? '#'}
             target="_blank"
             rel="noopener noreferrer"
-            className="group block p-3 rounded-xl bg-zinc-900/40 border border-white/5 hover:border-white/10 transition-all cursor-pointer"
+            className="group block p-3 rounded-xl nodal-module-glass nodal-monolith-edge hover:border-white/10 transition-all cursor-pointer"
           >
             <div className="flex items-start justify-between gap-2 mb-1">
               <h4 className="text-[11px] font-medium text-zinc-300 group-hover:text-white leading-tight">

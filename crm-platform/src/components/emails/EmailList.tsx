@@ -169,7 +169,7 @@ export function EmailList({
   return (
     <div className="flex flex-col h-full bg-zinc-950/30">
       {/* Filters Header - Segmented Control */}
-      <div className="flex-none p-4 border-b border-white/5 flex items-center justify-between bg-zinc-900/50 backdrop-blur-sm z-10">
+      <div className="flex-none p-4 border-b border-white/5 nodal-recessed flex items-center justify-between z-10">
         <div className="bg-black/40 border border-white/5 rounded-lg px-2 py-1.5 flex items-center gap-2 relative">
           <div className="relative inline-flex">
             {filter === 'all' && (
@@ -238,7 +238,7 @@ export function EmailList({
       </div>
 
       {/* Column Headers */}
-      <div className="flex-none px-4 py-3 border-b border-white/5 bg-zinc-900/80 backdrop-blur-sm sticky top-0 z-20 grid grid-cols-12 gap-4 text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
+      <div className="flex-none px-4 py-3 border-b border-white/5 nodal-recessed sticky top-0 z-20 grid grid-cols-12 gap-4 text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
         <div className="col-span-1 flex items-center justify-center">
           {onSelectionChange ? (
             <button
@@ -400,7 +400,7 @@ export function EmailList({
       </div>
 
       {/* Pagination Footer */}
-      <div className="flex-none border-t border-white/5 bg-zinc-900/90 p-4 flex items-center justify-between backdrop-blur-sm z-10">
+      <div className="flex-none border-t border-white/5 nodal-recessed p-4 flex items-center justify-between z-10">
         <div className="flex items-center gap-4">
             <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
               <span>Sync_Block {showingStart}–{showingEnd}</span>

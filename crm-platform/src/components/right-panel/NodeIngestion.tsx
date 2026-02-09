@@ -385,7 +385,7 @@ export function NodeIngestion() {
 
       toast.success(`${type} Node Initialized`, {
         description: `${entityName || firstName + ' ' + lastName} has been committed to the database.`,
-        className: "bg-zinc-900 border-white/10 text-white font-mono",
+        className: "bg-zinc-950 nodal-monolith-edge text-white font-mono",
       });
       
       // Invalidate queries to refresh the lists immediately
@@ -405,7 +405,7 @@ export function NodeIngestion() {
       console.error('Commit error:', error);
       toast.error('Commit Failed', {
         description: error.message || 'An unknown error occurred.',
-        className: "bg-zinc-900 border-red-500/50 text-white font-mono",
+        className: "bg-zinc-950 nodal-monolith-edge border-red-500/50 text-white font-mono",
       });
     } finally {
       setIsCommitting(false);
@@ -437,9 +437,9 @@ export function NodeIngestion() {
     <div className="h-full flex flex-col bg-zinc-950 text-white relative overflow-hidden">
       
       {/* HEADER - Forensic Style */}
-      <div className="h-14 border-b border-white/10 flex items-center justify-between px-6 bg-white/5">
+      <div className="h-14 border-b border-white/5 flex items-center justify-between px-6 nodal-recessed">
         <div className="flex items-center gap-2">
-          {type === 'ACCOUNT' ? <Building2 className="w-4 h-4 text-[#002FA7]" /> : <User className="w-4 h-4 text-[#002FA7]" />}
+          {type === 'ACCOUNT' ? <Building2 className="w-4 h-4 text-white" /> : <User className="w-4 h-4 text-white" />}
           <span className="font-mono text-[10px] tracking-widest text-zinc-300 uppercase">
             INITIALIZE_{type}_NODE
           </span>
@@ -466,7 +466,7 @@ export function NodeIngestion() {
                   <div className="space-y-2">
                     {/* Context Lock: contact hard-linked to this account */}
                     <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#002FA7]/10 border border-[#002FA7]/30">
-                      <Lock className="w-4 h-4 text-[#002FA7] shrink-0" />
+                      <Lock className="w-4 h-4 text-white shrink-0" />
                       <span className="text-[10px] font-mono text-zinc-300 uppercase tracking-widest truncate">
                         {ingestionContext?.accountName ?? 'Account'}
                       </span>
@@ -563,7 +563,7 @@ export function NodeIngestion() {
                       onChange={(e) => setIdentifier(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleScan()}
                       placeholder={type === 'ACCOUNT' ? "company.com" : "linkedin.com/in/..."}
-                      className="w-full bg-zinc-900/50 border border-white/10 rounded-lg p-4 text-sm font-mono text-white placeholder:text-zinc-700 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7]/50 outline-none transition-all"
+                      className="w-full bg-black/40 nodal-monolith-edge rounded-lg p-4 text-sm font-mono text-white placeholder:text-zinc-700 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7]/50 outline-none transition-all"
                       autoFocus
                     />
                     <div className="absolute right-4 top-4">
@@ -609,9 +609,9 @@ export function NodeIngestion() {
                 </div>
               ) : (
                 <div className="bg-[#002FA7]/10 border border-[#002FA7]/30 p-3 rounded flex items-start gap-3">
-                  <Sparkles className="w-4 h-4 text-[#002FA7] mt-0.5" />
+                  <Sparkles className="w-4 h-4 text-white mt-0.5" />
                   <div>
-                    <div className="text-[10px] font-mono text-[#002FA7] font-bold uppercase tracking-widest">
+                    <div className="text-[10px] font-mono text-white font-bold uppercase tracking-widest">
                       INTELLIGENCE_ACQUIRED
                     </div>
                     <div className="text-xs text-zinc-400 mt-1">
@@ -763,18 +763,18 @@ export function NodeIngestion() {
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-[10px] font-mono text-zinc-500 uppercase">Grid Coordinates</label>
                       {!isManual && (
-                        <button className="text-[9px] font-mono text-[#002FA7] hover:text-white transition-colors">
+                        <button className="text-[9px] font-mono text-white hover:text-zinc-300 transition-colors">
                           [ SYNC_HQ_ADDRESS ]
                         </button>
                       )}
                     </div>
                     <div className="relative group">
-                      <MapPin className="absolute left-3 top-2.5 w-4 h-4 text-zinc-600 group-focus-within:text-[#002FA7] transition-colors" />
+                      <MapPin className="absolute left-3 top-2.5 w-4 h-4 text-zinc-600 group-focus-within:text-white transition-colors" />
                       <input 
                         value={address}
                         onChange={(e) => setAddress(e.target.value)}
                         placeholder="Service Address (Meter Location)"
-                        className="w-full bg-zinc-900 border border-white/10 rounded p-2 pl-10 text-xs font-mono text-white focus:border-[#002FA7] outline-none"
+                        className="w-full bg-black/40 nodal-monolith-edge rounded p-2 pl-10 text-xs font-mono text-white focus:border-[#002FA7] outline-none"
                       />
                     </div>
                   </div>
@@ -818,7 +818,7 @@ export function NodeIngestion() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-zinc-900 border border-white/20 rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto custom-scrollbar"
+              className="bg-zinc-950 nodal-monolith-edge rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto custom-scrollbar"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="space-y-4">
@@ -843,7 +843,7 @@ export function NodeIngestion() {
                     <button
                       key={match.id || index}
                       onClick={() => handleSelectMatch(match)}
-                      className="w-full p-4 rounded-xl border border-white/10 bg-zinc-800/50 hover:bg-zinc-800 hover:border-[#002FA7]/50 transition-all text-left group"
+                      className="w-full p-4 rounded-xl nodal-monolith-edge bg-black/40 hover:bg-black/60 hover:border-[#002FA7]/50 transition-all text-left group"
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
@@ -866,7 +866,7 @@ export function NodeIngestion() {
                             </p>
                           )}
                         </div>
-                        <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-[#002FA7] shrink-0 transition-colors" />
+                        <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-white shrink-0 transition-colors" />
                       </div>
                     </button>
                   ))}

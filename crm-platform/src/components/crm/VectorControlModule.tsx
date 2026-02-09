@@ -173,7 +173,7 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
             placeholder="> SEARCH_OR_CREATE..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="bg-zinc-900/50 border-white/10 text-white placeholder:text-zinc-600 font-mono text-xs"
+            className="bg-black/40 nodal-monolith-edge text-white placeholder:text-zinc-600 font-mono text-xs"
             autoFocus
           />
         </div>

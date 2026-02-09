@@ -1,56 +1,80 @@
 'use client';
 
 import { Gauge, Layers, Zap, Activity } from 'lucide-react';
-
-// Placeholder — wire to useDashboardMetrics later
-const METRICS = [
-  {
-    key: 'liability',
-    label: 'LIABILITY_UNDER_MGMT',
-    value: '45.2 GWh',
-    sub: 'Annual volume protected',
-    icon: Layers,
-    pulse: false,
-  },
-  {
-    key: 'positions',
-    label: 'OPEN_POSITIONS',
-    value: '7',
-    sub: 'Contracts expiring in 90d',
-    icon: Gauge,
-    pulse: true, // Amber/rose when > 0
-  },
-  {
-    key: 'velocity',
-    label: 'OPERATIONAL_VELOCITY',
-    value: '24',
-    sub: 'Calls + emails (24h)',
-    icon: Activity,
-    pulse: false,
-  },
-  {
-    key: 'volatility',
-    label: 'GRID_VOLATILITY_INDEX',
-    value: '42',
-    sub: '0–100 market stress',
-    icon: Zap,
-    pulse: false,
-    gauge: true, // < 30 green, > 70 red
-  },
-];
+import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 
 export function KPIGrid() {
+  const { data: metrics, isLoading } = useDashboardMetrics();
+
+  // Format values with loading fallbacks
+  const liabilityValue = isLoading 
+    ? '—' 
+    : metrics?.liabilityKWh != null 
+      ? `${metrics.liabilityKWh.toLocaleString('en-US')} kWh`
+      : '0 kWh';
+  
+  const positionsValue = isLoading 
+    ? '—' 
+    : metrics?.openPositions?.toString() ?? '0';
+  
+  const velocityValue = isLoading 
+    ? '—' 
+    : metrics?.operationalVelocity?.toString() ?? '0';
+  
+  const volatilityValue = isLoading 
+    ? '—' 
+    : metrics?.gridVolatilityIndex?.toString() ?? '0';
+
+  const volatilityNum = metrics?.gridVolatilityIndex ?? 0;
+  const gaugeLow = volatilityNum < 30;
+  const gaugeHigh = volatilityNum > 70;
+
+  const METRICS = [
+    {
+      key: 'liability',
+      label: 'LIABILITY_UNDER_MGMT',
+      value: liabilityValue,
+      sub: 'Annual volume protected',
+      icon: Layers,
+      pulse: false,
+    },
+    {
+      key: 'positions',
+      label: 'OPEN_POSITIONS',
+      value: positionsValue,
+      sub: 'Contracts expiring in 90d',
+      icon: Gauge,
+      pulse: true, // Amber/rose when > 0
+    },
+    {
+      key: 'velocity',
+      label: 'OPERATIONAL_VELOCITY',
+      value: velocityValue,
+      sub: 'Calls + emails (24h)',
+      icon: Activity,
+      pulse: false,
+    },
+    {
+      key: 'volatility',
+      label: 'GRID_VOLATILITY_INDEX',
+      value: volatilityValue,
+      sub: '0–100 market stress',
+      icon: Zap,
+      pulse: false,
+      gauge: true, // < 30 green, > 70 red
+    },
+  ];
+
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       {METRICS.map((m) => {
-        const num = m.gauge ? parseInt(m.value, 10) : 0;
-        const gaugeLow = m.gauge && num < 30;
-        const gaugeHigh = m.gauge && num > 70;
+        const num = m.gauge ? (typeof volatilityNum === 'number' ? volatilityNum : parseInt(m.value, 10) || 0) : 0;
+        const positionsNum = m.key === 'positions' ? parseInt(m.value, 10) || 0 : 0;
         const Icon = m.icon;
         return (
           <div
             key={m.key}
-            className="bg-zinc-950/50 backdrop-blur-xl border border-white/5 rounded-2xl p-5 hover:border-white/10 transition-colors relative overflow-hidden group"
+            className="nodal-void-card p-5 hover:border-white/10 transition-colors relative overflow-hidden group"
           >
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
             <div className="flex items-start justify-between">
@@ -65,13 +89,15 @@ export function KPIGrid() {
               <div className="flex flex-col gap-0.5">
                 <span
                   className={`text-2xl font-mono font-semibold tabular-nums tracking-tight ${
-                    m.pulse && parseInt(m.value, 10) > 0
-                      ? 'text-amber-400'
-                      : gaugeHigh
-                        ? 'text-rose-400'
-                        : gaugeLow
-                          ? 'text-emerald-400'
-                          : 'text-white'
+                    isLoading
+                      ? 'text-zinc-500'
+                      : m.pulse && positionsNum > 0
+                        ? 'text-amber-400'
+                        : m.gauge && gaugeHigh
+                          ? 'text-rose-400'
+                          : m.gauge && gaugeLow
+                            ? 'text-emerald-400'
+                            : 'text-white'
                   }`}
                 >
                   {m.value}
@@ -80,10 +106,10 @@ export function KPIGrid() {
                   {m.sub}
                 </span>
               </div>
-              {m.pulse && parseInt(m.value, 10) > 0 && (
+              {m.pulse && positionsNum > 0 && !isLoading && (
                 <span className="flex h-2 w-2 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
               )}
-              {m.gauge && (
+              {m.gauge && !isLoading && (
                 <div className="w-12 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all ${

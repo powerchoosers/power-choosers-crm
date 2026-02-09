@@ -1,0 +1,18 @@
+{
+  "source": "ERCOT Official API",
+  "timestamp": "2026-02-06 01:00",
+  "metrics": {
+    "actual_load": 46415.88,
+    "forecast_load": 48736.674,
+    "total_capacity": 53378.261999999995,
+    "reserves": 6962,
+    "scarcity_prob": 0,
+    "wind_gen": 6962.382,
+    "pv_gen": 3713.2704,
+    "frequency": 60
+  },
+  "metadata": {
+    "last_updated": "2026-02-07T15:19:40.642Z",
+    "report_id": "NP6-345-CD"
+  }
+}

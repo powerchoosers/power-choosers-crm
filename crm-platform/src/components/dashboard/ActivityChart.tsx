@@ -24,7 +24,7 @@ const DATA = [
 
 export function ActivityChart() {
   return (
-    <div className="bg-zinc-950/50 backdrop-blur-xl border border-white/5 rounded-2xl p-6 h-full min-h-[380px] relative overflow-hidden">
+    <div className="nodal-void-card p-6 h-full min-h-[380px] relative overflow-hidden">
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
       <div className="mb-4 flex items-center justify-between">
         <div>

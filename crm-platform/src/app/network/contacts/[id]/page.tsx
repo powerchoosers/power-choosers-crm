@@ -458,11 +458,10 @@ export default function ContactDossierPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex-1 rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl overflow-hidden flex flex-col relative">
-        <div className="absolute inset-0 border border-white/5 rounded-2xl pointer-events-none bg-gradient-to-b from-white/5 to-transparent" />
+      <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
         <div className="absolute top-0 right-0 w-64 h-64 bg-[#002FA7]/10 blur-[120px] rounded-full pointer-events-none" />
 
-        <header className="flex-none px-6 py-6 md:px-8 border-b border-white/5 bg-zinc-900/80 backdrop-blur-sm relative z-10">
+        <header className="flex-none px-6 py-6 md:px-8 border-b border-white/5 nodal-recessed relative z-10">
           <div className="flex items-center justify-between gap-6">
             <div className="flex items-center gap-3">
               <button
@@ -510,7 +509,7 @@ export default function ContactDossierPage() {
                       exit={{ width: 0, opacity: 0, x: -10 }}
                       className="absolute left-full ml-3 top-1/2 -translate-y-1/2 flex items-center z-50"
                     >
-                      <div className="bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-lg p-2 shadow-2xl flex items-center gap-2 min-w-[320px]">
+                      <div className="bg-zinc-950/90 backdrop-blur-xl nodal-monolith-edge rounded-lg p-2 shadow-2xl flex items-center gap-2 min-w-[320px]">
                         <div className="p-1.5 bg-white/5 rounded border border-white/10 text-zinc-500">
                           <Activity className="w-3.5 h-3.5" />
                         </div>
@@ -661,7 +660,7 @@ export default function ContactDossierPage() {
 
                           {/* Last Sync */}
                           {contact.lastContact && (
-                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-zinc-900/30 border border-white/5">
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full nodal-module-glass border border-white/5">
                               <Clock className="w-2.5 h-2.5 text-zinc-600" />
                               <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
                                 Last_Sync: {(() => {
@@ -716,7 +715,7 @@ export default function ContactDossierPage() {
                             placeholder="COMPANY"
                           />
                         </div>
-                        <span className="w-1 h-1 rounded-full bg-zinc-800 shrink-0" />
+                        <span className="w-1 h-1 rounded-full bg-black/40 shrink-0" />
                         <div className="flex items-center gap-1.5 flex-1 min-w-0">
                           <MapPin className="w-3.5 h-3.5 text-white shrink-0" />
                           <input
@@ -947,11 +946,10 @@ export default function ContactDossierPage() {
 
                 {/* Contract & Supplier Intelligence */}
                 <div className={cn(
-                  "rounded-2xl border transition-all duration-500 bg-zinc-900/30 backdrop-blur-xl p-6 relative overflow-hidden shadow-lg space-y-6",
+                  "nodal-void-card transition-all duration-500 p-6 relative overflow-hidden shadow-lg space-y-6",
                   isEditing ? 'border-[#002FA7]/30' : 'border-white/10',
                   isRecalibrating && 'grayscale backdrop-blur-2xl'
                 )}>
-                  <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
                   
                   {/* Contract Maturity Field (Moved from Header in Plan) */}
                   <div>
@@ -968,7 +966,7 @@ export default function ContactDossierPage() {
                       </div>
                     </div>
                     
-                    <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden relative">
+                    <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden relative">
                       <div
                         className={`h-full ${maturityColor} transition-all duration-1000 ease-out relative`}
                         style={{ width: `${Math.round(maturityPct * 100)}%` }}
@@ -1074,14 +1072,13 @@ export default function ContactDossierPage() {
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-700 delay-100">
                 {/* FORENSIC NOTES TERMINAL */}
                 <div 
-                  className={`rounded-2xl border transition-all duration-500 bg-zinc-950/80 backdrop-blur-xl p-6 min-h-[500px] relative overflow-hidden shadow-2xl group flex flex-col font-mono ${isEditing ? 'border-[#002FA7]/50 ring-1 ring-[#002FA7]/20 cursor-text' : 'border-white/10'}`}
+                  className={`nodal-void-card transition-all duration-500 p-6 min-h-[500px] relative overflow-hidden shadow-2xl group flex flex-col font-mono ${isEditing ? 'border-[#002FA7]/50 ring-1 ring-[#002FA7]/20 cursor-text' : ''}`}
                   onClick={() => {
                     if (!isEditing) handleTerminalClick()
                   }}
                 >
                   {/* CRT Effect Overlay */}
                   <div className="absolute inset-0 pointer-events-none opacity-[0.03] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%] z-50" />
-                  <div className="absolute inset-0 bg-gradient-to-b from-[#002FA7]/5 to-transparent pointer-events-none" />
                   
                   <div className="flex items-center justify-between mb-6 border-b border-white/10 pb-4 relative z-10">
                     <div className="flex items-center gap-2">
@@ -1118,11 +1115,17 @@ export default function ContactDossierPage() {
                           const timestamp = timestampMatch ? timestampMatch[1] : null
                           const content = timestamp ? entry.replace(/^\[.*?\]/, '').trim() : entry
 
+                          // Calculate approximate height based on content length and line breaks
+                          const lineCount = content.split('\n').length
+                          const charCount = content.length
+                          const estimatedLines = Math.max(lineCount, Math.ceil(charCount / 80)) // ~80 chars per line
+                          const lineHeight = Math.max(2, estimatedLines * 1.5) // 1.5rem per line
+
                           return (
                             <div key={idx} className="group/entry flex gap-4 animate-in fade-in slide-in-from-left-2 duration-300" style={{ animationDelay: `${idx * 50}ms` }}>
-                              <div className="flex flex-col items-center gap-1 mt-1">
+                              <div className="flex flex-col items-center mt-1">
                                 <div className="w-1 h-1 rounded-full bg-[#002FA7]/40" />
-                                <div className="w-[1px] flex-1 bg-gradient-to-b from-[#002FA7]/20 to-transparent" />
+                                <div className="w-px bg-[#002FA7]/20" style={{ height: `${lineHeight}rem` }} />
                               </div>
                               <div className="flex-1">
                                 {timestamp && (
@@ -1204,7 +1207,7 @@ export default function ContactDossierPage() {
                 </div>
 
                 {/* Transmission Log — same functionality as account dossier Engagement Log */}
-                <div className="rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl p-6 shadow-xl">
+                <div className="nodal-void-card p-6 shadow-xl">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-[10px] font-mono text-zinc-400 uppercase tracking-[0.2em] flex items-center gap-2">
                       <Mic className="w-3.5 h-3.5" /> Transmission Log
@@ -1259,7 +1262,7 @@ export default function ContactDossierPage() {
                         </AnimatePresence>
                       </div>
                     ) : (
-                      <div className="p-8 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] flex flex-col items-center justify-center gap-3">
+                      <div className="p-8 rounded-2xl border border-dashed border-white/5 bg-black/20 flex flex-col items-center justify-center gap-3">
                         <History className="w-12 h-12 text-zinc-600 opacity-20" />
                         <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-[0.3em]">No signals detected</p>
                       </div>

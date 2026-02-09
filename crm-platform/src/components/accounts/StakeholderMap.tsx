@@ -25,7 +25,7 @@ export const StakeholderMap: React.FC<StakeholderMapProps> = ({ contacts = [], c
   if (!contacts || contacts.length === 0) return null
 
   return (
-    <div className={cn("bg-zinc-900/50 border border-white/5 rounded-2xl p-4 backdrop-blur-sm", className)}>
+    <div className={cn("nodal-module-glass nodal-monolith-edge rounded-2xl p-4", className)}>
       <h3 className="text-xs font-mono text-zinc-500 mb-4 uppercase tracking-[0.2em] flex items-center gap-2">
         <User className="w-3 h-3" /> Command Chain
       </h3>

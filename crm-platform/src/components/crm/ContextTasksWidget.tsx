@@ -34,7 +34,7 @@ export default function ContextTasksWidget({ entityId, entityName }: ContextTask
         pendingTasks.map((task) => (
           <div 
             key={task.id}
-            className="group flex items-start gap-3 p-3 rounded-xl bg-zinc-900/40 border border-white/5 hover:bg-white/5 transition-all"
+            className="group flex items-start gap-3 p-3 rounded-xl nodal-module-glass nodal-monolith-edge hover:bg-white/5 transition-all"
           >
             <Circle size={14} className="mt-0.5 text-zinc-600 group-hover:text-zinc-400" />
             <div className="flex-1 min-w-0">

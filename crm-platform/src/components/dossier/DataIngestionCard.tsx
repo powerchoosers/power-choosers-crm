@@ -270,8 +270,8 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
 
   if (!accountId) {
     return (
-      <div className="rounded-2xl border border-white/5 bg-zinc-900/40 backdrop-blur-xl overflow-hidden flex flex-col opacity-50 cursor-not-allowed">
-        <div className="flex justify-between items-center p-4 border-b border-white/5 bg-white/[0.02]">
+      <div className="nodal-void-card border border-white/5 overflow-hidden flex flex-col opacity-50 cursor-not-allowed">
+        <div className="flex justify-between items-center p-4 border-b border-white/5 nodal-recessed">
           <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
             Data_Locker <span className="text-zinc-700">[OFFLINE]</span>
           </h3>
@@ -294,7 +294,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
         relative overflow-hidden rounded-2xl transition-all duration-300
         ${isDragging 
           ? 'bg-[#002FA7]/10 border-[#002FA7] shadow-[0_0_30px_-10px_rgba(0,47,167,0.5)]' 
-          : 'bg-zinc-900/40 border-white/5 backdrop-blur-xl'}
+          : 'nodal-module-glass border-white/5'}
         border flex flex-col
         ${isRecalibrating ? 'grayscale' : ''}
       `}
@@ -325,7 +325,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
       )}
     
       {/* HEADER - NOW INSIDE CONTAINER */}
-      <div className="flex justify-between items-center p-4 border-b border-white/5 bg-white/[0.02]">
+      <div className="flex justify-between items-center p-4 border-b border-white/5 nodal-recessed">
         <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
           {uploading ? (
             <span className="text-[#002FA7] animate-pulse">● INGESTING...</span>
@@ -413,7 +413,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
 
         {/* UPLOADING STATE (Terminal Effect) */}
         {uploading && (
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-800">
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/40">
             <div className="h-full bg-[#002FA7] animate-progress w-full origin-left" />
           </div>
         )}

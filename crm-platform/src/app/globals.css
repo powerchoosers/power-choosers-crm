@@ -56,6 +56,26 @@
     @apply hover:border-white/10 hover:bg-zinc-900/60 transition-all duration-300;
   }
 
+  /* Void Standard: High-Blur Obsidian card (replaces grey gradients) - thinner borders like Target Signals */
+  .nodal-void-card {
+    @apply rounded-2xl border-t border-white/5 border-b border-black/50 border-l border-white/5 border-r border-white/5 bg-zinc-950/80 backdrop-blur-xl;
+  }
+
+  /* Monolith border only (lighting edge: top light, bottom shadow) - thinner borders */
+  .nodal-monolith-edge {
+    @apply border-t border-white/5 border-b border-black/50 border-l border-white/5 border-r border-white/5;
+  }
+
+  /* Level 2 recessed (passive data / headers / footers) */
+  .nodal-recessed {
+    @apply bg-black/20 backdrop-blur-md;
+  }
+
+  /* Level 3 active module glass - darker Void for Right Panel (matches Target Signals) */
+  .nodal-module-glass {
+    @apply bg-black/20 backdrop-blur-sm border-l border-white/5 border-r border-white/5;
+  }
+
   /* Forensic Icon Button - No container, zoom on hover, brighten */
   .icon-button-forensic {
     @apply flex items-center justify-center outline-none cursor-pointer p-0;

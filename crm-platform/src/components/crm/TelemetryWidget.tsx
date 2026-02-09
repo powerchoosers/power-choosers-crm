@@ -50,14 +50,14 @@ export default function TelemetryWidget({ location = 'LZ_NORTH', weather, weathe
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
-        <div className="p-3 rounded-2xl bg-zinc-900/40 border border-white/5 backdrop-blur-xl space-y-2">
+        <div className="p-3 rounded-2xl nodal-module-glass nodal-monolith-edge space-y-2">
           <div className="flex items-center gap-2 text-zinc-500">
             <Clock size={12} />
             <span className="text-[10px] font-mono uppercase">Local Time</span>
           </div>
           <div className="text-sm font-mono font-medium text-zinc-200 tabular-nums">{time}</div>
         </div>
-        <div className="p-3 rounded-2xl bg-zinc-900/40 border border-white/5 backdrop-blur-xl space-y-2">
+        <div className="p-3 rounded-2xl nodal-module-glass nodal-monolith-edge space-y-2">
           <div className="flex items-center gap-2 text-zinc-500">
             <Sun size={12} />
             <span className="text-[10px] font-mono uppercase">Weather</span>
@@ -77,8 +77,7 @@ export default function TelemetryWidget({ location = 'LZ_NORTH', weather, weathe
         </div>
       </div>
 
-      <div className="p-4 rounded-2xl bg-zinc-900/40 border border-white/5 backdrop-blur-xl space-y-4 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
+      <div className="p-4 rounded-2xl nodal-module-glass nodal-monolith-edge space-y-4 relative overflow-hidden">
         <div className="flex items-center justify-between relative z-10">
           <div className="flex items-center gap-2 text-zinc-400">
             <Activity size={14} className={metrics.loading ? "text-zinc-600" : "text-[#002FA7] animate-pulse"} />
@@ -86,7 +85,7 @@ export default function TelemetryWidget({ location = 'LZ_NORTH', weather, weathe
           </div>
           <span className="text-xs font-mono text-[#002FA7] tabular-nums">{volatilityIndex}%</span>
         </div>
-        <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden relative z-10">
+        <div className="h-1.5 w-full bg-black/40 rounded-full overflow-hidden relative z-10">
           <div 
             className="h-full bg-[#002FA7] shadow-[0_0_15px_rgba(0,47,167,0.8)] transition-all duration-1000 ease-out" 
             style={{ width: `${volatilityIndex}%` }}
