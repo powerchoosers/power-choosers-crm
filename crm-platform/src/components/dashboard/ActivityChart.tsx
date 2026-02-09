@@ -80,7 +80,7 @@ export function ActivityChart() {
               borderRadius: '12px',
               fontSize: '10px',
             }}
-            formatter={(value: number | undefined, name: string) => [
+            formatter={(value: number | undefined, name: string | undefined) => [
               name === 'volume'
                 ? (value ?? 0)
                 : `$${value ?? 0}`,
