@@ -308,11 +308,12 @@ export default function ContactDossierPage() {
       const transcript = (lastCall as { transcript?: string }).transcript
       if (transcript?.trim()) parts.push(`Last call transcript (excerpt): ${transcript.trim().slice(0, 600)}${transcript.length > 600 ? '…' : ''}`)
     }
+    const titleStr = typeof contact.title === 'string' ? contact.title : typeof contact.jobTitle === 'string' ? contact.jobTitle : undefined
     return {
-      contactName: contact.name ?? undefined,
-      contactTitle: contact.title ?? contact.jobTitle ?? undefined,
-      companyName: (contact.companyName || contact.company) ?? undefined,
-      accountName: (contact as { accountName?: string }).accountName ?? undefined,
+      contactName: typeof contact.name === 'string' ? contact.name : undefined,
+      contactTitle: titleStr,
+      companyName: typeof contact.companyName === 'string' ? contact.companyName : typeof contact.company === 'string' ? contact.company : undefined,
+      accountName: typeof (contact as { accountName?: string }).accountName === 'string' ? (contact as { accountName?: string }).accountName : undefined,
       contextForAi: parts.length ? parts.join('\n\n') : undefined,
     }
   }, [contact, forensicNotes, recentCalls])
