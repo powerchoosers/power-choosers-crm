@@ -15,6 +15,9 @@ interface SatelliteUplinkProps {
   currentPhone?: string;
   city?: string;
   state?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  accountId?: string; // For contacts, the account ID to save coordinates to
   onSyncComplete?: () => void;
 }
 
@@ -26,12 +29,18 @@ export default function SatelliteUplink({
   currentPhone,
   city,
   state,
+  latitude,
+  longitude,
+  accountId,
   onSyncComplete
 }: SatelliteUplinkProps) {
   const [isActive, setIsActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeAddress, setActiveAddress] = useState(address);
-  const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  // Initialize coordinates from saved props if available (saves API costs!)
+  const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(
+    latitude != null && longitude != null ? { lat: latitude, lng: longitude } : null
+  );
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
 
@@ -45,6 +54,24 @@ export default function SatelliteUplink({
       setActiveAddress(address);
     }
   }, [address, activeAddress]);
+
+  // Initialize coordinates from saved props if available (saves API costs!)
+  useEffect(() => {
+    if (latitude != null && longitude != null) {
+      const newCoords = { lat: latitude, lng: longitude };
+      // Only update if coordinates changed
+      setCoordinates(prev => {
+        if (!prev || prev.lat !== newCoords.lat || prev.lng !== newCoords.lng) {
+          return newCoords;
+        }
+        return prev;
+      });
+      // Auto-activate if we have saved coordinates and address
+      if (address) {
+        setIsActive(true);
+      }
+    }
+  }, [latitude, longitude, address]);
 
   // Geocode address to coordinates – use server API (works in production + localhost)
   const geocodeAddress = async (addressToGeocode: string): Promise<{ lat: number; lng: number } | null> => {
@@ -161,10 +188,11 @@ export default function SatelliteUplink({
         setIsActive(true);
 
         // PERSIST COORDINATES TO DATABASE (One-time cost, lifetime free)
-        if (entityId && entityType) {
-          const table = entityType === 'contact' ? 'contacts' : 'accounts';
+        // Always save to accounts table - contacts use account location (business location, not personal address)
+        if (entityType === 'account' && entityId) {
+          // Save directly to account
           await supabase
-            .from(table)
+            .from('accounts')
             .update({
               latitude: coords.lat,
               longitude: coords.lng,
@@ -172,6 +200,17 @@ export default function SatelliteUplink({
               ...(resolvedAddress && !address ? { address: resolvedAddress } : {})
             })
             .eq('id', entityId);
+        } else if (entityType === 'contact' && accountId) {
+          // For contacts, save to their account (business location, not personal address)
+          await supabase
+            .from('accounts')
+            .update({
+              latitude: coords.lat,
+              longitude: coords.lng,
+              // Also update address if it was resolved but missing
+              ...(resolvedAddress && !address ? { address: resolvedAddress } : {})
+            })
+            .eq('id', accountId);
         }
       } else {
         toast.error('Geocoding Failed', { description: 'Could not locate coordinates.' });
@@ -200,16 +239,26 @@ export default function SatelliteUplink({
         toast.success('Location Found', { description: searchInput });
 
         // PERSIST COORDINATES TO DATABASE
-        if (entityId && entityType) {
-          const table = entityType === 'contact' ? 'contacts' : 'accounts';
+        // Always save to accounts table - contacts use account location
+        if (entityType === 'account' && entityId) {
           await supabase
-            .from(table)
+            .from('accounts')
             .update({
               latitude: coords.lat,
               longitude: coords.lng,
               address: searchInput
             })
             .eq('id', entityId);
+        } else if (entityType === 'contact' && accountId) {
+          // For contacts, save to their account (business location, not personal address)
+          await supabase
+            .from('accounts')
+            .update({
+              latitude: coords.lat,
+              longitude: coords.lng,
+              address: searchInput
+            })
+            .eq('id', accountId);
         }
       } else {
         toast.error('Location Not Found', { description: 'Try a different address.' });
