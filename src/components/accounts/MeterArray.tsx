@@ -53,10 +53,10 @@ export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], isEditing =
   }
   return (
     <div className={cn(
-      "rounded-2xl border transition-all duration-500 bg-zinc-900/40 backdrop-blur-xl overflow-hidden flex flex-col",
-      isEditing ? 'border-[#002FA7]/30 ring-1 ring-[#002FA7]/20' : 'border-white/10'
+      "nodal-module-glass nodal-monolith-edge rounded-2xl transition-all duration-500 overflow-hidden flex flex-col",
+      isEditing ? 'border-[#002FA7]/30 ring-1 ring-[#002FA7]/20' : ''
     )}>
-      <div className="flex justify-between items-center p-4 border-b border-white/5 bg-white/[0.02]">
+      <div className="flex justify-between items-center p-4 border-b border-white/5 nodal-recessed">
         <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
           Grid_Connection_Points <span className="text-zinc-700">[{localMeters.length}]</span>
         </h3>
@@ -176,7 +176,7 @@ export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], isEditing =
               </div>
             ))
           ) : (
-            <div className="col-span-2 p-8 rounded-xl border border-dashed border-white/5 bg-white/[0.02] flex flex-col items-center justify-center gap-2">
+            <div className="col-span-2 p-8 rounded-xl border border-dashed border-white/5 bg-black/20 flex flex-col items-center justify-center gap-2">
               <Landmark className="w-6 h-6 text-zinc-700" />
               <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest text-center">
                 No grid connection points identified.<br/>

@@ -221,7 +221,7 @@ export default function SatelliteUplink({
 
   if (!isLoaded) {
     return (
-      <div className="bg-zinc-900/40 backdrop-blur-xl border border-white/5 rounded-3xl overflow-hidden relative h-48 flex items-center justify-center">
+      <div className="nodal-module-glass nodal-monolith-edge rounded-3xl overflow-hidden relative h-48 flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-[#002FA7] animate-spin" />
       </div>
     );
@@ -230,12 +230,12 @@ export default function SatelliteUplink({
   const mapExpanded = isActive && !!coordinates;
 
   return (
-    <div className="bg-zinc-900/40 backdrop-blur-xl border border-white/5 rounded-3xl overflow-hidden relative group">
+    <div className="nodal-module-glass nodal-monolith-edge rounded-3xl overflow-hidden relative group">
       
       {/* UPLINK HEADER */}
-      <div className="flex items-center justify-between p-3 bg-zinc-900/40 border-b border-white/5 backdrop-blur-xl">
+      <div className="flex items-center justify-between p-3 nodal-recessed border-b border-white/5">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center border transition-all duration-500 bg-zinc-800/30 border-white/5 text-zinc-600">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center border transition-all duration-500 bg-black/30 border-white/5 text-zinc-600">
             <Satellite className="w-4 h-4" />
           </div>
           <div>
@@ -249,7 +249,7 @@ export default function SatelliteUplink({
         {/* SEARCH ICON BUTTON */}
         <button
           onClick={() => setIsSearchOpen(!isSearchOpen)}
-          className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/10 bg-zinc-800/50 text-zinc-400 hover:text-white hover:border-[#002FA7]/50 hover:bg-[#002FA7]/20 transition-all hover:scale-110 hover:brightness-125"
+          className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/10 bg-black/40 text-zinc-400 hover:text-white hover:border-[#002FA7]/50 hover:bg-[#002FA7]/20 transition-all hover:scale-110 hover:brightness-125"
           title="Search Location"
         >
           <Search className="w-4 h-4" />
@@ -264,7 +264,7 @@ export default function SatelliteUplink({
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3, ease: 'easeInOut' }}
-            className="overflow-hidden border-b border-white/5 bg-zinc-900/60 backdrop-blur-xl"
+            className="overflow-hidden border-b border-white/5 nodal-recessed"
           >
             <div className="p-3 flex gap-2">
               <input
@@ -296,7 +296,7 @@ export default function SatelliteUplink({
       {/* BODY: The Map – animates height when map is active */}
       <motion.div
         className={cn(
-          "relative w-full bg-zinc-900/40 flex flex-col items-center justify-center overflow-hidden",
+          "relative w-full nodal-module-glass flex flex-col items-center justify-center overflow-hidden",
           (!isActive || !coordinates) && !isLoading ? "opacity-70" : "opacity-100"
         )}
         initial={false}
@@ -312,7 +312,7 @@ export default function SatelliteUplink({
           <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-30 flex flex-col items-center justify-center">
             {/* The "Locked" State */}
             <div className="z-10 text-center px-6">
-              <div className="mb-3 mx-auto w-10 h-10 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center text-zinc-500 group-hover:text-white group-hover:border-[#002FA7] transition-all">
+              <div className="mb-3 mx-auto w-10 h-10 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-center text-zinc-500 group-hover:text-white group-hover:border-[#002FA7] transition-all">
                 <Satellite className="w-4 h-4" />
               </div>
               <button 

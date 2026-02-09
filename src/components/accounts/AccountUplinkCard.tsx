@@ -99,8 +99,7 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
   }
 
   return (
-    <div className={`rounded-2xl border transition-all duration-500 bg-zinc-900/30 backdrop-blur-xl p-6 relative overflow-hidden shadow-lg ${isEditing ? 'border-[#002FA7]/30 ring-1 ring-[#002FA7]/20' : 'border-white/10'}`}>
-      <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
+    <div className={`nodal-void-card transition-all duration-500 p-6 relative overflow-hidden shadow-lg ${isEditing ? 'border-[#002FA7]/30 ring-1 ring-[#002FA7]/20' : ''}`}>
       
       <div className="flex items-center justify-between mb-6 relative z-10">
         <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Uplinks</h3>

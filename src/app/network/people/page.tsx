@@ -403,7 +403,7 @@ export default function PeoplePage() {
                     <MoreHorizontal className="h-4 w-4" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-zinc-950 border-white/10 text-zinc-300">
+                <DropdownMenuContent align="end" className="bg-zinc-950 nodal-monolith-edge text-zinc-300">
                   <DropdownMenuLabel>Actions</DropdownMenuLabel>
                   <DropdownMenuItem
                     className="hover:bg-white/5 cursor-pointer"
@@ -488,11 +488,10 @@ export default function PeoplePage() {
         onFilterChange={handleFilterChange}
       />
 
-      <div className="flex-1 rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl overflow-hidden flex flex-col relative">
-        <div className="absolute inset-0 border border-white/5 rounded-2xl pointer-events-none bg-gradient-to-b from-white/5 to-transparent z-10" />
+      <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
         <div className="flex-1 min-h-0 overflow-y-auto relative scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
             <Table>
-            <TableHeader className="sticky top-0 bg-zinc-900/80 backdrop-blur-sm z-20 border-b border-white/5">
+            <TableHeader className="sticky top-0 nodal-recessed z-20 border-b border-white/5">
                 {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
                     {headerGroup.headers.map((header) => {
@@ -572,11 +571,11 @@ export default function PeoplePage() {
             </Table>
         </div>
         
-        <div className="flex-none border-t border-white/5 bg-zinc-900/90 p-4 flex items-center justify-between backdrop-blur-sm z-10">
+        <div className="flex-none border-t border-white/5 nodal-recessed p-4 flex items-center justify-between z-10">
             <div className="flex items-center gap-4">
                 <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
                   <span>Sync_Block {showingStart}–{showingEnd}</span>
-                  <div className="h-1 w-1 rounded-full bg-zinc-800" />
+                  <div className="h-1 w-1 rounded-full bg-black/40" />
                   <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{effectiveTotalRecords}</span></span>
                 </div>
             </div>

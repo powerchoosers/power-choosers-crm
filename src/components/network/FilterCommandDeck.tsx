@@ -108,7 +108,7 @@ export default function FilterCommandDeck({
           animate={{ height: 'auto', opacity: 1, y: 0 }}
           exit={{ height: 0, opacity: 0, y: -10 }}
           transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-          className="overflow-hidden rounded-xl border border-white/5 bg-zinc-900/30 backdrop-blur-xl relative z-30 mb-6"
+          className="overflow-hidden rounded-xl nodal-monolith-edge nodal-module-glass relative z-30 mb-6"
         >
           <div className={cn(
             "p-6 grid gap-8",
@@ -217,7 +217,7 @@ function FilterChip({ label, active, onClick }: { label: string, active: boolean
         "px-3 py-1.5 rounded-lg text-[10px] font-mono border transition-all flex items-center gap-2",
         active 
           ? "bg-[#002FA7]/10 border-[#002FA7] text-white shadow-[0_0_15px_-5px_rgba(0,47,167,0.5)]" 
-          : "bg-zinc-900/50 border-white/5 text-zinc-500 hover:border-white/20 hover:text-zinc-300"
+          : "nodal-module-glass border-white/5 text-zinc-500 hover:border-white/20 hover:text-zinc-300"
       )}
     >
       {active && <Check className="w-2.5 h-2.5" />}

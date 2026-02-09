@@ -41,7 +41,7 @@ const leads: Lead[] = [
 
 export function SuggestedLeads() {
   return (
-    <div className="nodal-glass p-6 rounded-2xl flex flex-col h-full border border-white/5 relative overflow-hidden group">
+    <div className="nodal-void-card p-6 flex flex-col h-full relative overflow-hidden group">
       {/* Top light source catch */}
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
       

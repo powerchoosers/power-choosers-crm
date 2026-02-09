@@ -36,7 +36,7 @@ function MacroVarianceTooltip({
   const ind = payload.find((p) => p.dataKey === 'industrial')?.value as number | undefined
   const variance = com != null && ind != null ? com - ind : null
   return (
-    <div className="rounded-xl border border-white/10 bg-zinc-900/90 px-3 py-2 backdrop-blur-md shadow-xl">
+    <div className="rounded-xl nodal-monolith-edge bg-zinc-950/80 px-3 py-2 backdrop-blur-xl shadow-xl">
       <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{label}</div>
       <div className="mt-1 flex gap-4 text-sm font-mono tabular-nums">
         <span className="text-[#002FA7]">COM {com != null ? com.toFixed(2) : '—'}¢</span>
@@ -63,7 +63,7 @@ function ERCOTHistoryTooltip({
 }) {
   if (!active || !payload?.length || !label) return null
   return (
-    <div className="rounded-xl border border-white/10 bg-zinc-900/90 px-3 py-2 backdrop-blur-md shadow-xl">
+    <div className="rounded-xl nodal-monolith-edge bg-zinc-950/80 px-3 py-2 backdrop-blur-xl shadow-xl">
       <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{label}</div>
       <div className="mt-1 flex flex-col gap-0.5 text-sm font-mono tabular-nums">
         {payload.map((p) => (
@@ -175,7 +175,7 @@ export default function TelemetryPage() {
               <div
                 key={z.id}
                 className={cn(
-                  'rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl p-4 border-l-4',
+                  'nodal-void-card p-4 border-l-4',
                   price != null && price >= 1000 && 'border-rose-500/50 animate-pulse'
                 )}
                 style={{ borderLeftColor: z.color }}
@@ -213,11 +213,11 @@ export default function TelemetryPage() {
         <p className="text-[9px] font-mono text-zinc-600 max-w-xl">
           Historic settlement prices from stored snapshots. Data is logged when market pulse is saved (e.g. via Gemini, up to 2× per day). More points appear as snapshots accumulate.
         </p>
-        <div className="rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl overflow-hidden">
+        <div className="nodal-void-card overflow-hidden">
           {ercotHistoryError ? (
             <div className="p-6 text-center font-mono text-amber-500 text-sm">CONNECTION_LOST</div>
           ) : ercotHistoryLoading ? (
-            <div className="h-64 rounded-2xl animate-pulse bg-zinc-800/50" />
+            <div className="h-64 rounded-2xl animate-pulse bg-black/40" />
           ) : ercotHistoryChart.length === 0 ? (
             <div className="p-6 text-center font-mono text-zinc-500 text-sm">
               No history yet. Data is logged when market snapshots are saved (e.g. via Gemini).
@@ -259,11 +259,11 @@ export default function TelemetryPage() {
           Grid Physics Monitor
         </h2>
         {marketLoading ? (
-          <div className="h-24 rounded-2xl border border-white/10 bg-zinc-900/40 animate-pulse bg-zinc-800/50" />
+          <div className="h-24 nodal-void-card animate-pulse bg-black/40" />
         ) : (
           <div
             className={cn(
-              'rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl p-4',
+              'nodal-void-card p-4',
               grid.reserves != null && grid.reserves < 3000 && 'border-rose-500/30 shadow-[0_0_20px_rgba(244,63,94,0.15)]'
             )}
           >
@@ -277,7 +277,7 @@ export default function TelemetryPage() {
                 {Math.round(grid.reserves ?? 0).toLocaleString()} MW
               </span>
             </div>
-            <div className="relative h-10 w-full rounded-xl bg-zinc-800 overflow-hidden">
+            <div className="relative h-10 w-full rounded-xl bg-black/40 overflow-hidden">
               {/* Fill: load as % of capacity (gradient blue → rose) */}
               <div
                 className="absolute inset-y-0 left-0 rounded-xl bg-gradient-to-r from-[#002FA7] to-rose-500/80 transition-all duration-500"
@@ -324,11 +324,11 @@ export default function TelemetryPage() {
             EIA state-level average price (cents/kWh). Updates as EIA publishes; latest month may lag 1–2 months. This series is blended across utilities, so it is smoother than wholesale or single-bill summer spikes.
           </p>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-xl overflow-hidden">
+        <div className="nodal-void-card overflow-hidden">
           {eiaError ? (
             <div className="p-6 text-center font-mono text-amber-500 text-sm">CONNECTION_LOST</div>
           ) : eiaLoading ? (
-            <div className="h-64 rounded-2xl animate-pulse bg-zinc-800/50" />
+            <div className="h-64 rounded-2xl animate-pulse bg-black/40" />
           ) : eiaChartData.length === 0 ? (
             <div className="p-6 text-center font-mono text-zinc-500 text-sm">No data</div>
           ) : (

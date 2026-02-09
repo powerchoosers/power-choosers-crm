@@ -886,14 +886,14 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
 
   return (
     <motion.div
-      className="relative overflow-hidden rounded-3xl transition-all duration-300 bg-zinc-900/40 border border-white/5 backdrop-blur-xl flex flex-col"
+      className="relative overflow-hidden rounded-3xl transition-all duration-300 nodal-module-glass nodal-monolith-edge flex flex-col"
       initial={false}
       animate={{ minHeight: contentExpanded ? 400 : 140 }}
       transition={{ duration: 0.4, ease: 'easeInOut' }}
     >
       
       {/* HEADER - Status & Controls */}
-      <div className="p-4 pb-2 flex justify-between items-center border-b border-white/5 bg-zinc-900/50">
+      <div className="p-4 pb-2 flex justify-between items-center border-b border-white/5 nodal-recessed">
         <div className="flex items-center gap-2">
           <Users className={cn("w-3.5 h-3.5", scanStatus === 'complete' ? "text-white" : "text-zinc-500")} />
           <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
@@ -943,7 +943,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                 {searchTerm && (
                   <button
                     onClick={handleSearch}
-                    className="p-1 rounded bg-white/5 hover:bg-white/10 text-[#002FA7] transition-colors"
+                    className="p-1 rounded bg-black/20 hover:bg-black/30 text-[#002FA7] transition-colors"
                     title="Search Apollo"
                   >
                     <Search className="w-2.5 h-2.5" />
@@ -954,7 +954,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             {accountId && (
               <button
                 onClick={handleEnrichAccount}
-                className="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[9px] font-mono text-white transition-all flex items-center gap-1.5 group uppercase tracking-widest whitespace-nowrap"
+                className="px-2 py-1.5 rounded-lg bg-black/20 hover:bg-black/30 border border-white/5 text-[9px] font-mono text-white transition-all flex items-center gap-1.5 group uppercase tracking-widest whitespace-nowrap"
                 title="Deep_Enrich Account Profile"
               >
                 <Sparkles className="w-2.5 h-2.5 text-blue-400 group-hover:animate-pulse" />
@@ -975,7 +975,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/40 backdrop-blur-md animate-in fade-in duration-300 rounded-2xl">
             <div className="flex flex-col items-center gap-3">
               <div className="relative">
-                <div className="w-12 h-12 rounded-2xl border border-white/20 bg-zinc-900/50 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-2xl border border-white/20 nodal-module-glass flex items-center justify-center">
                   <Sparkles className="w-6 h-6 text-[#002FA7] animate-pulse" />
                 </div>
                 <div className="absolute -inset-1 rounded-2xl bg-[#002FA7]/20 animate-ping" />
@@ -994,7 +994,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         {/* STATE 1: IDLE */}
         {scanStatus === 'idle' && (
           <div className="h-full flex flex-col items-center justify-center py-8 px-4 text-center">
-            <div className="w-10 h-10 bg-zinc-800/30 rounded-2xl flex items-center justify-center mb-3 text-zinc-600 border border-white/5">
+            <div className="w-10 h-10 bg-black/30 rounded-2xl flex items-center justify-center mb-3 text-zinc-600 border border-white/5">
               <Lock className="w-4 h-4" />
             </div>
             <h4 className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 mb-1">Target_Locked</h4>
@@ -1040,7 +1040,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           <div className="space-y-3">
             {/* COMPANY SUMMARY SECTION */}
             {companySummary && (
-              <div className="px-3 py-3 border-b border-white/5 bg-white/5 rounded-xl mx-1 mt-1 space-y-3">
+              <div className="px-3 py-3 border border-white/5 nodal-recessed rounded-xl mx-1 mt-1 space-y-3">
                 <div className="flex items-start gap-3">
                   <div className="relative group/logo">
                     <CompanyIcon
@@ -1136,7 +1136,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                 paginatedData.map((person) => (
                   <div 
                     key={person.id} 
-                    className="group flex flex-col p-2.5 rounded-xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5 space-y-2"
+                    className="group flex flex-col p-2.5 rounded-xl hover:bg-black/30 transition-all border border-transparent hover:border-white/5 space-y-2"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex flex-col min-w-0 flex-1 mr-2">
@@ -1173,7 +1173,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                             <button 
                               onClick={() => handleAcquire(person, 'email')}
                               disabled={acquiringEmail === person.id}
-                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
+                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
                               title="Reveal Email"
                             >
                               {acquiringEmail === person.id ? (
@@ -1186,7 +1186,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                             <button 
                               onClick={() => handleAcquire(person, 'phone')}
                               disabled={acquiringEmail === person.id}
-                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
+                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
                               title="Reveal Phone"
                             >
                               {acquiringEmail === person.id ? (
@@ -1219,7 +1219,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                              <button 
                                 onClick={() => handleAcquire(person, 'email')}
                                 disabled={acquiringEmail === person.id}
-                                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
+                                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
                                 title="Reveal Email"
                               >
                                 {acquiringEmail === person.id ? (
@@ -1257,7 +1257,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                               <button 
                                 onClick={() => handleAcquire(person, 'phone')}
                                 disabled={acquiringEmail === person.id}
-                                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest shrink-0"
+                                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest shrink-0"
                                 title="Reveal Phone"
                               >
                                 {acquiringEmail === person.id ? (
@@ -1308,7 +1308,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                 </div>
                 <div className="flex items-center gap-2">
                   <span>Found: <span className="text-zinc-400 tabular-nums">{data.length}</span></span>
-                  <div className="w-1 h-1 rounded-full bg-zinc-800" />
+                  <div className="w-1 h-1 rounded-full bg-black/40" />
                   <span>Synced: <span className="text-zinc-400 tabular-nums">{data.filter(d => d.isMonitored).length}</span></span>
                 </div>
               </div>
@@ -1319,7 +1319,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
 
       {/* FOOTER: PAGINATION & STATS (Sync_Block Protocol) */}
       {scanStatus === 'complete' && (
-        <div className="mt-auto p-3 border-t border-white/5 flex items-center justify-between text-[9px] font-mono text-zinc-600 uppercase tracking-widest bg-zinc-900/50">
+        <div className="mt-auto p-3 border-t border-white/5 flex items-center justify-between text-[9px] font-mono text-zinc-600 uppercase tracking-widest nodal-recessed">
           <div className="flex items-center gap-2">
             <span className="flex items-center gap-1">
               <div className="w-1 h-1 rounded-full bg-[#002FA7]" />

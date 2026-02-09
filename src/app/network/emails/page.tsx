@@ -93,8 +93,7 @@ export default function EmailsPage() {
         }}
       />
 
-      <div className="flex-1 rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl overflow-hidden flex flex-col relative">
-        <div className="absolute inset-0 border border-white/5 rounded-2xl pointer-events-none bg-gradient-to-b from-white/5 to-transparent z-10" />
+      <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
             <EmailList 
                 emails={emails} 
                 isLoading={isLoadingEmails} 

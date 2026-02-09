@@ -194,7 +194,7 @@ const ProtocolNode = ({ data, id, selected }: NodeProps) => {
   return (
     <div className={cn(
       "min-w-[180px] rounded-xl border backdrop-blur-xl transition-all duration-300 relative",
-      selected ? "border-[#002FA7] shadow-[0_0_20px_rgba(0,47,167,0.3)]" : "border-white/10 bg-zinc-900/80 hover:border-white/20",
+      selected ? "border-[#002FA7] shadow-[0_0_20px_rgba(0,47,167,0.3)]" : "nodal-monolith-edge bg-zinc-950/80 hover:border-white/20",
       isTargeted && "border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)] scale-[1.02]",
       isInput && "bg-[#002FA7] border-none shadow-[0_0_20px_rgba(0,47,167,0.4)]"
     )}>
@@ -275,7 +275,7 @@ const ProtocolNode = ({ data, id, selected }: NodeProps) => {
                 key={outcome.id} 
                 className={cn(
                   "relative flex-1 flex flex-col items-center justify-center border rounded-lg py-1.5 px-1 group min-w-0 transition-all",
-                  isActive ? "bg-emerald-500/20 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)]" : "bg-zinc-900/50 border-white/5"
+                  isActive ? "bg-emerald-500/20 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)]" : "nodal-module-glass border-white/5"
                 )}
               >
                 <div className="mb-0.5">
@@ -1081,13 +1081,11 @@ function ProtocolArchitectInner() {
       </div>
 
       {/* Main Builder Container */}
-      <div className="flex-1 rounded-2xl border border-white/10 bg-zinc-900/30 backdrop-blur-xl overflow-hidden flex flex-col relative">
-        <div className="absolute inset-0 border border-white/5 rounded-2xl pointer-events-none bg-gradient-to-b from-white/5 to-transparent z-10" />
+      <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
         
         <div className="flex-1 flex overflow-hidden relative">
           {/* 1. THE ARMORY (Left Sidebar) */}
-          <div className="w-20 border-r border-white/5 bg-zinc-900/40 backdrop-blur-xl flex flex-col items-center pt-6 pb-8 gap-6 z-10 relative">
-            <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-white/10 to-transparent" />
+          <div className="w-20 border-r border-white/5 nodal-module-glass flex flex-col items-center pt-6 pb-8 gap-6 z-10 relative">
             
             <div className="flex-none">
               <div className="w-10 h-10 rounded-xl bg-[#002FA7]/10 border border-white/20 flex items-center justify-center shadow-[0_0_20px_rgba(0,47,167,0.3)]">
@@ -1155,7 +1153,7 @@ function ProtocolArchitectInner() {
 
           {/* 2. THE REACTOR (Canvas) */}
           <div 
-            className="flex-1 relative h-full bg-zinc-950/50"
+            className="flex-1 relative h-full bg-zinc-950"
             onDragOver={onDragOver}
             onDrop={onDrop}
           >
@@ -1174,10 +1172,10 @@ function ProtocolArchitectInner() {
               colorMode="dark"
             >
               <Background color="#18181b" gap={24} size={1} variant={BackgroundVariant.Dots} />
-              <Controls className="bg-zinc-900/80 border border-white/10 text-white backdrop-blur-md rounded-xl overflow-hidden shadow-2xl !bottom-4 !left-4" />
+              <Controls className="nodal-module-glass nodal-monolith-edge text-white rounded-xl overflow-hidden shadow-2xl !bottom-4 !left-4" />
               
               <Panel position="top-right" className="m-4">
-                <div className="bg-zinc-900/50 backdrop-blur-xl border border-white/5 p-4 rounded-2xl flex flex-col gap-3 min-w-[220px] shadow-2xl">
+                <div className="nodal-module-glass nodal-monolith-edge p-4 rounded-2xl flex flex-col gap-3 min-w-[220px] shadow-2xl">
                   <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500 uppercase tracking-widest px-1">
                     <div className="flex items-center gap-2">
                       <Settings2 className="w-3 h-3" /> Canvas_Metrics
@@ -1224,10 +1222,9 @@ function ProtocolArchitectInner() {
 
           {/* 3. THE CALIBRATION (Right Panel - Contextual) */}
           <div className={cn(
-            "w-96 border-l border-white/5 bg-zinc-900/40 backdrop-blur-2xl transition-all duration-500 ease-in-out relative flex flex-col z-20",
+            "w-96 border-l border-white/5 nodal-module-glass backdrop-blur-2xl transition-all duration-500 ease-in-out relative flex flex-col z-20",
             selectedNode ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 absolute right-0"
           )}>
-            <div className="absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-white/10 to-transparent" />
             
             <Tabs defaultValue="calibration" className="flex-1 flex flex-col min-h-0 h-full">
               <div className="p-8 pb-4 shrink-0 border-b border-white/5 bg-black/10">
@@ -1241,7 +1238,7 @@ function ProtocolArchitectInner() {
                   <div className="flex gap-2">
                     <button 
                       onClick={() => selectedNode && duplicateNode(selectedNode)}
-                      className="icon-button-forensic h-8 w-8 flex items-center justify-center rounded-lg bg-zinc-800/50 border border-white/5 text-zinc-400"
+                      className="icon-button-forensic h-8 w-8 flex items-center justify-center rounded-lg bg-black/40 border border-white/5 text-zinc-400"
                       title="Duplicate Node"
                     >
                       <Copy className="w-4 h-4" />
@@ -1385,7 +1382,7 @@ function ProtocolArchitectInner() {
                         <SelectTrigger className="w-full bg-black/40 border-white/5 rounded-xl h-12 font-mono text-sm focus:ring-0 focus:border-[#002FA7]">
                           <SelectValue placeholder="Select Signal Type" />
                         </SelectTrigger>
-                        <SelectContent className="bg-zinc-900 border-white/10">
+                        <SelectContent className="bg-zinc-950 nodal-monolith-edge">
                           <SelectItem value="VIEW">VIEW (Passive Recon)</SelectItem>
                           <SelectItem value="INTERACT">INTERACT (Like/Comment)</SelectItem>
                           <SelectItem value="CONNECT">CONNECT (Request)</SelectItem>
@@ -1405,7 +1402,7 @@ function ProtocolArchitectInner() {
                         <SelectTrigger className="w-full bg-black/40 border-white/5 rounded-xl h-12 font-mono text-sm focus:ring-0 focus:border-[#002FA7]">
                           <SelectValue placeholder="Select Template" />
                         </SelectTrigger>
-                        <SelectContent className="bg-zinc-900 border-white/10">
+                        <SelectContent className="bg-zinc-950 nodal-monolith-edge">
                           <SelectItem value="gatekeeper">Gatekeeper Bypass</SelectItem>
                           <SelectItem value="cfo_direct">CFO Direct</SelectItem>
                           <SelectItem value="follow_up">Follow-up / Voicemail</SelectItem>
@@ -1474,13 +1471,13 @@ function ProtocolArchitectInner() {
                         <div className="flex items-center justify-between px-3 py-2 border-b border-white/5 bg-white/5">
                           <div className="flex items-center gap-1">
                             <Select onValueChange={insertVariable}>
-                              <SelectTrigger className="h-7 bg-zinc-800/50 border-white/5 px-2 text-[9px] font-mono uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all focus:ring-0">
+                              <SelectTrigger className="h-7 bg-black/40 nodal-monolith-edge px-2 text-[9px] font-mono uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-black/60 transition-all focus:ring-0">
                                 <div className="flex items-center gap-1.5">
                                   <span className="text-[#002FA7]">+</span>
                                   <span>Variable</span>
                                 </div>
                               </SelectTrigger>
-                              <SelectContent className="bg-zinc-900 border-white/10">
+                              <SelectContent className="bg-zinc-950 nodal-monolith-edge">
                                 <SelectItem value="first_name">First Name</SelectItem>
                                 <SelectItem value="last_name">Last Name</SelectItem>
                                 <SelectItem value="company_name">Company Name</SelectItem>
@@ -1616,7 +1613,7 @@ function ProtocolArchitectInner() {
                       <SelectTrigger className="w-full bg-black/40 border-white/5 rounded-xl h-12 font-mono text-sm focus:ring-0 focus:border-[#002FA7]">
                         <SelectValue placeholder="Choose a contact..." />
                       </SelectTrigger>
-                      <SelectContent className="bg-zinc-900 border-white/10">
+                      <SelectContent className="bg-zinc-950 nodal-monolith-edge">
                         {contactsData?.pages?.flatMap(page => page.contacts).map((contact: Contact) => (
                           <SelectItem key={contact.id} value={contact.id}>
                             {contact.firstName} {contact.lastName} ({contact.metadata?.general?.company})
@@ -1654,7 +1651,6 @@ function ProtocolArchitectInner() {
                         "bg-zinc-950/80 border border-white/5 rounded-2xl p-6 min-h-[300px] relative overflow-hidden transition-all duration-500 mx-auto",
                         isPreviewMobile ? "w-[280px] text-[12px]" : "w-full text-sm"
                       )}>
-                        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
                         
                         {selectedNode?.data.type === 'email' && (
                           <div className="mb-4 pb-4 border-b border-white/5">
@@ -1703,11 +1699,11 @@ function ProtocolArchitectInner() {
                       )}
 
                       {/* Pane 3: Deliverability Forecast */}
-                      <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-4 grid grid-cols-2 gap-4">
+                      <div className="nodal-module-glass nodal-monolith-edge rounded-2xl p-4 grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">Spam_Score</span>
                           <div className="flex items-center gap-2">
-                            <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                            <div className="flex-1 h-1 bg-black/40 rounded-full overflow-hidden">
                               <div className="h-full bg-emerald-500 w-[92%]" />
                             </div>
                             <span className="text-[10px] font-mono text-emerald-500">0.8</span>
@@ -1716,7 +1712,7 @@ function ProtocolArchitectInner() {
                         <div className="space-y-1">
                           <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">Sentiment</span>
                           <div className="flex items-center gap-2">
-                            <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                            <div className="flex-1 h-1 bg-black/40 rounded-full overflow-hidden">
                               <div className="h-full bg-[#002FA7] w-[85%]" />
                             </div>
                             <span className="text-[10px] font-mono text-[#002FA7]">Neutral</span>
@@ -1749,11 +1745,11 @@ function ProtocolArchitectInner() {
         </div>
 
         {/* Standardized Sync_Block Footer */}
-        <div className="flex-none border-t border-white/5 bg-zinc-900/90 p-4 flex items-center justify-between backdrop-blur-sm z-10">
+        <div className="flex-none border-t border-white/5 nodal-recessed p-4 flex items-center justify-between z-10">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
               <span>Sync_Block 01-0{nodes.length}</span>
-              <div className="h-1 w-1 rounded-full bg-zinc-800" />
+              <div className="h-1 w-1 rounded-full bg-black/40" />
               <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{nodes.length}</span></span>
             </div>
           </div>
@@ -1770,7 +1766,7 @@ function ProtocolArchitectInner() {
 
       {/* Exit Dialog */}
       <Dialog open={showExitDialog} onOpenChange={setShowExitDialog}>
-        <DialogContent className="bg-zinc-900 border-white/10 text-white sm:max-w-[425px]">
+        <DialogContent className="bg-zinc-950 nodal-monolith-edge text-white sm:max-w-[425px]">
           <DialogHeader>
             <div className="flex items-center gap-2 text-amber-500 mb-2">
               <AlertTriangle className="w-5 h-5" />
@@ -1826,8 +1822,8 @@ function ToolButton({ icon: Icon, label, color, type }: { icon: any, label: stri
       onDragStart={(event) => onDragStart(event, type)}
     >
       <div className={cn(
-        "w-12 h-12 rounded-2xl bg-zinc-900/50 border border-white/5 flex items-center justify-center transition-all duration-300",
-        "group-hover:border-[#002FA7]/50 group-hover:bg-zinc-800/80 group-hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)]",
+        "w-12 h-12 rounded-2xl nodal-module-glass border border-white/5 flex items-center justify-center transition-all duration-300",
+        "group-hover:border-[#002FA7]/50 group-hover:bg-black/60 group-hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)]",
         color
       )}>
         <Icon className="w-5 h-5" />

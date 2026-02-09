@@ -35,7 +35,7 @@ export default function QuickActionsGrid() {
 
   return (
     <>
-      <div className="p-1.5 rounded-2xl bg-zinc-900/40 border border-white/5 backdrop-blur-xl">
+      <div className="p-1.5 rounded-2xl nodal-module-glass nodal-monolith-edge">
         <div className="grid grid-cols-3 gap-1.5">
           {actions.map((action) => (
             <button
