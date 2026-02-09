@@ -379,7 +379,7 @@ CRITICAL: You are writing draft content only. The app handles To/Sender/recipien
       let newBody = raw
       let parsedSubject: string | null = null
       const lines = raw.split(/\r?\n/)
-      const subjectLineIndex = lines.findIndex((line) => /^\s*SUBJECT:\s*.+/.test(line))
+      const subjectLineIndex = lines.findIndex((line: string) => /^\s*SUBJECT:\s*.+/.test(line))
       if (subjectLineIndex >= 0) {
         const subjectLine = lines[subjectLineIndex]
         const subMatch = subjectLine.match(/^\s*SUBJECT:\s*(.+)$/i)
