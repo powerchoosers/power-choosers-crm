@@ -19,6 +19,7 @@ import { useUIStore } from '@/store/uiStore'
 import { useGeminiStore } from '@/store/geminiStore'
 import { Button } from '@/components/ui/button'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
+import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -530,7 +531,16 @@ export default function AccountDossierPage() {
               <div>
                 <div className="flex items-center gap-3 mb-1">
                   <h1 className="text-2xl font-semibold tracking-tighter text-white">
-                    {account.name}
+                    {!isEditing ? (
+                      <ForensicDataPoint
+                        value={account.name ?? ''}
+                        copyValue={account.name ?? undefined}
+                        valueClassName="text-2xl font-semibold tracking-tighter text-white"
+                        inline
+                      />
+                    ) : (
+                      account.name
+                    )}
                   </h1>
 
                   {/* External Links */}
@@ -735,13 +745,13 @@ export default function AccountDossierPage() {
                           transition={{ duration: 0.4, ease: 'easeOut' }}
                           className="flex items-center gap-1.5 uppercase tracking-widest text-zinc-400"
                         >
-                          <Activity className="w-3.5 h-3.5 text-white" />
-                          {account.industry || 'Unknown Sector'}
+                          <Activity className="w-3.5 h-3.5 text-white shrink-0" />
+                          <ForensicDataPoint value={account.industry || 'Unknown Sector'} copyValue={account.industry || undefined} valueClassName="uppercase tracking-widest text-zinc-400" inline />
                         </motion.span>
                       ) : (
                         <span className="flex items-center gap-1.5 uppercase tracking-widest text-zinc-400">
-                          <Activity className="w-3.5 h-3.5 text-white" />
-                          {account.industry || 'Unknown Sector'}
+                          <Activity className="w-3.5 h-3.5 text-white shrink-0" />
+                          <ForensicDataPoint value={account.industry || 'Unknown Sector'} copyValue={account.industry || undefined} valueClassName="uppercase tracking-widest text-zinc-400" inline />
                         </span>
                       )}
                       <span className="w-1 h-1 rounded-full bg-zinc-800" />
@@ -752,13 +762,13 @@ export default function AccountDossierPage() {
                           transition={{ duration: 0.4, ease: 'easeOut' }}
                           className="flex items-center gap-1.5 text-zinc-400"
                         >
-                          <MapPin className="w-3.5 h-3.5 text-white" />
-                          {account.location || 'Unknown Location'}
+                          <MapPin className="w-3.5 h-3.5 text-white shrink-0" />
+                          <ForensicDataPoint value={account.location || 'Unknown Location'} copyValue={account.location || undefined} valueClassName="text-zinc-400" inline />
                         </motion.span>
                       ) : (
                         <span className="flex items-center gap-1.5 text-zinc-400">
-                          <MapPin className="w-3.5 h-3.5 text-white" />
-                          {account.location || 'Unknown Location'}
+                          <MapPin className="w-3.5 h-3.5 text-white shrink-0" />
+                          <ForensicDataPoint value={account.location || 'Unknown Location'} copyValue={account.location || undefined} valueClassName="text-zinc-400" inline />
                         </span>
                       )}
                     </>
@@ -898,14 +908,24 @@ export default function AccountDossierPage() {
                                 glowingFields.has('contractEnd') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)]"
                               )}
                             >
-                              {contractEndDate ? format(contractEndDate, 'MMM dd, yyyy') : 'TBD'}
+                              <ForensicDataPoint
+                                value={contractEndDate ? format(contractEndDate, 'MMM dd, yyyy') : 'TBD'}
+                                copyValue={contractEndDate ? format(contractEndDate, 'yyyy-MM-dd') : undefined}
+                                valueClassName={cn("text-white font-mono font-bold tabular-nums", glowingFields.has('contractEnd') && "text-[#002FA7]")}
+                                inline
+                              />
                             </motion.span>
                           ) : (
                             <span className={cn(
                               "text-white font-mono font-bold tabular-nums transition-all duration-800",
                               glowingFields.has('contractEnd') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)] animate-in fade-in duration-500"
                             )}>
-                              {contractEndDate ? format(contractEndDate, 'MMM dd, yyyy') : 'TBD'}
+                              <ForensicDataPoint
+                                value={contractEndDate ? format(contractEndDate, 'MMM dd, yyyy') : 'TBD'}
+                                copyValue={contractEndDate ? format(contractEndDate, 'yyyy-MM-dd') : undefined}
+                                valueClassName={cn("text-white font-mono font-bold tabular-nums", glowingFields.has('contractEnd') && "text-[#002FA7]")}
+                                inline
+                              />
                             </span>
                           )
                         )}
@@ -929,14 +949,24 @@ export default function AccountDossierPage() {
                             glowingFields.has('daysRemaining') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]"
                           )}
                         >
-                          {daysRemaining != null ? `${Math.max(daysRemaining, 0)} Days Remaining` : '-- Days Remaining'}
+                          <ForensicDataPoint
+                            value={daysRemaining != null ? `${Math.max(daysRemaining, 0)} Days Remaining` : '-- Days Remaining'}
+                            copyValue={daysRemaining != null ? String(Math.max(daysRemaining, 0)) : undefined}
+                            valueClassName="text-xs text-[#002FA7] font-mono tabular-nums"
+                            inline
+                          />
                         </motion.span>
                       ) : (
                         <span className={cn(
                           "text-xs text-[#002FA7] font-mono tabular-nums ml-auto transition-all duration-800",
                           glowingFields.has('daysRemaining') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-in fade-in duration-500"
                         )}>
-                          {daysRemaining != null ? `${Math.max(daysRemaining, 0)} Days Remaining` : '-- Days Remaining'}
+                          <ForensicDataPoint
+                            value={daysRemaining != null ? `${Math.max(daysRemaining, 0)} Days Remaining` : '-- Days Remaining'}
+                            copyValue={daysRemaining != null ? String(Math.max(daysRemaining, 0)) : undefined}
+                            valueClassName="text-xs text-[#002FA7] font-mono tabular-nums"
+                            inline
+                          />
                         </span>
                       )}
                     </div>
@@ -954,14 +984,14 @@ export default function AccountDossierPage() {
                           glowingFields.has('currentSupplier') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)]"
                         )}
                       >
-                        {account.electricitySupplier || '--'}
+                        <ForensicDataPoint value={account.electricitySupplier || '--'} copyValue={account.electricitySupplier || undefined} valueClassName="text-xl font-semibold tracking-tighter text-white" inline />
                       </motion.div>
                     ) : (
                       <div className={cn(
                         "text-xl font-semibold tracking-tighter text-white transition-all duration-800",
                         glowingFields.has('currentSupplier') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)] animate-in fade-in duration-500"
                       )}>
-                        {account.electricitySupplier || '--'}
+                        <ForensicDataPoint value={account.electricitySupplier || '--'} copyValue={account.electricitySupplier || undefined} valueClassName="text-xl font-semibold tracking-tighter text-white" inline />
                       </div>
                     )}
                   </div>
@@ -988,14 +1018,14 @@ export default function AccountDossierPage() {
                               glowingFields.has('strikePrice') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]"
                             )}
                           >
-                            {editStrikePrice ? `${editStrikePrice}¢` : '--'}
+                            <ForensicDataPoint value={editStrikePrice ? `${editStrikePrice}¢` : '--'} copyValue={editStrikePrice || undefined} valueClassName={cn("text-xl font-mono tabular-nums text-[#002FA7]", glowingFields.has('strikePrice') && "text-emerald-400")} inline />
                           </motion.div>
                         ) : (
                           <div className={cn(
                             "text-xl font-mono tabular-nums tracking-tighter text-[#002FA7] transition-all duration-800",
                             glowingFields.has('strikePrice') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-in fade-in duration-500"
                           )}>
-                            {editStrikePrice ? `${editStrikePrice}¢` : '--'}
+                            <ForensicDataPoint value={editStrikePrice ? `${editStrikePrice}¢` : '--'} copyValue={editStrikePrice || undefined} valueClassName="text-xl font-mono tabular-nums text-[#002FA7]" inline />
                           </div>
                         )
                       )}
@@ -1003,7 +1033,7 @@ export default function AccountDossierPage() {
                     <div>
                       <div className="text-zinc-500 text-[10px] font-mono uppercase tracking-[0.2em] mb-2">Load Factor</div>
                       <div className="text-xl font-mono tabular-nums tracking-tighter text-white">
-                        {(account.loadFactor || 0.45).toFixed(2)}
+                        <ForensicDataPoint value={(account.loadFactor || 0.45).toFixed(2)} copyValue={(account.loadFactor ?? 0.45).toString()} valueClassName="text-xl font-mono tabular-nums text-white" inline />
                       </div>
                     </div>
                   </div>
@@ -1030,14 +1060,24 @@ export default function AccountDossierPage() {
                             glowingFields.has('annualVolume') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)]"
                           )}
                         >
-                          {account.annualUsage ? `${parseInt(account.annualUsage).toLocaleString()} kWh` : '--'}
+                          <ForensicDataPoint
+                            value={account.annualUsage ? `${parseInt(account.annualUsage).toLocaleString()} kWh` : '--'}
+                            copyValue={account.annualUsage ?? undefined}
+                            valueClassName={cn("text-3xl font-mono tabular-nums tracking-tighter text-white font-semibold", glowingFields.has('annualVolume') && "text-[#002FA7]")}
+                            inline
+                          />
                         </motion.div>
                       ) : (
                         <div className={cn(
                           "text-3xl font-mono tabular-nums tracking-tighter text-white font-semibold transition-all duration-800",
                           glowingFields.has('annualVolume') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)] animate-in fade-in duration-500"
                         )}>
-                          {account.annualUsage ? `${parseInt(account.annualUsage).toLocaleString()} kWh` : '--'}
+                          <ForensicDataPoint
+                            value={account.annualUsage ? `${parseInt(account.annualUsage).toLocaleString()} kWh` : '--'}
+                            copyValue={account.annualUsage ?? undefined}
+                            valueClassName="text-3xl font-mono tabular-nums tracking-tighter text-white font-semibold"
+                            inline
+                          />
                         </div>
                       )
                     )}
@@ -1055,22 +1095,40 @@ export default function AccountDossierPage() {
                           glowingFields.has('revenue') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]"
                         )}
                       >
-                        {(() => {
-                          const usageStr = isEditing ? editAnnualUsage : (account.annualUsage || '0');
-                          const usage = parseInt(usageStr.toString().replace(/[^0-9]/g, '')) || 0;
-                          return (usage * 0.003).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-                        })()}
+                        <ForensicDataPoint
+                          value={(() => {
+                            const usageStr = isEditing ? editAnnualUsage : (account.annualUsage || '0');
+                            const usage = parseInt(usageStr.toString().replace(/[^0-9]/g, '')) || 0;
+                            return (usage * 0.003).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+                          })()}
+                          copyValue={(() => {
+                            const usageStr = isEditing ? editAnnualUsage : (account.annualUsage || '0');
+                            const usage = parseInt(usageStr.toString().replace(/[^0-9]/g, '')) || 0;
+                            return (usage * 0.003).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+                          })()}
+                          valueClassName="text-3xl font-mono tabular-nums tracking-tighter text-green-500/80"
+                          inline
+                        />
                       </motion.div>
                     ) : (
                       <div className={cn(
                         "text-3xl font-mono tabular-nums tracking-tighter text-green-500/80 transition-all duration-800",
                         glowingFields.has('revenue') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-in fade-in duration-500"
                       )}>
-                        {(() => {
-                          const usageStr = isEditing ? editAnnualUsage : (account.annualUsage || '0');
-                          const usage = parseInt(usageStr.toString().replace(/[^0-9]/g, '')) || 0;
-                          return (usage * 0.003).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-                        })()}
+                        <ForensicDataPoint
+                          value={(() => {
+                            const usageStr = isEditing ? editAnnualUsage : (account.annualUsage || '0');
+                            const usage = parseInt(usageStr.toString().replace(/[^0-9]/g, '')) || 0;
+                            return (usage * 0.003).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+                          })()}
+                          copyValue={(() => {
+                            const usageStr = isEditing ? editAnnualUsage : (account.annualUsage || '0');
+                            const usage = parseInt(usageStr.toString().replace(/[^0-9]/g, '')) || 0;
+                            return (usage * 0.003).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+                          })()}
+                          valueClassName="text-3xl font-mono tabular-nums tracking-tighter text-green-500/80"
+                          inline
+                        />
                       </div>
                     )}
                     <div className="text-[9px] font-mono text-zinc-600 mt-1 uppercase tracking-widest">Calculated at 0.003 margin base</div>
@@ -1139,15 +1197,15 @@ export default function AccountDossierPage() {
                                 <div className="w-1 h-1 rounded-full bg-[#002FA7]/40" />
                                 <div className="w-px bg-[#002FA7]/20" style={{ height: `${lineHeight}rem` }} />
                               </div>
-                              <div className="flex-1">
+                              <div className="flex-1 min-w-0">
                                 {timestamp && (
                                   <div className="text-[10px] text-zinc-600 mb-1 flex items-center gap-2">
-                                    <Clock className="w-3 h-3" />
-                                    <span>{timestamp}</span>
+                                    <Clock className="w-3 h-3 shrink-0" />
+                                    <ForensicDataPoint value={timestamp} copyValue={timestamp} valueClassName="text-[10px] text-zinc-600" inline />
                                   </div>
                                 )}
                                 <div className="text-zinc-300 group-hover/entry:text-white transition-colors">
-                                  {content}
+                                  <ForensicDataPoint value={content} copyValue={content} valueClassName="text-zinc-300 group-hover/entry:text-white" />
                                 </div>
                               </div>
                             </div>
