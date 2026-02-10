@@ -184,8 +184,8 @@ export default function TargetDetailPage() {
   }
 
   const handleConfirmPurge = async () => {
-    const selectedIndices = Object.keys(rowSelection).map(Number)
-    const selectedIds = selectedIndices.map(index => data[index]?.id).filter(Boolean)
+    // With getRowId: (row) => row.id, rowSelection keys are entity IDs, not indices
+    const selectedIds = Object.keys(rowSelection).filter(Boolean)
     
     if (selectedIds.length > 0) {
       if (isPeopleList) {
