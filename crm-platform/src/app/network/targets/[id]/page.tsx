@@ -522,11 +522,18 @@ export default function TargetDetailPage() {
     onRowSelectionChange: setRowSelection,
     manualPagination: false,
     pageCount,
+    getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
   })
 
   const filteredRowCount = totalRecords || data.length
+  // Show loading when we're on a page that needs more data and we have no rows yet (avoids "No results" flash)
+  const needsMoreDataForPage = data.length < (pageIndex + 1) * pageSize
+  const currentPageRowCount = Math.max(0, Math.min(data.length - pageIndex * pageSize, pageSize))
+  const showTableLoading =
+    isLoading || (currentPageRowCount === 0 && needsMoreDataForPage && query.hasNextPage)
+
   const showingStart = filteredRowCount === 0
     ? 0
     : Math.min(filteredRowCount, pageIndex * pageSize + 1)
@@ -601,7 +608,7 @@ export default function TargetDetailPage() {
               ))}
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {showTableLoading ? (
                 <ForensicTableSkeleton columns={tableColumns.length} rows={12} type={isPeopleList ? 'people' : 'account'} />
               ) : table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row) => (
