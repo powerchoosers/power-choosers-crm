@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { 
   flexRender,
   getCoreRowModel,
@@ -48,12 +48,16 @@ import {
 import { ClickToCallButton } from '@/components/calls/ClickToCallButton'
 import { cn } from '@/lib/utils'
 import { useTableState } from '@/hooks/useTableState'
+import { useTableScrollRestore } from '@/hooks/useTableScrollRestore'
 
 const PAGE_SIZE = 50
 
 export default function AccountsPage() {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { pageIndex, setPage, searchQuery, setSearch, pagination } = useTableState({ pageSize: PAGE_SIZE })
+  const scrollKey = (pathname ?? '/network/accounts') + (searchParams.toString() ? `?${searchParams.toString()}` : '')
   
   const [globalFilter, setGlobalFilter] = useState(searchQuery)
   const [debouncedFilter, setDebouncedFilter] = useState(searchQuery)
@@ -84,6 +88,7 @@ export default function AccountsPage() {
   const [isMounted, setIsMounted] = useState(false)
   const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [deletingAccountIds, setDeletingAccountIds] = useState<Set<string>>(new Set())
 
   const accounts = useMemo(() => data?.pages.flatMap(page => page.accounts) || [], [data])
 
@@ -92,6 +97,7 @@ export default function AccountsPage() {
   }, [])
 
   const isLoading = queryLoading || !isMounted
+  const { scrollContainerRef, saveScroll } = useTableScrollRestore(scrollKey, pageIndex, !isLoading)
 
   const effectiveTotalRecords = totalAccounts ?? accounts.length
   const totalPages = Math.max(1, Math.ceil(effectiveTotalRecords / PAGE_SIZE))
@@ -159,11 +165,14 @@ export default function AccountsPage() {
   const handleConfirmPurge = async () => {
     const selectedIndices = Object.keys(rowSelection).map(Number)
     const selectedIds = selectedIndices.map(index => accounts[index]?.id).filter(Boolean)
-    
-    if (selectedIds.length > 0) {
+    if (selectedIds.length === 0) return
+    setDeletingAccountIds(new Set(selectedIds))
+    try {
       await deleteAccounts(selectedIds)
+    } finally {
       setRowSelection({})
       setIsDestructModalOpen(false)
+      setDeletingAccountIds(new Set())
     }
   }
 
@@ -243,6 +252,7 @@ export default function AccountsPage() {
                   name={account.name}
                   size={36}
                   className="w-9 h-9 transition-all"
+                  isDeleting={deletingAccountIds.has(account.id)}
                 />
               </div>
               <div>
@@ -424,7 +434,7 @@ export default function AccountsPage() {
         },
       },
     ]
-  }, [pageIndex])
+  }, [pageIndex, deletingAccountIds])
 
   const table = useReactTable({
     data: accounts,
@@ -491,7 +501,7 @@ export default function AccountsPage() {
       />
 
       <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
-        <div className="flex-1 min-h-0 overflow-y-auto relative scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
+        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto relative scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
             <Table>
             <TableHeader className="sticky top-0 z-20 border-b border-white/5">
                 {table.getHeaderGroups().map((headerGroup) => (
@@ -534,7 +544,10 @@ export default function AccountsPage() {
                             ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10" 
                             : "hover:bg-white/[0.02]"
                         )}
-                        onClick={() => router.push(`/network/accounts/${row.original.id}`)}
+                        onClick={() => {
+                        saveScroll()
+                        router.push(`/network/accounts/${row.original.id}`)
+                      }}
                       >
                         {row.getVisibleCells().map((cell) => (
                           <TableCell key={cell.id} className="py-3">
@@ -570,15 +583,15 @@ export default function AccountsPage() {
                 </div>
             </div>
             <div className="flex items-center gap-2">
-                <button
-                    onClick={() => setPage(Math.max(0, pagination.pageIndex - 1))}
-                    disabled={pagination.pageIndex === 0}
-                    className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
-                    aria-label="Previous page"
-                    title="Previous Page"
-                >
-                    <ChevronLeft className="h-4 w-4" />
-                </button>
+<button
+                onClick={() => setPage(Math.max(0, pagination.pageIndex - 1))}
+                disabled={pagination.pageIndex === 0}
+                className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
+                aria-label="Previous page"
+                title="Previous Page"
+            >
+                <ChevronLeft className="h-4 w-4" />
+            </button>
                 <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
                   {(pagination.pageIndex + 1).toString().padStart(2, '0')}
                 </div>

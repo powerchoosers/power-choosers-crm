@@ -63,15 +63,17 @@ export function useTableState(options: TableStateOptions = {}) {
     }
   }, [updateParams, searchParam, pageParam, searchParams])
 
+  const pagination = useMemo(
+    () => ({ pageIndex: currentPage, pageSize }),
+    [currentPage, pageSize]
+  )
+
   return {
     pageIndex: currentPage,
     pageSize,
     searchQuery,
     setPage,
     setSearch,
-    pagination: {
-      pageIndex: currentPage,
-      pageSize,
-    }
+    pagination,
   }
 }

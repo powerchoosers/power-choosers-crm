@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, usePathname, useSearchParams } from 'next/navigation'
 import { 
   flexRender,
   getCoreRowModel,
@@ -23,6 +23,7 @@ import { useContacts, useContactsCount, useDeleteContacts, Contact } from '@/hoo
 import { useAccounts, useAccountsCount, useDeleteAccounts, Account } from '@/hooks/useAccounts'
 import { useTarget } from '@/hooks/useTargets'
 import { useTableState } from '@/hooks/useTableState'
+import { useTableScrollRestore } from '@/hooks/useTableScrollRestore'
 import { useDebounce } from '@/hooks/useDebounce'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -56,6 +57,8 @@ const PAGE_SIZE = 50
 
 export default function TargetDetailPage() {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { id } = useParams() as { id: string }
   const [isMounted, setIsMounted] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -64,16 +67,18 @@ export default function TargetDetailPage() {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = useState('')
 
-  // Use state-preserving table state
-  const { 
-    pageIndex, 
-    pageSize, 
-    searchQuery, 
-    setPage, 
-    setSearch, 
+  // Use state-preserving table state (must be before useTableScrollRestore so pageIndex is defined)
+  const {
+    pageIndex,
+    pageSize,
+    searchQuery,
+    setPage,
+    setSearch,
   } = useTableState({
     pageSize: PAGE_SIZE
   })
+
+  const scrollKey = (pathname ?? `/network/targets/${id}`) + (searchParams.toString() ? `?${searchParams.toString()}` : '')
 
   // Sync the local globalFilter state with the URL search query if needed
   useEffect(() => {
@@ -140,6 +145,7 @@ export default function TargetDetailPage() {
 
   const isLoading = targetLoading || (isPeopleList ? contactQuery.isLoading : isAccountList ? accountQuery.isLoading : false) || !isMounted
   const isError = isPeopleList ? contactQuery.isError : isAccountList ? accountQuery.isError : false
+  const { scrollContainerRef, saveScroll } = useTableScrollRestore(scrollKey, pageIndex, !isLoading)
 
   useEffect(() => {
     setIsMounted(true)
@@ -281,7 +287,7 @@ export default function TargetDetailPage() {
           <Link 
             href={`/network/accounts/${contact.accountId}`}
             className="flex items-center gap-2 group/acc whitespace-nowrap"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); saveScroll(); }}
           >
             <CompanyIcon
               logoUrl={contact.logoUrl}
@@ -411,7 +417,7 @@ export default function TargetDetailPage() {
           <Link 
             href={`/network/accounts/${account.id}`}
             className="flex items-center gap-3 group/acc whitespace-nowrap"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); saveScroll(); }}
           >
             <CompanyIcon
               logoUrl={account.logoUrl}
@@ -581,7 +587,7 @@ export default function TargetDetailPage() {
       {/* DATA CONTAINER */}
       <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
         
-        <div className="flex-1 overflow-auto relative scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
+        <div ref={scrollContainerRef} className="flex-1 overflow-auto relative scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
           <Table>
             <TableHeader className="sticky top-0 z-20 border-b border-white/5">
               {table.getHeaderGroups().map((headerGroup) => (
@@ -606,6 +612,7 @@ export default function TargetDetailPage() {
                       if ((e.target as HTMLElement).closest('a') || (e.target as HTMLElement).closest('button')) {
                         return;
                       }
+                      saveScroll()
                       router.push(`/network/${isPeopleList ? 'contacts' : 'accounts'}/${row.original.id}`)
                     }}
                     className="border-b border-white/5 hover:bg-white/5 transition-colors group cursor-pointer"

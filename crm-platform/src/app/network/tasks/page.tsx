@@ -48,6 +48,7 @@ import DestructModal from '@/components/network/DestructModal'
 const PAGE_SIZE = 50
 
 export default function TasksPage() {
+  const router = useRouter()
   const { pageIndex, setPage, searchQuery, setSearch, pagination } = useTableState({ pageSize: PAGE_SIZE })
   const [globalFilter, setGlobalFilter] = useState(searchQuery)
   const [debouncedFilter, setDebouncedFilter] = useState(searchQuery)
@@ -172,8 +173,9 @@ export default function TasksPage() {
       },
       cell: ({ row }) => {
         const task = row.original
+        const hasDossier = !!(task.contactId || task.accountId)
         return (
-          <div className="flex items-center gap-3 group/task cursor-pointer">
+          <div className={cn("flex items-center gap-3 group/task", hasDossier && "cursor-pointer")}>
              <div className={cn(
                "w-8 h-8 rounded-lg flex items-center justify-center border border-white/5",
                task.priority === 'High' ? "bg-red-500/10 text-red-500" :
@@ -253,7 +255,7 @@ export default function TasksPage() {
       cell: ({ row }) => {
         const task = row.original
         return (
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
             <button 
               className={cn("icon-button-forensic h-8 w-8 flex items-center justify-center", task.status === 'Completed' ? "text-green-500" : "text-zinc-400")}
               onClick={() => updateTask({ id: task.id, status: task.status === 'Completed' ? 'Pending' : 'Completed' })}
@@ -377,11 +379,22 @@ export default function TasksPage() {
                           ease: [0.23, 1, 0.32, 1] 
                         }}
                         data-state={row.getIsSelected() ? "selected" : undefined}
+                        onClick={(e) => {
+                          const task = row.original
+                          if (task.contactId) {
+                            router.push(`/network/contacts/${task.contactId}`)
+                          } else if (task.accountId) {
+                            router.push(`/network/accounts/${task.accountId}`)
+                          }
+                        }}
                         className={cn(
-                          "border-b border-white/5 transition-colors group cursor-pointer relative z-10",
+                          "border-b border-white/5 transition-colors group relative z-10",
+                          (row.original.contactId || row.original.accountId)
+                            ? "cursor-pointer hover:bg-white/[0.02]"
+                            : "",
                           row.getIsSelected() 
                             ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10" 
-                            : "hover:bg-white/[0.02]"
+                            : ""
                         )}
                       >
                         {row.getVisibleCells().map((cell) => (

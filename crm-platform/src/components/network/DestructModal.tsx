@@ -20,8 +20,10 @@ export default function DestructModal({ isOpen, onClose, onConfirm, count }: Des
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
   const onConfirmRef = useRef(onConfirm);
+  const onCloseRef = useRef(onClose);
 
   onConfirmRef.current = onConfirm;
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (isOpen) {
@@ -50,8 +52,7 @@ export default function DestructModal({ isOpen, onClose, onConfirm, count }: Des
         if (timerRef.current) clearInterval(timerRef.current);
         timerRef.current = null;
         onConfirmRef.current();
-        setIsHolding(false);
-        setProgress(0);
+        onCloseRef.current(); // Dismiss modal immediately so it wipes away at 100% without jumping back
       }
     }, TICK_MS);
 

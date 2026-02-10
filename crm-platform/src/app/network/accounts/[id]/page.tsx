@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Building2, MapPin, Globe, Phone, FileText, Activity, 
@@ -13,7 +13,7 @@ import { useAccount, useUpdateAccount } from '@/hooks/useAccounts'
 import { useAccountContacts, Contact } from '@/hooks/useContacts'
 import { useAccountCalls } from '@/hooks/useCalls'
 import { useEntityTasks } from '@/hooks/useEntityTasks'
-import { useTasks } from '@/hooks/useTasks'
+import { useTasks, useAllPendingTasks } from '@/hooks/useTasks'
 import { TaskCommandBar } from '@/components/crm/TaskCommandBar'
 import { useUIStore } from '@/store/uiStore'
 import { useGeminiStore } from '@/store/geminiStore'
@@ -60,6 +60,7 @@ function clamp01(n: number) {
 export default function AccountDossierPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const id = (params?.id as string) || ''
 
   const { data: account, isLoading } = useAccount(id)
@@ -76,21 +77,91 @@ export default function AccountDossierPage() {
   const prevIsEditing = useRef(isEditing)
 
   const { pendingTasks } = useEntityTasks(id, account?.name)
+  const { data: allPendingData } = useAllPendingTasks()
+  const allPendingTasks = allPendingData?.allPendingTasks ?? []
+  const globalTotal = allPendingData?.totalCount ?? 0
   const { updateTask } = useTasks()
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0)
   const hasTasks = pendingTasks.length > 0
   const displayTaskIndex = Math.min(currentTaskIndex, Math.max(0, pendingTasks.length - 1))
+  const currentTask = pendingTasks[displayTaskIndex]
+  const globalIndex = currentTask ? allPendingTasks.findIndex((t) => t.id === currentTask.id) : -1
+  const globalPosition = globalIndex >= 0 ? globalIndex + 1 : 0
 
   useEffect(() => {
     setCurrentTaskIndex((prev) => Math.min(prev, Math.max(0, pendingTasks.length - 1)))
   }, [pendingTasks.length])
 
+  const taskIdFromUrl = searchParams.get('taskId')
+  useEffect(() => {
+    if (!taskIdFromUrl || !pendingTasks.length) return
+    const idx = pendingTasks.findIndex((t) => t.id === taskIdFromUrl)
+    if (idx >= 0) setCurrentTaskIndex(idx)
+  }, [taskIdFromUrl, pendingTasks])
+
+  const navigateToTaskDossier = (task: { id: string; contactId?: string; accountId?: string }) => {
+    if (task.contactId) {
+      router.push(`/network/contacts/${task.contactId}?taskId=${encodeURIComponent(task.id)}`)
+    } else if (task.accountId) {
+      router.push(`/network/accounts/${task.accountId}?taskId=${encodeURIComponent(task.id)}`)
+    }
+  }
+
+  const handlePrev = () => {
+    if (globalIndex <= 0) return
+    const prevTask = allPendingTasks[globalIndex - 1]
+    if (!prevTask) return
+    const isSameEntity = (prevTask.accountId && prevTask.accountId === id) || (prevTask.contactId && prevTask.contactId === id)
+    if (!isSameEntity && (prevTask.contactId || prevTask.accountId)) {
+      navigateToTaskDossier(prevTask)
+    } else {
+      const localIdx = pendingTasks.findIndex((t) => t.id === prevTask.id)
+      if (localIdx >= 0) setCurrentTaskIndex(localIdx)
+    }
+  }
+
+  const handleNext = () => {
+    if (globalIndex < 0 || globalIndex >= allPendingTasks.length - 1) return
+    const nextTask = allPendingTasks[globalIndex + 1]
+    if (!nextTask) return
+    const isSameEntity = (nextTask.accountId && nextTask.accountId === id) || (nextTask.contactId && nextTask.contactId === id)
+    if (!isSameEntity && (nextTask.contactId || nextTask.accountId)) {
+      navigateToTaskDossier(nextTask)
+    } else {
+      const localIdx = pendingTasks.findIndex((t) => t.id === nextTask.id)
+      if (localIdx >= 0) setCurrentTaskIndex(localIdx)
+    }
+  }
+
   const handleCompleteAndAdvance = () => {
     const task = pendingTasks[displayTaskIndex]
     if (!task) return
     updateTask({ id: task.id, status: 'Completed' })
-    if (pendingTasks.length <= 1) toast.success('Mission complete')
+    const nextGlobalIndex = globalIndex >= 0 ? globalIndex : 0
+    if (nextGlobalIndex + 1 < allPendingTasks.length) {
+      const nextTask = allPendingTasks[nextGlobalIndex + 1]
+      if (nextTask && (nextTask.contactId || nextTask.accountId)) {
+        navigateToTaskDossier(nextTask)
+      } else {
+        toast.success('Task completed')
+      }
+    } else {
+      toast.success('Mission complete')
+    }
   }
+
+  // Enter key in dossier status (edit) mode syncs the record (same as padlock)
+  useEffect(() => {
+    if (!isEditing) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !(e.target instanceof HTMLTextAreaElement)) {
+        e.preventDefault()
+        toggleEditing()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [isEditing, toggleEditing])
 
   // Terminal State
   const [isTyping, setIsTyping] = useState(false)
@@ -399,10 +470,12 @@ export default function AccountDossierPage() {
                       transition={{ duration: 0.4, ease: 'easeOut' }}
                     >
                       <CompanyIcon
+                        key={`dossier-logo-${(editLogoUrl?.trim() || account.logoUrl?.trim()) || ''}-${(editDomain?.trim() || account.domain?.trim()) || ''}`}
                         logoUrl={(editLogoUrl?.trim() || account.logoUrl?.trim()) || undefined}
                         domain={(editDomain?.trim() || account.domain?.trim()) || undefined}
                         name={account.name}
                         size={56}
+                        roundedClassName="rounded-[14px]"
                         className={cn(
                           "w-14 h-14 transition-all",
                           isEditing && "cursor-pointer hover:border-[#002FA7]/50 hover:shadow-[0_0_20px_rgba(0,47,167,0.3)]"
@@ -411,10 +484,12 @@ export default function AccountDossierPage() {
                     </motion.div>
                   ) : (
                     <CompanyIcon
+                      key={`dossier-logo-${(editLogoUrl?.trim() || account.logoUrl?.trim()) || ''}-${(editDomain?.trim() || account.domain?.trim()) || ''}`}
                       logoUrl={(editLogoUrl?.trim() || account.logoUrl?.trim()) || undefined}
                       domain={(editDomain?.trim() || account.domain?.trim()) || undefined}
                       name={account.name}
                       size={56}
+                      roundedClassName="rounded-[14px]"
                       className={cn(
                         "w-14 h-14 transition-all",
                         isEditing && "cursor-pointer hover:border-[#002FA7]/50 hover:shadow-[0_0_20px_rgba(0,47,167,0.3)]"
@@ -707,9 +782,11 @@ export default function AccountDossierPage() {
                         <TaskCommandBar
                           pendingTasks={pendingTasks}
                           currentIndex={displayTaskIndex}
-                          onPrev={() => setCurrentTaskIndex((p) => Math.max(0, p - 1))}
-                          onNext={() => setCurrentTaskIndex((p) => Math.min(pendingTasks.length - 1, p + 1))}
-                          onSkip={() => setCurrentTaskIndex((p) => Math.min(pendingTasks.length - 1, p + 1))}
+                          globalTotal={globalTotal}
+                          globalPosition={globalPosition}
+                          onPrev={handlePrev}
+                          onNext={handleNext}
+                          onSkip={handleNext}
                           onCompleteAndAdvance={handleCompleteAndAdvance}
                         />
                       </>

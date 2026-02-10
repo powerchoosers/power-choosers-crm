@@ -261,3 +261,53 @@ export function useSearchTasks(queryTerm: string) {
     staleTime: 1000 * 60 * 1,
   })
 }
+
+const ALL_PENDING_LIMIT = 500
+
+/**
+ * All pending (non-completed) tasks in the CRM, ordered by createdAt desc.
+ * Used for global task pagination on dossier headers (e.g. "3/20" across all tasks).
+ */
+export function useAllPendingTasks() {
+  const { user, role, loading } = useAuth()
+
+  return useQuery({
+    queryKey: ['tasks-all-pending', user?.email, role],
+    queryFn: async () => {
+      if (loading || !user) return { allPendingTasks: [], totalCount: 0 }
+
+      try {
+        let query = supabase
+          .from('tasks')
+          .select('*')
+          .neq('status', 'Completed')
+          .order('createdAt', { ascending: false })
+          .limit(ALL_PENDING_LIMIT)
+
+        if (role !== 'admin' && user.email) {
+          query = query.eq('ownerId', user.email)
+        }
+
+        const { data, error } = await query
+
+        if (error) {
+          if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
+            return { allPendingTasks: [], totalCount: 0 }
+          }
+          throw error
+        }
+
+        const tasks = (data || []) as Task[]
+        return { allPendingTasks: tasks, totalCount: tasks.length }
+      } catch (err: unknown) {
+        if (err && typeof err === 'object' && 'name' in err && (err as { name?: string }).name === 'AbortError') {
+          throw err
+        }
+        console.error('Error fetching all pending tasks:', err)
+        return { allPendingTasks: [], totalCount: 0 }
+      }
+    },
+    enabled: !loading && !!user,
+    staleTime: 1000 * 60 * 2,
+  })
+}
