@@ -65,7 +65,8 @@ export default function AccountDossierPage() {
 
   const { data: account, isLoading } = useAccount(id)
   const { data: contacts, isLoading: isLoadingContacts } = useAccountContacts(id)
-  const { data: calls, isLoading: isLoadingCalls } = useAccountCalls(id)
+  const contactIds = contacts?.map(c => c.id).filter(Boolean) || []
+  const { data: calls, isLoading: isLoadingCalls } = useAccountCalls(id, contactIds)
   const updateAccount = useUpdateAccount()
   
   const { isEditing, setIsEditing, toggleEditing, setRightPanelMode, setIngestionContext, lastEnrichedAccountId } = useUIStore()
@@ -1268,11 +1269,11 @@ export default function AccountDossierPage() {
                 {/* Stakeholder Map */}
                 <StakeholderMap contacts={contacts || []} />
 
-                {/* Engagement Stream (Calls) */}
+                {/* Transmission Log — company calls and contact calls */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between px-1">
                     <h3 className="text-[10px] font-mono text-zinc-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                      Engagement Log
+                      Transmission Log
                     </h3>
                     <span className="text-[9px] font-mono text-zinc-600 font-bold tabular-nums">{calls?.length || 0} RECORDS</span>
                   </div>
@@ -1285,31 +1286,38 @@ export default function AccountDossierPage() {
                     ) : calls && calls.length > 0 ? (
                       <div className="space-y-2">
                         <AnimatePresence initial={false} mode="popLayout">
-                          {calls.slice(0, 5).map(call => (
-                            <motion.div 
-                              key={call.id}
-                              layout
-                              initial={{ opacity: 0, x: 20, scale: 0.98 }}
-                              animate={{ opacity: 1, x: 0, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.98 }}
-                              transition={{ 
-                                type: "spring",
-                                stiffness: 400,
-                                damping: 30
-                              }}
-                              className="hover:translate-x-1 transition-transform"
-                            >
-                              <CallListItem
-                                call={call}
-                                contactId={call.contactId || ''}
-                                accountId={id}
-                                accountLogoUrl={account?.logoUrl}
-                                accountDomain={account?.domain}
-                                accountName={account?.name}
-                                variant="minimal"
-                              />
-                            </motion.div>
-                          ))}
+                          {calls.slice(0, 5).map(call => {
+                            // For contact calls: use contact avatar in transcript; for company calls: use company icon
+                            const isContactCall = Boolean(call.contactId?.trim())
+                            const contactForCall = isContactCall ? contacts?.find(c => c.id === call.contactId) : null
+                            return (
+                              <motion.div 
+                                key={call.id}
+                                layout
+                                initial={{ opacity: 0, x: 20, scale: 0.98 }}
+                                animate={{ opacity: 1, x: 0, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.98 }}
+                                transition={{ 
+                                  type: "spring",
+                                  stiffness: 400,
+                                  damping: 30
+                                }}
+                                className="hover:translate-x-1 transition-transform"
+                              >
+                                <CallListItem
+                                  call={call}
+                                  contactId={call.contactId || ''}
+                                  accountId={id}
+                                  accountLogoUrl={account?.logoUrl}
+                                  accountDomain={account?.domain}
+                                  accountName={account?.name}
+                                  customerAvatar={isContactCall ? 'contact' : 'company'}
+                                  contactName={contactForCall?.name ?? contactForCall?.firstName ?? ''}
+                                  variant="minimal"
+                                />
+                              </motion.div>
+                            )
+                          })}
                         </AnimatePresence>
                       </div>
                     ) : (

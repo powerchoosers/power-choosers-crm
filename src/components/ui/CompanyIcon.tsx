@@ -51,6 +51,7 @@ function buildCandidateUrls(logoUrl: string | undefined, domain: string | undefi
 }
 
 const LOAD_TIMEOUT_MS = 4500
+const PRIMARY_LOGO_TIMEOUT_MS = 8000
 
 function CompanyIconInner({ 
   logoUrl, 
@@ -105,9 +106,11 @@ function CompanyIconInner({
       timeoutRef.current = null
     }
 
+    const isPrimaryLogo = candidates[0] === currentSrc
+    const timeoutMs = isPrimaryLogo ? PRIMARY_LOGO_TIMEOUT_MS : LOAD_TIMEOUT_MS
     timeoutRef.current = setTimeout(() => {
       setFailedSet((prev) => new Set(prev).add(currentSrc))
-    }, LOAD_TIMEOUT_MS)
+    }, timeoutMs)
 
     return () => {
       if (timeoutRef.current) {
