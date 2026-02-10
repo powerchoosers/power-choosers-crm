@@ -138,7 +138,7 @@ export function useEmails(searchQuery?: string) {
   })
 
   const sendEmailMutation = useMutation({
-    mutationFn: async (emailData: { to: string, subject: string, content: string, html?: string }) => {
+    mutationFn: async (emailData: { to: string, subject: string, content: string, html?: string, attachments?: Array<{ filename: string, content: string, type: string, size: number }> }) => {
       if (!user?.email) {
         throw new Error('You must be logged in to send email')
       }
@@ -162,6 +162,7 @@ export function useEmails(searchQuery?: string) {
           userEmail: user.email,
           from: user.email,
           fromName,
+          attachments: emailData.attachments,
         }),
       });
 

@@ -73,7 +73,7 @@ export default function ContactDossierPage() {
     }
   })()
   const { data: apolloNewsSignals } = useApolloNews(domain)
-  const { data: recentCalls, isLoading: isLoadingCalls } = useContactCalls(id)
+  const { data: recentCalls, isLoading: isLoadingCalls } = useContactCalls(id, account?.companyPhone)
   const updateContact = useUpdateContact()
   const { isEditing, setIsEditing, toggleEditing } = useUIStore()
   const setContext = useGeminiStore((state) => state.setContext)
@@ -111,6 +111,7 @@ export default function ContactDossierPage() {
   const [editOther, setEditOther] = useState('')
   const [editCompanyPhone, setEditCompanyPhone] = useState('')
   const [editPrimaryField, setEditPrimaryField] = useState<'mobile' | 'workDirectPhone' | 'otherPhone'>('mobile')
+  const [editContractEnd, setEditContractEnd] = useState('')
 
   // Refraction Event State (for field glow animations)
   const [glowingFields, setGlowingFields] = useState<Set<string>>(new Set())
@@ -199,6 +200,19 @@ export default function ContactDossierPage() {
     setCurrentCallPage(1)
   }, [id])
 
+  // Enter key in edit mode locks the dossier (same as clicking padlock), except when focus is in a textarea
+  useEffect(() => {
+    if (!isEditing) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !(e.target instanceof HTMLTextAreaElement)) {
+        e.preventDefault()
+        toggleEditing()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [isEditing, toggleEditing])
+
   // Sync local state when contact data arrives
   useEffect(() => {
     if (contact && !isEditing) {
@@ -226,6 +240,7 @@ export default function ContactDossierPage() {
       setEditOther(contact.otherPhone || '')
       setEditCompanyPhone(contact.companyPhone || '')
       setEditPrimaryField(contact.primaryPhoneField || 'mobile')
+      setEditContractEnd(contact.contractEnd ? String(contact.contractEnd).slice(0, 10) : '')
 
       const rawAddrs = Array.isArray(contact.serviceAddresses) ? contact.serviceAddresses : []
       setEditServiceAddresses(
@@ -317,7 +332,8 @@ export default function ContactDossierPage() {
             workDirectPhone: editWorkDirect,
             otherPhone: editOther,
             companyPhone: editCompanyPhone,
-            primaryPhoneField: editPrimaryField
+            primaryPhoneField: editPrimaryField,
+            contractEnd: editContractEnd || undefined
           })
           setShowSynced(true)
           setTimeout(() => setShowSynced(false), 3000)
@@ -332,7 +348,7 @@ export default function ContactDossierPage() {
       }
       triggerSave()
     }
-  }, [isEditing, id, editName, editFirstName, editLastName, editTitle, editCompany, editPhone, editEmail, editNotes, editSupplier, editStrikePrice, editAnnualUsage, editServiceAddresses, editMobile, editWorkDirect, editOther, editCompanyPhone, editPrimaryField, editLogoUrl, editWebsite, editLinkedinUrl, updateContact])
+  }, [isEditing, id, editName, editFirstName, editLastName, editTitle, editCompany, editPhone, editEmail, editNotes, editSupplier, editStrikePrice, editAnnualUsage, editServiceAddresses, editMobile, editWorkDirect, editOther, editCompanyPhone, editPrimaryField, editContractEnd, editLogoUrl, editWebsite, editLinkedinUrl, updateContact])
 
   const contactName = contact?.name || 'Unknown Contact'
   const contactTitle = contact?.title || ''
@@ -597,15 +613,7 @@ export default function ContactDossierPage() {
                   )}
                 </AnimatePresence>
 
-                <div
-                  className="flex flex-col"
-                  onKeyDown={(e) => {
-                    if (isEditing && e.key === 'Enter') {
-                      e.preventDefault()
-                      toggleEditing()
-                    }
-                  }}
-                >
+                <div className="flex flex-col">
                   <div className="flex items-center gap-3 mb-0.5">
                     {isEditing ? (
                       <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -1059,14 +1067,37 @@ export default function ContactDossierPage() {
                   <div>
                     <div className="flex justify-between items-end mb-2">
                       <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Position Maturity</h4>
-                      <div className="text-right">
-                        <span className="text-xs text-zinc-500 mr-2">Expiration:</span>
-                        <span className={cn(
-                          "text-white font-mono font-bold tabular-nums transition-all duration-800",
-                          glowingFields.has('contractEnd') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)] animate-in fade-in duration-500"
-                        )}>
-                          {contractEndDate ? format(contractEndDate, 'MMM dd, yyyy') : 'TBD'}
-                        </span>
+                      <div className="text-right flex items-center gap-2">
+                        <span className="text-xs text-zinc-500">Expiration:</span>
+                        {isEditing ? (
+                          <input
+                            type="date"
+                            value={editContractEnd}
+                            onChange={(e) => setEditContractEnd(e.target.value)}
+                            className="bg-black/40 border border-white/5 rounded-lg px-2 py-1 text-xs font-mono text-white tabular-nums focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
+                          />
+                        ) : (
+                          recentlyUpdatedFields.has('contractEnd') ? (
+                            <motion.span
+                              initial={{ filter: 'blur(6px)', opacity: 0.6 }}
+                              animate={{ filter: 'blur(0px)', opacity: 1 }}
+                              transition={{ duration: 0.4, ease: 'easeOut' }}
+                              className={cn(
+                                "text-white font-mono font-bold tabular-nums inline-block",
+                                glowingFields.has('contractEnd') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)]"
+                              )}
+                            >
+                              {contractEndDate ? format(contractEndDate, 'MMM dd, yyyy') : 'TBD'}
+                            </motion.span>
+                          ) : (
+                            <span className={cn(
+                              "text-white font-mono font-bold tabular-nums transition-all duration-800",
+                              glowingFields.has('contractEnd') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)] animate-in fade-in duration-500"
+                            )}>
+                              {contractEndDate ? format(contractEndDate, 'MMM dd, yyyy') : 'TBD'}
+                            </span>
+                          )
+                        )}
                       </div>
                     </div>
                     
@@ -1343,26 +1374,42 @@ export default function ContactDossierPage() {
                         <AnimatePresence initial={false} mode="popLayout">
                           {recentCalls
                             .slice((currentCallPage - 1) * CALLS_PER_PAGE, currentCallPage * CALLS_PER_PAGE)
-                            .map((call) => (
-                              <motion.div
-                                key={call.id}
-                                layout
-                                initial={{ opacity: 0, x: 20, scale: 0.98 }}
-                                animate={{ opacity: 1, x: 0, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.98 }}
-                                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                                className="hover:translate-x-1 transition-transform"
-                              >
-                                <CallListItem
-                                  call={call}
-                                  contactId={id}
-                                  accountId={contact?.linkedAccountId}
-                                  contactName={contact?.name}
-                                  customerAvatar="contact"
-                                  variant="minimal"
-                                />
-                              </motion.div>
-                            ))}
+                            .map((call) => {
+                              // Determine if this is a company call (to company phone) vs contact call
+                              const companyPhone = account?.companyPhone?.replace(/\D/g, '').slice(-10)
+                              const callToPhone = (call.phoneNumber || '').replace(/\D/g, '').slice(-10)
+                              const isCompanyCall = Boolean(companyPhone && callToPhone && companyPhone === callToPhone)
+                              return (
+                                <motion.div
+                                  key={call.id}
+                                  layout
+                                  initial={{ opacity: 0, x: 20, scale: 0.98 }}
+                                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                                  exit={{ opacity: 0, scale: 0.98 }}
+                                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                                  className="hover:translate-x-1 transition-transform"
+                                >
+                                  <div className="space-y-1">
+                                    {isCompanyCall && (
+                                      <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider px-2">
+                                        Company: {account?.name || 'Unknown'}
+                                      </div>
+                                    )}
+                                    <CallListItem
+                                      call={call}
+                                      contactId={id}
+                                      accountId={contact?.linkedAccountId}
+                                      accountLogoUrl={account?.logoUrl}
+                                      accountDomain={account?.domain}
+                                      accountName={account?.name}
+                                      contactName={contact?.name}
+                                      customerAvatar={isCompanyCall ? 'company' : 'contact'}
+                                      variant="minimal"
+                                    />
+                                  </div>
+                                </motion.div>
+                              )
+                            })}
                         </AnimatePresence>
                       </div>
                     ) : (

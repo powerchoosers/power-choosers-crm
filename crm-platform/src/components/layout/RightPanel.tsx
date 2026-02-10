@@ -55,6 +55,8 @@ export function RightPanel() {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const scrollRafRef = useRef<number | null>(null)
   const lastScrolledRef = useRef<boolean | null>(null)
+  const snapToTopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const SNAP_TOP_THRESHOLD = 80
   /** On dossier: which content to show. Only relevant when isActiveContext. */
   const [dossierPanelView, setDossierPanelView] = useState<DossierPanelView>('context')
   /** Hover over header mode strip: reveal other mode (carousel) without switching. */
@@ -126,6 +128,12 @@ export function RightPanel() {
 
   useEffect(() => {
     setIsReady(true)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (snapToTopTimeoutRef.current !== null) clearTimeout(snapToTopTimeoutRef.current)
+    }
   }, [])
 
   // Update time every second (client-side only to avoid hydration mismatch)
@@ -251,6 +259,17 @@ export function RightPanel() {
                 setIsScrolled(value);
               }
             });
+            // Snap to top when close to top after scroll settles
+            if (snapToTopTimeoutRef.current !== null) clearTimeout(snapToTopTimeoutRef.current);
+            snapToTopTimeoutRef.current = setTimeout(() => {
+              snapToTopTimeoutRef.current = null;
+              const el = scrollContainerRef.current;
+              if (!el) return;
+              const top = el.scrollTop;
+              if (top > 0 && top <= SNAP_TOP_THRESHOLD) {
+                el.scrollTo({ top: 0, behavior: 'smooth' });
+              }
+            }, 120);
           }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

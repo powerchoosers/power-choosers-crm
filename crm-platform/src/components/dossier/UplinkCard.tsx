@@ -51,6 +51,8 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
           name: contact.companyName || contact.company,
           account: contact.companyName || contact.company,
           isAccountOnly: true,
+          logoUrl: contact.logoUrl,
+          domain: contact.companyDomain,
           industry: contact.industry,
           location: contact.location,
           annualUsage: contact.annualUsage,
@@ -84,8 +86,8 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
 
   useEffect(() => {
     const phoneEntries: PhoneEntry[] = []
-    
-    // Add existing phones if they have values
+
+    // Add existing phones if they have values (Uplink shows mobile, workDirect, other, company)
     if (contact.mobile) {
       phoneEntries.push({ id: 'mobile', label: 'Mobile', value: contact.mobile, icon: Smartphone })
     }
@@ -97,6 +99,10 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
     }
     if (contact.companyPhone) {
       phoneEntries.push({ id: 'companyPhone', label: 'Company', value: contact.companyPhone, icon: Building2 })
+    }
+    // Fallback: contact.phone (e.g. from Org Intelligence before we set mobile) so Uplink always shows it
+    if (phoneEntries.length === 0 && contact.phone) {
+      phoneEntries.push({ id: 'mobile', label: 'Phone', value: contact.phone, icon: Smartphone })
     }
 
     // Ensure we have at least one entry for editing if empty

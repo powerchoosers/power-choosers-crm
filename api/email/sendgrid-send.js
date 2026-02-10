@@ -26,8 +26,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { to, subject, content, plainTextContent, from, fromName, _deliverability, threadId, inReplyTo, references, isHtmlEmail, userEmail, emailSettings, contactId, contactName, contactCompany, dryRun } = req.body;
-    logger.info(`[Gmail] Attempting to send email to: ${to}, subject: ${subject}, user: ${userEmail}`, 'sendgrid-send');
+    const { to, subject, content, plainTextContent, from, fromName, _deliverability, threadId, inReplyTo, references, isHtmlEmail, userEmail, emailSettings, contactId, contactName, contactCompany, dryRun, attachments } = req.body;
+    logger.info(`[Gmail] Attempting to send email to: ${to}, subject: ${subject}, user: ${userEmail}, attachments: ${attachments?.length || 0}`, 'sendgrid-send');
 
     if (!to || !subject || !content) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -172,7 +172,7 @@ export default async function handler(req, res) {
     // The Gmail service will automatically look up sender info from user profile
     const gmailService = new GmailService();
 
-    logger.debug('[Gmail] Sending email:', { to, subject, trackingId, userEmail });
+    logger.debug('[Gmail] Sending email:', { to, subject, trackingId, userEmail, attachments: attachments?.length || 0 });
 
     const result = await gmailService.sendEmail({
       to,
@@ -185,7 +185,8 @@ export default async function handler(req, res) {
       fromName: fromName, // Optional override
       threadId: threadId || undefined,
       inReplyTo: inReplyTo || undefined,
-      references: Array.isArray(references) ? references : (references ? [references] : undefined)
+      references: Array.isArray(references) ? references : (references ? [references] : undefined),
+      attachments: attachments || undefined
     });
 
     // Update email record with sent status and Gmail message ID
