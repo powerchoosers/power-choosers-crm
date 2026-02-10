@@ -349,10 +349,10 @@ function ProtocolArchitectInner() {
   const { screenToFlowPosition } = useReactFlow();
   
   // Real Data Integration
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { protocol, saveProtocol, isSaving } = useProtocolBuilder(id as string);
   const burnerFrom = getBurnerFromEmail(user?.email ?? undefined);
-  const burnerSenderName = getBurnerSenderName(user?.firstName ?? undefined);
+  const burnerSenderName = getBurnerSenderName(profile?.firstName ?? undefined);
   
   // State
   const [nodes, setNodes, onNodesChange] = useNodesState(
