@@ -41,8 +41,8 @@ export function useSearchCalls(queryTerm: string) {
         .from('calls')
         .select('*, contacts!calls_contactId_fkey(name)')
 
-      // Search in ai_summary, transcript, or contact name (column is ai_summary after migration)
-      query = query.or(`ai_summary.ilike.%${queryTerm}%,transcript.ilike.%${queryTerm}%,contacts.name.ilike.%${queryTerm}%`)
+      // Search in summary, transcript, or contact name
+      query = query.or(`summary.ilike.%${queryTerm}%,transcript.ilike.%${queryTerm}%,contacts.name.ilike.%${queryTerm}%`)
 
       const { data, error } = await query.limit(5)
 
@@ -62,8 +62,8 @@ export function useSearchCalls(queryTerm: string) {
         return {
           id: item.id,
           contactName: contact?.name || 'Unknown',
-          summary: item.ai_summary || item.summary,
-          date: item.timestamp || item.created_at || item.createdAt
+          summary: item.summary,
+          date: item.timestamp || item.createdAt
         }
       })
     },
@@ -86,7 +86,7 @@ export function useCallsCount(searchQuery?: string) {
           .select('id', { count: 'exact', head: true })
 
         if (searchQuery) {
-          query = query.or(`ai_summary.ilike.%${searchQuery}%,transcript.ilike.%${searchQuery}%`)
+          query = query.or(`summary.ilike.%${searchQuery}%,transcript.ilike.%${searchQuery}%`)
         }
 
         const { count, error } = await query
@@ -206,7 +206,7 @@ export function useCalls(searchQuery?: string) {
         .select('*, accounts!calls_accountId_fkey(name, city, state, industry, logo_url, domain)', { count: 'exact' })
 
       if (searchQuery) {
-        query = query.or(`ai_summary.ilike.%${searchQuery}%,transcript.ilike.%${searchQuery}%,contact_name.ilike.%${searchQuery}%`)
+        query = query.or(`summary.ilike.%${searchQuery}%,transcript.ilike.%${searchQuery}%`)
       }
 
       const from = pageParam * PAGE_SIZE
@@ -234,25 +234,25 @@ export function useCalls(searchQuery?: string) {
         const durationStr = [hours, minutes, seconds].map(v => String(v).padStart(2, '0')).join(':')
 
         const contact = Array.isArray(item.contacts) ? item.contacts[0] : item.contacts
-        const contactName = item.contact_name ?? contact?.name ?? 'Unknown'
+        const contactName = contact?.name ?? 'Unknown'
         const account = Array.isArray(item.accounts) ? item.accounts[0] : item.accounts
 
         return {
           id: item.id,
           contactName,
-          phoneNumber: (item.from_phone || item.from) === user.email ? (item.to_phone || item.to) : (item.from_phone || item.from), // Rough guess
+          phoneNumber: item.direction === 'outbound' ? (item.to || '') : (item.from || ''),
           type: type as Call['type'],
           status: status as Call['status'],
           duration: durationStr,
-          date: item.timestamp || item.created_at || item.createdAt,
-          note: item.ai_summary || item.summary,
-          recordingUrl: item.recording_url || item.recordingUrl,
-          recordingSid: item.recording_sid || item.recordingSid,
+          date: item.timestamp || item.createdAt || '',
+          note: item.summary,
+          recordingUrl: item.recordingUrl,
+          recordingSid: item.callSid || item.id,
           transcript: item.transcript,
-          aiInsights: item.ai_insights || item.aiInsights,
-          contactId: item.contact_id || item.contactId,
-          accountId: item.account_id || item.accountId,
-          accountName: account?.name ?? item.account_name ?? undefined,
+          aiInsights: item.aiInsights,
+          contactId: item.contactId,
+          accountId: item.accountId,
+          accountName: account?.name || undefined,
           accountCity: account?.city ?? undefined,
           accountState: account?.state ?? undefined,
           accountIndustry: account?.industry ?? undefined,
@@ -289,7 +289,7 @@ export function useAccountCalls(accountId: string, contactIds?: string[]) {
           event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
           schema: 'public',
           table: 'calls',
-          filter: `account_id=eq.${accountId}`,
+          filter: `accountId=eq.${accountId}`,
         },
         (payload) => {
           console.log('Real-time call update for account:', accountId, payload)
@@ -309,20 +309,25 @@ export function useAccountCalls(accountId: string, contactIds?: string[]) {
     queryFn: async () => {
       if (!accountId || loading || !user) return []
 
-      // Fetch calls by account_id (company calls) OR contact_id in contactIds (contact calls at this account)
-      let query = supabase
-        .from('calls')
-        .select('*, contacts!calls_contactId_fkey(name)')
+      // Fetch calls: accountId = this account, or contactId in contactIds (two queries then merge to avoid .or() issues)
+      const [accountRes, contactRes] = await Promise.all([
+        supabase.from('calls').select('*, contacts!calls_contactId_fkey(name)').eq('accountId', accountId).order('timestamp', { ascending: false }),
+        contactIds && contactIds.length > 0
+          ? supabase.from('calls').select('*, contacts!calls_contactId_fkey(name)').in('contactId', contactIds).order('timestamp', { ascending: false })
+          : Promise.resolve({ data: [] as CallRow[], error: null })
+      ])
 
-      if (contactIds && contactIds.length > 0) {
-        query = query.or(`account_id.eq.${accountId},contact_id.in.(${contactIds.join(',')})`)
-      } else {
-        query = query.eq('account_id', accountId)
-      }
+      if (accountRes.error) throw accountRes.error
+      if (contactRes.error) throw contactRes.error
 
-      const { data, error } = await query.order('timestamp', { ascending: false })
-
-      if (error) throw error
+      const byId = new Map<string, CallRow>()
+      for (const row of accountRes.data || []) byId.set(row.id, row)
+      for (const row of contactRes.data || []) if (!byId.has(row.id)) byId.set(row.id, row)
+      const data = Array.from(byId.values()).sort((a, b) => {
+        const ta = (a.timestamp || a.createdAt || '').toString()
+        const tb = (b.timestamp || b.createdAt || '').toString()
+        return tb.localeCompare(ta)
+      })
 
       return (data as CallRow[]).map(item => {
         const type = item.direction === 'inbound' ? 'Inbound' : 'Outbound'
@@ -335,20 +340,20 @@ export function useAccountCalls(accountId: string, contactIds?: string[]) {
 
         return {
           id: item.id,
-          callSid: item.callSid ?? item.call_sid ?? item.id,
+          callSid: item.callSid || item.id,
           contactName: contact?.name || 'Unknown',
-          phoneNumber: (item.from_phone ?? item.from) || (item.to_phone ?? item.to) || '',
+          phoneNumber: item.direction === 'outbound' ? (item.to || '') : (item.from || ''),
           type: type as Call['type'],
           status: status as Call['status'],
           duration: durationStr,
-          date: item.timestamp ?? item.createdAt ?? item.created_at ?? '',
-          note: item.ai_summary ?? item.summary,
-          recordingUrl: item.recordingUrl ?? item.recording_url,
-          recordingSid: item.recordingSid ?? item.recording_sid,
+          date: item.timestamp ?? item.createdAt ?? '',
+          note: item.summary,
+          recordingUrl: item.recordingUrl,
+          recordingSid: item.callSid || item.id,
           transcript: item.transcript,
-          aiInsights: item.aiInsights ?? item.ai_insights,
-          contactId: item.contactId ?? item.contact_id,
-          accountId: item.accountId ?? item.account_id
+          aiInsights: item.aiInsights,
+          contactId: item.contactId,
+          accountId: item.accountId
         }
       }) as Call[]
     },
@@ -376,7 +381,7 @@ export function useContactCalls(contactId: string, companyPhone?: string) {
           event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
           schema: 'public',
           table: 'calls',
-          filter: `contact_id=eq.${contactId}`,
+          filter: `contactId=eq.${contactId}`,
         },
         (payload) => {
           console.log('Real-time call update for contact:', contactId, payload)
@@ -396,28 +401,29 @@ export function useContactCalls(contactId: string, companyPhone?: string) {
     queryFn: async () => {
       if (!contactId || loading || !user) return []
 
-      // Fetch calls to this contact OR to the company phone (if provided)
-      let query = supabase.from('calls').select('*')
+      // Fetch calls to this contact; optionally also calls to company phone (second query, then merge)
+      const contactRes = await supabase.from('calls').select('*').eq('contactId', contactId).order('timestamp', { ascending: false }).limit(50)
 
+      if (contactRes.error) {
+        console.error('Error fetching contact calls:', contactRes.error)
+        return []
+      }
+
+      let data = (contactRes.data || []) as CallRow[]
       if (companyPhone?.trim()) {
         const normalized = companyPhone.replace(/\D/g, '').slice(-10)
         if (normalized) {
-          // Query: contact_id = contactId OR to_phone/to ends with normalized company phone
-          query = query.or(`contact_id.eq.${contactId},to_phone.ilike.%${normalized},to.ilike.%${normalized}`)
-        } else {
-          query = query.eq('contact_id', contactId)
+          const companyRes = await supabase.from('calls').select('*').or(`to.ilike.%${normalized}`).order('timestamp', { ascending: false }).limit(50)
+          if (!companyRes.error && companyRes.data?.length) {
+            const byId = new Map(data.map((r) => [r.id, r]))
+            for (const row of companyRes.data as CallRow[]) if (!byId.has(row.id)) byId.set(row.id, row)
+            data = Array.from(byId.values()).sort((a, b) => {
+              const ta = (a.timestamp || a.createdAt || '').toString()
+              const tb = (b.timestamp || b.createdAt || '').toString()
+              return tb.localeCompare(ta)
+            })
+          }
         }
-      } else {
-        query = query.eq('contact_id', contactId)
-      }
-
-      const { data, error } = await query
-        .order('timestamp', { ascending: false })
-        .limit(50)
-
-      if (error) {
-        console.error('Error fetching contact calls:', error)
-        return []
       }
 
       return (data as CallRow[]).map(item => {
@@ -428,25 +434,25 @@ export function useContactCalls(contactId: string, companyPhone?: string) {
         const minutes = Math.floor((durationNum % 3600) / 60)
         const seconds = durationNum % 60
         const durationStr = [hours, minutes, seconds].map(v => String(v).padStart(2, '0')).join(':')
-        const fromVal = item.from_phone ?? item.from
-        const toVal = item.to_phone ?? item.to
+        const fromVal = item.from
+        const toVal = item.to
 
         return {
           id: item.id,
-          callSid: item.callSid ?? item.call_sid ?? item.id,
+          callSid: item.callSid || item.id,
           contactName: '',
-          phoneNumber: fromVal === user.email ? toVal : fromVal,
+          phoneNumber: item.direction === 'outbound' ? (toVal || '') : (fromVal || ''),
           type: type as Call['type'],
           status: status as Call['status'],
           duration: durationStr,
-          date: item.timestamp ?? item.createdAt ?? item.created_at ?? '',
-          note: item.ai_summary ?? item.summary,
-          recordingUrl: item.recordingUrl ?? item.recording_url,
-          recordingSid: item.recordingSid ?? item.recording_sid,
+          date: item.timestamp ?? item.createdAt ?? '',
+          note: item.summary,
+          recordingUrl: item.recordingUrl,
+          recordingSid: item.callSid || item.id,
           transcript: item.transcript,
-          aiInsights: item.aiInsights ?? item.ai_insights,
-          contactId: item.contactId ?? item.contact_id,
-          accountId: item.accountId ?? item.account_id
+          aiInsights: item.aiInsights,
+          contactId: item.contactId,
+          accountId: item.accountId
         }
       }) as Call[]
     },

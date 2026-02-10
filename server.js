@@ -95,6 +95,7 @@ import sendgridSendHandler from './api/email/sendgrid-send.js';
 import inboundEmailHandler from './api/email/inbound-email.js';
 import createBookingHandler from './api/create-booking.js';
 import gmailSendSequenceHandler from './api/email/gmail-send-sequence.js';
+import gmailAttachmentHandler from './api/gmail/attachment.js';
 
 // ADDITIONAL IMPORTS FOR REMAINING PROXY FUNCTIONS
 import emailUnsubscribeHandler from './api/email/unsubscribe.js';
@@ -930,6 +931,20 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/email/gmail-send-sequence') {
     return handleApiGmailSendSequence(req, res);
+  }
+  if (pathname === '/api/gmail/attachment') {
+    // Parse request body before calling handler
+    if (req.method === 'POST') {
+      try {
+        req.body = await parseRequestBody(req);
+      } catch (error) {
+        console.error('[Server] Gmail Attachment - Body Parse Error:', error.message);
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid request body' }));
+        return;
+      }
+    }
+    return await gmailAttachmentHandler(req, res);
   }
   if (pathname === '/api/process-call') {
     return handleApiProcessCall(req, res);
