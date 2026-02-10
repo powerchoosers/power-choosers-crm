@@ -32,10 +32,10 @@ export function useSearchCalls(queryTerm: string) {
 
       let query = supabase
         .from('calls')
-        .select('*, contacts(name, ownerId)')
+        .select('*, contacts!calls_contactId_fkey(name)')
 
-      // Search in summary, transcript, or contact name
-      query = query.or(`summary.ilike.%${queryTerm}%,transcript.ilike.%${queryTerm}%,contacts.name.ilike.%${queryTerm}%`)
+      // Search in ai_summary, transcript, or contact name (column is ai_summary after migration)
+      query = query.or(`ai_summary.ilike.%${queryTerm}%,transcript.ilike.%${queryTerm}%,contacts.name.ilike.%${queryTerm}%`)
 
       const { data, error } = await query.limit(5)
 
@@ -79,7 +79,7 @@ export function useCallsCount(searchQuery?: string) {
           .select('id', { count: 'exact', head: true })
 
         if (searchQuery) {
-          query = query.or(`summary.ilike.%${searchQuery}%,transcript.ilike.%${searchQuery}%`)
+          query = query.or(`ai_summary.ilike.%${searchQuery}%,transcript.ilike.%${searchQuery}%`)
         }
 
         const { count, error } = await query
@@ -183,11 +183,11 @@ export function useCalls(searchQuery?: string) {
 
       let query = supabase
         .from('calls')
-        .select('*, contacts(name, ownerId)', { count: 'exact' })
+        .select('*, contacts!calls_contactId_fkey(name)', { count: 'exact' })
 
       if (searchQuery) {
-        // Search in contact name, summary, or transcript
-        query = query.or(`summary.ilike.%${searchQuery}%,transcript.ilike.%${searchQuery}%,contacts.name.ilike.%${searchQuery}%`)
+        // Search in contact name, ai_summary, or transcript (column is ai_summary after migration)
+        query = query.or(`ai_summary.ilike.%${searchQuery}%,transcript.ilike.%${searchQuery}%,contacts.name.ilike.%${searchQuery}%`)
       }
 
       const from = pageParam * PAGE_SIZE
