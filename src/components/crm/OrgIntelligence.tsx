@@ -1043,11 +1043,14 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
               <div className="px-3 py-3 border border-white/5 nodal-recessed rounded-xl mx-1 mt-1 space-y-3">
                 <div className="flex items-start gap-3">
                   <div className="relative group/logo">
+                    {/* Key by account logo/domain so when CRM account loads we remount and show same logo as dossier header (avoids wrong Apollo fallback) */}
                     <CompanyIcon
+                      key={`org-logo-${accountLogoUrl ?? ''}-${accountDomain ?? ''}`}
                       logoUrl={accountLogoUrl && accountLogoUrl.trim() ? accountLogoUrl.trim() : companySummary.logoUrl}
                       domain={accountDomain && accountDomain.trim() ? accountDomain.trim() : companySummary.domain}
                       name={companySummary.name || companyName || ''}
                       size={40}
+                      roundedClassName="rounded-[14px]"
                       className="w-10 h-10 transition-all"
                     />
                     {companySummary.domain && (

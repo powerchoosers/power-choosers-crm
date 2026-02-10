@@ -15,6 +15,8 @@ interface CompanyIconProps {
   className?: string
   /** Override border radius (e.g. rounded-[8px] for small sizes so squircle is visible) */
   roundedClassName?: string
+  /** When true, plays a brief "deleting" animation for visual feedback after purge. */
+  isDeleting?: boolean
 }
 
 const DEFAULT_ROUNDED = 'rounded-[14px]'
@@ -56,7 +58,8 @@ function CompanyIconInner({
   name, 
   size = 32, 
   className,
-  roundedClassName = DEFAULT_ROUNDED
+  roundedClassName = DEFAULT_ROUNDED,
+  isDeleting = false
 }: CompanyIconProps) {
   const effectiveLogoUrl = (typeof logoUrl === 'string' && logoUrl.trim()) ? logoUrl.trim() : undefined
   const effectiveDomain = (typeof domain === 'string' && domain.trim()) ? domain.trim() : undefined
@@ -138,12 +141,18 @@ function CompanyIconInner({
   if (!currentSrc) {
     return (
       <motion.div
+        layout
         initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
+        animate={
+          isDeleting
+            ? { scale: 0.88, opacity: 0.6, transition: { duration: 0.35, ease: 'easeOut' } }
+            : { opacity: 1, scale: 1, transition: { duration: 0.25, ease: 'easeOut' } }
+        }
         className={cn(
           'nodal-glass bg-zinc-900/80 flex items-center justify-center text-zinc-400 border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)] shrink-0',
           roundedClassName,
-          className
+          className,
+          isDeleting && 'ring-2 ring-red-500/70'
         )}
         style={{ width: size, height: size }}
         title={name}
@@ -162,7 +171,8 @@ function CompanyIconInner({
   }
 
   return (
-    <div
+    <motion.div
+      layout
       className={cn(
         'relative shrink-0 overflow-hidden nodal-glass bg-zinc-900/80 border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)]',
         roundedClassName,
@@ -170,6 +180,11 @@ function CompanyIconInner({
       )}
       style={{ width: size, height: size }}
       title={name}
+      animate={
+        isDeleting
+          ? { scale: 0.88, opacity: 0.6, transition: { duration: 0.35, ease: 'easeOut' } }
+          : { scale: 1, opacity: 1, transition: { duration: 0.25, ease: 'easeOut' } }
+      }
     >
       <AnimatePresence mode="wait">
         {!isLoaded && (
@@ -205,7 +220,18 @@ function CompanyIconInner({
       </motion.div>
 
       <div className={cn('absolute inset-0 pointer-events-none ring-1 ring-white/20', roundedClassName)} />
-    </div>
+      <AnimatePresence>
+        {isDeleting && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className={cn('absolute inset-0 pointer-events-none ring-2 ring-red-500/70', roundedClassName)}
+          />
+        )}
+      </AnimatePresence>
+    </motion.div>
   )
 }
 

@@ -1002,7 +1002,9 @@ export function useUpdateContact() {
       if (updates.primaryPhoneField !== undefined) dbUpdates.primaryPhoneField = updates.primaryPhoneField
       if (updates.city !== undefined) dbUpdates.city = updates.city
       if (updates.state !== undefined) dbUpdates.state = updates.state
-      
+      if (updates.firstName !== undefined) dbUpdates.firstName = updates.firstName
+      if (updates.lastName !== undefined) dbUpdates.lastName = updates.lastName
+
       dbUpdates.updatedAt = new Date().toISOString()
 
       // 1. Update Contact Table

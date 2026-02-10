@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { differenceInCalendarDays, format, isValid, parseISO, formatDistanceToNow } from 'date-fns'
 import { 
@@ -18,7 +18,7 @@ import { useAccount } from '@/hooks/useAccounts'
 import { useContactCalls } from '@/hooks/useCalls'
 import { useApolloNews } from '@/hooks/useApolloNews'
 import { useEntityTasks } from '@/hooks/useEntityTasks'
-import { useTasks } from '@/hooks/useTasks'
+import { useTasks, useAllPendingTasks } from '@/hooks/useTasks'
 import { TaskCommandBar } from '@/components/crm/TaskCommandBar'
 import { CallListItem } from '@/components/calls/CallListItem'
 import { useUIStore } from '@/store/uiStore'
@@ -57,6 +57,7 @@ function clamp01(n: number) {
 export default function ContactDossierPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const id = (params?.id as string) || ''
 
   const { data: contact, isLoading, isFetched } = useContact(id)
@@ -88,6 +89,8 @@ export default function ContactDossierPage() {
 
   // Local Field States for Editing
   const [editName, setEditName] = useState('')
+  const [editFirstName, setEditFirstName] = useState('')
+  const [editLastName, setEditLastName] = useState('')
   const [editTitle, setEditTitle] = useState('')
   const [editCompany, setEditCompany] = useState('')
   const [editPhone, setEditPhone] = useState('')
@@ -118,20 +121,77 @@ export default function ContactDossierPage() {
   const lastEnrichedContactId = useUIStore((s) => s.lastEnrichedContactId)
 
   const { pendingTasks } = useEntityTasks(id, contact?.name)
+  const { data: allPendingData } = useAllPendingTasks()
+  const allPendingTasks = allPendingData?.allPendingTasks ?? []
+  const globalTotal = allPendingData?.totalCount ?? 0
   const { updateTask } = useTasks()
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0)
   const hasTasks = pendingTasks.length > 0
   const displayTaskIndex = Math.min(currentTaskIndex, Math.max(0, pendingTasks.length - 1))
+  const currentTask = pendingTasks[displayTaskIndex]
+  const globalIndex = currentTask ? allPendingTasks.findIndex((t) => t.id === currentTask.id) : -1
+  const globalPosition = globalIndex >= 0 ? globalIndex + 1 : 0
 
   useEffect(() => {
     setCurrentTaskIndex((prev) => Math.min(prev, Math.max(0, pendingTasks.length - 1)))
   }, [pendingTasks.length])
 
+  const taskIdFromUrl = searchParams.get('taskId')
+  useEffect(() => {
+    if (!taskIdFromUrl || !pendingTasks.length) return
+    const idx = pendingTasks.findIndex((t) => t.id === taskIdFromUrl)
+    if (idx >= 0) setCurrentTaskIndex(idx)
+  }, [taskIdFromUrl, pendingTasks])
+
+  const navigateToTaskDossier = (task: { id: string; contactId?: string; accountId?: string }) => {
+    if (task.contactId) {
+      router.push(`/network/contacts/${task.contactId}?taskId=${encodeURIComponent(task.id)}`)
+    } else if (task.accountId) {
+      router.push(`/network/accounts/${task.accountId}?taskId=${encodeURIComponent(task.id)}`)
+    }
+  }
+
+  const handlePrev = () => {
+    if (globalIndex <= 0) return
+    const prevTask = allPendingTasks[globalIndex - 1]
+    if (!prevTask) return
+    const isSameEntity = (prevTask.contactId && prevTask.contactId === id) || (prevTask.accountId && prevTask.accountId === id)
+    if (!isSameEntity && (prevTask.contactId || prevTask.accountId)) {
+      navigateToTaskDossier(prevTask)
+    } else {
+      const localIdx = pendingTasks.findIndex((t) => t.id === prevTask.id)
+      if (localIdx >= 0) setCurrentTaskIndex(localIdx)
+    }
+  }
+
+  const handleNext = () => {
+    if (globalIndex < 0 || globalIndex >= allPendingTasks.length - 1) return
+    const nextTask = allPendingTasks[globalIndex + 1]
+    if (!nextTask) return
+    const isSameEntity = (nextTask.contactId && nextTask.contactId === id) || (nextTask.accountId && nextTask.accountId === id)
+    if (!isSameEntity && (nextTask.contactId || nextTask.accountId)) {
+      navigateToTaskDossier(nextTask)
+    } else {
+      const localIdx = pendingTasks.findIndex((t) => t.id === nextTask.id)
+      if (localIdx >= 0) setCurrentTaskIndex(localIdx)
+    }
+  }
+
   const handleCompleteAndAdvance = () => {
     const task = pendingTasks[displayTaskIndex]
     if (!task) return
     updateTask({ id: task.id, status: 'Completed' })
-    if (pendingTasks.length <= 1) toast.success('Mission complete')
+    const nextGlobalIndex = globalIndex >= 0 ? globalIndex : 0
+    if (nextGlobalIndex + 1 < allPendingTasks.length) {
+      const nextTask = allPendingTasks[nextGlobalIndex + 1]
+      if (nextTask && (nextTask.contactId || nextTask.accountId)) {
+        navigateToTaskDossier(nextTask)
+      } else {
+        toast.success('Task completed')
+      }
+    } else {
+      toast.success('Mission complete')
+    }
   }
 
   // Reset pagination when contact changes
@@ -142,7 +202,12 @@ export default function ContactDossierPage() {
   // Sync local state when contact data arrives
   useEffect(() => {
     if (contact && !isEditing) {
+      const c = contact as { firstName?: string; lastName?: string }
+      const first = c.firstName ?? (contact.name || '').split(/\s+/)[0] ?? ''
+      const last = c.lastName ?? (contact.name || '').split(/\s+/).slice(1).join(' ') ?? ''
       setEditName(contact.name || '')
+      setEditFirstName(first)
+      setEditLastName(last)
       setEditTitle(contact.title || '')
       setEditCompany(contact.companyName || contact.company || '')
       setEditPhone(contact.phone || '')
@@ -228,10 +293,13 @@ export default function ContactDossierPage() {
     if (wasEditing && !isEditing) {
       const triggerSave = async () => {
         setIsSaving(true)
+        const fullName = [editFirstName, editLastName].filter(Boolean).join(' ').trim() || editName
         try {
           await updateContact.mutateAsync({
             id,
-            name: editName,
+            name: fullName,
+            firstName: editFirstName,
+            lastName: editLastName,
             title: editTitle,
             companyName: editCompany,
             phone: editPhone,
@@ -264,7 +332,7 @@ export default function ContactDossierPage() {
       }
       triggerSave()
     }
-  }, [isEditing, id, editName, editTitle, editCompany, editPhone, editEmail, editNotes, editSupplier, editStrikePrice, editAnnualUsage, editServiceAddresses, editMobile, editWorkDirect, editOther, editCompanyPhone, editPrimaryField, editLogoUrl, editWebsite, editLinkedinUrl, updateContact])
+  }, [isEditing, id, editName, editFirstName, editLastName, editTitle, editCompany, editPhone, editEmail, editNotes, editSupplier, editStrikePrice, editAnnualUsage, editServiceAddresses, editMobile, editWorkDirect, editOther, editCompanyPhone, editPrimaryField, editLogoUrl, editWebsite, editLinkedinUrl, updateContact])
 
   const contactName = contact?.name || 'Unknown Contact'
   const contactTitle = contact?.title || ''
@@ -529,17 +597,34 @@ export default function ContactDossierPage() {
                   )}
                 </AnimatePresence>
 
-                <div className="flex flex-col">
+                <div
+                  className="flex flex-col"
+                  onKeyDown={(e) => {
+                    if (isEditing && e.key === 'Enter') {
+                      e.preventDefault()
+                      toggleEditing()
+                    }
+                  }}
+                >
                   <div className="flex items-center gap-3 mb-0.5">
                     {isEditing ? (
-                      <input
-                        type="text"
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        className="text-2xl font-semibold tracking-tighter text-white bg-transparent border-none outline-none focus:ring-1 focus:ring-[#002FA7]/50 rounded px-1 -ml-1 w-full"
-                        placeholder="Contact Name"
-                        autoFocus
-                      />
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <input
+                          type="text"
+                          value={editFirstName}
+                          onChange={(e) => setEditFirstName(e.target.value)}
+                          className="text-2xl font-semibold tracking-tighter text-white bg-transparent border-none outline-none focus:ring-1 focus:ring-[#002FA7]/50 rounded px-1 -ml-1 flex-1 min-w-0"
+                          placeholder="First name"
+                          autoFocus
+                        />
+                        <input
+                          type="text"
+                          value={editLastName}
+                          onChange={(e) => setEditLastName(e.target.value)}
+                          className="text-2xl font-semibold tracking-tighter text-white bg-transparent border-none outline-none focus:ring-1 focus:ring-[#002FA7]/50 rounded px-1 flex-1 min-w-0"
+                          placeholder="Last name"
+                        />
+                      </div>
                     ) : (
                       <>
                         {recentlyUpdatedFields.has('name') ? (
@@ -549,10 +634,10 @@ export default function ContactDossierPage() {
                             transition={{ duration: 0.4, ease: 'easeOut' }}
                             className="text-2xl font-semibold tracking-tighter text-white"
                           >
-                            {editName || contactName}
+                            {[editFirstName, editLastName].filter(Boolean).join(' ') || editName || contactName}
                           </motion.h1>
                         ) : (
-                          <h1 className="text-2xl font-semibold tracking-tighter text-white">{editName || contactName}</h1>
+                          <h1 className="text-2xl font-semibold tracking-tighter text-white">{[editFirstName, editLastName].filter(Boolean).join(' ') || editName || contactName}</h1>
                         )}
                         
                         {/* THE SIGNAL ARRAY */}
@@ -829,9 +914,11 @@ export default function ContactDossierPage() {
                       <TaskCommandBar
                         pendingTasks={pendingTasks}
                         currentIndex={displayTaskIndex}
-                        onPrev={() => setCurrentTaskIndex((p) => Math.max(0, p - 1))}
-                        onNext={() => setCurrentTaskIndex((p) => Math.min(pendingTasks.length - 1, p + 1))}
-                        onSkip={() => setCurrentTaskIndex((p) => Math.min(pendingTasks.length - 1, p + 1))}
+                        globalTotal={globalTotal}
+                        globalPosition={globalPosition}
+                        onPrev={handlePrev}
+                        onNext={handleNext}
+                        onSkip={handleNext}
                         onCompleteAndAdvance={handleCompleteAndAdvance}
                       />
                     </>
