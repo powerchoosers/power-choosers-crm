@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
 import { formatToE164 } from '@/lib/utils'
 import { usePathname } from 'next/navigation'
+import { IncomingCallToast } from '@/components/calls/IncomingCallToast'
 
 interface VoiceMetadata {
   name?: string
@@ -14,6 +15,8 @@ interface VoiceMetadata {
   title?: string
   logoUrl?: string
   domain?: string
+  city?: string
+  state?: string
   industry?: string
   description?: string
   linkedinUrl?: string
@@ -87,11 +90,17 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
             meta.title = data.contact.title
             meta.contactId = data.contact.id
             meta.accountId = data.contact.accountId
+            meta.city = data.contact.city
+            meta.state = data.contact.state
+            meta.logoUrl = data.contact.logoUrl
+            meta.domain = data.contact.domain
           } else if (data.account) {
             meta.name = data.account.name
             meta.logoUrl = data.account.logoUrl
             meta.domain = data.account.domain
             meta.accountId = data.account.id
+            meta.city = data.account.city
+            meta.state = data.account.state
           }
           return meta
         }
@@ -291,8 +300,9 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         const meta = await resolvePhoneMeta(from)
         setMetadata(meta)
 
-        const toastId = toast.info(`Incoming Call: ${meta?.name || from}`, {
-          description: meta?.account ? `from ${meta.account}` : 'Unknown Caller',
+        const toastId = toast.info(
+          <IncomingCallToast meta={meta} from={from} />,
+          {
           action: {
             label: 'Answer',
             onClick: async () => {
@@ -333,7 +343,8 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
             }
           },
           duration: 30000, // Longer duration for incoming call
-        })
+          }
+        )
         
         call.on('cancel', () => {
           console.log('[Voice] Call cancelled by caller')

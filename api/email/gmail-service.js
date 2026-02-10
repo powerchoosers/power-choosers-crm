@@ -225,7 +225,7 @@ export class GmailService {
      * Send email via Gmail API
      */
     async sendEmail(emailData) {
-        const { to, subject, html, text, from, fromName, inReplyTo, references, threadId, userEmail, ownerId } = emailData;
+        const { to, subject, html, text, from, fromName, inReplyTo, references, threadId, userEmail, ownerId, attachments } = emailData;
         
         // Look up sender info from user profile (if userEmail or ownerId provided)
         const lookupEmail = userEmail || ownerId;
@@ -261,15 +261,23 @@ export class GmailService {
         
         try {
             // Build MIME message
-            const boundary = '----=_Part_' + Date.now().toString(36);
+            const hasAttachments = attachments && Array.isArray(attachments) && attachments.length > 0;
+            const mixedBoundary = '----=_Part_Mixed_' + Date.now().toString(36);
+            const altBoundary = '----=_Part_Alt_' + Date.now().toString(36);
             
             let mimeMessage = [
                 `From: ${this.formatFromHeader(senderName, senderEmail)}`,
                 `To: ${this.sanitizeHeaderValue(to)}`,
                 `Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`,
                 'MIME-Version: 1.0',
-                `Content-Type: multipart/alternative; boundary="${boundary}"`,
             ];
+            
+            // Use multipart/mixed if there are attachments, otherwise multipart/alternative
+            if (hasAttachments) {
+                mimeMessage.push(`Content-Type: multipart/mixed; boundary="${mixedBoundary}"`);
+            } else {
+                mimeMessage.push(`Content-Type: multipart/alternative; boundary="${altBoundary}"`);
+            }
             
             // Add threading headers if present
             if (inReplyTo) {
@@ -281,9 +289,16 @@ export class GmailService {
             
             mimeMessage.push(''); // Empty line before body
             
+            if (hasAttachments) {
+                // Start with alternative part (text + HTML)
+                mimeMessage.push(`--${mixedBoundary}`);
+                mimeMessage.push(`Content-Type: multipart/alternative; boundary="${altBoundary}"`);
+                mimeMessage.push('');
+            }
+            
             // Plain text part
             if (text) {
-                mimeMessage.push(`--${boundary}`);
+                mimeMessage.push(`--${altBoundary}`);
                 mimeMessage.push('Content-Type: text/plain; charset=UTF-8');
                 mimeMessage.push('Content-Transfer-Encoding: base64');
                 mimeMessage.push('');
@@ -292,14 +307,27 @@ export class GmailService {
             
             // HTML part
             if (html) {
-                mimeMessage.push(`--${boundary}`);
+                mimeMessage.push(`--${altBoundary}`);
                 mimeMessage.push('Content-Type: text/html; charset=UTF-8');
                 mimeMessage.push('Content-Transfer-Encoding: base64');
                 mimeMessage.push('');
                 mimeMessage.push(Buffer.from(html).toString('base64'));
             }
             
-            mimeMessage.push(`--${boundary}--`);
+            mimeMessage.push(`--${altBoundary}--`);
+            
+            // Add attachments if present
+            if (hasAttachments) {
+                for (const attachment of attachments) {
+                    mimeMessage.push(`--${mixedBoundary}`);
+                    mimeMessage.push(`Content-Type: ${attachment.type || 'application/octet-stream'}; name="${attachment.filename}"`);
+                    mimeMessage.push(`Content-Disposition: attachment; filename="${attachment.filename}"`);
+                    mimeMessage.push('Content-Transfer-Encoding: base64');
+                    mimeMessage.push('');
+                    mimeMessage.push(attachment.content);
+                }
+                mimeMessage.push(`--${mixedBoundary}--`);
+            }
             
             // Base64url encode the entire message
             const rawMessage = Buffer.from(mimeMessage.join('\r\n'))
@@ -321,7 +349,8 @@ export class GmailService {
                 to,
                 subject,
                 messageId: response.data.id,
-                threadId: response.data.threadId
+                threadId: response.data.threadId,
+                attachments: hasAttachments ? attachments.length : 0
             });
             
             return {

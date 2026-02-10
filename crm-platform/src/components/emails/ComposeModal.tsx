@@ -402,6 +402,7 @@ function ComposePanel({
   const [subjectAnimationKey, setSubjectAnimationKey] = useState(0)
   /** In-modal toggle: when true and type is cold, send as plain text with minimal signature (Option B). */
   const [sendAsPlainText, setSendAsPlainText] = useState(false)
+  const [attachments, setAttachments] = useState<File[]>([])
 
   const signatureHtml = profile ? generateNodalSignature(profile, user, true) : ''
   const outgoingSignatureHtml = profile ? generateNodalSignature(profile, user, false) : ''
@@ -573,7 +574,18 @@ CRITICAL OUTPUT RULES:
     setPendingSubjectFromAi(null)
   }, [])
 
-  const handleSend = () => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    setAttachments(prev => [...prev, ...files])
+    // Reset input so the same file can be selected again if removed
+    e.target.value = ''
+  }
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleSend = async () => {
     if (!to || !subject || !content) {
       toast.error('Please fill in all fields')
       return
@@ -599,12 +611,36 @@ CRITICAL OUTPUT RULES:
       ? `${content.trim()}\n\nBest,\n${signerName}\n${titleLine}\nhttps://nodalpoint.io\n\n${COLD_PLAINTEXT_BRAND_LINE}`
       : null
 
+    // Convert attachments to base64
+    const attachmentsData = await Promise.all(
+      attachments.map(async (file) => {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => {
+            const result = reader.result as string
+            // Remove data URL prefix (e.g., "data:image/png;base64,")
+            const base64Data = result.split(',')[1] || result
+            resolve(base64Data)
+          }
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+        return {
+          filename: file.name,
+          content: base64,
+          type: file.type,
+          size: file.size
+        }
+      })
+    )
+
     sendEmail(
       {
         to,
         subject,
         content: coldPlaintextBody ?? content,
         html: fullHtml ?? (coldPlaintextBody ?? content),
+        attachments: attachmentsData.length > 0 ? attachmentsData : undefined,
       },
       {
         onSuccess: () => {
@@ -761,6 +797,29 @@ CRITICAL OUTPUT RULES:
                 Send as plain text (cold deliverability)
               </label>
             )}
+            {attachments.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">Attachments</span>
+                {attachments.map((file, idx) => (
+                  <div key={idx} className="flex items-center justify-between gap-2 p-2 rounded border border-white/10 bg-white/5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Paperclip className="w-3 h-3 text-zinc-400 flex-shrink-0" />
+                      <span className="text-xs text-zinc-300 truncate">{file.name}</span>
+                      <span className="text-[10px] text-zinc-500 flex-shrink-0">
+                        ({(file.size / 1024).toFixed(1)} KB)
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(idx)}
+                      className="icon-button-forensic h-6 w-6 flex items-center justify-center hover:text-red-400"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -869,9 +928,19 @@ CRITICAL OUTPUT RULES:
 
         <div className="flex-none px-6 py-4 border-t border-white/5 nodal-recessed flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
-            <button className="icon-button-forensic h-8 w-8 flex items-center justify-center">
+            <input
+              type="file"
+              multiple
+              onChange={handleFileSelect}
+              className="hidden"
+              id="email-attachment-input"
+            />
+            <label
+              htmlFor="email-attachment-input"
+              className="icon-button-forensic h-8 w-8 flex items-center justify-center cursor-pointer"
+            >
               <Paperclip className="w-4 h-4" />
-            </button>
+            </label>
             <button
               type="button"
               onClick={() => setAiRailOpen((open) => !open)}

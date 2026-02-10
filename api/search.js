@@ -100,7 +100,7 @@ export default async function handler(req, res) {
           account_id,
           city,
           state,
-          accounts ( name, domain )
+          accounts ( name, domain, logo_url )
         `)
         .or(orQuery)
         .limit(1);
@@ -125,7 +125,8 @@ export default async function handler(req, res) {
           accountId: data.account_id || '',
           city: data.city || '',
           state: data.state || '',
-          domain: data.accounts?.domain || ''
+          domain: data.accounts?.domain || '',
+          logoUrl: data.accounts?.logo_url || ''
         };
       } else if (error) {
         // If error is likely due to missing columns, we might try a fallback or just log it.

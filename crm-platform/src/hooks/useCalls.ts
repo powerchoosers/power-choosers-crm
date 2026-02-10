@@ -273,7 +273,7 @@ export function useCalls(searchQuery?: string) {
   })
 }
 
-export function useAccountCalls(accountId: string) {
+export function useAccountCalls(accountId: string, contactIds?: string[]) {
   const { user, loading } = useAuth()
   const queryClient = useQueryClient()
 
@@ -289,7 +289,7 @@ export function useAccountCalls(accountId: string) {
           event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
           schema: 'public',
           table: 'calls',
-          filter: `accountId=eq.${accountId}`,
+          filter: `account_id=eq.${accountId}`,
         },
         (payload) => {
           console.log('Real-time call update for account:', accountId, payload)
@@ -305,16 +305,22 @@ export function useAccountCalls(accountId: string) {
   }, [accountId, user, loading, queryClient])
 
   return useQuery({
-    queryKey: ['account-calls', accountId, user?.email ?? 'guest'],
+    queryKey: ['account-calls', accountId, contactIds?.join(',') ?? '', user?.email ?? 'guest'],
     queryFn: async () => {
       if (!accountId || loading || !user) return []
 
-      // Fetch calls by accountId. Use explicit FK for contacts (calls has duplicate FKs to contacts).
-      const { data, error } = await supabase
+      // Fetch calls by account_id (company calls) OR contact_id in contactIds (contact calls at this account)
+      let query = supabase
         .from('calls')
         .select('*, contacts!calls_contactId_fkey(name)')
-        .eq('accountId', accountId)
-        .order('timestamp', { ascending: false })
+
+      if (contactIds && contactIds.length > 0) {
+        query = query.or(`account_id.eq.${accountId},contact_id.in.(${contactIds.join(',')})`)
+      } else {
+        query = query.eq('account_id', accountId)
+      }
+
+      const { data, error } = await query.order('timestamp', { ascending: false })
 
       if (error) throw error
 
@@ -354,7 +360,7 @@ export function useAccountCalls(accountId: string) {
   })
 }
 
-export function useContactCalls(contactId: string) {
+export function useContactCalls(contactId: string, companyPhone?: string) {
   const { user, loading } = useAuth()
   const queryClient = useQueryClient()
 
@@ -370,7 +376,7 @@ export function useContactCalls(contactId: string) {
           event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
           schema: 'public',
           table: 'calls',
-          filter: `contactId=eq.${contactId}`,
+          filter: `contact_id=eq.${contactId}`,
         },
         (payload) => {
           console.log('Real-time call update for contact:', contactId, payload)
@@ -386,14 +392,26 @@ export function useContactCalls(contactId: string) {
   }, [contactId, user, loading, queryClient])
 
   return useQuery({
-    queryKey: ['contact-calls', contactId, user?.email],
+    queryKey: ['contact-calls', contactId, companyPhone ?? '', user?.email],
     queryFn: async () => {
       if (!contactId || loading || !user) return []
 
-      const { data, error } = await supabase
-        .from('calls')
-        .select('*')
-        .eq('contactId', contactId)
+      // Fetch calls to this contact OR to the company phone (if provided)
+      let query = supabase.from('calls').select('*')
+
+      if (companyPhone?.trim()) {
+        const normalized = companyPhone.replace(/\D/g, '').slice(-10)
+        if (normalized) {
+          // Query: contact_id = contactId OR to_phone/to ends with normalized company phone
+          query = query.or(`contact_id.eq.${contactId},to_phone.ilike.%${normalized},to.ilike.%${normalized}`)
+        } else {
+          query = query.eq('contact_id', contactId)
+        }
+      } else {
+        query = query.eq('contact_id', contactId)
+      }
+
+      const { data, error } = await query
         .order('timestamp', { ascending: false })
         .limit(50)
 

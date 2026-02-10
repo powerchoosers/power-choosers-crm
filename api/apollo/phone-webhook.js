@@ -104,9 +104,12 @@ export default async function handler(req, res) {
             .map(formatPhoneForContact)
             .filter(Boolean);
           const update = {};
-          if (numbers[0]) update.phone = numbers[0];
-          if (numbers[1]) update.mobile = numbers[1];
-          if (numbers[2]) update.workPhone = numbers[2];
+          if (numbers[0]) {
+            update.phone = numbers[0];
+            update.mobile = numbers[0];
+          }
+          if (numbers[1]) update.workPhone = numbers[1];
+          if (numbers[2]) update.otherPhone = numbers[2];
           if (Object.keys(update).length > 0) {
             update.updatedAt = new Date().toISOString();
             await supabaseAdmin.from('contacts').update(update).eq('id', contactRow.id);

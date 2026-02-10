@@ -24,6 +24,23 @@ interface OrgIntelligenceProps {
   accountDomain?: string;
 }
 
+/** Phone as string (legacy/cache) or { number, type } from Apollo (type: mobile, direct, work, etc.) */
+type PhoneEntry = string | { number: string; type?: string };
+
+function phoneDisplayNumber(entry: PhoneEntry): string {
+  return typeof entry === 'string' ? entry : entry.number;
+}
+
+/** Returns W / M / O for Work direct, Mobile, Other for display in revealed results */
+function phoneTypePrefix(entry: PhoneEntry, index: number): 'W' | 'M' | 'O' {
+  const type = typeof entry === 'string' ? '' : (entry.type || '').toLowerCase();
+  if (type.includes('mobile')) return 'M';
+  if (type.includes('direct') || type.includes('work')) return 'W';
+  if (type.includes('other') || type.includes('home')) return 'O';
+  if (typeof entry === 'string') return (['M', 'W', 'O'] as const)[index] ?? 'O';
+  return 'O';
+}
+
 interface ApolloContactRow {
   id: string;
   name: string;
@@ -36,7 +53,7 @@ interface ApolloContactRow {
   location?: string;
   linkedin?: string;
   crmId?: string;
-  phones?: string[];
+  phones?: PhoneEntry[];
 }
 
 interface ApolloCompany {
@@ -74,9 +91,13 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   const CONTACTS_PER_PAGE = 5;
 
   const handleCompanyCall = (phone: string, name: string) => {
+    const logoUrl = (accountLogoUrl && accountLogoUrl.trim()) || companySummary?.logoUrl;
+    const domainForCall = (accountDomain && accountDomain.trim()) || companySummary?.domain || domain;
     initiateCall(phone, {
-      name: name,
-      account: name
+      name,
+      account: name,
+      logoUrl: logoUrl || undefined,
+      domain: domainForCall || undefined,
     });
     toast.info(`Initiating call to ${name}...`);
   };
@@ -383,11 +404,15 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       const contactCity = (enriched as { city?: string }).city ?? person.location?.split(',')[0]?.trim() ?? null;
       const contactState = (enriched as { state?: string }).state ?? (person.location?.includes(',') ? person.location.split(',')[1]?.trim() : null) ?? null;
       const linkedinUrl = (enriched as { linkedin?: string }).linkedin || person.linkedin || null;
+      const immediatePhones = (enriched.phones?.map((ph: { number?: string }) => ph?.number).filter(Boolean) as string[]) || [];
+      const phone0 = immediatePhones[0] ? formatPhoneNumber(immediatePhones[0]) : '';
+      const phone1 = immediatePhones[1] ? formatPhoneNumber(immediatePhones[1]) : '';
+      const phone2 = immediatePhones[2] ? formatPhoneNumber(immediatePhones[2]) : '';
 
       const contactData: Record<string, unknown> = {
-        name: enriched.fullName || person.name,
-        firstName: enriched.firstName || person.firstName,
-        lastName: enriched.lastName || person.lastName,
+        name: enriched.fullName || person.name || [person.firstName, person.lastName].filter(Boolean).join(' ').trim() || 'Unknown',
+        firstName: enriched.firstName ?? person.firstName,
+        lastName: enriched.lastName ?? person.lastName,
         title: enriched.jobTitle || person.title,
         email: enriched.email || person.email,
         accountId: accountId,
@@ -395,6 +420,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         ...(linkedinUrl ? { linkedinUrl } : {}),
         ...(contactCity ? { city: contactCity } : {}),
         ...(contactState ? { state: contactState } : {}),
+        ...(phone0 ? { phone: phone0, mobile: phone0 } : {}),
+        ...(phone1 ? { workPhone: phone1 } : {}),
+        ...(phone2 ? { otherPhone: phone2 } : {}),
         metadata: {
           source: 'Apollo Organizational Intelligence',
           acquired_at: new Date().toISOString(),
@@ -478,14 +506,24 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       setLastEnrichedContactId(crmId ?? null);
       setTimeout(() => setLastEnrichedContactId(null), 3500);
       
-      // 3. Update local state (phones from immediate response; may be empty when reveal_phone_number=true)
-      const newPhones = enriched.phones?.map((ph: { number: string }) => ph.number) || [];
-      const existingPhones = person.phones || [];
-      const allPhones = Array.from(new Set([...existingPhones, ...newPhones]));
+      // 3. Update local state (phones from immediate response; keep type for W/M/O display)
+      const newPhonesTyped: PhoneEntry[] = (enriched.phones || []).map((ph: { number?: string; type?: string }) =>
+        ph?.number ? { number: ph.number, type: ph.type } : null
+      ).filter(Boolean) as PhoneEntry[];
+      const existingNormalized: PhoneEntry[] = (person.phones || []).map((e) => (typeof e === 'string' ? e : e));
+      const existingNums = new Set(existingNormalized.map(phoneDisplayNumber));
+      const mergedPhones: PhoneEntry[] = [...existingNormalized];
+      newPhonesTyped.forEach((entry) => {
+        const num = phoneDisplayNumber(entry);
+        if (!existingNums.has(num)) {
+          existingNums.add(num);
+          mergedPhones.push(entry);
+        }
+      });
 
-      const updatedData = data.map(p => 
-        p.id === person.id ? { 
-          ...p, 
+      const updatedData = data.map(p =>
+        p.id === person.id ? {
+          ...p,
           isMonitored: true,
           crmId: crmId,
           name: enriched.fullName || p.name,
@@ -495,7 +533,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           title: enriched.jobTitle || p.title,
           linkedin: enriched.linkedin || p.linkedin,
           location: enriched.location || p.location,
-          phones: allPhones
+          phones: mergedPhones
         } : p
       );
       
@@ -520,23 +558,45 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             if (!res.ok) return;
             const json = await res.json();
             if (json.ready && Array.isArray(json.phones) && json.phones.length > 0) {
-              const phoneStrings = json.phones.map((p: { sanitized_number?: string; raw_number?: string }) => p.sanitized_number || p.raw_number).filter(Boolean);
-              if (phoneStrings.length === 0) return;
+              const incoming: PhoneEntry[] = json.phones
+                .map((p: { sanitized_number?: string; raw_number?: string; type?: string }) => {
+                  const raw = p.sanitized_number || p.raw_number;
+                  if (!raw) return null;
+                  return { number: formatPhoneNumber(raw), type: p.type } as PhoneEntry;
+                })
+                .filter(Boolean);
+              if (incoming.length === 0) return;
               const phoneUpdate: Record<string, string> = {};
-              if (phoneStrings[0]) phoneUpdate.phone = formatPhoneNumber(phoneStrings[0]);
-              if (phoneStrings[1]) phoneUpdate.mobile = formatPhoneNumber(phoneStrings[1]);
-              if (phoneStrings[2]) phoneUpdate.workPhone = formatPhoneNumber(phoneStrings[2]);
+              const n0 = phoneDisplayNumber(incoming[0]);
+              const n1 = incoming[1] ? phoneDisplayNumber(incoming[1]) : '';
+              const n2 = incoming[2] ? phoneDisplayNumber(incoming[2]) : '';
+              if (n0) {
+                phoneUpdate.phone = n0;
+                phoneUpdate.mobile = n0;
+              }
+              if (n1) phoneUpdate.workPhone = n1;
+              if (n2) phoneUpdate.otherPhone = n2;
               const { error: updateError } = await supabase.from('contacts').update(phoneUpdate).eq('id', crmId);
               if (!updateError) {
                 setData(prev => {
-                  const updatedDataWithPhones = prev.map(p => 
-                    p.id === person.id ? { ...p, phones: Array.from(new Set([...(p.phones || []), ...phoneStrings])) } : p
+                  const existing = prev.find(p => p.id === person.id)?.phones || [];
+                  const existingNums = new Set(existing.map(phoneDisplayNumber));
+                  const merged: PhoneEntry[] = [...existing];
+                  incoming.forEach((entry) => {
+                    const num = phoneDisplayNumber(entry);
+                    if (!existingNums.has(num)) {
+                      existingNums.add(num);
+                      merged.push(entry);
+                    }
+                  });
+                  const updatedDataWithPhones = prev.map(p =>
+                    p.id === person.id ? { ...p, phones: merged } : p
                   );
-                  // Save updated phones to cache
                   saveToCache(companySummary, updatedDataWithPhones);
                   return updatedDataWithPhones;
                 });
-                toast.success(`Phone numbers for ${person.name} received & saved.`);
+                const displayName = person.name || [person.firstName, person.lastName].filter(Boolean).join(' ').trim() || 'Contact';
+                toast.success(`Phone numbers for ${displayName} received & saved.`);
               }
               return;
             }
@@ -1234,27 +1294,37 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                               </button>
                           )}
                           
-                          {/* Phone Column */}
+                          {/* Phone Column — W: Work direct, M: Mobile, O: Other */}
                           {person.phones && person.phones.length > 0 ? (
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              {person.phones.map((phone) => (
-                                <button
-                                  key={phone}
-                                  onClick={() => {
-                                    initiateCall(phone, {
-                                      name: person.name,
-                                      account: companyName,
-                                      title: person.title
-                                    });
-                                    toast.info(`Calling ${person.name}...`);
-                                  }}
-                                  className="flex items-center gap-1 text-[9px] font-mono text-zinc-400 hover:text-white transition-colors uppercase tracking-tighter"
-                                  title={phone}
-                                >
-                                  <Phone className="w-2.5 h-2.5 text-zinc-600" />
-                                  {phone}
-                                </button>
-                              ))}
+                            <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                              {person.phones.map((entry, idx) => {
+                                const num = phoneDisplayNumber(entry);
+                                const prefix = phoneTypePrefix(entry, idx);
+                                return (
+                                  <button
+                                    key={num}
+                                    onClick={() => {
+                                      const callName = person.name || [person.firstName, person.lastName].filter(Boolean).join(' ').trim() || 'Contact';
+                                      const logoUrl = (accountLogoUrl && accountLogoUrl.trim()) || companySummary?.logoUrl;
+                                      const domainForCall = (accountDomain && accountDomain.trim()) || companySummary?.domain || domain;
+                                      initiateCall(num, {
+                                        name: callName,
+                                        account: companyName,
+                                        title: person.title,
+                                        logoUrl: logoUrl || undefined,
+                                        domain: domainForCall || undefined,
+                                      });
+                                      toast.info(`Calling ${callName}...`);
+                                    }}
+                                    className="flex items-center gap-1 text-[9px] font-mono text-zinc-400 hover:text-white transition-colors uppercase tracking-tighter"
+                                    title={num}
+                                  >
+                                    <Phone className="w-2.5 h-2.5 text-zinc-600 shrink-0" />
+                                    <span className="text-zinc-500 font-semibold">{prefix}:</span>
+                                    {num}
+                                  </button>
+                                );
+                              })}
                             </div>
                           ) : (
                               <button 
