@@ -6,6 +6,7 @@ import { format } from 'date-fns'
 import { ContactDetail } from '@/hooks/useContacts'
 import { useCallStore } from '@/store/callStore'
 import { formatPhoneNumber } from '@/lib/formatPhone'
+import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
 
 interface UplinkCardProps {
   contact: ContactDetail
@@ -298,9 +299,14 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
                     <heroPhone.icon className="w-5 h-5 text-white/70 group-hover:text-white transition-colors" />
                     <Star className="w-2 h-2 fill-yellow-500 text-yellow-500 absolute -top-1 -right-1" />
                   </div>
-                  <div className="flex flex-col items-start min-w-0">
+                  <div className="flex flex-col items-start min-w-0 flex-1">
                     <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest">{heroPhone.label} (Primary)</span>
-                    <span className="font-mono tabular-nums text-[13px] tracking-tight text-white group-hover:text-white truncate w-full">{heroPhone.value || 'No phone'}</span>
+                    <ForensicDataPoint
+                      value={heroPhone.value || 'No phone'}
+                      copyValue={heroPhone.value || undefined}
+                      valueClassName="font-mono tabular-nums text-[13px] tracking-tight text-white group-hover:text-white truncate w-full"
+                      inline
+                    />
                   </div>
                 </div>
                 <ArrowUpRight className="w-3 h-3 text-white/50 group-hover:text-white transition-colors shrink-0" />
@@ -332,9 +338,14 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <phone.icon className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
-                      <div className="flex flex-col items-start min-w-0">
+                      <div className="flex flex-col items-start min-w-0 flex-1">
                         <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">{phone.label}</span>
-                        <span className="font-mono tabular-nums text-xs tracking-tight text-zinc-400 group-hover:text-zinc-200 truncate w-full">{phone.value}</span>
+                        <ForensicDataPoint
+                          value={phone.value}
+                          copyValue={phone.value}
+                          valueClassName="font-mono tabular-nums text-xs tracking-tight text-zinc-400 group-hover:text-zinc-200 truncate w-full"
+                          inline
+                        />
                       </div>
                     </div>
                     <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-zinc-400 transition-colors shrink-0" />
@@ -361,9 +372,14 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
             >
               <div className="flex items-center gap-3 min-w-0">
                 <Mail className="w-5 h-5 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
-                <div className="flex flex-col items-start min-w-0">
+                <div className="flex flex-col items-start min-w-0 flex-1">
                   <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">Electronic Mail</span>
-                  <span className="text-sm text-zinc-400 group-hover:text-zinc-200 truncate w-full">{email || 'No email'}</span>
+                  <ForensicDataPoint
+                    value={email || 'No email'}
+                    copyValue={email || undefined}
+                    valueClassName="text-sm text-zinc-400 group-hover:text-zinc-200 truncate w-full"
+                    inline
+                  />
                 </div>
               </div>
             </button>
