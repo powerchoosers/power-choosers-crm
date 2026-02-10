@@ -5,6 +5,7 @@ import { Phone, Globe, MapPin, Building2, ArrowUpRight, Sparkles, Star, Satellit
 import { Account } from '@/hooks/useAccounts'
 import { useCallStore } from '@/store/callStore'
 import { cn } from '@/lib/utils'
+import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { formatPhoneNumber } from '@/lib/formatPhone'
@@ -139,11 +140,14 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
                 <Phone className="w-5 h-5 text-white/70 group-hover:text-white transition-colors" />
                 <Star className="w-2 h-2 fill-yellow-500 text-yellow-500 absolute -top-1 -right-1" />
               </div>
-              <div className="flex flex-col items-start min-w-0">
+              <div className="flex flex-col items-start min-w-0 flex-1">
                 <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest">Corporate Phone (Primary)</span>
-                <span className="font-mono tabular-nums text-[13px] tracking-tight text-white group-hover:text-white truncate w-full text-left">
-                  {account.companyPhone || 'No phone'}
-                </span>
+                <ForensicDataPoint
+                  value={account.companyPhone || 'No phone'}
+                  copyValue={account.companyPhone || undefined}
+                  valueClassName="font-mono tabular-nums text-[13px] tracking-tight text-white group-hover:text-white truncate w-full text-left"
+                  inline
+                />
               </div>
             </div>
             <ArrowUpRight className="w-3 h-3 text-white/50 group-hover:text-white transition-colors shrink-0" />
@@ -195,13 +199,16 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
               onClick={() => { const url = domainToClickableUrl(account.domain); url && window.open(url, '_blank') }}
               disabled={!account.domain}
             >
-              <div className="flex items-center gap-3 min-w-0">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
                 <Globe className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
-                <div className="flex flex-col items-start min-w-0">
+                <div className="flex flex-col items-start min-w-0 flex-1">
                   <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">Digital Domain</span>
-                  <span className="font-mono text-xs tracking-tight text-zinc-400 group-hover:text-zinc-200 truncate w-full text-left">
-                    {account.domain || 'No domain'}
-                  </span>
+                  <ForensicDataPoint
+                    value={account.domain || 'No domain'}
+                    copyValue={account.domain || undefined}
+                    valueClassName="font-mono text-xs tracking-tight text-zinc-400 group-hover:text-zinc-200 truncate w-full text-left"
+                    inline
+                  />
                 </div>
               </div>
               <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-zinc-400 transition-colors shrink-0" />
@@ -237,18 +244,21 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
                     justUpdated && "text-green-500"
                   )} />
                 )}
-                <div className="flex flex-col items-start min-w-0">
+                <div className="flex flex-col items-start min-w-0 flex-1">
                   <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">Asset Recon (Location)</span>
-                  <span className={cn(
-                    "text-xs tracking-tight truncate w-full text-left transition-all",
-                    account.address 
-                      ? "text-zinc-400 group-hover:text-zinc-200" 
-                      : "text-[#4D88FF] group-hover:text-white font-mono",
-                    isSearching && "animate-pulse",
-                    justUpdated && "text-green-400 font-semibold"
-                  )}>
-                    {isSearching ? 'Scanning satellite...' : account.address || 'Search location'}
-                  </span>
+                  <ForensicDataPoint
+                    value={isSearching ? 'Scanning satellite...' : account.address || 'Search location'}
+                    copyValue={account.address || undefined}
+                    valueClassName={cn(
+                      "text-xs tracking-tight truncate w-full text-left transition-all",
+                      account.address 
+                        ? "text-zinc-400 group-hover:text-zinc-200" 
+                        : "text-[#4D88FF] group-hover:text-white font-mono",
+                      isSearching && "animate-pulse",
+                      justUpdated && "text-green-400 font-semibold"
+                    )}
+                    inline
+                  />
                 </div>
               </div>
               {account.address ? (

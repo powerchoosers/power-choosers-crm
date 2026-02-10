@@ -25,6 +25,7 @@ import { useUIStore } from '@/store/uiStore'
 import { useGeminiStore } from '@/store/geminiStore'
 import { Button } from '@/components/ui/button'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
+import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
 import { ComposeModal, type ComposeContext } from '@/components/emails/ComposeModal'
 import { toast } from 'sonner'
@@ -642,10 +643,22 @@ export default function ContactDossierPage() {
                             transition={{ duration: 0.4, ease: 'easeOut' }}
                             className="text-2xl font-semibold tracking-tighter text-white"
                           >
-                            {[editFirstName, editLastName].filter(Boolean).join(' ') || editName || contactName}
+                            <ForensicDataPoint
+                              value={[editFirstName, editLastName].filter(Boolean).join(' ') || editName || contactName}
+                              copyValue={[editFirstName, editLastName].filter(Boolean).join(' ') || editName || contactName}
+                              valueClassName="text-2xl font-semibold tracking-tighter text-white"
+                              inline
+                            />
                           </motion.h1>
                         ) : (
-                          <h1 className="text-2xl font-semibold tracking-tighter text-white">{[editFirstName, editLastName].filter(Boolean).join(' ') || editName || contactName}</h1>
+                          <h1 className="text-2xl font-semibold tracking-tighter text-white">
+                            <ForensicDataPoint
+                              value={[editFirstName, editLastName].filter(Boolean).join(' ') || editName || contactName}
+                              copyValue={[editFirstName, editLastName].filter(Boolean).join(' ') || editName || contactName}
+                              valueClassName="text-2xl font-semibold tracking-tighter text-white"
+                              inline
+                            />
+                          </h1>
                         )}
                         
                         {/* THE SIGNAL ARRAY */}
@@ -848,7 +861,7 @@ export default function ContactDossierPage() {
                           >
                             {editTitle && (
                               <>
-                                <span>{editTitle}</span>
+                                <ForensicDataPoint value={editTitle} copyValue={editTitle} valueClassName="uppercase tracking-widest text-zinc-400" inline />
                                 <span className="text-zinc-600 lowercase mx-1">at</span>
                               </>
                             )}
@@ -857,17 +870,17 @@ export default function ContactDossierPage() {
                                 href={`/network/accounts/${contact.linkedAccountId}`}
                                 className="hover:text-white transition-colors cursor-pointer"
                               >
-                                {editCompany || 'Unknown Entity'}
+                                <ForensicDataPoint value={editCompany || 'Unknown Entity'} copyValue={editCompany || undefined} valueClassName="uppercase tracking-widest text-zinc-400 hover:text-white" inline />
                               </Link>
                             ) : (
-                              <span>{editCompany || 'Unknown Entity'}</span>
+                              <ForensicDataPoint value={editCompany || 'Unknown Entity'} copyValue={editCompany || undefined} valueClassName="uppercase tracking-widest text-zinc-400" inline />
                             )}
                           </motion.span>
                         ) : (
                           <span className="flex items-center gap-1.5 uppercase tracking-widest text-zinc-400">
                             {editTitle && (
                               <>
-                                <span>{editTitle}</span>
+                                <ForensicDataPoint value={editTitle} copyValue={editTitle} valueClassName="uppercase tracking-widest text-zinc-400" inline />
                                 <span className="text-zinc-600 lowercase mx-1">at</span>
                               </>
                             )}
@@ -876,10 +889,10 @@ export default function ContactDossierPage() {
                                 href={`/network/accounts/${contact.linkedAccountId}`}
                                 className="hover:text-white transition-colors cursor-pointer"
                               >
-                                {editCompany || 'Unknown Entity'}
+                                <ForensicDataPoint value={editCompany || 'Unknown Entity'} copyValue={editCompany || undefined} valueClassName="uppercase tracking-widest text-zinc-400 hover:text-white" inline />
                               </Link>
                             ) : (
-                              <span>{editCompany || 'Unknown Entity'}</span>
+                              <ForensicDataPoint value={editCompany || 'Unknown Entity'} copyValue={editCompany || undefined} valueClassName="uppercase tracking-widest text-zinc-400" inline />
                             )}
                           </span>
                         )}
@@ -892,12 +905,12 @@ export default function ContactDossierPage() {
                             className="flex items-center gap-1.5 text-zinc-400"
                           >
                             <MapPin className="w-3.5 h-3.5 text-white" />
-                            {editLocation || 'Unknown Location'}
+                            <ForensicDataPoint value={editLocation || 'Unknown Location'} copyValue={editLocation || undefined} valueClassName="text-zinc-400" inline />
                           </motion.span>
                         ) : (
                           <span className="flex items-center gap-1.5 text-zinc-400">
                             <MapPin className="w-3.5 h-3.5 text-white" />
-                            {editLocation || 'Unknown Location'}
+                            <ForensicDataPoint value={editLocation || 'Unknown Location'} copyValue={editLocation || undefined} valueClassName="text-zinc-400" inline />
                           </span>
                         )}
                       </>
@@ -1087,14 +1100,24 @@ export default function ContactDossierPage() {
                                 glowingFields.has('contractEnd') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)]"
                               )}
                             >
-                              {contractEndDate ? format(contractEndDate, 'MMM dd, yyyy') : 'TBD'}
+                              <ForensicDataPoint
+                                value={contractEndDate ? format(contractEndDate, 'MMM dd, yyyy') : 'TBD'}
+                                copyValue={contractEndDate ? format(contractEndDate, 'yyyy-MM-dd') : undefined}
+                                valueClassName={cn("text-white font-mono font-bold tabular-nums", glowingFields.has('contractEnd') && "text-[#002FA7]")}
+                                inline
+                              />
                             </motion.span>
                           ) : (
                             <span className={cn(
                               "text-white font-mono font-bold tabular-nums transition-all duration-800",
                               glowingFields.has('contractEnd') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)] animate-in fade-in duration-500"
                             )}>
-                              {contractEndDate ? format(contractEndDate, 'MMM dd, yyyy') : 'TBD'}
+                              <ForensicDataPoint
+                                value={contractEndDate ? format(contractEndDate, 'MMM dd, yyyy') : 'TBD'}
+                                copyValue={contractEndDate ? format(contractEndDate, 'yyyy-MM-dd') : undefined}
+                                valueClassName={cn("text-white font-mono font-bold tabular-nums", glowingFields.has('contractEnd') && "text-[#002FA7]")}
+                                inline
+                              />
                             </span>
                           )
                         )}
@@ -1115,7 +1138,12 @@ export default function ContactDossierPage() {
                         "text-xs text-[#002FA7] font-mono tabular-nums ml-auto transition-all duration-800",
                         glowingFields.has('daysRemaining') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-in fade-in duration-500"
                       )}>
-                        {daysRemaining != null ? `${Math.max(daysRemaining, 0)} Days Remaining` : '-- Days Remaining'}
+                        <ForensicDataPoint
+                          value={daysRemaining != null ? `${Math.max(daysRemaining, 0)} Days Remaining` : '-- Days Remaining'}
+                          copyValue={daysRemaining != null ? String(Math.max(daysRemaining, 0)) : undefined}
+                          valueClassName="text-xs text-[#002FA7] font-mono tabular-nums"
+                          inline
+                        />
                       </span>
                     </div>
                   </div>
@@ -1135,7 +1163,7 @@ export default function ContactDossierPage() {
                         "text-xl font-semibold tracking-tighter text-white transition-all duration-800",
                         glowingFields.has('currentSupplier') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)] animate-in fade-in duration-500"
                       )}>
-                        {editSupplier || '--'}
+                        <ForensicDataPoint value={editSupplier || '--'} copyValue={editSupplier || undefined} valueClassName="text-xl font-semibold tracking-tighter text-white" inline />
                       </div>
                     )}
                   </div>
@@ -1158,7 +1186,7 @@ export default function ContactDossierPage() {
                           "text-xl font-mono tabular-nums tracking-tighter text-[#002FA7] transition-all duration-800",
                           glowingFields.has('strikePrice') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-in fade-in duration-500"
                         )}>
-                          {editStrikePrice || '--'}
+                          <ForensicDataPoint value={editStrikePrice || '--'} copyValue={editStrikePrice || undefined} valueClassName="text-xl font-mono tabular-nums text-[#002FA7]" inline />
                         </div>
                       )}
                     </div>
@@ -1178,7 +1206,7 @@ export default function ContactDossierPage() {
                           "text-xl font-mono tabular-nums tracking-tighter text-white transition-all duration-800",
                           glowingFields.has('annualUsage') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)] animate-in fade-in duration-500"
                         )}>
-                          {editAnnualUsage || '--'}
+                          <ForensicDataPoint value={editAnnualUsage || '--'} copyValue={editAnnualUsage || undefined} valueClassName="text-xl font-mono tabular-nums text-white" inline />
                         </div>
                       )}
                     </div>
@@ -1190,7 +1218,7 @@ export default function ContactDossierPage() {
                       "text-3xl font-mono tabular-nums tracking-tighter text-green-500/80 transition-all duration-800",
                       glowingFields.has('revenue') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-in fade-in duration-500"
                     )}>
-                      {annualRevenue}
+                      <ForensicDataPoint value={annualRevenue} copyValue={annualRevenue} valueClassName="text-3xl font-mono tabular-nums text-green-500/80" inline />
                     </div>
                     <div className="text-[9px] font-mono text-zinc-600 mt-1 uppercase tracking-widest">Calculated at 0.003 margin base</div>
                   </div>
@@ -1262,15 +1290,15 @@ export default function ContactDossierPage() {
                                 <div className="w-1 h-1 rounded-full bg-[#002FA7]/40" />
                                 <div className="w-px bg-[#002FA7]/20" style={{ height: `${lineHeight}rem` }} />
                               </div>
-                              <div className="flex-1">
+                              <div className="flex-1 min-w-0">
                                 {timestamp && (
                                   <div className="text-[10px] text-zinc-600 mb-1 flex items-center gap-2">
-                                    <Clock className="w-3 h-3" />
-                                    <span>{timestamp}</span>
+                                    <Clock className="w-3 h-3 shrink-0" />
+                                    <ForensicDataPoint value={timestamp} copyValue={timestamp} valueClassName="text-[10px] text-zinc-600" inline />
                                   </div>
                                 )}
                                 <div className="text-zinc-300 group-hover/entry:text-white transition-colors">
-                                  {content}
+                                  <ForensicDataPoint value={content} copyValue={content} valueClassName="text-zinc-300 group-hover/entry:text-white" />
                                 </div>
                               </div>
                             </div>
