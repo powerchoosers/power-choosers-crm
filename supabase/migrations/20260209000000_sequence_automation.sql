@@ -5,7 +5,7 @@
 -- using Supabase Edge Functions, pgmq queues, and pg_cron scheduling.
 --
 -- Features:
--- - Automated email sending via MailerSend
+-- - Automated email sending via Gmail API
 -- - Delay handling between sequence steps
 -- - Retry logic for failed steps
 -- - Business hours execution (8AM-5PM CST)

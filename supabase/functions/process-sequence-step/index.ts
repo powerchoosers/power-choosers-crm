@@ -1,7 +1,7 @@
 /**
  * Process Sequence Step Edge Function
  * 
- * This function processes sequence steps from the queue, sending emails via MailerSend
+ * This function processes sequence steps from the queue, sending emails via Gmail API
  * and handling delays, retries, and step completion tracking.
  */
 
@@ -241,17 +241,18 @@ async function processJob(job: Job) {
 }
 
 /**
- * Process email step - send email via MailerSend
+ * Process email step - send email via Gmail API
  */
 async function processEmailStep(execution: any) {
   const { id, contact_id, metadata, sequence_id } = execution
   
-  // Resolve sender: sequence owner email -> burner address + display name (e.g. Lewis | Nodal Point)
+  // Resolve sender: sequence owner email -> actual user email + display name (e.g. Lewis | Nodal Point)
   const [seqRow]: any[] = await sql`
     SELECT "ownerId" FROM sequences WHERE id = ${sequence_id}
   `
   const ownerEmail = seqRow?.ownerId ?? (seqRow as any)?.ownerid
-  const fromEmail = burnerFromAddress(ownerEmail)
+  // Use actual user email (not burner address) - emails come from the authenticated user
+  const fromEmail = ownerEmail || 'noreply@nodalpoint.io'
   let fromName = 'Nodal Point'
   if (ownerEmail) {
     const [userRow]: any[] = await sql`
@@ -323,8 +324,8 @@ async function processEmailStep(execution: any) {
     trackOpens: true
   }
   
-  // Send email via MailerSend API through our backend
-  const response = await fetch(`${API_BASE_URL}/api/mailersend/send`, {
+  // Send email via Gmail API through our backend
+  const response = await fetch(`${API_BASE_URL}/api/email/gmail-send-sequence`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -334,7 +335,7 @@ async function processEmailStep(execution: any) {
   
   if (!response.ok) {
     const errorText = await response.text()
-    throw new Error(`MailerSend API error: ${response.status} - ${errorText}`)
+    throw new Error(`Gmail API error: ${response.status} - ${errorText}`)
   }
   
   const result = await response.json()

@@ -53,10 +53,10 @@ steps:
     - '10'
     - '--concurrency'
     - '80'
-    # Only non-secret vars here; set Supabase/Twilio/MailerSend etc. in Cloud Run → nodal-point-network → Variables (update-env-vars keeps UI-set vars)
+    # Only non-secret vars here; set Supabase/Twilio/Gmail etc. in Cloud Run → nodal-point-network → Variables (update-env-vars keeps UI-set vars)
     - '--update-env-vars'
     - 'NODE_ENV=production,API_BASE_URL=https://nodal-point-network-792458658491.us-central1.run.app,PUBLIC_BASE_URL=https://nodalpoint.io'
-    # IMPORTANT: Add MAILERSEND_API_KEY to Cloud Run service environment variables via Console UI
+    # IMPORTANT: Add GOOGLE_SERVICE_ACCOUNT_KEY to Cloud Run service environment variables via Console UI
 
   # ---- Frontend: power-choosers-crm ----
   - name: 'gcr.io/cloud-builders/docker'

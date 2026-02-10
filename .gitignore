@@ -45,6 +45,7 @@ private.key
 *.key
 *.pem
 client_secret_*.json
+build.md
 
 # INI files (often contain keys – never commit)
 *.ini
