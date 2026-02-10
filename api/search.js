@@ -83,21 +83,21 @@ export default async function handler(req, res) {
       // For now, we assume the migration created these columns.
       // If the migration put everything in 'metadata', we would need a different query.
       
-      const orQuery = `mobile.eq.${searchDigits},work_phone.eq.${searchDigits},other_phone.eq.${searchDigits},phone.eq.${searchDigits}`;
+      const orQuery = `mobile.eq.${searchDigits},workPhone.eq.${searchDigits},otherPhone.eq.${searchDigits},phone.eq.${searchDigits}`;
       
       const { data: contacts, error } = await supabaseAdmin
         .from('contacts')
         .select(`
           id, 
-          first_name, 
-          last_name, 
+          firstName, 
+          lastName, 
           title, 
           email, 
           mobile, 
-          work_phone, 
-          other_phone, 
+          workPhone, 
+          otherPhone, 
           phone, 
-          account_id,
+          accountId,
           city,
           state,
           accounts ( name, domain, logo_url )
@@ -112,17 +112,17 @@ export default async function handler(req, res) {
         contactResult = {
           id: data.id,
           contactId: data.id,
-          name: `${data.first_name || ''} ${data.last_name || ''}`.trim(),
-          firstName: data.first_name || '',
-          lastName: data.last_name || '',
+          name: `${data.firstName || ''} ${data.lastName || ''}`.trim(),
+          firstName: data.firstName || '',
+          lastName: data.lastName || '',
           title: data.title || '',
           email: data.email || '',
           mobile: data.mobile || '',
-          workDirectPhone: data.work_phone || '',
-          otherPhone: data.other_phone || '',
+          workDirectPhone: data.workPhone || '',
+          otherPhone: data.otherPhone || '',
           // Use joined account data if available
           account: data.accounts?.name || '',
-          accountId: data.account_id || '',
+          accountId: data.accountId || '',
           city: data.city || '',
           state: data.state || '',
           domain: data.accounts?.domain || '',
@@ -144,11 +144,11 @@ export default async function handler(req, res) {
       try {
         logger.log('[Search] Querying accounts by phone fields...');
         
-        const orQueryAccount = `phone.eq.${searchDigits},company_phone.eq.${searchDigits},primary_phone.eq.${searchDigits}`;
+        const orQueryAccount = `phone.eq.${searchDigits}`;
         
         const { data: accounts, error } = await supabaseAdmin
           .from('accounts')
-          .select('id, name, phone, company_phone, primary_phone, city, state, domain, logo_url')
+          .select('id, name, phone, city, state, domain, logo_url')
           .or(orQueryAccount)
           .limit(1);
 
@@ -160,7 +160,7 @@ export default async function handler(req, res) {
             id: data.id,
             accountId: data.id,
             name: data.name || '',
-            companyPhone: data.company_phone || data.phone || data.primary_phone || '',
+            companyPhone: data.phone || '',
             city: data.city || '',
             state: data.state || '',
             domain: data.domain || '',
