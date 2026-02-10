@@ -93,6 +93,7 @@ Coding and workflow practices to prevent TypeScript/build errors during developm
 **Practice (from TypeScript structural typing and project rules):**
 
 - **TypeScript:** TypeScript is structurally typed; it checks that values have the expected properties. If you use a property at runtime, the type must declare it (or you must narrow/assert appropriately). ([Handbook – Everyday Types](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html))
+- **Right object, not just right type:** If the error is "Property 'X' does not exist on type 'Y'", check whether the property lives on a *different* object. Example: Firebase `User` has `email` but not `firstName`; in this project `firstName` is on AuthContext's `profile` (`UserProfile`). Use `profile?.firstName`, not `user?.firstName`.
 - When adding or using a new field (Supabase, API, form data), **update the corresponding TypeScript type/interface** in the same change (e.g. in `types/`, or next to the hook that maps the row).
 - When mapping API/DB rows to UI types, only include properties that exist on the source type, or extend the source type first.
 - **BulkImportModal / ingestion:** When you add fields to Accounts or Contacts for editing, add them to the mapping schemas per project rules so types and ingestion stay in parity.
@@ -154,6 +155,7 @@ Coding and workflow practices to prevent TypeScript/build errors during developm
 | Recharts formatter `name` optional vs required | Match library formatter type; guard if needed | §4 |
 | GeminiChat: `sendWithMessage` used before declaration | Move `sendWithMessage` (e.g. `useCallback`) above `useEffect` | §5 |
 | useContacts: `companyPhone` on `ContactRow` | Add `companyPhone` to `ContactRow` type and mapping | §6 |
+| Protocol builder: `firstName` on Firebase `User` | Use AuthContext `profile?.firstName`; Firebase `User` has no `firstName` | §6 |
 
 ---
 

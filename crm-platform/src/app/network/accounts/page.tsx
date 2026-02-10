@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { 
   flexRender,
@@ -89,12 +89,26 @@ export default function AccountsPage() {
   const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [deletingAccountIds, setDeletingAccountIds] = useState<Set<string>>(new Set())
+  const pendingSelectCountRef = useRef<number | null>(null)
 
   const accounts = useMemo(() => data?.pages.flatMap(page => page.accounts) || [], [data])
 
   useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  // After handleSelectCount fetches more, apply selection once we have enough accounts
+  useEffect(() => {
+    const target = pendingSelectCountRef.current
+    if (target != null && accounts.length >= target) {
+      pendingSelectCountRef.current = null
+      const newSelection: RowSelectionState = {}
+      accounts.slice(0, target).forEach((a) => {
+        newSelection[a.id] = true
+      })
+      setRowSelection(newSelection)
+    }
+  }, [accounts.length, accounts])
 
   const isLoading = queryLoading || !isMounted
   const { scrollContainerRef, saveScroll } = useTableScrollRestore(scrollKey, pageIndex, !isLoading)
@@ -130,18 +144,18 @@ export default function AccountsPage() {
   const selectedCount = Object.keys(rowSelection).length
 
   const handleSelectCount = async (count: number) => {
-    const newSelection: RowSelectionState = {}
-    for (let i = 0; i < count; i++) {
-      newSelection[i] = true
-    }
-    setRowSelection(newSelection)
-    
-    // If the requested count is more than currently loaded, fetch more
     if (count > accounts.length && hasNextPage && !isFetchingNextPage) {
+      pendingSelectCountRef.current = count
       const pagesToFetch = Math.ceil((count - accounts.length) / PAGE_SIZE)
       for (let i = 0; i < pagesToFetch; i++) {
         await fetchNextPage()
       }
+    } else {
+      const newSelection: RowSelectionState = {}
+      accounts.slice(0, count).forEach((a) => {
+        newSelection[a.id] = true
+      })
+      setRowSelection(newSelection)
     }
   }
 
@@ -163,8 +177,8 @@ export default function AccountsPage() {
   }
 
   const handleConfirmPurge = async () => {
-    const selectedIndices = Object.keys(rowSelection).map(Number)
-    const selectedIds = selectedIndices.map(index => accounts[index]?.id).filter(Boolean)
+    // With getRowId: (row) => row.id, rowSelection keys are account IDs
+    const selectedIds = Object.keys(rowSelection).filter(Boolean)
     if (selectedIds.length === 0) return
     setDeletingAccountIds(new Set(selectedIds))
     try {
@@ -439,6 +453,7 @@ export default function AccountsPage() {
   const table = useReactTable({
     data: accounts,
     columns,
+    getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     onSortingChange: setSorting,

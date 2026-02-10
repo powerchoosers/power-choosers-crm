@@ -99,10 +99,24 @@ export default function PeoplePage() {
   const { data: contactIdsInList } = useContactsInTargetLists(contactIds)
   const contactIdsInListRef = useRef<Set<string> | undefined>(contactIdsInList)
   contactIdsInListRef.current = contactIdsInList
+  const pendingSelectCountRef = useRef<number | null>(null)
 
   useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  // After handleSelectCount fetches more, apply selection once we have enough contacts
+  useEffect(() => {
+    const target = pendingSelectCountRef.current
+    if (target != null && contacts.length >= target) {
+      pendingSelectCountRef.current = null
+      const newSelection: RowSelectionState = {}
+      contacts.slice(0, target).forEach((c) => {
+        newSelection[c.id] = true
+      })
+      setRowSelection(newSelection)
+    }
+  }, [contacts.length, contacts])
 
   const isLoading = queryLoading || !isMounted
   const { scrollContainerRef, saveScroll } = useTableScrollRestore(scrollKey, pageIndex, !isLoading)
@@ -138,18 +152,18 @@ export default function PeoplePage() {
   const selectedCount = Object.keys(rowSelection).length
 
   const handleSelectCount = async (count: number) => {
-    const newSelection: RowSelectionState = {}
-    for (let i = 0; i < count; i++) {
-      newSelection[i] = true
-    }
-    setRowSelection(newSelection)
-    
-    // If the requested count is more than currently loaded, fetch more
     if (count > contacts.length && hasNextPage && !isFetchingNextPage) {
+      pendingSelectCountRef.current = count
       const pagesToFetch = Math.ceil((count - contacts.length) / PAGE_SIZE)
       for (let i = 0; i < pagesToFetch; i++) {
         await fetchNextPage()
       }
+    } else {
+      const newSelection: RowSelectionState = {}
+      contacts.slice(0, count).forEach((c) => {
+        newSelection[c.id] = true
+      })
+      setRowSelection(newSelection)
     }
   }
 
@@ -171,8 +185,8 @@ export default function PeoplePage() {
   }
 
   const handleConfirmPurge = async () => {
-    const selectedIndices = Object.keys(rowSelection).map(Number)
-    const selectedIds = selectedIndices.map(index => contacts[index]?.id).filter(Boolean)
+    // With getRowId: (row) => row.id, rowSelection keys are contact IDs
+    const selectedIds = Object.keys(rowSelection).filter(Boolean)
     
     if (selectedIds.length > 0) {
       await deleteContacts(selectedIds)
@@ -444,6 +458,7 @@ export default function PeoplePage() {
   const table = useReactTable({
     data: contacts,
     columns,
+    getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     onSortingChange: setSorting,
