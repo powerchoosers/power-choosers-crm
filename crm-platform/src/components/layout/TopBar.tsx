@@ -410,6 +410,7 @@ export function TopBar() {
                         <div className="w-full max-w-2xl h-[50px] nodal-glass border-signal/50 rounded-2xl shadow-[0_10px_30px_-10px_rgba(0,47,167,0.5)] flex items-center justify-between px-6">
                             <div className="flex items-center gap-3">
                                 <CompanyIcon
+                                    key={`callbar-${displayMetadata?.logoUrl ?? ''}-${displayMetadata?.domain ?? ''}`}
                                     logoUrl={displayMetadata?.logoUrl}
                                     domain={displayMetadata?.domain}
                                     name={displayMetadata?.account || displayMetadata?.name || phoneNumber || 'Caller'}

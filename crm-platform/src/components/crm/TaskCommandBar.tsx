@@ -14,6 +14,10 @@ function getTaskTypeLabel(task: Task): string {
 interface TaskCommandBarProps {
   pendingTasks: Task[]
   currentIndex: number
+  /** When set, show global position (e.g. 3/20) instead of entity-only (1/1) */
+  globalTotal?: number
+  /** 1-based position in global list; used with globalTotal */
+  globalPosition?: number
   onPrev: () => void
   onNext: () => void
   onSkip: () => void
@@ -24,6 +28,8 @@ interface TaskCommandBarProps {
 export function TaskCommandBar({
   pendingTasks,
   currentIndex,
+  globalTotal,
+  globalPosition,
   onPrev,
   onNext,
   onSkip,
@@ -33,19 +39,20 @@ export function TaskCommandBar({
   if (pendingTasks.length === 0) return null
   const current = pendingTasks[currentIndex]
   if (!current) return null
-  const total = pendingTasks.length
+  const total = globalTotal ?? pendingTasks.length
+  const position = globalPosition ?? currentIndex + 1
   const label = getTaskTypeLabel(current)
 
   return (
     <div className="flex items-center gap-3">
       <span className="text-xs font-mono text-zinc-500 tabular-nums whitespace-nowrap">
-        TASK {currentIndex + 1}/{total}: {label}
+        TASK {position}/{total}: {label}
       </span>
       <div className="flex items-center gap-1">
         <button
           type="button"
           onClick={onPrev}
-          disabled={currentIndex === 0}
+          disabled={position <= 1}
           className="p-1.5 rounded hover:bg-white/10 text-zinc-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
           title="Previous task"
         >
@@ -54,7 +61,7 @@ export function TaskCommandBar({
         <button
           type="button"
           onClick={onNext}
-          disabled={currentIndex >= total - 1}
+          disabled={position >= total}
           className="p-1.5 rounded hover:bg-white/10 text-zinc-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
           title="Next task"
         >

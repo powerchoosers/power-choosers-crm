@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { 
   flexRender,
   getCoreRowModel,
@@ -51,12 +51,16 @@ import {
 import { ClickToCallButton } from '@/components/calls/ClickToCallButton'
 import { cn } from '@/lib/utils'
 import { useTableState } from '@/hooks/useTableState'
+import { useTableScrollRestore } from '@/hooks/useTableScrollRestore'
 
 const PAGE_SIZE = 50
 
 export default function PeoplePage() {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { pageIndex, setPage, searchQuery, setSearch, pagination } = useTableState({ pageSize: PAGE_SIZE })
+  const scrollKey = (pathname ?? '/network/people') + (searchParams.toString() ? `?${searchParams.toString()}` : '')
   
   const [globalFilter, setGlobalFilter] = useState(searchQuery)
   const [debouncedFilter, setDebouncedFilter] = useState(searchQuery)
@@ -93,12 +97,15 @@ export default function PeoplePage() {
   const contacts = useMemo(() => data?.pages.flatMap(page => page.contacts) || [], [data])
   const contactIds = useMemo(() => contacts.map(c => c.id), [contacts])
   const { data: contactIdsInList } = useContactsInTargetLists(contactIds)
+  const contactIdsInListRef = useRef<Set<string> | undefined>(contactIdsInList)
+  contactIdsInListRef.current = contactIdsInList
 
   useEffect(() => {
     setIsMounted(true)
   }, [])
 
   const isLoading = queryLoading || !isMounted
+  const { scrollContainerRef, saveScroll } = useTableScrollRestore(scrollKey, pageIndex, !isLoading)
 
   const effectiveTotalRecords = totalContacts ?? contacts.length
   const totalPages = Math.max(1, Math.ceil(effectiveTotalRecords / PAGE_SIZE))
@@ -106,7 +113,7 @@ export default function PeoplePage() {
     ? Math.max(totalPages, pagination.pageIndex + 2)
     : totalPages
 
-  const handleFilterChange = (columnId: string, value: any) => {
+  const handleFilterChange = useCallback((columnId: string, value: any) => {
     setColumnFilters(prev => {
       const existing = prev.find(f => f.id === columnId)
       if (existing) {
@@ -119,7 +126,7 @@ export default function PeoplePage() {
       return [...prev, { id: columnId, value }]
     })
     setPage(0)
-  }
+  }, [setPage])
 
   useEffect(() => {
     const needed = (pagination.pageIndex + 2) * PAGE_SIZE
@@ -242,13 +249,13 @@ export default function PeoplePage() {
             <Link 
               href={`/network/contacts/${contact.id}`}
               className="flex items-center gap-3 group/person"
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); saveScroll(); }}
             >
               <ContactAvatar 
                 name={contact.name} 
                 size={36} 
                 className="w-9 h-9 transition-all"
-                showListBadge={contactIdsInList?.has(contact.id)}
+                showListBadge={contactIdsInListRef.current?.has(contact.id)}
               />
               <div>
                 <div className="font-medium text-zinc-200 group-hover/person:text-white group-hover/person:scale-[1.02] transition-all origin-left">
@@ -270,7 +277,7 @@ export default function PeoplePage() {
             <Link 
               href={`/network/accounts/${contact.accountId}`}
               className="flex items-center gap-2 group/acc"
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); saveScroll(); }}
             >
               <CompanyIcon
                 logoUrl={contact.logoUrl}
@@ -407,7 +414,10 @@ export default function PeoplePage() {
                   <DropdownMenuLabel>Actions</DropdownMenuLabel>
                   <DropdownMenuItem
                     className="hover:bg-white/5 cursor-pointer"
-                    onClick={() => router.push(`/network/contacts/${contact.id}`)}
+                    onClick={() => {
+                      saveScroll()
+                      router.push(`/network/contacts/${contact.id}`)
+                    }}
                   >
                     View Details
                   </DropdownMenuItem>
@@ -421,7 +431,19 @@ export default function PeoplePage() {
         },
       },
     ]
-  }, [router, pageIndex, contactIdsInList])
+  }, [router, pageIndex])
+
+  const onPaginationChange = useCallback(
+    (updater: (prev: PaginationState) => PaginationState | PaginationState) => {
+      if (typeof updater === 'function') {
+        const next = updater(pagination)
+        setPage(next.pageIndex)
+      } else {
+        setPage((updater as PaginationState).pageIndex)
+      }
+    },
+    [pagination, setPage]
+  )
 
   const table = useReactTable({
     data: contacts,
@@ -433,14 +455,7 @@ export default function PeoplePage() {
     onColumnFiltersChange: setColumnFilters,
     getFilteredRowModel: getFilteredRowModel(),
     onGlobalFilterChange: setGlobalFilter,
-    onPaginationChange: (updater) => {
-      if (typeof updater === 'function') {
-        const nextPagination = updater(pagination)
-        setPage(nextPagination.pageIndex)
-      } else {
-        setPage(updater.pageIndex)
-      }
-    },
+    onPaginationChange,
     onRowSelectionChange: setRowSelection,
     autoResetPageIndex: false,
     state: {
@@ -451,6 +466,21 @@ export default function PeoplePage() {
       rowSelection,
     },
   })
+
+  const headerSearchChange = useCallback((value: string) => {
+    setGlobalFilter(value)
+    setPage(0)
+  }, [setPage])
+
+  const headerFilterToggle = useCallback(() => {
+    setIsFilterOpen(prev => !prev)
+  }, [])
+
+  const primaryAction = useMemo(() => ({
+    label: "Add Person",
+    onClick: () => {},
+    icon: <Plus size={18} className="mr-2" />
+  }), [])
 
   const rows = table.getRowModel().rows
   const filteredRowCount = table.getFilteredRowModel().rows.length
@@ -467,17 +497,10 @@ export default function PeoplePage() {
         title="People"
         description="Manage your clients and prospects."
         globalFilter={globalFilter}
-        onSearchChange={(value) => {
-          setGlobalFilter(value)
-          setPage(0)
-        }}
-        onFilterToggle={() => setIsFilterOpen(!isFilterOpen)}
+        onSearchChange={headerSearchChange}
+        onFilterToggle={headerFilterToggle}
         isFilterActive={isFilterOpen || columnFilters.length > 0}
-        primaryAction={{
-          label: "Add Person",
-          onClick: () => {}, // Add your add person logic here
-          icon: <Plus size={18} className="mr-2" />
-        }}
+        primaryAction={primaryAction}
       />
 
       <FilterCommandDeck 
@@ -489,7 +512,7 @@ export default function PeoplePage() {
       />
 
       <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
-        <div className="flex-1 min-h-0 overflow-y-auto relative scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
+        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto relative scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
             <Table>
             <TableHeader className="sticky top-0 z-20 border-b border-white/5">
                 {table.getHeaderGroups().map((headerGroup) => (
@@ -543,18 +566,13 @@ export default function PeoplePage() {
                           if ((e.target as HTMLElement).closest('a') || (e.target as HTMLElement).closest('button')) {
                             return;
                           }
+                          saveScroll()
                           router.push(`/network/contacts/${row.original.id}`)
                         }}
                       >
                         {row.getVisibleCells().map((cell) => (
                           <TableCell key={cell.id} className="py-3">
-                            <motion.div
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              transition={{ duration: 0.4, delay: 0.1 }}
-                            >
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </motion.div>
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </TableCell>
                         ))}
                       </motion.tr>
