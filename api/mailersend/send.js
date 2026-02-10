@@ -11,6 +11,12 @@ export default async function handler(req, res) {
   }
 
   try {
+    let body = req.body;
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch (_) { body = {}; }
+    }
+    if (!body || typeof body !== 'object') body = {};
+
     const {
       to,
       from,
@@ -22,10 +28,13 @@ export default async function handler(req, res) {
       tags,
       trackClicks = true,
       trackOpens = true
-    } = req.body;
+    } = body;
 
-    // Validate required fields
-    if (!to || !from || !subject || (!html && !text)) {
+    // Validate required fields (allow object or string for to/from)
+    const hasTo = to && (typeof to === 'object' ? to.email : to);
+    const hasFrom = from && (typeof from === 'object' ? from.email : from);
+    const hasContent = html || text;
+    if (!hasTo || !hasFrom || !subject || !hasContent) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         error: 'Missing required fields',
