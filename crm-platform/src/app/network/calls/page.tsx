@@ -40,6 +40,7 @@ import { useRouter } from 'next/navigation'
 import { useTableState } from '@/hooks/useTableState'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
 import { toast } from 'sonner'
+import { CompanyIcon } from '@/components/ui/CompanyIcon'
 
 const PAGE_SIZE = 50
 
@@ -130,7 +131,8 @@ export default function CallsPage() {
       },
     },
     {
-      accessorKey: 'contactName',
+      id: 'client',
+      accessorFn: (row) => row.accountName ?? row.contactName,
       header: ({ column }) => {
         return (
           <button
@@ -138,21 +140,34 @@ export default function CallsPage() {
             className="icon-button-forensic -ml-4 flex items-center px-4 py-2 transition-all"
           >
             <ArrowUpDown className="mr-2 h-4 w-4" />
-            Contact
+            Client
           </button>
         )
       },
       cell: ({ row }) => {
         const call = row.original
+        const companyName = call.accountName?.trim() || 'Unknown company'
+        const location = [call.accountCity, call.accountState].filter(Boolean).join(', ')
+        const industry = call.accountIndustry?.trim()
+        const subtitle = location && industry
+          ? `${location} · ${industry}`
+          : location || industry || call.phoneNumber || '—'
         return (
           <div className="flex items-center gap-3 group/call cursor-pointer">
-             <div className="w-8 h-8 rounded-2xl bg-black/40 flex items-center justify-center text-xs font-medium text-zinc-400 border border-white/5 transition-all">
-                {call.contactName === 'Unknown' ? '?' : call.contactName.split(' ').map(n => n[0]).join('').substring(0, 2)}
-             </div>
-             <div>
-                <div className="font-medium text-zinc-200 group-hover/call:text-white group-hover/call:scale-[1.02] transition-all origin-left">{call.contactName}</div>
-                <div className="text-xs text-zinc-500 font-mono tabular-nums">{call.phoneNumber}</div>
-             </div>
+            <CompanyIcon
+              logoUrl={call.accountLogoUrl}
+              domain={call.accountDomain}
+              name={companyName}
+              size={32}
+              className="shrink-0 border border-white/5 transition-all"
+              roundedClassName="rounded-[14px]"
+            />
+            <div className="min-w-0">
+              <div className="font-medium text-zinc-200 group-hover/call:text-white group-hover/call:scale-[1.02] transition-all origin-left truncate">
+                {companyName}
+              </div>
+              <div className="text-xs text-zinc-500 font-mono tabular-nums truncate">{subtitle}</div>
+            </div>
           </div>
         )
       }
