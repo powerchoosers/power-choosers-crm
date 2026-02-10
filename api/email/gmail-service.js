@@ -68,49 +68,67 @@ export class GmailService {
             
             if (userData) {
                 const firstName = typeof userData.first_name === 'string' ? userData.first_name.trim() : '';
-                const lastName = typeof userData.last_name === 'string' ? userData.last_name.trim() : '';
-                const derivedFullName = firstName ? `${firstName} ${lastName}`.trim() : '';
-
-                let finalName = derivedFullName || userData.name || (userData.settings && userData.settings.displayName);
                 
-                // If we still don't have a name, infer it from the email
-                if (!finalName) {
-                    const emailPrefix = emailLower.split('@')[0];
-                    if (emailPrefix.includes('.')) {
-                        finalName = emailPrefix.split('.').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+                // Format sender name as "First Name | Nodal Point" (or just "Nodal Point" if no first name)
+                let finalName = 'Nodal Point';
+                if (firstName) {
+                    finalName = `${firstName} | Nodal Point`;
+                } else {
+                    // Fallback: try to infer first name from email or use other name fields
+                    const lastName = typeof userData.last_name === 'string' ? userData.last_name.trim() : '';
+                    const derivedFullName = firstName ? `${firstName} ${lastName}`.trim() : '';
+                    const alternativeName = derivedFullName || userData.name || (userData.settings && userData.settings.displayName);
+                    
+                    if (alternativeName) {
+                        // Extract first name from full name if available
+                        const firstPart = alternativeName.split(' ')[0].trim();
+                        if (firstPart) {
+                            finalName = `${firstPart} | Nodal Point`;
+                        }
                     } else {
-                        finalName = emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
+                        // Last resort: infer from email
+                        const emailPrefix = emailLower.split('@')[0];
+                        if (emailPrefix.includes('.')) {
+                            const inferredFirst = emailPrefix.split('.')[0];
+                            finalName = `${inferredFirst.charAt(0).toUpperCase() + inferredFirst.slice(1)} | Nodal Point`;
+                        } else {
+                            finalName = `${emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1)} | Nodal Point`;
+                        }
+                        logger.info(`[Gmail] Inferred name '${finalName}' for user '${emailLower}' (missing first_name in Supabase)`);
                     }
-                    logger.info(`[Gmail] Inferred name '${finalName}' for user '${emailLower}' (missing in Supabase)`);
                 }
 
                 return {
                     email: emailLower,
-                    name: finalName || emailLower.split('@')[0]
+                    name: finalName
                 };
             }
             
-            // Fallback: try to parse name from email
+            // Fallback: try to parse first name from email and format as "First Name | Nodal Point"
             const emailPrefix = emailLower.split('@')[0];
-            let name = emailPrefix;
+            let firstName = emailPrefix;
             if (emailPrefix.includes('.')) {
-                // Format: first.last -> "First Last"
-                const parts = emailPrefix.split('.');
-                name = parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
-            } else {
-                // Single word: capitalize first letter
-                name = emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
+                // Format: first.last -> use first part
+                firstName = emailPrefix.split('.')[0];
             }
+            firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
             
             return {
                 email: emailLower,
-                name: name
+                name: `${firstName} | Nodal Point`
             };
         } catch (err) {
             logger.error(`[Gmail] Error looking up user profile: ${err.message}`);
+            // Fallback: infer first name from email and format as "First Name | Nodal Point"
+            const emailPrefix = String(userEmail).split('@')[0];
+            let firstName = emailPrefix;
+            if (emailPrefix.includes('.')) {
+                firstName = emailPrefix.split('.')[0];
+            }
+            firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
             return {
                 email: String(userEmail).toLowerCase().trim(),
-                name: String(userEmail).split('@')[0]
+                name: `${firstName} | Nodal Point`
             };
         }
     }
@@ -218,6 +236,7 @@ export class GmailService {
         }
         
         // Use provided from/fromName if explicitly set, otherwise use looked-up info
+        // lookupUserProfile now returns "First Name | Nodal Point" format, so this will default correctly
         const senderName = fromName || senderInfo.name;
         const senderEmail = from || senderInfo.email;
         

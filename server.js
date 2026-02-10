@@ -94,7 +94,7 @@ import twilioCallerLookupHandler from './api/twilio/caller-lookup.js';
 import sendgridSendHandler from './api/email/sendgrid-send.js';
 import inboundEmailHandler from './api/email/inbound-email.js';
 import createBookingHandler from './api/create-booking.js';
-import mailersendSendHandler from './api/mailersend/send.js';
+import gmailSendSequenceHandler from './api/email/gmail-send-sequence.js';
 
 // ADDITIONAL IMPORTS FOR REMAINING PROXY FUNCTIONS
 import emailUnsubscribeHandler from './api/email/unsubscribe.js';
@@ -928,8 +928,8 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/email/unsubscribe') {
     return handleApiEmailUnsubscribe(req, res);
   }
-  if (pathname === '/api/mailersend/send') {
-    return handleApiMailersendSend(req, res);
+  if (pathname === '/api/email/gmail-send-sequence') {
+    return handleApiGmailSendSequence(req, res);
   }
   if (pathname === '/api/process-call') {
     return handleApiProcessCall(req, res);
@@ -1390,18 +1390,18 @@ async function handleApiEmailUnsubscribe(req, res) {
   return await emailUnsubscribeHandler(req, res);
 }
 
-async function handleApiMailersendSend(req, res) {
+async function handleApiGmailSendSequence(req, res) {
   if (req.method === 'POST') {
     try {
       req.body = await parseRequestBody(req);
     } catch (error) {
-      console.error('[Server] MailerSend Send - Body Parse Error:', error.message);
+      console.error('[Server] Gmail Send Sequence - Body Parse Error:', error.message);
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Invalid request body' }));
       return;
     }
   }
-  return await mailersendSendHandler(req, res);
+  return await gmailSendSequenceHandler(req, res);
 }
 
 // Process call and track email performance

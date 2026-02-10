@@ -2,26 +2,25 @@
 
 ## 🚀 5-Minute Setup
 
-### 1. Get MailerSend API Key
+### 1. Configure Gmail Service Account
 
-1. Go to https://www.mailersend.com/
-2. Sign up / Log in
-3. Verify your domain (e.g., nodalpoint.io)
-4. Go to API Tokens → Create Token
-5. Copy your API key (starts with `mlsn.`)
+1. Set up Google Cloud Service Account with Gmail API access
+2. Configure domain-wide delegation in Google Workspace Admin
+3. Export service account key JSON
+4. Base64 encode the JSON key
 
 ### 2. Add to Environment
 
 **Local (.env):**
 ```bash
-MAILERSEND_API_KEY=mlsn.your-key-here
+GOOGLE_SERVICE_ACCOUNT_KEY=your-base64-encoded-service-account-key-json
 ```
 
 **Production (Cloud Run):**
 ```bash
 # Cloud Console → Cloud Run → nodal-point-network → Edit
 # Add environment variable:
-MAILERSEND_API_KEY=mlsn.your-key-here
+GOOGLE_SERVICE_ACCOUNT_KEY=your-base64-encoded-service-account-key-json
 ```
 
 ### 3. Apply Migration
@@ -93,8 +92,8 @@ LIMIT 10;
 
 ### Emails not sending?
 
-1. Check API key: `echo $MAILERSEND_API_KEY`
-2. Verify domain in MailerSend Dashboard
+1. Check service account key: `echo $GOOGLE_SERVICE_ACCOUNT_KEY`
+2. Verify domain-wide delegation is configured
 3. Check logs: `npx supabase functions logs process-sequence-step`
 4. Manually trigger: `SELECT util.process_sequence_steps();`
 

@@ -1,11 +1,11 @@
 # Sequence Automation Setup Guide
 
-This guide walks through the complete setup and testing of the automated sequence execution system with MailerSend email capabilities.
+This guide walks through the complete setup and testing of the automated sequence execution system with Gmail API email capabilities.
 
 ## 🎯 Overview
 
 The sequence automation system enables automated outreach campaigns with:
-- **Automated email sending** via MailerSend API
+- **Automated email sending** via Gmail API
 - **Scheduled execution** during business hours (8AM-5PM CST)
 - **Delay handling** between sequence steps
 - **Retry logic** for failed steps
@@ -13,9 +13,9 @@ The sequence automation system enables automated outreach campaigns with:
 
 ## 📋 Prerequisites
 
-1. **MailerSend Account**: Create an account at [mailersend.com](https://www.mailersend.com/)
-2. **Verified Domain**: Verify your sending domain in MailerSend Dashboard
-3. **API Key**: Generate an API key from MailerSend Dashboard
+1. **Google Cloud Service Account**: Set up a service account with Gmail API access
+2. **Domain-Wide Delegation**: Configure domain-wide delegation for Gmail sending
+3. **Service Account Key**: Set `GOOGLE_SERVICE_ACCOUNT_KEY` environment variable
 4. **Supabase Project**: Your project must be linked and authenticated
 
 ## 🚀 Setup Instructions
@@ -88,16 +88,11 @@ You should see:
 - `process-sequence-steps-business-hours` - Runs every 5 minutes from 14:00-22:59 UTC (8AM-4:59PM CST)
 - `process-sequence-steps-end-of-day` - Runs at 23:00 UTC (5PM CST)
 
-### Step 6: Sender name and MailerSend footer
+### Step 6: Sender name
 
 **Sender name:** Sequence emails use the format **"First Name | Nodal Point"** (e.g. *Lewis | Nodal Point*). The Edge Function looks up the sequence owner in the `users` table and uses `first_name`; if missing, it falls back to "Nodal Point".
 
-**"Delivered with MailerSend" footer:** MailerSend can append this line to the bottom of emails. To remove or change it:
-1. Log in to [MailerSend](https://www.mailersend.com/) → **Domains** → select your sending domain (e.g. getnodalpoint.com).
-2. Open **Settings** or **Domain settings** and look for **Email footer**, **Branding**, or **Powered by**.
-3. Disable the "Delivered with MailerSend" / "Powered by MailerSend" option if your plan allows it (some plans require it; check your plan or contact support).
-
-There is no API or code setting to remove this footer; it is controlled in the MailerSend dashboard.
+**Gmail sending:** Emails are sent via Gmail API using domain-wide delegation, so they appear to come from the sequence owner's Gmail account. No third-party branding is added to emails.
 
 ## 🧪 Testing
 
@@ -309,8 +304,8 @@ LIMIT 10;
 **Symptoms**: Executions stay in 'pending' or 'queued' status
 
 **Checks**:
-1. Verify MailerSend API key is set: `echo $MAILERSEND_API_KEY`
-2. Check domain is verified in MailerSend Dashboard
+1. Verify Gmail service account key is set: `echo $GOOGLE_SERVICE_ACCOUNT_KEY`
+2. Check domain-wide delegation is configured in Google Workspace Admin
 3. Check cron jobs are running: `SELECT * FROM cron.job_run_details ORDER BY start_time DESC LIMIT 10;`
 4. Check Edge Function is deployed: `npx supabase functions list`
 
@@ -373,14 +368,14 @@ async function getSequenceProgress(sequenceId: string) {
 ## 📝 Next Steps
 
 1. **Test with real contacts** - Start with small test groups
-2. **Monitor delivery rates** - Check MailerSend Dashboard for delivery metrics
+2. **Monitor delivery rates** - Check Gmail API logs and email delivery status
 3. **Refine email templates** - Improve copy based on engagement
 4. **Add AI generation** - Integrate Gemini to dynamically generate email content
-5. **Implement tracking** - Add webhooks for opens/clicks from MailerSend
+5. **Implement tracking** - Add email tracking pixels and click tracking
 
 ## 🔗 References
 
-- **MailerSend API Docs**: https://developers.mailersend.com/
+- **Gmail API Docs**: https://developers.google.com/gmail/api
 - **Supabase Edge Functions**: https://supabase.com/docs/guides/functions
 - **pgmq Documentation**: https://github.com/tembo-io/pgmq
 - **pg_cron Documentation**: https://github.com/citusdata/pg_cron

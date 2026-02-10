@@ -2,19 +2,20 @@
 
 ## ✅ What Was Built
 
-I've fully wired up sequences/protocols with MailerSend email capabilities and Supabase cron jobs. Here's what was implemented:
+I've fully wired up sequences/protocols with Gmail API email capabilities and Supabase cron jobs. Here's what was implemented:
 
-### 1. MailerSend API Integration ✅
+### 1. Gmail API Integration ✅
 
-**File**: `api/mailersend/send.js`
-- Full MailerSend API wrapper
-- Supports all email features: personalization, tracking, tags
+**File**: `api/email/gmail-send-sequence.js`
+- Gmail API wrapper for sequence emails
+- Supports HTML/text content, tracking, personalization
 - Proper error handling and response formatting
 - Returns message IDs for tracking
+- Uses domain-wide delegation for sending
 
 **Integration**: 
-- Added to `server.js` with route `/api/mailersend/send`
-- Documented in `cloudbuild.yaml` (requires `MAILERSEND_API_KEY` env var)
+- Added to `server.js` with route `/api/email/gmail-send-sequence`
+- Documented in `cloudbuild.yaml` (requires `GOOGLE_SERVICE_ACCOUNT_KEY` env var)
 
 ### 2. Database Infrastructure ✅
 
@@ -36,7 +37,7 @@ Created:
 
 Features:
 - Processes sequence steps from the queue
-- Sends emails via MailerSend API through backend
+- Sends emails via Gmail API through backend
 - Handles variable replacement ({{first_name}}, {{company_name}}, etc.)
 - Implements retry logic (up to 3 attempts)
 - Tracks execution status and errors
@@ -77,7 +78,7 @@ Created comprehensive guides:
    ↓
 7. Edge Function processes batches
    ↓
-8. Sends emails via MailerSend API
+8. Sends emails via Gmail API
    ↓
 9. Updates execution status to 'completed'
    ↓
@@ -111,7 +112,7 @@ More can be easily added.
 
 ### Local Development
 
-- [ ] Add `MAILERSEND_API_KEY` to `.env` file
+- [ ] Add `GOOGLE_SERVICE_ACCOUNT_KEY` to `.env` file
 - [ ] Run migration: `npx supabase db push`
 - [ ] Set project URL secret (see setup guide)
 - [ ] Deploy Edge Function: `npx supabase functions deploy process-sequence-step --no-verify-jwt`
@@ -119,12 +120,12 @@ More can be easily added.
 
 ### Production Deployment
 
-- [ ] Add `MAILERSEND_API_KEY` to Cloud Run environment variables (nodal-point-network service)
+- [ ] Add `GOOGLE_SERVICE_ACCOUNT_KEY` to Cloud Run environment variables (nodal-point-network service)
 - [ ] Migration is auto-applied via Cloud Build
 - [ ] Set project URL secret in Supabase Dashboard (SQL Editor)
 - [ ] Deploy Edge Function via Supabase Dashboard or CLI
 - [ ] Set Edge Function `API_BASE_URL` secret: `npx supabase secrets set API_BASE_URL=https://nodal-point-network-792458658491.us-central1.run.app`
-- [ ] Verify domain in MailerSend Dashboard
+- [ ] Verify domain-wide delegation is configured in Google Workspace Admin
 - [ ] Test with small batch first
 
 ## 📊 Monitoring
@@ -158,9 +159,9 @@ LIMIT 10;
 npx supabase functions logs process-sequence-step --limit 50
 ```
 
-### MailerSend Dashboard
+### Gmail API Monitoring
 
-Check delivery rates, opens, clicks at: https://app.mailersend.com/
+Check email delivery status via Gmail API logs and Supabase email tracking records.
 
 ## 🎓 Usage Examples
 
@@ -203,7 +204,7 @@ console.log(result.data);
 
 ## ⚠️ Important Notes
 
-1. **MailerSend Domain Verification**: Your sending domain MUST be verified in MailerSend or emails will fail
+1. **Gmail Domain-Wide Delegation**: Domain-wide delegation MUST be configured in Google Workspace Admin for Gmail API sending
 2. **Business Hours Only**: Sequences only run 8AM-5PM CST to stay in free tier
 3. **Free Tier**: With 2 cron jobs running every 5 mins for 9 hours = ~200 invocations/day (well within limits)
 4. **Retry Logic**: Failed steps automatically retry up to 3 times before marking as failed
@@ -213,7 +214,7 @@ console.log(result.data);
 ## 🔮 Future Enhancements
 
 - [ ] AI-generated email content (integrate with existing Gemini optimization)
-- [ ] MailerSend webhook integration for open/click tracking
+- [ ] Email tracking integration for open/click tracking
 - [ ] SMS steps via Twilio
 - [ ] Call steps with automatic dialer integration
 - [ ] LinkedIn automation steps
@@ -224,7 +225,7 @@ console.log(result.data);
 ## 📁 Files Created/Modified
 
 ### New Files
-- `api/mailersend/send.js` - MailerSend API endpoint
+- `api/email/gmail-send-sequence.js` - Gmail API endpoint for sequences
 - `supabase/migrations/20260209000000_sequence_automation.sql` - Database infrastructure
 - `supabase/functions/process-sequence-step/index.ts` - Edge Function
 - `SEQUENCE_AUTOMATION_SETUP.md` - Setup guide
@@ -232,8 +233,8 @@ console.log(result.data);
 - `SEQUENCE_AUTOMATION_SUMMARY.md` - This file
 
 ### Modified Files
-- `server.js` - Added MailerSend route and handler
-- `cloudbuild.yaml` - Added note about MAILERSEND_API_KEY
+- `server.js` - Added Gmail sequence route and handler
+- `cloudbuild.yaml` - Added note about GOOGLE_SERVICE_ACCOUNT_KEY
 
 ## ✅ Testing Checklist
 
@@ -247,7 +248,7 @@ Use `test-sequence-automation.sql` to verify:
 - [ ] Executions created with correct scheduled times
 - [ ] Manual processing works
 - [ ] Email sent successfully
-- [ ] MailerSend message ID recorded
+- [ ] Gmail message ID recorded
 - [ ] Status updates to 'completed'
 - [ ] Email received in inbox
 
@@ -257,7 +258,7 @@ Use `test-sequence-automation.sql` to verify:
 2. **Deploy to production** following production checklist
 3. **Create first real sequence** in Protocol Builder
 4. **Enroll small test group** (5-10 contacts)
-5. **Monitor results** in MailerSend Dashboard
+5. **Monitor results** via Gmail API logs and email tracking
 6. **Iterate and improve** email copy based on metrics
 
 ---
