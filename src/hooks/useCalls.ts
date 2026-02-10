@@ -140,6 +140,7 @@ type CallRow = {
   from_phone?: string | null
   to?: string | null
   to_phone?: string | null
+  contact_name?: string | null
   contacts?: CallContact | CallContact[] | null
 }
 
@@ -181,13 +182,13 @@ export function useCalls(searchQuery?: string) {
     queryFn: async ({ pageParam = 0 }) => {
       if (loading || !user) return { calls: [], nextCursor: null }
 
+      // Select only from calls (no join) to avoid FK/relationship errors; use contact_name on calls
       let query = supabase
         .from('calls')
-        .select('*, contacts!calls_contactId_fkey(name)', { count: 'exact' })
+        .select('*', { count: 'exact' })
 
       if (searchQuery) {
-        // Search in contact name, ai_summary, or transcript (column is ai_summary after migration)
-        query = query.or(`ai_summary.ilike.%${searchQuery}%,transcript.ilike.%${searchQuery}%,contacts.name.ilike.%${searchQuery}%`)
+        query = query.or(`ai_summary.ilike.%${searchQuery}%,transcript.ilike.%${searchQuery}%,contact_name.ilike.%${searchQuery}%`)
       }
 
       const from = pageParam * PAGE_SIZE
@@ -195,7 +196,7 @@ export function useCalls(searchQuery?: string) {
 
       const { data, error, count } = await query
         .range(from, to)
-        .order('created_at', { ascending: false })
+        .order('timestamp', { ascending: false })
 
       if (error) {
         console.error('Error fetching calls:', error)
@@ -203,8 +204,6 @@ export function useCalls(searchQuery?: string) {
       }
 
       const calls = (data as CallRow[]).map(item => {
-        const contact = Array.isArray(item.contacts) ? item.contacts[0] : item.contacts
-        
         // Map direction/status to UI types
         const type = item.direction === 'inbound' ? 'Inbound' : 'Outbound'
         // Capitalize status
@@ -216,9 +215,12 @@ export function useCalls(searchQuery?: string) {
         const seconds = (item.duration || 0) % 60
         const durationStr = [hours, minutes, seconds].map(v => String(v).padStart(2, '0')).join(':')
 
+        const contact = Array.isArray(item.contacts) ? item.contacts[0] : item.contacts
+        const contactName = item.contact_name ?? contact?.name ?? 'Unknown'
+
         return {
           id: item.id,
-          contactName: contact?.name || 'Unknown',
+          contactName,
           phoneNumber: (item.from_phone || item.from) === user.email ? (item.to_phone || item.to) : (item.from_phone || item.from), // Rough guess
           type: type as Call['type'],
           status: status as Call['status'],
@@ -229,7 +231,8 @@ export function useCalls(searchQuery?: string) {
           recordingSid: item.recording_sid || item.recordingSid,
           transcript: item.transcript,
           aiInsights: item.ai_insights || item.aiInsights,
-          contactId: item.contact_id || item.contactId
+          contactId: item.contact_id || item.contactId,
+          accountId: item.account_id || item.accountId
         }
       }) as Call[]
 
