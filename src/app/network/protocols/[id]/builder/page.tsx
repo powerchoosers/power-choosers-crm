@@ -81,6 +81,8 @@ import {
 } from "@/components/ui/dialog";
 import { useContacts, type Contact } from '@/hooks/useContacts';
 import { useProtocolBuilder } from '@/hooks/useProtocolBuilder';
+import { useAuth } from '@/context/AuthContext';
+import { getBurnerFromEmail, getBurnerSenderName } from '@/lib/burner-email';
 import { toast } from 'sonner';
 
 // Mock Data for Visualization (The "Test Sequence")
@@ -347,7 +349,10 @@ function ProtocolArchitectInner() {
   const { screenToFlowPosition } = useReactFlow();
   
   // Real Data Integration
+  const { user } = useAuth();
   const { protocol, saveProtocol, isSaving } = useProtocolBuilder(id as string);
+  const burnerFrom = getBurnerFromEmail(user?.email ?? undefined);
+  const burnerSenderName = getBurnerSenderName(user?.firstName ?? undefined);
   
   // State
   const [nodes, setNodes, onNodesChange] = useNodesState(
@@ -1044,6 +1049,9 @@ function ProtocolArchitectInner() {
                   Status: {isDirty ? 'Unsaved_Changes' : 'Synced'} // Protocol ID: {id?.toString().slice(0, 8)}...
                 </span>
               </div>
+              <p className="text-[10px] font-mono text-zinc-500 mt-1">
+                Sequence emails send from: <span className="text-zinc-400">{burnerSenderName}</span> &lt;{burnerFrom}&gt;
+              </p>
             </div>
           </div>
         </div>
