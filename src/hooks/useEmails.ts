@@ -3,6 +3,14 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
 
+export interface EmailAttachment {
+  filename: string
+  mimeType: string
+  attachmentId: string
+  size: number
+  messageId: string
+}
+
 export interface Email {
   id: string
   subject: string
@@ -21,6 +29,7 @@ export interface Email {
   gmailMessageId?: string
   openCount?: number
   clickCount?: number
+  attachments?: EmailAttachment[]
 }
 
 const PAGE_SIZE = 50
@@ -113,7 +122,8 @@ export function useEmails(searchQuery?: string) {
             status: item.status,
             ownerId: item.metadata?.ownerId || user.email,
             openCount: item.openCount,
-            clickCount: item.clickCount
+            clickCount: item.clickCount,
+            attachments: item.attachments || item.metadata?.attachments
           }
         }) as Email[]
 

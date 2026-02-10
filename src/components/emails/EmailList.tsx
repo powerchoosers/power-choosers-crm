@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { format, formatDistanceToNow, isAfter, subMonths } from 'date-fns'
 import { motion } from 'framer-motion'
-import { Mail, ArrowUpRight, ArrowDownLeft, RefreshCw, Loader2, Eye, MousePointer2, ChevronLeft, ChevronRight, Clock, Check } from 'lucide-react'
+import { Mail, ArrowUpRight, ArrowDownLeft, RefreshCw, Loader2, Eye, MousePointer2, ChevronLeft, ChevronRight, Clock, Check, Paperclip } from 'lucide-react'
 import { Email } from '@/hooks/useEmails'
 import { cn } from '@/lib/utils'
 
@@ -340,12 +340,22 @@ export function EmailList({
 
               {/* Message Preview */}
               <div className={cn("min-w-0 space-y-1", filter === 'sent' ? "col-span-3" : "col-span-5")}>
-                <h4 className={cn(
-                  "text-sm truncate tracking-tight transition-all origin-left group-hover:scale-[1.02]", 
-                  email.unread ? "font-medium text-zinc-100" : "text-zinc-500 group-hover:text-zinc-300"
-                )}>
-                    {email.subject}
-                </h4>
+                <div className="flex items-center gap-2">
+                  <h4 className={cn(
+                    "text-sm truncate tracking-tight transition-all origin-left group-hover:scale-[1.02] flex-1", 
+                    email.unread ? "font-medium text-zinc-100" : "text-zinc-500 group-hover:text-zinc-300"
+                  )}>
+                      {email.subject}
+                  </h4>
+                  {email.attachments && email.attachments.length > 0 && (
+                    <div className="flex items-center gap-1 text-zinc-500 flex-shrink-0" title={`${email.attachments.length} attachment${email.attachments.length > 1 ? 's' : ''}`}>
+                      <Paperclip className="w-3 h-3" />
+                      {email.attachments.length > 1 && (
+                        <span className="text-[10px] font-mono tabular-nums">{email.attachments.length}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <p className="text-xs text-zinc-600 truncate group-hover:text-zinc-500 transition-colors">
                   {email.snippet || email.text || 'No preview available'}
                 </p>

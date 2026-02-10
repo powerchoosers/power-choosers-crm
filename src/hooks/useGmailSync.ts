@@ -38,8 +38,11 @@ interface GmailMessagePart {
   headers?: GmailHeader[];
   body?: {
     data?: string;
+    attachmentId?: string;
+    size?: number;
   };
   parts?: GmailMessagePart[];
+  filename?: string;
 }
 
 interface GmailMessage {
@@ -149,14 +152,36 @@ export function useGmailSync() {
     // Extract body parts (simplified logic from legacy)
     let htmlBody = '';
     let textBody = '';
+    const attachments: Array<{ 
+      filename: string; 
+      mimeType: string; 
+      attachmentId: string; 
+      size: number;
+      messageId: string;
+    }> = [];
     
     const extractParts = (part?: GmailMessagePart) => {
       if (!part) return;
-      if (part.mimeType === 'text/html' && part.body?.data) {
-        htmlBody = decodeBase64Url(part.body.data);
-      } else if (part.mimeType === 'text/plain' && part.body?.data) {
-        textBody = decodeBase64Url(part.body.data);
+      
+      // Check if this is an attachment
+      const isAttachment = part.filename && part.body?.attachmentId;
+      if (isAttachment) {
+        attachments.push({
+          filename: part.filename,
+          mimeType: part.mimeType || 'application/octet-stream',
+          attachmentId: part.body.attachmentId!,
+          size: part.body.size || 0,
+          messageId: message.id
+        });
+      } else {
+        // Extract body content
+        if (part.mimeType === 'text/html' && part.body?.data) {
+          htmlBody = decodeBase64Url(part.body.data);
+        } else if (part.mimeType === 'text/plain' && part.body?.data) {
+          textBody = decodeBase64Url(part.body.data);
+        }
       }
+      
       if (part.parts) part.parts.forEach(extractParts);
     };
     
@@ -203,10 +228,12 @@ export function useGmailSync() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       is_read: !labelIds.includes('UNREAD'),
+      attachments: attachments.length > 0 ? attachments : undefined,
       metadata: {
         ownerId: userEmail.toLowerCase(),
         gmailThreadId: message.threadId,
-        gmailMessageId: message.id
+        gmailMessageId: message.id,
+        attachments: attachments.length > 0 ? attachments : undefined
       }
     };
   }, []);
@@ -357,6 +384,7 @@ export function useGmailSync() {
             status: emailData.status,
             timestamp: emailData.timestamp,
             is_read: emailData.is_read,
+            attachments: emailData.attachments,
             metadata: emailData.metadata
           }, { 
             onConflict: 'id' 

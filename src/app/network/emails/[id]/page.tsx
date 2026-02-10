@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation'
 import { useEmail, useMarkEmailAsRead } from '@/hooks/useEmail'
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Reply, Trash2, MoreHorizontal, Printer, Star } from 'lucide-react'
+import { ArrowLeft, Reply, Trash2, MoreHorizontal, Printer, Star, Paperclip, Download } from 'lucide-react'
 import { format } from 'date-fns'
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ComposeModal } from '@/components/emails/ComposeModal'
@@ -20,6 +20,49 @@ export default function EmailDetailPage() {
   const { mutate: markAsRead } = useMarkEmailAsRead()
   const [isComposeOpen, setIsComposeOpen] = useState(false)
   const [isPrintRequested, setIsPrintRequested] = useState(false)
+  const [downloadingAttachment, setDownloadingAttachment] = useState<string | null>(null)
+
+  const handleDownloadAttachment = async (attachment: { filename: string; attachmentId: string; messageId: string; mimeType: string }) => {
+    setDownloadingAttachment(attachment.attachmentId)
+    try {
+      // Get Gmail access token from storage
+      const accessToken = typeof window !== 'undefined' 
+        ? sessionStorage.getItem('gmail_oauth_token') || localStorage.getItem('gmail_oauth_token')
+        : null
+
+      if (!accessToken) {
+        throw new Error('Gmail not connected. Please sync your Gmail first.')
+      }
+
+      const response = await fetch('/api/gmail/attachment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messageId: attachment.messageId,
+          attachmentId: attachment.attachmentId,
+          accessToken
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to download attachment')
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = attachment.filename
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('Error downloading attachment:', error)
+    } finally {
+      setDownloadingAttachment(null)
+    }
+  }
 
   // Mark as read when the email is loaded
   useEffect(() => {
@@ -147,6 +190,48 @@ export default function EmailDetailPage() {
              printTrigger={isPrintRequested}
              className="p-4"
            />
+           
+           {/* Attachments Section */}
+           {email.attachments && email.attachments.length > 0 && (
+             <div className="px-8 pb-6 space-y-3">
+               <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
+                 <Paperclip className="w-3 h-3" />
+                 <span>Attachments ({email.attachments.length})</span>
+               </div>
+               <div className="space-y-2">
+                 {email.attachments.map((attachment, idx) => (
+                   <div
+                     key={idx}
+                     className="flex items-center justify-between gap-3 p-3 rounded-lg border border-white/10 bg-black/20 hover:bg-black/30 transition-colors group"
+                   >
+                     <div className="flex items-center gap-3 min-w-0 flex-1">
+                       <div className="w-10 h-10 rounded-xl nodal-glass flex items-center justify-center border border-white/10 flex-shrink-0">
+                         <Paperclip className="w-4 h-4 text-zinc-400" />
+                       </div>
+                       <div className="min-w-0 flex-1">
+                         <p className="text-sm font-medium text-zinc-200 truncate">{attachment.filename}</p>
+                         <p className="text-xs text-zinc-500">
+                           {(attachment.size / 1024).toFixed(1)} KB
+                         </p>
+                       </div>
+                     </div>
+                     <button
+                       onClick={() => handleDownloadAttachment(attachment)}
+                       disabled={downloadingAttachment === attachment.attachmentId}
+                       className="icon-button-forensic h-9 px-4 flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider"
+                     >
+                       {downloadingAttachment === attachment.attachmentId ? (
+                         <Loader2 className="w-4 h-4 animate-spin" />
+                       ) : (
+                         <Download className="w-4 h-4" />
+                       )}
+                       Download
+                     </button>
+                   </div>
+                 ))}
+               </div>
+             </div>
+           )}
           </div>
 
         <div className="p-4 border-t border-white/5 nodal-recessed">

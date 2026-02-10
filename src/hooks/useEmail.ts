@@ -35,7 +35,8 @@ export function useEmail(id: string) {
           status: data.status,
           ownerId: data.metadata?.ownerId,
           openCount: data.openCount,
-          clickCount: data.clickCount
+          clickCount: data.clickCount,
+          attachments: data.attachments || data.metadata?.attachments
         } as Email
       }
       return null
