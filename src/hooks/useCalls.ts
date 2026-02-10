@@ -19,6 +19,13 @@ export interface Call {
   aiInsights?: Record<string, unknown> | null
   contactId?: string
   accountId?: string
+  /** Company/account for display: name, location, industry, logo */
+  accountName?: string
+  accountCity?: string
+  accountState?: string
+  accountIndustry?: string
+  accountLogoUrl?: string
+  accountDomain?: string
 }
 
 export function useSearchCalls(queryTerm: string) {
@@ -141,7 +148,18 @@ type CallRow = {
   to?: string | null
   to_phone?: string | null
   contact_name?: string | null
+  account_name?: string | null
   contacts?: CallContact | CallContact[] | null
+  accounts?: CallAccount | CallAccount[] | null
+}
+
+type CallAccount = {
+  name?: string | null
+  city?: string | null
+  state?: string | null
+  industry?: string | null
+  logo_url?: string | null
+  domain?: string | null
 }
 
 const PAGE_SIZE = 50
@@ -182,10 +200,10 @@ export function useCalls(searchQuery?: string) {
     queryFn: async ({ pageParam = 0 }) => {
       if (loading || !user) return { calls: [], nextCursor: null }
 
-      // Select only from calls (no join) to avoid FK/relationship errors; use contact_name on calls
+      // Join accounts for company display (name, city, state, industry, logo); use explicit FK
       let query = supabase
         .from('calls')
-        .select('*', { count: 'exact' })
+        .select('*, accounts!calls_accountId_fkey(name, city, state, industry, logo_url, domain)', { count: 'exact' })
 
       if (searchQuery) {
         query = query.or(`ai_summary.ilike.%${searchQuery}%,transcript.ilike.%${searchQuery}%,contact_name.ilike.%${searchQuery}%`)
@@ -217,6 +235,7 @@ export function useCalls(searchQuery?: string) {
 
         const contact = Array.isArray(item.contacts) ? item.contacts[0] : item.contacts
         const contactName = item.contact_name ?? contact?.name ?? 'Unknown'
+        const account = Array.isArray(item.accounts) ? item.accounts[0] : item.accounts
 
         return {
           id: item.id,
@@ -232,7 +251,13 @@ export function useCalls(searchQuery?: string) {
           transcript: item.transcript,
           aiInsights: item.ai_insights || item.aiInsights,
           contactId: item.contact_id || item.contactId,
-          accountId: item.account_id || item.accountId
+          accountId: item.account_id || item.accountId,
+          accountName: account?.name ?? item.account_name ?? undefined,
+          accountCity: account?.city ?? undefined,
+          accountState: account?.state ?? undefined,
+          accountIndustry: account?.industry ?? undefined,
+          accountLogoUrl: account?.logo_url ?? undefined,
+          accountDomain: account?.domain ?? undefined
         }
       }) as Call[]
 
