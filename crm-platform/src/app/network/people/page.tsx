@@ -434,13 +434,9 @@ export default function PeoplePage() {
   }, [router, pageIndex])
 
   const onPaginationChange = useCallback(
-    (updater: (prev: PaginationState) => PaginationState | PaginationState) => {
-      if (typeof updater === 'function') {
-        const next = updater(pagination)
-        setPage(next.pageIndex)
-      } else {
-        setPage((updater as PaginationState).pageIndex)
-      }
+    (updaterOrValue: PaginationState | ((old: PaginationState) => PaginationState)) => {
+      const next = typeof updaterOrValue === 'function' ? updaterOrValue(pagination) : updaterOrValue
+      setPage(next.pageIndex)
     },
     [pagination, setPage]
   )
