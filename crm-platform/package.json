@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --turbo",
     "build": "next build",
+    "build:safe": "npm run typecheck && next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
