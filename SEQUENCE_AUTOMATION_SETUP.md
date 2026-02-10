@@ -88,6 +88,17 @@ You should see:
 - `process-sequence-steps-business-hours` - Runs every 5 minutes from 14:00-22:59 UTC (8AM-4:59PM CST)
 - `process-sequence-steps-end-of-day` - Runs at 23:00 UTC (5PM CST)
 
+### Step 6: Sender name and MailerSend footer
+
+**Sender name:** Sequence emails use the format **"First Name | Nodal Point"** (e.g. *Lewis | Nodal Point*). The Edge Function looks up the sequence owner in the `users` table and uses `first_name`; if missing, it falls back to "Nodal Point".
+
+**"Delivered with MailerSend" footer:** MailerSend can append this line to the bottom of emails. To remove or change it:
+1. Log in to [MailerSend](https://www.mailersend.com/) → **Domains** → select your sending domain (e.g. getnodalpoint.com).
+2. Open **Settings** or **Domain settings** and look for **Email footer**, **Branding**, or **Powered by**.
+3. Disable the "Delivered with MailerSend" / "Powered by MailerSend" option if your plan allows it (some plans require it; check your plan or contact support).
+
+There is no API or code setting to remove this footer; it is controlled in the MailerSend dashboard.
+
 ## 🧪 Testing
 
 ### Test 1: Create a Simple Email Sequence

@@ -15,7 +15,7 @@ const sql = postgres(
   Deno.env.get('SUPABASE_DB_URL')!
 )
 
-// Job schema from queue
+// Job schema from queue (permissive metadata for pgmq payload)
 const jobSchema = z.object({
   jobId: z.number(),
   execution_id: z.string(),
@@ -23,7 +23,7 @@ const jobSchema = z.object({
   member_id: z.string(),
   step_index: z.number(),
   step_type: z.string(),
-  metadata: z.record(z.any()).optional()
+  metadata: z.any().optional()
 })
 
 const failedJobSchema = jobSchema.extend({
@@ -35,9 +35,20 @@ type FailedJob = z.infer<typeof failedJobSchema>
 
 const QUEUE_NAME = 'sequence_jobs'
 const API_BASE_URL = Deno.env.get('API_BASE_URL') || 'https://nodal-point-network-792458658491.us-central1.run.app'
+/** Burner domain for cold/sequence emails (e.g. getnodalpoint.com). From address = localPart@BURNER_DOMAIN. */
+const BURNER_DOMAIN = Deno.env.get('BURNER_DOMAIN') || 'getnodalpoint.com'
+
+/** Derive burner from address from owner email: l.patterson@nodalpoint.io -> l.patterson@getnodalpoint.com */
+function burnerFromAddress(ownerEmail: string | null | undefined): string {
+  if (!ownerEmail || typeof ownerEmail !== 'string') return `hello@${BURNER_DOMAIN}`
+  const at = ownerEmail.indexOf('@')
+  const localPart = at > 0 ? ownerEmail.slice(0, at).trim() : 'hello'
+  return `${localPart}@${BURNER_DOMAIN}`
+}
 
 // Listen for HTTP requests
 Deno.serve(async (req) => {
+  try {
   if (req.method !== 'POST') {
     return new Response('expected POST request', { status: 405 })
   }
@@ -109,6 +120,15 @@ Deno.serve(async (req) => {
       }
     }
   )
+  } catch (topError) {
+    const msg = topError instanceof Error ? topError.message : String(topError)
+    const stack = topError instanceof Error ? topError.stack : ''
+    console.error('[process-sequence-step] top-level error:', msg, stack)
+    return new Response(
+      JSON.stringify({ error: msg, stack: stack?.slice(0, 500) }),
+      { status: 200, headers: { 'content-type': 'application/json' } }
+    )
+  }
 })
 
 /**
@@ -120,25 +140,24 @@ async function processJob(job: Job) {
   console.log('[ProcessJob] Starting:', { execution_id, step_type })
   
   // Fetch execution details
-  const [execution]: any[] = await sql`
-    SELECT
-      se.id,
-      se.sequence_id,
-      se.member_id,
-      se.step_index,
-      se.step_type,
-      se.status,
-      se.metadata,
-      se.retry_count,
-      sm."targetId" as contact_id,
-      sm."targetType" as target_type
-    FROM sequence_executions se
-    JOIN sequence_members sm ON sm.id = se.member_id
-    WHERE se.id = ${execution_id}
+  const [execRow]: any[] = await sql`
+    SELECT id, sequence_id, member_id, step_index, step_type, status, metadata, retry_count
+    FROM sequence_executions
+    WHERE id = ${execution_id}
   `
-  
-  if (!execution) {
+  if (!execRow) {
     throw new Error(`Execution not found: ${execution_id}`)
+  }
+  const [memberRow]: any[] = await sql`
+    SELECT "targetId", "targetType" FROM sequence_members WHERE id = ${execRow.member_id}
+  `
+  if (!memberRow) {
+    throw new Error(`Sequence member not found: ${execRow.member_id}`)
+  }
+  const execution = {
+    ...execRow,
+    contact_id: (memberRow as any).targetId ?? (memberRow as any).targetid,
+    target_type: (memberRow as any).targetType ?? (memberRow as any).targettype
   }
   
   // Update execution status to processing
@@ -225,25 +244,44 @@ async function processJob(job: Job) {
  * Process email step - send email via MailerSend
  */
 async function processEmailStep(execution: any) {
-  const { id, contact_id, metadata } = execution
+  const { id, contact_id, metadata, sequence_id } = execution
   
-  console.log('[ProcessEmail] Fetching contact:', { contact_id })
+  // Resolve sender: sequence owner email -> burner address + display name (e.g. Lewis | Nodal Point)
+  const [seqRow]: any[] = await sql`
+    SELECT "ownerId" FROM sequences WHERE id = ${sequence_id}
+  `
+  const ownerEmail = seqRow?.ownerId ?? (seqRow as any)?.ownerid
+  const fromEmail = burnerFromAddress(ownerEmail)
+  let fromName = 'Nodal Point'
+  if (ownerEmail) {
+    const [userRow]: any[] = await sql`
+      SELECT first_name FROM users WHERE email = ${ownerEmail}
+    `
+    const firstName = (userRow as any)?.first_name
+    if (firstName && String(firstName).trim()) {
+      fromName = `${String(firstName).trim()} | Nodal Point`
+    }
+  }
+  
+  console.log('[ProcessEmail] Fetching contact:', { contact_id, fromEmail, fromName })
   
   // Fetch contact details
-  const [contact]: any[] = await sql`
-    SELECT 
-      id, 
-      email,
-      "firstName",
-      "lastName",
-      "companyName"
+  const [contactRow]: any[] = await sql`
+    SELECT id, email, "firstName", "lastName", "accountId"
     FROM contacts
     WHERE id = ${contact_id}
   `
-  
-  if (!contact || !contact.email) {
+  if (!contactRow || !contactRow.email) {
     throw new Error(`Contact not found or has no email: ${contact_id}`)
   }
+  let companyName = ''
+  if (contactRow.accountId) {
+    const accountRows: any[] = await sql`
+      SELECT name FROM accounts WHERE id = ${contactRow.accountId}
+    `
+    companyName = accountRows[0]?.name ?? ''
+  }
+  const contact = { ...contactRow, companyName }
   
   // Extract email details from metadata
   const subject = metadata?.subject || 'Message from Nodal Point'
@@ -259,12 +297,31 @@ async function processEmailStep(execution: any) {
     .replace(/\{\{first_name\}\}/g, contact.firstName || '')
     .replace(/\{\{last_name\}\}/g, contact.lastName || '')
     .replace(/\{\{company_name\}\}/g, contact.companyName || '')
+  const textBody = htmlBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
   
   console.log('[ProcessEmail] Sending email:', {
     to: contact.email,
+    from: fromEmail,
     subject,
     bodyLength: htmlBody.length
   })
+  
+  const payload = {
+    to: {
+      email: contact.email,
+      name: `${(contact.firstName || '').trim()} ${(contact.lastName || '').trim()}`.trim() || contact.email
+    },
+    from: {
+      email: fromEmail,
+      name: fromName
+    },
+    subject: subject || 'Message from Nodal Point',
+    html: htmlBody || undefined,
+    text: textBody || htmlBody || 'No content',
+    tags: ['sequence', `sequence_${execution.sequence_id}`],
+    trackClicks: true,
+    trackOpens: true
+  }
   
   // Send email via MailerSend API through our backend
   const response = await fetch(`${API_BASE_URL}/api/mailersend/send`, {
@@ -272,21 +329,7 @@ async function processEmailStep(execution: any) {
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      to: {
-        email: contact.email,
-        name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
-      },
-      from: {
-        email: 'hello@nodalpoint.io',
-        name: 'Nodal Point'
-      },
-      subject,
-      html: htmlBody,
-      tags: ['sequence', `sequence_${execution.sequence_id}`],
-      trackClicks: true,
-      trackOpens: true
-    })
+    body: JSON.stringify(payload)
   })
   
   if (!response.ok) {
