@@ -163,14 +163,15 @@ export function useGmailSync() {
     const extractParts = (part?: GmailMessagePart) => {
       if (!part) return;
       
-      // Check if this is an attachment
-      const isAttachment = part.filename && part.body?.attachmentId;
-      if (isAttachment) {
+      // Check if this is an attachment (narrow so filename/attachmentId are string for strictNullChecks)
+      const filename = part.filename;
+      const attachmentId = part.body?.attachmentId;
+      if (filename !== undefined && filename !== '' && attachmentId) {
         attachments.push({
-          filename: part.filename,
+          filename,
           mimeType: part.mimeType || 'application/octet-stream',
-          attachmentId: part.body.attachmentId!,
-          size: part.body.size || 0,
+          attachmentId,
+          size: part.body?.size ?? 0,
           messageId: message.id
         });
       } else {
