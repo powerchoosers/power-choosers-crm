@@ -39,8 +39,9 @@ export function TaskCommandBar({
   if (pendingTasks.length === 0) return null
   const current = pendingTasks[currentIndex]
   if (!current) return null
-  const total = globalTotal ?? pendingTasks.length
-  const position = globalPosition ?? currentIndex + 1
+  const useGlobal = globalTotal != null && globalTotal > 0 && globalPosition != null && globalPosition > 0
+  const total = useGlobal ? globalTotal : pendingTasks.length
+  const position = useGlobal ? globalPosition : currentIndex + 1
   const label = getTaskTypeLabel(current)
 
   return (

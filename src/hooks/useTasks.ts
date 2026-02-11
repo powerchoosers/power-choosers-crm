@@ -82,12 +82,16 @@ export function useTasks(searchQuery?: string) {
     mutationFn: async (newTask: Omit<Task, 'id' | 'createdAt'>) => {
       const id = crypto.randomUUID()
       const now = new Date().toISOString()
+      const priorityMap: Record<string, string> = { low: 'Low', medium: 'Medium', high: 'High', protocol: 'Protocol', sequence: 'Protocol' }
+      const rawPriority = (newTask.priority ?? 'Medium') as string
+      const priority = priorityMap[String(rawPriority).toLowerCase()] ?? (rawPriority || 'Medium')
+      const status = (newTask.status && ['Pending', 'In Progress', 'Completed'].includes(newTask.status)) ? newTask.status : 'Pending'
       const row = {
         id,
         title: newTask.title ?? 'Task',
         description: newTask.description ?? null,
-        status: newTask.status ?? 'Pending',
-        priority: newTask.priority ?? 'Medium',
+        status,
+        priority,
         dueDate: newTask.dueDate ?? null,
         contactId: newTask.contactId ?? null,
         accountId: newTask.accountId ?? null,

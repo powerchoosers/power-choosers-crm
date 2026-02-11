@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { CheckCircle2, Circle, Clock, AlertCircle, Plus } from 'lucide-react';
+import { PriorityBadge } from '@/components/ui/PriorityBadge';
 
 interface Task {
   id: string;
@@ -103,13 +104,7 @@ export function TaskManagement() {
                   {task.title}
                 </p>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded-sm font-mono uppercase tracking-tighter border ${
-                    task.priority === 'high' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' :
-                    task.priority === 'medium' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
-                    'bg-zinc-500/10 text-zinc-500 border-zinc-500/20'
-                  }`}>
-                    {task.priority}_PRIORITY
-                  </span>
+                  <PriorityBadge priority={task.priority} labelStyle="suffix" />
                   <div className="flex items-center gap-1 text-[10px] text-zinc-600 font-mono tabular-nums">
                     <Clock className="w-3 h-3" />
                     {task.dueDate}
