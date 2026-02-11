@@ -1,5 +1,64 @@
 import { supabase } from './supabase'
 
+/** Minimal contact shape for variable substitution (e.g. from useContact) */
+export interface ContactVariableSource {
+  id?: string
+  firstName?: string | null
+  lastName?: string | null
+  company?: string | null
+  companyName?: string | null
+  email?: string | null
+  title?: string | null
+  industry?: string | null
+  contractEnd?: string | null
+  metadata?: { general?: { company?: string }; energy?: { loadZone?: string } } | null
+}
+
+const fallback = (v: string | null | undefined): string => (v != null && String(v).trim() !== '' ? String(v).trim() : '—')
+
+/**
+ * Maps a contact to a flat object for {{variable}} substitution.
+ * Keys: first_name, last_name, company_name, email, load_zone, contract_end, etc.
+ */
+export function contactToVariableMap(contact: ContactVariableSource | null | undefined): Record<string, string> {
+  if (!contact) return {}
+  const meta = contact.metadata
+  return {
+    first_name: fallback(contact.firstName),
+    last_name: fallback(contact.lastName),
+    company_name: fallback(contact.company ?? contact.companyName ?? (meta?.general?.company as string)),
+    email: fallback(contact.email),
+    title: fallback(contact.title),
+    industry: fallback(contact.industry),
+    contract_end: fallback(contact.contractEnd),
+    load_zone: fallback(meta?.energy?.loadZone as string),
+    scarcity_risk: 'HIGH',
+    date: new Date().toISOString().slice(0, 10).replace(/-/g, ''),
+    context_id: contact.id ? `CONTACT_${contact.id.slice(0, 8).toUpperCase()}` : 'TX_001',
+    cta_url: '#',
+  }
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+/**
+ * Replaces {{key}} in html with data[key] (escaped). Keys not in data are left as {{key}}.
+ */
+export function substituteVariables(html: string, data: Record<string, string>): string {
+  let out = html
+  Object.entries(data).forEach(([key, value]) => {
+    const regex = new RegExp(`{{${key}}}`, 'g')
+    out = out.replace(regex, escapeHtml(value))
+  })
+  return out
+}
+
 export async function compileTransmission(assetId: string, contactData: any) {
   const { data: asset, error } = await supabase
     .from('transmission_assets')
@@ -76,6 +135,17 @@ export function generateStaticHtml(blocks: any[]) {
       `
     } else if (block.type === 'VARIABLE_CHIP') {
       html += `<span style="font-family: monospace; font-size: 12px; color: #002FA7;">${block.content}</span>`
+    } else if (block.type === 'IMAGE_BLOCK') {
+      const c = block.content as { url?: string; description?: string; caption?: string }
+      const url = (c?.url && String(c.url).trim()) ? String(c.url).trim().replace(/"/g, '&quot;') : ''
+      const desc = (c?.description != null && String(c.description).trim() !== '') ? String(c.description).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') : ''
+      const cap = (c?.caption != null && String(c.caption).trim() !== '') ? String(c.caption).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') : ''
+      if (url) {
+        html += `<figure style="margin: 20px 0;">`
+        html += `<img src="${url}" alt="${desc}" style="max-width: 100%; height: auto; display: block;" />`
+        if (cap) html += `<figcaption style="font-family: monospace; font-size: 10px; color: #71717a; margin-top: 8px;">${cap}</figcaption>`
+        html += `</figure>`
+      }
     }
   })
 
