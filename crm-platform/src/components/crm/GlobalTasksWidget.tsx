@@ -9,8 +9,8 @@ import { cn } from '@/lib/utils'
 
 const DISPLAY_LIMIT = 3
 const EXIT_DELAY_MS = 180
-const exitTransition = { duration: 0.4, ease: [0.32, 0.72, 0, 1] }
-const layoutTransition = { duration: 0.3, ease: [0.32, 0.72, 0, 1] }
+const exitTransition = { duration: 0.4, ease: [0.32, 0.72, 0, 1] as const }
+const layoutTransition = { duration: 0.3, ease: [0.32, 0.72, 0, 1] as const }
 
 function TaskRow({
   task,
