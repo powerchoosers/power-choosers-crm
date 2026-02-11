@@ -8,8 +8,8 @@ import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { cn } from '@/lib/utils'
 
 const EXIT_DELAY_MS = 180
-const exitTransition = { duration: 0.4, ease: [0.32, 0.72, 0, 1] }
-const layoutTransition = { duration: 0.3, ease: [0.32, 0.72, 0, 1] }
+const exitTransition = { duration: 0.4, ease: [0.32, 0.72, 0, 1] as const }
+const layoutTransition = { duration: 0.3, ease: [0.32, 0.72, 0, 1] as const }
 
 interface ContextTasksWidgetProps {
   entityId: string
