@@ -23,7 +23,8 @@ import {
   FileText, 
   Settings, 
   LogOut,
-  Plus
+  Plus,
+  Zap
 } from 'lucide-react'
 import { useUIStore } from '@/store/uiStore'
 
@@ -60,6 +61,7 @@ const navigationStructure = [
   {
     group: "Transmission",
     items: [
+      { name: 'Foundry', href: '/network/transmission', icon: Zap },
       { name: 'Emails', href: '/network/emails', icon: Mail },
       { name: 'Calls', href: '/network/calls', icon: Phone }
     ]
