@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import DOMPurify from 'dompurify'
 import { 
@@ -121,33 +121,57 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
   useEffect(() => {
     if (!previewContactId || !previewContact || generatingBlockId) return
     
-    blocks.forEach(block => {
-      if (block.type !== 'TEXT_MODULE') return
+    const blocksToGenerate = blocks.filter(block => {
+      if (block.type !== 'TEXT_MODULE') return false
       const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content || ''), useAi: false, aiPrompt: '' }
-      
-      // Only generate if: useAi is true, has a prompt, but no generated text yet
-      if (contentObj.useAi === true && contentObj.aiPrompt?.trim() && !contentObj.text?.trim()) {
-        generateWithAi(block.id, 'TEXT_MODULE', contentObj)
-      }
+      return contentObj.useAi === true && contentObj.aiPrompt?.trim() && !contentObj.text?.trim()
+    })
+    
+    // Only generate for blocks that need it, and only once per contact selection
+    blocksToGenerate.forEach(block => {
+      const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content || ''), useAi: false, aiPrompt: '' }
+      generateWithAi(block.id, 'TEXT_MODULE', contentObj)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewContactId, previewContact])
 
   const fetchAsset = async (id: string) => {
-    const { data, error } = await supabase
-      .from('transmission_assets')
-      .select('*')
-      .eq('id', id)
-      .single()
-    
-    if (data && !error) {
-      setAssetName(data.name)
-      setAssetType(data.type)
+    try {
+      const { data, error } = await supabase
+        .from('transmission_assets')
+        .select('*')
+        .eq('id', id)
+        .single()
+      
+      if (error) {
+        console.error('Error fetching asset:', error)
+        toast.error('Failed to load asset')
+        return
+      }
+      
+      if (!data) {
+        console.error('No data returned from fetchAsset')
+        toast.error('Asset not found')
+        return
+      }
+      
+      setAssetName(data.name || 'Untitled Asset')
+      setAssetType(data.type || 'market_signal')
       
       // Migrate old TEXT_MODULE blocks from string to object format
       try {
-        const blocks = (data.content_json?.blocks || []).map((block: any) => {
-          if (!block || typeof block !== 'object') return block
+        const rawBlocks = data.content_json?.blocks || []
+        if (!Array.isArray(rawBlocks)) {
+          console.warn('blocks is not an array, initializing empty array')
+          setBlocks([])
+          return
+        }
+        
+        const blocks = rawBlocks.map((block: any) => {
+          if (!block || typeof block !== 'object') {
+            console.warn('Invalid block found:', block)
+            return block
+          }
           if (block.type === 'TEXT_MODULE' && typeof block.content === 'string') {
             return {
               ...block,
@@ -166,12 +190,18 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
         // Fallback to original blocks if migration fails
         setBlocks(data.content_json?.blocks || [])
       }
+    } catch (err) {
+      console.error('Unexpected error in fetchAsset:', err)
+      toast.error('Failed to load asset')
     }
   }
 
   useEffect(() => {
     if (assetId && assetId !== 'new') {
-      fetchAsset(assetId)
+      fetchAsset(assetId).catch(err => {
+        console.error('Error fetching asset:', err)
+        toast.error('Failed to load asset')
+      })
     }
   }, [assetId])
 
