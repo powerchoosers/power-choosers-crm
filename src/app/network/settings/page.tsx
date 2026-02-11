@@ -24,6 +24,8 @@ export default function SettingsPage() {
   const [bio, setBio] = useState('')
   const [jobTitle, setJobTitle] = useState('')
   const [linkedinUrl, setLinkedinUrl] = useState('')
+  const [city, setCity] = useState('')
+  const [state, setState] = useState('')
   const [localEmail, setLocalEmail] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -104,6 +106,8 @@ export default function SettingsPage() {
     setBio(profile.bio || '')
     setJobTitle(profile.jobTitle || '')
     setLinkedinUrl(profile.linkedinUrl || '')
+    setCity(profile.city || '')
+    setState(profile.state || '')
     setTwilioNumbers(profile.twilioNumbers || [])
     setSelectedPhoneNumber(profile.selectedPhoneNumber || null)
     setBridgeToMobile(profile.bridgeToMobile || false)
@@ -173,7 +177,9 @@ export default function SettingsPage() {
             twilioNumbers: twilioNumbers,
             selectedPhoneNumber: selectedPhoneNumber,
             bridgeToMobile: bridgeToMobile,
-            role: role || 'employee' // Preserve role
+            role: role || 'employee', // Preserve role
+            city: city.trim() || null,
+            state: state.trim() || null
           },
           updated_at: new Date().toISOString(),
         })
@@ -319,6 +325,29 @@ export default function SettingsPage() {
                       placeholder="https://linkedin.com/in/username"
                       value={linkedinUrl}
                       onChange={(e) => setLinkedinUrl(e.target.value)}
+                      className="bg-transparent border-white/10 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-[#002FA7]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-2">
+                    <Label htmlFor="city" className="text-zinc-400">City</Label>
+                    <Input
+                      id="city"
+                      placeholder="Fort Worth"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className="bg-transparent border-white/10 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-[#002FA7]"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="state" className="text-zinc-400">State</Label>
+                    <Input
+                      id="state"
+                      placeholder="TX"
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
                       className="bg-transparent border-white/10 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-[#002FA7]"
                     />
                   </div>

@@ -14,6 +14,9 @@ export type UserProfile = {
   bio: string | null
   jobTitle: string | null
   linkedinUrl: string | null
+  city: string | null
+  state: string | null
+  hostedPhotoUrl: string | null
   twilioNumbers: Array<{ name: string; number: string }> | null
   selectedPhoneNumber: string | null
   bridgeToMobile: boolean | null
@@ -39,6 +42,9 @@ const AuthContext = createContext<AuthContextType>({
     bio: null,
     jobTitle: null,
     linkedinUrl: null,
+    city: null,
+    state: null,
+    hostedPhotoUrl: null,
     twilioNumbers: null,
     selectedPhoneNumber: null,
     bridgeToMobile: null
@@ -58,6 +64,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     bio: null,
     jobTitle: null,
     linkedinUrl: null,
+    city: null,
+    state: null,
+    hostedPhotoUrl: null,
     twilioNumbers: null,
     selectedPhoneNumber: null,
     bridgeToMobile: null
@@ -137,10 +146,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         bio: data.bio || null,
         jobTitle: data.job_title || null,
         linkedinUrl: data.linkedin_url || null,
+        city: settings.city ?? null,
+        state: settings.state ?? null,
+        hostedPhotoUrl: data.hosted_photo_url || null,
         twilioNumbers: settings.twilioNumbers || [],
         selectedPhoneNumber: settings.selectedPhoneNumber || null,
         bridgeToMobile: settings.bridgeToMobile || false
       })
+
+      // If user has Google avatar but no hosted URL, host it and save (for email signature)
+      const photoURL = currentUser.photoURL
+      const isGooglePhoto = photoURL && (photoURL.includes('googleusercontent.com') || photoURL.includes('ggpht.com'))
+      if (isGooglePhoto && !data.hosted_photo_url) {
+        fetch('/api/upload/host-google-avatar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ googlePhotoURL: photoURL }),
+        })
+          .then((res) => res.json())
+          .then((payload) => {
+            const imageUrl = payload?.imageUrl ?? payload?.url
+            if (imageUrl) {
+              supabase.from('users').update({ hosted_photo_url: imageUrl, updated_at: new Date().toISOString() }).eq('email', emailLower).then(() => refreshProfile())
+            }
+          })
+          .catch(() => {})
+      }
     }
   }
 
