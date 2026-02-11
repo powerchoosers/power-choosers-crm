@@ -1,6 +1,6 @@
 /**
- * POST /api/transmission/generate-text
- * Generates or rewrites copy for Transmission Foundry blocks using Perplexity Sonar.
+ * POST /api/foundry/generate-text
+ * Generates or rewrites copy for Foundry blocks using Perplexity Sonar.
  * Body: { prompt: string, context?: string, blockType?: 'narrative' | 'button' | 'subject' }
  * Returns: { text: string }
  */
@@ -72,7 +72,7 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const errText = await response.text().catch(() => '');
-      logger.warn('[Transmission Generate] Perplexity error', response.status, errText?.slice(0, 200));
+      logger.warn('[Foundry Generate] Perplexity error', response.status, errText?.slice(0, 200));
       res.writeHead(502, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'AI service error', details: errText?.slice(0, 200) }));
       return;
@@ -85,7 +85,7 @@ export default async function handler(req, res) {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ text }));
   } catch (error) {
-    logger.error('[Transmission Generate]', error?.message);
+    logger.error('[Foundry Generate]', error?.message);
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Server error', details: error?.message }));

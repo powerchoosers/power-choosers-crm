@@ -82,7 +82,7 @@ import {
 import { useContacts, type Contact } from '@/hooks/useContacts';
 import { useProtocolBuilder } from '@/hooks/useProtocolBuilder';
 import { useAuth } from '@/context/AuthContext';
-import { useTransmissionAssets } from '@/hooks/useTransmissionAssets';
+import { useFoundryAssets } from '@/hooks/useFoundryAssets';
 import { getBurnerFromEmail, getBurnerSenderName } from '@/lib/burner-email';
 import { toast } from 'sonner';
 
@@ -352,7 +352,7 @@ function ProtocolArchitectInner() {
   // Real Data Integration
   const { user, profile } = useAuth();
   const { protocol, saveProtocol, isSaving } = useProtocolBuilder(id as string);
-  const { data: transmissionAssets } = useTransmissionAssets();
+  const { data: foundryAssets } = useFoundryAssets();
   const burnerFrom = getBurnerFromEmail(user?.email ?? undefined);
   const burnerSenderName = getBurnerSenderName(profile?.firstName ?? undefined);
   
@@ -1452,7 +1452,7 @@ function ProtocolArchitectInner() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                        {emailViewMode === 'payload' ? 'Matrix_Payload' : emailViewMode === 'ai' ? 'Neural_Context' : 'Transmission_Asset'}
+                        {emailViewMode === 'payload' ? 'Matrix_Payload' : emailViewMode === 'ai' ? 'Neural_Context' : 'Foundry_Asset'}
                       </label>
                       
                       {selectedNode?.data.type === 'email' && (
@@ -1620,24 +1620,24 @@ function ProtocolArchitectInner() {
                     ) : (
                       <div className="space-y-4">
                         <div className="bg-black/40 border border-white/5 rounded-2xl p-4 space-y-4">
-                          <label className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest block">Select_Transmission_Asset</label>
+                          <label className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest block">Select_Foundry_Asset</label>
                           <Select 
-                            value={(selectedNode?.data.transmissionAssetId as string) || ''} 
-                            onValueChange={(val) => updateNodeData(selectedNode!.id, { transmissionAssetId: val })}
+                            value={(selectedNode?.data.foundryAssetId as string) || ''} 
+                            onValueChange={(val) => updateNodeData(selectedNode!.id, { foundryAssetId: val })}
                           >
                             <SelectTrigger className="w-full bg-black/40 border-white/5 rounded-xl h-12 font-mono text-sm focus:ring-0 focus:border-[#002FA7]">
                               <SelectValue placeholder="Choose an asset from Foundry..." />
                             </SelectTrigger>
                             <SelectContent className="bg-zinc-950 nodal-monolith-edge">
-                              {transmissionAssets?.map((asset) => (
+                              {foundryAssets?.map((asset) => (
                                 <SelectItem key={asset.id} value={asset.id}>
                                   {asset.name}
                                 </SelectItem>
                               ))}
-                              {(!transmissionAssets || transmissionAssets.length === 0) && (
+                              {(!foundryAssets || foundryAssets.length === 0) && (
                                 <div className="p-4 text-center">
                                   <p className="text-[10px] font-mono text-zinc-500 mb-2">No assets found in Foundry.</p>
-                                  <Link href="/network/transmission/new">
+                                  <Link href="/network/foundry/new">
                                     <Button size="sm" className="bg-[#002FA7] text-white h-7 text-[10px] uppercase tracking-widest">Create_Asset</Button>
                                   </Link>
                                 </div>
@@ -1646,18 +1646,18 @@ function ProtocolArchitectInner() {
                           </Select>
 
                           {(() => {
-                            const assetId = selectedNode?.data.transmissionAssetId
+                            const assetId = selectedNode?.data.foundryAssetId
                             if (!assetId || typeof assetId !== 'string') return null
                             return (
                               <div className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-2">
                                 <div className="flex items-center justify-between">
                                   <span className="text-[10px] font-mono text-zinc-500 uppercase">Asset_Preview</span>
-                                  <Link href={`/network/transmission/${assetId}`}>
+                                  <Link href={`/network/foundry/${assetId}`}>
                                     <Button variant="link" className="h-auto p-0 text-[10px] text-[#002FA7] uppercase">Edit_in_Foundry</Button>
                                   </Link>
                                 </div>
                                 <div className="text-[10px] text-zinc-400 italic font-mono bg-black/20 p-2 rounded border border-white/5">
-                                  {transmissionAssets?.find(a => a.id === assetId)?.name || 'Asset'} linked.
+                                  {foundryAssets?.find(a => a.id === assetId)?.name || 'Asset'} linked.
                                 </div>
                               </div>
                             )

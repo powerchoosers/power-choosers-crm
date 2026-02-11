@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 
-export interface TransmissionAsset {
+export interface FoundryAsset {
   id: string
   name: string
   type: 'market_signal' | 'invoice_req' | 'educational'
@@ -11,7 +11,7 @@ export interface TransmissionAsset {
   created_at: string
 }
 
-export function useTransmissionAssets() {
+export function useFoundryAssets() {
   return useQuery({
     queryKey: ['transmission_assets'],
     queryFn: async () => {
@@ -21,7 +21,7 @@ export function useTransmissionAssets() {
         .order('name', { ascending: true })
       
       if (error) throw error
-      return data as TransmissionAsset[]
+      return data as FoundryAsset[]
     }
   })
 }

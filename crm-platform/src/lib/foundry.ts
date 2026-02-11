@@ -129,7 +129,7 @@ export function substituteVariables(html: string, data: Record<string, string>):
   return out
 }
 
-export async function compileTransmission(assetId: string, contactData: any) {
+export async function compileFoundry(assetId: string, contactData: any) {
   const { data: asset, error } = await supabase
     .from('transmission_assets')
     .select('*')
@@ -137,7 +137,7 @@ export async function compileTransmission(assetId: string, contactData: any) {
     .single()
 
   if (error || !asset) {
-    throw new Error(`Failed to fetch transmission asset: ${error?.message || 'Not found'}`)
+    throw new Error(`Failed to fetch foundry asset: ${error?.message || 'Not found'}`)
   }
 
   let html = asset.compiled_html || ''
@@ -167,7 +167,7 @@ export async function compileTransmission(assetId: string, contactData: any) {
 export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boolean }) {
   const skipFooter = options?.skipFooter === true
   // This would be used in the builder to generate the final HTML string
-  // for storage in transmission_assets.compiled_html
+  // for storage in foundry assets compiled_html
   let html = `
     <div style="font-family: 'Inter', sans-serif; background: #ffffff; color: #18181b; padding: 40px; max-width: 600px; margin: 0 auto;">
       <div style="border-bottom: 1px solid #e4e4e7; padding-bottom: 12px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">

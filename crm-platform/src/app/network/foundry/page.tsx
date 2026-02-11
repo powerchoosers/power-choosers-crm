@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
-export default function TransmissionPage() {
+export default function FoundryPage() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -22,13 +22,13 @@ export default function TransmissionPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <CollapsiblePageHeader
-        title="TRANSMISSION FOUNDRY"
+        title="FOUNDRY"
         description="Engineer high-fidelity intelligence assets for automated deployment."
         globalFilter={searchQuery}
         onSearchChange={setSearchQuery}
         primaryAction={{
           label: "Forge New Asset",
-          onClick: () => router.push('/network/transmission/new'),
+          onClick: () => router.push('/network/foundry/new'),
           icon: <Plus size={18} className="mr-2" />
         }}
       />
@@ -49,7 +49,7 @@ export default function TransmissionPage() {
                 <TableRow 
                   key={asset.id} 
                   className="border-white/5 hover:bg-white/[0.02] cursor-pointer group"
-                  onClick={() => router.push(`/network/transmission/${asset.id}`)}
+                  onClick={() => router.push(`/network/foundry/${asset.id}`)}
                 >
                   <TableCell className="font-medium text-zinc-200">
                     <div className="flex items-center gap-3">
