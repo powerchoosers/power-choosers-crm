@@ -1252,10 +1252,9 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                   </div>
                 </div>
                 <div className="mt-2 mb-3 font-mono text-[11px] text-zinc-600">
-                  {profile?.email && <span>E: {profile.email}</span>}
-                  {profile?.selectedPhoneNumber && <span className="ml-4">P: {profile.selectedPhoneNumber}</span>}
+                  {profile?.selectedPhoneNumber && <span>P: {profile.selectedPhoneNumber}</span>}
                   {(profile?.city || profile?.state) && (
-                    <span className="ml-4">{[profile?.city, profile?.state].filter(Boolean).join(', ')}</span>
+                    <span className="ml-4">· {[profile?.city, profile?.state].filter(Boolean).join(', ')}</span>
                   )}
                 </div>
                 <div className="flex gap-4 font-mono text-[10px] text-[#002FA7] font-bold uppercase tracking-widest">
