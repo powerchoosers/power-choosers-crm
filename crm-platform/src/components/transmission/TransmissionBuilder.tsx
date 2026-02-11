@@ -21,6 +21,7 @@ import {
   Check,
   ChevronUp,
   ChevronDown,
+  Plus,
   Image as ImageIcon,
   User,
   Building2
@@ -46,6 +47,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+
+type ValueColor = 'yellow' | 'green' | 'red'
+
+const VALUE_COLORS: ValueColor[] = ['yellow', 'green', 'red']
+const VALUE_COLOR_CLASSES: Record<ValueColor, string> = {
+  yellow: 'bg-amber-400',
+  green: 'bg-emerald-500',
+  red: 'bg-red-500',
+}
 
 interface Block {
   id: string
@@ -177,7 +187,7 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
       type,
       content: type === 'TEXT_MODULE' ? 'Enter narrative payload...' : 
                type === 'TACTICAL_BUTTON' ? '[ INITIATE_PROTOCOL ]' : 
-               type === 'TELEMETRY_GRID' ? { headers: ['ITEM', 'VALUE'], rows: [['Metric', '0.00']] } : 
+               type === 'TELEMETRY_GRID' ? { headers: ['ITEM', 'VALUE'], rows: [['Metric', '0.00']], valueColors: ['green'] as const } : 
                type === 'IMAGE_BLOCK' ? { url: '', description: '', caption: '' } :
                '{{variable}}'
     }
@@ -370,6 +380,25 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
                         <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-tighter">{block.id.toUpperCase()}</span>
                       </div>
                       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                        {block.type === 'TELEMETRY_GRID' && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const headers = block.content?.headers ?? ['ITEM', 'VALUE']
+                              const numCols = headers.length
+                              const newRow = Array(numCols).fill('')
+                              const newRows = [...(block.content?.rows ?? [['Metric', '0.00']]), newRow]
+                              const prevColors = block.content?.valueColors ?? ['green']
+                              const valueColors = [...prevColors, 'green']
+                              updateBlockContent(block.id, { ...block.content, headers, rows: newRows, valueColors })
+                            }}
+                            className="p-1 hover:text-[#002FA7]"
+                            aria-label="Add data row"
+                          >
+                            <Plus size={14} />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); moveBlock(block.id, 'up'); }}
@@ -514,22 +543,57 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
                              />
                            ))}
                         </div>
-                        {block.content.rows.map((row: string[], ri: number) => (
-                          <div key={ri} className="grid grid-cols-2 gap-2">
-                            {row.map((cell: string, ci: number) => (
-                              <input 
-                                key={ci}
-                                value={cell}
-                                onChange={(e) => {
-                                  const newRows = [...block.content.rows]
-                                  newRows[ri][ci] = e.target.value
-                                  updateBlockContent(block.id, { ...block.content, rows: newRows })
-                                }}
-                                className="bg-black/20 border border-white/5 rounded px-2 py-1 text-xs text-zinc-300"
-                              />
-                            ))}
-                          </div>
-                        ))}
+                        {block.content.rows.map((row: string[], ri: number) => {
+                          const valueColors: ValueColor[] = block.content.valueColors ?? block.content.rows.map(() => 'green' as ValueColor)
+                          const currentColor: ValueColor = valueColors[ri] ?? 'green'
+                          return (
+                            <div key={ri} className="grid grid-cols-2 gap-2">
+                              {row.map((cell: string, ci: number) => (
+                                ci === 0 ? (
+                                  <input 
+                                    key={ci}
+                                    value={cell}
+                                    onChange={(e) => {
+                                      const newRows = [...block.content.rows]
+                                      newRows[ri][ci] = e.target.value
+                                      updateBlockContent(block.id, { ...block.content, rows: newRows })
+                                    }}
+                                    className="bg-black/20 border border-white/5 rounded px-2 py-1 text-xs text-zinc-300"
+                                  />
+                                ) : (
+                                  <div key={ci} className="flex items-center gap-2">
+                                    <input 
+                                      value={cell}
+                                      onChange={(e) => {
+                                        const newRows = [...block.content.rows]
+                                        newRows[ri][ci] = e.target.value
+                                        updateBlockContent(block.id, { ...block.content, rows: newRows })
+                                      }}
+                                      className="flex-1 min-w-0 bg-black/20 border border-white/5 rounded px-2 py-1 text-xs text-zinc-300"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        const nextIndex = (VALUE_COLORS.indexOf(currentColor) + 1) % VALUE_COLORS.length
+                                        const nextColor = VALUE_COLORS[nextIndex]
+                                        const nextColors = [...(block.content.valueColors ?? block.content.rows.map(() => 'green' as ValueColor))]
+                                        while (nextColors.length <= ri) nextColors.push('green')
+                                        nextColors[ri] = nextColor
+                                        updateBlockContent(block.id, { ...block.content, valueColors: nextColors })
+                                      }}
+                                      className={cn(
+                                        'w-6 h-6 rounded-lg shrink-0 border border-white/20',
+                                        VALUE_COLOR_CLASSES[currentColor]
+                                      )}
+                                      aria-label={`Value color: ${currentColor}`}
+                                    />
+                                  </div>
+                                )
+                              ))}
+                            </div>
+                          )
+                        })}
                       </div>
                     )}
 
@@ -695,13 +759,18 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
                                 </tr>
                               </thead>
                               <tbody>
-                                {block.content.rows.map((row: string[], ri: number) => (
-                                  <tr key={ri}>
-                                    {row.map((cell: string, ci: number) => (
-                                      <td key={ci} className="py-2 text-xs font-mono text-zinc-900">{cell}</td>
-                                    ))}
-                                  </tr>
-                                ))}
+                                {block.content.rows.map((row: string[], ri: number) => {
+                                  const valueColors: ValueColor[] = block.content.valueColors ?? []
+                                  const rowColor = valueColors[ri] ?? 'green'
+                                  const valueCellClass = rowColor === 'yellow' ? 'pl-2 border-l-4 border-l-amber-400' : rowColor === 'red' ? 'pl-2 border-l-4 border-l-red-500' : 'pl-2 border-l-4 border-l-emerald-500'
+                                  return (
+                                    <tr key={ri}>
+                                      {row.map((cell: string, ci: number) => (
+                                        <td key={ci} className={ci === 1 ? `py-2 text-xs font-mono text-zinc-900 ${valueCellClass}` : 'py-2 text-xs font-mono text-zinc-900'}>{cell}</td>
+                                      ))}
+                                    </tr>
+                                  )
+                                })}
                               </tbody>
                             </table>
                           </div>

@@ -328,6 +328,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 bio: data.bio || null,
                 jobTitle: data.job_title || null,
                 linkedinUrl: data.linkedin_url || null,
+                city: settings.city ?? null,
+                state: settings.state ?? null,
+                hostedPhotoUrl: data.hosted_photo_url || null,
                 twilioNumbers: settings.twilioNumbers || [],
                 selectedPhoneNumber: settings.selectedPhoneNumber || null,
                 bridgeToMobile: settings.bridgeToMobile || false
@@ -363,6 +366,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 bio: null,
                 jobTitle: null,
                 linkedinUrl: null,
+                city: null,
+                state: null,
+                hostedPhotoUrl: null,
                 twilioNumbers: [],
                 selectedPhoneNumber: null,
                 bridgeToMobile: false
