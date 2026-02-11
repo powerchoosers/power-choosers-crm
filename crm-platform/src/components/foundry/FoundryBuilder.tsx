@@ -133,17 +133,11 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewContactId, previewContact])
 
-  useEffect(() => {
-    if (assetId && assetId !== 'new') {
-      fetchAsset()
-    }
-  }, [assetId])
-
-  const fetchAsset = async () => {
+  const fetchAsset = async (id: string) => {
     const { data, error } = await supabase
       .from('transmission_assets')
       .select('*')
-      .eq('id', assetId)
+      .eq('id', id)
       .single()
     
     if (data && !error) {
@@ -152,6 +146,12 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
       setBlocks(data.content_json?.blocks || [])
     }
   }
+
+  useEffect(() => {
+    if (assetId && assetId !== 'new') {
+      fetchAsset(assetId)
+    }
+  }, [assetId])
 
   const saveAsset = async () => {
     setIsSaving(true)
