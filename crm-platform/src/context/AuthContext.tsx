@@ -201,6 +201,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         bio: 'System Administrator (Bypass)',
         jobTitle: 'Principal Market Architect',
         linkedinUrl: 'https://linkedin.com/in/nodalpoint',
+        city: null,
+        state: null,
+        hostedPhotoUrl: null,
         twilioNumbers: [],
         selectedPhoneNumber: null,
         bridgeToMobile: false
@@ -220,6 +223,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           bio: null,
           jobTitle: null,
           linkedinUrl: null,
+          city: null,
+          state: null,
+          hostedPhotoUrl: null,
           twilioNumbers: null,
           selectedPhoneNumber: null,
           bridgeToMobile: null
@@ -256,6 +262,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           bio: 'System Administrator (Bypass)',
           jobTitle: 'Principal Market Architect',
           linkedinUrl: 'https://linkedin.com/in/nodalpoint',
+          city: null,
+          state: null,
+          hostedPhotoUrl: null,
           twilioNumbers: [],
           selectedPhoneNumber: null,
           bridgeToMobile: false
@@ -397,6 +406,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           bio: null,
           jobTitle: null,
           linkedinUrl: null,
+          city: null,
+          state: null,
+          hostedPhotoUrl: null,
           twilioNumbers: null,
           selectedPhoneNumber: null,
           bridgeToMobile: null
