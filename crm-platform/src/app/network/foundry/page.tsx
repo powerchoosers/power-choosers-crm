@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { Plus, Zap, FileText, Activity, Layers } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -8,16 +8,36 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
 
 export default function FoundryPage() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
+  const [assets, setAssets] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Placeholder for assets
-  const assets = [
-    { id: '1', name: 'Market Volatility Alert', type: 'market_signal', updated_at: '2026-05-12T10:00:00Z' },
-    { id: '2', name: 'Invoice Variance Audit', type: 'invoice_req', updated_at: '2026-05-11T14:30:00Z' },
-  ]
+  useEffect(() => {
+    const fetchAssets = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('transmission_assets')
+          .select('*')
+          .order('updated_at', { ascending: false })
+        
+        if (error) {
+          console.error('Error fetching assets:', error)
+        } else {
+          setAssets(data || [])
+        }
+      } catch (err) {
+        console.error('Unexpected error:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchAssets()
+  }, [])
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -82,7 +102,7 @@ export default function FoundryPage() {
           <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
             <span>Sync_Block 01–02</span>
             <div className="h-1 w-1 rounded-full bg-black/40" />
-            <span className="text-zinc-500">Active_Foundry_Assets: <span className="text-zinc-400 tabular-nums">2</span></span>
+            <span className="text-zinc-500">Active_Foundry_Assets: <span className="text-zinc-400 tabular-nums">{assets.length}</span></span>
           </div>
         </div>
       </div>
