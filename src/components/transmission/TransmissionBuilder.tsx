@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import DOMPurify from 'dompurify'
 import { 
   Zap, 
   Layers, 
@@ -17,19 +18,30 @@ import {
   Trash2,
   RefreshCw,
   Search,
-  Check
+  Check,
+  ChevronUp,
+  ChevronDown,
+  Image as ImageIcon
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { supabase } from '@/lib/supabase'
-import { generateStaticHtml } from '@/lib/transmission'
+import { generateStaticHtml, substituteVariables, contactToVariableMap } from '@/lib/transmission'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import { useContacts, useContact } from '@/hooks/useContacts'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface Block {
   id: string
-  type: 'TEXT_MODULE' | 'TELEMETRY_GRID' | 'TACTICAL_BUTTON' | 'VARIABLE_CHIP'
+  type: 'TEXT_MODULE' | 'TELEMETRY_GRID' | 'TACTICAL_BUTTON' | 'VARIABLE_CHIP' | 'IMAGE_BLOCK'
   content: any
 }
 
@@ -42,7 +54,19 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
   const [isSaving, setIsSaving] = useState(false)
   const [assetName, setAssetName] = useState('New Asset')
   const [assetType, setAssetType] = useState<'market_signal' | 'invoice_req' | 'educational'>('market_signal')
+  const [previewContactId, setPreviewContactId] = useState<string | null>(null)
+  const [generatingBlockId, setGeneratingBlockId] = useState<string | null>(null)
   const router = useRouter()
+
+  const { data: contactsData } = useContacts()
+  const contacts = useMemo(() => contactsData?.pages?.flatMap((p: { contacts: any[] }) => p.contacts) ?? [], [contactsData])
+  const { data: previewContact } = useContact(previewContactId ?? '')
+  const previewHtml = useMemo(() => {
+    if (!previewContactId || !previewContact) return null
+    const html = generateStaticHtml(blocks)
+    const data = contactToVariableMap(previewContact)
+    return substituteVariables(html, data)
+  }, [blocks, previewContactId, previewContact])
 
   useEffect(() => {
     if (assetId && assetId !== 'new') {
@@ -109,6 +133,7 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
     { type: 'TELEMETRY_GRID', label: 'Data_Grid', icon: TableIcon },
     { type: 'TACTICAL_BUTTON', label: 'Action_Vector', icon: MousePointer2 },
     { type: 'VARIABLE_CHIP', label: 'Data_Injection', icon: Variable },
+    { type: 'IMAGE_BLOCK', label: 'Image', icon: ImageIcon },
   ]
 
   const addBlock = (type: Block['type']) => {
@@ -117,7 +142,8 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
       type,
       content: type === 'TEXT_MODULE' ? 'Enter narrative payload...' : 
                type === 'TACTICAL_BUTTON' ? '[ INITIATE_PROTOCOL ]' : 
-               type === 'TELEMETRY_GRID' ? { headers: ['ITEM', 'VALUE'], rows: [['Metric', '0.00']] } :
+               type === 'TELEMETRY_GRID' ? { headers: ['ITEM', 'VALUE'], rows: [['Metric', '0.00']] } : 
+               type === 'IMAGE_BLOCK' ? { url: '', description: '', caption: '' } :
                '{{variable}}'
     }
     setBlocks([...blocks, newBlock])
@@ -131,6 +157,48 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
 
   const updateBlockContent = (id: string, content: any) => {
     setBlocks(blocks.map(b => b.id === id ? { ...b, content } : b))
+  }
+
+  const generateWithAi = async (blockId: string, blockType: 'TEXT_MODULE' | 'TACTICAL_BUTTON', currentContent: string) => {
+    setGeneratingBlockId(blockId)
+    try {
+      const prompt = blockType === 'TACTICAL_BUTTON'
+        ? 'Rewrite as a single tactical CTA label for an intelligence brief.'
+        : 'Rewrite this for a Nodal Point intelligence brief. Keep it forensic and precise.'
+      const res = await fetch('/api/transmission/generate-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          context: currentContent,
+          blockType: blockType === 'TACTICAL_BUTTON' ? 'button' : 'narrative',
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(data?.error || data?.details || 'AI generation failed')
+        return
+      }
+      if (typeof data?.text === 'string' && data.text.trim()) {
+        updateBlockContent(blockId, data.text.trim())
+        toast.success('Copy updated')
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'AI generation failed')
+    } finally {
+      setGeneratingBlockId(null)
+    }
+  }
+
+  const moveBlock = (id: string, direction: 'up' | 'down') => {
+    const idx = blocks.findIndex(b => b.id === id)
+    if (idx < 0) return
+    if (direction === 'up' && idx === 0) return
+    if (direction === 'down' && idx === blocks.length - 1) return
+    const next = [...blocks]
+    const swap = direction === 'up' ? idx - 1 : idx + 1
+    ;[next[idx], next[swap]] = [next[swap], next[idx]]
+    setBlocks(next)
   }
 
   // Handle resizing
@@ -266,29 +334,69 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
                         </Badge>
                         <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-tighter">{block.id.toUpperCase()}</span>
                       </div>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); removeBlock(block.id); }}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-all"
-                      >
-                        <Trash2 size={12} />
-                      </button>
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); moveBlock(block.id, 'up'); }}
+                          disabled={blocks.findIndex(b => b.id === block.id) === 0}
+                          className="p-1 hover:text-[#002FA7] disabled:opacity-30 disabled:cursor-not-allowed"
+                          aria-label="Move up"
+                        >
+                          <ChevronUp size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); moveBlock(block.id, 'down'); }}
+                          disabled={blocks.findIndex(b => b.id === block.id) === blocks.length - 1}
+                          className="p-1 hover:text-[#002FA7] disabled:opacity-30 disabled:cursor-not-allowed"
+                          aria-label="Move down"
+                        >
+                          <ChevronDown size={14} />
+                        </button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); removeBlock(block.id); }}
+                          className="p-1 hover:text-red-400"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
                     </div>
 
                     {block.type === 'TEXT_MODULE' && (
-                      <textarea
-                        value={block.content}
-                        onChange={(e) => updateBlockContent(block.id, e.target.value)}
-                        className="w-full bg-transparent border-none focus:ring-0 text-sm font-sans text-zinc-300 min-h-[100px] resize-none p-0"
-                      />
+                      <div className="space-y-2">
+                        <textarea
+                          value={block.content}
+                          onChange={(e) => updateBlockContent(block.id, e.target.value)}
+                          className="w-full bg-transparent border-none focus:ring-0 text-sm font-sans text-zinc-300 min-h-[100px] resize-none p-0"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => generateWithAi(block.id, 'TEXT_MODULE', block.content)}
+                          disabled={generatingBlockId === block.id}
+                          className="text-[10px] font-mono uppercase tracking-widest text-[#002FA7] hover:underline disabled:opacity-50"
+                        >
+                          {generatingBlockId === block.id ? 'Generating…' : 'Generate with AI'}
+                        </button>
+                      </div>
                     )}
 
                     {block.type === 'TACTICAL_BUTTON' && (
-                      <input
-                        type="text"
-                        value={block.content}
-                        onChange={(e) => updateBlockContent(block.id, e.target.value)}
-                        className="w-full bg-black/40 border border-white/5 rounded-md px-3 py-2 text-xs font-mono text-[#002FA7] uppercase tracking-widest focus:ring-1 focus:ring-[#002FA7]/50 outline-none"
-                      />
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          value={block.content}
+                          onChange={(e) => updateBlockContent(block.id, e.target.value)}
+                          className="w-full bg-black/40 border border-white/5 rounded-md px-3 py-2 text-xs font-mono text-[#002FA7] uppercase tracking-widest focus:ring-1 focus:ring-[#002FA7]/50 outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => generateWithAi(block.id, 'TACTICAL_BUTTON', block.content)}
+                          disabled={generatingBlockId === block.id}
+                          className="text-[10px] font-mono uppercase tracking-widest text-[#002FA7] hover:underline disabled:opacity-50"
+                        >
+                          {generatingBlockId === block.id ? 'Generating…' : 'Generate with AI'}
+                        </button>
+                      </div>
                     )}
 
                     {block.type === 'VARIABLE_CHIP' && (
@@ -337,6 +445,73 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
                         ))}
                       </div>
                     )}
+
+                    {block.type === 'IMAGE_BLOCK' && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            id={`img-${block.id}`}
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0]
+                              if (!file) return
+                              const reader = new FileReader()
+                              reader.onload = async () => {
+                                const base64 = (reader.result as string)?.split(',')[1]
+                                if (!base64) return
+                                try {
+                                  const res = await fetch('/api/upload/signature-image', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ image: base64, type: 'template-image' }),
+                                  })
+                                  const data = await res.json()
+                                  if (data?.url) updateBlockContent(block.id, { ...block.content, url: data.url })
+                                  else toast.error(data?.error || 'Upload failed')
+                                } catch (err: any) {
+                                  toast.error(err?.message || 'Upload failed')
+                                }
+                                e.target.value = ''
+                              }
+                              reader.readAsDataURL(file)
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => document.getElementById(`img-${block.id}`)?.click()}
+                            className="h-8 px-3 rounded border border-white/10 bg-black/40 text-[10px] font-mono uppercase text-zinc-300 hover:bg-black/60"
+                          >
+                            Upload image
+                          </button>
+                          {block.content?.url && (
+                            <a href={block.content.url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-[#002FA7] truncate max-w-[120px]">URL</a>
+                          )}
+                        </div>
+                        {block.content?.url && (
+                          <div className="rounded-lg border border-white/5 overflow-hidden bg-black/20 max-h-24">
+                            <img src={block.content.url} alt="" className="w-full h-full object-contain max-h-24" />
+                          </div>
+                        )}
+                        <div className="grid gap-2">
+                          <input
+                            type="text"
+                            placeholder="Description (alt text)"
+                            value={block.content?.description ?? ''}
+                            onChange={(e) => updateBlockContent(block.id, { ...block.content, description: e.target.value })}
+                            className="w-full bg-black/40 border border-white/5 rounded px-2 py-1.5 text-[10px] font-mono text-zinc-400 placeholder:text-zinc-600"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Caption (visible below image)"
+                            value={block.content?.caption ?? ''}
+                            onChange={(e) => updateBlockContent(block.id, { ...block.content, caption: e.target.value })}
+                            className="w-full bg-black/40 border border-white/5 rounded px-2 py-1.5 text-[10px] font-mono text-zinc-400 placeholder:text-zinc-600"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </motion.div>
                 ))}
               </AnimatePresence>
@@ -358,9 +533,22 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
           className="bg-white overflow-hidden flex flex-col"
           style={{ width: `${100 - splitPosition}%` }}
         >
-          <div className="h-10 border-b border-zinc-200 bg-zinc-50 flex items-center px-4 justify-between">
-            <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">Live_Simulation // Mobile_Responsive</span>
-            <div className="flex gap-1">
+          <div className="h-10 border-b border-zinc-200 bg-zinc-50 flex items-center px-4 justify-between gap-4">
+            <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest shrink-0">Live_Simulation</span>
+            <Select value={previewContactId ?? '__none__'} onValueChange={(v) => setPreviewContactId(v === '__none__' ? null : v)}>
+              <SelectTrigger className="h-7 max-w-[220px] text-[10px] font-mono uppercase border-zinc-200 bg-white">
+                <SelectValue placeholder="Preview with contact" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__" className="text-[10px] font-mono">None</SelectItem>
+                {contacts.map((c: { id: string; firstName?: string; lastName?: string; company?: string }) => (
+                  <SelectItem key={c.id} value={c.id} className="text-[10px] font-mono">
+                    {[c.firstName, c.lastName].filter(Boolean).join(' ') || 'Unknown'} ({c.company || '—'})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex gap-1 shrink-0">
               <div className="w-2 h-2 rounded-full bg-zinc-200" />
               <div className="w-2 h-2 rounded-full bg-zinc-200" />
               <div className="w-2 h-2 rounded-full bg-[#002FA7]" />
@@ -369,70 +557,79 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
 
           <div className="flex-1 overflow-y-auto bg-zinc-100 p-8 flex justify-center np-scroll">
             <div className="w-full max-w-[600px] bg-white shadow-2xl min-h-full flex flex-col">
-              {/* Telemetry Header */}
-              <div className="border-b border-zinc-200 p-6 flex justify-between items-center">
-                <span className="text-[10px] font-mono text-zinc-900 font-bold tracking-[0.2em] uppercase">NODAL_POINT // INTELLIGENCE</span>
-                <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-tighter">REF: {new Date().toISOString().split('T')[0].replace(/-/g, '')} // TX_001</span>
-              </div>
-
-              {/* Rendered Content */}
-              <div className="p-8 space-y-6 flex-1">
-                {blocks.map((block) => (
-                  <div key={block.id}>
-                    {block.type === 'TEXT_MODULE' && (
-                      <p className="text-zinc-900 leading-relaxed font-sans">{block.content}</p>
-                    )}
-
-                    {block.type === 'TACTICAL_BUTTON' && (
-                      <div className="pt-4">
-                        <button className="bg-[#002FA7] text-white px-6 py-3 font-mono font-bold text-xs uppercase tracking-widest rounded-sm shadow-lg shadow-[#002FA7]/20">
-                          {block.content}
-                        </button>
-                      </div>
-                    )}
-
-                    {block.type === 'VARIABLE_CHIP' && (
-                      <span className="bg-zinc-100 px-2 py-0.5 rounded text-[10px] font-mono text-[#002FA7] border border-zinc-200">
-                        {block.content}
-                      </span>
-                    )}
-
-                    {block.type === 'TELEMETRY_GRID' && (
-                      <div className="bg-[#F4F4F5] rounded-md p-4 border border-zinc-200 overflow-hidden">
-                        <table className="w-full border-collapse">
-                          <thead>
-                            <tr className="border-b border-zinc-300">
-                              {block.content.headers.map((h: string, i: number) => (
-                                <th key={i} className="text-left py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">{h}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {block.content.rows.map((row: string[], ri: number) => (
-                              <tr key={ri}>
-                                {row.map((cell: string, ci: number) => (
-                                  <td key={ci} className="py-2 text-xs font-mono text-zinc-900">{cell}</td>
-                                ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
+              {previewHtml ? (
+                <div
+                  className="p-8 flex-1 transmission-preview"
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewHtml, { ALLOWED_TAGS: ['p', 'div', 'span', 'a', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'figure', 'img', 'figcaption', 'br'], ALLOWED_ATTR: ['href', 'src', 'alt', 'style', 'title'] }) }}
+                />
+              ) : (
+                <>
+                  <div className="border-b border-zinc-200 p-6 flex justify-between items-center">
+                    <span className="text-[10px] font-mono text-zinc-900 font-bold tracking-[0.2em] uppercase">NODAL_POINT // INTELLIGENCE</span>
+                    <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-tighter">REF: {new Date().toISOString().split('T')[0].replace(/-/g, '')} // TX_001</span>
                   </div>
-                ))}
-              </div>
-
-              {/* Signature */}
-              <div className="p-8 border-t border-zinc-100 bg-zinc-50 mt-auto">
-                <div className="font-sans font-bold text-zinc-900 text-sm">Lewis Patterson</div>
-                <div className="font-sans text-zinc-500 text-xs mb-4">Director of Energy Architecture</div>
-                <div className="flex gap-4 font-mono text-[10px] text-[#002FA7] font-bold uppercase tracking-widest">
-                  <span>LINKEDIN</span>
-                  <span>NETWORK</span>
-                  <span>[ RUN_AUDIT ]</span>
-                </div>
-              </div>
+                  <div className="p-8 space-y-6 flex-1">
+                    {blocks.map((block) => (
+                      <div key={block.id}>
+                        {block.type === 'TEXT_MODULE' && (
+                          <p className="text-zinc-900 leading-relaxed font-sans">{block.content}</p>
+                        )}
+                        {block.type === 'TACTICAL_BUTTON' && (
+                          <div className="pt-4">
+                            <button className="bg-[#002FA7] text-white px-6 py-3 font-mono font-bold text-xs uppercase tracking-widest rounded-sm shadow-lg shadow-[#002FA7]/20">
+                              {block.content}
+                            </button>
+                          </div>
+                        )}
+                        {block.type === 'VARIABLE_CHIP' && (
+                          <span className="bg-zinc-100 px-2 py-0.5 rounded text-[10px] font-mono text-[#002FA7] border border-zinc-200">
+                            {block.content}
+                          </span>
+                        )}
+                        {block.type === 'TELEMETRY_GRID' && (
+                          <div className="bg-[#F4F4F5] rounded-md p-4 border border-zinc-200 overflow-hidden">
+                            <table className="w-full border-collapse">
+                              <thead>
+                                <tr className="border-b border-zinc-300">
+                                  {block.content.headers.map((h: string, i: number) => (
+                                    <th key={i} className="text-left py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {block.content.rows.map((row: string[], ri: number) => (
+                                  <tr key={ri}>
+                                    {row.map((cell: string, ci: number) => (
+                                      <td key={ci} className="py-2 text-xs font-mono text-zinc-900">{cell}</td>
+                                    ))}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                        {block.type === 'IMAGE_BLOCK' && block.content?.url && (
+                          <figure className="my-4">
+                            <img src={block.content.url} alt={block.content?.description ?? ''} className="max-w-full h-auto block rounded border border-zinc-200" />
+                            {block.content?.caption && (
+                              <figcaption className="text-[10px] font-mono text-zinc-500 mt-2">{block.content.caption}</figcaption>
+                            )}
+                          </figure>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="p-8 border-t border-zinc-100 bg-zinc-50 mt-auto">
+                    <div className="font-sans font-bold text-zinc-900 text-sm">Lewis Patterson</div>
+                    <div className="font-sans text-zinc-500 text-xs mb-4">Director of Energy Architecture</div>
+                    <div className="flex gap-4 font-mono text-[10px] text-[#002FA7] font-bold uppercase tracking-widest">
+                      <span>LINKEDIN</span>
+                      <span>NETWORK</span>
+                      <span>[ RUN_AUDIT ]</span>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
