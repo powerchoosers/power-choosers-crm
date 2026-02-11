@@ -82,6 +82,7 @@ import {
 import { useContacts, type Contact } from '@/hooks/useContacts';
 import { useProtocolBuilder } from '@/hooks/useProtocolBuilder';
 import { useAuth } from '@/context/AuthContext';
+import { useTransmissionAssets } from '@/hooks/useTransmissionAssets';
 import { getBurnerFromEmail, getBurnerSenderName } from '@/lib/burner-email';
 import { toast } from 'sonner';
 
@@ -351,6 +352,7 @@ function ProtocolArchitectInner() {
   // Real Data Integration
   const { user, profile } = useAuth();
   const { protocol, saveProtocol, isSaving } = useProtocolBuilder(id as string);
+  const { data: transmissionAssets } = useTransmissionAssets();
   const burnerFrom = getBurnerFromEmail(user?.email ?? undefined);
   const burnerSenderName = getBurnerSenderName(profile?.firstName ?? undefined);
   
@@ -458,7 +460,7 @@ function ProtocolArchitectInner() {
   const { data: contactsData } = useContacts();
   const [testContactId, setTestContactId] = useState<string>('');
   const [isOptimizing, setIsOptimizing] = useState(false);
-  const [emailViewMode, setEmailViewMode] = useState<'payload' | 'ai'>('payload');
+  const [emailViewMode, setEmailViewMode] = useState<'payload' | 'ai' | 'asset'>('payload');
   const [isPreviewMobile, setIsPreviewMobile] = useState(false);
   const [aiLogic, setAiLogic] = useState<string>('');
   const [aiSubject, setAiSubject] = useState<string>('');
@@ -1450,7 +1452,7 @@ function ProtocolArchitectInner() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                        {emailViewMode === 'payload' ? 'Payload_Matrix' : 'Context_Matrix // Strategy'}
+                        {emailViewMode === 'payload' ? 'Matrix_Payload' : emailViewMode === 'ai' ? 'Neural_Context' : 'Transmission_Asset'}
                       </label>
                       
                       {selectedNode?.data.type === 'email' && (
@@ -1465,9 +1467,16 @@ function ProtocolArchitectInner() {
                           <button
                             onClick={() => setEmailViewMode('ai')}
                             className={cn("icon-button-forensic w-6 h-6 flex items-center justify-center rounded-md transition-all", emailViewMode === 'ai' ? "bg-white/10 text-emerald-400 shadow-sm" : "text-zinc-500")}
-                            title="AI Strategy View"
+                            title="Neural Mode (AI)"
                           >
                             <Sparkles className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setEmailViewMode('asset')}
+                            className={cn("icon-button-forensic w-6 h-6 flex items-center justify-center rounded-md transition-all", emailViewMode === 'asset' ? "bg-white/10 text-[#002FA7] shadow-sm" : "text-zinc-500")}
+                            title="Asset Mode (Library)"
+                          >
+                            <Zap className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       )}
@@ -1507,7 +1516,7 @@ function ProtocolArchitectInner() {
                           onChange={(e) => updateNodeData(selectedNode!.id, { body: e.target.value })}
                         />
                       </div>
-                    ) : (
+                    ) : emailViewMode === 'ai' ? (
                       <div className="space-y-4">
                         {/* Prompt Builder: Role, Objective, Constraints */}
                         <div className="space-y-4 bg-black/40 border border-white/5 rounded-2xl p-4">
@@ -1607,6 +1616,53 @@ function ProtocolArchitectInner() {
                           {isOptimizing ? <Clock className="w-4 h-4 animate-spin mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
                           Calibrate_Strategy_AI
                         </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="bg-black/40 border border-white/5 rounded-2xl p-4 space-y-4">
+                          <label className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest block">Select_Transmission_Asset</label>
+                          <Select 
+                            value={(selectedNode?.data.transmissionAssetId as string) || ''} 
+                            onValueChange={(val) => updateNodeData(selectedNode!.id, { transmissionAssetId: val })}
+                          >
+                            <SelectTrigger className="w-full bg-black/40 border-white/5 rounded-xl h-12 font-mono text-sm focus:ring-0 focus:border-[#002FA7]">
+                              <SelectValue placeholder="Choose an asset from Foundry..." />
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-950 nodal-monolith-edge">
+                              {transmissionAssets?.map((asset) => (
+                                <SelectItem key={asset.id} value={asset.id}>
+                                  {asset.name}
+                                </SelectItem>
+                              ))}
+                              {(!transmissionAssets || transmissionAssets.length === 0) && (
+                                <div className="p-4 text-center">
+                                  <p className="text-[10px] font-mono text-zinc-500 mb-2">No assets found in Foundry.</p>
+                                  <Link href="/network/transmission/new">
+                                    <Button size="sm" className="bg-[#002FA7] text-white h-7 text-[10px] uppercase tracking-widest">Create_Asset</Button>
+                                  </Link>
+                                </div>
+                              )}
+                            </SelectContent>
+                          </Select>
+
+                          {(() => {
+                            const assetId = selectedNode?.data.transmissionAssetId
+                            if (!assetId || typeof assetId !== 'string') return null
+                            return (
+                              <div className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] font-mono text-zinc-500 uppercase">Asset_Preview</span>
+                                  <Link href={`/network/transmission/${assetId}`}>
+                                    <Button variant="link" className="h-auto p-0 text-[10px] text-[#002FA7] uppercase">Edit_in_Foundry</Button>
+                                  </Link>
+                                </div>
+                                <div className="text-[10px] text-zinc-400 italic font-mono bg-black/20 p-2 rounded border border-white/5">
+                                  {transmissionAssets?.find(a => a.id === assetId)?.name || 'Asset'} linked.
+                                </div>
+                              </div>
+                            )
+                          })()}
+                        </div>
                       </div>
                     )}
                   </div>
