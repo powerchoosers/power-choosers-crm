@@ -143,7 +143,23 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
     if (data && !error) {
       setAssetName(data.name)
       setAssetType(data.type)
-      setBlocks(data.content_json?.blocks || [])
+      
+      // Migrate old TEXT_MODULE blocks from string to object format
+      const blocks = (data.content_json?.blocks || []).map((block: any) => {
+        if (block.type === 'TEXT_MODULE' && typeof block.content === 'string') {
+          return {
+            ...block,
+            content: {
+              text: block.content,
+              useAi: false,
+              aiPrompt: ''
+            }
+          }
+        }
+        return block
+      })
+      
+      setBlocks(blocks)
     }
   }
 
