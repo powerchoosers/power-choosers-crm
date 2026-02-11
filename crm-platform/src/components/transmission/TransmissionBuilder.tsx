@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import DOMPurify from 'dompurify'
 import { 
@@ -21,13 +21,16 @@ import {
   Check,
   ChevronUp,
   ChevronDown,
-  Image as ImageIcon
+  Image as ImageIcon,
+  User,
+  Building2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { supabase } from '@/lib/supabase'
 import { generateStaticHtml, substituteVariables, contactToVariableMap } from '@/lib/transmission'
+import { CONTACT_VARIABLES, ACCOUNT_VARIABLES, extractVariableKeysFromText } from '@/lib/transmission-variables'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { useContacts, useContact } from '@/hooks/useContacts'
@@ -38,6 +41,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 
 interface Block {
   id: string
@@ -56,7 +64,31 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
   const [assetType, setAssetType] = useState<'market_signal' | 'invoice_req' | 'educational'>('market_signal')
   const [previewContactId, setPreviewContactId] = useState<string | null>(null)
   const [generatingBlockId, setGeneratingBlockId] = useState<string | null>(null)
+  const [variablePopoverOpen, setVariablePopoverOpen] = useState<string | null>(null)
+  const textModuleTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const router = useRouter()
+
+  const insertVariableIntoText = (blockId: string, key: string, currentContent: string) => {
+    const placeholder = `{{${key}}} `
+    const block = blocks.find((b) => b.id === blockId)
+    if (!block) return
+    const ta = textModuleTextareaRef.current
+    if (ta && blockId === activeBlock) {
+      const start = ta.selectionStart
+      const end = ta.selectionEnd
+      const newContent = currentContent.slice(0, start) + placeholder + currentContent.slice(end)
+      updateBlockContent(blockId, newContent)
+      setVariablePopoverOpen(null)
+      setTimeout(() => {
+        ta.focus()
+        const pos = start + placeholder.length
+        ta.setSelectionRange(pos, pos)
+      }, 0)
+    } else {
+      updateBlockContent(blockId, currentContent + placeholder)
+      setVariablePopoverOpen(null)
+    }
+  }
 
   const { data: contactsData } = useContacts()
   const contacts = useMemo(() => contactsData?.pages?.flatMap((p: { contacts: any[] }) => p.contacts) ?? [], [contactsData])
@@ -91,9 +123,13 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
   const saveAsset = async () => {
     setIsSaving(true)
     const compiled_html = generateStaticHtml(blocks)
-    const variables = blocks
+    const chipVars = blocks
       .filter(b => b.type === 'VARIABLE_CHIP')
-      .map(b => b.content.replace(/{{|}}/g, ''))
+      .map(b => (typeof b.content === 'string' ? b.content.replace(/{{|}}/g, '') : ''))
+    const textVars = blocks
+      .filter(b => b.type === 'TEXT_MODULE' && typeof b.content === 'string')
+      .flatMap(b => extractVariableKeysFromText(b.content))
+    const variables = [...new Set([...chipVars.filter(Boolean), ...textVars])]
 
     const payload = {
       name: assetName,
@@ -132,7 +168,6 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
     { type: 'TEXT_MODULE', label: 'Narrative_Text', icon: Type },
     { type: 'TELEMETRY_GRID', label: 'Data_Grid', icon: TableIcon },
     { type: 'TACTICAL_BUTTON', label: 'Action_Vector', icon: MousePointer2 },
-    { type: 'VARIABLE_CHIP', label: 'Data_Injection', icon: Variable },
     { type: 'IMAGE_BLOCK', label: 'Image', icon: ImageIcon },
   ]
 
@@ -365,18 +400,70 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
                     {block.type === 'TEXT_MODULE' && (
                       <div className="space-y-2">
                         <textarea
+                          ref={(el) => { if (activeBlock === block.id) textModuleTextareaRef.current = el }}
                           value={block.content}
                           onChange={(e) => updateBlockContent(block.id, e.target.value)}
                           className="w-full bg-transparent border-none focus:ring-0 text-sm font-sans text-zinc-300 min-h-[100px] resize-none p-0"
                         />
-                        <button
-                          type="button"
-                          onClick={() => generateWithAi(block.id, 'TEXT_MODULE', block.content)}
-                          disabled={generatingBlockId === block.id}
-                          className="text-[10px] font-mono uppercase tracking-widest text-[#002FA7] hover:underline disabled:opacity-50"
-                        >
-                          {generatingBlockId === block.id ? 'Generating…' : 'Generate with AI'}
-                        </button>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Popover open={variablePopoverOpen === block.id} onOpenChange={(open) => setVariablePopoverOpen(open ? block.id : null)}>
+                            <PopoverTrigger asChild>
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-1.5 h-7 px-2 rounded border border-[#002FA7]/30 bg-[#002FA7]/10 text-[10px] font-mono uppercase tracking-widest text-[#002FA7] hover:bg-[#002FA7]/20"
+                              >
+                                <Variable size={12} />
+                                Insert variable
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-72 p-0 bg-zinc-900 border-white/10" align="start">
+                              <div className="max-h-[280px] overflow-y-auto np-scroll">
+                                <div className="p-2 border-b border-white/10">
+                                  <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
+                                    <User size={10} /> Contact
+                                  </span>
+                                </div>
+                                <div className="p-1">
+                                  {CONTACT_VARIABLES.map((v) => (
+                                    <button
+                                      key={v.key}
+                                      type="button"
+                                      className="w-full text-left px-2 py-1.5 rounded text-xs font-sans text-zinc-300 hover:bg-white/10 hover:text-white"
+                                      onClick={() => insertVariableIntoText(block.id, v.key, block.content)}
+                                    >
+                                      {v.label} <span className="text-[10px] font-mono text-[#002FA7]">{v.key}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                                <div className="p-2 border-b border-t border-white/10">
+                                  <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
+                                    <Building2 size={10} /> Account
+                                  </span>
+                                </div>
+                                <div className="p-1">
+                                  {ACCOUNT_VARIABLES.map((v) => (
+                                    <button
+                                      key={v.key}
+                                      type="button"
+                                      className="w-full text-left px-2 py-1.5 rounded text-xs font-sans text-zinc-300 hover:bg-white/10 hover:text-white"
+                                      onClick={() => insertVariableIntoText(block.id, v.key, block.content)}
+                                    >
+                                      {v.label} <span className="text-[10px] font-mono text-[#002FA7]">{v.key}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                          <button
+                            type="button"
+                            onClick={() => generateWithAi(block.id, 'TEXT_MODULE', block.content)}
+                            disabled={generatingBlockId === block.id}
+                            className="text-[10px] font-mono uppercase tracking-widest text-[#002FA7] hover:underline disabled:opacity-50"
+                          >
+                            {generatingBlockId === block.id ? 'Generating…' : 'Generate with AI'}
+                          </button>
+                        </div>
                       </div>
                     )}
 
@@ -565,17 +652,28 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
               ) : (
                 <>
                   <div className="border-b border-zinc-200 p-6 flex justify-between items-center">
-                    <span className="text-[10px] font-mono text-zinc-900 font-bold tracking-[0.2em] uppercase">NODAL_POINT // INTELLIGENCE</span>
+                    <div className="flex items-center gap-2">
+                      <img src="/images/nodalpoint.png" alt="" className="h-6 w-auto" />
+                      <span className="text-[10px] font-mono text-zinc-900 font-bold tracking-[0.2em] uppercase">NODAL_POINT // INTELLIGENCE</span>
+                    </div>
                     <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-tighter">REF: {new Date().toISOString().split('T')[0].replace(/-/g, '')} // TX_001</span>
                   </div>
                   <div className="p-8 space-y-6 flex-1">
                     {blocks.map((block) => (
                       <div key={block.id}>
                         {block.type === 'TEXT_MODULE' && (
-                          <p className="text-zinc-900 leading-relaxed font-sans">{block.content}</p>
+                          <p className="text-zinc-900 leading-relaxed font-sans whitespace-pre-wrap">
+                            {typeof block.content === 'string'
+                              ? block.content.split(/(\{\{[^}]+\}\})/g).map((part, i) =>
+                                  part.startsWith('{{') && part.endsWith('}}')
+                                    ? <span key={i} className="bg-amber-100 text-amber-800 px-0.5 rounded font-mono text-[10px]">{part}</span>
+                                    : part
+                                )
+                              : block.content}
+                          </p>
                         )}
                         {block.type === 'TACTICAL_BUTTON' && (
-                          <div className="pt-4">
+                          <div className="pt-4 flex justify-center">
                             <button className="bg-[#002FA7] text-white px-6 py-3 font-mono font-bold text-xs uppercase tracking-widest rounded-sm shadow-lg shadow-[#002FA7]/20">
                               {block.content}
                             </button>
