@@ -34,6 +34,7 @@ import { generateStaticHtml, substituteVariables, contactToVariableMap } from '@
 import { CONTACT_VARIABLES, ACCOUNT_VARIABLES, extractVariableKeysFromText } from '@/lib/transmission-variables'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
 import { useContacts, useContact } from '@/hooks/useContacts'
 import {
   Select,
@@ -77,6 +78,7 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
   const [variablePopoverOpen, setVariablePopoverOpen] = useState<string | null>(null)
   const textModuleTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const router = useRouter()
+  const { user, profile } = useAuth()
 
   const insertVariableIntoText = (blockId: string, key: string, currentContent: string) => {
     const placeholder = `{{${key}}} `
@@ -105,7 +107,7 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
   const { data: previewContact } = useContact(previewContactId ?? '')
   const previewHtml = useMemo(() => {
     if (!previewContactId || !previewContact) return null
-    const html = generateStaticHtml(blocks)
+    const html = generateStaticHtml(blocks, { skipFooter: true })
     const data = contactToVariableMap(previewContact)
     return substituteVariables(html, data)
   }, [blocks, previewContactId, previewContact])
@@ -687,7 +689,7 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
           <div className="h-10 border-b border-zinc-200 bg-zinc-50 flex items-center px-4 justify-between gap-4">
             <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest shrink-0">Live_Simulation</span>
             <Select value={previewContactId ?? '__none__'} onValueChange={(v) => setPreviewContactId(v === '__none__' ? null : v)}>
-              <SelectTrigger className="h-7 max-w-[220px] text-[10px] font-mono uppercase border-zinc-200 bg-white">
+              <SelectTrigger size="sm" className="!h-6 !py-1 max-w-[220px] text-[10px] font-mono uppercase border-zinc-200 bg-white">
                 <SelectValue placeholder="Preview with contact" />
               </SelectTrigger>
               <SelectContent>
@@ -786,17 +788,40 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
                       </div>
                     ))}
                   </div>
-                  <div className="p-8 border-t border-zinc-100 bg-zinc-50 mt-auto">
-                    <div className="font-sans font-bold text-zinc-900 text-sm">Lewis Patterson</div>
-                    <div className="font-sans text-zinc-500 text-xs mb-4">Director of Energy Architecture</div>
-                    <div className="flex gap-4 font-mono text-[10px] text-[#002FA7] font-bold uppercase tracking-widest">
-                      <span>LINKEDIN</span>
-                      <span>NETWORK</span>
-                      <span>[ RUN_AUDIT ]</span>
-                    </div>
-                  </div>
                 </>
               )}
+              {/* Live signature (builder-only): Settings + hosted avatar, clickable links */}
+              <div className="p-8 border-t border-zinc-100 bg-zinc-50 mt-auto">
+                <div className="flex items-center gap-3">
+                  {(profile?.hostedPhotoUrl || user?.photoURL) && (
+                    <img
+                      src={profile?.hostedPhotoUrl || user?.photoURL || ''}
+                      alt=""
+                      className="w-10 h-10 rounded-[12px] border border-zinc-200 object-cover shrink-0"
+                    />
+                  )}
+                  <div>
+                    <div className="font-sans font-bold text-zinc-900 text-sm">
+                      {[profile?.firstName, profile?.lastName].filter(Boolean).join(' ') || profile?.name || user?.displayName || '—'}
+                    </div>
+                    <div className="font-sans text-zinc-500 text-xs">
+                      {profile?.jobTitle || '—'}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-2 mb-3 font-mono text-[11px] text-zinc-600">
+                  {profile?.email && <span>E: {profile.email}</span>}
+                  {profile?.selectedPhoneNumber && <span className="ml-4">P: {profile.selectedPhoneNumber}</span>}
+                  {(profile?.city || profile?.state) && (
+                    <span className="ml-4">{[profile?.city, profile?.state].filter(Boolean).join(', ')}</span>
+                  )}
+                </div>
+                <div className="flex gap-4 font-mono text-[10px] text-[#002FA7] font-bold uppercase tracking-widest">
+                  <a href={profile?.linkedinUrl || 'https://linkedin.com/company/nodal-point'} target="_blank" rel="noopener noreferrer" className="hover:underline">LINKEDIN</a>
+                  <a href="https://nodalpoint.io" target="_blank" rel="noopener noreferrer" className="hover:underline">NETWORK</a>
+                  <a href="https://nodalpoint.io/bill-debugger" target="_blank" rel="noopener noreferrer" className="hover:underline">[ RUN_AUDIT ]</a>
+                </div>
+              </div>
             </div>
           </div>
         </div>
