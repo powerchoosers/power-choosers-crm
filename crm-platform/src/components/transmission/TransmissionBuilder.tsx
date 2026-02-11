@@ -29,6 +29,8 @@ import {
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import { supabase } from '@/lib/supabase'
 import { generateStaticHtml, substituteVariables, contactToVariableMap } from '@/lib/transmission'
 import { CONTACT_VARIABLES, ACCOUNT_VARIABLES, extractVariableKeysFromText } from '@/lib/transmission-variables'
@@ -60,7 +62,7 @@ const VALUE_COLOR_CLASSES: Record<ValueColor, string> = {
 
 interface Block {
   id: string
-  type: 'TEXT_MODULE' | 'TELEMETRY_GRID' | 'TACTICAL_BUTTON' | 'VARIABLE_CHIP' | 'IMAGE_BLOCK'
+  type: 'TEXT_MODULE' | 'TELEMETRY_GRID' | 'TACTICAL_BUTTON' | 'VARIABLE_CHIP' | 'IMAGE_BLOCK' | 'LIABILITY_GAUGE' | 'MARKET_BREADCRUMB'
   content: any
 }
 
@@ -80,24 +82,27 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
   const router = useRouter()
   const { user, profile } = useAuth()
 
-  const insertVariableIntoText = (blockId: string, key: string, currentContent: string) => {
+  const insertVariableIntoText = (blockId: string, key: string, currentText: string) => {
     const placeholder = `{{${key}}} `
     const block = blocks.find((b) => b.id === blockId)
     if (!block) return
     const ta = textModuleTextareaRef.current
+    const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content || ''), useAi: false, aiPrompt: '' }
     if (ta && blockId === activeBlock) {
       const start = ta.selectionStart
       const end = ta.selectionEnd
-      const newContent = currentContent.slice(0, start) + placeholder + currentContent.slice(end)
-      updateBlockContent(blockId, newContent)
+      const newText = currentText.slice(0, start) + placeholder + currentText.slice(end)
+      updateBlockContent(blockId, { ...contentObj, text: newText })
       setVariablePopoverOpen(null)
       setTimeout(() => {
-        ta.focus()
-        const pos = start + placeholder.length
-        ta.setSelectionRange(pos, pos)
+        if (ta) {
+          ta.focus()
+          const pos = start + placeholder.length
+          ta.setSelectionRange(pos, pos)
+        }
       }, 0)
     } else {
-      updateBlockContent(blockId, currentContent + placeholder)
+      updateBlockContent(blockId, { ...contentObj, text: (currentText || '') + placeholder })
       setVariablePopoverOpen(null)
     }
   }
@@ -111,6 +116,22 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
     const data = contactToVariableMap(previewContact)
     return substituteVariables(html, data)
   }, [blocks, previewContactId, previewContact])
+
+  // Auto-generate TEXT_MODULE blocks with AI when contact is selected
+  useEffect(() => {
+    if (!previewContactId || !previewContact || generatingBlockId) return
+    
+    blocks.forEach(block => {
+      if (block.type !== 'TEXT_MODULE') return
+      const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content || ''), useAi: false, aiPrompt: '' }
+      
+      // Only generate if: useAi is true, has a prompt, but no generated text yet
+      if (contentObj.useAi === true && contentObj.aiPrompt?.trim() && !contentObj.text?.trim()) {
+        generateWithAi(block.id, 'TEXT_MODULE', contentObj)
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewContactId, previewContact])
 
   useEffect(() => {
     if (assetId && assetId !== 'new') {
@@ -139,8 +160,11 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
       .filter(b => b.type === 'VARIABLE_CHIP')
       .map(b => (typeof b.content === 'string' ? b.content.replace(/{{|}}/g, '') : ''))
     const textVars = blocks
-      .filter(b => b.type === 'TEXT_MODULE' && typeof b.content === 'string')
-      .flatMap(b => extractVariableKeysFromText(b.content))
+      .filter(b => b.type === 'TEXT_MODULE')
+      .flatMap(b => {
+        const contentObj = typeof b.content === 'object' ? b.content : { text: String(b.content || ''), useAi: false, aiPrompt: '' }
+        return extractVariableKeysFromText(contentObj.text || '')
+      })
     const variables = [...new Set([...chipVars.filter(Boolean), ...textVars])]
 
     const payload = {
@@ -181,16 +205,33 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
     { type: 'TELEMETRY_GRID', label: 'Data_Grid', icon: TableIcon },
     { type: 'TACTICAL_BUTTON', label: 'Action_Vector', icon: MousePointer2 },
     { type: 'IMAGE_BLOCK', label: 'Image', icon: ImageIcon },
+    { type: 'LIABILITY_GAUGE', label: 'Risk_Vector', icon: Zap },
+    { type: 'MARKET_BREADCRUMB', label: 'Market_Intel', icon: Search },
   ]
 
   const addBlock = (type: Block['type']) => {
     const newBlock: Block = {
       id: Math.random().toString(36).substr(2, 9),
       type,
-      content: type === 'TEXT_MODULE' ? 'Enter narrative payload...' : 
+      content: type === 'TEXT_MODULE' ? { text: 'Enter narrative payload...', useAi: false, aiPrompt: '' } : 
                type === 'TACTICAL_BUTTON' ? '[ INITIATE_PROTOCOL ]' : 
                type === 'TELEMETRY_GRID' ? { headers: ['ITEM', 'VALUE'], rows: [['Metric', '0.00']], valueColors: ['green'] as const } : 
                type === 'IMAGE_BLOCK' ? { url: '', description: '', caption: '' } :
+               type === 'LIABILITY_GAUGE' ? {
+                 baselineLabel: 'CURRENT_FIXED_RATE',
+                 baselineValue: '0.082',
+                 riskLabel: 'SCARCITY_EXPOSURE',
+                 riskLevel: 75,
+                 status: 'VOLATILE',
+                 note: 'Note: Structural variance detected in regional load profiles. Architecture is currently leaking $4.2k/mo in ghost capacity.'
+               } :
+               type === 'MARKET_BREADCRUMB' ? {
+                 headline: 'ERCOT_RESERVES_DROP_BELOW_3000MW',
+                 source: 'GridMonitor_Intelligence',
+                 url: 'https://',
+                 nodalAnalysis: 'Detected scarcity risk in {{contact.load_zone}}. Estimated variance: $0.12/kWh.',
+                 impactLevel: 'HIGH_VOLATILITY'
+               } :
                '{{variable}}'
     }
     setBlocks([...blocks, newBlock])
@@ -206,19 +247,81 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
     setBlocks(blocks.map(b => b.id === id ? { ...b, content } : b))
   }
 
-  const generateWithAi = async (blockId: string, blockType: 'TEXT_MODULE' | 'TACTICAL_BUTTON', currentContent: string) => {
+  const generateWithAi = async (blockId: string, blockType: 'TEXT_MODULE' | 'TACTICAL_BUTTON' | 'LIABILITY_GAUGE' | 'MARKET_BREADCRUMB', currentContent: string | { text?: string; aiPrompt?: string }, noteField?: string) => {
     setGeneratingBlockId(blockId)
     try {
-      const prompt = blockType === 'TACTICAL_BUTTON'
-        ? 'Rewrite as a single tactical CTA label for an intelligence brief.'
-        : 'Rewrite this for a Nodal Point intelligence brief. Keep it forensic and precise.'
+      let prompt: string
+      let blockTypeParam: string
+      let contextText: string = ''
+      
+      if (blockType === 'TEXT_MODULE') {
+        const block = blocks.find(b => b.id === blockId)
+        const blockIndex = blocks.findIndex(b => b.id === blockId)
+        const isFirstBlock = blockIndex === 0
+        const contentObj = typeof currentContent === 'object' ? currentContent : { text: String(currentContent), aiPrompt: '', useAi: false }
+        const userPrompt = contentObj.aiPrompt?.trim() || ''
+        
+        // Build context from all other blocks
+        const otherBlocks = blocks.filter((b, idx) => idx !== blockIndex)
+        const contextParts: string[] = []
+        otherBlocks.forEach((b, idx) => {
+          if (b.type === 'TEXT_MODULE') {
+            const txt = typeof b.content === 'string' ? b.content : (b.content?.text || '')
+            if (txt.trim()) contextParts.push(`Block ${idx + 1}: ${txt.slice(0, 200)}`)
+          } else if (b.type === 'TACTICAL_BUTTON') {
+            contextParts.push(`Block ${idx + 1}: CTA button "${b.content}"`)
+          } else if (b.type === 'TELEMETRY_GRID') {
+            const headers = b.content?.headers?.join(', ') || ''
+            contextParts.push(`Block ${idx + 1}: Data grid with columns: ${headers}`)
+          } else if (b.type === 'LIABILITY_GAUGE') {
+            contextParts.push(`Block ${idx + 1}: Liability gauge showing ${b.content?.baselineValue || 'rate'}/kWh, ${b.content?.riskLevel || 0}% risk`)
+          } else if (b.type === 'MARKET_BREADCRUMB') {
+            contextParts.push(`Block ${idx + 1}: Market intel "${b.content?.headline || ''}"`)
+          }
+        })
+        const transmissionContext = contextParts.length > 0 ? `\n\nOther blocks in this transmission:\n${contextParts.join('\n')}` : ''
+        
+        const contactInfo = previewContact
+          ? `\n\nContact: ${(previewContact as { firstName?: string })?.firstName || '—'} ${(previewContact as { lastName?: string })?.lastName || ''}, Company: ${(previewContact as { companyName?: string })?.companyName || '—'}, Current rate: ${(previewContact as { currentRate?: string })?.currentRate || '—'}/kWh`
+          : ''
+        
+        if (isFirstBlock) {
+          prompt = `You are writing the introduction paragraph for an energy intelligence email. Start with "{contact.firstName}," followed by 3-4 sentences.${userPrompt ? `\n\nUser instruction: ${userPrompt}` : ''}\n\nWrite in Nodal Point's forensic, intelligence-brief style. No marketing fluff.${transmissionContext}${contactInfo}`
+        } else {
+          prompt = `You are writing a body paragraph for an energy intelligence email. Use the contact's first name naturally within the paragraph.${userPrompt ? `\n\nUser instruction: ${userPrompt}` : ''}\n\nWrite in Nodal Point's forensic, intelligence-brief style. No marketing fluff.${transmissionContext}${contactInfo}`
+        }
+        blockTypeParam = 'narrative'
+        contextText = typeof currentContent === 'string' ? currentContent : (currentContent?.text || '')
+      } else if (blockType === 'TACTICAL_BUTTON') {
+        prompt = 'Rewrite as a single tactical CTA label for an intelligence brief.'
+        blockTypeParam = 'button'
+        contextText = typeof currentContent === 'string' ? currentContent : String(currentContent)
+      } else if (blockType === 'LIABILITY_GAUGE') {
+        const contactSummary = previewContact
+          ? ` Contact context: current rate ${(previewContact as { currentRate?: string })?.currentRate ?? '—'}, supplier ${(previewContact as { electricitySupplier?: string })?.electricitySupplier ?? '—'}, contract end ${(previewContact as { contractEnd?: string })?.contractEnd ?? '—'}.`
+          : ''
+        prompt = `Rewrite the following as a one-sentence risk diagnosis for an energy liability gauge. Focus on structural inefficiency and grid physics. Minimalist and forensic. No marketing.${contactSummary}`
+        blockTypeParam = 'narrative'
+        contextText = typeof currentContent === 'string' ? currentContent : String(currentContent)
+      } else if (blockType === 'MARKET_BREADCRUMB') {
+        const contactSummary = previewContact
+          ? ` Contact context: load zone ${(previewContact as { metadata?: { energy?: { loadZone?: string } } })?.metadata?.energy?.loadZone ?? '—'}, company ${(previewContact as { companyName?: string })?.companyName ?? '—'}, current rate ${(previewContact as { currentRate?: string })?.currentRate ?? '—'}.`
+          : ''
+        prompt = `Rewrite this market news into a 2-sentence impact assessment for a client in {{load_zone}}. Focus on how this event increases their 'Liability' or 'Cost Leakage'. Do not summarize the article; interpret its 'Physics' relative to the client's strike price.${contactSummary}`
+        blockTypeParam = 'narrative'
+        contextText = typeof currentContent === 'string' ? currentContent : String(currentContent)
+      } else {
+        prompt = 'Rewrite this for a Nodal Point intelligence brief. Keep it forensic and precise.'
+        blockTypeParam = 'narrative'
+        contextText = typeof currentContent === 'string' ? currentContent : String(currentContent)
+      }
       const res = await fetch('/api/transmission/generate-text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt,
-          context: currentContent,
-          blockType: blockType === 'TACTICAL_BUTTON' ? 'button' : 'narrative',
+          context: contextText,
+          blockType: blockTypeParam,
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -227,7 +330,21 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
         return
       }
       if (typeof data?.text === 'string' && data.text.trim()) {
-        updateBlockContent(blockId, data.text.trim())
+        if (blockType === 'TEXT_MODULE') {
+          const block = blocks.find(b => b.id === blockId)
+          if (block) {
+            const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content), useAi: false, aiPrompt: '' }
+            updateBlockContent(blockId, { ...contentObj, text: data.text.trim() })
+          }
+        } else if (blockType === 'LIABILITY_GAUGE' && noteField === 'note') {
+          const block = blocks.find(b => b.id === blockId)
+          if (block) updateBlockContent(blockId, { ...block.content, note: data.text.trim() })
+        } else if (blockType === 'MARKET_BREADCRUMB' && noteField === 'nodalAnalysis') {
+          const block = blocks.find(b => b.id === blockId)
+          if (block) updateBlockContent(blockId, { ...block.content, nodalAnalysis: data.text.trim() })
+        } else {
+          updateBlockContent(blockId, data.text.trim())
+        }
         toast.success('Copy updated')
       }
     } catch (err: any) {
@@ -428,75 +545,121 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
                       </div>
                     </div>
 
-                    {block.type === 'TEXT_MODULE' && (
-                      <div className="space-y-2">
-                        <textarea
-                          ref={(el) => { if (activeBlock === block.id) textModuleTextareaRef.current = el }}
-                          value={block.content}
-                          onChange={(e) => updateBlockContent(block.id, e.target.value)}
-                          className="w-full bg-transparent border-none focus:ring-0 text-sm font-sans text-zinc-300 min-h-[100px] resize-none p-0"
-                        />
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Popover open={variablePopoverOpen === block.id} onOpenChange={(open) => setVariablePopoverOpen(open ? block.id : null)}>
-                            <PopoverTrigger asChild>
-                              <button
-                                type="button"
-                                className="inline-flex items-center gap-1.5 h-7 px-2 rounded border border-[#002FA7]/30 bg-[#002FA7]/10 text-[10px] font-mono uppercase tracking-widest text-[#002FA7] hover:bg-[#002FA7]/20"
-                              >
-                                <Variable size={12} />
-                                Insert variable
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-72 p-0 bg-zinc-900 border-white/10" align="start">
-                              <div className="max-h-[280px] overflow-y-auto np-scroll">
-                                <div className="p-2 border-b border-white/10">
-                                  <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
-                                    <User size={10} /> Contact
-                                  </span>
-                                </div>
-                                <div className="p-1">
-                                  {CONTACT_VARIABLES.map((v) => (
+                    {block.type === 'TEXT_MODULE' && (() => {
+                      const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content || ''), useAi: false, aiPrompt: '' }
+                      const useAi = contentObj.useAi ?? false
+                      const blockIndex = blocks.findIndex(b => b.id === block.id)
+                      const isFirstBlock = blockIndex === 0
+                      
+                      return (
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={useAi}
+                              onCheckedChange={(checked) => {
+                                const currentContent = typeof block.content === 'object' ? block.content : { text: String(block.content || ''), useAi: false, aiPrompt: '' }
+                                updateBlockContent(block.id, { ...currentContent, useAi: checked })
+                              }}
+                            />
+                            <Label className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 cursor-pointer">
+                              Generate with AI
+                            </Label>
+                            {useAi && (
+                              <span className="text-[9px] font-mono text-zinc-500">
+                                {isFirstBlock ? '(Introduction)' : '(Body paragraph)'}
+                              </span>
+                            )}
+                          </div>
+                          
+                          {useAi ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={contentObj.aiPrompt || ''}
+                                onChange={(e) => {
+                                  const currentContent = typeof block.content === 'object' ? block.content : { text: String(block.content || ''), useAi: true, aiPrompt: '' }
+                                  updateBlockContent(block.id, { ...currentContent, aiPrompt: e.target.value })
+                                }}
+                                placeholder={isFirstBlock ? 'e.g., "Quick intro to the email and tell the customer that it was a pleasure speaking with him today"' : 'e.g., "Explain the concept of phantom charges in simple terms"'}
+                                className="w-full bg-transparent border border-white/10 rounded px-2 py-1.5 text-xs font-sans text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-[#002FA7] min-h-[60px] resize-none"
+                              />
+                              {generatingBlockId === block.id && (
+                                <p className="text-[10px] font-mono text-zinc-500">Generating...</p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <textarea
+                                ref={(el) => { if (activeBlock === block.id) textModuleTextareaRef.current = el }}
+                                value={contentObj.text || ''}
+                                onChange={(e) => {
+                                  const currentContent = typeof block.content === 'object' ? block.content : { text: '', useAi: false, aiPrompt: '' }
+                                  updateBlockContent(block.id, { ...currentContent, text: e.target.value })
+                                }}
+                                placeholder="Enter narrative payload..."
+                                className="w-full bg-transparent border-none focus:ring-0 text-sm font-sans text-zinc-300 min-h-[100px] resize-none p-0 placeholder:text-zinc-600"
+                              />
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Popover open={variablePopoverOpen === block.id} onOpenChange={(open) => setVariablePopoverOpen(open ? block.id : null)}>
+                                  <PopoverTrigger asChild>
                                     <button
-                                      key={v.key}
                                       type="button"
-                                      className="w-full text-left px-2 py-1.5 rounded text-xs font-sans text-zinc-300 hover:bg-white/10 hover:text-white"
-                                      onClick={() => insertVariableIntoText(block.id, v.key, block.content)}
+                                      className="inline-flex items-center gap-1.5 h-7 px-2 rounded border border-[#002FA7]/30 bg-[#002FA7]/10 text-[10px] font-mono uppercase tracking-widest text-[#002FA7] hover:bg-[#002FA7]/20"
                                     >
-                                      {v.label} <span className="text-[10px] font-mono text-[#002FA7]">{v.key}</span>
+                                      <Variable size={12} />
+                                      Insert variable
                                     </button>
-                                  ))}
-                                </div>
-                                <div className="p-2 border-b border-t border-white/10">
-                                  <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
-                                    <Building2 size={10} /> Account
-                                  </span>
-                                </div>
-                                <div className="p-1">
-                                  {ACCOUNT_VARIABLES.map((v) => (
-                                    <button
-                                      key={v.key}
-                                      type="button"
-                                      className="w-full text-left px-2 py-1.5 rounded text-xs font-sans text-zinc-300 hover:bg-white/10 hover:text-white"
-                                      onClick={() => insertVariableIntoText(block.id, v.key, block.content)}
-                                    >
-                                      {v.label} <span className="text-[10px] font-mono text-[#002FA7]">{v.key}</span>
-                                    </button>
-                                  ))}
-                                </div>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-72 p-0 bg-zinc-900 border-white/10" align="start">
+                                    <div className="max-h-[280px] overflow-y-auto np-scroll">
+                                      <div className="p-2 border-b border-white/10">
+                                        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
+                                          <User size={10} /> Contact
+                                        </span>
+                                      </div>
+                                      <div className="p-1">
+                                        {CONTACT_VARIABLES.map((v) => (
+                                          <button
+                                            key={v.key}
+                                            type="button"
+                                            className="w-full text-left px-2 py-1.5 rounded text-xs font-sans text-zinc-300 hover:bg-white/10 hover:text-white"
+                                            onClick={() => {
+                                              const currentContent = typeof block.content === 'object' ? block.content : { text: String(block.content || ''), useAi: false, aiPrompt: '' }
+                                              insertVariableIntoText(block.id, v.key, currentContent.text || '')
+                                            }}
+                                          >
+                                            {v.label} <span className="text-[10px] font-mono text-[#002FA7]">{v.key}</span>
+                                          </button>
+                                        ))}
+                                      </div>
+                                      <div className="p-2 border-b border-t border-white/10">
+                                        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
+                                          <Building2 size={10} /> Account
+                                        </span>
+                                      </div>
+                                      <div className="p-1">
+                                        {ACCOUNT_VARIABLES.map((v) => (
+                                          <button
+                                            key={v.key}
+                                            type="button"
+                                            className="w-full text-left px-2 py-1.5 rounded text-xs font-sans text-zinc-300 hover:bg-white/10 hover:text-white"
+                                            onClick={() => {
+                                              const currentContent = typeof block.content === 'object' ? block.content : { text: String(block.content || ''), useAi: false, aiPrompt: '' }
+                                              insertVariableIntoText(block.id, v.key, currentContent.text || '')
+                                            }}
+                                          >
+                                            {v.label} <span className="text-[10px] font-mono text-[#002FA7]">{v.key}</span>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
                               </div>
-                            </PopoverContent>
-                          </Popover>
-                          <button
-                            type="button"
-                            onClick={() => generateWithAi(block.id, 'TEXT_MODULE', block.content)}
-                            disabled={generatingBlockId === block.id}
-                            className="text-[10px] font-mono uppercase tracking-widest text-[#002FA7] hover:underline disabled:opacity-50"
-                          >
-                            {generatingBlockId === block.id ? 'Generating…' : 'Generate with AI'}
-                          </button>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    )}
+                      )
+                    })()}
 
                     {block.type === 'TACTICAL_BUTTON' && (
                       <div className="space-y-2">
@@ -665,6 +828,128 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
                         </div>
                       </div>
                     )}
+
+                    {block.type === 'LIABILITY_GAUGE' && (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-mono text-zinc-500 uppercase">Baseline label</label>
+                            <input
+                              value={block.content?.baselineLabel ?? ''}
+                              onChange={(e) => updateBlockContent(block.id, { ...block.content, baselineLabel: e.target.value })}
+                              className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-mono text-zinc-500 uppercase">Baseline value ($/kWh)</label>
+                            <input
+                              value={block.content?.baselineValue ?? ''}
+                              onChange={(e) => updateBlockContent(block.id, { ...block.content, baselineValue: e.target.value })}
+                              className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-mono text-zinc-500 uppercase">Risk % (0–100)</label>
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              value={block.content?.riskLevel ?? 75}
+                              onChange={(e) => updateBlockContent(block.id, { ...block.content, riskLevel: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })}
+                              className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-mono text-zinc-500 uppercase">Status</label>
+                            <input
+                              value={block.content?.status ?? ''}
+                              onChange={(e) => updateBlockContent(block.id, { ...block.content, status: e.target.value })}
+                              className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-mono text-zinc-500 uppercase">Risk diagnosis note</label>
+                          <textarea
+                            value={block.content?.note ?? ''}
+                            onChange={(e) => updateBlockContent(block.id, { ...block.content, note: e.target.value })}
+                            rows={2}
+                            className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300 resize-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => generateWithAi(block.id, 'LIABILITY_GAUGE', block.content?.note ?? '', 'note')}
+                            disabled={generatingBlockId === block.id}
+                            className="text-[10px] font-mono uppercase tracking-widest text-[#002FA7] hover:underline disabled:opacity-50"
+                          >
+                            {generatingBlockId === block.id ? 'Generating…' : 'Generate with AI'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {block.type === 'MARKET_BREADCRUMB' && (
+                      <div className="space-y-3">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-mono text-zinc-500 uppercase">Headline</label>
+                          <input
+                            value={block.content?.headline ?? ''}
+                            onChange={(e) => updateBlockContent(block.id, { ...block.content, headline: e.target.value })}
+                            className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300"
+                            placeholder="ERCOT_RESERVES_DROP_BELOW_3000MW"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-mono text-zinc-500 uppercase">Source</label>
+                            <input
+                              value={block.content?.source ?? ''}
+                              onChange={(e) => updateBlockContent(block.id, { ...block.content, source: e.target.value })}
+                              className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300"
+                              placeholder="GridMonitor_Intelligence"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-mono text-zinc-500 uppercase">Impact level</label>
+                            <input
+                              value={block.content?.impactLevel ?? ''}
+                              onChange={(e) => updateBlockContent(block.id, { ...block.content, impactLevel: e.target.value })}
+                              className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300"
+                              placeholder="HIGH_VOLATILITY"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-mono text-zinc-500 uppercase">URL</label>
+                          <input
+                            value={block.content?.url ?? ''}
+                            onChange={(e) => updateBlockContent(block.id, { ...block.content, url: e.target.value })}
+                            className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300"
+                            placeholder="https://..."
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-mono text-zinc-500 uppercase">Nodal Architect Analysis</label>
+                          <textarea
+                            value={block.content?.nodalAnalysis ?? ''}
+                            onChange={(e) => updateBlockContent(block.id, { ...block.content, nodalAnalysis: e.target.value })}
+                            rows={2}
+                            className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300 resize-none"
+                            placeholder="Detected scarcity risk in {{contact.load_zone}}. Estimated variance: $0.12/kWh."
+                          />
+                          <button
+                            type="button"
+                            onClick={() => generateWithAi(block.id, 'MARKET_BREADCRUMB', block.content?.nodalAnalysis ?? '', 'nodalAnalysis')}
+                            disabled={generatingBlockId === block.id}
+                            className="text-[10px] font-mono uppercase tracking-widest text-[#002FA7] hover:underline disabled:opacity-50"
+                          >
+                            {generatingBlockId === block.id ? 'Generating…' : 'Generate with AI'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </motion.div>
                 ))}
               </AnimatePresence>
@@ -708,11 +993,11 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto bg-zinc-100 p-8 flex justify-center np-scroll">
-            <div className="w-full max-w-[600px] bg-white shadow-2xl min-h-full flex flex-col">
+          <div className="flex-1 overflow-y-auto bg-zinc-100 p-8 flex justify-center items-start np-scroll">
+            <div className="w-full max-w-[600px] bg-white shadow-2xl flex flex-col shrink-0">
               {previewHtml ? (
                 <div
-                  className="p-8 flex-1 transmission-preview"
+                  className="p-8 transmission-preview"
                   dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewHtml, { ALLOWED_TAGS: ['p', 'div', 'span', 'a', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'figure', 'img', 'figcaption', 'br'], ALLOWED_ATTR: ['href', 'src', 'alt', 'style', 'title'] }) }}
                 />
               ) : (
@@ -724,20 +1009,22 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
                     </div>
                     <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-tighter">REF: {new Date().toISOString().split('T')[0].replace(/-/g, '')} // TX_001</span>
                   </div>
-                  <div className="p-8 space-y-6 flex-1">
+                  <div className="p-8 space-y-6">
                     {blocks.map((block) => (
                       <div key={block.id}>
-                        {block.type === 'TEXT_MODULE' && (
-                          <p className="text-zinc-900 leading-relaxed font-sans whitespace-pre-wrap">
-                            {typeof block.content === 'string'
-                              ? block.content.split(/(\{\{[^}]+\}\})/g).map((part, i) =>
-                                  part.startsWith('{{') && part.endsWith('}}')
-                                    ? <span key={i} className="bg-amber-100 text-amber-800 px-0.5 rounded font-mono text-[10px]">{part}</span>
-                                    : part
-                                )
-                              : block.content}
-                          </p>
-                        )}
+                        {block.type === 'TEXT_MODULE' && (() => {
+                          const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content || ''), useAi: false, aiPrompt: '' }
+                          const text = contentObj.text || ''
+                          return (
+                            <p className="text-zinc-900 leading-relaxed font-sans whitespace-pre-wrap">
+                              {text.split(/(\{\{[^}]+\}\})/g).map((part: string, i: number) =>
+                                part.startsWith('{{') && part.endsWith('}}')
+                                  ? <span key={i} className="bg-amber-100 text-amber-800 px-0.5 rounded font-mono text-[10px]">{part}</span>
+                                  : part
+                              )}
+                            </p>
+                          )
+                        })()}
                         {block.type === 'TACTICAL_BUTTON' && (
                           <div className="pt-4 flex justify-center">
                             <button className="bg-[#002FA7] text-white px-6 py-3 font-mono font-bold text-xs uppercase tracking-widest rounded-sm shadow-lg shadow-[#002FA7]/20">
@@ -764,11 +1051,11 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
                                 {block.content.rows.map((row: string[], ri: number) => {
                                   const valueColors: ValueColor[] = block.content.valueColors ?? []
                                   const rowColor = valueColors[ri] ?? 'green'
-                                  const valueCellClass = rowColor === 'yellow' ? 'pl-2 border-l-4 border-l-amber-400' : rowColor === 'red' ? 'pl-2 border-l-4 border-l-red-500' : 'pl-2 border-l-4 border-l-emerald-500'
+                                  const valueTextClass = rowColor === 'yellow' ? 'text-amber-600' : rowColor === 'red' ? 'text-red-600' : 'text-emerald-600'
                                   return (
                                     <tr key={ri}>
                                       {row.map((cell: string, ci: number) => (
-                                        <td key={ci} className={ci === 1 ? `py-2 text-xs font-mono text-zinc-900 ${valueCellClass}` : 'py-2 text-xs font-mono text-zinc-900'}>{cell}</td>
+                                        <td key={ci} className={ci === 1 ? `py-2 text-xs font-mono ${valueTextClass}` : 'py-2 text-xs font-mono text-zinc-900'}>{cell}</td>
                                       ))}
                                     </tr>
                                   )
@@ -784,6 +1071,63 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
                               <figcaption className="text-[10px] font-mono text-zinc-500 mt-2">{block.content.caption}</figcaption>
                             )}
                           </figure>
+                        )}
+                        {block.type === 'LIABILITY_GAUGE' && (
+                          <div className="p-6 bg-zinc-100 border border-zinc-200 rounded-xl space-y-4">
+                            <div className="flex justify-between items-end">
+                              <div>
+                                <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">{block.content?.baselineLabel ?? 'CURRENT_FIXED_RATE'}</p>
+                                <p className="text-xl font-mono text-zinc-900 tabular-nums">${block.content?.baselineValue ?? '0.082'}/kWh</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-[10px] font-mono text-[#002FA7] uppercase tracking-widest">{block.content?.status ?? 'VOLATILE'}</p>
+                                <p className="text-xl font-mono text-zinc-900 tabular-nums">{block.content?.riskLevel ?? 75}%</p>
+                              </div>
+                            </div>
+                            <div className="h-2 w-full bg-zinc-300 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-[#002FA7] transition-all duration-1000"
+                                style={{ width: `${Math.min(100, Math.max(0, Number(block.content?.riskLevel) ?? 75))}%` }}
+                              />
+                            </div>
+                            {(block.content?.note ?? '').trim() && (
+                              <p className="text-[9px] font-mono text-zinc-600 leading-tight uppercase tracking-tighter">
+                                {block.content.note}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {block.type === 'MARKET_BREADCRUMB' && (
+                          <div className="border border-zinc-200 bg-white overflow-hidden shadow-sm">
+                            <div className="bg-zinc-50 px-4 py-2 border-b border-zinc-100 flex justify-between items-center">
+                              <span className="text-[9px] font-mono text-zinc-400 uppercase tracking-widest">
+                                Source: {block.content?.source ?? 'GridMonitor_Intelligence'}
+                              </span>
+                              <span className="text-[9px] font-mono text-[#002FA7] font-bold">
+                                [ {block.content?.impactLevel ?? 'HIGH_VOLATILITY'} ]
+                              </span>
+                            </div>
+                            <div className="p-4 space-y-3">
+                              <h4 className="text-sm font-bold text-zinc-900 leading-tight uppercase font-mono">
+                                {block.content?.headline ?? 'ERCOT_RESERVES_DROP_BELOW_3000MW'}
+                              </h4>
+                              {(block.content?.nodalAnalysis ?? '').trim() && (
+                                <div className="bg-zinc-900 p-3 rounded-sm border-l-4 border-[#002FA7]">
+                                  <p className="text-[10px] font-mono text-zinc-400 uppercase mb-1">
+                                    Nodal_Architect_Analysis:
+                                  </p>
+                                  <p className="text-xs text-white leading-relaxed font-sans italic">
+                                    "{block.content.nodalAnalysis}"
+                                  </p>
+                                </div>
+                              )}
+                              {block.content?.url && (
+                                <a href={block.content.url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-mono text-[#002FA7] underline uppercase tracking-tighter">
+                                  [ VIEW_FULL_TRANSMISSION ]
+                                </a>
+                              )}
+                            </div>
+                          </div>
                         )}
                       </div>
                     ))}

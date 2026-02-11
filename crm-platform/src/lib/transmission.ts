@@ -69,6 +69,7 @@ export function contactToVariableMap(contact: ContactVariableSource | null | und
     'contact.currentRate': fallback(contact.currentRate),
     'contact.contractEnd': fallback(contact.contractEnd),
     'contact.accountDescription': fallback(contact.accountDescription),
+    'contact.load_zone': fallback(meta?.energy?.loadZone as string),
   }
 
   const accountKeys: Record<string, string> = {
@@ -180,7 +181,9 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
 
   blocks.forEach((block: any) => {
     if (block.type === 'TEXT_MODULE') {
-      const escaped = String(block.content ?? '')
+      const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content ?? ''), useAi: false, aiPrompt: '' }
+      const text = contentObj.text || ''
+      const escaped = text
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
@@ -194,10 +197,10 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
       `
     } else if (block.type === 'TELEMETRY_GRID') {
       const valueColors: ('yellow' | 'green' | 'red')[] = block.content.valueColors ?? []
-      const valueColorBorder = (c: string) => {
-        if (c === 'yellow') return 'border-left: 4px solid #eab308; padding-left: 8px;'
-        if (c === 'red') return 'border-left: 4px solid #ef4444; padding-left: 8px;'
-        return 'border-left: 4px solid #22c55e; padding-left: 8px;'
+      const valueColorStyle = (c: string) => {
+        if (c === 'yellow') return 'color: #b45309;'
+        if (c === 'red') return 'color: #dc2626;'
+        return 'color: #059669;'
       }
       html += `
         <div style="background: #f4f4f5; border-radius: 6px; padding: 16px; margin-bottom: 20px; border: 1px solid #e4e4e7;">
@@ -210,12 +213,12 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
             <tbody>
               ${block.content.rows.map((row: string[], ri: number) => {
                 const rowColor = valueColors[ri] ?? 'green'
-                const valueStyle = valueColorBorder(rowColor)
+                const valueStyle = valueColorStyle(rowColor)
                 return `
                 <tr>
                   ${row.map((cell: string, ci: number) =>
                     ci === 1
-                      ? `<td style="padding: 8px 0; color: #18181b; ${valueStyle}">${escapeHtml(cell)}</td>`
+                      ? `<td style="padding: 8px 0; ${valueStyle}">${escapeHtml(cell)}</td>`
                       : `<td style="padding: 8px 0; color: #18181b;">${escapeHtml(cell)}</td>`
                   ).join('')}
                 </tr>
@@ -226,6 +229,32 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
       `
     } else if (block.type === 'VARIABLE_CHIP') {
       html += `<span style="font-family: monospace; font-size: 12px; color: #002FA7;">${block.content}</span>`
+    } else if (block.type === 'LIABILITY_GAUGE') {
+      const c = block.content || {}
+      const baselineLabel = escapeHtml(c.baselineLabel ?? 'CURRENT_FIXED_RATE')
+      // Use contact rate in HTML so when a contact is selected in live simulation, gauge shows their data
+      const baselineValue = '{{contact.currentRate}}'
+      const riskLevel = Math.min(100, Math.max(0, Number(c.riskLevel) ?? 75))
+      const status = escapeHtml(c.status ?? 'VOLATILE')
+      const note = (c.note != null && String(c.note).trim() !== '') ? String(c.note).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') : ''
+      html += `
+        <div style="background: #f4f4f5; border-radius: 8px; padding: 20px; margin-bottom: 20px; border: 1px solid #e4e4e7;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px;">
+            <div>
+              <p style="font-family: monospace; font-size: 10px; color: #71717a; text-transform: uppercase; letter-spacing: 0.1em; margin: 0 0 4px 0;">${baselineLabel}</p>
+              <p style="font-family: monospace; font-size: 20px; color: #18181b; margin: 0;">$${baselineValue}/kWh</p>
+            </div>
+            <div style="text-align: right;">
+              <p style="font-family: monospace; font-size: 10px; color: #002FA7; text-transform: uppercase; letter-spacing: 0.1em; margin: 0 0 4px 0;">${status}</p>
+              <p style="font-family: monospace; font-size: 20px; color: #18181b; margin: 0;">${riskLevel}%</p>
+            </div>
+          </div>
+          <div style="height: 8px; width: 100%; background: #d4d4d8; border-radius: 4px; overflow: hidden;">
+            <div style="height: 100%; width: ${riskLevel}%; background: #002FA7; transition: width 0.3s ease;"></div>
+          </div>
+          ${note ? `<p style="font-family: monospace; font-size: 9px; color: #52525b; line-height: 1.4; text-transform: uppercase; letter-spacing: 0.05em; margin: 12px 0 0 0;">${note}</p>` : ''}
+        </div>
+      `
     } else if (block.type === 'IMAGE_BLOCK') {
       const c = block.content as { url?: string; description?: string; caption?: string }
       const url = (c?.url && String(c.url).trim()) ? String(c.url).trim().replace(/"/g, '&quot;') : ''
@@ -237,6 +266,48 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
         if (cap) html += `<figcaption style="font-family: monospace; font-size: 10px; color: #71717a; margin-top: 8px;">${cap}</figcaption>`
         html += `</figure>`
       }
+    } else if (block.type === 'MARKET_BREADCRUMB') {
+      const c = block.content || {}
+      const headline = escapeHtml(c.headline ?? 'ERCOT_RESERVES_DROP_BELOW_3000MW')
+      const source = escapeHtml(c.source ?? 'GridMonitor_Intelligence')
+      const impactLevel = escapeHtml(c.impactLevel ?? 'HIGH_VOLATILITY')
+      const url = (c.url && String(c.url).trim()) ? String(c.url).trim().replace(/"/g, '&quot;') : ''
+      // nodalAnalysis supports variables like {{contact.load_zone}} - escape HTML but preserve {{...}} placeholders
+      const nodalAnalysis = (c.nodalAnalysis != null && String(c.nodalAnalysis).trim() !== '') 
+        ? String(c.nodalAnalysis).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+        : ''
+      html += `
+        <div style="border: 1px solid #e4e4e7; background: #ffffff; overflow: hidden; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <div style="background: #f4f4f5; padding: 8px 16px; border-bottom: 1px solid #e4e4e7; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-family: monospace; font-size: 9px; color: #71717a; text-transform: uppercase; letter-spacing: 0.1em;">
+              Source: ${source}
+            </span>
+            <span style="font-family: monospace; font-size: 9px; color: #002FA7; font-weight: bold;">
+              [ ${impactLevel} ]
+            </span>
+          </div>
+          <div style="padding: 16px; space-y: 12px;">
+            <h4 style="font-size: 14px; font-weight: bold; color: #18181b; line-height: 1.3; text-transform: uppercase; font-family: monospace; margin: 0 0 12px 0;">
+              ${headline}
+            </h4>
+            ${nodalAnalysis ? `
+            <div style="background: #18181b; padding: 12px; border-radius: 2px; border-left: 4px solid #002FA7; margin-bottom: 12px;">
+              <p style="font-family: monospace; font-size: 10px; color: #a1a1aa; text-transform: uppercase; margin: 0 0 4px 0;">
+                Nodal_Architect_Analysis:
+              </p>
+              <p style="font-size: 12px; color: #ffffff; line-height: 1.5; font-style: italic; margin: 0;">
+                "${nodalAnalysis}"
+              </p>
+            </div>
+            ` : ''}
+            ${url ? `
+            <a href="${url}" style="font-family: monospace; font-size: 10px; color: #002FA7; text-decoration: underline; text-transform: uppercase; letter-spacing: 0.05em;">
+              [ VIEW_FULL_TRANSMISSION ]
+            </a>
+            ` : ''}
+          </div>
+        </div>
+      `
     }
   })
 
