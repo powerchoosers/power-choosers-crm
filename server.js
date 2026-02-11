@@ -121,6 +121,7 @@ import analyzeBillHandler from './api/analyze-bill.js';
 import analyzeDocumentHandler from './api/analyze-document.js';
 import generateCallScriptHandler from './api/ai/generate-call-script.js';
 import foundryGenerateTextHandler from './api/foundry/generate-text.js';
+import foundryAssetsHandler from './api/foundry/assets.js';
 import postsListHandler from './api/posts/list.js';
 import sitemapHandler from './api/sitemap.js';
 import algoliaReindexHandler from './api/algolia/reindex.js';
@@ -1004,6 +1005,9 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/foundry/generate-text') {
     return handleApiFoundryGenerateText(req, res);
   }
+  if (pathname === '/api/foundry/assets') {
+    return handleApiFoundryAssets(req, res);
+  }
   if (pathname === '/api/posts/generate-static') {
     return handleApiGenerateStaticPost(req, res);
   }
@@ -1546,6 +1550,21 @@ async function handleApiFoundryGenerateText(req, res) {
     return await foundryGenerateTextHandler(req, res);
   } catch (error) {
     console.error('[Server] Error in foundry generate-text handler wrapper:', error);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Server error', details: error.message }));
+    }
+  }
+}
+
+async function handleApiFoundryAssets(req, res) {
+  try {
+    if (req.method === 'POST') {
+      req.body = await parseRequestBody(req);
+    }
+    return await foundryAssetsHandler(req, res);
+  } catch (error) {
+    console.error('[Server] Error in foundry assets handler wrapper:', error);
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Server error', details: error.message }));

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, UploadCloud, Check, AlertCircle, ArrowRight, Loader2 } from 'lucide-react'
@@ -15,6 +16,7 @@ type ExtractedData = {
 }
 
 export default function BillDebuggerPage() {
+  const router = useRouter()
   const [view, setView] = useState<'upload' | 'console' | 'analyzing' | 'email' | 'success' | 'error'>('upload')
   const [footerText, setFooterText] = useState('Waiting for input stream...')
   const [isProcessing, setIsProcessing] = useState(false)
@@ -141,9 +143,13 @@ export default function BillDebuggerPage() {
         }}></div>
 
         {/* Exit Button */}
-        <Link href="/" className="absolute top-4 right-4 md:top-6 md:right-8 z-50 p-2 text-zinc-400 hover:text-zinc-800 transition-colors duration-200">
+        <button 
+            onClick={() => router.back()} 
+            className="absolute top-4 right-4 md:top-6 md:right-8 z-50 p-2 text-zinc-400 hover:text-zinc-800 transition-colors duration-200 cursor-pointer"
+            aria-label="Go back"
+        >
             <X className="w-8 h-8" />
-        </Link>
+        </button>
 
         {/* Main Content Container */}
         <main className="relative z-10 flex-1 flex flex-col items-center justify-center w-full max-w-4xl mx-auto px-6 py-20 md:py-0">
