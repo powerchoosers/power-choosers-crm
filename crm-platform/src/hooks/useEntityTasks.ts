@@ -20,7 +20,7 @@ export function useEntityTasks(entityId: string | undefined, entityName?: string
       const matchesRelatedId = t.relatedTo === entityId
       return matchesId || matchesName || matchesRelatedId
     })
-    return forEntity.filter((t: Task) => t.status !== 'Completed')
+    return forEntity.filter((t: Task) => (t.status ?? 'Pending') !== 'Completed')
   }, [tasksData, entityId, entityName])
 
   return { pendingTasks, totalCount: pendingTasks.length }
