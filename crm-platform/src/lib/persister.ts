@@ -10,7 +10,9 @@ export function createIDBPersister(idbValidKey: IDBValidKey = 'reactQuery'): Per
     persistClient: async (client: PersistedClient) => {
       try {
         await set(idbValidKey, client)
-      } catch (error) {
+      } catch (error: unknown) {
+        // DataCloneError when client contains non-clonable values (e.g. Promise); skip persist
+        if (error instanceof Error && error.name === 'DataCloneError') return
         console.error('Error persisting query client:', error)
       }
     },
