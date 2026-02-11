@@ -192,6 +192,12 @@ export function generateStaticHtml(blocks: any[]) {
         </div>
       `
     } else if (block.type === 'TELEMETRY_GRID') {
+      const valueColors: ('yellow' | 'green' | 'red')[] = block.content.valueColors ?? []
+      const valueColorBorder = (c: string) => {
+        if (c === 'yellow') return 'border-left: 4px solid #eab308; padding-left: 8px;'
+        if (c === 'red') return 'border-left: 4px solid #ef4444; padding-left: 8px;'
+        return 'border-left: 4px solid #22c55e; padding-left: 8px;'
+      }
       html += `
         <div style="background: #f4f4f5; border-radius: 6px; padding: 16px; margin-bottom: 20px; border: 1px solid #e4e4e7;">
           <table style="width: 100%; border-collapse: collapse; font-family: monospace; font-size: 12px;">
@@ -201,11 +207,18 @@ export function generateStaticHtml(blocks: any[]) {
               </tr>
             </thead>
             <tbody>
-              ${block.content.rows.map((row: string[]) => `
+              ${block.content.rows.map((row: string[], ri: number) => {
+                const rowColor = valueColors[ri] ?? 'green'
+                const valueStyle = valueColorBorder(rowColor)
+                return `
                 <tr>
-                  ${row.map((cell: string) => `<td style="padding: 8px 0; color: #18181b;">${cell}</td>`).join('')}
+                  ${row.map((cell: string, ci: number) =>
+                    ci === 1
+                      ? `<td style="padding: 8px 0; color: #18181b; ${valueStyle}">${escapeHtml(cell)}</td>`
+                      : `<td style="padding: 8px 0; color: #18181b;">${escapeHtml(cell)}</td>`
+                  ).join('')}
                 </tr>
-              `).join('')}
+              `}).join('')}
             </tbody>
           </table>
         </div>
