@@ -147,7 +147,29 @@ if (filename !== undefined && filename !== '' && attachmentId) {
 
 ---
 
-## 9. Optional: pre-commit or CI typecheck
+## 9. Literal arrays vs tuples: use `as const` when the API expects a tuple
+
+**Problem:** “Type 'number[]' is not assignable to type 'Easing'” (or similar) when you pass an array literal like `[0.32, 0.72, 0, 1]` into a third-party API that expects a **tuple** (e.g. a cubic-bezier easing). TypeScript infers the literal as `number[]`, which is not assignable to a tuple type like `[number, number, number, number]`.
+
+**Practice (from TypeScript literal types and inference):**
+
+- **Inference:** An array literal `[a, b, c, d]` is inferred as `number[]` unless you widen or narrow it. Many libraries (e.g. Framer Motion’s `transition.ease`) expect a cubic-bezier **tuple** of exactly four numbers, typed as `[number, number, number, number]` or `Easing`.
+- **Fix:** Use **`as const`** on the array literal so TypeScript infers a **readonly tuple** (e.g. `readonly [0.32, 0.72, 0, 1]`), which is assignable to tuple/Easing types.
+- **Where this shows up:** Framer Motion `transition: { duration: 0.4, ease: [0.32, 0.72, 0, 1] }` → use `ease: [0.32, 0.72, 0, 1] as const`. Same for any config object passed to animation or chart libraries that expect fixed-length number arrays.
+
+**Example:**
+
+```ts
+// BAD — inferred as number[]; "Type 'number[]' is not assignable to type 'Easing'"
+const exitTransition = { duration: 0.4, ease: [0.32, 0.72, 0, 1] };
+
+// GOOD — inferred as readonly tuple; matches Framer Motion Easing
+const exitTransition = { duration: 0.4, ease: [0.32, 0.72, 0, 1] as const };
+```
+
+---
+
+## 10. Optional: pre-commit or CI typecheck
 
 **Practice:**
 
@@ -168,6 +190,7 @@ if (filename !== undefined && filename !== '' && attachmentId) {
 | Hook order            | Declare callbacks/hooks before any hook that lists them in deps. | [Rules of Hooks](https://react.dev/reference/rules/rules-of-hooks) |
 | New fields            | Update TypeScript types and mapping schemas when adding/using new fields. | Structural typing, project BulkImport rules |
 | Strict mode           | Keep `strict: true`; fix types instead of relaxing options. | [TSConfig strict](https://www.typescriptlang.org/tsconfig/strict) |
+| Literal array → tuple | Use `as const` on array literals when the API expects a tuple (e.g. Framer Motion `ease`). | §9 |
 | Next.js               | Don’t use `ignoreBuildErrors` without another type-check step. | [Next.js TypeScript](https://nextjs.org/docs/app/building-your-application/configuring/typescript) |
 
 ---
@@ -184,6 +207,7 @@ if (filename !== undefined && filename !== '' && attachmentId) {
 | useContacts: `companyPhone` on `ContactRow` | Add `companyPhone` to `ContactRow` type and mapping | §6 |
 | Protocol builder: `firstName` on Firebase `User` | Use AuthContext `profile?.firstName`; Firebase `User` has no `firstName` | §6 |
 | useGmailSync: `part.filename` / `part.body.attachmentId` in object literal | Assign to variables, then guard (`if (x !== undefined && attachmentId)`), then use variables in the object; do not use optional props directly where `string` is required | §3 |
+| Framer Motion `ease: [0.32, 0.72, 0, 1]` → “Type 'number[]' is not assignable to type 'Easing'” | Use `ease: [0.32, 0.72, 0, 1] as const` so the literal is inferred as a tuple | §9 |
 
 ---
 
