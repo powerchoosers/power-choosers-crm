@@ -30,7 +30,7 @@ function isPlainObject(v) {
 export default async function handler(req, res) {
   if (cors(req, res)) return;
 
-  if (req.method !== 'POST') {
+  if (req.method !== 'GET' && req.method !== 'POST') {
     res.writeHead(405, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Method not allowed' }));
     return;
@@ -47,6 +47,36 @@ export default async function handler(req, res) {
     if (!email) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Unauthorized' }));
+      return;
+    }
+
+    // GET: fetch single asset by id (bypasses RLS via supabaseAdmin)
+    if (req.method === 'GET') {
+      const url = new URL(req.url || '', `http://${req.headers?.host || 'localhost'}`);
+      const id = (url.searchParams.get('id') || '').trim();
+      if (!id) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Missing id' }));
+        return;
+      }
+      const { data, error } = await supabaseAdmin
+        .from('transmission_assets')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (error) {
+        logger.error('[Foundry Assets] GET Supabase error', 'Server', { message: error.message });
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Not found', details: error.message }));
+        return;
+      }
+      if (!data) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Asset not found' }));
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ asset: data }));
       return;
     }
 

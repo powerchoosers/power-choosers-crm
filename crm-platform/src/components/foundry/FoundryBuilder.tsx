@@ -31,11 +31,11 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { supabase } from '@/lib/supabase'
 import { generateStaticHtml, substituteVariables, contactToVariableMap } from '@/lib/foundry'
 import { CONTACT_VARIABLES, ACCOUNT_VARIABLES, extractVariableKeysFromText } from '@/lib/foundry-variables'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/context/AuthContext'
 import { useContacts, useContact } from '@/hooks/useContacts'
 import {
@@ -80,6 +80,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
   const [variablePopoverOpen, setVariablePopoverOpen] = useState<string | null>(null)
   const textModuleTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const router = useRouter()
+  const queryClient = useQueryClient()
   const { user, profile } = useAuth()
 
   const insertVariableIntoText = (blockId: string, key: string, currentText: string) => {
@@ -135,61 +136,65 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewContactId, previewContact])
 
+  const applyAssetData = (data: { name?: string; type?: string; content_json?: { blocks?: any[] } }) => {
+    setAssetName(data.name || 'Untitled Asset')
+    setAssetType((data.type as 'market_signal' | 'invoice_req' | 'educational') || 'market_signal')
+    const rawBlocks = data.content_json?.blocks || []
+    if (!Array.isArray(rawBlocks)) {
+      setBlocks([])
+      return
+    }
+    const blocks = rawBlocks.map((block: any) => {
+      if (!block || typeof block !== 'object') return block
+      if (block.type === 'TEXT_MODULE' && typeof block.content === 'string') {
+        return {
+          ...block,
+          content: { text: block.content || '', useAi: false, aiPrompt: '' }
+        }
+      }
+      return block
+    })
+    setBlocks(blocks)
+  }
+
   const fetchAsset = async (id: string) => {
     try {
-      const { data, error } = await supabase
-        .from('transmission_assets')
-        .select('*')
-        .eq('id', id)
-        .single()
-      
-      if (error) {
-        console.error('Error fetching asset:', error)
-        toast.error('Failed to load asset')
+      // Use cached asset from sessionStorage if we just created it (avoids failed refetch due to RLS/replication)
+      const cacheKey = `foundry_asset_${id}`
+      if (typeof window !== 'undefined') {
+        const cached = sessionStorage.getItem(cacheKey)
+        if (cached) {
+          try {
+            const data = JSON.parse(cached)
+            sessionStorage.removeItem(cacheKey)
+            applyAssetData(data)
+            return
+          } catch (_) {
+            sessionStorage.removeItem(cacheKey)
+          }
+        }
+      }
+
+      // Use API so we bypass RLS (backend uses supabaseAdmin)
+      const idToken = await (user as any)?.getIdToken?.().catch(() => null)
+      const res = await fetch(`/api/foundry/assets?id=${encodeURIComponent(id)}`, {
+        method: 'GET',
+        headers: {
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        console.error('Error fetching asset:', json?.error || res.status, json?.details)
+        toast.error(json?.error || 'Failed to load asset')
         return
       }
-      
+      const data = json?.asset
       if (!data) {
-        console.error('No data returned from fetchAsset')
         toast.error('Asset not found')
         return
       }
-      
-      setAssetName(data.name || 'Untitled Asset')
-      setAssetType(data.type || 'market_signal')
-      
-      // Migrate old TEXT_MODULE blocks from string to object format
-      try {
-        const rawBlocks = data.content_json?.blocks || []
-        if (!Array.isArray(rawBlocks)) {
-          console.warn('blocks is not an array, initializing empty array')
-          setBlocks([])
-          return
-        }
-        
-        const blocks = rawBlocks.map((block: any) => {
-          if (!block || typeof block !== 'object') {
-            console.warn('Invalid block found:', block)
-            return block
-          }
-          if (block.type === 'TEXT_MODULE' && typeof block.content === 'string') {
-            return {
-              ...block,
-              content: {
-                text: block.content || '',
-                useAi: false,
-                aiPrompt: ''
-              }
-            }
-          }
-          return block
-        })
-        setBlocks(blocks)
-      } catch (err) {
-        console.error('Error migrating blocks:', err)
-        // Fallback to original blocks if migration fails
-        setBlocks(data.content_json?.blocks || [])
-      }
+      applyAssetData(data)
     } catch (err) {
       console.error('Unexpected error in fetchAsset:', err)
       toast.error('Failed to load asset')
@@ -246,9 +251,16 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
 
       if (assetId && assetId !== 'new') {
         toast.success('Asset updated in Foundry')
+        queryClient.invalidateQueries({ queryKey: ['transmission_assets'] })
       } else {
         const newId = data?.asset?.id
+        const asset = data?.asset
         if (typeof newId === 'string' && newId.trim()) {
+          // Cache so the next page load uses it (avoids "Failed to load asset" when RLS or replication delays)
+          if (typeof window !== 'undefined' && asset) {
+            sessionStorage.setItem(`foundry_asset_${newId}`, JSON.stringify(asset))
+          }
+          queryClient.invalidateQueries({ queryKey: ['transmission_assets'] })
           toast.success('Asset forged in Foundry')
           router.push(`/network/foundry/${newId}`)
         } else {

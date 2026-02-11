@@ -31,6 +31,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         dehydrateOptions: {
           shouldDehydrateMutation: () => false,
           shouldDehydrateQuery: (query) => {
+            // Don't persist in-flight queries (they can contain Promises and cause DataCloneError)
+            if (query.state.fetchStatus === 'fetching') return false
             const key0 = Array.isArray(query.queryKey) ? query.queryKey[0] : undefined
             if (typeof key0 !== 'string') return false
             return [
