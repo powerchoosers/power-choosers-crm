@@ -163,7 +163,8 @@ export async function compileTransmission(assetId: string, contactData: any) {
   return html
 }
 
-export function generateStaticHtml(blocks: any[]) {
+export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boolean }) {
+  const skipFooter = options?.skipFooter === true
   // This would be used in the builder to generate the final HTML string
   // for storage in transmission_assets.compiled_html
   let html = `
@@ -239,13 +240,15 @@ export function generateStaticHtml(blocks: any[]) {
     }
   })
 
-  html += `
+  if (!skipFooter) {
+    html += `
       <div style="margin-top: 40px; border-top: 1px solid #f4f4f5; padding-top: 20px; font-family: sans-serif;">
         <div style="font-weight: bold; color: #18181b;">Lewis Patterson</div>
         <div style="color: #71717a; font-size: 12px;">Director of Energy Architecture</div>
       </div>
-    </div>
-  `
+    `
+  }
+  html += `</div>`
 
   return html
 }
