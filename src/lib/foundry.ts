@@ -232,8 +232,6 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
     } else if (block.type === 'LIABILITY_GAUGE') {
       const c = block.content || {}
       const baselineLabel = escapeHtml(c.baselineLabel ?? 'CURRENT_FIXED_RATE')
-      // Use contact rate in HTML so when a contact is selected in live simulation, gauge shows their data
-      const baselineValue = '{{contact.currentRate}}'
       const riskLevel = Math.min(100, Math.max(0, Number(c.riskLevel) ?? 75))
       const status = escapeHtml(c.status ?? 'VOLATILE')
       const note = (c.note != null && String(c.note).trim() !== '') ? String(c.note).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') : ''
@@ -242,7 +240,7 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
           <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px;">
             <div>
               <p style="font-family: monospace; font-size: 10px; color: #71717a; text-transform: uppercase; letter-spacing: 0.1em; margin: 0 0 4px 0;">${baselineLabel}</p>
-              <p style="font-family: monospace; font-size: 20px; color: #18181b; margin: 0;">$${baselineValue}/kWh</p>
+              <p style="font-family: monospace; font-size: 20px; color: #18181b; margin: 0;">${'$'}{{contact.currentRate}}/kWh</p>
             </div>
             <div style="text-align: right;">
               <p style="font-family: monospace; font-size: 10px; color: #002FA7; text-transform: uppercase; letter-spacing: 0.1em; margin: 0 0 4px 0;">${status}</p>
