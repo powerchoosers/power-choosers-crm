@@ -32,8 +32,8 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { supabase } from '@/lib/supabase'
-import { generateStaticHtml, substituteVariables, contactToVariableMap } from '@/lib/transmission'
-import { CONTACT_VARIABLES, ACCOUNT_VARIABLES, extractVariableKeysFromText } from '@/lib/transmission-variables'
+import { generateStaticHtml, substituteVariables, contactToVariableMap } from '@/lib/foundry'
+import { CONTACT_VARIABLES, ACCOUNT_VARIABLES, extractVariableKeysFromText } from '@/lib/foundry-variables'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
@@ -66,7 +66,7 @@ interface Block {
   content: any
 }
 
-export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
+export default function FoundryBuilder({ assetId }: { assetId?: string }) {
   const [blocks, setBlocks] = useState<Block[]>([])
   const [activeBlock, setActiveBlock] = useState<string | null>(null)
   const [splitPosition, setSplitPosition] = useState(50)
@@ -191,7 +191,7 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
           .single()
         if (error) throw error
         toast.success('Asset forged in Foundry')
-        router.push(`/network/transmission/${data.id}`)
+        router.push(`/network/foundry/${data.id}`)
       }
     } catch (err: any) {
       toast.error(`Forge failure: ${err.message}`)
@@ -279,16 +279,16 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
             contextParts.push(`Block ${idx + 1}: Market intel "${b.content?.headline || ''}"`)
           }
         })
-        const transmissionContext = contextParts.length > 0 ? `\n\nOther blocks in this transmission:\n${contextParts.join('\n')}` : ''
+        const foundryContext = contextParts.length > 0 ? `\n\nOther blocks in this foundry asset:\n${contextParts.join('\n')}` : ''
         
         const contactInfo = previewContact
           ? `\n\nContact: ${(previewContact as { firstName?: string })?.firstName || '—'} ${(previewContact as { lastName?: string })?.lastName || ''}, Company: ${(previewContact as { companyName?: string })?.companyName || '—'}, Current rate: ${(previewContact as { currentRate?: string })?.currentRate || '—'}/kWh`
           : ''
         
         if (isFirstBlock) {
-          prompt = `You are writing the introduction paragraph for an energy intelligence email. Start with "{contact.firstName}," followed by 3-4 sentences.${userPrompt ? `\n\nUser instruction: ${userPrompt}` : ''}\n\nWrite in Nodal Point's forensic, intelligence-brief style. No marketing fluff.${transmissionContext}${contactInfo}`
+          prompt = `You are writing the introduction paragraph for an energy intelligence email. Start with "{contact.firstName}," followed by 3-4 sentences.${userPrompt ? `\n\nUser instruction: ${userPrompt}` : ''}\n\nWrite in Nodal Point's forensic, intelligence-brief style. No marketing fluff.${foundryContext}${contactInfo}`
         } else {
-          prompt = `You are writing a body paragraph for an energy intelligence email. Use the contact's first name naturally within the paragraph.${userPrompt ? `\n\nUser instruction: ${userPrompt}` : ''}\n\nWrite in Nodal Point's forensic, intelligence-brief style. No marketing fluff.${transmissionContext}${contactInfo}`
+          prompt = `You are writing a body paragraph for an energy intelligence email. Use the contact's first name naturally within the paragraph.${userPrompt ? `\n\nUser instruction: ${userPrompt}` : ''}\n\nWrite in Nodal Point's forensic, intelligence-brief style. No marketing fluff.${foundryContext}${contactInfo}`
         }
         blockTypeParam = 'narrative'
         contextText = typeof currentContent === 'string' ? currentContent : (currentContent?.text || '')
@@ -315,7 +315,7 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
         blockTypeParam = 'narrative'
         contextText = typeof currentContent === 'string' ? currentContent : String(currentContent)
       }
-      const res = await fetch('/api/transmission/generate-text', {
+      const res = await fetch('/api/foundry/generate-text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -558,7 +558,12 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
                               checked={useAi}
                               onCheckedChange={(checked) => {
                                 const currentContent = typeof block.content === 'object' ? block.content : { text: String(block.content || ''), useAi: false, aiPrompt: '' }
-                                updateBlockContent(block.id, { ...currentContent, useAi: checked })
+                                // When turning AI on, clear the text so placeholder shows in preview
+                                if (checked) {
+                                  updateBlockContent(block.id, { ...currentContent, useAi: true, text: '' })
+                                } else {
+                                  updateBlockContent(block.id, { ...currentContent, useAi: false })
+                                }
                               }}
                             />
                             <Label className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 cursor-pointer">
@@ -997,7 +1002,7 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
             <div className="w-full max-w-[600px] bg-white shadow-2xl flex flex-col shrink-0">
               {previewHtml ? (
                 <div
-                  className="p-8 transmission-preview"
+                  className="p-8 foundry-preview"
                   dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewHtml, { ALLOWED_TAGS: ['p', 'div', 'span', 'a', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'figure', 'img', 'figcaption', 'br'], ALLOWED_ATTR: ['href', 'src', 'alt', 'style', 'title'] }) }}
                 />
               ) : (
@@ -1015,6 +1020,25 @@ export default function TransmissionBuilder({ assetId }: { assetId?: string }) {
                         {block.type === 'TEXT_MODULE' && (() => {
                           const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content || ''), useAi: false, aiPrompt: '' }
                           const text = contentObj.text || ''
+                          const useAi = contentObj.useAi ?? false
+                          const hasText = text.trim().length > 0
+                          
+                          // Show placeholder when AI is enabled but no text generated yet
+                          if (useAi && !hasText) {
+                            return (
+                              <div className="border-2 border-dashed border-zinc-300 rounded-lg p-8 bg-zinc-50">
+                                <div className="text-center">
+                                  <p className="text-zinc-400 text-sm font-mono uppercase tracking-widest">
+                                    AI Generated Content Placeholder
+                                  </p>
+                                  <p className="text-zinc-300 text-xs font-mono mt-2">
+                                    Text will appear here when a contact is selected
+                                  </p>
+                                </div>
+                              </div>
+                            )
+                          }
+                          
                           return (
                             <p className="text-zinc-900 leading-relaxed font-sans whitespace-pre-wrap">
                               {text.split(/(\{\{[^}]+\}\})/g).map((part: string, i: number) =>
