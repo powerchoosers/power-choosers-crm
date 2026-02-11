@@ -1,22 +1,37 @@
 import { UserProfile } from "@/context/AuthContext"
 import { User } from "firebase/auth"
 
+function esc(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
 export function generateNodalSignature(profile: UserProfile, user: User | null, isDarkMode: boolean = false): string {
-  const name = profile.name || user?.displayName || 'Nodal Point Team'
+  // Name: first + last from profile, else profile.name, else displayName
+  const nameParts = [profile.firstName, profile.lastName].filter(Boolean).join(' ')
+  const name = nameParts || profile.name || user?.displayName || 'Nodal Point Team'
   const jobTitle = profile.jobTitle || 'Market Architect'
   const email = profile.email || user?.email || 'contact@nodalpoint.io'
   const linkedinUrl = profile.linkedinUrl || 'https://linkedin.com/company/nodal-point'
-  const avatarUrl = user?.photoURL || ''
-  
+  // Use hosted avatar (from host-google-avatar) for email reliability, fallback to Firebase photoURL
+  const avatarUrl = profile.hostedPhotoUrl || user?.photoURL || ''
+
   // Theme-aware colors
   const textColor = isDarkMode ? '#e4e4e7' : '#18181b' // zinc-200 vs zinc-900
   const subTextColor = isDarkMode ? '#a1a1aa' : '#52525b' // zinc-400 vs zinc-600
   const secondaryTextColor = isDarkMode ? '#71717a' : '#3f3f46' // zinc-500 vs zinc-800
   const borderColor = isDarkMode ? 'rgba(255,255,255,0.1)' : '#e4e4e7'
-  
-  // Use the selected phone number if available, otherwise the first twilio number, otherwise a fallback
-  const phone = profile.selectedPhoneNumber || 
-                (profile.twilioNumbers && profile.twilioNumbers.length > 0 ? profile.twilioNumbers[0].number : '+1 (817) 809-3367')
+
+  // Phone: selected number for calls (from Settings)
+  const phone = profile.selectedPhoneNumber ||
+    (profile.twilioNumbers && profile.twilioNumbers.length > 0 ? profile.twilioNumbers[0].number : '+1 (817) 809-3367')
+
+  const city = profile.city || ''
+  const state = profile.state || ''
+  const locationLine = [city, state].filter(Boolean).join(', ')
 
   return `
 <table cellpadding="0" cellspacing="0" style="font-family: Helvetica, Arial, sans-serif; font-size: 14px; width: 100%; max-width: 600px; border-collapse: collapse;">
@@ -30,32 +45,33 @@ export function generateNodalSignature(profile: UserProfile, user: User | null, 
     <!-- THE INTEL BLOCK -->
     <td style="vertical-align: top;">
       
-      <!-- IDENTITY VECTOR -->
+      <!-- IDENTITY VECTOR (avatar left of name/title) -->
       <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 12px;">
         ${avatarUrl ? `
-        <img src="${avatarUrl}" alt="${name}" style="width: 40px; height: 40px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 2px 10px -2px rgba(0,0,0,0.6);" />
+        <img src="${esc(avatarUrl)}" alt="${esc(name)}" style="width: 40px; height: 40px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 2px 10px -2px rgba(0,0,0,0.6);" />
         ` : ''}
         <div>
           <span style="font-weight: 700; letter-spacing: -0.5px; font-size: 16px; color: ${textColor}; display: block;">
-            ${name}
+            ${esc(name)}
           </span>
           <span style="font-family: 'Courier New', Courier, monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: ${subTextColor}; display: block; margin-top: 4px;">
-            ${jobTitle}
+            ${esc(jobTitle)}
           </span>
         </div>
       </div>
 
-      <!-- TELEMETRY (Contact Info) -->
+      <!-- TELEMETRY (Contact Info: email, phone, city/state) -->
       <div style="margin-bottom: 16px; font-size: 12px; line-height: 1.6; color: ${secondaryTextColor};">
-        <span style="font-family: 'Courier New', Courier, monospace;">E:</span> ${email} <br>
-        <span style="font-family: 'Courier New', Courier, monospace;">P:</span> ${phone}
+        <span style="font-family: 'Courier New', Courier, monospace;">E:</span> ${esc(email)} <br>
+        <span style="font-family: 'Courier New', Courier, monospace;">P:</span> ${esc(phone)}
+        ${locationLine ? ` <br><span style="font-family: 'Courier New', Courier, monospace;">${esc(locationLine)}</span>` : ''}
       </div>
 
       <!-- COMMAND DECK (Links) -->
       <div style="font-size: 11px; font-family: 'Courier New', Courier, monospace; letter-spacing: 0.5px;">
         
         <!-- LINKEDIN -->
-        <a href="${linkedinUrl}" style="color: #002FA7; text-decoration: none; font-weight: 700;">
+        <a href="${esc(linkedinUrl)}" style="color: #002FA7; text-decoration: none; font-weight: 700;">
           LINKEDIN
         </a>
         
