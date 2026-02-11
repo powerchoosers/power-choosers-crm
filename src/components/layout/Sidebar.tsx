@@ -57,9 +57,9 @@ const navigationStructure = [
     ]
   },
 
-  // ZONE 4: FOUNDRY (The Live Channels)
+  // ZONE 4: TRANSMISSIONS (The Live Channels)
   {
-    group: "Foundry",
+    group: "Transmissions",
     items: [
       { name: 'Foundry', href: '/network/foundry', icon: Zap },
       { name: 'Emails', href: '/network/emails', icon: Mail },
