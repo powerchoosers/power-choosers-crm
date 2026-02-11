@@ -18,6 +18,11 @@ export interface ForensicDataPointProps {
   inline?: boolean
   /** Children to render instead of value (e.g. Link); copyValue still used for clipboard */
   children?: React.ReactNode
+  /**
+   * Compact mode for header names: no gap; copy icon slot expands on hover so
+   * siblings (e.g. website/LinkedIn buttons) slide right to make room.
+   */
+  compact?: boolean
 }
 
 const COPIED_DURATION_MS = 2000
@@ -33,14 +38,15 @@ export function ForensicDataPoint({
   className,
   valueClassName,
   inline = false,
-  children
+  children,
+  compact = false
 }: ForensicDataPointProps) {
   const [copied, setCopied] = useState(false)
   const toCopy = copyValue !== undefined && copyValue !== '' ? copyValue : value
   const isEmpty = !toCopy.trim()
 
   const handleCopy = useCallback(
-    (e: React.MouseEvent) => {
+    (e: React.MouseEvent | React.KeyboardEvent) => {
       e.preventDefault()
       e.stopPropagation()
       if (isEmpty) return
@@ -55,34 +61,61 @@ export function ForensicDataPoint({
     [toCopy, isEmpty]
   )
 
+  const handleCopyKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        handleCopy(e)
+      }
+    },
+    [handleCopy]
+  )
+
   const Wrapper = inline ? 'span' : 'div'
+  const copyControl = !isEmpty ? (
+    <span
+      role="button"
+      tabIndex={0}
+      onClick={handleCopy}
+      onKeyDown={handleCopyKeyDown}
+      className={cn(
+        'cursor-pointer p-0.5 rounded text-zinc-500 hover:text-white focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50',
+        compact
+          ? 'absolute right-0 top-1/2 -translate-y-1/2 transition-opacity duration-200 opacity-0 group-hover/dp:opacity-100 focus:opacity-100'
+          : 'shrink-0 transition-opacity duration-200 opacity-0 group-hover/dp:opacity-100 focus:opacity-100'
+      )}
+      title="Copy"
+      aria-label="Copy"
+    >
+      {copied ? (
+        <Check size={14} className="text-emerald-500" />
+      ) : (
+        <Copy size={14} />
+      )}
+    </span>
+  ) : null
+
   return (
     <Wrapper
-      className={cn('group/dp relative flex items-center gap-2 w-full min-w-0', inline && 'inline-flex', className)}
+      className={cn(
+        'group/dp relative flex items-center gap-2',
+        compact ? 'w-max max-w-full shrink-0' : 'w-full min-w-0',
+        inline && 'inline-flex',
+        className
+      )}
     >
       {label && (
         <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest shrink-0">{label}</span>
       )}
-      <span className={cn('min-w-0 truncate', valueClassName)}>
+      <span className={cn(compact ? 'shrink-0' : 'min-w-0 truncate', valueClassName)}>
         {children !== undefined ? children : value || '—'}
       </span>
-      {!isEmpty && (
-        <button
-          type="button"
-          onClick={handleCopy}
-          className={cn(
-            'shrink-0 p-0.5 rounded transition-opacity duration-200 text-zinc-500 hover:text-white',
-            'opacity-0 group-hover/dp:opacity-100 focus:opacity-100 focus:outline-none'
-          )}
-          title="Copy"
-          aria-label="Copy"
-        >
-          {copied ? (
-            <Check size={14} className="text-emerald-500" />
-          ) : (
-            <Copy size={14} />
-          )}
-        </button>
+      {compact ? (
+        <span className="relative flex min-h-6 w-0 shrink-0 self-stretch items-center overflow-hidden transition-[width] duration-200 ease-out group-hover/dp:w-6">
+          {copyControl}
+        </span>
+      ) : (
+        copyControl
       )}
     </Wrapper>
   )

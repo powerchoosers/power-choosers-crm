@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { differenceInCalendarDays, format, isValid, parseISO, formatDistanceToNow } from 'date-fns'
 import { 
   Activity, AlertTriangle, ArrowLeft, Clock, Globe, Linkedin, Mail, MapPin, Phone, 
-  Lock, Unlock, Check, Sparkles, Plus, Star, Trash2,
+  Lock, Unlock, Check, Sparkles, Plus, Star, Trash2, Copy,
   Building2, CheckCircle, Play, DollarSign, Mic, History, RefreshCw, X,
   ArrowRightLeft, ChevronLeft, ChevronRight
 } from 'lucide-react'
@@ -74,7 +74,7 @@ export default function ContactDossierPage() {
     }
   })()
   const { data: apolloNewsSignals } = useApolloNews(domain)
-  const { data: recentCalls, isLoading: isLoadingCalls } = useContactCalls(id, account?.companyPhone)
+  const { data: recentCalls, isLoading: isLoadingCalls } = useContactCalls(id, account?.companyPhone, account?.id)
   const updateContact = useUpdateContact()
   const { isEditing, setIsEditing, toggleEditing } = useUIStore()
   const setContext = useGeminiStore((state) => state.setContext)
@@ -131,8 +131,9 @@ export default function ContactDossierPage() {
   const hasTasks = pendingTasks.length > 0
   const displayTaskIndex = Math.min(currentTaskIndex, Math.max(0, pendingTasks.length - 1))
   const currentTask = pendingTasks[displayTaskIndex]
-  const globalIndex = currentTask ? allPendingTasks.findIndex((t) => t.id === currentTask.id) : -1
+  const globalIndex = currentTask ? allPendingTasks.findIndex((t) => String(t.id) === String(currentTask.id)) : -1
   const globalPosition = globalIndex >= 0 ? globalIndex + 1 : 0
+  const useGlobalPagination = globalIndex >= 0 && globalTotal > 0
 
   useEffect(() => {
     setCurrentTaskIndex((prev) => Math.min(prev, Math.max(0, pendingTasks.length - 1)))
@@ -145,37 +146,65 @@ export default function ContactDossierPage() {
     if (idx >= 0) setCurrentTaskIndex(idx)
   }, [taskIdFromUrl, pendingTasks])
 
+  const navId = String(id).trim()
+  const getTaskContactId = (t: { contactId?: string }) => (t.contactId != null && String(t.contactId).trim() !== '') ? String(t.contactId).trim() : undefined
+  const getTaskAccountId = (t: { accountId?: string }) => (t.accountId != null && String(t.accountId).trim() !== '') ? String(t.accountId).trim() : undefined
+
   const navigateToTaskDossier = (task: { id: string; contactId?: string; accountId?: string }) => {
-    if (task.contactId) {
-      router.push(`/network/contacts/${task.contactId}?taskId=${encodeURIComponent(task.id)}`)
-    } else if (task.accountId) {
-      router.push(`/network/accounts/${task.accountId}?taskId=${encodeURIComponent(task.id)}`)
+    const cid = getTaskContactId(task)
+    const aid = getTaskAccountId(task)
+    if (cid) {
+      router.push(`/network/contacts/${cid}?taskId=${encodeURIComponent(task.id)}`)
+    } else if (aid) {
+      router.push(`/network/accounts/${aid}?taskId=${encodeURIComponent(task.id)}`)
     }
   }
 
   const handlePrev = () => {
+    if (globalIndex < 0) {
+      setCurrentTaskIndex((p) => Math.max(0, p - 1))
+      return
+    }
     if (globalIndex <= 0) return
-    const prevTask = allPendingTasks[globalIndex - 1]
+    let prevIdx = globalIndex - 1
+    let prevTask = allPendingTasks[prevIdx]
+    while (prevTask && !getTaskContactId(prevTask) && !getTaskAccountId(prevTask) && prevIdx > 0) {
+      prevIdx -= 1
+      prevTask = allPendingTasks[prevIdx]
+    }
     if (!prevTask) return
-    const isSameEntity = (prevTask.contactId && prevTask.contactId === id) || (prevTask.accountId && prevTask.accountId === id)
-    if (!isSameEntity && (prevTask.contactId || prevTask.accountId)) {
-      navigateToTaskDossier(prevTask)
-    } else {
-      const localIdx = pendingTasks.findIndex((t) => t.id === prevTask.id)
+    const prevContactId = getTaskContactId(prevTask)
+    const prevAccountId = getTaskAccountId(prevTask)
+    const isSameEntity = (prevContactId && prevContactId === navId) || (prevAccountId && prevAccountId === navId)
+    if (isSameEntity) {
+      const localIdx = pendingTasks.findIndex((t) => String(t.id) === String(prevTask!.id))
       if (localIdx >= 0) setCurrentTaskIndex(localIdx)
+    } else if (prevContactId || prevAccountId) {
+      navigateToTaskDossier(prevTask)
     }
   }
 
   const handleNext = () => {
-    if (globalIndex < 0 || globalIndex >= allPendingTasks.length - 1) return
-    const nextTask = allPendingTasks[globalIndex + 1]
+    if (globalIndex < 0) {
+      setCurrentTaskIndex((p) => Math.min(pendingTasks.length - 1, p + 1))
+      return
+    }
+    if (globalIndex >= allPendingTasks.length - 1) return
+    let nextIdx = globalIndex + 1
+    let nextTask = allPendingTasks[nextIdx]
+    while (nextTask && !getTaskContactId(nextTask) && !getTaskAccountId(nextTask) && nextIdx < allPendingTasks.length - 1) {
+      nextIdx += 1
+      nextTask = allPendingTasks[nextIdx]
+    }
     if (!nextTask) return
-    const isSameEntity = (nextTask.contactId && nextTask.contactId === id) || (nextTask.accountId && nextTask.accountId === id)
-    if (!isSameEntity && (nextTask.contactId || nextTask.accountId)) {
-      navigateToTaskDossier(nextTask)
-    } else {
-      const localIdx = pendingTasks.findIndex((t) => t.id === nextTask.id)
+    const nextContactId = getTaskContactId(nextTask)
+    const nextAccountId = getTaskAccountId(nextTask)
+    const isSameEntity = (nextContactId && nextContactId === navId) || (nextAccountId && nextAccountId === navId)
+    if (isSameEntity) {
+      const localIdx = pendingTasks.findIndex((t) => String(t.id) === String(nextTask!.id))
       if (localIdx >= 0) setCurrentTaskIndex(localIdx)
+    } else if (nextContactId || nextAccountId) {
+      navigateToTaskDossier(nextTask)
     }
   }
 
@@ -185,8 +214,13 @@ export default function ContactDossierPage() {
     updateTask({ id: task.id, status: 'Completed' })
     const nextGlobalIndex = globalIndex >= 0 ? globalIndex : 0
     if (nextGlobalIndex + 1 < allPendingTasks.length) {
-      const nextTask = allPendingTasks[nextGlobalIndex + 1]
-      if (nextTask && (nextTask.contactId || nextTask.accountId)) {
+      let nextIdx = nextGlobalIndex + 1
+      let nextTask = allPendingTasks[nextIdx]
+      while (nextTask && !getTaskContactId(nextTask) && !getTaskAccountId(nextTask) && nextIdx < allPendingTasks.length - 1) {
+        nextIdx += 1
+        nextTask = allPendingTasks[nextIdx]
+      }
+      if (nextTask && (getTaskContactId(nextTask) || getTaskAccountId(nextTask))) {
         navigateToTaskDossier(nextTask)
       } else {
         toast.success('Task completed')
@@ -388,6 +422,7 @@ export default function ContactDossierPage() {
   const annualUsage = contact?.annualUsage || ''
   const [isTyping, setIsTyping] = useState(false)
   const [terminalInput, setTerminalInput] = useState('')
+  const [descriptionCopied, setDescriptionCopied] = useState(false)
   const terminalRef = useRef<HTMLDivElement>(null)
 
   const handleTerminalClick = () => {
@@ -648,6 +683,7 @@ export default function ContactDossierPage() {
                               copyValue={[editFirstName, editLastName].filter(Boolean).join(' ') || editName || contactName}
                               valueClassName="text-2xl font-semibold tracking-tighter text-white"
                               inline
+                              compact
                             />
                           </motion.h1>
                         ) : (
@@ -657,12 +693,13 @@ export default function ContactDossierPage() {
                               copyValue={[editFirstName, editLastName].filter(Boolean).join(' ') || editName || contactName}
                               valueClassName="text-2xl font-semibold tracking-tighter text-white"
                               inline
+                              compact
                             />
                           </h1>
                         )}
                         
                         {/* THE SIGNAL ARRAY */}
-                        <div className="flex items-center gap-1 bg-white/[0.02] rounded-full p-1 border border-white/5 ml-2 relative group/links">
+                        <div className="flex items-center gap-1 bg-white/[0.02] rounded-full p-1 border border-white/5 relative group/links">
                           <div className="flex items-center">
                             <button 
                               onClick={() => {
@@ -935,8 +972,8 @@ export default function ContactDossierPage() {
                       <TaskCommandBar
                         pendingTasks={pendingTasks}
                         currentIndex={displayTaskIndex}
-                        globalTotal={globalTotal}
-                        globalPosition={globalPosition}
+                        globalTotal={useGlobalPagination ? globalTotal : undefined}
+                        globalPosition={useGlobalPagination ? globalPosition : undefined}
                         onPrev={handlePrev}
                         onNext={handleNext}
                         onSkip={handleNext}
@@ -1271,7 +1308,44 @@ export default function ContactDossierPage() {
                         />
                       </div>
                     ) : (
-                      <div className="space-y-4">
+                      <div className="group/copyblock relative">
+                        {editNotes?.trim() && (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              navigator.clipboard.writeText(editNotes).then(
+                                () => {
+                                  setDescriptionCopied(true)
+                                  setTimeout(() => setDescriptionCopied(false), 2000)
+                                }
+                              )
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                navigator.clipboard.writeText(editNotes).then(
+                                  () => {
+                                    setDescriptionCopied(true)
+                                    setTimeout(() => setDescriptionCopied(false), 2000)
+                                  }
+                                )
+                              }
+                            }}
+                            className="absolute top-0 right-0 z-10 p-1 rounded text-zinc-500 hover:text-white focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 cursor-pointer opacity-0 transition-opacity duration-200 group-hover/copyblock:opacity-100"
+                            title="Copy full description"
+                            aria-label="Copy full description"
+                          >
+                            {descriptionCopied ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-500" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </span>
+                        )}
+                        <div className="space-y-4">
                         {/* Historical Log Entries */}
                         {editNotes.split('\n\n').map((entry, idx) => {
                           const timestampMatch = entry.match(/^\[(.*?)\]/)
@@ -1294,16 +1368,17 @@ export default function ContactDossierPage() {
                                 {timestamp && (
                                   <div className="text-[10px] text-zinc-600 mb-1 flex items-center gap-2">
                                     <Clock className="w-3 h-3 shrink-0" />
-                                    <ForensicDataPoint value={timestamp} copyValue={timestamp} valueClassName="text-[10px] text-zinc-600" inline />
+                                    <span>{timestamp}</span>
                                   </div>
                                 )}
-                                <div className="text-zinc-300 group-hover/entry:text-white transition-colors">
-                                  <ForensicDataPoint value={content} copyValue={content} valueClassName="text-zinc-300 group-hover/entry:text-white" />
+                                <div className="text-zinc-300 group-hover/entry:text-white transition-colors whitespace-pre-wrap break-words">
+                                  {content}
                                 </div>
                               </div>
                             </div>
                           )
                         })}
+                        </div>
                         
                         {/* Live Terminal Input */}
                         <div className="flex gap-4 pt-4 border-t border-white/5">
@@ -1364,7 +1439,7 @@ export default function ContactDossierPage() {
                             )}
                           </div>
                         </div>
-                      </div>
+                        </div>
                     )}
                   </div>
                 </div>

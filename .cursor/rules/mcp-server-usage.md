@@ -67,8 +67,22 @@ The AI can invoke MCP tools when they are relevant (e.g. "check migrations", "ap
 **Important:**
 - **Always prefer `dry_run: true` first** when the user asks to "push" or "apply" migrations, so they (and the agent) can see the list of migrations that would run.
 - If the tool returns "Remote migration versions not found in local migrations directory", the **migration history is out of sync**. Resolving this requires **repair** (and possibly manual SQL or pull) as documented in `SUPABASE DOCS/supabase-cli-migration-workflow.md`. The MCP server does **not** expose a repair tool; run `supabase migration repair` from the **integrated terminal** (where `supabase` is on PATH, e.g. after adding Scoop shims in `.vscode/settings.json`).
+- If the tool returns **"Found local migration files to be inserted before the last migration on remote database"** and suggests **"Rerun the command with --include-all flag"**, the MCP push cannot apply those migrations. In that case, run from the **integrated terminal**: `npx supabase db push --include-all` (from the project root). The CLI may prompt `[Y/n]`; the user can confirm. The agent should **not** ask the user to "run the migration" when the agent can run it via MCP or terminal.
 
 **Example ask:** "Apply pending migrations." / "Push migrations to Supabase." / "What would happen if we pushed? (dry run)."
+
+---
+
+### Running migrations after creating migration files
+
+**The agent must run migrations after creating or modifying migration files** — do not leave this for the user unless the tool fails.
+
+1. **After adding or editing a migration** under `supabase/migrations/`:
+   - Run **`supabase_migration_list`** to see current status (optional).
+   - Run **`supabase_db_push`** with **`dry_run: true`** to see which migrations would be applied.
+   - If the output lists your new migration(s) and shows no error about "include-all" or "remote not in local", run **`supabase_db_push`** with **`dry_run: false`** to apply.
+   - If the output says **"Rerun the command with --include-all flag"**, run in the **integrated terminal** from the project root: **`npx supabase db push --include-all`**. The user may need to confirm `Y` at the prompt.
+2. **Do not** say "you can run the migration" or "please run `supabase db push`" as a handoff. Run the push via MCP (or terminal with `--include-all` when required) as part of the same workflow.
 
 ---
 
@@ -154,9 +168,11 @@ ORDER BY ordinal_position;
 
 | Goal | Action |
 |------|--------|
+| **After creating/editing a migration file** | Run `supabase_db_push` (dry run first, then apply). If MCP returns "use --include-all", run in terminal: `npx supabase db push --include-all`. Do not ask the user to run the migration. |
 | See migration status | Use `supabase_migration_list`. |
 | Preview what would be applied | Use `supabase_db_push` with `dry_run: true`. |
 | Apply pending migrations | Use `supabase_db_push` (after dry run if desired). |
+| Push failed with "include-all" message | Run in **terminal**: `npx supabase db push --include-all` (from project root). |
 | Fix "remote not in local" / history sync | Use **terminal**: `supabase migration repair --status reverted <versions...>` (see CLI output or `supabase-cli-migration-workflow.md`). |
 | **Schema / relationship errors** | Use **MCP first**: `supabase_execute_sql` to inspect FK names and schema; fix queries with exact constraint names. |
 | Inspect tables, FKs, or run SQL | Use `supabase_execute_sql` with `sql` or `file`. |

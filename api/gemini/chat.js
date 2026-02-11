@@ -949,11 +949,27 @@ const toolHandlers = {
     return data;
   },
   create_task: async (task) => {
-    // Ensure we have a valid UUID for the primary key
-    if (!task.id) {
-        task.id = crypto.randomUUID();
-    }
-    const { data, error } = await supabaseAdmin.from('tasks').insert([task]).select().single();
+    if (!task.id) task.id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    // Normalize to CRM canonical casing so UI styling (e.g. Medium = yellow) works
+    const priorityMap = { low: 'Low', medium: 'Medium', high: 'High' };
+    const priority = (task.priority && priorityMap[String(task.priority).toLowerCase()]) || 'Medium';
+    const status = (task.status && ['Pending', 'In Progress', 'Completed'].includes(task.status)) ? task.status : 'Pending';
+    const row = {
+      id: task.id,
+      title: task.title ?? 'Task',
+      description: task.description ?? null,
+      status,
+      priority,
+      dueDate: task.dueDate ?? null,
+      contactId: task.contactId ?? null,
+      accountId: task.accountId ?? null,
+      ownerId: task.ownerId ?? null,
+      createdAt: task.createdAt ?? now,
+      updatedAt: task.updatedAt ?? now,
+      metadata: (task.metadata && typeof task.metadata === 'object') ? task.metadata : {}
+    };
+    const { data, error } = await supabaseAdmin.from('tasks').insert([row]).select().single();
     if (error) throw error;
     return data;
   },

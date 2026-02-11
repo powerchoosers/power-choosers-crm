@@ -37,25 +37,56 @@ export function useSearchCalls(queryTerm: string) {
       if (!queryTerm || queryTerm.length < 2) return []
       if (loading || !user) return []
 
-      let query = supabase
-        .from('calls')
-        .select('*, contacts!calls_contactId_fkey(name)')
+      // PostgREST .or() does not support !fkey hint in the filter, so we search by (1) summary/transcript,
+      // (2) contact name via contacts then calls by contactId, and (3) account name via accounts then calls by accountId.
+      const term = queryTerm.replace(/%/g, '\\%')
+      const selectCalls = '*, contacts!calls_contactId_fkey(name)'
 
-      // Search in summary, transcript, or contact name
-      query = query.or(`summary.ilike.%${queryTerm}%,transcript.ilike.%${queryTerm}%,contacts.name.ilike.%${queryTerm}%`)
+      const [byContentRes, contactIdsRes, accountIdsRes] = await Promise.all([
+        supabase
+          .from('calls')
+          .select(selectCalls)
+          .or(`summary.ilike.%${term}%,transcript.ilike.%${term}%`)
+          .limit(5),
+        supabase.from('contacts').select('id').ilike('name', `%${term}%`).limit(10),
+        supabase.from('accounts').select('id').or(`name.ilike.%${term}%,domain.ilike.%${term}%`).limit(10)
+      ])
 
-      const { data, error } = await query.limit(5)
-
-      if (error) {
-        console.error('Search calls error details:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
-          query: { queryTerm, role, email: user.email }
+      if (byContentRes.error) {
+        const errMsg = typeof byContentRes.error?.message === 'string' ? byContentRes.error.message : String(byContentRes.error)
+        console.error('Search calls error:', errMsg, {
+          code: (byContentRes.error as { code?: string }).code,
+          queryTerm,
+          email: user?.email
         })
         return []
       }
+
+      const contactIds = (contactIdsRes.data ?? [])
+        .map((r: { id: string }) => r.id)
+        .filter(Boolean)
+      const accountIds = (accountIdsRes.data ?? [])
+        .map((r: { id: string }) => r.id)
+        .filter(Boolean)
+
+      let byContactData: CallRow[] = []
+      let byAccountData: CallRow[] = []
+      const [byContactRes, byAccountRes] = await Promise.all([
+        contactIds.length > 0 && contactIdsRes.error == null
+          ? supabase.from('calls').select(selectCalls).in('contactId', contactIds).limit(5)
+          : Promise.resolve({ data: [] as CallRow[], error: null }),
+        accountIds.length > 0 && accountIdsRes.error == null
+          ? supabase.from('calls').select(selectCalls).in('accountId', accountIds).limit(5)
+          : Promise.resolve({ data: [] as CallRow[], error: null })
+      ])
+      if (!byContactRes.error && byContactRes.data) byContactData = byContactRes.data as CallRow[]
+      if (!byAccountRes.error && byAccountRes.data) byAccountData = byAccountRes.data as CallRow[]
+
+      const byId = new Map<string, CallRow>()
+      for (const row of byContentRes.data ?? []) byId.set((row as CallRow).id, row as CallRow)
+      for (const row of byContactData) if (!byId.has(row.id)) byId.set(row.id, row)
+      for (const row of byAccountData) if (!byId.has(row.id)) byId.set(row.id, row)
+      const data = Array.from(byId.values()).slice(0, 5)
 
       return (data as CallRow[]).map(item => {
         const contact = Array.isArray(item.contacts) ? item.contacts[0] : item.contacts
@@ -365,7 +396,7 @@ export function useAccountCalls(accountId: string, contactIds?: string[]) {
   })
 }
 
-export function useContactCalls(contactId: string, companyPhone?: string) {
+export function useContactCalls(contactId: string, companyPhone?: string, accountId?: string) {
   const { user, loading } = useAuth()
   const queryClient = useQueryClient()
 
@@ -397,11 +428,11 @@ export function useContactCalls(contactId: string, companyPhone?: string) {
   }, [contactId, user, loading, queryClient])
 
   return useQuery({
-    queryKey: ['contact-calls', contactId, companyPhone ?? '', user?.email],
+    queryKey: ['contact-calls', contactId, companyPhone ?? '', accountId ?? '', user?.email],
     queryFn: async () => {
       if (!contactId || loading || !user) return []
 
-      // Fetch calls to this contact; optionally also calls to company phone (second query, then merge)
+      // 1) Calls to/from this contact
       const contactRes = await supabase.from('calls').select('*').eq('contactId', contactId).order('timestamp', { ascending: false }).limit(50)
 
       if (contactRes.error) {
@@ -409,22 +440,33 @@ export function useContactCalls(contactId: string, companyPhone?: string) {
         return []
       }
 
-      let data = (contactRes.data || []) as CallRow[]
+      const byId = new Map<string, CallRow>()
+      for (const row of contactRes.data || []) byId.set(row.id, row as CallRow)
+
+      // 2) Calls to company phone (to = company number) – many calls have empty to, so also use (3)
       if (companyPhone?.trim()) {
         const normalized = companyPhone.replace(/\D/g, '').slice(-10)
         if (normalized) {
           const companyRes = await supabase.from('calls').select('*').or(`to.ilike.%${normalized}`).order('timestamp', { ascending: false }).limit(50)
           if (!companyRes.error && companyRes.data?.length) {
-            const byId = new Map(data.map((r) => [r.id, r]))
             for (const row of companyRes.data as CallRow[]) if (!byId.has(row.id)) byId.set(row.id, row)
-            data = Array.from(byId.values()).sort((a, b) => {
-              const ta = (a.timestamp || a.createdAt || '').toString()
-              const tb = (b.timestamp || b.createdAt || '').toString()
-              return tb.localeCompare(ta)
-            })
           }
         }
       }
+
+      // 3) Account-level calls (accountId set, no contact) – same as account dossier “company” calls; often have empty to
+      if (accountId?.trim()) {
+        const accountRes = await supabase.from('calls').select('*').eq('accountId', accountId).is('contactId', null).order('timestamp', { ascending: false }).limit(50)
+        if (!accountRes.error && accountRes.data?.length) {
+          for (const row of accountRes.data as CallRow[]) if (!byId.has(row.id)) byId.set(row.id, row)
+        }
+      }
+
+      let data = Array.from(byId.values()).sort((a, b) => {
+        const ta = (a.timestamp || a.createdAt || '').toString()
+        const tb = (b.timestamp || b.createdAt || '').toString()
+        return tb.localeCompare(ta)
+      })
 
       return (data as CallRow[]).map(item => {
         const type = item.direction === 'inbound' ? 'Inbound' : 'Outbound'

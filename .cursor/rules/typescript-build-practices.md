@@ -4,6 +4,16 @@ Coding and workflow practices to prevent TypeScript/build errors during developm
 
 ---
 
+## MANDATORY: When writing new code
+
+**Apply these at the time you write code, not only when fixing a build error.**
+
+1. **Optional properties / `string | undefined`:** If you read a property that might be undefined (e.g. `part.filename`, `item.name`) and use it where a **concrete type** is required (e.g. `string` in an object literal or function argument), **narrow first**. Do not assign `part.filename` directly into `{ filename: part.filename }` if the type expects `filename: string` — TypeScript will error. Instead: assign to a variable, guard (e.g. `if (x !== undefined && x !== '')`), then use the variable inside the block.
+2. **Check the type you're assigning into:** If the target type is `string`, `number`, or a non-optional field, the source must be narrowed to that type (no `string | undefined` unless the target allows it).
+3. **Run typecheck:** After writing or changing TypeScript, run `npm run typecheck` from `crm-platform/` before committing.
+
+---
+
 ## Official documentation (reference)
 
 | Source | URL | Use for |
@@ -46,7 +56,7 @@ Coding and workflow practices to prevent TypeScript/build errors during developm
 
 ## 3. Prefer `undefined` for “no value”; be explicit with `null` (strictNullChecks)
 
-**Problem:** “Type 'null' is not assignable to type 'string | undefined'” in mock data or props.
+**Problem:** “Type 'null' is not assignable to type 'string | undefined'” in mock data or props. **Also:** "Type 'string | undefined' is not assignable to type 'string'" when you pass an optional property into a place that expects a concrete type.
 
 **Practice (from TypeScript strictNullChecks and handbook):**
 
@@ -55,7 +65,23 @@ Coding and workflow practices to prevent TypeScript/build errors during developm
 - **Optional parameters:** In strict null checking mode, optional parameters automatically get `undefined` in their type (e.g. `x?: number` ⇒ `number | undefined`). You must handle `undefined` before using the value.
 - **Conventions:** Prefer `undefined` (and `string | undefined`) for “no value” and optional fields. Use `null` only when the type or API explicitly expects `null` (e.g. `string | null`).
 - **Mock data/fixtures:** Match the real type: if the type is `entity?: string` or `entity: string | undefined`, use `entity: undefined`, not `entity: null`.
-- **Narrowing:** Use `if (x != null)` or `if (x !== undefined)` (or optional chaining `x?.`) to narrow before use.
+- **Narrowing (required when assigning into `string` or other concrete types):** Use `if (x != null)` or `if (x !== undefined)` (or optional chaining `x?.`) to narrow before use. **Do not** write `{ filename: part.filename }` when `part.filename` is `string | undefined` and the target type expects `filename: string`. Instead: assign to a variable, guard, then use the variable in the object (see example below).
+
+**Correct pattern when building an object from optional properties:**
+
+```ts
+// BAD — causes "Type 'string | undefined' is not assignable to type 'string'"
+if (part.filename && part.body?.attachmentId) {
+  attachments.push({ filename: part.filename, attachmentId: part.body.attachmentId!, ... });
+}
+
+// GOOD — narrow first, then use (TypeScript narrows the variable inside the block)
+const filename = part.filename;
+const attachmentId = part.body?.attachmentId;
+if (filename !== undefined && filename !== '' && attachmentId) {
+  attachments.push({ filename, attachmentId, ... });
+}
+```
 
 ---
 
@@ -137,6 +163,7 @@ Coding and workflow practices to prevent TypeScript/build errors during developm
 | When to typecheck     | Before every build/deploy; in CI; optionally pre-commit. | Next.js: run `tsc --noEmit` before deploy |
 | Target / lib          | Use `ES2018`+ if using regex `s` flag or other ES2018+ features. | TSConfig [target](https://www.typescriptlang.org/tsconfig/target) |
 | null vs undefined     | Prefer `undefined` for optional; use `null` only when type allows. | [strictNullChecks](https://www.typescriptlang.org/tsconfig/strictNullChecks), [Handbook](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html) |
+| Optional → concrete   | When assigning optional props (e.g. `part.filename`) into `string` or required fields: narrow first (assign to variable, guard, then use). | §3, MANDATORY |
 | Third-party callbacks | Match library callback signatures exactly (params and return). | TypeScript parameter/return type checking |
 | Hook order            | Declare callbacks/hooks before any hook that lists them in deps. | [Rules of Hooks](https://react.dev/reference/rules/rules-of-hooks) |
 | New fields            | Update TypeScript types and mapping schemas when adding/using new fields. | Structural typing, project BulkImport rules |
@@ -156,6 +183,7 @@ Coding and workflow practices to prevent TypeScript/build errors during developm
 | GeminiChat: `sendWithMessage` used before declaration | Move `sendWithMessage` (e.g. `useCallback`) above `useEffect` | §5 |
 | useContacts: `companyPhone` on `ContactRow` | Add `companyPhone` to `ContactRow` type and mapping | §6 |
 | Protocol builder: `firstName` on Firebase `User` | Use AuthContext `profile?.firstName`; Firebase `User` has no `firstName` | §6 |
+| useGmailSync: `part.filename` / `part.body.attachmentId` in object literal | Assign to variables, then guard (`if (x !== undefined && attachmentId)`), then use variables in the object; do not use optional props directly where `string` is required | §3 |
 
 ---
 

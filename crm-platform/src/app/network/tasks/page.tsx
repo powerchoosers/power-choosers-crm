@@ -39,6 +39,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from '@/lib/utils'
+import { PriorityBadge, priorityColorClasses } from '@/components/ui/PriorityBadge'
 import { format, formatDistanceToNow, subMonths, isAfter } from 'date-fns'
 import { useRouter } from 'next/navigation'
 import { useTableState } from '@/hooks/useTableState'
@@ -178,11 +179,9 @@ export default function TasksPage() {
           <div className={cn("flex items-center gap-3 group/task", hasDossier && "cursor-pointer")}>
              <div className={cn(
                "w-8 h-8 rounded-lg flex items-center justify-center border border-white/5",
-               task.priority === 'High' ? "bg-red-500/10 text-red-500" :
-               task.priority === 'Medium' ? "bg-yellow-500/10 text-yellow-500" :
-               "bg-black/40 text-zinc-400"
+               priorityColorClasses(task.priority)
              )}>
-                {task.status === 'Completed' ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+                {(task.status?.toLowerCase?.() ?? '') === 'completed' ? <CheckCircle2 size={16} /> : <Circle size={16} />}
              </div>
              <div>
                 <div className={cn(
@@ -201,18 +200,8 @@ export default function TasksPage() {
       accessorKey: 'priority',
       header: 'Priority',
       cell: ({ row }) => {
-        const priority = row.getValue('priority') as string
-        return (
-          <span className={cn(
-            "inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-mono uppercase tracking-wider border",
-            priority === 'High' && "bg-red-500/10 text-red-500 border-red-500/20",
-            priority === 'Medium' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
-            priority === 'Low' && "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
-            priority === 'Protocol' && "bg-[#002FA7]/10 text-[#002FA7] border-[#002FA7]/20",
-          )}>
-            {priority === 'Sequence' ? 'Protocol' : priority}
-          </span>
-        )
+        const priority = (row.getValue('priority') as string) ?? ''
+        return <PriorityBadge priority={priority} labelStyle="suffix" />
       },
     },
     {
