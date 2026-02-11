@@ -228,22 +228,32 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
     }
 
     try {
+      const idToken = await (user as any)?.getIdToken?.().catch(() => null)
+      const res = await fetch('/api/foundry/assets', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+        body: JSON.stringify({
+          id: assetId && assetId !== 'new' ? assetId : undefined,
+          ...payload,
+        }),
+      })
+
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || data?.details || 'Forge failure')
+
       if (assetId && assetId !== 'new') {
-        const { error } = await supabase
-          .from('transmission_assets')
-          .update(payload)
-          .eq('id', assetId)
-        if (error) throw error
         toast.success('Asset updated in Foundry')
       } else {
-        const { data, error } = await supabase
-          .from('transmission_assets')
-          .insert([{ ...payload, user_id: (await supabase.auth.getUser()).data.user?.id }])
-          .select()
-          .single()
-        if (error) throw error
-        toast.success('Asset forged in Foundry')
-        router.push(`/network/foundry/${data.id}`)
+        const newId = data?.asset?.id
+        if (typeof newId === 'string' && newId.trim()) {
+          toast.success('Asset forged in Foundry')
+          router.push(`/network/foundry/${newId}`)
+        } else {
+          toast.success('Asset forged')
+        }
       }
     } catch (err: any) {
       toast.error(`Forge failure: ${err.message}`)
