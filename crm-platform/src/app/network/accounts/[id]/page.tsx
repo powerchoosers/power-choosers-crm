@@ -3,8 +3,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Building2, MapPin, Globe, Phone, FileText, Activity, 
+import {
+  Building2, MapPin, Globe, Phone, FileText, Activity,
   Zap, Server, Users, ArrowLeft, MoreHorizontal,
   LayoutDashboard, Database, Terminal, Shield, Sparkles, Clock, Mic,
   Lock, Unlock, Linkedin, Check, Plus, Copy
@@ -69,7 +69,7 @@ export default function AccountDossierPage() {
   const contactIds = contacts?.map(c => c.id).filter(Boolean) || []
   const { data: calls, isLoading: isLoadingCalls } = useAccountCalls(id, contactIds)
   const updateAccount = useUpdateAccount()
-  
+
   const { isEditing, setIsEditing, toggleEditing, setRightPanelMode, setIngestionContext, lastEnrichedAccountId } = useUIStore()
   const setContext = useGeminiStore((state) => state.setContext)
 
@@ -95,7 +95,7 @@ export default function AccountDossierPage() {
     setCurrentTaskIndex((prev) => Math.min(prev, Math.max(0, pendingTasks.length - 1)))
   }, [pendingTasks.length])
 
-  const taskIdFromUrl = searchParams.get('taskId')
+  const taskIdFromUrl = searchParams?.get('taskId') ?? null
   useEffect(() => {
     if (!taskIdFromUrl || !pendingTasks.length) return
     const idx = pendingTasks.findIndex((t) => t.id === taskIdFromUrl)
@@ -395,7 +395,7 @@ export default function AccountDossierPage() {
   // Maturity Logic
   const contractEndDate = useMemo(() => parseContractEndDate(account?.contractEnd), [account?.contractEnd])
   const daysRemaining = contractEndDate ? differenceInCalendarDays(contractEndDate, new Date()) : null
-  
+
   const maturityPct = useMemo(() => {
     if (daysRemaining == null) return 0
     return clamp01(1 - daysRemaining / 365)
@@ -411,7 +411,7 @@ export default function AccountDossierPage() {
 
   // Terminal Logic
   const handleTerminalClick = () => setIsTyping(true)
-  
+
   const handleTerminalSubmit = async () => {
     if (!terminalInput.trim()) {
       setIsTyping(false)
@@ -419,7 +419,7 @@ export default function AccountDossierPage() {
     }
 
     const input = terminalInput.trim()
-    
+
     // System Commands
     if (input.startsWith('/')) {
       const cmd = input.slice(1).toLowerCase()
@@ -488,15 +488,15 @@ export default function AccountDossierPage() {
 
         {/* 1. Corporate Entity Header */}
         <header className="flex-none px-6 py-6 md:px-8 border-b border-white/5 nodal-recessed relative z-10">
-           <div className="flex items-center justify-between gap-6">
-             <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-6">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => router.back()}
                 className="icon-button-forensic w-10 h-10 flex items-center justify-center -ml-2"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
-              
+
               {/* Logo/Icon */}
               <div className="relative group/logo">
                 <div onClick={() => isEditing && setActiveEditField(activeEditField === 'logo' ? null : 'logo')}>
@@ -534,7 +534,7 @@ export default function AccountDossierPage() {
                     />
                   )}
                 </div>
-                
+
                 <AnimatePresence>
                   {isEditing && activeEditField === 'logo' && (
                     <motion.div
@@ -582,7 +582,7 @@ export default function AccountDossierPage() {
                   {/* External Links */}
                   <div className="flex items-center gap-1 bg-white/[0.02] rounded-full p-1 border border-white/5 relative group/links">
                     <div className="flex items-center">
-                      <button 
+                      <button
                         onClick={() => {
                           if (isEditing) {
                             setActiveEditField(activeEditField === 'domain' ? null : 'domain')
@@ -596,12 +596,12 @@ export default function AccountDossierPage() {
                           !editDomain && !account.domain && "opacity-50 cursor-not-allowed",
                           isEditing && activeEditField === 'domain' && "bg-[#002FA7]/20 text-white",
                           isEditing && "hover:bg-[#002FA7]/20 transition-colors"
-                        )} 
+                        )}
                         title={isEditing ? "Edit Domain" : "Visit Website"}
                       >
                         <Globe className="w-3.5 h-3.5" />
                       </button>
-                      
+
                       <AnimatePresence>
                         {isEditing && activeEditField === 'domain' && (
                           <motion.div
@@ -628,7 +628,7 @@ export default function AccountDossierPage() {
                     <div className="w-px h-3 bg-white/10" />
 
                     <div className="flex items-center">
-                      <button 
+                      <button
                         onClick={() => {
                           if (isEditing) {
                             setActiveEditField(activeEditField === 'linkedin' ? null : 'linkedin')
@@ -642,7 +642,7 @@ export default function AccountDossierPage() {
                           !editLinkedinUrl && !account.linkedinUrl && "opacity-50 cursor-not-allowed",
                           isEditing && activeEditField === 'linkedin' && "bg-[#002FA7]/20 text-white",
                           isEditing && "hover:bg-[#002FA7]/20 transition-colors"
-                        )} 
+                        )}
                         title={isEditing ? "Edit LinkedIn" : "View LinkedIn"}
                       >
                         <Linkedin className="w-3.5 h-3.5" />
@@ -696,21 +696,21 @@ export default function AccountDossierPage() {
                           <div className={cn(
                             "w-1.5 h-1.5 rounded-full",
                             isCustomer ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
-                            isActiveLoad ? "bg-signal animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.5)]" : 
-                            isExpired ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" : 
-                            "bg-zinc-600"
+                              isActiveLoad ? "bg-signal animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.5)]" :
+                                isExpired ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" :
+                                  "bg-zinc-600"
                           )} />
                           <span className={cn(
                             "text-[10px] font-mono uppercase tracking-widest font-medium",
                             isCustomer ? "text-emerald-500" :
-                            isActiveLoad ? "text-signal" : 
-                            isExpired ? "text-red-500/80" : 
-                            "text-zinc-500"
+                              isActiveLoad ? "text-signal" :
+                                isExpired ? "text-red-500/80" :
+                                  "text-zinc-500"
                           )}>
-                             {displayStatus}
-                           </span>
-                         </div>
-                       )
+                            {displayStatus}
+                          </span>
+                        </div>
+                      )
                     })()}
 
                     {/* Last Sync Indicator */}
@@ -732,7 +732,7 @@ export default function AccountDossierPage() {
                     {/* Synced indicator with exit animation */}
                     <AnimatePresence>
                       {showSynced && (
-                        <motion.div 
+                        <motion.div
                           key="synced-indicator"
                           initial={{ opacity: 0, scale: 0.9, filter: "blur(4px)" }}
                           animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
@@ -841,11 +841,11 @@ export default function AccountDossierPage() {
                     <button
                       onClick={toggleEditing}
                       className={cn(
-                         "w-7 h-7 flex items-center justify-center transition-all duration-300",
-                         isEditing 
-                           ? "text-blue-400 bg-blue-400/10 border border-blue-400/30 rounded-lg shadow-[0_0_15px_rgba(59,130,246,0.2)] scale-110" 
-                           : "text-zinc-500 hover:text-white bg-transparent border border-transparent"
-                       )}
+                        "w-7 h-7 flex items-center justify-center transition-all duration-300",
+                        isEditing
+                          ? "text-blue-400 bg-blue-400/10 border border-blue-400/30 rounded-lg shadow-[0_0_15px_rgba(59,130,246,0.2)] scale-110"
+                          : "text-zinc-500 hover:text-white bg-transparent border border-transparent"
+                      )}
                       title={isEditing ? "Lock Dossier" : "Unlock Dossier"}
                     >
                       {isEditing ? (
@@ -878,12 +878,12 @@ export default function AccountDossierPage() {
         {/* Main Grid Content */}
         <div className="flex-1 flex overflow-hidden relative z-10 group/dossier">
           <div className="grid grid-cols-12 w-full h-full">
-            
+
             {/* Column A: Physics (3 cols) */}
             <div className="col-span-3 h-full overflow-y-auto p-6 border-r border-white/5 np-scroll scrollbar-thin scrollbar-thumb-zinc-800/0 hover:scrollbar-thumb-zinc-800/50 scrollbar-track-transparent transition-all duration-300 bg-black/10">
               <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-700">
                 <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em] mb-4">01 // Physics</div>
-                
+
                 {(recentlyUpdatedFields.has('companyPhone') || recentlyUpdatedFields.has('address') || recentlyUpdatedFields.has('domain')) ? (
                   <motion.div
                     initial={{ filter: 'blur(6px)', opacity: 0.6 }}
@@ -902,16 +902,16 @@ export default function AccountDossierPage() {
                     />
                   </motion.div>
                 ) : (
-                <AccountUplinkCard 
-                  account={{
-                    ...account,
-                    companyPhone: editCompanyPhone ?? account.companyPhone,
-                    domain: editDomain ?? account.domain,
-                    address: editAddress ?? account.address
-                  }} 
-                  isEditing={isEditing}
-                  onUpdate={handleUpdate}
-                />
+                  <AccountUplinkCard
+                    account={{
+                      ...account,
+                      companyPhone: editCompanyPhone ?? account.companyPhone,
+                      domain: editDomain ?? account.domain,
+                      address: editAddress ?? account.address
+                    }}
+                    isEditing={isEditing}
+                    onUpdate={handleUpdate}
+                  />
                 )}
 
                 {/* Position Maturity (Ported Style) */}
@@ -920,7 +920,7 @@ export default function AccountDossierPage() {
                   isEditing ? 'border-[#002FA7]/30' : 'border-white/10',
                   isRecalibrating && 'grayscale backdrop-blur-2xl'
                 )}>
-                  
+
                   <div>
                     <div className="flex justify-between items-end mb-2">
                       <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Position Maturity</h4>
@@ -967,13 +967,13 @@ export default function AccountDossierPage() {
                         )}
                       </div>
                     </div>
-                    
+
                     <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden relative">
                       <div className={`h-full ${maturityColor} transition-all duration-1000 ease-out relative`} style={{ width: `${Math.round(maturityPct * 100)}%` }}>
                         <div className="absolute right-0 top-0 bottom-0 w-1 bg-white/50 shadow-[0_0_10px_white]" />
                       </div>
                     </div>
-                    
+
                     <div className="flex justify-between mt-2">
                       {recentlyUpdatedFields.has('contractEnd') ? (
                         <motion.span
@@ -1179,7 +1179,7 @@ export default function AccountDossierPage() {
                 <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em] mb-4">02 // Infrastructure</div>
 
                 {/* Forensic Log Stream (Ported) */}
-                <div 
+                <div
                   className={`nodal-void-card transition-all duration-500 p-6 min-h-[500px] relative overflow-hidden shadow-2xl group flex flex-col font-mono ${isEditing ? 'border-[#002FA7]/50 ring-1 ring-[#002FA7]/20 cursor-text' : ''}`}
                   onClick={() => {
                     if (!isEditing) handleTerminalClick()
@@ -1187,7 +1187,7 @@ export default function AccountDossierPage() {
                 >
                   {/* CRT Effect Overlay */}
                   <div className="absolute inset-0 pointer-events-none opacity-[0.03] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%] z-50" />
-                  
+
                   <div className="flex items-center justify-between mb-6 border-b border-white/10 pb-4 relative z-10">
                     <div className="flex items-center gap-2">
                       <div className={`h-2 w-2 rounded-full animate-pulse ${isEditing ? 'bg-[#002FA7] shadow-[0_0_12px_rgba(0,47,167,0.8)]' : 'bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.8)]'}`} />
@@ -1199,7 +1199,7 @@ export default function AccountDossierPage() {
                       SECURE_NODE: {id.slice(0, 8).toUpperCase()}
                     </div>
                   </div>
-                  
+
                   <div className="flex-1 text-sm leading-relaxed relative z-10">
                     {isEditing ? (
                       <div className="flex flex-col h-full">
@@ -1253,47 +1253,47 @@ export default function AccountDossierPage() {
                           </span>
                         )}
                         <div className="space-y-4">
-                        {editNotes ? editNotes.split('\n\n').map((entry, idx) => {
-                          const timestampMatch = entry.match(/^\[(.*?)\]/)
-                          const timestamp = timestampMatch ? timestampMatch[1] : null
-                          const content = timestamp ? entry.replace(/^\[.*?\]/, '').trim() : entry
+                          {editNotes ? editNotes.split('\n\n').map((entry, idx) => {
+                            const timestampMatch = entry.match(/^\[(.*?)\]/)
+                            const timestamp = timestampMatch ? timestampMatch[1] : null
+                            const content = timestamp ? entry.replace(/^\[.*?\]/, '').trim() : entry
 
-                          // Calculate approximate height based on content length and line breaks
-                          const lineCount = content.split('\n').length
-                          const charCount = content.length
-                          const estimatedLines = Math.max(lineCount, Math.ceil(charCount / 80)) // ~80 chars per line
-                          const lineHeight = Math.max(2, estimatedLines * 1.5) // 1.5rem per line
+                            // Calculate approximate height based on content length and line breaks
+                            const lineCount = content.split('\n').length
+                            const charCount = content.length
+                            const estimatedLines = Math.max(lineCount, Math.ceil(charCount / 80)) // ~80 chars per line
+                            const lineHeight = Math.max(2, estimatedLines * 1.5) // 1.5rem per line
 
-                          return (
-                            <div key={idx} className="group/entry flex gap-4 animate-in fade-in slide-in-from-left-2 duration-300" style={{ animationDelay: `${idx * 50}ms` }}>
-                              <div className="flex flex-col items-center mt-1">
-                                <div className="w-1 h-1 rounded-full bg-[#002FA7]/40" />
-                                <div className="w-px bg-[#002FA7]/20" style={{ height: `${lineHeight}rem` }} />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                {timestamp && (
-                                  <div className="text-[10px] text-zinc-600 mb-1 flex items-center gap-2">
-                                    <Clock className="w-3 h-3 shrink-0" />
-                                    <span>{timestamp}</span>
+                            return (
+                              <div key={idx} className="group/entry flex gap-4 animate-in fade-in slide-in-from-left-2 duration-300" style={{ animationDelay: `${idx * 50}ms` }}>
+                                <div className="flex flex-col items-center mt-1">
+                                  <div className="w-1 h-1 rounded-full bg-[#002FA7]/40" />
+                                  <div className="w-px bg-[#002FA7]/20" style={{ height: `${lineHeight}rem` }} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  {timestamp && (
+                                    <div className="text-[10px] text-zinc-600 mb-1 flex items-center gap-2">
+                                      <Clock className="w-3 h-3 shrink-0" />
+                                      <span>{timestamp}</span>
+                                    </div>
+                                  )}
+                                  <div className="text-zinc-300 group-hover/entry:text-white transition-colors whitespace-pre-wrap break-words">
+                                    {content}
                                   </div>
-                                )}
-                                <div className="text-zinc-300 group-hover/entry:text-white transition-colors whitespace-pre-wrap break-words">
-                                  {content}
                                 </div>
                               </div>
-                            </div>
-                          )
-                        }) : (
-                          <div className="text-zinc-600 italic">No forensic data available. Initiate recon...</div>
-                        )}
+                            )
+                          }) : (
+                            <div className="text-zinc-600 italic">No forensic data available. Initiate recon...</div>
+                          )}
                         </div>
-                        
+
                         {/* Live Terminal Input */}
                         <div className="flex gap-4 pt-4 border-t border-white/5">
                           <span className="text-white shrink-0 mt-1">
                             <Sparkles className="w-4 h-4 animate-pulse" />
                           </span>
-                          
+
                           <div className="flex-1 flex flex-col">
                             {isTyping ? (
                               <div className="flex items-start">
@@ -1325,7 +1325,7 @@ export default function AccountDossierPage() {
                                 <span className="w-2 h-4 bg-[#22c55e] animate-[blink_1s_step-end_infinite] inline-block shrink-0 mt-0.5 ml-1" />
                               </div>
                             ) : (
-                              <button 
+                              <button
                                 onClick={handleTerminalClick}
                                 className="text-left text-zinc-600 hover:text-zinc-400 transition-colors flex items-center gap-2 group/btn"
                               >
@@ -1372,10 +1372,10 @@ export default function AccountDossierPage() {
                     onUpdate={handleMetersUpdate}
                   />
                 )}
-                
+
                 {/* Data Locker */}
-                <DataIngestionCard 
-                  accountId={account.id} 
+                <DataIngestionCard
+                  accountId={account.id}
                   onIngestionComplete={handleIngestionComplete}
                 />
               </div>
@@ -1397,7 +1397,7 @@ export default function AccountDossierPage() {
                     <Plus className="w-4 h-4" />
                   </button>
                 </div>
-                
+
                 {/* Stakeholder Map */}
                 <StakeholderMap contacts={contacts || []} />
 
@@ -1409,7 +1409,7 @@ export default function AccountDossierPage() {
                     </h3>
                     <span className="text-[9px] font-mono text-zinc-600 font-bold tabular-nums">{calls?.length || 0} RECORDS</span>
                   </div>
-                  
+
                   <div className="space-y-3">
                     {isLoadingCalls ? (
                       <div className="text-center py-12 text-xs font-mono text-zinc-600 animate-pulse">
@@ -1423,13 +1423,13 @@ export default function AccountDossierPage() {
                             const isContactCall = Boolean(call.contactId?.trim())
                             const contactForCall = isContactCall ? contacts?.find(c => c.id === call.contactId) : null
                             return (
-                              <motion.div 
+                              <motion.div
                                 key={call.id}
                                 layout
                                 initial={{ opacity: 0, x: 20, scale: 0.98 }}
                                 animate={{ opacity: 1, x: 0, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.98 }}
-                                transition={{ 
+                                transition={{
                                   type: "spring",
                                   stiffness: 400,
                                   damping: 30
