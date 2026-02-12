@@ -40,7 +40,7 @@ export default function ConnectivityPage() {
       NEXT_PUBLIC_SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       'window.GOOGLE_MAPS_API': typeof window !== 'undefined' && 'GOOGLE_MAPS_API' in window
     })
-    
+
     checkProxy()
   }, [])
 
@@ -63,7 +63,7 @@ export default function ConnectivityPage() {
   const checkDirect = async () => {
     setDirectStatus('loading')
     setDirectError(null)
-    const directUrl = 'https://nodal-point-network-792458658491.us-central1.run.app/api/debug/health'
+    const directUrl = 'https://nodalpoint.io/api/debug/health'
     try {
       const res = await fetch(directUrl)
       if (!res.ok) throw new Error(`Status: ${res.status} ${res.statusText}`)
@@ -90,7 +90,7 @@ export default function ConnectivityPage() {
               Analyze network path integrity between Frontend (Next.js) and Backend (Network Service).
             </p>
           </div>
-          <Button 
+          <Button
             onClick={() => { checkProxy(); checkDirect(); }}
             variant="outline"
             className="border-white/10 hover:bg-white/5"
@@ -107,12 +107,12 @@ export default function ConnectivityPage() {
             <h2 className="text-lg font-semibold">Internal Uplink (Next.js Proxy)</h2>
             <StatusBadge status={proxyStatus} />
           </div>
-          
+
           <div className="space-y-4">
             <p className="text-sm text-zinc-400">
               Testing route: <code className="bg-zinc-950 px-2 py-1 rounded text-indigo-300">/api/debug/health</code>
             </p>
-            
+
             {proxyError && (
               <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
                 <strong>Connection Failed:</strong> {proxyError}
@@ -184,10 +184,10 @@ export default function ConnectivityPage() {
           {directError && (
             <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-400 text-sm">
               <strong>Direct Access Failed:</strong> {directError}
-            <p className="mt-2 text-xs opacity-75">
-              If &quot;Internal Uplink&quot; works but this fails, it&apos;s likely a CORS issue (which is fine for backend-to-backend comms, but prevents browser direct access).
-              If BOTH fail, the Network Service is down or unreachable.
-            </p>
+              <p className="mt-2 text-xs opacity-75">
+                If &quot;Internal Uplink&quot; works but this fails, it&apos;s likely a CORS issue (which is fine for backend-to-backend comms, but prevents browser direct access).
+                If BOTH fail, the Network Service is down or unreachable.
+              </p>
             </div>
           )}
 
