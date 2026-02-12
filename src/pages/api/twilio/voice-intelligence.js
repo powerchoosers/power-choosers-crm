@@ -8,7 +8,7 @@ function generateLiveTips(insights) {
     const transcript = insights.transcript.toLowerCase();
     const sentiment = insights.sentiment;
     const topics = insights.topics || [];
-    
+
     // Sentiment-based tips
     if (sentiment === 'negative') {
         tips.push({
@@ -23,7 +23,7 @@ function generateLiveTips(insights) {
             priority: 'medium'
         });
     }
-    
+
     // Topic-based tips
     if (topics.includes('price') || transcript.includes('cost') || transcript.includes('expensive')) {
         tips.push({
@@ -32,7 +32,7 @@ function generateLiveTips(insights) {
             priority: 'high'
         });
     }
-    
+
     if (topics.includes('contract') || transcript.includes('contract') || transcript.includes('agreement')) {
         tips.push({
             type: 'info',
@@ -40,7 +40,7 @@ function generateLiveTips(insights) {
             priority: 'medium'
         });
     }
-    
+
     if (topics.includes('renewal') || transcript.includes('renew') || transcript.includes('expire')) {
         tips.push({
             type: 'opportunity',
@@ -48,7 +48,7 @@ function generateLiveTips(insights) {
             priority: 'high'
         });
     }
-    
+
     // Energy-specific tips
     if (transcript.includes('supplier') || transcript.includes('provider')) {
         tips.push({
@@ -57,7 +57,7 @@ function generateLiveTips(insights) {
             priority: 'medium'
         });
     }
-    
+
     if (transcript.includes('usage') || transcript.includes('kwh') || transcript.includes('kilowatt')) {
         tips.push({
             type: 'info',
@@ -65,7 +65,7 @@ function generateLiveTips(insights) {
             priority: 'medium'
         });
     }
-    
+
     // Objection handling tips
     if (transcript.includes('not interested') || transcript.includes('not ready')) {
         tips.push({
@@ -74,7 +74,7 @@ function generateLiveTips(insights) {
             priority: 'high'
         });
     }
-    
+
     if (transcript.includes('think about it') || transcript.includes('consider')) {
         tips.push({
             type: 'info',
@@ -82,7 +82,7 @@ function generateLiveTips(insights) {
             priority: 'medium'
         });
     }
-    
+
     // Closing tips
     if (transcript.includes('next step') || transcript.includes('what happens next')) {
         tips.push({
@@ -91,7 +91,7 @@ function generateLiveTips(insights) {
             priority: 'high'
         });
     }
-    
+
     return tips.slice(0, 3); // Return top 3 most relevant tips
 }
 
@@ -102,19 +102,19 @@ async function handler(req, res) {
         res.end(JSON.stringify({ error: 'Method not allowed' }));
         return;
     }
-    
+
     try {
         const { CallSid, VoiceIntelligenceInsights } = req.body;
-        
+
         logger.log(`[Voice Intelligence] Received insights for call: ${CallSid}`);
         logger.log(`[Voice Intelligence] Insights:`, JSON.stringify(VoiceIntelligenceInsights, null, 2));
-        
+
         if (!CallSid || !VoiceIntelligenceInsights) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Missing required parameters' }));
             return;
         }
-        
+
         // Extract insights data
         const insights = {
             summary: VoiceIntelligenceInsights.summary || '',
@@ -125,17 +125,17 @@ async function handler(req, res) {
             language: VoiceIntelligenceInsights.language || 'en-US',
             processedAt: new Date().toISOString()
         };
-        
+
         // Generate AI-powered live tips based on conversation
         const liveTips = generateLiveTips(insights);
         insights.liveTips = liveTips;
-        
+
         // Update the call data in the central store
         try {
             const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
             const host = req.headers['x-forwarded-host'] || req.headers.host || '';
             const envBase = process.env.PUBLIC_BASE_URL || '';
-            const base = host ? `${proto}://${host}` : (envBase || 'https://nodalpoint.io');
+            const base = host ? `${proto}://${host}` : (envBase || 'https://nodal-point-network.vercel.app');
             await fetch(`${base}/api/calls`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -159,16 +159,16 @@ async function handler(req, res) {
         } catch (e) {
             logger.warn('[Voice Intelligence] Failed posting insights to /api/calls:', e?.message);
         }
-        
+
         logger.log(`[Voice Intelligence] Processing completed for call: ${CallSid}`);
-        
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
             success: true,
             callSid: CallSid,
             insights: insights
         }));
-        
+
     } catch (error) {
         logger.error('[Voice Intelligence] Error:', error);
         res.writeHead(500, { 'Content-Type': 'application/json' });
