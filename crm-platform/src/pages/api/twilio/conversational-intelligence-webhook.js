@@ -5,132 +5,132 @@ import logger from '../_logger.js';
 // Twilio webhook: no CORS needed (server-to-server)
 
 function parseBody(req) {
-  const ct = (req.headers['content-type'] || '').toLowerCase();
-  const b = req.body;
-  if (!b) return {};
-  if (typeof b === 'object') return b;
-  if (typeof b === 'string') {
-    try { if (ct.includes('application/json')) return JSON.parse(b); } catch(_) {}
-    try { const params = new URLSearchParams(b); const out = {}; for (const [k,v] of params) out[k]=v; return out; } catch(_) {}
-  }
-  return {};
+    const ct = (req.headers['content-type'] || '').toLowerCase();
+    const b = req.body;
+    if (!b) return {};
+    if (typeof b === 'object') return b;
+    if (typeof b === 'string') {
+        try { if (ct.includes('application/json')) return JSON.parse(b); } catch (_) { }
+        try { const params = new URLSearchParams(b); const out = {}; for (const [k, v] of params) out[k] = v; return out; } catch (_) { }
+    }
+    return {};
 }
 
-function pick(obj, keys, d='') { for (const k of keys) { if (obj && obj[k] != null && obj[k] !== '') return obj[k]; } return d; }
-function toArr(v){ return Array.isArray(v)?v:(v? [v]:[]); }
+function pick(obj, keys, d = '') { for (const k of keys) { if (obj && obj[k] != null && obj[k] !== '') return obj[k]; } return d; }
+function toArr(v) { return Array.isArray(v) ? v : (v ? [v] : []); }
 
 // Helpers shared by both Operator and CI paths
-function normalizeSupplierTokens(s){
-  try {
+function normalizeSupplierTokens(s) {
+    try {
+        if (!s) return '';
+        let out = String(s);
+        out = out.replace(/\bT\s*X\s*U\b/gi, 'TXU');
+        out = out.replace(/\bN\s*R\s*G\b/gi, 'NRG');
+        out = out.replace(/\bT\s*X\s*you\b/gi, 'TXU');
+        return out;
+    } catch (_) { return String(s || ''); }
+}
+
+function canonicalizeSupplierName(s) {
     if (!s) return '';
-    let out = String(s);
-    out = out.replace(/\bT\s*X\s*U\b/gi, 'TXU');
-    out = out.replace(/\bN\s*R\s*G\b/gi, 'NRG');
-    out = out.replace(/\bT\s*X\s*you\b/gi, 'TXU');
+    const raw = normalizeSupplierTokens(s).trim();
+    const key = raw.replace(/[^a-z0-9]/gi, '').toLowerCase();
+    const map = {
+        'txu': 'TXU', 'txuenergy': 'TXU',
+        'nrg': 'NRG',
+        'reliant': 'Reliant', 'reliantenergy': 'Reliant',
+        'constellation': 'Constellation',
+        'directenergy': 'Direct Energy',
+        'greenmountain': 'Green Mountain', 'greenmountainenergy': 'Green Mountain',
+        'cirro': 'Cirro',
+        'engie': 'Engie',
+        'shellenergy': 'Shell Energy',
+        'championenergy': 'Champion Energy', 'champion': 'Champion Energy',
+        'gexa': 'Gexa',
+        'taraenergy': 'Tara Energy', 'apg&e': 'APG & E', 'apge': 'APG & E',
+    };
+    return map[key] || raw;
+}
+
+function extractContractFromTranscript(text) {
+    const out = { currentRate: '', rateType: '', supplier: '', contractEnd: '', usageKWh: '', contractLength: '' };
+    if (!text) return out;
+    const t = normalizeSupplierTokens(String(text));
+    // Rate: $0.078/kWh or 0.078 near 'rate'
+    try {
+        const rateKw = /(rate|price)[^\n\r]{0,30}?([$]?\s*\d{1,2}(?:\.\d{1,3})?\s*(?:cents|¢|\$?\/?\s*kwh))/i;
+        const m1 = t.match(rateKw);
+        const m2 = t.match(/\b\$?\s*(\d{1,2}\.\d{2,3})\b\s*(?:cents|¢|\/?\s*kwh)/i);
+        const val = (m1 && m1[2]) || (m2 && m2[1] ? `$${m2[1]}/kWh` : '');
+        if (val) out.currentRate = val.replace(/\s+/g, '').replace(/\$/, '$');
+    } catch (_) { }
+    // Rate type
+    if (/\bfixed\b/i.test(t)) out.rateType = 'fixed';
+    else if (/\bvariable\b/i.test(t)) out.rateType = 'variable';
+    else if (/\bindex(ed)?\b/i.test(t)) out.rateType = 'indexed';
+    // Supplier candidates
+    try {
+        const supCand = t.match(/\b(?:supplier|utility)\b[^\n\r]{0,30}?([A-Za-z &]+)\b/)?.[1] || '';
+        const normalized = canonicalizeSupplierName(supCand);
+        const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        if (normalized && !WEEKDAYS.includes(normalized.toLowerCase())) out.supplier = normalized;
+    } catch (_) { }
+    // Usage
+    try {
+        const u = t.match(/\b([\d,.]{3,})\s*(kwh|kilowatt\s*hours?)\b/i);
+        if (u) {
+            const num = u[1].replace(/,/g, '');
+            const formatted = Number(num).toLocaleString();
+            out.usageKWh = `${formatted} kWh`;
+        }
+    } catch (_) { }
+    // Contract end: month name + day + year (allow spaces in digits)
+    try {
+        let s = t.replace(/(\d)\s+(\d)/g, '$1$2');
+        const m = s.match(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t|tember)|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+([0-9]{1,2})(?:st|nd|rd|th)?\s*,?\s*(20\d{2})/i);
+        if (m) out.contractEnd = `${m[1]} ${m[2]}, ${m[3]}`;
+    } catch (_) { }
+    // Contract length
+    try {
+        const cl = t.match(/\b(\d{1,2})\s*(?:year|years|month|months)\b/i);
+        if (cl) out.contractLength = `${cl[1]} ${/year/i.test(cl[0]) ? 'years' : 'months'}`;
+    } catch (_) { }
     return out;
-  } catch(_) { return String(s||''); }
 }
 
-function canonicalizeSupplierName(s){
-  if (!s) return '';
-  const raw = normalizeSupplierTokens(s).trim();
-  const key = raw.replace(/[^a-z0-9]/gi,'').toLowerCase();
-  const map = {
-    'txu':'TXU', 'txuenergy':'TXU',
-    'nrg':'NRG',
-    'reliant':'Reliant', 'reliantenergy':'Reliant',
-    'constellation':'Constellation',
-    'directenergy':'Direct Energy',
-    'greenmountain':'Green Mountain', 'greenmountainenergy':'Green Mountain',
-    'cirro':'Cirro',
-    'engie':'Engie',
-    'shellenergy':'Shell Energy',
-    'championenergy':'Champion Energy', 'champion':'Champion Energy',
-    'gexa':'Gexa',
-    'taraenergy':'Tara Energy', 'apg&e':'APG & E', 'apge':'APG & E',
-  };
-  return map[key] || raw;
-}
-
-function extractContractFromTranscript(text){
-  const out = { currentRate: '', rateType: '', supplier: '', contractEnd: '', usageKWh: '', contractLength: '' };
-  if (!text) return out;
-  const t = normalizeSupplierTokens(String(text));
-  // Rate: $0.078/kWh or 0.078 near 'rate'
-  try {
-    const rateKw = /(rate|price)[^\n\r]{0,30}?([$]?\s*\d{1,2}(?:\.\d{1,3})?\s*(?:cents|¢|\$?\/?\s*kwh))/i;
-    const m1 = t.match(rateKw);
-    const m2 = t.match(/\b\$?\s*(\d{1,2}\.\d{2,3})\b\s*(?:cents|¢|\/?\s*kwh)/i);
-    const val = (m1 && m1[2]) || (m2 && m2[1] ? `$${m2[1]}/kWh` : '');
-    if (val) out.currentRate = val.replace(/\s+/g,'').replace(/\$/,'$');
-  } catch(_) {}
-  // Rate type
-  if (/\bfixed\b/i.test(t)) out.rateType = 'fixed';
-  else if (/\bvariable\b/i.test(t)) out.rateType = 'variable';
-  else if (/\bindex(ed)?\b/i.test(t)) out.rateType = 'indexed';
-  // Supplier candidates
-  try {
-    const supCand = t.match(/\b(?:supplier|utility)\b[^\n\r]{0,30}?([A-Za-z &]+)\b/)?.[1] || '';
-    const normalized = canonicalizeSupplierName(supCand);
-    const WEEKDAYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
-    if (normalized && !WEEKDAYS.includes(normalized.toLowerCase())) out.supplier = normalized;
-  } catch(_) {}
-  // Usage
-  try {
-    const u = t.match(/\b([\d,.]{3,})\s*(kwh|kilowatt\s*hours?)\b/i);
-    if (u) {
-      const num = u[1].replace(/,/g,'');
-      const formatted = Number(num).toLocaleString();
-      out.usageKWh = `${formatted} kWh`;
+function buildSpeakerTurnsFromSentences(sentences, agentChannelStr) {
+    const turns = [];
+    if (!Array.isArray(sentences) || !sentences.length) return turns;
+    const normalizeChannel = (c) => {
+        const s = (c == null ? '' : String(c)).trim();
+        if (s === '0') return '1';
+        if (/^[Aa]$/.test(s)) return '1';
+        if (/^[Bb]$/.test(s)) return '2';
+        return s;
+    };
+    const resolveRole = (s) => {
+        const sp = (s.speaker || s.role || '').toString().toLowerCase();
+        if (sp.includes('agent') || sp.includes('rep')) return 'agent';
+        if (sp.includes('customer') || sp.includes('caller') || sp.includes('client')) return 'customer';
+        const ch = normalizeChannel(s.channel ?? s.channelNumber ?? s.channel_id ?? s.channelIndex);
+        if (ch) return ch === (agentChannelStr || '1') ? 'agent' : 'customer';
+        return '';
+    };
+    let current = null;
+    for (const s of sentences) {
+        const role = resolveRole(s) || 'customer';
+        const t = Math.max(0, Math.floor((s.startTime || 0))); // seconds
+        const text = s.text || s.transcript || '';
+        if (current && current.role === role) {
+            current.text += (current.text ? ' ' : '') + text;
+            current.t = t;
+        } else {
+            if (current) turns.push(current);
+            current = { role, t, text };
+        }
     }
-  } catch(_) {}
-  // Contract end: month name + day + year (allow spaces in digits)
-  try {
-    let s = t.replace(/(\d)\s+(\d)/g, '$1$2');
-    const m = s.match(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t|tember)|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+([0-9]{1,2})(?:st|nd|rd|th)?\s*,?\s*(20\d{2})/i);
-    if (m) out.contractEnd = `${m[1]} ${m[2]}, ${m[3]}`;
-  } catch(_) {}
-  // Contract length
-  try {
-    const cl = t.match(/\b(\d{1,2})\s*(?:year|years|month|months)\b/i);
-    if (cl) out.contractLength = `${cl[1]} ${/year/i.test(cl[0]) ? 'years' : 'months'}`;
-  } catch(_) {}
-  return out;
-}
-
-function buildSpeakerTurnsFromSentences(sentences, agentChannelStr){
-  const turns = [];
-  if (!Array.isArray(sentences) || !sentences.length) return turns;
-  const normalizeChannel = (c) => {
-    const s = (c == null ? '' : String(c)).trim();
-    if (s === '0') return '1';
-    if (/^[Aa]$/.test(s)) return '1';
-    if (/^[Bb]$/.test(s)) return '2';
-    return s;
-  };
-  const resolveRole = (s) => {
-    const sp = (s.speaker || s.role || '').toString().toLowerCase();
-    if (sp.includes('agent') || sp.includes('rep')) return 'agent';
-    if (sp.includes('customer') || sp.includes('caller') || sp.includes('client')) return 'customer';
-    const ch = normalizeChannel(s.channel ?? s.channelNumber ?? s.channel_id ?? s.channelIndex);
-    if (ch) return ch === (agentChannelStr || '1') ? 'agent' : 'customer';
-    return '';
-  };
-  let current = null;
-  for (const s of sentences){
-    const role = resolveRole(s) || 'customer';
-    const t = Math.max(0, Math.floor((s.startTime || 0))); // seconds
-    const text = s.text || s.transcript || '';
-    if (current && current.role === role) {
-      current.text += (current.text ? ' ' : '') + text;
-      current.t = t;
-    } else {
-      if (current) turns.push(current);
-      current = { role, t, text };
-    }
-  }
-  if (current) turns.push(current);
-  return turns;
+    if (current) turns.push(current);
+    return turns;
 }
 
 import twilio from 'twilio';
@@ -141,26 +141,26 @@ export default async function handler(req, res) {
     const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
     const host = req.headers['x-forwarded-host'] || req.headers.host || '';
     const envBase = process.env.PUBLIC_BASE_URL || process.env.API_BASE_URL || '';
-    const base = host ? `${proto}://${host}` : (envBase || 'https://nodalpoint.io');
+    const base = host ? `${proto}://${host}` : (envBase || 'https://nodal-point-network.vercel.app');
 
     if (req.method !== 'POST') {
         res.writeHead(405, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Method not allowed' }));
         return;
     }
-    
+
     try {
         const _start = Date.now();
         const _ts = new Date().toISOString();
-        try { logger.debug('CI Webhook received', 'TwilioWebhook', { timestamp: _ts }); } catch(_) {}
-        logger.debug('Conversational Intelligence webhook received', 'TwilioWebhook', { 
-            payloadSize: JSON.stringify(req.body).length 
+        try { logger.debug('CI Webhook received', 'TwilioWebhook', { timestamp: _ts }); } catch (_) { }
+        logger.debug('Conversational Intelligence webhook received', 'TwilioWebhook', {
+            payloadSize: JSON.stringify(req.body).length
         });
-        
-        const { 
-            TranscriptSid, 
-            ServiceSid, 
-            Status, 
+
+        const {
+            TranscriptSid,
+            ServiceSid,
+            Status,
             CallSid,
             RecordingSid,
             EventType,
@@ -168,11 +168,11 @@ export default async function handler(req, res) {
             AccountSid,
             timestamp
         } = req.body;
-        
+
         if (!TranscriptSid || !ServiceSid) {
-            logger.warn('Missing required fields in CI webhook', 'TwilioWebhook', { 
-                hasTranscriptSid: !!TranscriptSid, 
-                hasServiceSid: !!ServiceSid 
+            logger.warn('Missing required fields in CI webhook', 'TwilioWebhook', {
+                hasTranscriptSid: !!TranscriptSid,
+                hasServiceSid: !!ServiceSid
             });
             res.writeHead(400, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Missing required fields' }));
@@ -180,10 +180,10 @@ export default async function handler(req, res) {
         }
 
         // Log webhook payload summary for debugging
-        logger.debug('CI webhook payload summary', 'TwilioWebhook', { 
-            payloadSize: JSON.stringify(req.body).length 
+        logger.debug('CI webhook payload summary', 'TwilioWebhook', {
+            payloadSize: JSON.stringify(req.body).length
         });
-        
+
         logger.debug('Processing CI webhook', 'TwilioWebhook', {
             transcriptSid: TranscriptSid,
             serviceSid: ServiceSid,
@@ -195,11 +195,11 @@ export default async function handler(req, res) {
             AccountSid,
             timestamp
         });
-        
+
         // Only process analysis completed events (per Twilio guidance)
-        const isAnalysisComplete = EventType === 'analysis_completed' || 
-                                 EventType === 'ci.analysis.completed';
-        
+        const isAnalysisComplete = EventType === 'analysis_completed' ||
+            EventType === 'ci.analysis.completed';
+
         if (!isAnalysisComplete) {
             logger.log('[Conversational Intelligence Webhook] Not an analysis completion event:', {
                 EventType,
@@ -210,7 +210,7 @@ export default async function handler(req, res) {
             res.end(JSON.stringify({ success: true, message: 'Not analysis completion event' }));
             return;
         }
-        
+
         // Validate analysis status
         if (analysisStatus && analysisStatus !== 'completed') {
             logger.log('[Conversational Intelligence Webhook] Analysis not completed yet:', {
@@ -222,7 +222,7 @@ export default async function handler(req, res) {
             res.end(JSON.stringify({ success: true, message: 'Analysis in progress' }));
             return;
         }
-        
+
         // Initialize Twilio client
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
@@ -236,7 +236,7 @@ export default async function handler(req, res) {
                 try {
                     const t = await client.intelligence.v2.transcripts(TranscriptSid).fetch();
                     callSidFromCustomerKey = t?.customerKey || '';
-                } catch(_) {}
+                } catch (_) { }
                 if (db && callSidFromCustomerKey) {
                     try {
                         const snap = await db.collection('calls').doc(callSidFromCustomerKey).get();
@@ -247,7 +247,7 @@ export default async function handler(req, res) {
                                 allowed = true;
                             }
                         }
-                    } catch(_) {}
+                    } catch (_) { }
                 }
                 if (!allowed) {
                     logger.log('[CI Webhook] CI auto-process disabled; ignoring transcript not explicitly requested', { TranscriptSid, callSidFromCustomerKey });
@@ -256,7 +256,7 @@ export default async function handler(req, res) {
                     return;
                 }
             }
-        } catch(_) {}
+        } catch (_) { }
 
         // Defer heavy work: queue background fetch and ACK fast to avoid webhook retries/timeouts
         try {
@@ -264,15 +264,15 @@ export default async function handler(req, res) {
             // Fire-and-forget; do not await
             fetch(`${base}/api/twilio/poll-ci-analysis`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-            }).then(()=>{ try { logger.log('[CI Webhook] Queued background poll for', TranscriptSid); } catch(_) {} })
-              .catch((e)=>{ try { logger.warn('[CI Webhook] Background poll queue failed:', e?.message||e); } catch(_) {} });
-        } catch (e) { try { logger.warn('[CI Webhook] Queue error:', e?.message||e); } catch(_) {} }
+            }).then(() => { try { logger.log('[CI Webhook] Queued background poll for', TranscriptSid); } catch (_) { } })
+                .catch((e) => { try { logger.warn('[CI Webhook] Background poll queue failed:', e?.message || e); } catch (_) { } });
+        } catch (e) { try { logger.warn('[CI Webhook] Queue error:', e?.message || e); } catch (_) { } }
         const _elapsed = Date.now() - _start;
-        try { logger.log('[CI Webhook] ACK 200 queued in', _elapsed + 'ms', 'for', TranscriptSid); } catch(_) {}
+        try { logger.log('[CI Webhook] ACK 200 queued in', _elapsed + 'ms', 'for', TranscriptSid); } catch (_) { }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, queued: true, transcriptSid: TranscriptSid, elapsedMs: _elapsed }));
         return;
-        
+
         try {
             // Get the transcript details and validate CI analysis status
             const transcript = await client.intelligence.v2.transcripts(TranscriptSid).fetch();
@@ -285,7 +285,7 @@ export default async function handler(req, res) {
                 ciStatus: transcript.ciStatus || 'unknown',
                 processingStatus: transcript.processingStatus || 'unknown'
             });
-            
+
             // Double-check that CI analysis is actually completed (per Twilio guidance)
             if (transcript.analysisStatus && transcript.analysisStatus !== 'completed') {
                 if (transcript.analysisStatus === 'failed') {
@@ -300,7 +300,7 @@ export default async function handler(req, res) {
                     res.end(JSON.stringify({ success: true, message: 'CI analysis failed' }));
                     return;
                 }
-                
+
                 logger.log('[Conversational Intelligence Webhook] CI analysis not completed yet:', {
                     transcriptStatus: transcript.status,
                     analysisStatus: transcript.analysisStatus,
@@ -312,17 +312,17 @@ export default async function handler(req, res) {
                 res.end(JSON.stringify({ success: true, message: 'CI analysis in progress' }));
                 return;
             }
-            
+
             // Compute channel to role mapping for this call (agent vs customer)
             let channelRoleMap = { agentChannel: '1', customerChannel: '2' };
             try {
                 let callResource = null;
-                try { callResource = await client.calls(CallSid).fetch(); } catch(_) {}
+                try { callResource = await client.calls(CallSid).fetch(); } catch (_) { }
                 const fromStr = callResource?.from || '';
                 const toStr = callResource?.to || '';
                 const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
                 const envBiz = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
-                  .split(',').map(norm).filter(Boolean);
+                    .split(',').map(norm).filter(Boolean);
                 const from10 = norm(fromStr);
                 const to10 = norm(toStr);
                 const isBiz = (p) => !!p && envBiz.includes(p);
@@ -331,7 +331,7 @@ export default async function handler(req, res) {
                 channelRoleMap.agentChannel = fromIsAgent ? '1' : '2';
                 channelRoleMap.customerChannel = fromIsAgent ? '2' : '1';
                 logger.log('[CI Webhook] Channel-role mapping', channelRoleMap, { from: fromStr, to: toStr });
-            } catch(e) {
+            } catch (e) {
                 logger.warn('[CI Webhook] Failed to compute channel-role mapping, defaulting:', e?.message);
             }
 
@@ -353,7 +353,7 @@ export default async function handler(req, res) {
                     await new Promise(r => setTimeout(r, stepMs));
                     waited += stepMs;
                 }
-                
+
                 logger.log(`[Conversational Intelligence Webhook] Raw sentences response:`, {
                     count: sentencesResponse.length,
                     sample: sentencesResponse.slice(0, 2).map(s => ({
@@ -366,7 +366,7 @@ export default async function handler(req, res) {
                     // Log full sentences response for debugging (first 3 sentences)
                     fullResponse: sentencesResponse.slice(0, 3)
                 });
-                
+
                 // Validate we have proper sentence segmentation (per Twilio guidance)
                 if (sentencesResponse.length === 0) {
                     logger.warn('[Conversational Intelligence Webhook] No sentences returned - CI analysis may not be complete');
@@ -374,7 +374,7 @@ export default async function handler(req, res) {
                     res.end(JSON.stringify({ success: true, message: 'No sentences available yet' }));
                     return;
                 }
-                
+
                 // Check for segmentation failure indicators (per Twilio guidance: 5-20+ sentences expected for 1-2 min calls)
                 if (sentencesResponse.length <= 2) {
                     logger.warn('[Conversational Intelligence Webhook] Very few sentences detected - possible segmentation failure:', {
@@ -383,26 +383,26 @@ export default async function handler(req, res) {
                         message: 'Expected 5-20+ sentences for typical 1-2 minute calls'
                     });
                 }
-                
+
                 if (sentencesResponse.length === 1 && sentencesResponse[0].text && sentencesResponse[0].text.length > 500) {
                     logger.warn('[Conversational Intelligence Webhook] Single long sentence detected - CI segmentation likely failed:', {
                         sentenceLength: sentencesResponse[0].text.length,
                         message: 'Single sentence over 500 chars suggests segmentation failure'
                     });
                 }
-                
+
                 const agentChNum = Number(channelRoleMap.agentChannel || '1');
                 const customerChNum = Number(channelRoleMap.customerChannel || '2');
                 let channelWarningsLogged = 0;
-                
+
                 sentences = sentencesResponse.map((s, idx) => {
                     // Try multiple possible channel field names (Twilio API variations)
                     let channel = s.channel ?? s.channelNumber ?? s.channel_id ?? s.channelIndex ?? s.mediaChannel;
                     let channelNum = null;
-                    
+
                     // Also check for participant role which may indicate speaker
                     const participantRole = s.participantRole || s.participant?.role || s.role || '';
-                    
+
                     // Normalize channel values defensively
                     if (channel === null || channel === undefined) {
                         // Try to infer from participant role if channel is missing
@@ -431,7 +431,7 @@ export default async function handler(req, res) {
                     } else {
                         channelNum = Number(channel) || 1;
                     }
-                    
+
                     // Determine speaker - use participant role if available, otherwise channel mapping
                     let speaker = 'Agent';
                     if (participantRole) {
@@ -439,7 +439,7 @@ export default async function handler(req, res) {
                     } else {
                         speaker = channelNum === agentChNum ? 'Agent' : 'Customer';
                     }
-                    
+
                     return {
                         text: s.text || '',
                         confidence: s.confidence,
@@ -451,15 +451,15 @@ export default async function handler(req, res) {
                         speaker: speaker
                     };
                 });
-                
+
                 transcriptText = sentences.map(s => s.text || '').filter(text => text.trim()).join(' ');
-                
+
                 // Create formatted transcript with speaker labels for better display
                 const formattedTranscript = sentences
                     .filter(s => s.text && s.text.trim())
                     .map(s => `${s.speaker}: ${s.text.trim()}`)
                     .join('\n\n');
-                
+
                 logger.log(`[Conversational Intelligence Webhook] Retrieved ${sentences.length} sentences, transcript length: ${transcriptText.length}`);
                 logger.log(`[Conversational Intelligence Webhook] Formatted transcript with speaker labels: ${formattedTranscript.length} chars`);
                 logger.log(`[Conversational Intelligence Webhook] Channel distribution:`, {
@@ -472,14 +472,14 @@ export default async function handler(req, res) {
             } catch (error) {
                 logger.error('[Conversational Intelligence Webhook] Error fetching sentences:', error);
             }
-            
+
             // Get operator results (includes Twilio-generated summary)
             let operatorResults = null;
             try {
                 const resultsResponse = await client.intelligence.v2
                     .transcripts(TranscriptSid)
                     .operatorResults.list();
-                
+
                 if (resultsResponse.length > 0) {
                     operatorResults = resultsResponse.map(r => ({
                         name: r.name,
@@ -489,17 +489,17 @@ export default async function handler(req, res) {
                         // Include textGenerationResults for summary extraction
                         textGenerationResults: r.textGenerationResults
                     }));
-                    logger.log(`[Conversational Intelligence Webhook] Retrieved ${resultsResponse.length} operator results:`, 
-                        operatorResults.map(op => ({ 
-                            name: op.name, 
+                    logger.log(`[Conversational Intelligence Webhook] Retrieved ${resultsResponse.length} operator results:`,
+                        operatorResults.map(op => ({
+                            name: op.name,
                             type: op.operatorType,
-                            hasTextGeneration: !!op.textGenerationResults 
+                            hasTextGeneration: !!op.textGenerationResults
                         })));
                 }
             } catch (error) {
-                                logger.warn('[Conversational Intelligence Webhook] No operator results available:', error.message);
+                logger.warn('[Conversational Intelligence Webhook] No operator results available:', error.message);
             }
-            
+
             // Generate AI insights from the transcript
             let aiInsights = null;
             if (transcriptText) {
@@ -507,38 +507,38 @@ export default async function handler(req, res) {
                 // Add normalized contract fields from transcript if missing or weak
                 const contractFromText = extractContractFromTranscript(transcriptText);
                 aiInsights.contract = {
-                  ...(aiInsights.contract || {}),
-                  currentRate: aiInsights.contract?.currentRate || contractFromText.currentRate || '',
-                  rateType: aiInsights.contract?.rateType || contractFromText.rateType || '',
-                  supplier: canonicalizeSupplierName(aiInsights.contract?.supplier || contractFromText.supplier || ''),
-                  contractEnd: aiInsights.contract?.contractEnd || contractFromText.contractEnd || '',
-                  usageKWh: aiInsights.contract?.usageKWh || contractFromText.usageKWh || '',
-                  contractLength: aiInsights.contract?.contractLength || contractFromText.contractLength || ''
+                    ...(aiInsights.contract || {}),
+                    currentRate: aiInsights.contract?.currentRate || contractFromText.currentRate || '',
+                    rateType: aiInsights.contract?.rateType || contractFromText.rateType || '',
+                    supplier: canonicalizeSupplierName(aiInsights.contract?.supplier || contractFromText.supplier || ''),
+                    contractEnd: aiInsights.contract?.contractEnd || contractFromText.contractEnd || '',
+                    usageKWh: aiInsights.contract?.usageKWh || contractFromText.usageKWh || '',
+                    contractLength: aiInsights.contract?.contractLength || contractFromText.contractLength || ''
                 };
                 // Derive grouped speaker turns from sentences when diarization is not present
                 if (!Array.isArray(aiInsights.speakerTurns) || !aiInsights.speakerTurns.length) {
-                  aiInsights.speakerTurns = buildSpeakerTurnsFromSentences(sentences, channelRoleMap.agentChannel);
+                    aiInsights.speakerTurns = buildSpeakerTurnsFromSentences(sentences, channelRoleMap.agentChannel);
                 }
                 // Also attach CI metadata so the UI can render reliably
                 aiInsights.conversationalIntelligence = {
-                  transcriptSid: TranscriptSid,
-                  status: transcript.status,
-                  sentenceCount: Array.isArray(sentences) ? sentences.length : 0,
-                  channelRoleMap,
-                  // Include sentences with channel info for frontend speaker mapping
-                  sentences: sentences.map(s => ({
-                      text: s.text || '',
-                      startTime: s.startTime,
-                      endTime: s.endTime,
-                      channel: s.channel,
-                      channelNum: s.channelNum,
-                      speaker: s.speaker,
-                      participantRole: s.participantRole || '',
-                      confidence: s.confidence
-                  }))
+                    transcriptSid: TranscriptSid,
+                    status: transcript.status,
+                    sentenceCount: Array.isArray(sentences) ? sentences.length : 0,
+                    channelRoleMap,
+                    // Include sentences with channel info for frontend speaker mapping
+                    sentences: sentences.map(s => ({
+                        text: s.text || '',
+                        startTime: s.startTime,
+                        endTime: s.endTime,
+                        channel: s.channel,
+                        channelNum: s.channelNum,
+                        speaker: s.speaker,
+                        participantRole: s.participantRole || '',
+                        confidence: s.confidence
+                    }))
                 };
             }
-            
+
             // Update the call data in the central store (ensure we use a real Call SID to avoid duplicates)
             try {
                 const resolved = await resolveToCallSid({ callSid: CallSid, recordingSid: RecordingSid, transcriptSid: TranscriptSid });
@@ -573,7 +573,7 @@ export default async function handler(req, res) {
                             }
                         })
                     });
-                    
+
                     if (updateResponse.ok) {
                         logger.log('[Conversational Intelligence Webhook] Successfully updated call data');
                     } else {
@@ -583,26 +583,26 @@ export default async function handler(req, res) {
             } catch (error) {
                 logger.error('[Conversational Intelligence Webhook] Error updating call data:', error);
             }
-            
+
         } catch (error) {
             logger.error('[Conversational Intelligence Webhook] Error processing transcript:', error);
         }
-        
+
         logger.log('[Conversational Intelligence Webhook] Processing completed');
-        
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
             success: true,
             message: 'Transcript processed successfully'
         }));
         return;
-        
+
     } catch (error) {
         logger.error('[Conversational Intelligence Webhook] Error:', error);
         res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ 
+        res.end(JSON.stringify({
             error: 'Failed to process webhook',
-            details: error.message 
+            details: error.message
         }));
         return;
     }
@@ -612,14 +612,14 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
     try {
         const words = transcript.toLowerCase().split(/\s+/);
         const wordCount = words.length;
-        
+
         // Enhanced sentiment analysis
         const positiveWords = ['good', 'great', 'excellent', 'perfect', 'love', 'happy', 'satisfied', 'interested', 'yes', 'sure', 'definitely', 'amazing', 'fantastic', 'wonderful'];
         const negativeWords = ['bad', 'terrible', 'awful', 'hate', 'angry', 'frustrated', 'disappointed', 'no', 'not', 'never', 'problem', 'issue', 'concern', 'worried'];
-        
+
         const positiveCount = words.filter(word => positiveWords.includes(word)).length;
         const negativeCount = words.filter(word => negativeWords.includes(word)).length;
-        
+
         let sentiment = 'Neutral';
         let sentimentScore = 0;
         if (positiveCount > negativeCount) {
@@ -629,7 +629,7 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
             sentiment = 'Negative';
             sentimentScore = -(negativeCount - positiveCount) / wordCount;
         }
-        
+
         // Extract key topics with confidence
         const businessTopics = {
             'price': ['price', 'cost', 'expensive', 'cheap', 'budget', 'afford', 'dollar', 'payment'],
@@ -640,7 +640,7 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
             'meeting': ['meeting', 'demo', 'presentation', 'call', 'schedule', 'appointment'],
             'proposal': ['proposal', 'quote', 'estimate', 'offer', 'deal', 'package']
         };
-        
+
         const detectedTopics = [];
         for (const [topic, keywords] of Object.entries(businessTopics)) {
             const matches = keywords.filter(keyword => words.includes(keyword));
@@ -652,23 +652,23 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
                 });
             }
         }
-        
+
         // Extract next steps
         const nextStepKeywords = ['call', 'email', 'meeting', 'demo', 'proposal', 'quote', 'follow', 'schedule', 'send', 'review', 'next step', 'what happens next'];
         const nextSteps = nextStepKeywords.filter(step => words.includes(step));
-        
+
         // Extract pain points
         const painKeywords = ['problem', 'issue', 'concern', 'worry', 'challenge', 'difficult', 'expensive', 'slow', 'complicated', 'confused'];
         const painPoints = painKeywords.filter(pain => words.includes(pain));
-        
+
         // Check for budget discussion
         const budgetKeywords = ['budget', 'cost', 'price', 'expensive', 'cheap', 'afford', 'money', 'dollar', 'payment', 'investment'];
         const budgetDiscussed = budgetKeywords.some(keyword => words.includes(keyword));
-        
+
         // Check for timeline discussion
         const timelineKeywords = ['when', 'timeline', 'schedule', 'deadline', 'urgent', 'soon', 'quickly', 'time', 'date'];
         const timelineMentioned = timelineKeywords.some(keyword => words.includes(keyword));
-        
+
         // Extract decision makers (simple name detection)
         const decisionMakers = [];
         const namePattern = /\b[A-Z][a-z]+ [A-Z][a-z]+\b/g;
@@ -676,7 +676,7 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
         if (names.length > 0) {
             decisionMakers.push(...names.slice(0, 3)); // Limit to 3 names
         }
-        
+
         // Use operator results if available - extract Twilio-generated summary
         let enhancedInsights = {};
         let twilioSummary = '';
@@ -684,27 +684,27 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
             // Look for the summary in operator results - check multiple locations
             for (const op of operatorResults) {
                 // Check for text_generation type or summary-related names
-                if (op.operatorType === 'text_generation' || 
+                if (op.operatorType === 'text_generation' ||
                     ['summary', 'conversation_summary', 'call_summary'].includes(op.name?.toLowerCase())) {
                     // Check multiple possible locations for the summary
-                    const summaryText = op.textGenerationResults || 
-                                       op.summary || 
-                                       op.results?.textGenerationResults || 
-                                       op.results?.summary ||
-                                       op.extractionResults?.summary ||
-                                       (typeof op.result === 'string' ? op.result : null);
+                    const summaryText = op.textGenerationResults ||
+                        op.summary ||
+                        op.results?.textGenerationResults ||
+                        op.results?.summary ||
+                        op.extractionResults?.summary ||
+                        (typeof op.result === 'string' ? op.result : null);
                     if (summaryText) {
                         twilioSummary = String(summaryText).trim();
                         logger.log('[CI Webhook] Found Twilio summary from operator:', op.name, 'length:', twilioSummary.length);
                         break;
                     }
                 }
-                
+
                 // Also check extraction operators which may contain parsed JSON with summary
                 if (op.operatorType === 'extraction' && op.extractionResults) {
                     try {
-                        const extracted = typeof op.extractionResults === 'string' 
-                            ? JSON.parse(op.extractionResults) 
+                        const extracted = typeof op.extractionResults === 'string'
+                            ? JSON.parse(op.extractionResults)
                             : op.extractionResults;
                         if (extracted.summary) {
                             twilioSummary = String(extracted.summary).trim();
@@ -716,17 +716,17 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
                     }
                 }
             }
-            
+
             enhancedInsights = {
                 operatorAnalysis: operatorResults,
                 confidence: operatorResults.reduce((acc, r) => acc + (r.confidence || 0), 0) / operatorResults.length,
                 hasTwilioSummary: !!twilioSummary
             };
         }
-        
+
         // Use Twilio-generated summary if available, otherwise generate one
         const generatedSummary = `Advanced AI analysis of ${wordCount}-word conversation. ${sentiment} sentiment detected (${(sentimentScore * 100).toFixed(1)}% confidence). ${detectedTopics.length > 0 ? 'Key topics: ' + detectedTopics.map(t => t.topic).join(', ') : 'General business discussion.'}`;
-        
+
         return {
             summary: twilioSummary || generatedSummary,
             sentiment: sentiment,
@@ -743,7 +743,7 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
             source: 'twilio-conversational-intelligence',
             ...enhancedInsights
         };
-        
+
     } catch (error) {
         logger.error('[Conversational Intelligence Webhook] Insights generation error:', error);
         return {

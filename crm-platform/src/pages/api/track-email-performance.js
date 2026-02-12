@@ -9,20 +9,21 @@ function cors(req, res) {
     'http://127.0.0.1:3000',
     'https://powerchoosers.com',
     'https://www.powerchoosers.com',
-    'https://nodalpoint.io'
+    'https://nodalpoint.io',
+    'https://nodal-point-network.vercel.app'
   ];
-  
+
   if (allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   } else {
     res.setHeader('Access-Control-Allow-Origin', '*');
   }
-  
+
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Vary', 'Origin');
-  
+
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
     res.end();
@@ -38,9 +39,9 @@ export default async function handler(req, res) {
     res.end(JSON.stringify({ error: 'Method not allowed' }));
     return;
   }
-  
+
   try {
-    const { 
+    const {
       emailId,
       recipientEmail,
       subjectStyle,
@@ -49,15 +50,15 @@ export default async function handler(req, res) {
       timestamp,
       event // 'sent', 'opened', 'replied', 'bounced'
     } = req.body;
-    
+
     // Store tracking data (can be enhanced to store in Firebase or analytics service)
-    
+
     // TODO: Store in Firebase Firestore for future analysis
     // Example structure:
     // collection: 'email_performance'
     // document: emailId
     // fields: { subject_style, cta_type, opening_style, events: [{ event, timestamp }] }
-    
+
     // Return success
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, tracked: true }));
