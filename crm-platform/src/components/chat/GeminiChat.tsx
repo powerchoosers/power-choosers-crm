@@ -387,13 +387,13 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
       const hasContractData = !!dossier.contractExpiration
 
       return (
-        <motion.div 
+        <motion.div
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
           className="flex flex-col gap-3 p-4 rounded-xl bg-white/5 border border-white/10 relative overflow-hidden group w-full"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-[#002FA7]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          
+
           <div className="flex items-center gap-4 relative z-10">
             <div className="w-12 h-12 rounded-2xl bg-black/40 flex items-center justify-center border border-white/10 text-zinc-400 font-bold text-lg shrink-0">
               {dossier.initials || dossier.name.charAt(0)}
@@ -438,12 +438,12 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
       if (!isRecord(data)) return null
       const pos = data as unknown as PositionMaturity
       return (
-        <motion.div 
+        <motion.div
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
           className="nodal-void-card transition-all duration-500 p-6 relative overflow-hidden shadow-lg space-y-6 w-full"
         >
-          
+
           {pos.isSimulation && (
             <div className="absolute top-3 right-4">
               <span className="text-[9px] font-mono text-amber-500 border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 rounded uppercase tracking-[0.2em] animate-pulse">
@@ -577,7 +577,7 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
               <span>SYSTEM_GRID_METRICS</span>
               <span className="text-[8px] opacity-50">TS: {pulse.timestamp ?? '—'}</span>
             </h4>
-            
+
             <div className="grid grid-cols-3 gap-4 mb-6">
               <div className="space-y-1">
                 <div className="text-[9px] text-zinc-500 uppercase">Actual Load</div>
@@ -638,7 +638,7 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
       }
 
       return (
-        <motion.div 
+        <motion.div
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
           className="rounded-xl nodal-module-glass nodal-monolith-edge overflow-hidden w-full"
@@ -680,7 +680,7 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
       if (!isRecord(data)) return null
       const docData = data as unknown as ForensicDocuments
       return (
-        <motion.div 
+        <motion.div
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
           className="rounded-2xl nodal-module-glass nodal-monolith-edge overflow-hidden w-full"
@@ -767,29 +767,29 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
             .filter((v): v is NewsTickerItem => v !== null)
         })()
 
-      return (
-        <div className="grid grid-cols-1 min-w-0 w-full max-w-full">
-          <div className="flex items-center justify-between px-1 mb-2">
-            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Market_Volatility_Feed</span>
-            <Activity size={10} className="text-emerald-500" />
-          </div>
-          <div className="overflow-x-auto w-full pb-2 no-scrollbar touch-pan-x flex gap-3">
-            {items.map((item, i) => (
-              <div key={i} className="min-w-[160px] sm:min-w-[200px] max-w-[240px] p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-1 hover:bg-white/10 transition-colors shrink-0">
-                <div className="flex items-center justify-between text-[9px] sm:text-[10px] font-mono">
-                  <span className="text-zinc-400 truncate mr-2">{item.source || 'ERCOT'}</span>
-                  <span className={cn("shrink-0", item.trend === 'up' ? "text-red-400" : "text-emerald-400")}>
-                    {item.trend === 'up' ? '▲' : '▼'} {item.volatility || '2.4%'}
-                  </span>
+        return (
+          <div className="grid grid-cols-1 min-w-0 w-full max-w-full">
+            <div className="flex items-center justify-between px-1 mb-2">
+              <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Market_Volatility_Feed</span>
+              <Activity size={10} className="text-emerald-500" />
+            </div>
+            <div className="overflow-x-auto w-full pb-2 no-scrollbar touch-pan-x flex gap-3">
+              {items.map((item, i) => (
+                <div key={i} className="min-w-[160px] sm:min-w-[200px] max-w-[240px] p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-1 hover:bg-white/10 transition-colors shrink-0">
+                  <div className="flex items-center justify-between text-[9px] sm:text-[10px] font-mono">
+                    <span className="text-zinc-400 truncate mr-2">{item.source || 'ERCOT'}</span>
+                    <span className={cn("shrink-0", item.trend === 'up' ? "text-red-400" : "text-emerald-400")}>
+                      {item.trend === 'up' ? '▲' : '▼'} {item.volatility || '2.4%'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] sm:text-xs font-medium text-zinc-100 line-clamp-2 leading-snug">
+                    {item.title}
+                  </p>
                 </div>
-                <p className="text-[11px] sm:text-xs font-medium text-zinc-100 line-clamp-2 leading-snug">
-                  {item.title}
-                </p>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )
+        )
       }
     case 'mini_profile':
       {
@@ -807,24 +807,24 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
             .filter((v): v is MiniProfile => v !== null)
         })()
 
-      return (
-        <div className="grid grid-cols-1 gap-2 w-full min-w-0 overflow-hidden">
-          {profiles.map((profile, i) => (
-            <div key={i} className="flex items-center gap-3 p-2 sm:p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group min-w-0">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-[14px] sm:rounded-2xl bg-black/40 flex items-center justify-center text-zinc-400 font-bold border border-white/5 group-hover:border-blue-500/50 transition-colors shrink-0">
-                {profile.name?.charAt(0)}
+        return (
+          <div className="grid grid-cols-1 gap-2 w-full min-w-0 overflow-hidden">
+            {profiles.map((profile, i) => (
+              <div key={i} className="flex items-center gap-3 p-2 sm:p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group min-w-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-[14px] sm:rounded-2xl bg-black/40 flex items-center justify-center text-zinc-400 font-bold border border-white/5 group-hover:border-blue-500/50 transition-colors shrink-0">
+                  {profile.name?.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0 overflow-hidden">
+                  <h4 className="text-xs sm:text-sm font-semibold text-zinc-100 truncate">{profile.name}</h4>
+                  <p className="text-[9px] sm:text-[10px] text-zinc-500 font-mono truncate uppercase tracking-tighter">{profile.company || profile.title}</p>
+                </div>
+                <Button size="sm" className="h-7 sm:h-8 px-2 sm:px-3 bg-[#002FA7]/20 text-[#002FA7] border border-[#002FA7]/30 hover:bg-[#002FA7] hover:text-white transition-all text-[9px] sm:text-[10px] font-bold uppercase tracking-tighter shrink-0">
+                  Inject
+                </Button>
               </div>
-              <div className="flex-1 min-w-0 overflow-hidden">
-                <h4 className="text-xs sm:text-sm font-semibold text-zinc-100 truncate">{profile.name}</h4>
-                <p className="text-[9px] sm:text-[10px] text-zinc-500 font-mono truncate uppercase tracking-tighter">{profile.company || profile.title}</p>
-              </div>
-              <Button size="sm" className="h-7 sm:h-8 px-2 sm:px-3 bg-[#002FA7]/20 text-[#002FA7] border border-[#002FA7]/30 hover:bg-[#002FA7] hover:text-white transition-all text-[9px] sm:text-[10px] font-bold uppercase tracking-tighter shrink-0">
-                Inject
-              </Button>
-            </div>
-          ))}
-        </div>
-      )
+            ))}
+          </div>
+        )
       }
     case 'company_news': {
       const articles: ApolloNewsSignal[] = (() => {
@@ -929,7 +929,7 @@ export function GeminiChatPanel() {
   const user = auth?.user
   const pathname = usePathname()
   const params = useParams()
-  
+
   // State for hosted avatar to avoid Google CORS issues
   const [hostedAvatarUrl, setHostedAvatarUrl] = useState<string | null>(null)
   const [isAvatarLoading, setIsAvatarLoading] = useState(false)
@@ -963,11 +963,11 @@ export function GeminiChatPanel() {
     let baseContext: { type: string, id?: string | string[], label: string };
     if (storeContext) {
       baseContext = storeContext;
-    } else if (pathname.includes('/people/')) {
-      baseContext = { type: 'contact', id: params.id, label: `CONTACT: ${String(params.id).slice(0, 12)}` };
-    } else if (pathname.includes('/accounts/')) {
-      baseContext = { type: 'account', id: params.id, label: `ACCOUNT: ${String(params.id).slice(0, 12)}` };
-    } else if (pathname.includes('/dashboard')) {
+    } else if (pathname?.includes('/people/')) {
+      baseContext = { type: 'contact', id: params?.id, label: `CONTACT: ${String(params?.id || '').slice(0, 12)}` };
+    } else if (pathname?.includes('/accounts/')) {
+      baseContext = { type: 'account', id: params?.id, label: `ACCOUNT: ${String(params?.id || '').slice(0, 12)}` };
+    } else if (pathname?.includes('/dashboard')) {
       baseContext = { type: 'dashboard', label: 'GLOBAL_DASHBOARD' };
     } else {
       baseContext = { type: 'general', label: 'GLOBAL_SCOPE' };
@@ -981,7 +981,7 @@ export function GeminiChatPanel() {
       .replace(/^CONTACT:\s*/i, '')
       .replace(/^ACCOUNT:\s*/i, '')
       .trim();
-    
+
     let displayLabel;
     if (baseContext.type === 'general' || cleanLabel === 'GLOBAL_SCOPE' || cleanLabel === 'GLOBAL_DASHBOARD') {
       displayLabel = `ACTIVE_CONTEXT: ${cleanLabel}`;
@@ -1054,7 +1054,7 @@ export function GeminiChatPanel() {
           context_type: contextInfo.type,
           context_id: ('id' in contextInfo && typeof contextInfo.id === 'string') ? contextInfo.id : null,
         }).select().single()
-        
+
         if (data) {
           const newSession = data as ChatSession
           sessionId = newSession.id
@@ -1089,7 +1089,7 @@ export function GeminiChatPanel() {
     const hasFallbackReason = diagnostics.some((d) => d.reason === 'FALLBACK_TO_DEFAULT')
     return (hasFailed && hasSuccess) || !!hasFallbackReason
   }, [diagnostics])
-  
+
   // Host Google Avatar if needed
   useEffect(() => {
     const hostAvatar = async () => {
@@ -1151,13 +1151,13 @@ export function GeminiChatPanel() {
         id: 'greeting',
         timestamp: Date.now(),
         content: contextInfo.type === 'contact'
-          ? `System ready, ${firstName}. I see you're viewing contact ${params.id}. Scanning Gmail for recent threads and Apollo for firmographics...`
+          ? `System ready, ${firstName}. I see you're viewing contact ${params?.id || 'target'}. Scanning Gmail for recent threads and Apollo for firmographics...`
           : contextInfo.type === 'account'
-            ? `System ready, ${firstName}. Analyzing account data for ${params.id}. Checking energy market conditions for this node...`
+            ? `System ready, ${firstName}. Analyzing account data for ${params?.id || 'target'}. Checking energy market conditions for this node...`
             : `System ready, ${firstName}. Awaiting command for Nodal Point intelligence network.`
       }
     ])
-  }, [isOpen, messages.length, contextInfo.type, contextInfo.id, hasContextId, isAccountOrContact, params.id, profile?.firstName])
+  }, [isOpen, messages.length, contextInfo.type, contextInfo.id, hasContextId, isAccountOrContact, params?.id, profile?.firstName])
 
   const sendWithMessageRef = useRef<(text: string) => Promise<void>>(null as unknown as (text: string) => Promise<void>)
   useEffect(() => {
@@ -1205,8 +1205,8 @@ export function GeminiChatPanel() {
     if (!textarea) return
 
     // Reset height to calculate scrollHeight correctly
-    textarea.style.height = '44px' 
-    
+    textarea.style.height = '44px'
+
     // Set height based on scrollHeight, capped at ~3 lines (approx 112px)
     // Only expand if there's content, otherwise stay at 44px
     if (input.trim()) {
@@ -1395,7 +1395,7 @@ SELECT * FROM hybrid_search_accounts(
       className="absolute top-12 right-2 mt-2 w-[calc(100%-1rem)] max-w-[480px] flex flex-col h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl bg-zinc-950/80 backdrop-blur-3xl nodal-monolith-edge shadow-2xl overflow-hidden z-50"
     >
       {/* Nodal Point Glass Highlight */}
-      
+
       {/* Header */}
       <div className="p-4 border-b border-white/10 flex items-center justify-between nodal-recessed relative z-10">
         <div className="flex items-center gap-3">
@@ -1468,7 +1468,7 @@ SELECT * FROM hybrid_search_accounts(
               <div className="flex items-center justify-between border-b border-white/5 pb-1 mb-2">
                 <div className="flex items-center gap-2">
                   <span className="text-[#002FA7] font-bold tracking-widest">AI_ROUTER_HUD // LIVE_DIAGNOSTICS</span>
-                  <button 
+                  <button
                     onClick={copySupabaseAIPrompt}
                     className="p-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500 hover:text-white transition-all flex items-center gap-1 group"
                     title="Copy AI Troubleshooting Prompt"
@@ -1476,7 +1476,7 @@ SELECT * FROM hybrid_search_accounts(
                     <Bot size={10} className="group-hover:scale-110 transition-transform" />
                     <span className="text-[8px] font-bold uppercase tracking-tighter">AI_PROMPT</span>
                   </button>
-                  <button 
+                  <button
                     onClick={copySupabasePrompt}
                     className="p-1 rounded bg-[#002FA7]/10 border border-[#002FA7]/20 text-[#002FA7] hover:bg-[#002FA7] hover:text-white transition-all flex items-center gap-1 group"
                     title="Copy Supabase Debug Prompt"
@@ -1487,7 +1487,7 @@ SELECT * FROM hybrid_search_accounts(
                 </div>
                 <span className="text-zinc-600 text-[8px] uppercase">Routing Protocol v2.3</span>
               </div>
-              
+
               {!diagnostics ? (
                 <div className="text-zinc-500 italic py-2">No active trace. Send a message to initiate neural routing...</div>
               ) : (
@@ -1496,10 +1496,10 @@ SELECT * FROM hybrid_search_accounts(
                     <div key={i} className={cn(
                       "flex flex-col gap-0.5 p-1.5 rounded border transition-all duration-300",
                       d.status === 'success' ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-400" :
-                      d.status === 'failed' ? "bg-red-500/5 border-red-500/20 text-red-400" :
-                      d.status === 'retry' ? "bg-amber-500/5 border-amber-500/20 text-amber-400" :
-                      d.status === 'attempting' ? "bg-[#002FA7]/10 border-[#002FA7]/30 text-[#002FA7] animate-pulse" :
-                      "bg-white/5 border-white/10 text-zinc-400"
+                        d.status === 'failed' ? "bg-red-500/5 border-red-500/20 text-red-400" :
+                          d.status === 'retry' ? "bg-amber-500/5 border-amber-500/20 text-amber-400" :
+                            d.status === 'attempting' ? "bg-[#002FA7]/10 border-[#002FA7]/30 text-[#002FA7] animate-pulse" :
+                              "bg-white/5 border-white/10 text-zinc-400"
                     )}>
                       <div className="flex items-center justify-between">
                         <span className="font-bold uppercase tracking-tighter">
@@ -1589,21 +1589,21 @@ SELECT * FROM hybrid_search_accounts(
         <div className="p-4 space-y-8 min-w-0 w-full max-w-full overflow-x-hidden flex flex-col">
           <AnimatePresence initial={false}>
             {messages.map((m: GeminiMessage, i) => (
-              <motion.div 
-                key={m.id || `msg-${i}`} 
-                initial={{ 
-                  opacity: 0, 
+              <motion.div
+                key={m.id || `msg-${i}`}
+                initial={{
+                  opacity: 0,
                   x: m.role === 'user' ? 20 : -20,
                   filter: "blur(10px)"
                 }}
-                animate={{ 
-                  opacity: 1, 
+                animate={{
+                  opacity: 1,
                   x: 0,
                   filter: "blur(0px)"
                 }}
                 transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
                 className={cn(
-                  "flex gap-3 w-full min-w-0 max-w-full overflow-hidden items-start", 
+                  "flex gap-3 w-full min-w-0 max-w-full overflow-hidden items-start",
                   m.role === 'user' ? "flex-row-reverse justify-start" : "flex-row justify-start"
                 )}
               >
@@ -1623,11 +1623,11 @@ SELECT * FROM hybrid_search_accounts(
                     {/* User Initials/Avatar */}
                     <div className="shrink-0 h-10 w-10 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-center overflow-hidden">
                       {isAvatarLoading || hostedAvatarUrl ? (
-                        <ImageWithSkeleton 
-                          src={hostedAvatarUrl} 
-                          isLoading={isAvatarLoading} 
-                          alt="User" 
-                          className="w-full h-full" 
+                        <ImageWithSkeleton
+                          src={hostedAvatarUrl}
+                          isLoading={isAvatarLoading}
+                          alt="User"
+                          className="w-full h-full"
                         />
                       ) : (
                         <span className="font-sans text-xs text-zinc-500">YOU</span>
@@ -1639,7 +1639,7 @@ SELECT * FROM hybrid_search_accounts(
                   <div className="flex justify-start mb-2 relative w-full group">
                     {/* The Neural Line (The glowing spine on the left) */}
                     <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-[#002FA7] via-[#002FA7]/20 to-transparent group-hover:from-blue-400 transition-colors duration-500" />
-                    
+
                     <div className="pl-6 w-full">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-[10px] font-sans text-[#002FA7] uppercase tracking-widest font-bold">
@@ -1647,7 +1647,7 @@ SELECT * FROM hybrid_search_accounts(
                         </span>
                         {isLoading && i === messages.length - 1 && <Waveform />}
                       </div>
-                        {i === messages.length - 1 && isBackupFallback && (
+                      {i === messages.length - 1 && isBackupFallback && (
                         <p className="text-[9px] font-sans text-zinc-500 mb-1">Using backup model</p>
                       )}
                       <div className="flex flex-col gap-4 w-full min-w-0 max-w-full overflow-hidden">
@@ -1667,7 +1667,7 @@ SELECT * FROM hybrid_search_accounts(
                             const [jsonPart, ...rest] = part.split('END_JSON')
                             const data = JSON.parse(jsonPart)
                             const trailingText = rest.join('END_JSON').trim()
-                            
+
                             return (
                               <div key={partKey} className="flex flex-col gap-4 w-full min-w-0 max-w-full overflow-hidden">
                                 <div className="w-full overflow-hidden grid grid-cols-1">
@@ -1718,14 +1718,14 @@ SELECT * FROM hybrid_search_accounts(
                           <p className="text-[10px] text-red-400 font-mono leading-tight flex-1">
                             {error}
                           </p>
-                          <button 
+                          <button
                             onClick={copySupabasePrompt}
                             className="icon-button-forensic w-8 h-8 shrink-0 flex items-center justify-center text-emerald-500 hover:text-emerald-400"
                             title="Copy Supabase Debug Prompt"
                           >
                             <Cpu size={16} />
                           </button>
-                          <button 
+                          <button
                             onClick={copyDebugInfo}
                             className="icon-button-forensic w-8 h-8 shrink-0 flex items-center justify-center"
                             title="Copy Prompt for Backend Dev"
@@ -1751,11 +1751,11 @@ SELECT * FROM hybrid_search_accounts(
       </ScrollArea>
 
       {/* Control Module (Stacked Command Deck) */}
-      <motion.div 
+      <motion.div
         layout
         className="p-4 border-t border-white/10 nodal-recessed relative z-10"
       >
-        <motion.form 
+        <motion.form
           layout
           initial={false}
           transition={{ type: "spring", bounce: 0, duration: 0.4 }}
@@ -1836,13 +1836,13 @@ SELECT * FROM hybrid_search_accounts(
           )}
 
           {/* TIER 2: INPUT DECK (Action) */}
-          <motion.div 
+          <motion.div
             layout
             transition={{ type: "spring", bounce: 0, duration: 0.4 }}
             className="flex items-end gap-2 p-2 relative min-h-[44px]"
           >
             <div className="relative flex-1">
-              <textarea 
+              <textarea
                 ref={textareaRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -1858,9 +1858,9 @@ SELECT * FROM hybrid_search_accounts(
                 rows={1}
               />
             </div>
-            
+
             <div className="flex items-center gap-1 pb-1.5 pr-1">
-              <button 
+              <button
                 type="button"
                 onMouseDown={() => setIsListening(true)}
                 onMouseUp={() => setIsListening(false)}
@@ -1872,7 +1872,7 @@ SELECT * FROM hybrid_search_accounts(
                 <Mic className="w-4 h-4" />
               </button>
 
-              <button 
+              <button
                 type="submit"
                 disabled={isLoading || !input.trim()}
                 className="bg-[#002FA7] hover:bg-blue-600 text-white p-2.5 rounded-xl shadow-[0_0_15px_-3px_rgba(0,47,167,0.5)] transition-all active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed border border-[#002FA7]/30"
@@ -1882,7 +1882,7 @@ SELECT * FROM hybrid_search_accounts(
             </div>
           </motion.div>
         </motion.form>
-        
+
         <div className="text-center mt-3">
           <span className="text-[9px] text-zinc-700 font-sans uppercase tracking-[0.2em]">Nodal Point Neural Engine v2.0</span>
         </div>

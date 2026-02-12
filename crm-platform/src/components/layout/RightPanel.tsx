@@ -1,7 +1,7 @@
 'use client'
 
-import { 
-  Zap, CheckCircle, Play, DollarSign, Mic, ChevronRight, Plus, AlertCircle 
+import {
+  Zap, CheckCircle, Play, DollarSign, Mic, ChevronRight, Plus, AlertCircle
 } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, usePathname } from 'next/navigation'
@@ -39,16 +39,16 @@ export function RightPanel() {
   const { rightPanelMode } = useUIStore()
   const pathname = usePathname()
   const params = useParams()
-  
+
   // State detection
-  const isContactPage = pathname.includes('/contacts/')
-  const isAccountPage = pathname.includes('/accounts/')
+  const isContactPage = pathname?.includes('/contacts/') || false
+  const isAccountPage = pathname?.includes('/accounts/') || false
   const isActiveContext = isContactPage || isAccountPage
-  const entityId = params.id as string
-  
+  const entityId = params?.id as string
+
   const { data: contact, refetch: refetchContact } = useContact(isContactPage ? entityId : '')
   const { data: account, refetch: refetchAccount } = useAccount(isAccountPage ? entityId : (contact?.accountId || ''))
-  
+
   const [isReady, setIsReady] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const [currentTime, setCurrentTime] = useState('')
@@ -66,7 +66,7 @@ export function RightPanel() {
 
   const { data: tasksData } = useTasks()
   const { isError: isMarketError } = useMarketPulse()
-  
+
   const taskCounts = useMemo(() => {
     const tasks = tasksData?.pages.flatMap(page => page.tasks) || []
     const completedCount = tasks.filter(t => t.status === 'Completed').length
@@ -79,7 +79,7 @@ export function RightPanel() {
   const state = contact?.state || account?.metadata?.state || account?.metadata?.general?.state;
   const rawLocation = account?.location || contact?.location;
   const entityZone = mapLocationToZone(city, state, rawLocation);
-  
+
   // Always use account address for the map, fall back to contact address only if no account
   const entityAddress = account?.address || contact?.address || ''
   const entityName = contact?.name || account?.name
@@ -115,13 +115,13 @@ export function RightPanel() {
     hoverLockRef.current = true
     setTimeout(() => { hoverLockRef.current = false }, 300)
   }, [])
-  
+
   const handleMouseEnterHeader = useCallback(() => {
     if (!hoverLockRef.current) {
       setHeaderHoverReveal(true)
     }
   }, [])
-  
+
   const handleMouseLeaveHeader = useCallback(() => {
     setHeaderHoverReveal(false)
   }, [])
@@ -158,12 +158,12 @@ export function RightPanel() {
 
   return (
     <aside className="fixed right-0 top-0 bottom-0 z-30 w-80 bg-zinc-950 border-l border-white/5 flex flex-col overflow-hidden hidden lg:flex np-scroll">
-      
+
       {/* 1. THE HEADER (Fixed HUD Info) - Glassmorphic Blur */}
       <div className={cn(
         "absolute top-0 left-0 right-0 z-50 px-6 h-24 flex items-center justify-between select-none transition-all duration-300 ease-in-out",
-        isScrolled 
-          ? "bg-zinc-950/80 backdrop-blur-xl border-b border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.5)] backdrop-saturate-150" 
+        isScrolled
+          ? "bg-zinc-950/80 backdrop-blur-xl border-b border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.5)] backdrop-saturate-150"
           : "bg-transparent"
       )}>
         {/* 1. MODE INDICATOR — On dossier: hover-reveal carousel to switch to Scanning Mode; click to switch */}
@@ -236,7 +236,7 @@ export function RightPanel() {
         </div>
 
         {/* 3. THE CONTROL (Minimize) */}
-        <button 
+        <button
           className="icon-button-forensic"
           title="Minimize Intelligence Feed"
         >
@@ -245,7 +245,7 @@ export function RightPanel() {
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden relative">
-        <motion.div 
+        <motion.div
           key="content-wrapper"
           ref={scrollContainerRef}
           onScroll={(e) => {
@@ -277,7 +277,7 @@ export function RightPanel() {
           className="flex-1 flex flex-col gap-4 overflow-y-auto px-6 pt-[93px] pb-4 np-scroll scroll-smooth"
         >
           <AnimatePresence mode="wait" initial={false}>
-          {effectiveView === 'context' ? (
+            {effectiveView === 'context' ? (
               <motion.div
                 key="active-context"
                 initial={{ y: 24, opacity: 0 }}
@@ -333,8 +333,8 @@ export function RightPanel() {
                 {/* 3. SATELLITE (Infrastructure) */}
                 <div className="space-y-3">
                   <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Satellite_Uplink</h3>
-                  <SatelliteUplink 
-                    address={entityAddress} 
+                  <SatelliteUplink
+                    address={entityAddress}
                     name={entityName}
                     entityId={entityId}
                     entityType={isContactPage ? 'contact' : 'account'}
@@ -355,7 +355,7 @@ export function RightPanel() {
                 {/* 4. ORGANIZATIONAL (Intelligence) */}
                 <div className="space-y-3 pb-4">
                   <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Org_Intelligence</h3>
-                  <OrgIntelligence 
+                  <OrgIntelligence
                     domain={contact?.companyDomain || account?.domain}
                     companyName={contact?.company || account?.name}
                     website={contact?.website || account?.domain}
@@ -420,7 +420,7 @@ export function RightPanel() {
               </motion.div>
             )}
           </AnimatePresence>
-          </motion.div>
+        </motion.div>
       </div>
     </aside>
   )
