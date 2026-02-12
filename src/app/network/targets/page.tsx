@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { 
-  Users, 
-  Building2, 
-  Plus, 
-  Search, 
-  FolderOpen, 
-  Trash2, 
+import {
+  Users,
+  Building2,
+  Plus,
+  Search,
+  FolderOpen,
+  Trash2,
   Edit3,
   Radar,
   Loader2
@@ -59,36 +59,36 @@ export default function TargetOverviewPage() {
 
   // STATE: Active Mode (People vs Accounts) — URL only for initial render (avoids hydration mismatch; localStorage is synced in useEffect)
   const [activeMode, setActiveMode] = useState<'people' | 'account'>(() => {
-    const urlMode = searchParams.get('mode') as 'people' | 'account' | null
+    const urlMode = searchParams?.get('mode') as 'people' | 'account' | null
     if (urlMode === 'people' || urlMode === 'account') return urlMode
     return 'people'
   })
-  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '')
+  const [searchQuery, setSearchQuery] = useState(searchParams?.get('q') || '')
 
   // Sync mode from localStorage when navigating back (if URL doesn't have mode param)
   useEffect(() => {
     const isListPage = pathname === '/network/targets' || pathname?.endsWith('/network/targets')
-    if (!isListPage || searchParams.get('mode')) return
-    
+    if (!isListPage || searchParams?.get('mode')) return
+
     try {
       const stored = localStorage.getItem(TARGETS_MODE_STORAGE_KEY) as 'people' | 'account' | null
       if (stored === 'people' || stored === 'account') {
         setActiveMode(stored)
       }
-    } catch (_) {}
+    } catch (_) { }
   }, [pathname, searchParams])
 
   // Update URL and persist mode to localStorage when state changes
   useEffect(() => {
-    const params = new URLSearchParams(searchParams.toString())
+    const params = new URLSearchParams(searchParams?.toString() || '')
     if (activeMode !== 'people') params.set('mode', activeMode)
     else params.delete('mode')
-    
+
     if (searchQuery) params.set('q', searchQuery)
     else params.delete('q')
 
     const newString = params.toString()
-    const oldString = searchParams.toString()
+    const oldString = searchParams?.toString() || ''
 
     if (newString !== oldString) {
       router.replace(`${pathname}?${newString}`, { scroll: false })
@@ -96,9 +96,9 @@ export default function TargetOverviewPage() {
 
     try {
       localStorage.setItem(TARGETS_MODE_STORAGE_KEY, activeMode)
-    } catch (_) {}
+    } catch (_) { }
   }, [activeMode, searchQuery, pathname, router, searchParams])
-  
+
   // DATA FETCHING
   const { data: targets, isLoading, error } = useTargets()
   const createTarget = useCreateTarget()
@@ -109,19 +109,19 @@ export default function TargetOverviewPage() {
   const filteredTargets = targets?.filter(l => {
     if (!l.kind) return false
     const normalizedKind = l.kind.toLowerCase()
-    
+
     // Mode filtering
-    const matchesMode = activeMode === 'account' 
+    const matchesMode = activeMode === 'account'
       ? normalizedKind.includes('account')
       : normalizedKind === activeMode
-      
+
     if (!matchesMode) return false
-    
+
     // Search filtering
     if (searchQuery) {
       return l.name.toLowerCase().includes(searchQuery.toLowerCase())
     }
-    
+
     return true
   }) || []
 
@@ -150,7 +150,7 @@ export default function TargetOverviewPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      
+
       {/* 1. TOP PAGE HEADER (Matches People page style) */}
       <div className="flex-none px-2">
         <div className="flex items-center justify-between">
@@ -162,7 +162,7 @@ export default function TargetOverviewPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button 
+            <Button
               onClick={() => setIsCreateOpen(true)}
               className="h-10 px-4 rounded-xl flex items-center gap-2 bg-white text-zinc-950 hover:bg-zinc-200 transition-all hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)] font-medium"
             >
@@ -180,10 +180,10 @@ export default function TargetOverviewPage() {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="target-name">Name</Label>
-              <Input 
-                id="target-name" 
-                value={newTargetName} 
-                onChange={(e) => setNewTargetName(e.target.value)} 
+              <Input
+                id="target-name"
+                value={newTargetName}
+                onChange={(e) => setNewTargetName(e.target.value)}
                 placeholder={`e.g. ${activeMode === 'people' ? 'Q1 Contacts' : 'Enterprise Accounts'}`}
                 className="bg-black/40 nodal-monolith-edge"
               />
@@ -200,15 +200,15 @@ export default function TargetOverviewPage() {
 
       {/* 2. THE DATA CONTAINER (Contained & Scrollable) */}
       <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
-        
+
         {/* INNER HEADER: Houses Search & Switcher */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 nodal-recessed sticky top-0 z-20">
           <div className="flex items-center gap-6">
             {/* Search Bar Div */}
             <div className="relative w-80">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={`Search ${activeMode} arrays...`}
@@ -233,13 +233,13 @@ export default function TargetOverviewPage() {
                     transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                   />
                 )}
-                <button 
+                <button
                   onClick={() => setActiveMode('people')}
                   className={cn(
                     "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider transition-colors duration-200 gap-2 flex items-center shrink-0",
-                    activeMode === 'people' 
-                    ? "text-white" 
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                    activeMode === 'people'
+                      ? "text-white"
+                      : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
                   )}
                   title="Human Intel Layer"
                 >
@@ -254,13 +254,13 @@ export default function TargetOverviewPage() {
                     transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                   />
                 )}
-                <button 
+                <button
                   onClick={() => setActiveMode('account')}
                   className={cn(
                     "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider transition-colors duration-200 gap-2 flex items-center shrink-0",
-                    activeMode === 'account' 
-                    ? "text-white" 
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                    activeMode === 'account'
+                      ? "text-white"
+                      : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
                   )}
                   title="Asset Intel Layer"
                 >
@@ -284,13 +284,13 @@ export default function TargetOverviewPage() {
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ 
-                      duration: 0.3, 
+                    transition={{
+                      duration: 0.3,
                       delay: Math.min(index * 0.02, 0.4),
-                      ease: [0.23, 1, 0.32, 1] 
+                      ease: [0.23, 1, 0.32, 1]
                     }}
                   >
-                    <Link 
+                    <Link
                       href={`/network/targets/${target.id}`}
                       className="group relative nodal-module-glass nodal-monolith-edge rounded-2xl p-6 hover:bg-zinc-950/90 hover:border-white/10 transition-all cursor-pointer flex flex-col justify-between h-44"
                     >
@@ -334,7 +334,7 @@ export default function TargetOverviewPage() {
               </AnimatePresence>
 
               {/* Add New Target Card */}
-              <button 
+              <button
                 type="button"
                 onClick={() => setIsCreateOpen(true)}
                 className="nodal-monolith-edge border border-dashed border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 text-zinc-500 hover:text-zinc-400 hover:border-white/20 hover:bg-black/20 transition-all h-44"
@@ -364,7 +364,7 @@ export default function TargetOverviewPage() {
               <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{filteredTargets.length}</span></span>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
