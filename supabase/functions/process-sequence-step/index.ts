@@ -34,7 +34,7 @@ type Job = z.infer<typeof jobSchema>
 type FailedJob = z.infer<typeof failedJobSchema>
 
 const QUEUE_NAME = 'sequence_jobs'
-const API_BASE_URL = Deno.env.get('API_BASE_URL') || 'https://nodalpoint.io'
+const API_BASE_URL = Deno.env.get('API_BASE_URL') || 'https://nodal-point-network.vercel.app'
 /** Burner domain for cold/sequence emails (e.g. getnodalpoint.com). From address = localPart@BURNER_DOMAIN. */
 const BURNER_DOMAIN = Deno.env.get('BURNER_DOMAIN') || 'getnodalpoint.com'
 
