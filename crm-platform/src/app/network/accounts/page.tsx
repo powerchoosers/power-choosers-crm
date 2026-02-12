@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { 
+import {
   flexRender,
   getCoreRowModel,
   useReactTable,
@@ -57,8 +57,8 @@ export default function AccountsPage() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { pageIndex, setPage, searchQuery, setSearch, pagination } = useTableState({ pageSize: PAGE_SIZE })
-  const scrollKey = (pathname ?? '/network/accounts') + (searchParams.toString() ? `?${searchParams.toString()}` : '')
-  
+  const scrollKey = (pathname ?? '/network/accounts') + (searchParams?.toString() ? `?${searchParams.toString()}` : '')
+
   const [globalFilter, setGlobalFilter] = useState(searchQuery)
   const [debouncedFilter, setDebouncedFilter] = useState(searchQuery)
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -219,7 +219,7 @@ export default function AccountsPage() {
               )}>
                 {index.toString().padStart(2, '0')}
               </span>
-              
+
               {/* Hover/Selected State: Ghost Checkbox */}
               <button
                 onClick={(e) => {
@@ -228,8 +228,8 @@ export default function AccountsPage() {
                 }}
                 className={cn(
                   "absolute inset-0 m-auto w-4 h-4 rounded border transition-all flex items-center justify-center",
-                  isSelected 
-                    ? "bg-[#002FA7] border-[#002FA7] opacity-100" 
+                  isSelected
+                    ? "bg-[#002FA7] border-[#002FA7] opacity-100"
                     : "bg-white/5 border-white/10 opacity-0 group-hover/select:opacity-100"
                 )}
               >
@@ -255,7 +255,7 @@ export default function AccountsPage() {
         cell: ({ row }) => {
           const account = row.original
           return (
-            <Link 
+            <Link
               href={`/network/accounts/${account.id}`}
               className="flex items-center gap-3 group/acc cursor-pointer"
             >
@@ -319,16 +319,16 @@ export default function AccountsPage() {
               <div className={cn(
                 "w-1.5 h-1.5 rounded-full",
                 isCustomer ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
-                isActiveLoad ? "bg-signal animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.5)]" : 
-                isExpired ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" : 
-                "bg-zinc-600"
+                  isActiveLoad ? "bg-signal animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.5)]" :
+                    isExpired ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" :
+                      "bg-zinc-600"
               )} />
               <span className={cn(
                 "text-[10px] font-mono uppercase tracking-wider tabular-nums",
                 isCustomer ? "text-emerald-500" :
-                isActiveLoad ? "text-signal" : 
-                isExpired ? "text-red-500/80" : 
-                "text-zinc-500"
+                  isActiveLoad ? "text-signal" :
+                    isExpired ? "text-red-500/80" :
+                      "text-zinc-500"
               )}>
                 {displayStatus}
               </span>
@@ -367,12 +367,12 @@ export default function AccountsPage() {
             const date = new Date(dateStr)
             const threeMonthsAgo = subMonths(new Date(), 3)
             const isRecent = isAfter(date, threeMonthsAgo)
-            
+
             return (
               <div className="flex items-center gap-2 text-zinc-500 font-mono text-xs tabular-nums">
                 <Clock size={12} className="text-zinc-600" />
                 <span>
-                  {isRecent 
+                  {isRecent
                     ? formatDistanceToNow(date, { addSuffix: true })
                     : format(date, 'MMM d, yyyy')}
                 </span>
@@ -389,12 +389,12 @@ export default function AccountsPage() {
         cell: ({ row }) => {
           const val = row.original.updated
           if (!val) return <span className="text-zinc-600 font-mono text-xs">--</span>
-          
+
           try {
             const date = new Date(val)
             const threeMonthsAgo = subMonths(new Date(), 3)
             const isRecent = isAfter(date, threeMonthsAgo)
-            
+
             return (
               <div className="flex items-center gap-2 text-zinc-500 font-mono text-xs tabular-nums">
                 <div className={cn(
@@ -402,7 +402,7 @@ export default function AccountsPage() {
                   isRecent ? "bg-signal animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.5)]" : "bg-zinc-600"
                 )} />
                 <span>
-                  {isRecent 
+                  {isRecent
                     ? formatDistanceToNow(date, { addSuffix: true })
                     : format(date, 'MMM d, yyyy')}
                 </span>
@@ -419,7 +419,7 @@ export default function AccountsPage() {
           const account = row.original
           return (
             <div className="flex items-center justify-end gap-2">
-              <ClickToCallButton 
+              <ClickToCallButton
                 phoneNumber={account.companyPhone}
                 account={account.name}
                 logoUrl={account.logoUrl}
@@ -502,12 +502,12 @@ export default function AccountsPage() {
         isFilterActive={isFilterOpen || columnFilters.length > 0}
         primaryAction={{
           label: "Add Account",
-          onClick: () => {},
+          onClick: () => { },
           icon: <Plus size={18} className="mr-2" />
         }}
       />
 
-      <FilterCommandDeck 
+      <FilterCommandDeck
         isOpen={isFilterOpen}
         onClose={() => setIsFilterOpen(false)}
         type="account"
@@ -517,123 +517,123 @@ export default function AccountsPage() {
 
       <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
         <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto relative scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
-            <Table>
+          <Table>
             <TableHeader className="sticky top-0 z-20 border-b border-white/5">
-                {table.getHeaderGroups().map((headerGroup) => (
+              {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
-                    {headerGroup.headers.map((header) => {
+                  {headerGroup.headers.map((header) => {
                     return (
-                        <TableHead key={header.id} className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">
+                      <TableHead key={header.id} className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">
                         {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                            )}
-                        </TableHead>
+                          ? null
+                          : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                      </TableHead>
                     )
-                    })}
+                  })}
                 </TableRow>
-                ))}
+              ))}
             </TableHeader>
             <TableBody>
-                {isLoading ? (
-                  <ForensicTableSkeleton columns={columns.length} rows={12} />
-                ) : table.getRowModel().rows?.length ? (
-                  <AnimatePresence mode="popLayout">
-                    {table.getRowModel().rows.map((row, index) => (
-                      <motion.tr
-                        key={row.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.98 }}
-                        transition={{ 
-                          duration: 0.3, 
-                          delay: Math.min(index * 0.02, 0.4),
-                          ease: [0.23, 1, 0.32, 1] 
-                        }}
-                        data-state={row.getIsSelected() && "selected"}
-                        className={cn(
-                          "border-b border-white/5 transition-colors group cursor-pointer relative z-10",
-                          row.getIsSelected() 
-                            ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10" 
-                            : "hover:bg-white/[0.02]"
-                        )}
-                        onClick={() => {
+              {isLoading ? (
+                <ForensicTableSkeleton columns={columns.length} rows={12} />
+              ) : table.getRowModel().rows?.length ? (
+                <AnimatePresence mode="popLayout">
+                  {table.getRowModel().rows.map((row, index) => (
+                    <motion.tr
+                      key={row.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.98 }}
+                      transition={{
+                        duration: 0.3,
+                        delay: Math.min(index * 0.02, 0.4),
+                        ease: [0.23, 1, 0.32, 1]
+                      }}
+                      data-state={row.getIsSelected() && "selected"}
+                      className={cn(
+                        "border-b border-white/5 transition-colors group cursor-pointer relative z-10",
+                        row.getIsSelected()
+                          ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10"
+                          : "hover:bg-white/[0.02]"
+                      )}
+                      onClick={() => {
                         saveScroll()
                         router.push(`/network/accounts/${row.original.id}`)
                       }}
-                      >
-                        {row.getVisibleCells().map((cell) => (
-                          <TableCell key={cell.id} className="py-3">
-                            <motion.div
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              transition={{ duration: 0.4, delay: 0.1 }}
-                            >
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </motion.div>
-                          </TableCell>
-                        ))}
-                      </motion.tr>
-                    ))}
-                  </AnimatePresence>
-                ) : (
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id} className="py-3">
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.4, delay: 0.1 }}
+                          >
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </motion.div>
+                        </TableCell>
+                      ))}
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
+              ) : (
                 <TableRow>
-                    <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
+                  <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
                     No accounts found.
-                    </TableCell>
+                  </TableCell>
                 </TableRow>
-                )}
+              )}
             </TableBody>
-            </Table>
+          </Table>
         </div>
-        
+
         <div className="flex-none border-t border-white/5 nodal-recessed p-4 flex items-center justify-between z-10">
-            <div className="flex items-center gap-4">
-                <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
-                  <span>Sync_Block {showingStart}–{showingEnd}</span>
-                  <div className="h-1 w-1 rounded-full bg-black/40" />
-                  <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{effectiveTotalRecords}</span></span>
-                </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
+              <span>Sync_Block {showingStart}–{showingEnd}</span>
+              <div className="h-1 w-1 rounded-full bg-black/40" />
+              <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{effectiveTotalRecords}</span></span>
             </div>
-            <div className="flex items-center gap-2">
-<button
-                onClick={() => setPage(Math.max(0, pagination.pageIndex - 1))}
-                disabled={pagination.pageIndex === 0}
-                className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
-                aria-label="Previous page"
-                title="Previous Page"
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(Math.max(0, pagination.pageIndex - 1))}
+              disabled={pagination.pageIndex === 0}
+              className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
+              aria-label="Previous page"
+              title="Previous Page"
             >
-                <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-4 w-4" />
             </button>
-                <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
-                  {(pagination.pageIndex + 1).toString().padStart(2, '0')}
-                </div>
-                <button
-                    onClick={async () => {
-                      const nextPageIndex = pagination.pageIndex + 1
-                      if (nextPageIndex >= displayTotalPages) return
-
-                      const needed = (nextPageIndex + 1) * PAGE_SIZE
-                      if (accounts.length < needed && hasNextPage && !isFetchingNextPage) {
-                        await fetchNextPage()
-                      }
-
-                      setPage(nextPageIndex)
-                    }}
-                    disabled={pagination.pageIndex + 1 >= displayTotalPages || (!hasNextPage && accounts.length < (pagination.pageIndex + 2) * PAGE_SIZE)}
-                    className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
-                    aria-label="Next page"
-                    title="Next Page"
-                >
-                    <ChevronRight className="h-4 w-4" />
-                </button>
+            <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
+              {(pagination.pageIndex + 1).toString().padStart(2, '0')}
             </div>
+            <button
+              onClick={async () => {
+                const nextPageIndex = pagination.pageIndex + 1
+                if (nextPageIndex >= displayTotalPages) return
+
+                const needed = (nextPageIndex + 1) * PAGE_SIZE
+                if (accounts.length < needed && hasNextPage && !isFetchingNextPage) {
+                  await fetchNextPage()
+                }
+
+                setPage(nextPageIndex)
+              }}
+              disabled={pagination.pageIndex + 1 >= displayTotalPages || (!hasNextPage && accounts.length < (pagination.pageIndex + 2) * PAGE_SIZE)}
+              className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
+              aria-label="Next page"
+              title="Next Page"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
 
-      <BulkActionDeck 
+      <BulkActionDeck
         selectedCount={selectedCount}
         totalAvailable={effectiveTotalRecords}
         onClear={() => setRowSelection({})}
@@ -641,7 +641,7 @@ export default function AccountsPage() {
         onSelectCount={handleSelectCount}
       />
 
-      <DestructModal 
+      <DestructModal
         isOpen={isDestructModalOpen}
         onClose={() => setIsDestructModalOpen(false)}
         onConfirm={handleConfirmPurge}
