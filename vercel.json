@@ -1,0 +1,21 @@
+{
+    "buildCommand": "cd crm-platform && npm install && npm run build",
+    "outputDirectory": "crm-platform/.next",
+    "installCommand": "npm install --prefix crm-platform",
+    "framework": "nextjs",
+    "rewrites": [
+        {
+            "source": "/posts/:slug",
+            "destination": "/api/posts/:slug"
+        }
+    ],
+    "crons": [
+        {
+            "path": "/api/cron/refresh-apollo-news",
+            "schedule": "0 9 * * *"
+        }
+    ],
+    "github": {
+        "silent": false
+    }
+}
