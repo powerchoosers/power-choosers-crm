@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { 
-  ReactFlow, 
-  Background, 
-  Controls, 
+import {
+  ReactFlow,
+  Background,
+  Controls,
   MiniMap,
   addEdge,
   Connection,
@@ -22,14 +22,14 @@ import {
   useUpdateNodeInternals,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { 
-  Mail, 
-  Phone, 
-  Linkedin, 
-  MapPin, 
-  Zap, 
-  Play, 
-  Save, 
+import {
+  Mail,
+  Phone,
+  Linkedin,
+  MapPin,
+  Zap,
+  Play,
+  Save,
   ChevronLeft,
   Sparkles,
   Settings2,
@@ -88,76 +88,76 @@ import { toast } from 'sonner';
 
 // Mock Data for Visualization (The "Test Sequence")
 const MOCK_NODES: Node[] = [
-  { 
-    id: '1', 
-    position: { x: 250, y: 50 }, 
-    data: { label: 'Start: Target Array Initialize', type: 'input' }, 
-    type: 'protocolNode', 
+  {
+    id: '1',
+    position: { x: 250, y: 50 },
+    data: { label: 'Start: Target Array Initialize', type: 'input' },
+    type: 'protocolNode',
   },
-  { 
-    id: '2', 
-    position: { x: 250, y: 150 }, 
-    data: { label: 'LinkedIn: View Profile', type: 'linkedin' }, 
-    type: 'protocolNode', 
+  {
+    id: '2',
+    position: { x: 250, y: 150 },
+    data: { label: 'LinkedIn: View Profile', type: 'linkedin' },
+    type: 'protocolNode',
   },
-  { 
-    id: '3', 
-    position: { x: 250, y: 250 }, 
-    data: { 
-      label: 'Email: 4CP Value Prop', 
+  {
+    id: '3',
+    position: { x: 250, y: 250 },
+    data: {
+      label: 'Email: 4CP Value Prop',
       type: 'email',
       outcomes: [
         { id: 'opened', label: 'Opened' },
         { id: 'no_reply', label: 'No Reply' }
       ]
-    }, 
-    type: 'protocolNode', 
+    },
+    type: 'protocolNode',
   },
-  { 
-    id: '4', 
-    position: { x: 50, y: 500 }, 
-    data: { label: 'Call: Follow-up', type: 'call' }, 
-    type: 'protocolNode', 
+  {
+    id: '4',
+    position: { x: 50, y: 500 },
+    data: { label: 'Call: Follow-up', type: 'call' },
+    type: 'protocolNode',
   },
-  { 
-    id: '5', 
-    position: { x: 450, y: 500 }, 
-    data: { label: 'Task: Drop-in Packet', type: 'recon' }, 
-    type: 'protocolNode', 
+  {
+    id: '5',
+    position: { x: 450, y: 500 },
+    data: { label: 'Task: Drop-in Packet', type: 'recon' },
+    type: 'protocolNode',
   },
 ];
 
 const MOCK_EDGES: Edge[] = [
   { id: 'e1-2', source: '1', target: '2', animated: true, style: { stroke: 'rgba(63, 63, 70, 0.5)', strokeWidth: 2 } },
   { id: 'e2-3', source: '2', target: '3', animated: true, style: { stroke: 'rgba(63, 63, 70, 0.5)', strokeWidth: 2 } },
-  { 
-    id: 'e3-4', 
-    source: '3', 
-    sourceHandle: 'opened', 
-    target: '4', 
-    label: 'Opened', 
-    labelStyle: { fill: '#002FA7', fontSize: '10px', fontWeight: 'bold' }, 
+  {
+    id: 'e3-4',
+    source: '3',
+    sourceHandle: 'opened',
+    target: '4',
+    label: 'Opened',
+    labelStyle: { fill: '#002FA7', fontSize: '10px', fontWeight: 'bold' },
     style: { stroke: '#002FA7', strokeWidth: 2 },
     animated: true
   },
-  { 
-    id: 'e3-5', 
-    source: '3', 
-    sourceHandle: 'no_reply', 
-    target: '5', 
-    label: 'No Reply', 
-    labelStyle: { fill: '#002FA7', fontSize: '10px', fontWeight: 'bold' }, 
+  {
+    id: 'e3-5',
+    source: '3',
+    sourceHandle: 'no_reply',
+    target: '5',
+    label: 'No Reply',
+    labelStyle: { fill: '#002FA7', fontSize: '10px', fontWeight: 'bold' },
     style: { stroke: '#002FA7', strokeWidth: 2 },
     animated: true
   },
 ];
 
 const FRESH_NODES: Node[] = [
-  { 
-    id: '1', 
-    position: { x: 400, y: 100 }, 
-    data: { label: 'Start: Target Array Initialize', type: 'input' }, 
-    type: 'protocolNode', 
+  {
+    id: '1',
+    position: { x: 400, y: 100 },
+    data: { label: 'Start: Target Array Initialize', type: 'input' },
+    type: 'protocolNode',
   },
 ];
 
@@ -168,7 +168,7 @@ const TEST_PROTOCOL_ID = '123'; // The hardcoded ID for the demo/test sequence
 const ProtocolNode = ({ data, id, selected }: NodeProps) => {
   const updateNodeInternals = useUpdateNodeInternals();
   const outcomes = data.outcomes as { id: string; label: string }[] || [];
-  
+
   useEffect(() => {
     // Force re-measure whenever data changes (e.g. hover state, vector added)
     // This fixes the "Connects to Center" bug by ensuring handles are registered immediately
@@ -179,7 +179,7 @@ const ProtocolNode = ({ data, id, selected }: NodeProps) => {
   const isTargeted = data.isTargeted as boolean;
   const activeHandleId = data.activeHandleId as string | null;
   const debugSlotIndex = data.debugSlotIndex as number | undefined;
-  
+
   const getIcon = () => {
     switch (type) {
       case 'email': return <Mail className="w-4 h-4" />;
@@ -210,36 +210,36 @@ const ProtocolNode = ({ data, id, selected }: NodeProps) => {
       {debugSlotIndex !== undefined && outcomes.length > 0 && (
         <div className="absolute inset-0 pointer-events-none z-50 rounded-xl overflow-hidden">
           {outcomes.map((_, i) => (
-             <div 
-               key={i} 
-               className={cn(
-                 "absolute top-0 bottom-0 border-r border-red-500/50 bg-red-500/5",
-                 i === debugSlotIndex ? "bg-emerald-500/10 border-emerald-500/50" : ""
-               )}
-               style={{ 
-                 left: `${(i / outcomes.length) * 100}%`, 
-                 width: `${100 / outcomes.length}%` 
-               }}
-             >
-                <div className="absolute bottom-6 left-1 text-[8px] font-mono text-white bg-black/50 px-1 rounded z-50 pointer-events-none whitespace-nowrap">
-                  SLOT_{i} ({outcomes[i].id.slice(0,4)})
-                </div>
-             </div>
+            <div
+              key={i}
+              className={cn(
+                "absolute top-0 bottom-0 border-r border-red-500/50 bg-red-500/5",
+                i === debugSlotIndex ? "bg-emerald-500/10 border-emerald-500/50" : ""
+              )}
+              style={{
+                left: `${(i / outcomes.length) * 100}%`,
+                width: `${100 / outcomes.length}%`
+              }}
+            >
+              <div className="absolute bottom-6 left-1 text-[8px] font-mono text-white bg-black/50 px-1 rounded z-50 pointer-events-none whitespace-nowrap">
+                SLOT_{i} ({outcomes[i].id.slice(0, 4)})
+              </div>
+            </div>
           ))}
         </div>
       )}
 
-      <Handle 
-        type="target" 
-        position={Position.Top} 
+      <Handle
+        type="target"
+        position={Position.Top}
         style={{ top: '-6px' }}
         className={cn(
-          "!w-3 !h-3 !border-none transition-transform !absolute", 
+          "!w-3 !h-3 !border-none transition-transform !absolute",
           isInput ? "opacity-0" : "!bg-[#002FA7]",
           isTargeted && !activeHandleId && "scale-150 shadow-[0_0_10px_rgba(16,185,129,1)]"
-        )} 
+        )}
       />
-      
+
       <div className="p-3">
         <div className="flex items-center gap-2 mb-1">
           <div className={cn("p-1.5 rounded-lg", isInput ? "bg-white/20" : "bg-[#002FA7]/10")}>
@@ -261,7 +261,7 @@ const ProtocolNode = ({ data, id, selected }: NodeProps) => {
           {outcomes.map((outcome) => {
             const label = outcome.label.toLowerCase();
             const isActive = activeHandleId === outcome.id;
-            
+
             const getOutcomeIcon = () => {
               if (label.includes('opened')) return <ArrowUpRight className={cn("w-2.5 h-2.5", isActive ? "text-emerald-400" : "text-emerald-500/70")} />;
               if (label.includes('clicked')) return <ArrowUpRight className={cn("w-2.5 h-2.5", isActive ? "text-sky-400" : "text-sky-500/70")} />;
@@ -274,8 +274,8 @@ const ProtocolNode = ({ data, id, selected }: NodeProps) => {
             };
 
             return (
-              <div 
-                key={outcome.id} 
+              <div
+                key={outcome.id}
                 className={cn(
                   "relative flex-1 flex flex-col items-center justify-center border rounded-lg py-1.5 px-1 group min-w-0 transition-all",
                   isActive ? "bg-emerald-500/20 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)]" : "nodal-module-glass border-white/5"
@@ -301,33 +301,33 @@ const ProtocolNode = ({ data, id, selected }: NodeProps) => {
         outcomes.map((outcome, index) => {
           const isActive = activeHandleId === outcome.id;
           const leftOffset = ((index + 0.5) / outcomes.length) * 100;
-          
+
           return (
-            <Handle 
-               key={outcome.id}
-               type="source" 
-               position={Position.Bottom} 
-               id={outcome.id}
-               data-handle-id={outcome.id}
-               style={{ left: `${leftOffset}%`, bottom: '-6px', zIndex: 50 }}
-               className={cn(
-                 "!w-3 !h-3 !border-none transition-all !absolute",
-                 isActive ? "!bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,1)]" : "!bg-[#002FA7]"
-               )} 
-             />
-           );
-         })
-       ) : (
-         <Handle 
-           type="source" 
-           position={Position.Bottom} 
-           style={{ bottom: '-6px' }}
-           className={cn(
-             "!bg-[#002FA7] !w-3 !h-3 !border-none transition-transform !absolute",
-             isTargeted && "scale-150 shadow-[0_0_10px_rgba(16,185,129,1)]"
-           )} 
-         />
-       )}
+            <Handle
+              key={outcome.id}
+              type="source"
+              position={Position.Bottom}
+              id={outcome.id}
+              data-handle-id={outcome.id}
+              style={{ left: `${leftOffset}%`, bottom: '-6px', zIndex: 50 }}
+              className={cn(
+                "!w-3 !h-3 !border-none transition-all !absolute",
+                isActive ? "!bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,1)]" : "!bg-[#002FA7]"
+              )}
+            />
+          );
+        })
+      ) : (
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          style={{ bottom: '-6px' }}
+          className={cn(
+            "!bg-[#002FA7] !w-3 !h-3 !border-none transition-transform !absolute",
+            isTargeted && "scale-150 shadow-[0_0_10px_rgba(16,185,129,1)]"
+          )}
+        />
+      )}
     </div>
   );
 };
@@ -345,17 +345,18 @@ export default function ProtocolArchitect() {
 }
 
 function ProtocolArchitectInner() {
-  const { id } = useParams();
+  const params = useParams();
+  const id = params?.id as string;
   const router = useRouter();
   const { screenToFlowPosition } = useReactFlow();
-  
+
   // Real Data Integration
   const { user, profile } = useAuth();
   const { protocol, saveProtocol, isSaving } = useProtocolBuilder(id as string);
   const { data: foundryAssets } = useFoundryAssets();
   const burnerFrom = getBurnerFromEmail(user?.email ?? undefined);
   const burnerSenderName = getBurnerSenderName(profile?.firstName ?? undefined);
-  
+
   // State
   const [nodes, setNodes, onNodesChange] = useNodesState(
     id === TEST_PROTOCOL_ID ? MOCK_NODES : FRESH_NODES
@@ -363,7 +364,7 @@ function ProtocolArchitectInner() {
   const [edges, setEdges, onEdgesChange] = useEdgesState(
     id === TEST_PROTOCOL_ID ? MOCK_EDGES : FRESH_EDGES
   );
-  
+
   const [isDirty, setIsDirty] = useState(false);
   const [showExitDialog, setShowExitDialog] = useState(false);
   const dataLoadedRef = useRef(false);
@@ -371,14 +372,14 @@ function ProtocolArchitectInner() {
   // Load Data Effect
   useEffect(() => {
     if (protocol?.bgvector && !dataLoadedRef.current && id !== TEST_PROTOCOL_ID) {
-       // Only load if valid data exists and we haven't loaded yet
-       if (Array.isArray(protocol.bgvector.nodes) && protocol.bgvector.nodes.length > 0) {
-           setNodes(protocol.bgvector.nodes);
-           setEdges(protocol.bgvector.edges || []);
-       }
-       dataLoadedRef.current = true;
-       // Reset dirty state after initial load
-       setIsDirty(false);
+      // Only load if valid data exists and we haven't loaded yet
+      if (Array.isArray(protocol.bgvector.nodes) && protocol.bgvector.nodes.length > 0) {
+        setNodes(protocol.bgvector.nodes);
+        setEdges(protocol.bgvector.edges || []);
+      }
+      dataLoadedRef.current = true;
+      // Reset dirty state after initial load
+      setIsDirty(false);
     }
   }, [protocol, id, setNodes, setEdges]);
 
@@ -452,10 +453,10 @@ function ProtocolArchitectInner() {
   // Monitor Edges
   useMemo(() => {
     if (debugMode) {
-        setDebugData(d => ({ ...d, totalEdges: edges.length }));
+      setDebugData(d => ({ ...d, totalEdges: edges.length }));
     }
   }, [edges.length, debugMode]);
-  
+
   // Phase 4: AI & Preview
   const { data: contactsData } = useContacts();
   const [testContactId, setTestContactId] = useState<string>('');
@@ -473,15 +474,15 @@ function ProtocolArchitectInner() {
 
   const insertVariable = (variable: string) => {
     if (!textareaRef.current || !selectedNode) return;
-    
+
     const start = textareaRef.current.selectionStart;
     const end = textareaRef.current.selectionEnd;
     const text = selectedNode.data.body as string || '';
     const before = text.substring(0, start);
     const after = text.substring(end);
-    
+
     updateNodeData(selectedNode.id, { body: before + `{{${variable}}}` + after });
-    
+
     // Reset focus and cursor position after React update
     setTimeout(() => {
       if (textareaRef.current) {
@@ -514,11 +515,11 @@ function ProtocolArchitectInner() {
       });
 
       if (!response.ok) throw new Error('Failed to optimize');
-      
+
       const data = await response.json();
       updateNodeData(selectedNode.id, { prompt: data.optimized });
       toast.success("Prompt optimized by Nodal Architect");
-      
+
       // If we have a test contact, auto-generate the preview
       if (testContact) {
         generateEmailPreview(data.optimized);
@@ -557,9 +558,9 @@ function ProtocolArchitectInner() {
       });
 
       if (!response.ok) throw new Error('Failed to generate preview');
-      
+
       const data = await response.json();
-      updateNodeData(selectedNode.id, { 
+      updateNodeData(selectedNode.id, {
         body: data.optimized,
         subject: data.subject || selectedNode.data.subject
       });
@@ -644,7 +645,7 @@ function ProtocolArchitectInner() {
     setNodes((nds) =>
       nds.map((node) => {
         if (node.id === nodeId) {
-          const outcomes = (node.data.outcomes as any[]).map(o => 
+          const outcomes = (node.data.outcomes as any[]).map(o =>
             o.id === outcomeId ? { ...o, label: newLabel } : o
           );
           return { ...node, data: { ...node.data, outcomes } };
@@ -667,7 +668,7 @@ function ProtocolArchitectInner() {
     if (selectedNode?.id === nodeId) {
       setSelectedNode((prev) => {
         if (!prev) return null;
-        const outcomes = (prev.data.outcomes as any[]).map(o => 
+        const outcomes = (prev.data.outcomes as any[]).map(o =>
           o.id === outcomeId ? { ...o, label: newLabel } : o
         );
         return { ...prev, data: { ...prev.data, outcomes } };
@@ -681,7 +682,7 @@ function ProtocolArchitectInner() {
 
     const newId = `outcome-${crypto.randomUUID().slice(0, 8)}`;
     const newOutcomes = [...(node.data.outcomes as any[]), { id: newId, label: 'New Outcome' }];
-    
+
     updateNodeData(nodeId, { outcomes: newOutcomes });
   };
 
@@ -701,11 +702,11 @@ function ProtocolArchitectInner() {
       setIsDirty(true);
       // Find the source node to check if it's a split node
       const sourceNode = nodes.find(n => n.id === params.source);
-      
+
       // Ensure unique ID for every edge to allow multiple connections
       const edgeId = `e-${params.source}-${params.sourceHandle || 'default'}-${params.target}-${params.targetHandle || 'default'}-${crypto.randomUUID().slice(0, 4)}`;
-      
-      const edgeParams: any = { 
+
+      const edgeParams: any = {
         ...params,
         id: edgeId
       };
@@ -716,18 +717,18 @@ function ProtocolArchitectInner() {
       if (hasOutcomes && params.sourceHandle) {
         const outcomes = sourceNode?.data.outcomes as any[];
         const outcome = outcomes?.find((o: any) => o.id === params.sourceHandle);
-        
+
         if (outcome) {
           edgeParams.label = outcome.label;
           edgeParams.labelStyle = { fill: '#002FA7', fontSize: '10px', fontWeight: 'bold' };
           edgeParams.style = { stroke: '#002FA7', strokeWidth: 2 };
           edgeParams.animated = true;
         } else {
-            // Fallback: If handle ID is passed but not found in outcomes (rare sync issue), 
-            // do NOT default to center. Force React Flow to look for the handle.
-            // If React Flow can't find the handle in DOM, it defaults to center.
-            // We can't fix DOM missing here, but we can ensure we don't clear the handle ID.
-            console.warn(`Handle ${params.sourceHandle} not found in node outcomes`, outcomes);
+          // Fallback: If handle ID is passed but not found in outcomes (rare sync issue), 
+          // do NOT default to center. Force React Flow to look for the handle.
+          // If React Flow can't find the handle in DOM, it defaults to center.
+          // We can't fix DOM missing here, but we can ensure we don't clear the handle ID.
+          console.warn(`Handle ${params.sourceHandle} not found in node outcomes`, outcomes);
         }
       } else {
         // Standard edge (grey)
@@ -787,10 +788,10 @@ function ProtocolArchitectInner() {
       if (closestNode && (closestNode.data.outcomes as any[])?.length > 0) {
         outcomes = closestNode.data.outcomes as any[];
         // Use measured width if available for accuracy, else fallback to 200 (approx visual width)
-        nodeWidth = closestNode.measured?.width || 200; 
+        nodeWidth = closestNode.measured?.width || 200;
         const relativeX = position.x - closestNode.position.x;
         const slotWidth = nodeWidth / outcomes.length;
-        
+
         // Improved slot calculation with bounds clamping
         const rawIndex = Math.floor(relativeX / slotWidth);
         slotIndexCalc = Math.max(0, Math.min(outcomes.length - 1, rawIndex));
@@ -802,8 +803,8 @@ function ProtocolArchitectInner() {
         setActiveHandleId(handleId);
         setNodes((nds) => nds.map(n => ({
           ...n,
-          data: { 
-            ...n.data, 
+          data: {
+            ...n.data,
             isTargeted: n.id === closestNodeId,
             activeHandleId: n.id === closestNodeId ? handleId : null,
             // Pass debug info to node for visualization
@@ -822,7 +823,7 @@ function ProtocolArchitectInner() {
             minDistance: Math.round(minDistance),
             calculatedWidth: nodeWidth,
             nodeX: closestNode?.position.x || 0,
-            outcomesList: outcomes.map(o => `${o.label}(${o.id.slice(0,4)})`)
+            outcomesList: outcomes.map(o => `${o.label}(${o.id.slice(0, 4)})`)
           }));
           console.log('dragOver', {
             closestNodeId,
@@ -846,7 +847,7 @@ function ProtocolArchitectInner() {
     (event: React.DragEvent) => {
       event.preventDefault();
       setIsDirty(true);
-      
+
       const type = event.dataTransfer.getData('application/reactflow');
 
       if (typeof type === 'undefined' || !type) {
@@ -871,7 +872,7 @@ function ProtocolArchitectInner() {
       const newNodeId = crypto.randomUUID();
       const isSplit = type === 'split';
       const isVector = type.startsWith('vector:');
-      
+
       // ... Vector Adding Logic (Keep as is) ...
       if (isVector) {
         const vectorLabel = type.split(':')[1].replace('_', ' ');
@@ -895,10 +896,10 @@ function ProtocolArchitectInner() {
           const targetNode = closestNode as Node;
           const outcomeId = `outcome-${crypto.randomUUID().slice(0, 8)}`;
           const currentOutcomes = (targetNode.data.outcomes as any[]) || [];
-          
+
           if (currentOutcomes.length < 3) {
-            updateNodeData(targetNode.id, { 
-              outcomes: [...currentOutcomes, { id: outcomeId, label }] 
+            updateNodeData(targetNode.id, {
+              outcomes: [...currentOutcomes, { id: outcomeId, label }]
             });
             toast.success(`Added ${label} vector to ${targetNode.data.label}`);
           } else {
@@ -934,16 +935,16 @@ function ProtocolArchitectInner() {
       const connectNode = activeTargetNodeId ? nodes.find(n => n.id === activeTargetNodeId) : closestNode;
       if (connectNode) {
         const outcomes = connectNode.data.outcomes as any[] || [];
-        
+
         if (outcomes.length > 0) {
-            // ALWAYS Calculate based on drop position to ensure 100% accuracy
-            // We ignore activeHandleId state to prevent race conditions or stale hovers
-            const nodeWidth = connectNode.measured?.width || 200;
-            const relativeX = rawPosition.x - connectNode.position.x;
-            const slotWidth = nodeWidth / outcomes.length;
-            const rawIndex = Math.floor(relativeX / slotWidth);
-            const slotIndex = Math.max(0, Math.min(outcomes.length - 1, rawIndex));
-            sourceHandle = outcomes[slotIndex].id;
+          // ALWAYS Calculate based on drop position to ensure 100% accuracy
+          // We ignore activeHandleId state to prevent race conditions or stale hovers
+          const nodeWidth = connectNode.measured?.width || 200;
+          const relativeX = rawPosition.x - connectNode.position.x;
+          const slotWidth = nodeWidth / outcomes.length;
+          const rawIndex = Math.floor(relativeX / slotWidth);
+          const slotIndex = Math.max(0, Math.min(outcomes.length - 1, rawIndex));
+          sourceHandle = outcomes[slotIndex].id;
         }
       }
 
@@ -951,7 +952,7 @@ function ProtocolArchitectInner() {
         id: newNodeId,
         type: 'protocolNode',
         position: finalPosition,
-        data: { 
+        data: {
           label: isSplit ? 'Interaction Split' : `${type.charAt(0).toUpperCase() + type.slice(1)} Node`,
           type: type,
           subject: '',
@@ -976,49 +977,49 @@ function ProtocolArchitectInner() {
       // 5. Create Connection
       if (connectNode) {
         const outcomes = connectNode.data.outcomes as any[] || [];
-        
+
         // Ensure sourceHandle is valid
         let validHandle = outcomes.find(o => o.id === sourceHandle);
-        
+
         // FALLBACK: If outcomes exist but no handle selected, default to the closest slot
         // This prevents "invisible lines" where connection logic runs but fails silently
         if (outcomes.length > 0 && !validHandle) {
-             const nodeWidth = connectNode.measured?.width || 200;
-             const relativeX = rawPosition.x - connectNode.position.x;
-             const slotWidth = nodeWidth / outcomes.length;
-             const rawIndex = Math.floor(relativeX / slotWidth);
-             const slotIndex = Math.max(0, Math.min(outcomes.length - 1, rawIndex));
-             sourceHandle = outcomes[slotIndex].id;
-             validHandle = outcomes[slotIndex];
+          const nodeWidth = connectNode.measured?.width || 200;
+          const relativeX = rawPosition.x - connectNode.position.x;
+          const slotWidth = nodeWidth / outcomes.length;
+          const rawIndex = Math.floor(relativeX / slotWidth);
+          const slotIndex = Math.max(0, Math.min(outcomes.length - 1, rawIndex));
+          sourceHandle = outcomes[slotIndex].id;
+          validHandle = outcomes[slotIndex];
         }
 
         const canConnect = outcomes.length === 0 || !!validHandle;
 
         if (canConnect) {
-            const newEdge: Edge = {
-              id: `e-${connectNode.id}-${sourceHandle || 'default'}-${newNodeId}-${crypto.randomUUID().slice(0, 4)}`,
-              source: connectNode.id,
-              sourceHandle: sourceHandle || undefined,
-              target: newNodeId,
-              animated: true,
-              label: validHandle ? validHandle.label : undefined,
-              labelStyle: validHandle ? { fill: '#ffffff', fontSize: '10px', fontWeight: 'bold' } : undefined,
-              style: { 
-                stroke: validHandle ? '#002FA7' : '#52525b', // Zinc-600 for default lines for better visibility
-                strokeWidth: 2 
-              }
-            };
-            
-            // FORCE ADD: Use concat instead of addEdge to bypass any potential filtering
-            setEdges((eds) => eds.concat(newEdge));
-            toast.success(`Connected to ${validHandle?.label}`);
-            
-            if (debugMode) {
-              setDebugData((d) => ({ ...d, edgeId: newEdge.id, sourceHandle: sourceHandle || '' }));
-              console.log('drop:newEdge', newEdge);
+          const newEdge: Edge = {
+            id: `e-${connectNode.id}-${sourceHandle || 'default'}-${newNodeId}-${crypto.randomUUID().slice(0, 4)}`,
+            source: connectNode.id,
+            sourceHandle: sourceHandle || undefined,
+            target: newNodeId,
+            animated: true,
+            label: validHandle ? validHandle.label : undefined,
+            labelStyle: validHandle ? { fill: '#ffffff', fontSize: '10px', fontWeight: 'bold' } : undefined,
+            style: {
+              stroke: validHandle ? '#002FA7' : '#52525b', // Zinc-600 for default lines for better visibility
+              strokeWidth: 2
             }
+          };
+
+          // FORCE ADD: Use concat instead of addEdge to bypass any potential filtering
+          setEdges((eds) => eds.concat(newEdge));
+          toast.success(`Connected to ${validHandle?.label}`);
+
+          if (debugMode) {
+            setDebugData((d) => ({ ...d, edgeId: newEdge.id, sourceHandle: sourceHandle || '' }));
+            console.log('drop:newEdge', newEdge);
+          }
         } else {
-            console.warn("Aborted connection: Node has outcomes but no valid handle selected.");
+          console.warn("Aborted connection: Node has outcomes but no valid handle selected.");
         }
       }
     },
@@ -1036,7 +1037,7 @@ function ProtocolArchitectInner() {
       {/* Page Header */}
       <div className="flex items-center justify-between px-2">
         <div className="flex items-center gap-4">
-          <button 
+          <button
             onClick={handleExit}
             className="icon-button-forensic w-9 h-9 flex items-center justify-center rounded-xl border border-white/5 bg-transparent text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
           >
@@ -1059,7 +1060,7 @@ function ProtocolArchitectInner() {
         </div>
 
         <div className="flex items-center gap-3">
-          <button 
+          <button
             onClick={() => setDebugMode((v) => !v)}
             className={cn(
               "icon-button-forensic font-mono text-[10px] uppercase tracking-wider h-9 px-4 rounded-xl flex items-center transition-all",
@@ -1069,19 +1070,19 @@ function ProtocolArchitectInner() {
           >
             <Bug className="w-3.5 h-3.5 mr-2" /> {debugMode ? 'Debug_On' : 'Debug_Off'}
           </button>
-          <button 
+          <button
             onClick={handleSave}
             disabled={isSaving}
             className={cn(
               "icon-button-forensic text-zinc-400 font-mono text-[10px] uppercase tracking-wider h-9 px-4 rounded-xl flex items-center transition-all hover:text-white hover:bg-white/5",
               isSaving && "opacity-50 cursor-not-allowed"
-            )} 
+            )}
             title="Save Draft"
           >
             {isSaving ? <Clock className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-2" />}
             {isSaving ? 'Saving...' : 'Save_Draft'}
           </button>
-          <button 
+          <button
             className="bg-white text-zinc-950 hover:bg-zinc-200 font-mono text-[10px] uppercase tracking-widest font-bold h-9 px-5 rounded-xl shadow-[0_0_30px_-5px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)] transition-all"
             title="Deploy Protocol"
           >
@@ -1092,17 +1093,17 @@ function ProtocolArchitectInner() {
 
       {/* Main Builder Container */}
       <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
-        
+
         <div className="flex-1 flex overflow-hidden relative">
           {/* 1. THE ARMORY (Left Sidebar) */}
           <div className="w-20 border-r border-white/5 nodal-module-glass flex flex-col items-center pt-6 pb-8 gap-6 z-10 relative">
-            
+
             <div className="flex-none">
               <div className="w-10 h-10 rounded-xl bg-[#002FA7]/10 border border-white/20 flex items-center justify-center shadow-[0_0_20px_rgba(0,47,167,0.3)]">
                 <Target className="w-5 h-5 text-white" />
               </div>
             </div>
-            
+
             <div className="flex flex-col gap-5 overflow-y-auto scrollbar-none pb-8">
               <ToolButton icon={Mail} label="Email" color="text-zinc-300" type="email" />
               <ToolButton icon={Phone} label="Voice" color="text-zinc-300" type="call" />
@@ -1115,46 +1116,46 @@ function ProtocolArchitectInner() {
               {/* Interaction Vectors */}
               <div className="flex flex-col gap-5 mt-4 pt-4 border-t border-white/5">
                 <h4 className="text-[8px] font-mono text-zinc-600 uppercase tracking-[0.2em] text-center">Vectors</h4>
-                <ToolButton 
-                  icon={ArrowUpRight} 
-                  label="Opened" 
-                  type="vector:opened" 
+                <ToolButton
+                  icon={ArrowUpRight}
+                  label="Opened"
+                  type="vector:opened"
                   color="text-emerald-500/70 group-hover:text-emerald-400"
                 />
-                <ToolButton 
-                  icon={ArrowUpRight} 
-                  label="No_Reply" 
-                  type="vector:no_reply" 
+                <ToolButton
+                  icon={ArrowUpRight}
+                  label="No_Reply"
+                  type="vector:no_reply"
                   color="text-rose-500/70 group-hover:text-rose-400"
                 />
-                <ToolButton 
-                  icon={ArrowUpRight} 
-                  label="Clicked" 
-                  type="vector:clicked" 
+                <ToolButton
+                  icon={ArrowUpRight}
+                  label="Clicked"
+                  type="vector:clicked"
                   color="text-sky-500/70 group-hover:text-sky-400"
                 />
-                <ToolButton 
-                  icon={CheckCircle2} 
-                  label="Positive" 
-                  type="vector:positive" 
+                <ToolButton
+                  icon={CheckCircle2}
+                  label="Positive"
+                  type="vector:positive"
                   color="text-emerald-500 group-hover:text-emerald-400"
                 />
-                <ToolButton 
-                  icon={XCircle} 
-                  label="Negative" 
-                  type="vector:negative" 
+                <ToolButton
+                  icon={XCircle}
+                  label="Negative"
+                  type="vector:negative"
                   color="text-rose-500 group-hover:text-rose-400"
                 />
-                <ToolButton 
-                  icon={CalendarCheck} 
-                  label="Booked" 
-                  type="vector:booked" 
+                <ToolButton
+                  icon={CalendarCheck}
+                  label="Booked"
+                  type="vector:booked"
                   color="text-amber-500 group-hover:text-amber-400"
                 />
-                <ToolButton 
-                  icon={PhoneMissed} 
-                  label="No_Answer" 
-                  type="vector:no_answer" 
+                <ToolButton
+                  icon={PhoneMissed}
+                  label="No_Answer"
+                  type="vector:no_answer"
                   color="text-zinc-500 group-hover:text-zinc-400"
                 />
               </div>
@@ -1162,7 +1163,7 @@ function ProtocolArchitectInner() {
           </div>
 
           {/* 2. THE REACTOR (Canvas) */}
-          <div 
+          <div
             className="flex-1 relative h-full bg-zinc-950"
             onDragOver={onDragOver}
             onDrop={onDrop}
@@ -1183,7 +1184,7 @@ function ProtocolArchitectInner() {
             >
               <Background color="#18181b" gap={24} size={1} variant={BackgroundVariant.Dots} />
               <Controls className="nodal-module-glass nodal-monolith-edge text-white rounded-xl overflow-hidden shadow-2xl !bottom-4 !left-4" />
-              
+
               <Panel position="top-right" className="m-4">
                 <div className="nodal-module-glass nodal-monolith-edge p-4 rounded-2xl flex flex-col gap-3 min-w-[220px] shadow-2xl">
                   <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500 uppercase tracking-widest px-1">
@@ -1235,7 +1236,7 @@ function ProtocolArchitectInner() {
             "w-96 border-l border-white/5 nodal-module-glass backdrop-blur-2xl transition-all duration-500 ease-in-out relative flex flex-col z-20",
             selectedNode ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 absolute right-0"
           )}>
-            
+
             <Tabs defaultValue="calibration" className="flex-1 flex flex-col min-h-0 h-full">
               <div className="p-8 pb-4 shrink-0 border-b border-white/5 bg-black/10">
                 <div className="flex items-center justify-between mb-6">
@@ -1246,14 +1247,14 @@ function ProtocolArchitectInner() {
                     </span>
                   </div>
                   <div className="flex gap-2">
-                    <button 
+                    <button
                       onClick={() => selectedNode && duplicateNode(selectedNode)}
                       className="icon-button-forensic h-8 w-8 flex items-center justify-center rounded-lg bg-black/40 border border-white/5 text-zinc-400"
                       title="Duplicate Node"
                     >
                       <Copy className="w-4 h-4" />
                     </button>
-                    <button 
+                    <button
                       onClick={() => selectedNode && deleteNode(selectedNode.id)}
                       className="icon-button-forensic h-8 w-8 flex items-center justify-center rounded-lg bg-red-500/10 border border-red-500/20 text-red-400"
                       title="Delete Node"
@@ -1273,8 +1274,8 @@ function ProtocolArchitectInner() {
                 <div className="space-y-8 pb-32">
                   <div className="space-y-3">
                     <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Protocol Label</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       className="w-full bg-black/40 border border-white/5 rounded-xl p-3 text-sm font-mono focus:border-[#002FA7] outline-none transition-all"
                       value={selectedNode?.data.label as string || ''}
                       onChange={(e) => updateNodeData(selectedNode!.id, { label: e.target.value })}
@@ -1305,15 +1306,15 @@ function ProtocolArchitectInner() {
                         <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Interaction_Branches</label>
                         <span className="text-[9px] font-mono text-[#002FA7] uppercase tracking-tighter">Max: 03 Nodes</span>
                       </div>
-                      
+
                       <div className="space-y-3">
                         {(selectedNode?.data.outcomes as any[] || []).map((outcome, idx) => (
                           <div key={outcome.id} className="group relative">
                             <div className="flex items-center gap-3">
                               <div className="flex-1 bg-black/40 border border-white/5 rounded-xl flex items-center px-3 focus-within:border-[#002FA7] transition-all">
                                 <span className="text-[10px] font-mono text-zinc-600 mr-2">{idx + 1}</span>
-                                <input 
-                                  type="text" 
+                                <input
+                                  type="text"
                                   className="w-full bg-transparent py-3 text-sm font-mono outline-none text-zinc-100"
                                   value={outcome.label}
                                   onChange={(e) => updateOutcomeLabel(selectedNode!.id, outcome.id, e.target.value)}
@@ -1321,7 +1322,7 @@ function ProtocolArchitectInner() {
                                 />
                               </div>
                               {(selectedNode?.data.outcomes as any[]).length > 1 && (
-                                <button 
+                                <button
                                   onClick={() => removeOutcome(selectedNode!.id, outcome.id)}
                                   className="icon-button-forensic h-10 w-10 flex items-center justify-center rounded-xl bg-red-500/5 border border-red-500/10 text-red-500/50"
                                   title="Remove Branch"
@@ -1334,8 +1335,8 @@ function ProtocolArchitectInner() {
                         ))}
 
                         {(selectedNode?.data.outcomes as any[] || []).length < 3 && (
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             onClick={() => addOutcome(selectedNode!.id)}
                             className="w-full h-10 border border-dashed border-white/10 text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-white hover:border-white/20 hover:bg-white/5 transition-all"
                           >
@@ -1361,8 +1362,8 @@ function ProtocolArchitectInner() {
                                 } else {
                                   // Add new outcome with this label
                                   const outcomeId = `outcome-${crypto.randomUUID().slice(0, 8)}`;
-                                  updateNodeData(selectedNode!.id, { 
-                                    outcomes: [...outcomes, { id: outcomeId, label: preset }] 
+                                  updateNodeData(selectedNode!.id, {
+                                    outcomes: [...outcomes, { id: outcomeId, label: preset }]
                                   });
                                 }
                               }}
@@ -1385,8 +1386,8 @@ function ProtocolArchitectInner() {
                   {selectedNode?.data.type === 'linkedin' && (
                     <div className="space-y-3">
                       <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Signal_Type</label>
-                      <Select 
-                        value={selectedNode?.data.signalType as string || 'VIEW'} 
+                      <Select
+                        value={selectedNode?.data.signalType as string || 'VIEW'}
                         onValueChange={(val) => updateNodeData(selectedNode!.id, { signalType: val })}
                       >
                         <SelectTrigger className="w-full bg-black/40 border-white/5 rounded-xl h-12 font-mono text-sm focus:ring-0 focus:border-[#002FA7]">
@@ -1405,8 +1406,8 @@ function ProtocolArchitectInner() {
                   {selectedNode?.data.type === 'call' && (
                     <div className="space-y-3">
                       <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Script_Template</label>
-                      <Select 
-                        value={selectedNode?.data.templateId as string || ''} 
+                      <Select
+                        value={selectedNode?.data.templateId as string || ''}
                         onValueChange={(val) => updateNodeData(selectedNode!.id, { templateId: val })}
                       >
                         <SelectTrigger className="w-full bg-black/40 border-white/5 rounded-xl h-12 font-mono text-sm focus:ring-0 focus:border-[#002FA7]">
@@ -1424,8 +1425,8 @@ function ProtocolArchitectInner() {
                   {selectedNode?.data.type === 'email' && (
                     <div className="space-y-3">
                       <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Subject_Matrix</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         className="w-full bg-black/40 border border-white/5 rounded-xl p-3 text-sm font-mono focus:border-[#002FA7] outline-none transition-all"
                         placeholder="Subject Line"
                         value={selectedNode?.data.subject as string || ''}
@@ -1439,9 +1440,9 @@ function ProtocolArchitectInner() {
                       <Clock className="w-3 h-3" /> Latency_Delay
                     </label>
                     <div className="flex items-center gap-3">
-                      <input 
-                        type="number" 
-                        className="bg-black/40 border border-white/5 rounded-xl p-3 w-20 text-center font-mono text-sm focus:border-[#002FA7] outline-none transition-all" 
+                      <input
+                        type="number"
+                        className="bg-black/40 border border-white/5 rounded-xl p-3 w-20 text-center font-mono text-sm focus:border-[#002FA7] outline-none transition-all"
                         value={selectedNode?.data.delay as string || '1'}
                         onChange={(e) => updateNodeData(selectedNode!.id, { delay: e.target.value })}
                       />
@@ -1454,7 +1455,7 @@ function ProtocolArchitectInner() {
                       <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                         {emailViewMode === 'payload' ? 'Matrix_Payload' : emailViewMode === 'ai' ? 'Neural_Context' : 'Foundry_Asset'}
                       </label>
-                      
+
                       {selectedNode?.data.type === 'email' && (
                         <div className="flex items-center gap-1 bg-black/40 border border-white/5 rounded-lg p-0.5">
                           <button
@@ -1508,7 +1509,7 @@ function ProtocolArchitectInner() {
                           </div>
                         </div>
 
-                        <textarea 
+                        <textarea
                           ref={textareaRef}
                           className="w-full h-48 bg-transparent p-4 text-sm text-zinc-300 font-mono resize-none outline-none placeholder:text-zinc-700"
                           placeholder="Hi {{first_name}}, I noticed your 4CP exposure in the LZ_NORTH node..."
@@ -1522,14 +1523,14 @@ function ProtocolArchitectInner() {
                         <div className="space-y-4 bg-black/40 border border-white/5 rounded-2xl p-4">
                           <div className="space-y-2">
                             <label className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">Architect_Role</label>
-                            <input 
+                            <input
                               type="text"
                               className="w-full bg-white/5 border border-white/5 rounded-lg p-2 text-xs font-mono text-emerald-400/90 focus:border-emerald-500/50 outline-none transition-all"
                               placeholder="e.g., Act as a Forensic Energy Auditor..."
                               value={(selectedNode?.data.promptConfig as any)?.role || ''}
                               onChange={(e) => {
                                 const config = (selectedNode?.data.promptConfig as any) || {};
-                                updateNodeData(selectedNode!.id, { 
+                                updateNodeData(selectedNode!.id, {
                                   promptConfig: { ...config, role: e.target.value },
                                   prompt: `${e.target.value}\n${config.objective || ''}\n${config.constraints || ''}`
                                 });
@@ -1538,14 +1539,14 @@ function ProtocolArchitectInner() {
                           </div>
                           <div className="space-y-2">
                             <label className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">Liability_Objective</label>
-                            <input 
+                            <input
                               type="text"
                               className="w-full bg-white/5 border border-white/5 rounded-lg p-2 text-xs font-mono text-emerald-400/90 focus:border-emerald-500/50 outline-none transition-all"
                               placeholder="e.g., Expose the structural variance in their 4CP charges."
                               value={(selectedNode?.data.promptConfig as any)?.objective || ''}
                               onChange={(e) => {
                                 const config = (selectedNode?.data.promptConfig as any) || {};
-                                updateNodeData(selectedNode!.id, { 
+                                updateNodeData(selectedNode!.id, {
                                   promptConfig: { ...config, objective: e.target.value },
                                   prompt: `${config.role || ''}\n${e.target.value}\n${config.constraints || ''}`
                                 });
@@ -1554,14 +1555,14 @@ function ProtocolArchitectInner() {
                           </div>
                           <div className="space-y-2">
                             <label className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">Forensic_Constraints</label>
-                            <input 
+                            <input
                               type="text"
                               className="w-full bg-white/5 border border-white/5 rounded-lg p-2 text-xs font-mono text-emerald-400/90 focus:border-emerald-500/50 outline-none transition-all"
                               placeholder="e.g., Max 80 words. No sales fluff. Use 'No-Oriented' questions."
                               value={(selectedNode?.data.promptConfig as any)?.constraints || ''}
                               onChange={(e) => {
                                 const config = (selectedNode?.data.promptConfig as any) || {};
-                                updateNodeData(selectedNode!.id, { 
+                                updateNodeData(selectedNode!.id, {
                                   promptConfig: { ...config, constraints: e.target.value },
                                   prompt: `${config.role || ''}\n${config.objective || ''}\n${e.target.value}`
                                 });
@@ -1581,13 +1582,13 @@ function ProtocolArchitectInner() {
                               { id: 'contract_expiry', label: 'Contract Expiry', icon: Calendar },
                             ].map((vector) => (
                               <label key={vector.id} className="flex items-center gap-2 cursor-pointer group">
-                                <input 
+                                <input
                                   type="checkbox"
                                   className="hidden"
                                   checked={((selectedNode?.data.vectors as string[]) || []).includes(vector.id)}
                                   onChange={(e) => {
                                     const vectors = (selectedNode?.data.vectors as string[]) || [];
-                                    const newVectors = e.target.checked 
+                                    const newVectors = e.target.checked
                                       ? [...vectors, vector.id]
                                       : vectors.filter(v => v !== vector.id);
                                     updateNodeData(selectedNode!.id, { vectors: newVectors });
@@ -1608,7 +1609,7 @@ function ProtocolArchitectInner() {
                         </div>
 
                         {/* Optimize Button */}
-                        <Button 
+                        <Button
                           onClick={optimizeWithGemini}
                           disabled={isOptimizing}
                           className="w-full h-10 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-mono uppercase tracking-widest hover:bg-emerald-500/20 hover:text-emerald-300 transition-all disabled:opacity-50"
@@ -1621,8 +1622,8 @@ function ProtocolArchitectInner() {
                       <div className="space-y-4">
                         <div className="bg-black/40 border border-white/5 rounded-2xl p-4 space-y-4">
                           <label className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest block">Select_Foundry_Asset</label>
-                          <Select 
-                            value={(selectedNode?.data.foundryAssetId as string) || ''} 
+                          <Select
+                            value={(selectedNode?.data.foundryAssetId as string) || ''}
                             onValueChange={(val) => updateNodeData(selectedNode!.id, { foundryAssetId: val })}
                           >
                             <SelectTrigger className="w-full bg-black/40 border-white/5 rounded-xl h-12 font-mono text-sm focus:ring-0 focus:border-[#002FA7]">
@@ -1715,7 +1716,7 @@ function ProtocolArchitectInner() {
                         "bg-zinc-950/80 border border-white/5 rounded-2xl p-6 min-h-[300px] relative overflow-hidden transition-all duration-500 mx-auto",
                         isPreviewMobile ? "w-[280px] text-[12px]" : "w-full text-sm"
                       )}>
-                        
+
                         {selectedNode?.data.type === 'email' && (
                           <div className="mb-4 pb-4 border-b border-white/5">
                             <span className="text-[10px] text-zinc-500 font-mono block mb-1 uppercase tracking-widest">Subject</span>
@@ -1725,7 +1726,7 @@ function ProtocolArchitectInner() {
                           </div>
                         )}
 
-                        <div 
+                        <div
                           className="text-zinc-300 font-mono whitespace-pre-wrap leading-relaxed"
                           dangerouslySetInnerHTML={{ __html: previewBody || '(No content to preview)' }}
                         />
@@ -1738,7 +1739,7 @@ function ProtocolArchitectInner() {
                             </div>
                           </div>
                         )}
-                        
+
                         {isOptimizing && (
                           <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center z-20">
                             <div className="flex flex-col items-center gap-3">
@@ -1841,21 +1842,21 @@ function ProtocolArchitectInner() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               onClick={() => setShowExitDialog(false)}
               className="text-zinc-400 hover:text-white hover:bg-white/5"
             >
               Cancel
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               onClick={() => router.push('/network/protocols')}
               className="bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20"
             >
               Discard Changes
             </Button>
-            <Button 
+            <Button
               onClick={async () => {
                 await handleSave();
                 setShowExitDialog(false);
@@ -1880,7 +1881,7 @@ function ToolButton({ icon: Icon, label, color, type }: { icon: any, label: stri
   };
 
   return (
-    <div 
+    <div
       className="group flex flex-col items-center gap-2 cursor-grab active:cursor-grabbing"
       draggable
       onDragStart={(event) => onDragStart(event, type)}
