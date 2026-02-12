@@ -14,11 +14,11 @@ Your CRM platform is now configured for Vercel deployment with the following dom
 ### Project Structure
 ```
 Power Choosers CRM/
-├── vercel.json           # Vercel configuration
-├── crm-platform/         # Main Next.js application
+├── crm-platform/         # Main Next.js application (ROOT DIRECTORY)
+│   ├── vercel.json       # Vercel configuration (MOVED HERE)
 │   ├── src/
 │   │   ├── app/         # Next.js App Router
-│   │   ├── pages/api/   # API routes (93+ handlers)
+│   │   ├── pages/api/   # API routes
 │   │   └── components/  # React components
 │   ├── package.json     # All dependencies
 │   └── next.config.ts   # Vercel-optimized config
@@ -50,19 +50,13 @@ Your `vercel.json` is configured with:
 3. Select your **Power Choosers CRM** repository
 4. Vercel will auto-detect the configuration from `vercel.json`
 
-### Step 2: Configure Build Settings
-
-Vercel should automatically detect:
-- **Framework:** Next.js
-- **Root Directory:** `crm-platform`
-- **Build Command:** `npm run build` (from vercel.json)
-- **Output Directory:** `.next`
-- **Install Command:** `npm install` (from vercel.json)
-
 If you need to verify/override:
-- Go to **Project Settings** → **Build & Development Settings**
-- Ensure the root directory is set to `crm-platform`
-
+- Go to **Project Settings** → **General**
+- **CRITICAL:** Set the **Root Directory** to `crm-platform`
+- Vercel will then correctly find the `package.json` and `vercel.json`
+- Framework Preset should be **Next.js**
+- Build & Development Settings can usually be left at defaults once Root Directory is set.
+```
 ### Step 3: Add Environment Variables (CRITICAL!)
 
 Go to **Project Settings** → **Environment Variables** and add the following:

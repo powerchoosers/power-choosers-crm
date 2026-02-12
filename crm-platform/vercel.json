@@ -1,7 +1,4 @@
 {
-    "buildCommand": "cd crm-platform && npm install && npm run build",
-    "outputDirectory": "crm-platform/.next",
-    "installCommand": "npm install --prefix crm-platform",
     "framework": "nextjs",
     "rewrites": [
         {
