@@ -137,7 +137,47 @@ if (filename !== undefined && filename !== '' && attachmentId) {
 
 ---
 
-## 8. Next.js: use built-in type checking; optional incremental
+## 8. Next.js Client Hooks: Null Safety for useSearchParams
+
+**Problem:** "Type error: 'searchParams' is possibly 'null'" when calling methods on `useSearchParams()` result (e.g., `.get()`, `.toString()`).
+
+**Why this happens:**
+
+- **Next.js 13+ App Router:** `useSearchParams()` can return `null` during SSR or when navigation is in progress ([Next.js useSearchParams docs](https://nextjs.org/docs/app/api-reference/functions/use-search-params)).
+- **Vercel builds enforce strict TypeScript:** Vercel's build process runs `tsc --noEmit` and fails on type errors. Cloud Run or local dev may have had `ignoreBuildErrors: true` or skipped type checking.
+- **TypeScript strictNullChecks:** With `strict: true`, you cannot call methods on a value typed as `T | null` without narrowing.
+
+**Practice (from Next.js and TypeScript):**
+
+- **Always use optional chaining (`?.`)** when calling methods on `useSearchParams()` result:
+  ```typescript
+  const searchParams = useSearchParams()
+  const taskId = searchParams?.get('taskId') ?? null
+  const query = searchParams?.toString() || ''
+  ```
+- **Do not** directly call `.get()` or `.toString()` without checking:
+  ```typescript
+  // BAD - fails TypeScript check
+  const taskId = searchParams.get('taskId')
+  const query = searchParams.toString()
+  
+  // GOOD - null-safe
+  const taskId = searchParams?.get('taskId') ?? null
+  const query = searchParams?.toString() || ''
+  ```
+- **Pattern for scroll keys or URL manipulation:**
+  ```typescript
+  const scrollKey = (pathname ?? '/default') + (searchParams?.toString() ? `?${searchParams.toString()}` : '')
+  ```
+
+**Why Vercel is stricter:**
+- Vercel always runs `next build` with type checking enabled (equivalent to `tsc --noEmit` before build).
+- Cloud Run deployments may have used Docker builds that didn't enforce TypeScript checks, or had `typescript.ignoreBuildErrors: true` in `next.config`.
+- **Best practice:** Match Vercel's strictness locally by running `npm run typecheck` before every commit.
+
+---
+
+## 9. Next.js: use built-in type checking; optional incremental
 
 **Practice (from Next.js TypeScript docs):**
 
@@ -147,7 +187,7 @@ if (filename !== undefined && filename !== '' && attachmentId) {
 
 ---
 
-## 9. Literal arrays vs tuples: use `as const` when the API expects a tuple
+## 10. Optional: pre-commit or CI typecheck
 
 **Problem:** “Type 'number[]' is not assignable to type 'Easing'” (or similar) when you pass an array literal like `[0.32, 0.72, 0, 1]` into a third-party API that expects a **tuple** (e.g. a cubic-bezier easing). TypeScript infers the literal as `number[]`, which is not assignable to a tuple type like `[number, number, number, number]`.
 
@@ -169,7 +209,7 @@ const exitTransition = { duration: 0.4, ease: [0.32, 0.72, 0, 1] as const };
 
 ---
 
-## 10. Optional: pre-commit or CI typecheck
+## 11. Literal arrays vs tuples: use `as const` when the API expects a tuple
 
 **Practice:**
 
