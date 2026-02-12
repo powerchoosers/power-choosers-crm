@@ -23,32 +23,31 @@ Welcome to the **Nodal Point CRM Platform**, a modern, scalable, and high-perfor
   - [Lucide React](https://lucide.dev/) (Icons)
   - [Framer Motion](https://www.framer.com/motion/) (Animations)
 - **Authentication:** Firebase Auth (login); Supabase `users` table (profile: role, name, Twilio settings, etc.)
-- **Backend/API:** Node.js (Legacy Server & API Proxy at root). Key API routes include `/api/market/ercot`, `/api/market/eia`, `/api/weather` (Google Weather API; lat/lng or geocode from address/city+state), `/api/maps/geocode`.
+- **Backend/API**: Integrated Next.js API Routes (Pages Router) located at `crm-platform/src/pages/api/`. Handles all logic including Twilio webhooks, market data (ERCOT/EIA), and AI processing (Gemini).
+- **Hosting**: [Vercel](https://vercel.com/) (Production) — Root directory: `crm-platform`.
+- **Domain**: `nodalpoint.io` (Managed via Vercel).
 
 ## 🛠️ Project Structure
 
-The project is divided into two main parts:
-
-1.  **`crm-platform/` (Frontend)**: The new Next.js application containing all UI, routing, and client-side logic.
-2.  **Root Directory (Backend)**: Contains `server.js` and `api/` folders, serving as the backend API and legacy feature support.
+The project is unified into a single Next.js application:
 
 ```
 Power Choosers CRM/
-├── crm-platform/           # New Next.js Application (MAIN ENTRY POINT)
+├── crm-platform/           # Next.js Application (UNIFIED ROOT)
 │   ├── src/
-│   │   ├── app/            # App Router (Pages & Layouts)
+│   │   ├── app/            # App Router (UI & Layouts)
+│   │   ├── pages/api/      # API Routes (93+ handlers, Twilio, Market, AI)
 │   │   ├── components/     # Reusable UI (modals, layout, ui, crm, calls, etc.)
 │   │   ├── context/        # AuthContext, VoiceContext
-│   │   ├── hooks/          # Data & UI hooks (useContacts, useCalls, useAccounts, etc.)
-│   │   ├── lib/            # supabase, firebase, persister, market-mapping, utils
-│   │   ├── store/          # Zustand: callStore, geminiStore, syncStore, uiStore
+│   │   ├── hooks/          # Data & UI hooks (useContacts, useCalls, etc.)
+│   │   ├── lib/            # supabase, firebase, persister, utils
+│   │   ├── store/          # Zustand states
 │   │   └── types/          # TypeScript interfaces
-│   ├── public/             # Static Assets (images, scripts)
-│   └── package.json        # Frontend Dependencies
-├── api/                    # Backend API Endpoints (Twilio, etc.)
-├── backups/                # Legacy HTML Dashboard (Reference Only)
-├── server.js               # Node.js Backend (API & Legacy Support)
-├── scripts/dev-all.js      # Starts Next.js + backend (npm run dev:all)
+│   ├── public/             # Static Assets (images, logo)
+│   ├── package.json        # All Dependencies (Frontend + Backend)
+│   └── vercel.json         # Vercel Configuration
+├── backups/                # Legacy Reference & Migration Backups
+├── vercel_deployment.md    # Deployment & Management Guide
 └── feature-tracking.md    # Migration Status Log
 ```
 
@@ -129,40 +128,30 @@ The platform features a "Stealth" geometry map (`InfrastructureMap.tsx`) for gri
 
 ## ⚡ Quick Start & Architecture
 
-The platform operates using a **Three-Server Architecture**:
+The platform operates as a unified Next.js 16 application:
 
-### 1. Frontend (Next.js)
-The modern UI for users.
+### 1. Local Development
+Everything runs in one process. Next.js serves both the UI and the API routes from the same server.
 - **Local**: `http://localhost:3000`
-- **Command (frontend only)**: `cd crm-platform && npm run dev` (Next.js with Turbopack; port 3000 default)
-- **Command (both)**: From repo root, `npm run dev:all` — starts Next.js and backend in one terminal via `scripts/dev-all.js`
+- **Command**: `cd crm-platform && npm run dev`
+- **Port**: Default is 3000. All `/api/*` requests go directly to the local server.
 
-### 2. Local Backend (Node.js)
-Handles API requests and legacy logic during development.
-- **Local**: `http://127.0.0.1:3001`
-- **Command**: From repo root, `node server.js` or `npm run dev` (nodemon). Use `npm run dev:all` to run both.
+### 2. Production Environment (Vercel)
+The live platform is hosted on Vercel for high-performance edge computing and serverless scalability.
+- **Primary Domain**: `https://nodalpoint.io`
+- **Preview Domain**: `https://nodal-point-network.vercel.app`
+- **Architecture**: Vercel automatically deploys API routes as Serverless Functions.
+- **Root Directory Setting**: The Vercel project **MUST** have the **Root Directory** set to `crm-platform`.
 
-### 3. Production Environment (Cloud Run)
-The live platform operates across two distinct Cloud Run services in the **`us-central1`** region (optimized for cost and custom domain mapping):
-- **Frontend (UI)**: `https://power-choosers-crm-792458658491.us-central1.run.app` (Mapped to `https://nodalpoint.io`)
-- **Backend (Network/API)**: `https://nodal-point-network-792458658491.us-central1.run.app`
-- **Architecture**: The Frontend service handles the UI and routing, while the Network service handles Twilio webhooks, heavy API processing, and legacy backend logic.
-- **Cost Optimization**:
-  - **Domain Mapping**: We use native Cloud Run Domain Mapping (Free) instead of a Global Load Balancer ($18+/mo).
-  - **Storage**: Artifact Registry uses a cleanup policy (`policy.json`) to delete images older than 30 days and keep only the 5 most recent versions.
-- **Deployment Strategy (Docker)**:
-  - **Frontend image** (`crm-platform/Dockerfile`): Build context is repo root (`.` in Cloud Build). Next.js standalone output is copied to `/app`; **`server.js` is at `/app/server.js`** (Next.js standalone places it at the root of the output). No separate `node_modules` at runtime; dependencies are bundled.
-  - **Backend image** (root `Dockerfile`): `server.js` at `/app/server.js`; port 8080. Used for the `nodal-point-network` Cloud Run service.
-- **Deploying to Cloud Run (no auto-deploy on push)**:
-  - **Pushing to Git does NOT trigger a build.** There is no GitHub Actions or automatic Cloud Build trigger in this repo. Cloud Run only updates when a build is run.
-  - **To deploy after pushing changes:** From the repo root run `gcloud builds submit --config cloudbuild.yaml`. This uploads your local source and builds both frontend and backend images, then deploys them to Cloud Run. Ensure you have the Cloud Build substitution variables set (e.g. in a trigger or via `--substitutions`) for the frontend `NEXT_PUBLIC_*` build args—see `cloudbuild.yaml` comments.
-  - **Optional:** In Google Cloud Console → Cloud Build → Triggers, you can create a trigger that runs `cloudbuild.yaml` on push to `main` (connect your repo and set the substitution variables there). Then every push to `main` would deploy automatically.
+### 3. CI/CD Strategy (Vercel + GitHub)
+- **Automatic Deployment**: Pushing to the `main` branch on GitHub triggers an automatic deployment to production.
+- **Push Protection**: GitHub Push Protection is active; never commit raw API keys. Use placeholders in documentation and real variables in the Vercel Dashboard.
 
 ### 📞 Twilio Webhook Configuration
-When configuring Twilio phone numbers or TwiML Apps, ALWAYS use the canonical domain to ensure reliability and valid SSL verification:
+When configuring Twilio phone numbers or TwiML Apps, ALWAYS use the canonical domain:
 - **Voice Webhook**: `https://nodalpoint.io/api/twilio/voice`
 - **Status Callback**: `https://nodalpoint.io/api/twilio/status`
-- **Fallback URL**: `https://nodalpoint.io/api/twilio/voice` (Optional)
+- **Fallback URL**: `https://nodalpoint.io/api/twilio/voice`
 
 ## 📍 Routing & Proxy Logic
 
