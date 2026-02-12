@@ -91,7 +91,7 @@ export default async function handler(req, res) {
         res.end(JSON.stringify({ error: 'Method not allowed' }));
         return;
     }
-    
+
     try {
         // Read params from body (POST) or query (GET)
         const src = req.method === 'POST' ? (req.body || {}) : (req.query || {});
@@ -112,12 +112,12 @@ export default async function handler(req, res) {
         // For inbound calls, use businessNumber as callerId when dialing to browser client
         const sanitizedFrom = normalizePhoneNumber(From);
         const callerIdForDial = isInboundToBusiness ? businessNumber : (sanitizedFrom || businessNumber);
-        
+
         // Ensure absolute base URL for Twilio callbacks (prefer PUBLIC_BASE_URL for stability)
         const envBase = process.env.PUBLIC_BASE_URL || '';
         const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
         const host = req.headers['x-forwarded-host'] || req.headers.host || '';
-        const base = envBase ? envBase.replace(/\/$/, '') : (host ? `${proto}://${host}` : 'https://nodalpoint.io');
+        const base = envBase ? envBase.replace(/\/$/, '') : (host ? `${proto}://${host}` : 'https://nodal-point-network.vercel.app');
 
         // Extract metadata and create initial call record to ensure it appears in CRM immediately
         let contactId = '';
@@ -125,7 +125,7 @@ export default async function handler(req, res) {
         if (CallSid && src.metadata) {
             try {
                 const meta = typeof src.metadata === 'string' ? JSON.parse(src.metadata) : src.metadata;
-                
+
                 // Extract IDs for propagation to dial status callbacks
                 contactId = meta.contactId || '';
                 accountId = meta.accountId || '';
@@ -172,7 +172,7 @@ export default async function handler(req, res) {
             });
             // Small prompt to keep caller informed
             twiml.say({ voice: 'alice' }, 'Please hold while we try to connect you.');
-            
+
             // Pass the original caller's number as a custom parameter
             const client = dial.client('agent');
             if (From && From !== businessNumber) {
@@ -181,7 +181,7 @@ export default async function handler(req, res) {
                     value: From
                 });
             }
-            
+
             logger.log(`[Voice] Generated TwiML to dial <Client>agent</Client> with callerId: ${From || businessNumber}, originalCaller: ${From}`);
         } else if (To) {
             // OUTBOUND CALLBACK SCENARIO: Dial specific number provided
@@ -224,22 +224,22 @@ export default async function handler(req, res) {
             });
             dial.client('agent');
         }
-        
+
         // Send TwiML response
         const xml = twiml.toString();
-        try { logger.log('[Voice TwiML]', xml); } catch(_) {}
+        try { logger.log('[Voice TwiML]', xml); } catch (_) { }
         res.setHeader('Content-Type', 'text/xml');
         res.writeHead(200);
         res.end(xml);
         return;
-        
+
     } catch (error) {
         logger.error('Voice webhook error:', error);
-        
+
         // Return error TwiML
         const twiml = new VoiceResponse();
         twiml.say('Sorry, there was an error processing your call.');
-        
+
         res.setHeader('Content-Type', 'text/xml');
         res.writeHead(500);
         res.end(twiml.toString());
