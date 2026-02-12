@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lewis Patterson | Director of Energy Architecture</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #ffffff;
+            --text: #09090b;
+            --zinc-100: #f4f4f5;
+            --zinc-200: #e4e4e7;
+            --zinc-300: #d4d4d8;
+            --zinc-400: #a1a1aa;
+            --zinc-500: #71717a;
+            --zinc-600: #52525b;
+            --zinc-700: #3f3f46;
+            --zinc-800: #27272a;
+            --zinc-900: #18181b;
+            --zinc-950: #09090b;
+            --klein-blue: #002FA7;
+            --emerald: #10b981;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                /* For screen viewing, we can use a darker theme if user prefers, 
+                   but for PDF export/printing we usually want a white background. 
+                   I will stick to a semi-premium light theme for the resume by default 
+                   as it translates better to PDF across all viewers. */
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--zinc-100);
+            color: var(--text);
+            line-height: 1.5;
+            padding: 40px 20px;
+            -webkit-print-color-adjust: exact;
+        }
+
+        .resume-container {
+            max-width: 850px;
+            margin: 0 auto;
+            background: var(--bg);
+            padding: 60px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
+            min-height: 1100px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .forensic-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 6px;
+            height: 100%;
+            background-color: var(--klein-blue);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 40px;
+        }
+
+        .identity-block h1 {
+            font-size: 36px;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            text-transform: uppercase;
+            line-height: 1;
+            margin-bottom: 8px;
+            color: var(--zinc-950);
+        }
+
+        .identity-block .title-slug {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--klein-blue);
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--emerald);
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 8px var(--emerald);
+        }
+
+        .contact-block {
+            text-align: right;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--zinc-500);
+            line-height: 1.8;
+        }
+
+        .contact-block a {
+            color: var(--zinc-900);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .contact-block a:hover {
+            color: var(--klein-blue);
+        }
+
+        .contact-label {
+            color: var(--zinc-400);
+            margin-right: 4px;
+        }
+
+        section {
+            margin-bottom: 32px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .section-header h2 {
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--zinc-400);
+            white-space: nowrap;
+        }
+
+        .section-header .line {
+            height: 1px;
+            background: var(--zinc-200);
+            width: 100%;
+        }
+
+        .summary-text {
+            font-size: 16px;
+            font-weight: 400;
+            color: var(--zinc-700);
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .summary-text strong {
+            color: var(--zinc-950);
+            font-weight: 600;
+        }
+
+        .expertise-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 30px;
+        }
+
+        .expertise-item {
+            background: var(--zinc-100);
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--zinc-200);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--zinc-800);
+        }
+
+        .expertise-item span {
+            color: var(--klein-blue);
+            font-weight: 700;
+        }
+
+        .experience-item {
+            margin-bottom: 28px;
+        }
+
+        .experience-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .experience-header h3 {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--zinc-950);
+        }
+
+        .experience-meta {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--zinc-500);
+            text-transform: uppercase;
+        }
+
+        .experience-sub-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: var(--zinc-600);
+            font-weight: 500;
+            margin-bottom: 12px;
+        }
+
+        .experience-body {
+            font-size: 14px;
+            color: var(--zinc-700);
+            line-height: 1.6;
+            margin-left: 20px;
+            position: relative;
+        }
+
+        .experience-body::before {
+            content: "";
+            position: absolute;
+            left: -20px;
+            top: 8px;
+            width: 8px;
+            height: 1px;
+            background: var(--klein-blue);
+        }
+
+        .experience-bullets {
+            list-style: none;
+        }
+
+        .experience-bullets li {
+            position: relative;
+            padding-left: 20px;
+            margin-bottom: 4px;
+        }
+
+        .experience-bullets li::before {
+            content: "//";
+            position: absolute;
+            left: 0;
+            color: var(--klein-blue);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 11px;
+        }
+
+        .education-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .education-item h3 {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--zinc-950);
+        }
+
+        .education-item p {
+            font-size: 14px;
+            color: var(--zinc-600);
+        }
+
+        .footer-tagline {
+            margin-top: 60px;
+            text-align: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--zinc-400);
+            border-top: 1px solid var(--zinc-100);
+            padding-top: 20px;
+        }
+
+        @media print {
+            body {
+                padding: 0;
+                background: white;
+            }
+
+            .resume-container {
+                box-shadow: none;
+                margin: 0;
+                padding: 40px;
+                width: 100%;
+                max-width: 100%;
+            }
+
+            .expertise-item {
+                background: transparent;
+                border: 1px solid #eee;
+            }
+
+            .download-fab {
+                display: none !important;
+            }
+        }
+
+        /* Floating Download Button */
+        .download-fab {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: var(--klein-blue);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 99px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(0, 47, 167, 0.4);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .download-fab:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 15px 40px rgba(0, 47, 167, 0.6);
+            background: #002aa0;
+        }
+
+        .download-fab:active {
+            transform: translateY(0) scale(0.98);
+        }
+
+        .download-fab svg {
+            width: 18px;
+            height: 18px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="resume-container">
+        <div class="forensic-line"></div>
+
+        <header>
+            <div class="identity-block">
+                <h1>Lewis Patterson</h1>
+                <div class="title-slug">
+                    <span class="status-dot"></span>
+                    Director of Energy Architecture
+                </div>
+            </div>
+            <div class="contact-block">
+                <div><span class="contact-label">P:</span> <a href="tel:+19728342317">+1 (972) 834-2317</a></div>
+                <div><span class="contact-label">E:</span> <a
+                        href="mailto:lap3productions@gmail.com">lap3productions@gmail.com</a></div>
+                <div><span class="contact-label">L:</span> <a href="https://linkedin.com/in/lewis-patterson"
+                        target="_blank">linkedin.com/in/lewis-patterson</a></div>
+                <div><span class="contact-label">W:</span> <a href="https://nodalpoint.io"
+                        target="_blank">nodalpoint.io</a></div>
+            </div>
+        </header>
+
+        <section>
+            <div class="section-header">
+                <h2>Forensic Thesis</h2>
+                <div class="line"></div>
+            </div>
+            <p class="summary-text">
+                The Texas energy market is not a commodity market; it is a <strong>volatility market</strong>. I serve
+                as a forensic engineer for institutional load profiles, decoupling commercial liability from grid
+                scarcity. I lead the Forensic Audit Protocol, reverse-engineering supplier tariffs to identify and
+                eliminate structural cost leakage hidden in the "pass-through" mechanisms of the ERCOT grid.
+            </p>
+            <div class="expertise-grid">
+                <div class="expertise-item"><span>01</span> Forensic Rate Engineering</div>
+                <div class="expertise-item"><span>02</span> 4CP Coincident Peak Defense</div>
+                <div class="expertise-item"><span>03</span> Volatility Architecture</div>
+                <div class="expertise-item"><span>04</span> Structural Decoupling</div>
+            </div>
+        </section>
+
+        <section>
+            <div class="section-header">
+                <h2>Execution History</h2>
+                <div class="line"></div>
+            </div>
+
+            <div class="experience-item">
+                <div class="experience-header">
+                    <h3>Nodal Point</h3>
+                    <div class="experience-meta">Jul 2025 — Present</div>
+                </div>
+                <div class="experience-sub-header">
+                    <span>Director of Energy Architecture</span>
+                    <span>Fort Worth, TX</span>
+                </div>
+                <div class="experience-body">
+                    <ul class="experience-bullets">
+                        <li>Executing deep-level audits of historical interval data to detect variances between Metered
+                            Demand and Billed Demand; eliminated "Ghost Capacity" in client billing.</li>
+                        <li>Designing algorithmic load-shedding strategies to predict and mitigate liability during
+                            critical summer intervals, deleting transmission cost liability for the subsequent year.
+                        </li>
+                        <li>Structuring energy contracts as financial derivatives to hedge client P&L against Scarcity
+                            Pricing Adders and ORDC spikes ($5,000/MWh risk).</li>
+                        <li>Isolating Energy signals from Ancillary Services and TDU noise through engineered structural
+                            products.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="experience-item">
+                <div class="experience-header">
+                    <h3>United Power Group</h3>
+                    <div class="experience-meta">Jan 2023 — Jul 2025</div>
+                </div>
+                <div class="experience-sub-header">
+                    <span>Energy Consultant</span>
+                    <span>Lewisville, TX</span>
+                </div>
+                <div class="experience-body">
+                    <p>Orchestrated energy procurement strategies and efficiency consulting for commercial portfolios,
+                        focusing on risk mitigation and rate optimization in the deregulated Texas market.</p>
+                </div>
+            </div>
+
+            <div class="experience-item">
+                <div class="experience-header">
+                    <h3>National Utilisource</h3>
+                    <div class="experience-meta">Nov 2021 — Dec 2022</div>
+                </div>
+                <div class="experience-sub-header">
+                    <span>Energy Consultant</span>
+                    <span>Plano, TX</span>
+                </div>
+                <div class="experience-body">
+                    <p>Delivered specialized energy engineering and consulting services, identifying budgetary leaks and
+                        managing multi-site energy portfolios for commercial clients.</p>
+                </div>
+            </div>
+
+            <div class="experience-item">
+                <div class="experience-header">
+                    <h3>The Basketball League (TBL)</h3>
+                    <div class="experience-meta">Apr 2019 — Sep 2021</div>
+                </div>
+                <div class="experience-sub-header">
+                    <span>Professional Shooting Guard</span>
+                    <span>Lewisville, TX</span>
+                </div>
+                <div class="experience-body">
+                    <p>Professional athlete competing at the highest tier of the TBL. Orchestrated full-court defense
+                        and offensive execution, maintaining elite physical performance and team leadership.</p>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <div class="section-header">
+                <h2>Academic Foundation</h2>
+                <div class="line"></div>
+            </div>
+            <div class="education-item">
+                <div>
+                    <h3>Houston Christian University</h3>
+                    <p>B.B.A. in Business Administration and Management</p>
+                </div>
+                <div class="experience-meta">NCAA Division I Basketball</div>
+            </div>
+        </section>
+
+        <div class="footer-tagline">
+            We do not guess. We measure. Signal Over Noise.
+        </div>
+    </div>
+
+    <!-- Floating Download Button -->
+    <button class="download-fab" onclick="window.print()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" x2="12" y1="15" y2="3" />
+        </svg>
+        Download PDF
+    </button>
+</body>
+
+</html>

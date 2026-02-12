@@ -11,7 +11,8 @@
     "build:safe": "npm run typecheck && next build --webpack",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typecheck:strict": "next build --webpack"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

@@ -9,7 +9,7 @@ import Link from 'next/link'
 
 function FoundryBuilderContent() {
   const params = useParams()
-  const id = params.id as string
+  const id = (params?.id as string) || ''
 
   return (
     <div className="flex flex-col h-[calc(100vh-6rem)] space-y-4">

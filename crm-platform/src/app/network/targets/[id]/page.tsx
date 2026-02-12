@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter, useParams, usePathname, useSearchParams } from 'next/navigation'
-import { 
+import {
   flexRender,
   getCoreRowModel,
   useReactTable,
@@ -78,7 +78,7 @@ export default function TargetDetailPage() {
     pageSize: PAGE_SIZE
   })
 
-  const scrollKey = (pathname ?? `/network/targets/${id}`) + (searchParams.toString() ? `?${searchParams.toString()}` : '')
+  const scrollKey = (pathname ?? `/network/targets/${id}`) + (searchParams?.toString() ? `?${searchParams.toString()}` : '')
 
   // Sync the local globalFilter state with the URL search query if needed
   useEffect(() => {
@@ -108,17 +108,17 @@ export default function TargetDetailPage() {
   }, [columnFilters]);
 
   const contactQuery = useContacts(
-    searchQuery, 
+    searchQuery,
     filters,
-    isPeopleList ? id : undefined, 
+    isPeopleList ? id : undefined,
     isPeopleList && !!target
   )
   const contactCount = useContactsCount(searchQuery, filters, isPeopleList ? id : undefined, isPeopleList && !!target)
-  
+
   const accountQuery = useAccounts(
-    searchQuery, 
-    filters, 
-    isAccountList ? id : undefined, 
+    searchQuery,
+    filters,
+    isAccountList ? id : undefined,
     isAccountList && !!target
   )
   const accountCount = useAccountsCount(searchQuery, filters, isAccountList ? id : undefined, isAccountList && !!target)
@@ -186,7 +186,7 @@ export default function TargetDetailPage() {
   const handleConfirmPurge = async () => {
     // With getRowId: (row) => row.id, rowSelection keys are entity IDs, not indices
     const selectedIds = Object.keys(rowSelection).filter(Boolean)
-    
+
     if (selectedIds.length > 0) {
       if (isPeopleList) {
         await deleteContacts(selectedIds)
@@ -233,8 +233,8 @@ export default function TargetDetailPage() {
               }}
               className={cn(
                 "absolute inset-0 m-auto w-4 h-4 rounded border transition-all flex items-center justify-center",
-                isSelected 
-                  ? "bg-[#002FA7] border-[#002FA7] opacity-100" 
+                isSelected
+                  ? "bg-[#002FA7] border-[#002FA7] opacity-100"
                   : "bg-white/5 border-white/10 opacity-0 group-hover/select:opacity-100"
               )}
             >
@@ -250,18 +250,18 @@ export default function TargetDetailPage() {
       cell: ({ row }) => {
         const contact = row.original
         return (
-          <Link 
+          <Link
             href={`/network/contacts/${contact.id}`}
             className="flex items-center gap-3 group/person whitespace-nowrap"
             onClick={(e) => e.stopPropagation()}
           >
-            <ContactAvatar 
-                name={contact.name} 
-                size={36} 
-                className="w-9 h-9 transition-all"
-                textClassName="text-[10px]"
-                showListBadge={isPeopleList}
-              />
+            <ContactAvatar
+              name={contact.name}
+              size={36}
+              className="w-9 h-9 transition-all"
+              textClassName="text-[10px]"
+              showListBadge={isPeopleList}
+            />
             <div>
               <div className="font-medium text-zinc-200 group-hover/person:text-white group-hover/person:scale-[1.02] transition-all origin-left">
                 {contact.name}
@@ -284,7 +284,7 @@ export default function TargetDetailPage() {
       cell: ({ row }) => {
         const contact = row.original
         return (
-          <Link 
+          <Link
             href={`/network/accounts/${contact.accountId}`}
             className="flex items-center gap-2 group/acc whitespace-nowrap"
             onClick={(e) => { e.stopPropagation(); saveScroll(); }}
@@ -343,14 +343,14 @@ export default function TargetDetailPage() {
         const contact = row.original
         return (
           <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-            <ClickToCallButton 
+            <ClickToCallButton
               phoneNumber={contact.phone}
               name={contact.name}
               account={contact.company}
               logoUrl={contact.logoUrl}
               className="h-8 w-8"
             />
-            <button 
+            <button
               className="icon-button-forensic h-8 w-8 flex items-center justify-center"
               title="More Actions"
             >
@@ -397,8 +397,8 @@ export default function TargetDetailPage() {
               }}
               className={cn(
                 "absolute inset-0 m-auto w-4 h-4 rounded border transition-all flex items-center justify-center",
-                isSelected 
-                  ? "bg-[#002FA7] border-[#002FA7] opacity-100" 
+                isSelected
+                  ? "bg-[#002FA7] border-[#002FA7] opacity-100"
                   : "bg-white/5 border-white/10 opacity-0 group-hover/select:opacity-100"
               )}
             >
@@ -414,7 +414,7 @@ export default function TargetDetailPage() {
       cell: ({ row }) => {
         const account = row.original
         return (
-          <Link 
+          <Link
             href={`/network/accounts/${account.id}`}
             className="flex items-center gap-3 group/acc whitespace-nowrap"
             onClick={(e) => { e.stopPropagation(); saveScroll(); }}
@@ -482,14 +482,14 @@ export default function TargetDetailPage() {
         const account = row.original
         return (
           <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-            <ClickToCallButton 
+            <ClickToCallButton
               phoneNumber={account.companyPhone}
               account={account.name}
               logoUrl={account.logoUrl}
               isCompany={true}
               className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10"
             />
-            <button 
+            <button
               className="icon-button-forensic h-8 w-8 flex items-center justify-center"
               title="More Actions"
             >
@@ -551,7 +551,7 @@ export default function TargetDetailPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4">
-      
+
       <CollapsiblePageHeader
         backHref="/network/targets"
         title={
@@ -578,12 +578,12 @@ export default function TargetDetailPage() {
         isFilterActive={isFilterOpen || columnFilters.length > 0}
         primaryAction={{
           label: "Initialize Node",
-          onClick: () => {},
+          onClick: () => { },
           icon: <Plus size={18} />
         }}
       />
 
-      <FilterCommandDeck 
+      <FilterCommandDeck
         isOpen={isFilterOpen}
         onClose={() => setIsFilterOpen(false)}
         type={isPeopleList ? 'people' : 'account'}
@@ -593,7 +593,7 @@ export default function TargetDetailPage() {
 
       {/* DATA CONTAINER */}
       <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
-        
+
         <div ref={scrollContainerRef} className="flex-1 overflow-auto relative scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
           <Table>
             <TableHeader className="sticky top-0 z-20 border-b border-white/5">
@@ -678,7 +678,7 @@ export default function TargetDetailPage() {
         </div>
       </div>
 
-      <BulkActionDeck 
+      <BulkActionDeck
         selectedCount={selectedCount}
         totalAvailable={totalRecords}
         onClear={() => setRowSelection({})}
@@ -686,7 +686,7 @@ export default function TargetDetailPage() {
         onSelectCount={handleSelectCount}
       />
 
-      <DestructModal 
+      <DestructModal
         isOpen={isDestructModalOpen}
         onClose={() => setIsDestructModalOpen(false)}
         onConfirm={handleConfirmPurge}

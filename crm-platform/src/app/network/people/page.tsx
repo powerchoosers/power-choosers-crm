@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { 
+import {
   flexRender,
   getCoreRowModel,
   useReactTable,
@@ -60,8 +60,8 @@ export default function PeoplePage() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { pageIndex, setPage, searchQuery, setSearch, pagination } = useTableState({ pageSize: PAGE_SIZE })
-  const scrollKey = (pathname ?? '/network/people') + (searchParams.toString() ? `?${searchParams.toString()}` : '')
-  
+  const scrollKey = (pathname ?? '/network/people') + (searchParams?.toString() ? `?${searchParams.toString()}` : '')
+
   const [globalFilter, setGlobalFilter] = useState(searchQuery)
   const [debouncedFilter, setDebouncedFilter] = useState(searchQuery)
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -187,7 +187,7 @@ export default function PeoplePage() {
   const handleConfirmPurge = async () => {
     // With getRowId: (row) => row.id, rowSelection keys are contact IDs
     const selectedIds = Object.keys(rowSelection).filter(Boolean)
-    
+
     if (selectedIds.length > 0) {
       await deleteContacts(selectedIds)
       setRowSelection({})
@@ -224,7 +224,7 @@ export default function PeoplePage() {
               )}>
                 {index.toString().padStart(2, '0')}
               </span>
-              
+
               {/* Hover/Selected State: Ghost Checkbox */}
               <button
                 onClick={(e) => {
@@ -233,8 +233,8 @@ export default function PeoplePage() {
                 }}
                 className={cn(
                   "absolute inset-0 m-auto w-4 h-4 rounded border transition-all flex items-center justify-center",
-                  isSelected 
-                    ? "bg-[#002FA7] border-[#002FA7] opacity-100" 
+                  isSelected
+                    ? "bg-[#002FA7] border-[#002FA7] opacity-100"
                     : "bg-white/5 border-white/10 opacity-0 group-hover/select:opacity-100"
                 )}
               >
@@ -260,14 +260,14 @@ export default function PeoplePage() {
         cell: ({ row }) => {
           const contact = row.original
           return (
-            <Link 
+            <Link
               href={`/network/contacts/${contact.id}`}
               className="flex items-center gap-3 group/person"
               onClick={(e) => { e.stopPropagation(); saveScroll(); }}
             >
-              <ContactAvatar 
-                name={contact.name} 
-                size={36} 
+              <ContactAvatar
+                name={contact.name}
+                size={36}
                 className="w-9 h-9 transition-all"
                 showListBadge={contactIdsInListRef.current?.has(contact.id)}
               />
@@ -288,7 +288,7 @@ export default function PeoplePage() {
           const companyName = row.getValue('company') as string
           const contact = row.original
           return (
-            <Link 
+            <Link
               href={`/network/accounts/${contact.accountId}`}
               className="flex items-center gap-2 group/acc"
               onClick={(e) => { e.stopPropagation(); saveScroll(); }}
@@ -342,20 +342,20 @@ export default function PeoplePage() {
           const status = row.getValue('status') as string
           const isCustomer = status === 'Customer'
           const isLead = status === 'Lead'
-          
+
           return (
             <div className="flex items-center gap-2">
               <div className={cn(
                 "w-1.5 h-1.5 rounded-full",
-                isCustomer ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" : 
-                isLead ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" : 
-                "bg-zinc-600"
+                isCustomer ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
+                  isLead ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" :
+                    "bg-zinc-600"
               )} />
               <span className={cn(
                 "text-[10px] font-mono uppercase tracking-wider tabular-nums",
-                isCustomer ? "text-emerald-500" : 
-                isLead ? "text-blue-500/80" : 
-                "text-zinc-500"
+                isCustomer ? "text-emerald-500" :
+                  isLead ? "text-blue-500/80" :
+                    "text-zinc-500"
               )}>
                 {isCustomer ? 'Client' : status}
               </span>
@@ -369,17 +369,17 @@ export default function PeoplePage() {
         cell: ({ row }) => {
           const val = row.getValue('lastContact') as string
           if (!val) return <span className="text-zinc-600 font-mono text-xs">--</span>
-          
+
           try {
             const date = new Date(val)
             const threeMonthsAgo = subMonths(new Date(), 3)
             const isRecent = isAfter(date, threeMonthsAgo)
-            
+
             return (
               <div className="flex items-center gap-2 text-zinc-500 font-mono text-xs tabular-nums">
                 <Clock size={12} className="text-zinc-600" />
                 <span>
-                  {isRecent 
+                  {isRecent
                     ? formatDistanceToNow(date, { addSuffix: true })
                     : format(date, 'MMM d, yyyy')}
                 </span>
@@ -396,14 +396,14 @@ export default function PeoplePage() {
           const contact = row.original
           return (
             <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-              <ClickToCallButton 
+              <ClickToCallButton
                 phoneNumber={contact.phone}
                 name={contact.name}
                 account={contact.company}
                 logoUrl={contact.logoUrl}
                 className="h-8 w-8 icon-button-forensic"
               />
-              <button 
+              <button
                 className="h-8 w-8 icon-button-forensic flex items-center justify-center"
                 onClick={() => {
                   setComposeTarget({
@@ -489,7 +489,7 @@ export default function PeoplePage() {
 
   const primaryAction = useMemo(() => ({
     label: "Add Person",
-    onClick: () => {},
+    onClick: () => { },
     icon: <Plus size={18} className="mr-2" />
   }), [])
 
@@ -514,7 +514,7 @@ export default function PeoplePage() {
         primaryAction={primaryAction}
       />
 
-      <FilterCommandDeck 
+      <FilterCommandDeck
         isOpen={isFilterOpen}
         onClose={() => setIsFilterOpen(false)}
         type="people"
@@ -524,125 +524,125 @@ export default function PeoplePage() {
 
       <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
         <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto relative scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
-            <Table>
+          <Table>
             <TableHeader className="sticky top-0 z-20 border-b border-white/5">
-                {table.getHeaderGroups().map((headerGroup) => (
+              {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
-                    {headerGroup.headers.map((header) => {
+                  {headerGroup.headers.map((header) => {
                     return (
-                        <TableHead key={header.id} className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">
+                      <TableHead key={header.id} className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">
                         {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                            )}
-                        </TableHead>
+                          ? null
+                          : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                      </TableHead>
                     )
-                    })}
+                  })}
                 </TableRow>
-                ))}
+              ))}
             </TableHeader>
             <TableBody>
-                {isLoading ? (
-                  <ForensicTableSkeleton columns={columns.length} rows={12} type="people" />
-                ) : isError ? (
+              {isLoading ? (
+                <ForensicTableSkeleton columns={columns.length} rows={12} type="people" />
+              ) : isError ? (
                 <TableRow>
-                    <TableCell colSpan={columns.length} className="h-24 text-center text-red-400">
-                        Error loading people. Please check your internet connection or permissions.
-                    </TableCell>
+                  <TableCell colSpan={columns.length} className="h-24 text-center text-red-400">
+                    Error loading people. Please check your internet connection or permissions.
+                  </TableCell>
                 </TableRow>
-                ) : rows?.length ? (
-                  <AnimatePresence mode="popLayout">
-                    {rows.map((row, index) => (
-                      <motion.tr
-                        key={row.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.98 }}
-                        transition={{ 
-                          duration: 0.3, 
-                          delay: Math.min(index * 0.02, 0.4),
-                          ease: [0.23, 1, 0.32, 1] 
-                        }}
-                        data-state={row.getIsSelected() && "selected"}
-                        className={cn(
-                          "border-b border-white/5 transition-colors group cursor-pointer relative z-10",
-                          row.getIsSelected() 
-                            ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10" 
-                            : "hover:bg-white/[0.02]"
-                        )}
-                        onClick={(e) => {
-                          // Don't trigger row click if clicking a link or button
-                          if ((e.target as HTMLElement).closest('a') || (e.target as HTMLElement).closest('button')) {
-                            return;
-                          }
-                          saveScroll()
-                          router.push(`/network/contacts/${row.original.id}`)
-                        }}
-                      >
-                        {row.getVisibleCells().map((cell) => (
-                          <TableCell key={cell.id} className="py-3">
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </TableCell>
-                        ))}
-                      </motion.tr>
-                    ))}
-                  </AnimatePresence>
-                ) : (
+              ) : rows?.length ? (
+                <AnimatePresence mode="popLayout">
+                  {rows.map((row, index) => (
+                    <motion.tr
+                      key={row.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.98 }}
+                      transition={{
+                        duration: 0.3,
+                        delay: Math.min(index * 0.02, 0.4),
+                        ease: [0.23, 1, 0.32, 1]
+                      }}
+                      data-state={row.getIsSelected() && "selected"}
+                      className={cn(
+                        "border-b border-white/5 transition-colors group cursor-pointer relative z-10",
+                        row.getIsSelected()
+                          ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10"
+                          : "hover:bg-white/[0.02]"
+                      )}
+                      onClick={(e) => {
+                        // Don't trigger row click if clicking a link or button
+                        if ((e.target as HTMLElement).closest('a') || (e.target as HTMLElement).closest('button')) {
+                          return;
+                        }
+                        saveScroll()
+                        router.push(`/network/contacts/${row.original.id}`)
+                      }}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id} className="py-3">
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
+                      ))}
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
+              ) : (
                 <TableRow>
-                    <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
-                        No people found.
-                    </TableCell>
+                  <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
+                    No people found.
+                  </TableCell>
                 </TableRow>
-                )}
+              )}
             </TableBody>
-            </Table>
+          </Table>
         </div>
-        
+
         <div className="flex-none border-t border-white/5 nodal-recessed p-4 flex items-center justify-between z-10">
-            <div className="flex items-center gap-4">
-                <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
-                  <span>Sync_Block {showingStart}–{showingEnd}</span>
-                  <div className="h-1 w-1 rounded-full bg-black/40" />
-                  <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{effectiveTotalRecords}</span></span>
-                </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
+              <span>Sync_Block {showingStart}–{showingEnd}</span>
+              <div className="h-1 w-1 rounded-full bg-black/40" />
+              <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{effectiveTotalRecords}</span></span>
             </div>
-            <div className="flex items-center gap-2">
-                <button
-                    onClick={() => setPage(Math.max(0, pagination.pageIndex - 1))}
-                    disabled={pagination.pageIndex === 0}
-                    className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
-                    title="Previous Page"
-                >
-                    <ChevronLeft className="h-4 w-4" />
-                </button>
-                <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
-                  {(pagination.pageIndex + 1).toString().padStart(2, '0')}
-                </div>
-                <button
-                    onClick={async () => {
-                      const nextPageIndex = pagination.pageIndex + 1
-                      if (nextPageIndex >= displayTotalPages) return
-
-                      const needed = (nextPageIndex + 1) * PAGE_SIZE
-                      if (contacts.length < needed && hasNextPage && !isFetchingNextPage) {
-                        await fetchNextPage()
-                      }
-
-                      setPage(nextPageIndex)
-                    }}
-                    disabled={pagination.pageIndex + 1 >= displayTotalPages || (!hasNextPage && contacts.length < (pagination.pageIndex + 2) * PAGE_SIZE)}
-                    className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
-                    title="Next Page"
-                >
-                    <ChevronRight className="h-4 w-4" />
-                </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(Math.max(0, pagination.pageIndex - 1))}
+              disabled={pagination.pageIndex === 0}
+              className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
+              title="Previous Page"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
+              {(pagination.pageIndex + 1).toString().padStart(2, '0')}
             </div>
+            <button
+              onClick={async () => {
+                const nextPageIndex = pagination.pageIndex + 1
+                if (nextPageIndex >= displayTotalPages) return
+
+                const needed = (nextPageIndex + 1) * PAGE_SIZE
+                if (contacts.length < needed && hasNextPage && !isFetchingNextPage) {
+                  await fetchNextPage()
+                }
+
+                setPage(nextPageIndex)
+              }}
+              disabled={pagination.pageIndex + 1 >= displayTotalPages || (!hasNextPage && contacts.length < (pagination.pageIndex + 2) * PAGE_SIZE)}
+              className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
+              title="Next Page"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
 
-      <BulkActionDeck 
+      <BulkActionDeck
         selectedCount={selectedCount}
         totalAvailable={effectiveTotalRecords}
         onClear={() => setRowSelection({})}
@@ -650,7 +650,7 @@ export default function PeoplePage() {
         onSelectCount={handleSelectCount}
       />
 
-      <DestructModal 
+      <DestructModal
         isOpen={isDestructModalOpen}
         onClose={() => setIsDestructModalOpen(false)}
         onConfirm={handleConfirmPurge}
