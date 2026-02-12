@@ -17,21 +17,6 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  async redirects() {
-    return [
-      {
-        source: '/:path*',
-        has: [
-          {
-            type: 'host',
-            value: 'www.nodalpoint.io',
-          },
-        ],
-        destination: 'https://nodalpoint.io/:path*',
-        permanent: true,
-      },
-    ];
-  },
 };
 
 export default nextConfig;
