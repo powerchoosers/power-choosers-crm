@@ -34,7 +34,7 @@ type Job = z.infer<typeof jobSchema>
 type FailedJob = z.infer<typeof failedJobSchema>
 
 const QUEUE_NAME = 'sequence_jobs'
-const API_BASE_URL = Deno.env.get('API_BASE_URL') || 'https://nodal-point-network-792458658491.us-central1.run.app'
+const API_BASE_URL = Deno.env.get('API_BASE_URL') || 'https://nodalpoint.io'
 /** Burner domain for cold/sequence emails (e.g. getnodalpoint.com). From address = localPart@BURNER_DOMAIN. */
 const BURNER_DOMAIN = Deno.env.get('BURNER_DOMAIN') || 'getnodalpoint.com'
 
@@ -49,77 +49,77 @@ function burnerFromAddress(ownerEmail: string | null | undefined): string {
 // Listen for HTTP requests
 Deno.serve(async (req) => {
   try {
-  if (req.method !== 'POST') {
-    return new Response('expected POST request', { status: 405 })
-  }
-  
-  if (req.headers.get('content-type') !== 'application/json') {
-    return new Response('expected json body', { status: 400 })
-  }
-  
-  // Use Zod to parse and validate the request body
-  const parseResult = z.array(jobSchema).safeParse(await req.json())
-  if (parseResult.error) {
-    return new Response(`invalid request body: ${parseResult.error.message}`, {
-      status: 400
-    })
-  }
-  
-  const pendingJobs = parseResult.data
-  
-  // Track jobs that completed successfully
-  const completedJobs: Job[] = []
-  // Track jobs that failed due to an error
-  const failedJobs: FailedJob[] = []
-  
-  async function processJobs() {
-    let currentJob: Job | undefined
-    while ((currentJob = pendingJobs.shift()) !== undefined) {
-      try {
-        await processJob(currentJob)
-        completedJobs.push(currentJob)
-      } catch (error) {
-        failedJobs.push({
-          ...currentJob,
+    if (req.method !== 'POST') {
+      return new Response('expected POST request', { status: 405 })
+    }
+
+    if (req.headers.get('content-type') !== 'application/json') {
+      return new Response('expected json body', { status: 400 })
+    }
+
+    // Use Zod to parse and validate the request body
+    const parseResult = z.array(jobSchema).safeParse(await req.json())
+    if (parseResult.error) {
+      return new Response(`invalid request body: ${parseResult.error.message}`, {
+        status: 400
+      })
+    }
+
+    const pendingJobs = parseResult.data
+
+    // Track jobs that completed successfully
+    const completedJobs: Job[] = []
+    // Track jobs that failed due to an error
+    const failedJobs: FailedJob[] = []
+
+    async function processJobs() {
+      let currentJob: Job | undefined
+      while ((currentJob = pendingJobs.shift()) !== undefined) {
+        try {
+          await processJob(currentJob)
+          completedJobs.push(currentJob)
+        } catch (error) {
+          failedJobs.push({
+            ...currentJob,
+            error: error instanceof Error ? error.message : JSON.stringify(error)
+          })
+        }
+      }
+    }
+
+    try {
+      // Process jobs while listening for worker termination
+      await Promise.race([processJobs(), catchUnload()])
+    } catch (error) {
+      // If the worker is terminating, add pending jobs to fail list
+      failedJobs.push(
+        ...pendingJobs.map((job) => ({
+          ...job,
           error: error instanceof Error ? error.message : JSON.stringify(error)
-        })
-      }
+        }))
+      )
     }
-  }
-  
-  try {
-    // Process jobs while listening for worker termination
-    await Promise.race([processJobs(), catchUnload()])
-  } catch (error) {
-    // If the worker is terminating, add pending jobs to fail list
-    failedJobs.push(
-      ...pendingJobs.map((job) => ({
-        ...job,
-        error: error instanceof Error ? error.message : JSON.stringify(error)
-      }))
+
+    // Log completed and failed jobs
+    console.log('finished processing sequence steps:', {
+      completedJobs: completedJobs.length,
+      failedJobs: failedJobs.length
+    })
+
+    return new Response(
+      JSON.stringify({
+        completedJobs,
+        failedJobs
+      }),
+      {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+          'x-completed-jobs': completedJobs.length.toString(),
+          'x-failed-jobs': failedJobs.length.toString()
+        }
+      }
     )
-  }
-  
-  // Log completed and failed jobs
-  console.log('finished processing sequence steps:', {
-    completedJobs: completedJobs.length,
-    failedJobs: failedJobs.length
-  })
-  
-  return new Response(
-    JSON.stringify({
-      completedJobs,
-      failedJobs
-    }),
-    {
-      status: 200,
-      headers: {
-        'content-type': 'application/json',
-        'x-completed-jobs': completedJobs.length.toString(),
-        'x-failed-jobs': failedJobs.length.toString()
-      }
-    }
-  )
   } catch (topError) {
     const msg = topError instanceof Error ? topError.message : String(topError)
     const stack = topError instanceof Error ? topError.stack : ''
@@ -136,9 +136,9 @@ Deno.serve(async (req) => {
  */
 async function processJob(job: Job) {
   const { jobId, execution_id, sequence_id, member_id, step_type, metadata } = job
-  
+
   console.log('[ProcessJob] Starting:', { execution_id, step_type })
-  
+
   // Fetch execution details
   const [execRow]: any[] = await sql`
     SELECT id, sequence_id, member_id, step_index, step_type, status, metadata, retry_count
@@ -159,7 +159,7 @@ async function processJob(job: Job) {
     contact_id: (memberRow as any).targetId ?? (memberRow as any).targetid,
     target_type: (memberRow as any).targetType ?? (memberRow as any).targettype
   }
-  
+
   // Update execution status to processing
   await sql`
     UPDATE sequence_executions
@@ -169,7 +169,7 @@ async function processJob(job: Job) {
       updated_at = NOW()
     WHERE id = ${execution_id}
   `
-  
+
   try {
     // Process based on step type
     switch (step_type) {
@@ -197,7 +197,7 @@ async function processJob(job: Job) {
       default:
         throw new Error(`Unknown step type: ${step_type}`)
     }
-    
+
     // Mark as completed
     await sql`
       UPDATE sequence_executions
@@ -207,19 +207,19 @@ async function processJob(job: Job) {
         updated_at = NOW()
       WHERE id = ${execution_id}
     `
-    
+
     // Delete from queue
     await sql`SELECT pgmq.delete(${QUEUE_NAME}, ${jobId}::bigint)`
-    
+
     console.log('[ProcessJob] Completed:', { execution_id, step_type })
-    
+
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : JSON.stringify(error)
     const retryCount = (execution.retry_count || 0) + 1
     const maxRetries = 3
-    
+
     console.error('[ProcessJob] Failed:', { execution_id, error: errorMessage, retryCount })
-    
+
     // Update execution with error
     await sql`
       UPDATE sequence_executions
@@ -230,12 +230,12 @@ async function processJob(job: Job) {
         updated_at = NOW()
       WHERE id = ${execution_id}
     `
-    
+
     // If max retries reached, delete from queue
     if (retryCount >= maxRetries) {
       await sql`SELECT pgmq.delete(${QUEUE_NAME}, ${jobId}::bigint)`
     }
-    
+
     throw error
   }
 }
@@ -245,7 +245,7 @@ async function processJob(job: Job) {
  */
 async function processEmailStep(execution: any) {
   const { id, contact_id, metadata, sequence_id } = execution
-  
+
   // Resolve sender: sequence owner email -> actual user email + display name (e.g. Lewis | Nodal Point)
   const [seqRow]: any[] = await sql`
     SELECT "ownerId" FROM sequences WHERE id = ${sequence_id}
@@ -263,9 +263,9 @@ async function processEmailStep(execution: any) {
       fromName = `${String(firstName).trim()} | Nodal Point`
     }
   }
-  
+
   console.log('[ProcessEmail] Fetching contact:', { contact_id, fromEmail, fromName })
-  
+
   // Fetch contact details
   const [contactRow]: any[] = await sql`
     SELECT id, email, "firstName", "lastName", "accountId"
@@ -283,30 +283,30 @@ async function processEmailStep(execution: any) {
     companyName = accountRows[0]?.name ?? ''
   }
   const contact = { ...contactRow, companyName }
-  
+
   // Extract email details from metadata
   const subject = metadata?.subject || 'Message from Nodal Point'
   const body = metadata?.body || metadata?.html || ''
   const prompt = metadata?.prompt || ''
-  
+
   // If we have a prompt, we should generate the email body using AI
   // For now, we'll use the body directly
   let htmlBody = body
-  
+
   // Replace variables in the email body
   htmlBody = htmlBody
     .replace(/\{\{first_name\}\}/g, contact.firstName || '')
     .replace(/\{\{last_name\}\}/g, contact.lastName || '')
     .replace(/\{\{company_name\}\}/g, contact.companyName || '')
   const textBody = htmlBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-  
+
   console.log('[ProcessEmail] Sending email:', {
     to: contact.email,
     from: fromEmail,
     subject,
     bodyLength: htmlBody.length
   })
-  
+
   const payload = {
     to: {
       email: contact.email,
@@ -323,7 +323,7 @@ async function processEmailStep(execution: any) {
     trackClicks: true,
     trackOpens: true
   }
-  
+
   // Send email via Gmail API through our backend
   const response = await fetch(`${API_BASE_URL}/api/email/gmail-send-sequence`, {
     method: 'POST',
@@ -332,23 +332,23 @@ async function processEmailStep(execution: any) {
     },
     body: JSON.stringify(payload)
   })
-  
+
   if (!response.ok) {
     const errorText = await response.text()
     throw new Error(`Gmail API error: ${response.status} - ${errorText}`)
   }
-  
+
   const result = await response.json()
   console.log('[ProcessEmail] Email sent:', result)
-  
+
   // Update execution metadata with send result
   await sql`
     UPDATE sequence_executions
     SET 
       metadata = metadata || ${JSON.stringify({
-        messageId: result.messageId,
-        sentAt: new Date().toISOString()
-      })},
+    messageId: result.messageId,
+    sentAt: new Date().toISOString()
+  })},
       updated_at = NOW()
     WHERE id = ${id}
   `
