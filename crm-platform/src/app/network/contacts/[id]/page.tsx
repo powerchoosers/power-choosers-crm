@@ -5,8 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { differenceInCalendarDays, format, isValid, parseISO, formatDistanceToNow } from 'date-fns'
-import { 
-  Activity, AlertTriangle, ArrowLeft, Clock, Globe, Linkedin, Mail, MapPin, Phone, 
+import {
+  Activity, AlertTriangle, ArrowLeft, Clock, Globe, Linkedin, Mail, MapPin, Phone,
   Lock, Unlock, Check, Sparkles, Plus, Star, Trash2, Copy,
   Building2, CheckCircle, Play, DollarSign, Mic, History, RefreshCw, X,
   ArrowRightLeft, ChevronLeft, ChevronRight
@@ -105,7 +105,7 @@ export default function ContactDossierPage() {
   const [editWebsite, setEditWebsite] = useState('')
   const [editLinkedinUrl, setEditLinkedinUrl] = useState('')
   const [editServiceAddresses, setEditServiceAddresses] = useState<Array<{ address: string; isPrimary: boolean }>>([])
-  
+
   // New Phone States
   const [editMobile, setEditMobile] = useState('')
   const [editWorkDirect, setEditWorkDirect] = useState('')
@@ -139,7 +139,7 @@ export default function ContactDossierPage() {
     setCurrentTaskIndex((prev) => Math.min(prev, Math.max(0, pendingTasks.length - 1)))
   }, [pendingTasks.length])
 
-  const taskIdFromUrl = searchParams.get('taskId')
+  const taskIdFromUrl = searchParams?.get('taskId') ?? null
   useEffect(() => {
     if (!taskIdFromUrl || !pendingTasks.length) return
     const idx = pendingTasks.findIndex((t) => t.id === taskIdFromUrl)
@@ -269,7 +269,7 @@ export default function ContactDossierPage() {
       setEditLogoUrl((contact.logoUrl || contact.avatarUrl || '') as string)
       setEditWebsite(contact.website || '')
       setEditLinkedinUrl(contact.linkedinUrl || '')
-      
+
       setEditMobile(contact.mobile || '')
       setEditWorkDirect(contact.workDirectPhone || '')
       setEditOther(contact.otherPhone || '')
@@ -336,7 +336,7 @@ export default function ContactDossierPage() {
   useEffect(() => {
     // Only proceed if isEditing actually changed
     if (prevIsEditing.current === isEditing) return
-    
+
     const wasEditing = prevIsEditing.current
     prevIsEditing.current = isEditing
 
@@ -393,7 +393,7 @@ export default function ContactDossierPage() {
 
   const contractEndDate = useMemo(() => parseContractEndDate(contact?.contractEnd), [contact?.contractEnd])
   const daysRemaining = contractEndDate ? differenceInCalendarDays(contractEndDate, new Date()) : null
-  
+
   const maturityPct = useMemo(() => {
     if (daysRemaining == null) return 0
     return clamp01(1 - daysRemaining / 365)
@@ -465,7 +465,7 @@ export default function ContactDossierPage() {
     }
 
     const input = terminalInput.trim()
-    
+
     // System Commands
     if (input.startsWith('/')) {
       const cmd = input.slice(1).toLowerCase()
@@ -494,7 +494,7 @@ export default function ContactDossierPage() {
 
     const timestamp = format(new Date(), 'yyyy-MM-dd HH:mm')
     const newNote = `[${timestamp}] ${input}`
-    const updatedNotes = forensicNotes 
+    const updatedNotes = forensicNotes
       ? `${forensicNotes}\n\n${newNote}`
       : newNote
 
@@ -516,7 +516,7 @@ export default function ContactDossierPage() {
   const handleIngestionComplete = () => {
     // Trigger the container blur/desaturation
     setIsRecalibrating(true)
-    
+
     // Mark all key fields as "glowing" for the reveal animation
     const fieldsToGlow = new Set([
       'contractEnd',
@@ -527,7 +527,7 @@ export default function ContactDossierPage() {
       'revenue'
     ])
     setGlowingFields(fieldsToGlow)
-    
+
     // Clear effects after animation duration
     setTimeout(() => {
       setIsRecalibrating(false)
@@ -565,7 +565,7 @@ export default function ContactDossierPage() {
             <h2 className="text-xl font-semibold tracking-tighter text-white">Subject Not Found</h2>
             <p className="text-zinc-500 text-sm mt-1">The requested intelligence dossier does not exist.</p>
           </div>
-          <Button 
+          <Button
             className="bg-white text-zinc-950 hover:bg-zinc-200 font-medium"
             onClick={() => router.back()}
           >
@@ -611,9 +611,9 @@ export default function ContactDossierPage() {
                       />
                     </motion.div>
                   ) : (
-                    <ContactAvatar 
-                      name={contactName} 
-                      size={56} 
+                    <ContactAvatar
+                      name={contactName}
+                      size={56}
                       className={cn(
                         "w-14 h-14 transition-all",
                         isEditing && "cursor-pointer hover:border-[#002FA7]/50 hover:shadow-[0_0_20px_rgba(0,47,167,0.2)]"
@@ -697,11 +697,11 @@ export default function ContactDossierPage() {
                             />
                           </h1>
                         )}
-                        
+
                         {/* THE SIGNAL ARRAY */}
                         <div className="flex items-center gap-1 bg-white/[0.02] rounded-full p-1 border border-white/5 relative group/links">
                           <div className="flex items-center">
-                            <button 
+                            <button
                               onClick={() => {
                                 if (isEditing) {
                                   setActiveEditField(activeEditField === 'website' ? null : 'website')
@@ -715,12 +715,12 @@ export default function ContactDossierPage() {
                                 !editWebsite && !contact?.website && "opacity-50 cursor-not-allowed",
                                 isEditing && activeEditField === 'website' && "bg-[#002FA7]/20 text-white",
                                 isEditing && "hover:bg-[#002FA7]/20 transition-colors"
-                              )} 
+                              )}
                               title={isEditing ? "Edit Website" : "Visit Website"}
                             >
                               <Globe className="w-3.5 h-3.5" />
                             </button>
-                            
+
                             <AnimatePresence>
                               {isEditing && activeEditField === 'website' && (
                                 <motion.div
@@ -747,7 +747,7 @@ export default function ContactDossierPage() {
                           <div className="w-px h-3 bg-white/10" />
 
                           <div className="flex items-center">
-                            <button 
+                            <button
                               onClick={() => {
                                 if (isEditing) {
                                   setActiveEditField(activeEditField === 'linkedin' ? null : 'linkedin')
@@ -761,7 +761,7 @@ export default function ContactDossierPage() {
                                 !editLinkedinUrl && !contact?.linkedinUrl && "opacity-50 cursor-not-allowed",
                                 isEditing && activeEditField === 'linkedin' && "bg-[#002FA7]/20 text-white",
                                 isEditing && "hover:bg-[#002FA7]/20 transition-colors"
-                              )} 
+                              )}
                               title={isEditing ? "Edit LinkedIn" : "View LinkedIn"}
                             >
                               <Linkedin className="w-3.5 h-3.5" />
@@ -836,11 +836,11 @@ export default function ContactDossierPage() {
                         </motion.div>
                       </>
                     )}
-                    
+
                     {/* Synced indicator with exit animation */}
                     <AnimatePresence>
                       {showSynced && (
-                        <motion.div 
+                        <motion.div
                           key="synced-badge"
                           initial={{ opacity: 0, scale: 0.9, filter: "blur(4px)" }}
                           animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
@@ -903,7 +903,7 @@ export default function ContactDossierPage() {
                               </>
                             )}
                             {contact?.linkedAccountId ? (
-                              <Link 
+                              <Link
                                 href={`/network/accounts/${contact.linkedAccountId}`}
                                 className="hover:text-white transition-colors cursor-pointer"
                               >
@@ -922,7 +922,7 @@ export default function ContactDossierPage() {
                               </>
                             )}
                             {contact?.linkedAccountId ? (
-                              <Link 
+                              <Link
                                 href={`/network/accounts/${contact.linkedAccountId}`}
                                 className="hover:text-white transition-colors cursor-pointer"
                               >
@@ -985,8 +985,8 @@ export default function ContactDossierPage() {
                     onClick={toggleEditing}
                     className={cn(
                       "w-7 h-7 flex items-center justify-center transition-all duration-300",
-                      isEditing 
-                        ? "text-blue-400 bg-blue-400/10 border border-blue-400/30 rounded-lg shadow-[0_0_15px_rgba(59,130,246,0.2)] scale-110" 
+                      isEditing
+                        ? "text-blue-400 bg-blue-400/10 border border-blue-400/30 rounded-lg shadow-[0_0_15px_rgba(59,130,246,0.2)] scale-110"
                         : "text-zinc-500 hover:text-white bg-transparent border border-transparent"
                     )}
                     title={isEditing ? "Lock Dossier" : "Unlock Dossier"}
@@ -1042,67 +1042,67 @@ export default function ContactDossierPage() {
                         isEditing={isEditing}
                         onEmailClick={() => setIsComposeOpen(true)}
                         onUpdate={(updates) => {
-                      if (updates.email !== undefined) setEditEmail(updates.email)
-                      if (updates.mobile !== undefined) {
-                        setEditMobile(updates.mobile)
-                        if (editPrimaryField === 'mobile') setEditPhone(updates.mobile)
-                      }
-                      if (updates.workDirectPhone !== undefined) {
-                        setEditWorkDirect(updates.workDirectPhone)
-                        if (editPrimaryField === 'workDirectPhone') setEditPhone(updates.workDirectPhone)
-                      }
-                      if (updates.otherPhone !== undefined) {
-                        setEditOther(updates.otherPhone)
-                        if (editPrimaryField === 'otherPhone') setEditPhone(updates.otherPhone)
-                      }
-                      if (updates.companyPhone !== undefined) setEditCompanyPhone(updates.companyPhone)
-                      if (updates.primaryPhoneField !== undefined) {
-                        setEditPrimaryField(updates.primaryPhoneField)
-                        if (updates.primaryPhoneField === 'mobile') setEditPhone(editMobile)
-                        else if (updates.primaryPhoneField === 'workDirectPhone') setEditPhone(editWorkDirect)
-                        else if (updates.primaryPhoneField === 'otherPhone') setEditPhone(editOther)
-                      }
-                    }}
-                  />
+                          if (updates.email !== undefined) setEditEmail(updates.email)
+                          if (updates.mobile !== undefined) {
+                            setEditMobile(updates.mobile)
+                            if (editPrimaryField === 'mobile') setEditPhone(updates.mobile)
+                          }
+                          if (updates.workDirectPhone !== undefined) {
+                            setEditWorkDirect(updates.workDirectPhone)
+                            if (editPrimaryField === 'workDirectPhone') setEditPhone(updates.workDirectPhone)
+                          }
+                          if (updates.otherPhone !== undefined) {
+                            setEditOther(updates.otherPhone)
+                            if (editPrimaryField === 'otherPhone') setEditPhone(updates.otherPhone)
+                          }
+                          if (updates.companyPhone !== undefined) setEditCompanyPhone(updates.companyPhone)
+                          if (updates.primaryPhoneField !== undefined) {
+                            setEditPrimaryField(updates.primaryPhoneField)
+                            if (updates.primaryPhoneField === 'mobile') setEditPhone(editMobile)
+                            else if (updates.primaryPhoneField === 'workDirectPhone') setEditPhone(editWorkDirect)
+                            else if (updates.primaryPhoneField === 'otherPhone') setEditPhone(editOther)
+                          }
+                        }}
+                      />
                     </motion.div>
                   ) : (
-                  <UplinkCard 
-                    contact={{
-                      ...contact,
-                      email: editEmail,
-                      phone: editPhone,
-                      mobile: editMobile,
-                      workDirectPhone: editWorkDirect,
-                      otherPhone: editOther,
-                      companyPhone: editCompanyPhone,
-                      primaryPhoneField: editPrimaryField
-                    }}
-                    isEditing={isEditing}
-                    onEmailClick={() => setIsComposeOpen(true)}
-                    onUpdate={(updates) => {
-                      if (updates.email !== undefined) setEditEmail(updates.email)
-                      if (updates.mobile !== undefined) {
-                        setEditMobile(updates.mobile)
-                        if (editPrimaryField === 'mobile') setEditPhone(updates.mobile)
-                      }
-                      if (updates.workDirectPhone !== undefined) {
-                        setEditWorkDirect(updates.workDirectPhone)
-                        if (editPrimaryField === 'workDirectPhone') setEditPhone(updates.workDirectPhone)
-                      }
-                      if (updates.otherPhone !== undefined) {
-                        setEditOther(updates.otherPhone)
-                        if (editPrimaryField === 'otherPhone') setEditPhone(updates.otherPhone)
-                      }
-                      if (updates.companyPhone !== undefined) setEditCompanyPhone(updates.companyPhone)
-                      if (updates.primaryPhoneField !== undefined) {
-                        setEditPrimaryField(updates.primaryPhoneField)
-                        // Update the main phone field based on the new primary
-                        if (updates.primaryPhoneField === 'mobile') setEditPhone(editMobile)
-                        else if (updates.primaryPhoneField === 'workDirectPhone') setEditPhone(editWorkDirect)
-                        else if (updates.primaryPhoneField === 'otherPhone') setEditPhone(editOther)
-                      }
-                    }}
-                  />
+                    <UplinkCard
+                      contact={{
+                        ...contact,
+                        email: editEmail,
+                        phone: editPhone,
+                        mobile: editMobile,
+                        workDirectPhone: editWorkDirect,
+                        otherPhone: editOther,
+                        companyPhone: editCompanyPhone,
+                        primaryPhoneField: editPrimaryField
+                      }}
+                      isEditing={isEditing}
+                      onEmailClick={() => setIsComposeOpen(true)}
+                      onUpdate={(updates) => {
+                        if (updates.email !== undefined) setEditEmail(updates.email)
+                        if (updates.mobile !== undefined) {
+                          setEditMobile(updates.mobile)
+                          if (editPrimaryField === 'mobile') setEditPhone(updates.mobile)
+                        }
+                        if (updates.workDirectPhone !== undefined) {
+                          setEditWorkDirect(updates.workDirectPhone)
+                          if (editPrimaryField === 'workDirectPhone') setEditPhone(updates.workDirectPhone)
+                        }
+                        if (updates.otherPhone !== undefined) {
+                          setEditOther(updates.otherPhone)
+                          if (editPrimaryField === 'otherPhone') setEditPhone(updates.otherPhone)
+                        }
+                        if (updates.companyPhone !== undefined) setEditCompanyPhone(updates.companyPhone)
+                        if (updates.primaryPhoneField !== undefined) {
+                          setEditPrimaryField(updates.primaryPhoneField)
+                          // Update the main phone field based on the new primary
+                          if (updates.primaryPhoneField === 'mobile') setEditPhone(editMobile)
+                          else if (updates.primaryPhoneField === 'workDirectPhone') setEditPhone(editWorkDirect)
+                          else if (updates.primaryPhoneField === 'otherPhone') setEditPhone(editOther)
+                        }
+                      }}
+                    />
                   )
                 )}
 
@@ -1112,7 +1112,7 @@ export default function ContactDossierPage() {
                   isEditing ? 'border-[#002FA7]/30' : 'border-white/10',
                   isRecalibrating && 'grayscale backdrop-blur-2xl'
                 )}>
-                  
+
                   {/* Contract Maturity Field (Moved from Header in Plan) */}
                   <div>
                     <div className="flex justify-between items-end mb-2">
@@ -1160,7 +1160,7 @@ export default function ContactDossierPage() {
                         )}
                       </div>
                     </div>
-                    
+
                     <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden relative">
                       <div
                         className={`h-full ${maturityColor} transition-all duration-1000 ease-out relative`}
@@ -1261,7 +1261,7 @@ export default function ContactDossierPage() {
                   </div>
                 </div>
 
-                <DataIngestionCard 
+                <DataIngestionCard
                   accountId={contact?.accountId}
                   onIngestionComplete={handleIngestionComplete}
                 />
@@ -1271,7 +1271,7 @@ export default function ContactDossierPage() {
             <div className="col-span-12 lg:col-span-8 h-full overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-zinc-700/50 hover:scrollbar-thumb-[#002FA7]/50 scrollbar-track-transparent transition-all duration-300 np-scroll">
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-700 delay-100">
                 {/* FORENSIC NOTES TERMINAL */}
-                <div 
+                <div
                   className={`nodal-void-card transition-all duration-500 p-6 min-h-[500px] relative overflow-hidden shadow-2xl group flex flex-col font-mono ${isEditing ? 'border-[#002FA7]/50 ring-1 ring-[#002FA7]/20 cursor-text' : ''}`}
                   onClick={() => {
                     if (!isEditing) handleTerminalClick()
@@ -1279,7 +1279,7 @@ export default function ContactDossierPage() {
                 >
                   {/* CRT Effect Overlay */}
                   <div className="absolute inset-0 pointer-events-none opacity-[0.03] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%] z-50" />
-                  
+
                   <div className="flex items-center justify-between mb-6 border-b border-white/10 pb-4 relative z-10">
                     <div className="flex items-center gap-2">
                       <div className={`h-2 w-2 rounded-full animate-pulse ${isEditing ? 'bg-[#002FA7] shadow-[0_0_12px_rgba(0,47,167,0.8)]' : 'bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.8)]'}`} />
@@ -1292,7 +1292,7 @@ export default function ContactDossierPage() {
                       <span>NP-OS_V.1.0.4</span>
                     </div>
                   </div>
-                  
+
                   <div className="flex-1 text-sm leading-relaxed relative z-10">
                     {isEditing ? (
                       <div className="flex flex-col h-full">
@@ -1346,46 +1346,46 @@ export default function ContactDossierPage() {
                           </span>
                         )}
                         <div className="space-y-4">
-                        {/* Historical Log Entries */}
-                        {editNotes.split('\n\n').map((entry, idx) => {
-                          const timestampMatch = entry.match(/^\[(.*?)\]/)
-                          const timestamp = timestampMatch ? timestampMatch[1] : null
-                          const content = timestamp ? entry.replace(/^\[.*?\]/, '').trim() : entry
+                          {/* Historical Log Entries */}
+                          {editNotes.split('\n\n').map((entry, idx) => {
+                            const timestampMatch = entry.match(/^\[(.*?)\]/)
+                            const timestamp = timestampMatch ? timestampMatch[1] : null
+                            const content = timestamp ? entry.replace(/^\[.*?\]/, '').trim() : entry
 
-                          // Calculate approximate height based on content length and line breaks
-                          const lineCount = content.split('\n').length
-                          const charCount = content.length
-                          const estimatedLines = Math.max(lineCount, Math.ceil(charCount / 80)) // ~80 chars per line
-                          const lineHeight = Math.max(2, estimatedLines * 1.5) // 1.5rem per line
+                            // Calculate approximate height based on content length and line breaks
+                            const lineCount = content.split('\n').length
+                            const charCount = content.length
+                            const estimatedLines = Math.max(lineCount, Math.ceil(charCount / 80)) // ~80 chars per line
+                            const lineHeight = Math.max(2, estimatedLines * 1.5) // 1.5rem per line
 
-                          return (
-                            <div key={idx} className="group/entry flex gap-4 animate-in fade-in slide-in-from-left-2 duration-300" style={{ animationDelay: `${idx * 50}ms` }}>
-                              <div className="flex flex-col items-center mt-1">
-                                <div className="w-1 h-1 rounded-full bg-[#002FA7]/40" />
-                                <div className="w-px bg-[#002FA7]/20" style={{ height: `${lineHeight}rem` }} />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                {timestamp && (
-                                  <div className="text-[10px] text-zinc-600 mb-1 flex items-center gap-2">
-                                    <Clock className="w-3 h-3 shrink-0" />
-                                    <span>{timestamp}</span>
+                            return (
+                              <div key={idx} className="group/entry flex gap-4 animate-in fade-in slide-in-from-left-2 duration-300" style={{ animationDelay: `${idx * 50}ms` }}>
+                                <div className="flex flex-col items-center mt-1">
+                                  <div className="w-1 h-1 rounded-full bg-[#002FA7]/40" />
+                                  <div className="w-px bg-[#002FA7]/20" style={{ height: `${lineHeight}rem` }} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  {timestamp && (
+                                    <div className="text-[10px] text-zinc-600 mb-1 flex items-center gap-2">
+                                      <Clock className="w-3 h-3 shrink-0" />
+                                      <span>{timestamp}</span>
+                                    </div>
+                                  )}
+                                  <div className="text-zinc-300 group-hover/entry:text-white transition-colors whitespace-pre-wrap break-words">
+                                    {content}
                                   </div>
-                                )}
-                                <div className="text-zinc-300 group-hover/entry:text-white transition-colors whitespace-pre-wrap break-words">
-                                  {content}
                                 </div>
                               </div>
-                            </div>
-                          )
-                        })}
+                            )
+                          })}
                         </div>
-                        
+
                         {/* Live Terminal Input */}
                         <div className="flex gap-4 pt-4 border-t border-white/5">
                           <span className="text-white shrink-0 mt-1">
                             <Sparkles className="w-4 h-4 animate-pulse" />
                           </span>
-                          
+
                           <div className="flex-1 flex flex-col">
                             {isTyping ? (
                               <div className="flex items-start">
@@ -1417,7 +1417,7 @@ export default function ContactDossierPage() {
                                 <span className="w-2 h-4 bg-[#22c55e] animate-[blink_1s_step-end_infinite] inline-block shrink-0 mt-0.5 ml-1" />
                               </div>
                             ) : (
-                              <button 
+                              <button
                                 onClick={handleTerminalClick}
                                 className="text-left text-zinc-600 hover:text-zinc-400 transition-colors flex items-center gap-2 group/btn"
                               >
@@ -1439,7 +1439,7 @@ export default function ContactDossierPage() {
                             )}
                           </div>
                         </div>
-                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
