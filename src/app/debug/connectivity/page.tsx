@@ -63,7 +63,7 @@ export default function ConnectivityPage() {
   const checkDirect = async () => {
     setDirectStatus('loading')
     setDirectError(null)
-    const directUrl = 'https://nodalpoint.io/api/debug/health'
+    const directUrl = 'https://nodal-point-network.vercel.app/api/debug/health'
     try {
       const res = await fetch(directUrl)
       if (!res.ok) throw new Error(`Status: ${res.status} ${res.statusText}`)
