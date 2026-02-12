@@ -41,19 +41,23 @@
             background-color: var(--zinc-100);
             color: var(--text);
             line-height: 1.5;
-            padding: 20px;
+            padding: 40px 0;
+            margin: 0;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
         }
 
         .resume-container {
-            max-width: 850px;
+            max-width: 820px;
             margin: 0 auto;
             background: var(--bg);
-            padding: 40px;
+            padding: 40px 60px 10px 45px;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
             position: relative;
             overflow: hidden;
+            min-height: 1000px;
+            display: flex;
+            flex-direction: column;
         }
 
         .forensic-line {
@@ -69,22 +73,22 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 28px;
+            margin-bottom: 20px;
         }
 
         .identity-block h1 {
-            font-size: 32px;
+            font-size: 28px;
             font-weight: 800;
             letter-spacing: -0.04em;
             text-transform: uppercase;
             line-height: 1;
-            margin-bottom: 6px;
+            margin-bottom: 5px;
             color: var(--zinc-950);
         }
 
         .identity-block .title-slug {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
+            font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.15em;
             color: var(--klein-blue);
@@ -127,14 +131,14 @@
         }
 
         section {
-            margin-bottom: 24px;
+            margin-bottom: 22px;
         }
 
         .section-header {
             display: flex;
             align-items: center;
             gap: 16px;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
         }
 
         .section-header h2 {
@@ -153,7 +157,7 @@
         }
 
         .summary-text {
-            font-size: 15px;
+            font-size: 14px;
             font-weight: 400;
             color: var(--zinc-700);
             line-height: 1.5;
@@ -168,20 +172,20 @@
         .expertise-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: 8px;
+            margin-bottom: 16px;
         }
 
         .expertise-item {
             background: var(--zinc-100);
-            padding: 10px 14px;
-            border-radius: 8px;
+            padding: 8px 12px;
+            border-radius: 6px;
             border: 1px solid var(--zinc-200);
             font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
+            font-size: 9px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             color: var(--zinc-800);
         }
 
@@ -191,7 +195,7 @@
         }
 
         .experience-item {
-            margin-bottom: 20px;
+            margin-bottom: 14px;
         }
 
         .experience-header {
@@ -202,7 +206,7 @@
         }
 
         .experience-header h3 {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 700;
             color: var(--zinc-950);
         }
@@ -218,17 +222,17 @@
         .experience-sub-header {
             display: flex;
             justify-content: space-between;
-            font-size: 12px;
+            font-size: 11px;
             color: var(--zinc-600);
             font-weight: 500;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
 
         .experience-body {
             font-size: 13px;
             color: var(--zinc-700);
             line-height: 1.5;
-            margin-left: 18px;
+            margin-left: 16px;
             position: relative;
         }
 
@@ -248,8 +252,8 @@
 
         .experience-bullets li {
             position: relative;
-            padding-left: 18px;
-            margin-bottom: 3px;
+            padding-left: 16px;
+            margin-bottom: 2px;
         }
 
         .experience-bullets li::before {
@@ -280,7 +284,7 @@
         }
 
         .footer-tagline {
-            margin-top: 32px;
+            margin-top: auto;
             text-align: center;
             font-family: 'JetBrains Mono', monospace;
             font-size: 9px;
@@ -288,7 +292,8 @@
             letter-spacing: 0.1em;
             color: var(--zinc-400);
             border-top: 1px solid var(--zinc-100);
-            padding-top: 16px;
+            padding: 20px 0;
+            width: 100%;
         }
 
         @media print {
@@ -407,7 +412,7 @@
             <div class="experience-item">
                 <div class="experience-header">
                     <h3>Nodal Point</h3>
-                    <div class="experience-meta">Jul 2025 — Present</div>
+                    <div class="experience-meta">Jul 2025 — Feb 2026</div>
                 </div>
                 <div class="experience-sub-header">
                     <span>Director of Energy Architecture</span>
@@ -415,15 +420,14 @@
                 </div>
                 <div class="experience-body">
                     <ul class="experience-bullets">
-                        <li>Executing deep-level audits of historical interval data to detect variances between Metered
-                            Demand and Billed Demand; eliminated "Ghost Capacity" in client billing.</li>
-                        <li>Designing algorithmic load-shedding strategies to predict and mitigate liability during
-                            critical summer intervals, deleting transmission cost liability for the subsequent year.
-                        </li>
-                        <li>Structuring energy contracts as financial derivatives to hedge client P&L against Scarcity
-                            Pricing Adders and ORDC spikes ($5,000/MWh risk).</li>
-                        <li>Isolating Energy signals from Ancillary Services and TDU noise through engineered structural
-                            products.</li>
+                        <li>Audit interval data to detect Metered vs. Billed Demand variances; identified and eliminated
+                            "Ghost Capacity" billing for institutional portfolios.</li>
+                        <li>Design algorithmic load-shedding strategies to mitigate 4CP liability; successfully deleted
+                            transmission cost exposure for heavy industrial load.</li>
+                        <li>Structure complex energy contracts as financial derivatives to hedge P&L against scarcity
+                            pricing adders and ORDC spikes ($5,000/MWh).</li>
+                        <li>Isolate high-frequency energy signals from TDU noise to engineer structural decoupling
+                            products for commercial liability management.</li>
                     </ul>
                 </div>
             </div>
@@ -438,8 +442,9 @@
                     <span>Lewisville, TX</span>
                 </div>
                 <div class="experience-body">
-                    <p>Orchestrated energy procurement strategies and efficiency consulting for commercial portfolios,
-                        focusing on risk mitigation and rate optimization in the deregulated Texas market.</p>
+                    <p>Designed and orchestrated energy procurement strategies for commercial portfolios, focusing on
+                        risk mitigation through forensic rate analysis and efficiency consulting in the Texas market.
+                    </p>
                 </div>
             </div>
 
@@ -453,25 +458,12 @@
                     <span>Plano, TX</span>
                 </div>
                 <div class="experience-body">
-                    <p>Delivered specialized energy engineering and consulting services, identifying budgetary leaks and
-                        managing multi-site energy portfolios for commercial clients.</p>
+                    <p>Delivered specialized energy engineering and consulting; reverse-engineered supplier tariffs to
+                        identify budgetary leaks and managed multi-site energy portfolios for commercial clients.</p>
                 </div>
             </div>
 
-            <div class="experience-item">
-                <div class="experience-header">
-                    <h3>The Basketball League (TBL)</h3>
-                    <div class="experience-meta">Apr 2019 — Sep 2021</div>
-                </div>
-                <div class="experience-sub-header">
-                    <span>Professional Shooting Guard</span>
-                    <span>Lewisville, TX</span>
-                </div>
-                <div class="experience-body">
-                    <p>Professional athlete competing at the highest tier of the TBL. Orchestrated full-court defense
-                        and offensive execution, maintaining elite physical performance and team leadership.</p>
-                </div>
-            </div>
+
         </section>
 
         <section>
@@ -489,7 +481,7 @@
         </section>
 
         <div class="footer-tagline">
-            We do not guess. We measure. Signal Over Noise.
+            Forensic Ledger and Professional References Available Upon Request.
         </div>
     </div>
 
@@ -524,28 +516,39 @@
             button.style.display = 'none';
 
             const element = document.querySelector('.resume-container');
+            const originalMargin = element.style.margin;
+            const originalBodyPadding = document.body.style.padding;
+
+            element.style.margin = '0';
+            document.body.style.padding = '0';
+
             const opt = {
-                margin: [0.25, 0.25, 0.25, 0.25],
+                margin: 0,
                 filename: 'Lewis_Patterson_Resume.pdf',
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: {
-                    scale: 2,
+                    scale: 2.22,
                     useCORS: true,
                     letterRendering: true,
                     logging: false,
-                    windowWidth: 850,
-                    windowHeight: 1100
+                    scrollX: 0,
+                    scrollY: 0,
+                    windowWidth: 816,
+                    x: 0
                 },
                 jsPDF: {
-                    unit: 'in',
-                    format: 'letter',
+                    unit: 'px',
+                    format: [816, 1056],
                     orientation: 'portrait',
-                    compress: true
+                    compress: true,
+                    hotfixes: ['px_scaling']
                 },
                 pagebreak: { mode: 'avoid-all' }
             };
 
             html2pdf().set(opt).from(element).save().then(function () {
+                element.style.margin = originalMargin;
+                document.body.style.padding = originalBodyPadding;
                 // Reset button state
                 button.style.display = 'flex';
                 btnText.textContent = originalText;

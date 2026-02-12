@@ -9,7 +9,7 @@ async function getBody(req) {
   if (req.body && typeof req.body === 'object') {
     return req.body;
   }
-  
+
   // Otherwise, try to read the stream (fallback for direct handler calls)
   return await new Promise((resolve) => {
     try {
@@ -18,29 +18,29 @@ async function getBody(req) {
         resolve({});
         return;
       }
-      
+
       let b = '';
       const timeout = setTimeout(() => resolve({}), 5000); // 5s timeout
-      
+
       req.on('data', c => { b += c; });
-      req.on('end', () => { 
+      req.on('end', () => {
         clearTimeout(timeout);
-        try { resolve(b ? JSON.parse(b) : {}); } catch(_) { resolve({}); } 
+        try { resolve(b ? JSON.parse(b) : {}); } catch (_) { resolve({}); }
       });
-      req.on('error', () => { 
+      req.on('error', () => {
         clearTimeout(timeout);
-        resolve({}); 
+        resolve({});
       });
-    } catch(_) { resolve({}); }
+    } catch (_) { resolve({}); }
   });
 }
 
-export default async function handler(req, res){
+export default async function handler(req, res) {
   // Handle CORS preflight - returns true if OPTIONS was handled
   if (cors(req, res)) return;
-  
-  if (req.method !== 'POST'){
-    res.statusCode = 405; res.setHeader('Content-Type','application/json');
+
+  if (req.method !== 'POST') {
+    res.statusCode = 405; res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ error: 'Method not allowed' }));
     return;
   }
@@ -49,25 +49,25 @@ export default async function handler(req, res){
   const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
   const host = req.headers['x-forwarded-host'] || req.headers.host || '';
   const envBase = process.env.PUBLIC_BASE_URL || process.env.API_BASE_URL || '';
-  const base = envBase || (host ? `${proto}://${host}` : 'https://nodalpoint.io');
+  const base = envBase || (host ? `${proto}://${host}` : 'https://nodal-point-network.vercel.app');
 
-  try{
+  try {
     const body = await getBody(req);
     const callSid = String(body.callSid || '').trim();
     let recordingSid = String(body.recordingSid || '').trim();
     const serviceSid = process.env.TWILIO_INTELLIGENCE_SERVICE_SID || undefined;
 
-    if (!callSid && !recordingSid){
-      res.statusCode = 400; res.setHeader('Content-Type','application/json');
+    if (!callSid && !recordingSid) {
+      res.statusCode = 400; res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ error: 'callSid or recordingSid is required' }));
       return;
     }
 
     if (!serviceSid) {
-      res.statusCode = 500; res.setHeader('Content-Type','application/json');
+      res.statusCode = 500; res.setHeader('Content-Type', 'application/json');
       const errorMsg = 'Conversational Intelligence service not configured. Missing or empty TWILIO_INTELLIGENCE_SERVICE_SID environment variable. Please set this in your Cloud Run environment variables or local .env file.';
       logger.error('[CI Request] Configuration error:', errorMsg);
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: errorMsg,
         details: 'This environment variable is required to create Conversational Intelligence transcripts. Check your Cloud Run service configuration or local environment setup.'
       }));
@@ -80,31 +80,31 @@ export default async function handler(req, res){
     // OPTIMIZED: Add timeout to Firestore read to prevent hanging
     let ciTranscriptSid = '';
     let existingRecordingSid = '';
-    try{
-      if (db && callSid){
+    try {
+      if (db && callSid) {
         // Add 5-second timeout for Firestore read
-        const timeoutPromise = new Promise((_, reject) => 
+        const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Firestore timeout')), 5000)
         );
         const readPromise = db.collection('calls').doc(callSid).get();
-        
+
         const snap = await Promise.race([readPromise, timeoutPromise]);
-        if (snap.exists){
+        if (snap.exists) {
           const data = snap.data() || {};
           if (data.ciTranscriptSid) ciTranscriptSid = String(data.ciTranscriptSid);
           if (data.recordingSid) existingRecordingSid = String(data.recordingSid);
           // Try to parse from recordingUrl if present
-          if (!existingRecordingSid && data.recordingUrl){
-            try{
+          if (!existingRecordingSid && data.recordingUrl) {
+            try {
               // Match Recording SID from URL - handles both .mp3 and query string formats
               // Examples: /Recordings/RE123.mp3 or /Recordings/RE123?RequestedChannels=2
               const m = String(data.recordingUrl).match(/Recordings\/(RE[A-Z0-9]+)/i);
               if (m && m[1]) existingRecordingSid = m[1];
-            }catch(_){ }
+            } catch (_) { }
           }
         }
       }
-    }catch(e){ 
+    } catch (e) {
       logger.warn('[CI Request] Firestore read failed or timed out:', e.message);
     }
 
@@ -113,22 +113,22 @@ export default async function handler(req, res){
 
     // Helper: select preferred recording (dual-channel + completed, most recent)
     // OPTIMIZED: Reduced retries to prevent 30s timeout (max ~10s now)
-    async function selectPreferredRecordingByCall(callSid, maxAttempts = 3){
+    async function selectPreferredRecordingByCall(callSid, maxAttempts = 3) {
       const backoffs = [2000, 4000, 0]; // ~6s total (much faster)
-      for (let attempt = 0; attempt < Math.min(maxAttempts, backoffs.length); attempt++){
-        try{
+      for (let attempt = 0; attempt < Math.min(maxAttempts, backoffs.length); attempt++) {
+        try {
           const list = await client.recordings.list({ callSid, limit: 20 });
           const items = Array.isArray(list) ? list : [];
-          if (items.length){
+          if (items.length) {
             // Try to find dual-channel first, then latest completed
             // Some SDKs expose channels on the list item; if not, we can fetch details lazily
             let dual = [];
             const others = [];
-            for (const rec of items){
+            for (const rec of items) {
               const statusOk = !rec.status || String(rec.status).toLowerCase() === 'completed';
               if (!statusOk) { others.push(rec); continue; }
               let channels = rec.channels;
-              if (channels == null){
+              if (channels == null) {
                 try {
                   const fetched = await client.recordings(rec.sid).fetch();
                   channels = fetched?.channels;
@@ -137,32 +137,32 @@ export default async function handler(req, res){
                   if (rec.duration == null && fetched && (fetched.duration != null || fetched.durationSec != null)) {
                     rec.duration = fetched.duration != null ? Number(fetched.duration) : Number(fetched.durationSec);
                   }
-                } catch(_){ }
+                } catch (_) { }
               }
-              const isDual = String(channels||'') === '2';
-              if (isDual){ dual.push(rec); } else { others.push(rec); }
+              const isDual = String(channels || '') === '2';
+              if (isDual) { dual.push(rec); } else { others.push(rec); }
             }
-            const sortByDurDescThenDate = (a,b)=>{
+            const sortByDurDescThenDate = (a, b) => {
               const da = (a.duration != null ? Number(a.duration) : -1);
               const db = (b.duration != null ? Number(b.duration) : -1);
               if (db !== da) return db - da;
-              const tb = new Date(b.dateCreated||b.startTime||0).getTime();
-              const ta = new Date(a.dateCreated||a.startTime||0).getTime();
+              const tb = new Date(b.dateCreated || b.startTime || 0).getTime();
+              const ta = new Date(a.dateCreated || a.startTime || 0).getTime();
               return tb - ta;
             };
-            const sortByDateDesc = (a,b)=> new Date(b.dateCreated||b.startTime||0) - new Date(a.dateCreated||a.startTime||0);
-            if (dual.length){
+            const sortByDateDesc = (a, b) => new Date(b.dateCreated || b.startTime || 0) - new Date(a.dateCreated || a.startTime || 0);
+            if (dual.length) {
               // Prefer source=Dial, then most recent
-              const dial = dual.filter(r=> String(r.source||'').toLowerCase()==='dial').sort(sortByDurDescThenDate);
+              const dial = dual.filter(r => String(r.source || '').toLowerCase() === 'dial').sort(sortByDurDescThenDate);
               if (dial.length) return dial[0].sid;
               dual.sort(sortByDurDescThenDate);
               return dual[0].sid;
             }
             // Fallback: any completed, most recent
-            const completed = items.filter(r=> !r.status || String(r.status).toLowerCase()==='completed').sort(sortByDateDesc);
-            if (completed.length){ return completed[0].sid; }
+            const completed = items.filter(r => !r.status || String(r.status).toLowerCase() === 'completed').sort(sortByDateDesc);
+            if (completed.length) { return completed[0].sid; }
           }
-        }catch(_){ }
+        } catch (_) { }
         const baseDelay = backoffs[attempt] || 0;
         const jitter = baseDelay ? Math.floor(Math.random() * 1000) : 0; // add up to 1s jitter to avoid thundering herd
         const delay = baseDelay + jitter;
@@ -172,17 +172,17 @@ export default async function handler(req, res){
     }
 
     // If still missing, try to resolve via Twilio by Call SID with backoff
-    if (!recordingSid && callSid && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN){
+    if (!recordingSid && callSid && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
       logger.log(`[CI Request] Looking up recording for call: ${callSid}`);
       recordingSid = await selectPreferredRecordingByCall(callSid, 3); // Reduced from 5 to 3 attempts
       logger.log(`[CI Request] Recording lookup result: ${recordingSid || 'NOT FOUND'}`);
     }
 
-    if (!recordingSid){
+    if (!recordingSid) {
       logger.error(`[CI Request] No recording found for call: ${callSid}`);
-      res.statusCode = 404; res.setHeader('Content-Type','application/json');
-      res.end(JSON.stringify({ 
-        error: 'Recording not found for call', 
+      res.statusCode = 404; res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({
+        error: 'Recording not found for call',
         callSid,
         details: 'Recording may not exist yet. Recordings typically appear 30-60 seconds after call completion. Please wait and try again.',
         suggestion: 'Wait 1-2 minutes after the call ends, then click Process Call again.'
@@ -203,7 +203,7 @@ export default async function handler(req, res){
           sourceSid: recordingSid,
           limit: 1
         });
-        
+
         if (existingTranscripts && existingTranscripts.length > 0) {
           existingTwilioTranscript = existingTranscripts[0];
           ciTranscriptSid = existingTwilioTranscript.sid;
@@ -218,42 +218,42 @@ export default async function handler(req, res){
     // If we found an existing transcript, handle it appropriately
     if (ciTranscriptSid && existingTwilioTranscript) {
       const transcriptStatus = existingTwilioTranscript.status || 'unknown';
-      
+
       // Pre-flag the call so webhook gating sees ciRequested=true
       try {
-        await fetch(`${base}/api/calls`,{
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ 
-            callSid, 
-            recordingSid, 
-            ciRequested: true, 
+        await fetch(`${base}/api/calls`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            callSid,
+            recordingSid,
+            ciRequested: true,
             conversationalIntelligence: { transcriptSid: ciTranscriptSid, status: transcriptStatus },
             ciTranscriptSid: ciTranscriptSid
           })
-        }).catch(()=>{});
-      } catch(_) {}
+        }).catch(() => { });
+      } catch (_) { }
 
       // If transcript is already completed, trigger immediate processing to fetch results
       if (transcriptStatus === 'completed') {
         logger.log(`[CI Request] Existing transcript is completed, triggering immediate result fetch: ${ciTranscriptSid}`);
-        
+
         // Trigger background processing to fetch results (fire and forget)
         try {
           await fetch(`${base}/api/twilio/poll-ci-analysis`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              transcriptSid: ciTranscriptSid, 
-              callSid: callSid 
+            body: JSON.stringify({
+              transcriptSid: ciTranscriptSid,
+              callSid: callSid
             })
-          }).catch(() => {});
-        } catch(_) {}
-        
+          }).catch(() => { });
+        } catch (_) { }
+
         res.statusCode = 202;
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ 
-          ok: true, 
-          transcriptSid: ciTranscriptSid, 
+        res.end(JSON.stringify({
+          ok: true,
+          transcriptSid: ciTranscriptSid,
           recordingSid,
           existing: true,
           status: 'completed',
@@ -264,12 +264,12 @@ export default async function handler(req, res){
       } else if (['queued', 'in-progress'].includes(transcriptStatus)) {
         // Transcript exists but still processing
         logger.log(`[CI Request] Existing transcript still processing: ${ciTranscriptSid}, status: ${transcriptStatus}`);
-        
+
         res.statusCode = 202;
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ 
-          ok: true, 
-          transcriptSid: ciTranscriptSid, 
+        res.end(JSON.stringify({
+          ok: true,
+          transcriptSid: ciTranscriptSid,
           recordingSid,
           existing: true,
           status: transcriptStatus,
@@ -284,20 +284,20 @@ export default async function handler(req, res){
       }
     }
 
-    if (!ciTranscriptSid){
+    if (!ciTranscriptSid) {
       // Pre-flag the call so webhook gating sees ciRequested=true even if webhook arrives very fast
       try {
-        await fetch(`${base}/api/calls`,{
-          method:'POST', headers:{'Content-Type':'application/json'},
+        await fetch(`${base}/api/calls`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ callSid, recordingSid, ciRequested: true, conversationalIntelligence: { status: 'queued' } })
-        }).catch(()=>{});
-      } catch(_) {}
+        }).catch(() => { });
+      } catch (_) { }
 
       // Determine channel mapping for proper speaker separation
       let agentChannelNum = 1; // Default to channel 1 for agent
       try {
         let callResource = null;
-        try { callResource = await client.calls(callSid).fetch(); } catch(_) {}
+        try { callResource = await client.calls(callSid).fetch(); } catch (_) { }
         const fromStr = callResource?.from || '';
         const toStr = callResource?.to || '';
         const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
@@ -317,29 +317,29 @@ export default async function handler(req, res){
 
       // Create CI transcript with proper channel participants for speaker separation
       const webhookUrl = `${base}/api/twilio/conversational-intelligence-webhook`;
-      
-      const createArgs = { 
-        serviceSid, 
-        channel: { 
+
+      const createArgs = {
+        serviceSid,
+        channel: {
           media_properties: { source_sid: recordingSid },
           participants: [
             { role: 'Agent', channel_participant: agentChannelNum },
             { role: 'Customer', channel_participant: agentChannelNum === 1 ? 2 : 1 }
           ]
-        }, 
+        },
         customerKey: callSid,
         webhookUrl: webhookUrl,
         webhookMethod: 'POST'
       };
-      
+
       const idemKey = (callSid && recordingSid) ? `${callSid}-${recordingSid}` : undefined;
       const created = idemKey
         ? await client.intelligence.v2.transcripts.create(createArgs, { idempotencyKey: idemKey })
         : await client.intelligence.v2.transcripts.create(createArgs);
       ciTranscriptSid = created.sid;
-      
+
       logger.log(`[CI Request] Created transcript: ${ciTranscriptSid}, status: ${created.status}`);
-      
+
       // Poll transcript status to ensure it's processing
       // OPTIMIZED: Reduced from 3 to 2 attempts (2s instead of 3s) - minimal impact but reduces Cloud Run costs
       let attempts = 0;
@@ -348,7 +348,7 @@ export default async function handler(req, res){
         try {
           const transcript = await client.intelligence.v2.transcripts(ciTranscriptSid).fetch();
           logger.log(`[CI Request] Transcript ${ciTranscriptSid} status: ${transcript.status}`);
-          
+
           if (transcript.status === 'completed') {
             logger.log(`[CI Request] Transcript completed immediately: ${ciTranscriptSid}`);
             break;
@@ -370,9 +370,9 @@ export default async function handler(req, res){
     }
 
     // Persist request flags so webhook only processes allowed transcripts
-    try{
-      await fetch(`${base}/api/calls`,{
-        method:'POST', headers:{'Content-Type':'application/json'},
+    try {
+      await fetch(`${base}/api/calls`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           callSid,
           recordingSid,
@@ -381,18 +381,18 @@ export default async function handler(req, res){
           ciRequested: true,
           ciTranscriptSid: ciTranscriptSid
         })
-      }).catch(()=>{});
-    }catch(_){ }
+      }).catch(() => { });
+    } catch (_) { }
 
-    res.statusCode = 202; res.setHeader('Content-Type','application/json');
-    res.end(JSON.stringify({ 
-      ok: true, 
-      transcriptSid: ciTranscriptSid, 
+    res.statusCode = 202; res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({
+      ok: true,
+      transcriptSid: ciTranscriptSid,
       recordingSid,
       message: 'Transcript processing started. Check status via webhook or polling.',
       webhookUrl: `${base}/api/twilio/conversational-intelligence-webhook`
     }));
-  }catch(e){
+  } catch (e) {
     logger.error('[ci-request] Error:', e);
     logger.error('[ci-request] Error details:', {
       message: e?.message,
@@ -412,10 +412,10 @@ export default async function handler(req, res){
     else if (twilioCode === 20404) friendly = 'Resource not found';
     else if (twilioCode === 21211) friendly = 'Invalid phone number format';
     res.statusCode = (twilioCode && Number(twilioCode) >= 400 && Number(twilioCode) < 600) ? 400 : 500;
-    res.setHeader('Content-Type','application/json');
-    res.end(JSON.stringify({ 
-      error: friendly, 
-      details: e?.message, 
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({
+      error: friendly,
+      details: e?.message,
       code: twilioCode,
       moreInfo: e?.moreInfo,
       fullError: e?.toString()

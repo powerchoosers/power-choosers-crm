@@ -348,7 +348,7 @@ const toolHandlers = {
 
     if (!usedVector) {
       let query = supabaseAdmin.from('contacts').select('*').limit(limit);
-      
+
       if (accountId) {
         query = query.eq('accountId', accountId);
       }
@@ -359,7 +359,7 @@ const toolHandlers = {
           query = query.or(`name.ilike.%${term}%,firstName.ilike.%${term}%,lastName.ilike.%${term}%,email.ilike.%${term}%,title.ilike.%${term}%,city.ilike.%${term}%,state.ilike.%${term}%,metadata->>title.ilike.%${term}%,metadata->>city.ilike.%${term}%`);
         }
       }
-      
+
       const { data: keywordData, error } = await query;
       if (error) throw error;
       data = keywordData;
@@ -371,8 +371,8 @@ const toolHandlers = {
     }
     if (title) {
       const titleLower = title.toLowerCase();
-      data = data.filter(c => 
-        (c.title && c.title.toLowerCase().includes(titleLower)) || 
+      data = data.filter(c =>
+        (c.title && c.title.toLowerCase().includes(titleLower)) ||
         (c.metadata?.title && c.metadata.title.toLowerCase().includes(titleLower))
       );
     }
@@ -391,7 +391,7 @@ const toolHandlers = {
   get_market_pulse: async () => {
     try {
       logger.info('[Gemini] Tool call: get_market_pulse', 'ChatTool');
-      
+
       // Fetch both prices and grid conditions
       const [priceData, gridData] = await Promise.all([
         getErcotMarketData('prices'),
@@ -423,7 +423,7 @@ const toolHandlers = {
         const isAM = hour < 12;
         const startOfBlock = new Date(now);
         startOfBlock.setHours(isAM ? 0 : 12, 0, 0, 0);
-        
+
         const { data: existing } = await supabaseAdmin
           .from('market_telemetry')
           .select('id')
@@ -432,7 +432,7 @@ const toolHandlers = {
 
         if (!existing || existing.length === 0) {
           logger.info(`[Gemini] Logging market telemetry for ${isAM ? 'AM' : 'PM'} block`, 'ChatTool');
-          
+
           // Generate embedding for semantic search
           let embedding = null;
           try {
@@ -481,17 +481,17 @@ const toolHandlers = {
             match_threshold: 0.3,
             match_count: limit
           });
-          
+
           if (callResults && callResults.length > 0) {
-             const callIds = callResults.map(c => c.id);
-             const { data: fullCalls } = await supabaseAdmin
-                .from('calls')
-                .select('*, contacts(first_name, last_name, email), accounts(name)')
-                .in('id', callIds);
-             
-             if (fullCalls) {
-                results.calls = fullCalls;
-             }
+            const callIds = callResults.map(c => c.id);
+            const { data: fullCalls } = await supabaseAdmin
+              .from('calls')
+              .select('*, contacts(first_name, last_name, email), accounts(name)')
+              .in('id', callIds);
+
+            if (fullCalls) {
+              results.calls = fullCalls;
+            }
           }
 
           // 1.1 Search Call Details (Transcripts)
@@ -504,9 +504,9 @@ const toolHandlers = {
           if (detailResults && detailResults.length > 0) {
             const detailIds = detailResults.map(d => d.id);
             const { data: fullDetails } = await supabaseAdmin
-                .from('call_details')
-                .select('*, calls(*, contacts(first_name, last_name, email), accounts(name))')
-                .in('id', detailIds);
+              .from('call_details')
+              .select('*, calls(*, contacts(first_name, last_name, email), accounts(name))')
+              .in('id', detailIds);
 
             if (fullDetails) {
               results.transcripts = fullDetails;
@@ -543,7 +543,7 @@ const toolHandlers = {
           if (emailResults) {
             results.emails = emailResults;
           }
-          
+
           // If we have filters, apply them to the vector results
           if (contact_id) {
             results.calls = results.calls.filter(c => c.contactId === contact_id);
@@ -581,7 +581,7 @@ const toolHandlers = {
         supabaseAdmin.from('calls').select('*').eq('contactId', contact_id).order('timestamp', { ascending: false }).limit(limit),
         supabaseAdmin.from('emails').select('*').eq('contactId', contact_id).order('timestamp', { ascending: false }).limit(limit)
       ]);
-      
+
       // If we already had vector results, we might want to merge or prioritize? 
       // For simplicity, if IDs are provided, we prioritize those records.
       results.calls = calls.data || [];
@@ -603,39 +603,39 @@ const toolHandlers = {
 
     // Normalization Logic to match frontend and fix legacy data gaps
     const metadata = data.metadata || {};
-    
+
     // 1. Name Resolution
     if (!data.firstName) data.firstName = metadata.firstName || metadata.first_name || metadata.general?.firstName;
     if (!data.lastName) data.lastName = metadata.lastName || metadata.last_name || metadata.general?.lastName;
-    
+
     // 2. Company/Account Resolution
     if (!data.accounts) {
-       const companyName = metadata.company || metadata.companyName || metadata.general?.company || metadata.general?.companyName;
-       if (companyName) {
-         // Try to find account by name to fill the gap
-         const { data: account } = await supabaseAdmin.from('accounts').select('*').ilike('name', companyName).limit(1).maybeSingle();
-         if (account) {
-           data.accounts = account;
-           // We don't save back to DB here (read-only tool), but we present it as linked
-         } else {
-           // Stub account data from metadata if real account not found
-           data.accounts = {
-             name: companyName,
-             domain: metadata.domain || metadata.general?.domain,
-             description: 'Legacy Record - No linked account'
-           };
-         }
-       }
+      const companyName = metadata.company || metadata.companyName || metadata.general?.company || metadata.general?.companyName;
+      if (companyName) {
+        // Try to find account by name to fill the gap
+        const { data: account } = await supabaseAdmin.from('accounts').select('*').ilike('name', companyName).limit(1).maybeSingle();
+        if (account) {
+          data.accounts = account;
+          // We don't save back to DB here (read-only tool), but we present it as linked
+        } else {
+          // Stub account data from metadata if real account not found
+          data.accounts = {
+            name: companyName,
+            domain: metadata.domain || metadata.general?.domain,
+            description: 'Legacy Record - No linked account'
+          };
+        }
+      }
     }
 
     // 3. Contract Data Promotion
     if (data.accounts) {
       const accountMetadata = data.accounts.metadata || {};
       // Ensure contract_end_date is promoted for the AI to see easily
-      let contract_end_date = data.accounts.contract_end_date || 
-                             accountMetadata.contract_end_date || 
-                             accountMetadata.contractEndDate || 
-                             accountMetadata.general?.contractEndDate;
+      let contract_end_date = data.accounts.contract_end_date ||
+        accountMetadata.contract_end_date ||
+        accountMetadata.contractEndDate ||
+        accountMetadata.general?.contractEndDate;
 
       // Handle common date formats like MM/DD/YYYY to YYYY-MM-DD
       if (contract_end_date && contract_end_date.includes('/')) {
@@ -644,7 +644,7 @@ const toolHandlers = {
           contract_end_date = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
         }
       }
-      
+
       data.contract_end_date = contract_end_date;
       data.electricity_supplier = data.accounts.electricity_supplier || accountMetadata.electricity_supplier;
       data.annual_usage = data.accounts.annual_usage || accountMetadata.annual_usage;
@@ -673,17 +673,17 @@ const toolHandlers = {
       .select('*, contacts(*)')
       .eq('id', account_id)
       .single();
-    
+
     if (error) throw error;
 
     // Promote energy metrics and corporate data from metadata if missing in top-level
     const metadata = data.metadata || {};
-    
+
     // Robust date resolution
-    data.contract_end_date = data.contract_end_date || 
-                            metadata.contract_end_date || 
-                            metadata.contractEndDate || 
-                            metadata.general?.contractEndDate;
+    data.contract_end_date = data.contract_end_date ||
+      metadata.contract_end_date ||
+      metadata.contractEndDate ||
+      metadata.general?.contractEndDate;
 
     // Handle common date formats like MM/DD/YYYY to YYYY-MM-DD
     if (data.contract_end_date && data.contract_end_date.includes('/')) {
@@ -699,7 +699,7 @@ const toolHandlers = {
     data.revenue = data.revenue || metadata.revenue || metadata.annual_revenue;
     data.employees = data.employees || metadata.employees || metadata.employee_count;
     data.industry = data.industry || metadata.industry;
-    
+
     // Promote location and description
     data.description = data.description || metadata.description || metadata.general?.description;
     data.address = data.address || metadata.address || metadata.billing_address || metadata.general?.address;
@@ -718,7 +718,7 @@ const toolHandlers = {
   create_contact: async (contact) => {
     // Ensure we have a valid UUID for the primary key (since DB column is text without default)
     if (!contact.id) {
-        contact.id = crypto.randomUUID();
+      contact.id = crypto.randomUUID();
     }
     const { data, error } = await supabaseAdmin.from('contacts').insert([contact]).select().single();
     if (error) throw error;
@@ -737,7 +737,7 @@ const toolHandlers = {
       let query = supabaseAdmin.from('accounts').select('*').limit(limit);
       if (city) query = query.ilike('city', `%${city}%`);
       if (state) query = query.ilike('state', `%${state}%`);
-      
+
       const { data: locData, error } = await query;
       if (!error && locData && locData.length > 0) {
         data = locData;
@@ -765,9 +765,9 @@ const toolHandlers = {
     if (expiration_year) {
       const yearStr = String(expiration_year);
       const shortYear = yearStr.slice(2);
-      
+
       console.log(`[list_accounts] Performing direct query for expiration year: ${yearStr}`);
-      
+
       // Attempt a direct Supabase query for the year across multiple fields
       // Use cast to text for contract_end_date to avoid Postgres 42883 error
       const { data: yearData, error: yearError } = await supabaseAdmin
@@ -784,7 +784,7 @@ const toolHandlers = {
         .gte('contract_end_date', `${yearStr}-01-01`)
         .lte('contract_end_date', `${yearStr}-12-31`)
         .limit(100);
-      
+
       const combinedData = [...(yearData || []), ...(dateData || [])];
       // Deduplicate by ID
       const uniqueData = Array.from(new Map(combinedData.map(item => [item.id, item])).values());
@@ -829,7 +829,7 @@ const toolHandlers = {
     // 3. Fallback to Keyword Search
     if (!usedVector) {
       let query = supabaseAdmin.from('accounts').select('*');
-      
+
       if (expiration_year) {
         const yearStr = String(expiration_year);
         const shortYear = yearStr.slice(2);
@@ -858,36 +858,36 @@ const toolHandlers = {
         const baseOr = `name.ilike.%${safeSearch}%,domain.ilike.%${safeSearch}%,industry.ilike.%${safeSearch}%,metadata->>industry.ilike.%${safeSearch}%`;
         query = query.or(tokenOr ? `${baseOr},${tokenOr}` : baseOr);
       }
-      
+
       const { data: keywordData, error } = await query.limit(200);
       data = keywordData || [];
     }
-    
+
     // ALWAYS apply filters in-memory for precision
     if (industry) {
-        const indLower = industry.toLowerCase();
-        data = data.filter(r => 
-            (r.industry && r.industry.toLowerCase().includes(indLower)) || 
-            (r.metadata?.industry && r.metadata.industry.toLowerCase().includes(indLower))
-        );
+      const indLower = industry.toLowerCase();
+      data = data.filter(r =>
+        (r.industry && r.industry.toLowerCase().includes(indLower)) ||
+        (r.metadata?.industry && r.metadata.industry.toLowerCase().includes(indLower))
+      );
     }
     if (expiration_year) {
-        const yearStr = String(expiration_year);
-        const shortYear = yearStr.slice(2);
-        data = data.filter(r => {
-            const metadata = r.metadata || {};
-            const d = r.contract_end_date || 
-                      metadata.contract_end_date || 
-                      metadata.contractEndDate || 
-                      metadata.general?.contractEndDate;
-            if (!d) return false;
-            const dateStr = String(d).toLowerCase();
-            return dateStr.includes(yearStr) || 
-                   dateStr.includes(`/${shortYear}`) ||
-                   dateStr.includes(`-${shortYear}`) ||
-                   dateStr.endsWith(` ${yearStr}`) ||
-                   dateStr.endsWith(` ${shortYear}`);
-        });
+      const yearStr = String(expiration_year);
+      const shortYear = yearStr.slice(2);
+      data = data.filter(r => {
+        const metadata = r.metadata || {};
+        const d = r.contract_end_date ||
+          metadata.contract_end_date ||
+          metadata.contractEndDate ||
+          metadata.general?.contractEndDate;
+        if (!d) return false;
+        const dateStr = String(d).toLowerCase();
+        return dateStr.includes(yearStr) ||
+          dateStr.includes(`/${shortYear}`) ||
+          dateStr.includes(`-${shortYear}`) ||
+          dateStr.endsWith(` ${yearStr}`) ||
+          dateStr.endsWith(` ${shortYear}`);
+      });
     }
 
     if (normalizedSearch && data.length > 1) {
@@ -905,9 +905,9 @@ const toolHandlers = {
     const mapped = data.map(record => {
       const metadata = record.metadata || {};
       let contract_end_date = record.contract_end_date ||
-                             metadata.contract_end_date ||
-                             metadata.contractEndDate ||
-                             metadata.general?.contractEndDate;
+        metadata.contract_end_date ||
+        metadata.contractEndDate ||
+        metadata.general?.contractEndDate;
 
       if (contract_end_date && contract_end_date.includes('/')) {
         const parts = contract_end_date.split('/');
@@ -1001,31 +1001,31 @@ const toolHandlers = {
             semantic_weight: 0.5,
             rrf_k: 50
           });
-          
+
           if (error) {
             console.error('[search_emails] Hybrid search RPC error:', error);
           }
-          
+
           if (!error && hybridResults && hybridResults.length > 0) {
             data = hybridResults;
             usedHybrid = true;
           }
         }
       } catch (e) {
-         console.error('[search_emails] Hybrid generation error:', e);
+        console.error('[search_emails] Hybrid generation error:', e);
       }
     }
 
     if (!usedHybrid) {
-        const { data: keywordData, error } = await supabaseAdmin
+      const { data: keywordData, error } = await supabaseAdmin
         .from('emails')
         .select('*')
         .or(`subject.ilike.%${query}%,text.ilike.%${query}%,from.ilike.%${query}%`)
         .order('timestamp', { ascending: false })
         .limit(limit);
-        
-        if (error) throw error;
-        data = keywordData;
+
+      if (error) throw error;
+      data = keywordData;
     }
 
     console.log(`[search_emails] Found ${data?.length || 0} results (Hybrid: ${usedHybrid})`);
@@ -1049,15 +1049,15 @@ const toolHandlers = {
             semantic_weight: 0.5,
             rrf_k: 50
           });
-          
+
           if (error) {
             console.error('[search_transcripts] Hybrid search RPC error:', error);
           }
-          
+
           if (!error && hybridResults && hybridResults.length > 0) {
             data = hybridResults;
             usedHybrid = true;
-            
+
             // Apply filters if provided
             if (account_id) {
               data = data.filter(c => c.accountId === account_id);
@@ -1068,26 +1068,26 @@ const toolHandlers = {
           }
         }
       } catch (e) {
-         console.error('[search_transcripts] Hybrid generation error:', e);
+        console.error('[search_transcripts] Hybrid generation error:', e);
       }
     }
 
     if (!usedHybrid) {
-        let query_builder = supabaseAdmin
-          .from('calls')
-          .select('*')
-          .not('transcript', 'is', null)
-          .or(`transcript.ilike.%${query}%,summary.ilike.%${query}%`)
-          .order('timestamp', { ascending: false })
-          .limit(limit);
-        
-        if (account_id) query_builder = query_builder.eq('accountId', account_id);
-        if (contact_id) query_builder = query_builder.eq('contactId', contact_id);
-        
-        const { data: keywordData, error } = await query_builder;
-        
-        if (error) throw error;
-        data = keywordData;
+      let query_builder = supabaseAdmin
+        .from('calls')
+        .select('*')
+        .not('transcript', 'is', null)
+        .or(`transcript.ilike.%${query}%,summary.ilike.%${query}%`)
+        .order('timestamp', { ascending: false })
+        .limit(limit);
+
+      if (account_id) query_builder = query_builder.eq('accountId', account_id);
+      if (contact_id) query_builder = query_builder.eq('contactId', contact_id);
+
+      const { data: keywordData, error } = await query_builder;
+
+      if (error) throw error;
+      data = keywordData;
     }
 
     console.log(`[search_transcripts] Found ${data?.length || 0} results (Hybrid: ${usedHybrid})`);
@@ -1182,7 +1182,7 @@ export default async function handler(req, res) {
         if (content && typeof content !== 'string') {
           content = JSON.stringify(content);
         }
-        return { 
+        return {
           role: m.role === 'model' ? 'assistant' : m.role, // Normalize model to assistant for internal consistency
           content: (content || '').trim(),
           tool_calls: m.tool_calls,
@@ -1248,7 +1248,7 @@ export default async function handler(req, res) {
           try {
             const u = new URL(contact.website.startsWith('http') ? contact.website : `https://${contact.website}`);
             contactDomain = u.hostname.replace(/^www\./, '') || null;
-          } catch (_) {}
+          } catch (_) { }
         }
         if (contactDomain) {
           const { data: articles } = await supabaseAdmin.from('apollo_news_articles').select('title, snippet, published_at').eq('domain', contactDomain).order('published_at', { ascending: false }).limit(5);
@@ -1380,7 +1380,7 @@ export default async function handler(req, res) {
         const blocks = extractJsonBlocks(m.content);
         for (const b of blocks) {
           if (!b || typeof b !== 'object') continue;
-          
+
           // Check for position_maturity block (highest confidence of "active" account)
           if (b.type === 'position_maturity' && b.data && b.data.id) {
             return { id: String(b.data.id), name: b.data.name ? String(b.data.name) : null };
@@ -1496,7 +1496,7 @@ export default async function handler(req, res) {
         const tokens = q0.split(/\s+/).filter(Boolean);
         let city = null;
         let state = null;
-        
+
         // Check for "Humble, Texas" or "Humble Texas" or just "Humble"
         if (tokens.length >= 2) {
           state = tokens[tokens.length - 1];
@@ -1505,7 +1505,7 @@ export default async function handler(req, res) {
           city = tokens[0];
         }
 
-          const locRes = await toolHandlers.list_accounts({ city, state, limit: 20 });
+        const locRes = await toolHandlers.list_accounts({ city, state, limit: 20 });
         const records = locRes?.data ?? locRes ?? [];
         diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
 
@@ -1513,7 +1513,7 @@ export default async function handler(req, res) {
         if (records.length === 1) {
           const match = records[0];
           const account = await toolHandlers.get_account_details({ account_id: match.id });
-          
+
           const expiration = account?.contract_end_date ? String(account.contract_end_date) : null;
           if (!expiration) {
             const narrative = `${firstName}, I found ${account?.name || 'the account'} in ${city || state}, but there is no contract expiration date stored on the record right now.`;
@@ -2034,13 +2034,25 @@ export default async function handler(req, res) {
 
       const model = modelName || 'openai/gpt-oss-120b:free';
       const openAiTools = jsonMode ? undefined : convertToolsToOpenAI(tools);
-      
+
       const hasSystemPrompt = cleanedMessages.some(m => m.role === 'system');
-      
-      let currentMessages = hasSystemPrompt 
+
+      let currentMessages = hasSystemPrompt
         ? cleanedMessages.slice(-15).map(m => {
+          const msg = {
+            role: m.role === 'tool' ? 'tool' : (m.role === 'user' ? 'user' : (m.role === 'system' ? 'system' : 'assistant')),
+            content: m.content || null,
+          };
+          if (m.tool_calls) msg.tool_calls = m.tool_calls;
+          if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
+          if (m.name) msg.name = m.name;
+          return msg;
+        })
+        : [
+          { role: 'system', content: buildSystemPrompt().trim() },
+          ...cleanedMessages.slice(-15).map(m => {
             const msg = {
-              role: m.role === 'tool' ? 'tool' : (m.role === 'user' ? 'user' : (m.role === 'system' ? 'system' : 'assistant')),
+              role: m.role === 'tool' ? 'tool' : (m.role === 'user' ? 'user' : 'assistant'),
               content: m.content || null,
             };
             if (m.tool_calls) msg.tool_calls = m.tool_calls;
@@ -2048,20 +2060,8 @@ export default async function handler(req, res) {
             if (m.name) msg.name = m.name;
             return msg;
           })
-        : [
-            { role: 'system', content: buildSystemPrompt().trim() },
-            ...cleanedMessages.slice(-15).map(m => {
-              const msg = {
-                role: m.role === 'tool' ? 'tool' : (m.role === 'user' ? 'user' : 'assistant'),
-                content: m.content || null,
-              };
-              if (m.tool_calls) msg.tool_calls = m.tool_calls;
-              if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
-              if (m.name) msg.name = m.name;
-              return msg;
-            })
-          ];
-      
+        ];
+
       // Ensure the last message is from the user if it's not already
       if (currentMessages[currentMessages.length - 1].role !== 'user' && currentMessages[currentMessages.length - 1].role !== 'tool') {
         const lastUserMsg = cleanedMessages.slice().reverse().find(m => m.role === 'user');
@@ -2090,13 +2090,13 @@ export default async function handler(req, res) {
 
       while (turnCount < MAX_TURNS) {
         turnCount++;
-        
+
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`,
-            'HTTP-Referer': 'https://nodalpoint.io',
+            'HTTP-Referer': 'https://nodal-point-network.vercel.app',
             'X-Title': 'Nodal Point CRM',
           },
           body: JSON.stringify(requestBody),
@@ -2111,7 +2111,7 @@ export default async function handler(req, res) {
 
         const data = await response.json();
         const message = data?.choices?.[0]?.message;
-        
+
         if (!message) {
           throw new Error('OpenRouter returned an empty response');
         }
@@ -2136,12 +2136,12 @@ export default async function handler(req, res) {
               console.warn(`[OpenRouter Tool] Failed to parse arguments for ${functionName}:`, toolCall.function.arguments);
               // Fallback for some models that might send malformed JSON
             }
-            
+
             console.log(`[OpenRouter Tool] Executing ${functionName} with args:`, functionArgs);
-            
+
             const handler = toolHandlers[functionName];
             let result;
-            
+
             if (handler) {
               try {
                 result = await handler(functionArgs);
@@ -2170,7 +2170,7 @@ export default async function handler(req, res) {
           return message.content || '';
         }
       }
-      
+
       throw new Error('Max tool recursion depth reached');
     };
 
@@ -2180,7 +2180,7 @@ export default async function handler(req, res) {
       }
 
       const model = modelName || perplexityModel;
-      
+
       const lastFailure = diagnostics.findLast(d => d.status === 'failed');
       const failureContext = lastFailure ? `(Reason: Previous attempt with ${lastFailure.model} failed: ${lastFailure.error})` : '';
 
@@ -2191,13 +2191,13 @@ export default async function handler(req, res) {
 
       // Slice the last 10 messages but ensure we don't break mid-conversation if possible
       const candidates = cleanedMessages.slice(-10);
-      
+
       for (const m of candidates) {
         const role = m.role === 'user' ? 'user' : 'assistant';
-        
+
         // Skip if it's the same role as last one (Perplexity requires alternation)
         if (role === lastRole) continue;
-        
+
         // Skip if first message is not user (Perplexity requires starting with user)
         if (normalized.length === 0 && role !== 'user') continue;
 
@@ -2362,24 +2362,24 @@ export default async function handler(req, res) {
     if (!bodyModel || bodyModel.includes('gemini')) {
       // (This part already exists in the code below)
     } else if (process.env.OPEN_ROUTER_API_KEY && !routingDiagnostics.some(d => d.model === 'openai/gpt-oss-120b:free')) {
-       // If a non-gemini model was requested but failed, try the default OpenRouter model as a fallback
-       try {
-         const orModel = 'openai/gpt-oss-120b:free';
-         routingDiagnostics.push({
-           model: orModel,
-           provider: 'openrouter',
-           status: 'attempting',
-           reason: 'FALLBACK_TO_DEFAULT',
-           timestamp: new Date().toISOString()
-         });
-         const content = await callOpenRouter(orModel);
-         routingDiagnostics.push({ model: orModel, provider: 'openrouter', status: 'success', timestamp: new Date().toISOString() });
-         res.writeHead(200, { 'Content-Type': 'application/json' });
-         res.end(JSON.stringify({ content, provider: 'openrouter', model: orModel, diagnostics: routingDiagnostics }));
-         return;
-       } catch (e) {
-         routingDiagnostics.push({ model: 'openai/gpt-oss-120b:free', provider: 'openrouter', status: 'failed', error: e.message });
-       }
+      // If a non-gemini model was requested but failed, try the default OpenRouter model as a fallback
+      try {
+        const orModel = 'openai/gpt-oss-120b:free';
+        routingDiagnostics.push({
+          model: orModel,
+          provider: 'openrouter',
+          status: 'attempting',
+          reason: 'FALLBACK_TO_DEFAULT',
+          timestamp: new Date().toISOString()
+        });
+        const content = await callOpenRouter(orModel);
+        routingDiagnostics.push({ model: orModel, provider: 'openrouter', status: 'success', timestamp: new Date().toISOString() });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ content, provider: 'openrouter', model: orModel, diagnostics: routingDiagnostics }));
+        return;
+      } catch (e) {
+        routingDiagnostics.push({ model: 'openai/gpt-oss-120b:free', provider: 'openrouter', status: 'failed', error: e.message });
+      }
     }
 
     if (!geminiApiKey) {
@@ -2424,7 +2424,7 @@ export default async function handler(req, res) {
     for (const m of historyToProcess.slice(startIndex)) {
       // Gemini roles are 'user' and 'model'
       const role = m.role === 'user' ? 'user' : 'model';
-      
+
       // Basic role alternation check for non-tool messages
       if (m.role !== 'tool' && role !== nextExpectedRole) continue;
 
@@ -2449,8 +2449,8 @@ export default async function handler(req, res) {
       if (m.role === 'tool') {
         validHistory.push({
           role: 'model', // Tool responses are part of the model's side of the conversation in some SDK versions, 
-                         // but Gemini actually uses a separate role usually. 
-                         // However, Node SDK startChat history often requires alternation.
+          // but Gemini actually uses a separate role usually. 
+          // However, Node SDK startChat history often requires alternation.
           parts: [{
             functionResponse: {
               name: m.name,
@@ -2460,7 +2460,7 @@ export default async function handler(req, res) {
         });
         // After a tool response, we still expect the model to finish its thought (another 'model' role)
         // or the user to respond. This is tricky. 
-        continue; 
+        continue;
       }
 
       validHistory.push({ role, parts });
@@ -2476,8 +2476,8 @@ export default async function handler(req, res) {
           timestamp: new Date().toISOString()
         });
 
-        const systemPrompt = hasSystemPrompt 
-          ? cleanedMessages.find(m => m.role === 'system')?.content 
+        const systemPrompt = hasSystemPrompt
+          ? cleanedMessages.find(m => m.role === 'system')?.content
           : buildSystemPrompt();
 
         console.log(`[Gemini Chat] Attempting request with model: ${modelName}`);
@@ -2573,7 +2573,7 @@ export default async function handler(req, res) {
 
         let text = response.text();
         console.log(`[Gemini Chat] Final response text from ${modelName}:`, text);
-        
+
         if (!text || text.trim().length === 0) {
           throw new Error('Empty response from model');
         }
@@ -2586,18 +2586,18 @@ export default async function handler(req, res) {
         if (currentDiagnostic) currentDiagnostic.status = 'success';
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ 
-          content: text, 
-          provider: 'gemini', 
+        res.end(JSON.stringify({
+          content: text,
+          provider: 'gemini',
           model: modelName,
           diagnostics: routingDiagnostics
         }));
         return;
       } catch (error) {
         lastErr = error;
-        const errorType = isGeminiQuotaOrBillingError(error) ? 'quota_billing' : 
-                         isModelNotFoundError(error) ? 'not_found' : 'general_error';
-        
+        const errorType = isGeminiQuotaOrBillingError(error) ? 'quota_billing' :
+          isModelNotFoundError(error) ? 'not_found' : 'general_error';
+
         const currentDiagnostic = routingDiagnostics.find(d => d.model === modelName && d.status === 'attempting');
         if (currentDiagnostic) {
           currentDiagnostic.status = 'failed';
@@ -2629,9 +2629,9 @@ export default async function handler(req, res) {
       console.log('[Gemini Chat] Falling back to Perplexity...');
       const content = await callPerplexity(null, routingDiagnostics);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
-        content, 
-        provider: 'perplexity', 
+      res.end(JSON.stringify({
+        content,
+        provider: 'perplexity',
         model: perplexityModel,
         diagnostics: routingDiagnostics
       }));
@@ -2643,8 +2643,8 @@ export default async function handler(req, res) {
     console.error('[Global Chat Error]:', error);
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
-        error: 'Internal server error', 
+      res.end(JSON.stringify({
+        error: 'Internal server error',
         message: error.message,
         diagnostics: typeof routingDiagnostics !== 'undefined' ? routingDiagnostics : []
       }));

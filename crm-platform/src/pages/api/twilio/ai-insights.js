@@ -6,18 +6,18 @@ function corsMiddleware(req, res, next) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    
+
     if (req.method === 'OPTIONS') {
         res.writeHead(200);
         res.end();
         return;
     }
-    
+
     next();
 }
 
 // Helper: wait
-function delay(ms){ return new Promise(r => setTimeout(r, ms)); }
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // Robust transcript fetch with retry and auto-create when missing
 async function getTranscriptWithRetry(client, recordingSid, opts = {}) {
@@ -55,95 +55,95 @@ async function getTranscriptWithRetry(client, recordingSid, opts = {}) {
         try {
             const t = await client.transcriptions(lastSid).fetch();
             return t.transcriptionText || '';
-        } catch(_) {}
+        } catch (_) { }
     }
     return '';
 }
 
 export default async function handler(req, res) {
-    corsMiddleware(req, res, () => {});
-    
+    corsMiddleware(req, res, () => { });
+
     if (req.method !== 'POST') {
         res.writeHead(405, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Method not allowed' }));
         return;
     }
-    
+
     try {
         const { callSid } = req.body;
-        
+
         if (!callSid) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'CallSid is required' }));
             return;
         }
-        
+
         logger.log('[Twilio AI] Processing call insights for:', callSid);
-        
+
         // Initialize Twilio client
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-        
+
         // Get call details and recordings
         const call = await client.calls(callSid).fetch();
         const recordings = await client.recordings.list({ callSid: callSid, limit: 1 });
-        
+
         if (recordings.length === 0) {
             res.writeHead(404, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'No recording found for this call' }));
             return;
         }
-        
+
         const recording = recordings[0];
         logger.log('[Twilio AI] Found recording:', recording.sid);
-        
+
         // Try Conversational Intelligence first, then fallback to basic transcription
         let transcript = '';
         let aiInsights = null;
         let conversationalIntelligence = null;
-        
+
         try {
             // Check if Conversational Intelligence service is configured
             const serviceSid = process.env.TWILIO_INTELLIGENCE_SERVICE_SID;
-            
+
             if (serviceSid) {
                 logger.log('[Twilio AI] Using Conversational Intelligence service');
-                
+
                 // Try to get existing Conversational Intelligence transcript
                 const transcripts = await client.intelligence.v2.transcripts.list({
                     serviceSid: serviceSid,
                     sourceSid: recording.sid,
                     limit: 1
                 });
-                
+
                 if (transcripts.length > 0) {
                     const ciTranscript = await client.intelligence.v2.transcripts(transcripts[0].sid).fetch();
-                    
+
                     if (ciTranscript.status === 'completed') {
                         // Get sentences from Conversational Intelligence
                         const sentences = await client.intelligence.v2
                             .transcripts(ciTranscript.sid)
                             .sentences.list();
-                        
+
                         transcript = sentences.map(s => s.text).join(' ');
                         conversationalIntelligence = {
                             transcriptSid: ciTranscript.sid,
                             status: ciTranscript.status,
                             sentenceCount: sentences.length,
-                            averageConfidence: sentences.length > 0 ? 
+                            averageConfidence: sentences.length > 0 ?
                                 sentences.reduce((acc, s) => acc + (s.confidence || 0), 0) / sentences.length : 0
                         };
-                        
+
                         logger.log(`[Twilio AI] Found Conversational Intelligence transcript with ${sentences.length} sentences`);
                     }
                 }
             }
-            
+
             // Fallback to basic transcription if Conversational Intelligence not available
             if (!transcript) {
                 logger.log('[Twilio AI] Falling back to basic transcription');
                 transcript = await getTranscriptWithRetry(client, recording.sid, { attempts: 6, delayMs: 3000 });
             }
-            
+
             if (transcript) {
                 aiInsights = await generateTwilioAIInsights(transcript);
                 if (conversationalIntelligence) {
@@ -153,7 +153,7 @@ export default async function handler(req, res) {
                     aiInsights.source = 'twilio-basic-transcription';
                 }
             }
-            
+
         } catch (transcriptionError) {
             logger.error('[Twilio AI] Transcription error:', transcriptionError);
             // Fallback to basic insights placeholder
@@ -170,13 +170,13 @@ export default async function handler(req, res) {
                 error: transcriptionError.message
             };
         }
-        
+
         // Update the call data in the central store
         try {
             const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
             const host = req.headers['x-forwarded-host'] || req.headers.host || '';
             const envBase = process.env.PUBLIC_BASE_URL || '';
-            const base = host ? `${proto}://${host}` : (envBase || 'https://nodalpoint.io');
+            const base = host ? `${proto}://${host}` : (envBase || 'https://nodal-point-network.vercel.app');
             await fetch(`${base}/api/calls`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -185,13 +185,13 @@ export default async function handler(req, res) {
                     transcript,
                     aiInsights
                 })
-            }).catch(() => {});
+            }).catch(() => { });
         } catch (e) {
             logger.warn('[Twilio AI] Failed posting insights to /api/calls:', e?.message);
         }
-        
+
         logger.log('[Twilio AI] Processing completed for:', callSid);
-        
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
             success: true,
@@ -199,13 +199,13 @@ export default async function handler(req, res) {
             transcript,
             aiInsights
         }));
-        
+
     } catch (error) {
         logger.error('[Twilio AI] Error:', error);
         res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ 
+        res.end(JSON.stringify({
             error: 'Failed to process call with Twilio AI',
-            details: error.message 
+            details: error.message
         }));
         return;
     }
@@ -215,41 +215,41 @@ async function generateTwilioAIInsights(transcript) {
     try {
         // For now, we'll use a simple analysis approach
         // In the future, this could be enhanced with Twilio's AI services
-        
+
         const text = (transcript || '').toString();
         const lower = text.toLowerCase();
         const words = lower.split(/\s+/).filter(Boolean);
         const wordCount = words.length;
-        
+
         // Basic sentiment analysis based on keywords
         const positiveWords = ['good', 'great', 'excellent', 'perfect', 'love', 'happy', 'satisfied', 'interested', 'yes', 'sure', 'definitely'];
         const negativeWords = ['bad', 'terrible', 'awful', 'hate', 'angry', 'frustrated', 'disappointed', 'no', 'not', 'never', 'problem'];
-        
+
         const positiveCount = words.filter(word => positiveWords.includes(word)).length;
         const negativeCount = words.filter(word => negativeWords.includes(word)).length;
-        
+
         let sentiment = 'Neutral';
         if (positiveCount > negativeCount) sentiment = 'Positive';
         else if (negativeCount > positiveCount) sentiment = 'Negative';
-        
+
         // Extract key topics based on common business terms
-        const businessTopics = ['price','cost','budget','contract','agreement','proposal','quote','timeline','schedule','meeting','demo','trial','supplier','rate'];
+        const businessTopics = ['price', 'cost', 'budget', 'contract', 'agreement', 'proposal', 'quote', 'timeline', 'schedule', 'meeting', 'demo', 'trial', 'supplier', 'rate'];
         const keyTopics = businessTopics.filter(topic => words.includes(topic));
-        
+
         // Extract potential next steps
-        const nextStepKeywords = ['call','email','meeting','demo','proposal','quote','follow','schedule','send','review'];
+        const nextStepKeywords = ['call', 'email', 'meeting', 'demo', 'proposal', 'quote', 'follow', 'schedule', 'send', 'review'];
         const nextSteps = nextStepKeywords.filter(step => words.includes(step));
-        
+
         // Extract potential pain points
         const painKeywords = ['problem', 'issue', 'concern', 'worry', 'challenge', 'difficult', 'expensive', 'slow', 'complicated'];
         const painPoints = painKeywords.filter(pain => words.includes(pain));
-        
+
         // Check for budget discussion
         const budgetDiscussed = /(budget|cost|price|expensive|cheap|afford|payment|invoice)/i.test(text);
-        
+
         // Check for timeline discussion
         const timelineMentioned = /(when|timeline|schedule|deadline|urgent|soon|quickly|time)/i.test(text);
-        
+
         // Light extraction for contract details
         const contract = { currentRate: '', rateType: '', supplier: '', contractEnd: '', usageKWh: '', contractLength: '' };
         const rateMatch = text.match(/\$?\s?(\d{1,2}(?:\.\d{1,3})?)\s*\/?\s*kwh/i);
@@ -257,7 +257,7 @@ async function generateTwilioAIInsights(transcript) {
         const rateTypeMatch = lower.match(/\b(fixed|variable|indexed)\b/);
         if (rateTypeMatch) contract.rateType = rateTypeMatch[1];
         // Extract supplier cautiously; avoid capturing weekdays (e.g., "on Thursday")
-        const WEEKDAYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+        const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         const supplierMatch = text.match(/\b(?:with|from|using|by)\s+([A-Z][A-Za-z&\- ]{2,40})\b/);
         if (supplierMatch) {
             const candidateSupplier = supplierMatch[1].trim();
@@ -268,10 +268,10 @@ async function generateTwilioAIInsights(transcript) {
         const endMatch = text.match(/(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t)?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)[ ,]*\s*(20\d{2})/i);
         if (endMatch) contract.contractEnd = `${endMatch[1]} ${endMatch[2]}`;
         const usageMatch = text.match(/(\d{2,3}[,\.]?\d{3}|\d{4,6})\s*(kwh|kw\s*h|kilowatt\s*hours)/i);
-        if (usageMatch) contract.usageKWh = usageMatch[1].replace(/\./g,',') + ' kWh';
+        if (usageMatch) contract.usageKWh = usageMatch[1].replace(/\./g, ',') + ' kWh';
         const lengthMatch = text.match(/(\d{1,2})\s*(month|months|mo|year|years|yr|yrs)/i);
-        if (lengthMatch) contract.contractLength = /year/i.test(lengthMatch[2]) ? `${lengthMatch[1]} year${lengthMatch[1]==='1'?'':'s'}` : `${lengthMatch[1]} months`;
-        
+        if (lengthMatch) contract.contractLength = /year/i.test(lengthMatch[2]) ? `${lengthMatch[1]} year${lengthMatch[1] === '1' ? '' : 's'}` : `${lengthMatch[1]} months`;
+
         return {
             summary: `Call transcript contains ${wordCount} words. ${sentiment} sentiment detected. ${keyTopics.length ? 'Key topics: ' + keyTopics.join(', ') : 'General discussion.'}`,
             sentiment,
@@ -283,7 +283,7 @@ async function generateTwilioAIInsights(transcript) {
             decisionMakers: [],
             contract
         };
-        
+
     } catch (error) {
         logger.error('[Twilio AI] Insights generation error:', error);
         return {
@@ -295,7 +295,7 @@ async function generateTwilioAIInsights(transcript) {
             budget: 'Unclear',
             timeline: 'Not specified',
             decisionMakers: [],
-            contract: { currentRate:'', rateType:'', supplier:'', contractEnd:'', usageKWh:'', contractLength:'' }
+            contract: { currentRate: '', rateType: '', supplier: '', contractEnd: '', usageKWh: '', contractLength: '' }
         };
     }
 }
