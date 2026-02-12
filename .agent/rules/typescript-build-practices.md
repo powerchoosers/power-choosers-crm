@@ -8,7 +8,7 @@ Prevent TypeScript/build errors. **All practices aligned with official TS/Next.j
 
 1. **Optional properties:** If property might be `undefined` (e.g., `part.filename`) and target expects concrete type (`string`), **narrow first**. Don't assign `part.filename` directly into `{ filename: part.filename }` if type expects `string`.
 2. **Check target type:** If target is `string`/`number`/non-optional, source must be narrowed (no `string | undefined` unless allowed).
-3. **Run typecheck:** `npm run typecheck` from `crm-platform/` before commits.
+3. **Run typecheck:** `npm run typecheck:strict` from `crm-platform/` before commits. This runs the actual Next.js build (without lint) to catch ALL errors that Vercel catches, including those from generated types.
 
 ---
 
@@ -143,7 +143,7 @@ const taskId = searchParams?.get('taskId') ?? null
 const query = searchParams?.toString() || ''
 ```
 
-**Vercel Strictness:** Vercel enforces `tsc --noEmit` during builds. Cloud Run may have skipped checks. **Match Vercel locally:** Run `npm run typecheck` before commits.
+**Vercel Strictness:** Vercel runs full `next build` with type checking. Cloud Run may have skipped checks. **Match Vercel locally:** Run `npm run typecheck:strict` before commits.
 
 ---
 
