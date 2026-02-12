@@ -169,26 +169,65 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
   // This would be used in the builder to generate the final HTML string
   // for storage in foundry assets compiled_html
   let html = `
-    <div style="font-family: 'Inter', sans-serif; background: #ffffff; color: #18181b; padding: 40px; max-width: 600px; margin: 0 auto;">
-      <div style="border-bottom: 1px solid #e4e4e7; padding-bottom: 12px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
+    <div style="font-family: 'Inter', sans-serif; background: #ffffff; color: #18181b; width: 100%; max-width: 600px; margin: 0 auto;">
+      <div style="border-bottom: 1px solid #e4e4e7; padding: 24px; margin-bottom: 0; display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <img src="/images/nodalpoint.png" alt="" style="height: 24px; width: auto;" />
           <span style="font-family: monospace; font-size: 10px; font-weight: bold; letter-spacing: 2px; color: #18181b;">NODAL_POINT // INTELLIGENCE</span>
         </div>
         <span style="font-family: monospace; font-size: 10px; color: #71717a;">REF: {{date}} // {{context_id}}</span>
       </div>
+      <div style="padding: 32px;">
   `
 
   blocks.forEach((block: any) => {
     if (block.type === 'TEXT_MODULE') {
       const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content ?? ''), useAi: false, aiPrompt: '' }
       const text = contentObj.text || ''
-      const escaped = text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-      html += `<p style="line-height: 1.6; margin-bottom: 20px; white-space: pre-wrap;">${escaped}</p>`
+      const bullets = contentObj.bullets ?? []
+      const useAi = contentObj.useAi ?? false
+      
+      if (useAi && !text.trim()) {
+        html += `
+          <div style="border: 2px dashed #e4e4e7; border-radius: 8px; padding: 30px; background: #fafafa; text-align: center; margin-bottom: 20px;">
+            <p style="font-family: monospace; font-size: 10px; color: #a1a1aa; text-transform: uppercase; letter-spacing: 2px; margin: 0;">
+              [ AI_GENERATION_IN_PROGRESS ]
+            </p>
+          </div>
+        `
+      } else {
+        const escaped = text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                
+              const paragraphs = escaped.split(/\n\n+/).filter((p: string) => p.trim())
+              
+              html += `<div style="margin-bottom: 24px;">`
+              paragraphs.forEach((p: string, idx: number) => {
+                html += `<p style="line-height: 1.25; font-size: 13px; font-family: sans-serif; white-space: pre-wrap; margin: 0 0 16px 0; color: #18181b;">${p.trim()}</p>`
+              })
+              
+              if (bullets.length > 0) {
+                html += `<ul style="list-style: none; padding: 0; margin: 20px 0 0 0;">`
+          bullets.forEach((bullet: string) => {
+            const escapedBullet = bullet
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+            html += `
+              <li style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; font-family: monospace; font-size: 10px; color: #52525b; line-height: 1.25;">
+                <span style="color: #002FA7; margin-top: 2px; shrink-0;">●</span>
+                <span style="display: block;">${escapedBullet}</span>
+              </li>
+            `
+          })
+          html += `</ul>`
+        }
+        html += `</div>`
+      }
     } else if (block.type === 'TACTICAL_BUTTON') {
       html += `
         <div style="margin: 30px 0; text-align: center;">
@@ -203,7 +242,7 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
         return 'color: #059669;'
       }
       html += `
-        <div style="background: #f4f4f5; border-radius: 6px; padding: 16px; margin-bottom: 20px; border: 1px solid #e4e4e7;">
+        <div style="background: #f4f4f5; border-radius: 6px; padding: 16px; margin-bottom: 24px; border: 1px solid #e4e4e7;">
           <table style="width: 100%; border-collapse: collapse; font-family: monospace; font-size: 12px;">
             <thead>
               <tr style="border-bottom: 1px solid #d4d4d8;">
@@ -236,7 +275,7 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
       const status = escapeHtml(c.status ?? 'VOLATILE')
       const note = (c.note != null && String(c.note).trim() !== '') ? String(c.note).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') : ''
       html += `
-        <div style="background: #f4f4f5; border-radius: 8px; padding: 20px; margin-bottom: 20px; border: 1px solid #e4e4e7;">
+        <div style="background: #f4f4f5; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #e4e4e7;">
           <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px;">
             <div>
               <p style="font-family: monospace; font-size: 10px; color: #71717a; text-transform: uppercase; letter-spacing: 0.1em; margin: 0 0 4px 0;">${baselineLabel}</p>
@@ -275,7 +314,7 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
         ? String(c.nodalAnalysis).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
         : ''
       html += `
-        <div style="border: 1px solid #e4e4e7; background: #ffffff; overflow: hidden; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <div style="border: 1px solid #e4e4e7; background: #ffffff; overflow: hidden; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           <div style="background: #f4f4f5; padding: 8px 16px; border-bottom: 1px solid #e4e4e7; display: flex; justify-content: space-between; align-items: center;">
             <span style="font-family: monospace; font-size: 9px; color: #71717a; text-transform: uppercase; letter-spacing: 0.1em;">
               Source: ${source}
@@ -313,11 +352,12 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
     html += `
       <div style="margin-top: 40px; border-top: 1px solid #f4f4f5; padding-top: 20px; font-family: sans-serif;">
         <div style="font-weight: bold; color: #18181b;">Lewis Patterson</div>
-        <div style="color: #71717a; font-size: 12px;">Director of Energy Architecture</div>
+        <div style="color: #71717a; font-size: 12px; margin-bottom: 4px;">Director of Energy Architecture</div>
+        <div style="color: #71717a; font-size: 10px; font-family: monospace;">+1 (281) 744-5393 • HOUSTON, TX</div>
       </div>
     `
   }
-  html += `</div>`
+  html += `</div></div>`
 
   return html
 }
