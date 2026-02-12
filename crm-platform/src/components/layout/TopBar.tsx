@@ -469,16 +469,32 @@ export function TopBar() {
                                                 className="absolute top-full mt-3 left-1/2 -translate-x-1/2 w-48 bg-zinc-950/90 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50"
                                             >
                                                 <div className="grid grid-cols-3 gap-2">
-                                                    {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map((digit) => (
+                                                    {[
+                                                        { digit: '1', letters: '' },
+                                                        { digit: '2', letters: 'ABC' },
+                                                        { digit: '3', letters: 'DEF' },
+                                                        { digit: '4', letters: 'GHI' },
+                                                        { digit: '5', letters: 'JKL' },
+                                                        { digit: '6', letters: 'MNO' },
+                                                        { digit: '7', letters: 'PQRS' },
+                                                        { digit: '8', letters: 'TUV' },
+                                                        { digit: '9', letters: 'WXYZ' },
+                                                        { digit: '*', letters: '' },
+                                                        { digit: '0', letters: '+' },
+                                                        { digit: '#', letters: '' },
+                                                    ].map((item) => (
                                                         <button
-                                                            key={digit}
+                                                            key={item.digit}
                                                             type="button"
                                                             onClick={() => {
-                                                                sendDigits(digit);
+                                                                sendDigits(item.digit);
                                                             }}
-                                                            className="h-10 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 text-white font-mono text-sm transition-all active:scale-95"
+                                                            className="h-12 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 text-white font-mono text-base transition-all active:scale-95 flex flex-col items-center justify-center gap-0.5"
                                                         >
-                                                            {digit}
+                                                            <span className="leading-none">{item.digit}</span>
+                                                            {item.letters && (
+                                                                <span className="text-[9px] text-zinc-400 tracking-widest leading-none">{item.letters}</span>
+                                                            )}
                                                         </button>
                                                     ))}
                                                 </div>

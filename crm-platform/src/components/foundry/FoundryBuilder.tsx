@@ -1,16 +1,13 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import DOMPurify from 'dompurify'
 import { 
   Zap, 
   Layers, 
-  Code2, 
-  Eye, 
   Save, 
-  ChevronRight, 
-  GripVertical,
   Type,
   Table as TableIcon,
   MousePointer2,
@@ -18,7 +15,6 @@ import {
   Trash2,
   RefreshCw,
   Search,
-  Check,
   ChevronUp,
   ChevronDown,
   Plus,
@@ -58,6 +54,13 @@ const VALUE_COLOR_CLASSES: Record<ValueColor, string> = {
   yellow: 'bg-amber-400',
   green: 'bg-emerald-500',
   red: 'bg-red-500',
+}
+
+interface TextModuleContent {
+  text: string;
+  useAi: boolean;
+  aiPrompt: string;
+  bullets?: string[];
 }
 
 interface Block {
@@ -134,7 +137,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
       generateWithAi(block.id, 'TEXT_MODULE', contentObj)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewContactId, previewContact])
+  }, [previewContactId, previewContact, generatingBlockId])
 
   const applyAssetData = (data: { name?: string; type?: string; content_json?: { blocks?: any[] } }) => {
     setAssetName(data.name || 'Untitled Asset')
@@ -157,7 +160,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
     setBlocks(blocks)
   }
 
-  const fetchAsset = async (id: string) => {
+  const fetchAsset = useCallback(async (id: string) => {
     try {
       // Use cached asset from sessionStorage if we just created it (avoids failed refetch due to RLS/replication)
       const cacheKey = `foundry_asset_${id}`
@@ -169,7 +172,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
             sessionStorage.removeItem(cacheKey)
             applyAssetData(data)
             return
-          } catch (_) {
+          } catch {
             sessionStorage.removeItem(cacheKey)
           }
         }
@@ -199,7 +202,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
       console.error('Unexpected error in fetchAsset:', err)
       toast.error('Failed to load asset')
     }
-  }
+  }, [user])
 
   useEffect(() => {
     if (assetId && assetId !== 'new') {
@@ -208,7 +211,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
         toast.error('Failed to load asset')
       })
     }
-  }, [assetId])
+  }, [assetId, fetchAsset])
 
   const saveAsset = async () => {
     setIsSaving(true)
@@ -287,7 +290,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
     const newBlock: Block = {
       id: Math.random().toString(36).substr(2, 9),
       type,
-      content: type === 'TEXT_MODULE' ? { text: 'Enter narrative payload...', useAi: false, aiPrompt: '' } : 
+      content: type === 'TEXT_MODULE' ? { text: '', useAi: false, aiPrompt: '', bullets: [] } : 
                type === 'TACTICAL_BUTTON' ? '[ INITIATE_PROTOCOL ]' : 
                type === 'TELEMETRY_GRID' ? { headers: ['ITEM', 'VALUE'], rows: [['Metric', '0.00']], valueColors: ['green'] as const } : 
                type === 'IMAGE_BLOCK' ? { url: '', description: '', caption: '' } :
@@ -297,7 +300,8 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                  riskLabel: 'SCARCITY_EXPOSURE',
                  riskLevel: 75,
                  status: 'VOLATILE',
-                 note: 'Note: Structural variance detected in regional load profiles. Architecture is currently leaking $4.2k/mo in ghost capacity.'
+                 note: '',
+                 bullets: ['Structural variance detected in regional load profiles', 'Architecture leaking $4.2k/mo in ghost capacity', 'Grid volatility index elevated']
                } :
                type === 'MARKET_BREADCRUMB' ? {
                  headline: 'ERCOT_RESERVES_DROP_BELOW_3000MW',
@@ -329,10 +333,11 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
       let contextText: string = ''
       
       if (blockType === 'TEXT_MODULE') {
-        const block = blocks.find(b => b.id === blockId)
         const blockIndex = blocks.findIndex(b => b.id === blockId)
         const isFirstBlock = blockIndex === 0
-        const contentObj = typeof currentContent === 'object' ? currentContent : { text: String(currentContent), aiPrompt: '', useAi: false }
+        const contentObj = typeof currentContent === 'object' 
+          ? currentContent as TextModuleContent 
+          : { text: String(currentContent), aiPrompt: '', useAi: false, bullets: [] } as TextModuleContent
         const userPrompt = contentObj.aiPrompt?.trim() || ''
         
         // Build context from all other blocks
@@ -360,9 +365,40 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
           : ''
         
         if (isFirstBlock) {
-          prompt = `You are writing the introduction paragraph for an energy intelligence email. Start with "{contact.firstName}," followed by 3-4 sentences.${userPrompt ? `\n\nUser instruction: ${userPrompt}` : ''}\n\nWrite in Nodal Point's forensic, intelligence-brief style. No marketing fluff.${foundryContext}${contactInfo}`
+          prompt = `You are writing the introduction and intelligence briefing for an energy intelligence email. 
+          
+          STRUCTURE:
+          1. Greeting: "{contact.firstName}," (On its own line)
+          2. Double Newline
+          3. Paragraph 1: EXACTLY 1 concise forensic sentence setting the context.
+          4. Double Newline
+          5. Paragraph 2: EXACTLY 2 forensic sentences detailing the technical requirements or intelligence signals.
+          
+          CONTENT RULES:
+          - CONCISENESS IS MANDATORY. Keep sentences short and clinical.
+          - Use Nodal Point's forensic, intelligence-brief style.
+          - NO bracketed sources like [1], [2], [3].
+          - NO marketing fluff.
+          - Include ${contentObj.bullets?.length || 0} technical signal bullets.
+          
+          FORMAT: Return a JSON object with "text" (string) and "bullets" (array of strings, exactly ${contentObj.bullets?.length || 0} items).
+          Ensure Paragraph 1 and Paragraph 2 are separated by TWO newline characters (\n\n).
+          ${userPrompt ? `\n\nUser instruction: ${userPrompt}` : ''}${foundryContext}${contactInfo}`
         } else {
-          prompt = `You are writing a body paragraph for an energy intelligence email. Use the contact's first name naturally within the paragraph.${userPrompt ? `\n\nUser instruction: ${userPrompt}` : ''}\n\nWrite in Nodal Point's forensic, intelligence-brief style. No marketing fluff.${foundryContext}${contactInfo}`
+          prompt = `You are writing a body paragraph for an energy intelligence email. 
+          
+          STRUCTURE:
+          1. Narrative: EXACTLY 2-3 concise forensic sentences.
+          
+          CONTENT RULES:
+          - CONCISENESS IS MANDATORY. Keep sentences short and clinical.
+          - Use the contact's first name naturally within the paragraph.
+          - NO bracketed sources like [1], [2], [3].
+          - NO marketing fluff.
+          - Include ${contentObj.bullets?.length || 0} technical signal bullets.
+          
+          FORMAT: Return a JSON object with "text" (string) and "bullets" (array of strings, exactly ${contentObj.bullets?.length || 0} items).
+          ${userPrompt ? `\n\nUser instruction: ${userPrompt}` : ''}${foundryContext}${contactInfo}`
         }
         blockTypeParam = 'narrative'
         contextText = typeof currentContent === 'string' ? currentContent : (currentContent?.text || '')
@@ -403,12 +439,33 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
         toast.error(data?.error || data?.details || 'AI generation failed')
         return
       }
-      if (typeof data?.text === 'string' && data.text.trim()) {
+
+      // Handle JSON response (text + bullets) or plain text
+      let generatedText = ''
+      let generatedBullets: string[] = []
+
+      if (typeof data?.text === 'string') {
+        try {
+          // Check if the AI returned a JSON string inside the text field
+          const parsed = JSON.parse(data.text)
+          generatedText = (parsed.text || '').replace(/\[\d+\]/g, '').trim()
+          generatedBullets = (parsed.bullets || []).map((b: string) => b.replace(/\[\d+\]/g, '').trim())
+        } catch {
+          // Fallback to plain text if not JSON
+          generatedText = data.text.replace(/\[\d+\]/g, '').trim()
+        }
+      }
+
+      if (generatedText) {
         if (blockType === 'TEXT_MODULE') {
           const block = blocks.find(b => b.id === blockId)
           if (block) {
             const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content), useAi: false, aiPrompt: '' }
-            updateBlockContent(blockId, { ...contentObj, text: data.text.trim() })
+            updateBlockContent(blockId, { 
+              ...contentObj, 
+              text: generatedText,
+              bullets: generatedBullets.length > 0 ? generatedBullets : (contentObj.bullets ?? [])
+            })
           }
         } else if (blockType === 'LIABILITY_GAUGE' && noteField === 'note') {
           const block = blocks.find(b => b.id === blockId)
@@ -640,8 +697,13 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                                 }
                               }}
                             />
-                            <Label className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 cursor-pointer">
-                              Generate with AI
+                            <Label 
+                              className={cn(
+                                "text-[10px] font-mono uppercase tracking-widest cursor-pointer transition-colors",
+                                useAi ? "text-emerald-500 font-bold" : "text-zinc-400"
+                              )}
+                            >
+                              {useAi ? 'AI ACTIVATED' : 'ACTIVATE AI'}
                             </Label>
                             {useAi && (
                               <span className="text-[9px] font-mono text-zinc-500">
@@ -675,7 +737,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                                   updateBlockContent(block.id, { ...currentContent, text: e.target.value })
                                 }}
                                 placeholder="Enter narrative payload..."
-                                className="w-full bg-transparent border-none focus:ring-0 text-sm font-sans text-zinc-300 min-h-[100px] resize-none p-0 placeholder:text-zinc-600"
+                                className="w-full bg-transparent border-none focus:ring-0 text-xs font-sans text-zinc-300 min-h-[100px] resize-none p-0 placeholder:text-zinc-600"
                               />
                               <div className="flex flex-wrap items-center gap-2">
                                 <Popover open={variablePopoverOpen === block.id} onOpenChange={(open) => setVariablePopoverOpen(open ? block.id : null)}>
@@ -736,9 +798,58 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                               </div>
                             </div>
                           )}
+                          
+                          {/* Signal Bullets */}
+                          <div className="space-y-2 pt-2">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="bg-[#002FA7]/10 border-[#002FA7]/20 text-[#002FA7] text-[9px] font-mono uppercase">Signal</Badge>
+                              <label className="text-[9px] font-mono text-zinc-500 uppercase">Bullets</label>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const bullets = contentObj.bullets ?? []
+                                  updateBlockContent(block.id, { ...contentObj, bullets: [...bullets, 'New signal point...'] })
+                                }}
+                                className="text-[9px] font-mono text-[#002FA7] hover:underline"
+                              >
+                                + Add Bullet
+                              </button>
+                            </div>
+                            <div className="space-y-1">
+                              {(contentObj.bullets ?? []).map((bullet: string, bi: number) => (
+                                <div key={bi} className="flex items-center gap-1">
+                                  <span className="text-[#002FA7] text-[10px]">●</span>
+                                  <input
+                                    value={useAi ? 'AI_GENERATED_SIGNAL_POINT' : bullet}
+                                    readOnly={useAi}
+                                    onChange={(e) => {
+                                      if (useAi) return
+                                      const newBullets = [...(contentObj.bullets ?? [])]
+                                      newBullets[bi] = e.target.value
+                                      updateBlockContent(block.id, { ...contentObj, bullets: newBullets })
+                                    }}
+                                    className={cn(
+                                      "flex-1 bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono",
+                                      useAi ? "text-emerald-500 italic opacity-70 cursor-not-allowed" : "text-zinc-300"
+                                    )}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newBullets = (contentObj.bullets ?? []).filter((_: any, i: number) => i !== bi)
+                                      updateBlockContent(block.id, { ...contentObj, bullets: newBullets })
+                                    }}
+                                    className="p-1 hover:text-red-400"
+                                  >
+                                    <Trash2 size={10} />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         </div>
-                      )
-                    })()}
+                      )}
+                    )()}
 
                     {block.type === 'TACTICAL_BUTTON' && (
                       <div className="space-y-2">
@@ -886,7 +997,13 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                         </div>
                         {block.content?.url && (
                           <div className="rounded-lg border border-white/5 overflow-hidden bg-black/20 max-h-24">
-                            <img src={block.content.url} alt="" className="w-full h-full object-contain max-h-24" />
+                            <Image 
+                              src={block.content.url} 
+                              alt="Asset Preview" 
+                              width={200} 
+                              height={96} 
+                              className="w-full h-full object-contain max-h-24" 
+                            />
                           </div>
                         )}
                         <div className="grid gap-2">
@@ -965,6 +1082,48 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                           >
                             {generatingBlockId === block.id ? 'Generating…' : 'Generate with AI'}
                           </button>
+                        </div>
+                        
+                        {/* Signal Bullets */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="bg-[#002FA7]/10 border-[#002FA7]/20 text-[#002FA7] text-[9px] font-mono uppercase">Signal</Badge>
+                            <label className="text-[9px] font-mono text-zinc-500 uppercase">Bullets</label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const bullets = block.content?.bullets ?? []
+                                updateBlockContent(block.id, { ...block.content, bullets: [...bullets, 'New signal point...'] })
+                              }}
+                              className="text-[9px] font-mono text-[#002FA7] hover:underline"
+                            >
+                              + Add Bullet
+                            </button>
+                          </div>
+                          {(block.content?.bullets ?? []).map((bullet: string, bi: number) => (
+                            <div key={bi} className="flex items-center gap-1">
+                              <span className="text-[#002FA7] text-[10px]">●</span>
+                              <input
+                                value={bullet}
+                                onChange={(e) => {
+                                  const newBullets = [...(block.content?.bullets ?? [])]
+                                  newBullets[bi] = e.target.value
+                                  updateBlockContent(block.id, { ...block.content, bullets: newBullets })
+                                }}
+                                className="flex-1 bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newBullets = (block.content?.bullets ?? []).filter((_: any, i: number) => i !== bi)
+                                  updateBlockContent(block.id, { ...block.content, bullets: newBullets })
+                                }}
+                                className="p-1 hover:text-red-400"
+                              >
+                                <Trash2 size={10} />
+                              </button>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
@@ -1045,14 +1204,32 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
            <div className="h-8 w-px bg-white/20 group-hover:bg-[#002FA7] transition-colors" />
         </div>
 
-        {/* Right Panel: The Simulation */}
-        <div 
+                      {/* Right Panel: The Simulation */}
+                      <div
           className="bg-white overflow-hidden flex flex-col"
           style={{ width: `${100 - splitPosition}%` }}
         >
           <div className="h-10 border-b border-zinc-200 bg-zinc-50 flex items-center px-4 justify-between gap-4">
             <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest shrink-0">Live_Simulation</span>
-            <Select value={previewContactId ?? '__none__'} onValueChange={(v) => setPreviewContactId(v === '__none__' ? null : v)}>
+            <Select 
+              value={previewContactId ?? '__none__'} 
+              onValueChange={(v) => {
+                const contactId = v === '__none__' ? null : v
+                setPreviewContactId(contactId)
+                if (contactId) {
+                  // Clear AI-generated text to force fresh generation and prevent "flashing" old contact data
+                  setBlocks(current => current.map(block => {
+                    if (block.type === 'TEXT_MODULE') {
+                      const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content || ''), useAi: false, aiPrompt: '' }
+                      if (contentObj.useAi) {
+                        return { ...block, content: { ...contentObj, text: '' } }
+                      }
+                    }
+                    return block
+                  }))
+                }
+              }}
+            >
               <SelectTrigger size="sm" className="!h-6 !py-1 max-w-[220px] text-[10px] font-mono uppercase border-zinc-200 bg-white">
                 <SelectValue placeholder="Preview with contact" />
               </SelectTrigger>
@@ -1076,17 +1253,25 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
             <div className="w-full max-w-[600px] bg-white shadow-2xl flex flex-col shrink-0">
               {previewHtml ? (
                 <div
-                  className="p-8 foundry-preview"
-                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewHtml, { ALLOWED_TAGS: ['p', 'div', 'span', 'a', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'figure', 'img', 'figcaption', 'br'], ALLOWED_ATTR: ['href', 'src', 'alt', 'style', 'title'] }) }}
+                  className="foundry-preview w-full"
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewHtml, { ALLOWED_TAGS: ['p', 'div', 'span', 'a', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'figure', 'img', 'figcaption', 'br', 'ul', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'], ALLOWED_ATTR: ['href', 'src', 'alt', 'style', 'title'] }) }}
                 />
               ) : (
                 <>
                   <div className="border-b border-zinc-200 p-6 flex justify-between items-center">
                     <div className="flex items-center gap-2">
-                      <img src="/images/nodalpoint.png" alt="" className="h-6 w-auto" />
+                      <Image 
+                        src="/images/nodalpoint.png" 
+                        alt="Nodal Point Logo" 
+                        width={24} 
+                        height={24} 
+                        className="h-6 w-auto" 
+                      />
                       <span className="text-[10px] font-mono text-zinc-900 font-bold tracking-[0.2em] uppercase">NODAL_POINT // INTELLIGENCE</span>
                     </div>
-                    <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-tighter">REF: {new Date().toISOString().split('T')[0].replace(/-/g, '')} // TX_001</span>
+                    <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-tighter">
+                      REF: {new Date().toISOString().split('T')[0].replace(/-/g, '')} {'//'} TX_001
+                    </span>
                   </div>
                   <div className="p-8 space-y-6">
                     {blocks.map((block) => (
@@ -1114,13 +1299,33 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                           }
                           
                           return (
-                            <p className="text-zinc-900 leading-relaxed font-sans whitespace-pre-wrap">
-                              {text.split(/(\{\{[^}]+\}\})/g).map((part: string, i: number) =>
-                                part.startsWith('{{') && part.endsWith('}}')
-                                  ? <span key={i} className="bg-amber-100 text-amber-800 px-0.5 rounded font-mono text-[10px]">{part}</span>
-                                  : part
+                            <div className="flex flex-col">
+                              {text.split(/\n\n+/).filter((p: string) => p.trim()).map((paragraph: string, pi: number) => (
+                                <p key={pi} className="text-zinc-900 leading-tight font-sans whitespace-pre-wrap text-[13px] mb-4 last:mb-0">
+                                  {paragraph.trim().split(/(\{\{[^}]+\}\})/g).map((part: string, i: number) =>
+                                    part.startsWith('{{') && part.endsWith('}}')
+                                      ? <span key={i} className="bg-amber-100 text-amber-800 px-0.5 rounded font-mono text-[10px]">{part}</span>
+                                      : part
+                                  )}
+                                </p>
+                              ))}
+                              {(contentObj.bullets ?? []).length > 0 && (
+                                <ul className="space-y-1.5 mt-5">
+                                  {(contentObj.bullets ?? []).map((bullet: string, bi: number) => (
+                                    <li key={bi} className="flex items-start gap-2 text-[10px] font-mono text-zinc-500 leading-tight">
+                                      <span className="text-[#002FA7] mt-1 shrink-0">●</span>
+                                      <span>
+                                        {bullet.split(/(\{\{[^}]+\}\})/g).map((part: string, i: number) =>
+                                          part.startsWith('{{') && part.endsWith('}}')
+                                            ? <span key={i} className="bg-amber-100 text-amber-800 px-0.5 rounded">{part}</span>
+                                            : part
+                                        )}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
                               )}
-                            </p>
+                            </div>
                           )
                         })()}
                         {block.type === 'TACTICAL_BUTTON' && (
@@ -1164,7 +1369,13 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                         )}
                         {block.type === 'IMAGE_BLOCK' && block.content?.url && (
                           <figure className="my-4">
-                            <img src={block.content.url} alt={block.content?.description ?? ''} className="max-w-full h-auto block rounded border border-zinc-200" />
+                            <Image 
+                              src={block.content.url} 
+                              alt={block.content?.description ?? 'Asset Image'} 
+                              width={600} 
+                              height={400} 
+                              className="max-w-full h-auto block rounded border border-zinc-200" 
+                            />
                             {block.content?.caption && (
                               <figcaption className="text-[10px] font-mono text-zinc-500 mt-2">{block.content.caption}</figcaption>
                             )}
@@ -1193,6 +1404,16 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                                 {block.content.note}
                               </p>
                             )}
+                            {(block.content?.bullets ?? []).length > 0 && (
+                              <ul className="space-y-1 mt-3">
+                                {(block.content?.bullets ?? []).map((bullet: string, bi: number) => (
+                                  <li key={bi} className="flex items-start gap-2 text-[10px] font-mono text-zinc-600">
+                                    <span className="text-[#002FA7] mt-0.5 shrink-0">●</span>
+                                    <span>{bullet}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
                           </div>
                         )}
                         {block.type === 'MARKET_BREADCRUMB' && (
@@ -1214,8 +1435,8 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                                   <p className="text-[10px] font-mono text-zinc-400 uppercase mb-1">
                                     Nodal_Architect_Analysis:
                                   </p>
-                                  <p className="text-xs text-white leading-relaxed font-sans italic">
-                                    "{block.content.nodalAnalysis}"
+                                  <p className="text-xs text-white leading-snug font-sans italic">
+                                    &quot;{block.content.nodalAnalysis}&quot;
                                   </p>
                                 </div>
                               )}
@@ -1236,9 +1457,11 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
               <div className="p-8 border-t border-zinc-100 bg-zinc-50 mt-auto">
                 <div className="flex items-center gap-3">
                   {(profile?.hostedPhotoUrl || user?.photoURL) && (
-                    <img
+                    <Image
                       src={profile?.hostedPhotoUrl || user?.photoURL || ''}
-                      alt=""
+                      alt="Profile"
+                      width={40}
+                      height={40}
                       className="w-10 h-10 rounded-[12px] border border-zinc-200 object-cover shrink-0"
                     />
                   )}
@@ -1251,10 +1474,12 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                     </div>
                   </div>
                 </div>
-                <div className="mt-2 mb-3 font-mono text-[11px] text-zinc-600">
+                <div className="mt-2 mb-3 font-mono text-[11px] text-zinc-600 flex flex-col gap-0.5">
                   {profile?.selectedPhoneNumber && <span>P: {profile.selectedPhoneNumber}</span>}
                   {(profile?.city || profile?.state) && (
-                    <span className="ml-4">· {[profile?.city, profile?.state].filter(Boolean).join(', ')}</span>
+                    <span className="text-[10px] text-zinc-500">
+                      {[profile?.city, profile?.state].filter(Boolean).join(', ')}
+                    </span>
                   )}
                 </div>
                 <div className="flex gap-4 font-mono text-[10px] text-[#002FA7] font-bold uppercase tracking-widest">

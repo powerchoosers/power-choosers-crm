@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -8,12 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useEmails } from '@/hooks/useEmails'
 import { useAuth } from '@/context/AuthContext'
 import { generateNodalSignature } from '@/lib/signature'
-import { Loader2, X, Paperclip, Sparkles, Minus, Maximize2, Cpu, Check, RotateCcw } from 'lucide-react'
+import { Loader2, X, Paperclip, Sparkles, Minus, Maximize2, Cpu, Check, RotateCcw, Zap } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { ScanlineLoader } from '@/components/chat/ScanlineLoader'
 import { INDUSTRY_VECTORS } from '@/lib/industry-mapping'
+import { generateStaticHtml, substituteVariables, contactToVariableMap } from '@/lib/foundry'
+import { useQuery } from '@tanstack/react-query'
 
 const EMAIL_AI_MODELS = [
   { value: 'gemini-2.5-flash', label: 'GEMINI-2.5-FLASH' },
@@ -389,6 +391,10 @@ function ComposePanel({
   const { user, profile } = useAuth()
   const { sendEmail, isSending } = useEmails()
 
+  // Foundry template state
+  const [selectedFoundryId, setSelectedFoundryId] = useState<string | null>(null)
+  const [isLoadingTemplate, setIsLoadingTemplate] = useState(false)
+
   // AI Command Rail state
   const [aiRailOpen, setAiRailOpen] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
@@ -404,8 +410,10 @@ function ComposePanel({
   const [sendAsPlainText, setSendAsPlainText] = useState(false)
   const [attachments, setAttachments] = useState<File[]>([])
 
-  const signatureHtml = profile ? generateNodalSignature(profile, user, true) : ''
-  const outgoingSignatureHtml = profile ? generateNodalSignature(profile, user, false) : ''
+  // Suppress signature when using foundry template
+  const shouldShowSignature = !selectedFoundryId
+  const signatureHtml = (profile && shouldShowSignature) ? generateNodalSignature(profile, user, true) : ''
+  const outgoingSignatureHtml = (profile && shouldShowSignature) ? generateNodalSignature(profile, user, false) : ''
   const signerName = profile ? [profile.firstName, profile.lastName].filter(Boolean).join(' ') || 'Lewis Patterson' : 'Lewis Patterson'
 
   const isRefinementMode = content.trim().length > 0
@@ -557,6 +565,122 @@ CRITICAL OUTPUT RULES:
     }
   }, [buildEmailSystemPrompt, content, isRefinementMode, selectedModel, profile?.firstName, subject, emailTypeId, context])
 
+  // Fetch available foundry templates
+  const { data: foundryAssets } = useQuery<any[]>({
+    queryKey: ['transmission_assets'],
+    queryFn: async () => {
+      const idToken = await (user as any)?.getIdToken?.().catch(() => null)
+      const res = await fetch('/api/foundry/list', {
+        headers: {
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+      })
+      if (!res.ok) {
+        // Silently fail if endpoint doesn't exist yet
+        return []
+      }
+      const data = await res.json()
+      return data.assets || []
+    },
+    enabled: !!user,
+  })
+
+  // Load and compile foundry template when selected
+  useEffect(() => {
+    if (!selectedFoundryId || !context) return
+
+    const loadTemplate = async () => {
+      setIsLoadingTemplate(true)
+      try {
+        const idToken = await (user as any)?.getIdToken?.().catch(() => null)
+        const res = await fetch(`/api/foundry/assets?id=${encodeURIComponent(selectedFoundryId)}`, {
+          headers: {
+            ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+          },
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json?.error || 'Failed to load template')
+
+        const asset = json?.asset
+        if (!asset) throw new Error('Template not found')
+
+        // Generate HTML from blocks
+        const blocks = asset.content_json?.blocks || []
+        let html = generateStaticHtml(blocks, { skipFooter: true })
+
+        // Build variable map from contact context
+        const contactData = context ? {
+          firstName: context.contactName?.split(' ')[0],
+          lastName: context.contactName?.split(' ').slice(1).join(' '),
+          name: context.contactName,
+          companyName: context.companyName || context.accountName,
+          company: context.companyName || context.accountName,
+          industry: context.industry,
+          accountDescription: context.accountDescription,
+        } : {}
+
+        const variableMap = contactToVariableMap(contactData)
+
+        // Substitute variables
+        html = substituteVariables(html, variableMap)
+
+        // Auto-generate AI blocks if needed
+        const aiBlocksToGenerate = blocks.filter((block: any) => {
+          if (block.type !== 'TEXT_MODULE') return false
+          const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content || ''), useAi: false, aiPrompt: '' }
+          return contentObj.useAi === true && contentObj.aiPrompt?.trim() && !contentObj.text?.trim()
+        })
+
+        if (aiBlocksToGenerate.length > 0) {
+          // Generate AI content for each block
+          for (const block of aiBlocksToGenerate) {
+            const contentObj = typeof block.content === 'object' ? block.content : { text: '', useAi: false, aiPrompt: '' }
+            const userPrompt = contentObj.aiPrompt?.trim() || ''
+
+            const contactInfo = context
+              ? `\n\nContact: ${context.contactName || '—'}, Company: ${context.companyName || '—'}`
+              : ''
+
+            const prompt = `You are writing content for an energy intelligence email. ${userPrompt}${contactInfo}\n\nReturn a JSON object with "text" (string) and "bullets" (array of strings).`
+
+            const aiRes = await fetch('/api/foundry/generate-text', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                prompt,
+                context: '',
+                blockType: 'narrative',
+              }),
+            })
+
+            const aiData = await aiRes.json()
+            if (aiRes.ok && aiData.text) {
+              // Replace placeholder in HTML
+              const placeholder = '[ AI_GENERATION_IN_PROGRESS ]'
+              html = html.replace(placeholder, aiData.text)
+            }
+          }
+        }
+
+        setContent(html)
+
+        // Set subject if template has a name-based subject
+        if (asset.name && !subject) {
+          setSubject(asset.name)
+        }
+
+        toast.success('Foundry template loaded')
+      } catch (err: any) {
+        toast.error(err?.message || 'Failed to load template')
+        setSelectedFoundryId(null)
+      } finally {
+        setIsLoadingTemplate(false)
+      }
+    }
+
+    loadTemplate()
+  }, [selectedFoundryId, context, user, subject])
+
   const acceptAiContent = useCallback(() => {
     const body = pendingAiContent ?? ''
     const subj = pendingSubjectFromAi
@@ -596,9 +720,12 @@ CRITICAL OUTPUT RULES:
       isColdType &&
       (context?.deliverabilityMode === 'cold_plaintext' || sendAsPlainText)
 
+    // When using foundry template, content is already HTML with no signature
     const fullHtml = isColdPlaintext
       ? undefined
-      : `
+      : selectedFoundryId
+        ? content // Foundry template is already complete HTML
+        : `
       <div style="font-family: sans-serif; white-space: pre-wrap; margin-bottom: 24px; color: #18181b;">${content}</div>
       ${outgoingSignatureHtml}
     `
@@ -755,20 +882,50 @@ CRITICAL OUTPUT RULES:
             </motion.div>
           </div>
 
+          {/* Foundry Template Indicator */}
+          {selectedFoundryId && foundryAssets && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#002FA7]/30 bg-[#002FA7]/5"
+            >
+              <Zap className="w-3.5 h-3.5 text-[#002FA7]" />
+              <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-wider">
+                Foundry Template: {foundryAssets.find((a: any) => a.id === selectedFoundryId)?.name || 'Loading...'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedFoundryId(null)}
+                className="ml-auto text-zinc-400 hover:text-red-400 transition-colors"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </motion.div>
+          )}
+
           <div className="flex flex-col relative">
             <div className="relative">
-              <textarea
-                placeholder="Write your message..."
-                value={content}
-                onChange={(e) => {
-                  setContent(e.target.value)
-                  if (pendingAiContent) {
-                    setPendingAiContent(null)
-                    setPendingSubjectFromAi(null)
-                  }
-                }}
-                className="w-full min-h-[150px] bg-transparent border-0 resize-none focus:outline-none text-zinc-300 placeholder:text-zinc-600 font-sans leading-relaxed"
-              />
+              {selectedFoundryId ? (
+                // Show HTML preview for Foundry templates
+                <div
+                  className="w-full min-h-[150px] max-h-[400px] overflow-y-auto np-scroll bg-white/5 rounded-lg p-4 border border-white/10"
+                  dangerouslySetInnerHTML={{ __html: content }}
+                />
+              ) : (
+                // Show textarea for regular emails
+                <textarea
+                  placeholder="Write your message..."
+                  value={content}
+                  onChange={(e) => {
+                    setContent(e.target.value)
+                    if (pendingAiContent) {
+                      setPendingAiContent(null)
+                      setPendingSubjectFromAi(null)
+                    }
+                  }}
+                  className="w-full min-h-[150px] bg-transparent border-0 resize-none focus:outline-none text-zinc-300 placeholder:text-zinc-600 font-sans leading-relaxed"
+                />
+              )}
               {isAiLoading && (
                 <div className="absolute inset-0 min-h-[120px] bg-zinc-950/80 rounded-lg border border-[#002FA7]/20">
                   <ScanlineLoader />
@@ -780,13 +937,13 @@ CRITICAL OUTPUT RULES:
             )}
             {signatureHtml && (
               <div className="mt-4 pt-4 border-t border-white/5 opacity-90">
-                <div 
+                <div
                   className="rounded-lg overflow-hidden"
-                  dangerouslySetInnerHTML={{ __html: signatureHtml }} 
+                  dangerouslySetInnerHTML={{ __html: signatureHtml }}
                 />
               </div>
             )}
-            {(emailTypeId === 'cold_first_touch' || emailTypeId === 'cold_followup') && (
+            {(emailTypeId === 'cold_first_touch' || emailTypeId === 'cold_followup') && !selectedFoundryId && (
               <label className="mt-4 flex items-center gap-2 cursor-pointer select-none text-[10px] font-mono text-zinc-400 hover:text-zinc-200 transition-colors">
                 <input
                   type="checkbox"
@@ -893,27 +1050,27 @@ CRITICAL OUTPUT RULES:
                   <div className="flex flex-wrap gap-1.5">
                     {isRefinementMode
                       ? emailTypeConfig.refinementChips.map((chip) => (
-                          <button
-                            key={chip.label}
-                            type="button"
-                            onClick={() => generateEmailWithAi(chip.directive)}
-                            disabled={isAiLoading}
-                            className="text-[10px] font-mono px-2.5 py-1 rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-zinc-200 transition-colors"
-                          >
-                            {chip.label}
-                          </button>
-                        ))
+                        <button
+                          key={chip.label}
+                          type="button"
+                          onClick={() => generateEmailWithAi(chip.directive)}
+                          disabled={isAiLoading}
+                          className="text-[10px] font-mono px-2.5 py-1 rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-zinc-200 transition-colors"
+                        >
+                          {chip.label}
+                        </button>
+                      ))
                       : emailTypeConfig.generationChips.map((chip) => (
-                          <button
-                            key={chip.label}
-                            type="button"
-                            onClick={() => generateEmailWithAi(chip.directive)}
-                            disabled={isAiLoading}
-                            className="text-[10px] font-mono px-2.5 py-1 rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-zinc-200 transition-colors"
-                          >
-                            {chip.label}
-                          </button>
-                        ))}
+                        <button
+                          key={chip.label}
+                          type="button"
+                          onClick={() => generateEmailWithAi(chip.directive)}
+                          disabled={isAiLoading}
+                          className="text-[10px] font-mono px-2.5 py-1 rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-zinc-200 transition-colors"
+                        >
+                          {chip.label}
+                        </button>
+                      ))}
                   </div>
                 )}
                 {context?.industry && (emailTypeId === 'cold_first_touch' || emailTypeId === 'cold_followup') && (
@@ -927,7 +1084,7 @@ CRITICAL OUTPUT RULES:
         </AnimatePresence>
 
         <div className="flex-none px-6 py-4 border-t border-white/5 nodal-recessed flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <input
               type="file"
               multiple
@@ -951,6 +1108,26 @@ CRITICAL OUTPUT RULES:
             >
               <Sparkles className="w-4 h-4" />
             </button>
+
+            {/* Foundry Template Selector */}
+            <div className="h-6 w-px bg-white/10" />
+            <Select value={selectedFoundryId || ''} onValueChange={(v) => setSelectedFoundryId(v || null)}>
+              <SelectTrigger className="h-8 w-auto min-w-[140px] bg-white/5 border-white/10 text-[10px] font-mono text-zinc-400 uppercase tracking-wider rounded-lg">
+                <Zap className="w-3.5 h-3.5 text-[#002FA7]" />
+                <SelectValue placeholder="Foundry Template" />
+              </SelectTrigger>
+              <SelectContent className="bg-zinc-950 nodal-monolith-edge z-[200]">
+                <SelectItem value="" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                  None (Standard Email)
+                </SelectItem>
+                {foundryAssets?.map((asset: any) => (
+                  <SelectItem key={asset.id} value={asset.id} className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    {asset.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {isLoadingTemplate && <Loader2 className="w-4 h-4 animate-spin text-[#002FA7]" />}
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={onClose} className="text-zinc-400 hover:text-white hover:bg-white/5">
