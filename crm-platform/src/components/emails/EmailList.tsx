@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { format, formatDistanceToNow, isAfter, subMonths } from 'date-fns'
 import { motion } from 'framer-motion'
 import { Mail, ArrowUpRight, ArrowDownLeft, RefreshCw, Loader2, Eye, MousePointer2, ChevronLeft, ChevronRight, Clock, Check, Paperclip } from 'lucide-react'
@@ -72,6 +72,13 @@ export function EmailList({
     }
     return email.type === filter
   })
+
+  // Auto-reset to page 1 if the filter changes and makes the current page invalid
+  useEffect(() => {
+    if (currentPage > 1 && filteredEmails.length > 0 && (currentPage - 1) * itemsPerPage >= filteredEmails.length) {
+      setCurrentPage(1)
+    }
+  }, [filter, filteredEmails.length, currentPage, setCurrentPage])
 
   // Pagination Logic
   const totalPages = Math.max(1, Math.ceil(filteredEmails.length / itemsPerPage))
@@ -435,6 +442,7 @@ export function EmailList({
               const nextPage = currentPage + 1
               const needed = nextPage * itemsPerPage
 
+              // If we need more items to potentially fill the next page, fetch them
               if (
                 fetchNextPage &&
                 hasNextPage &&
@@ -444,11 +452,14 @@ export function EmailList({
                 await fetchNextPage()
               }
 
-              if (hasNextPage || nextPage <= totalPages) {
+              // Only change page if the next page actually has items 
+              // or if we have more pages coming from the server (though we might hit an empty page)
+              // For a better experience, we only advance if filteredEmails has enough items
+              if (nextPage <= totalPages) {
                 handlePageChange(nextPage)
               }
             }}
-            disabled={(!hasNextPage && currentPage >= totalPages) || isFetchingNextPage}
+            disabled={(currentPage >= totalPages && !hasNextPage) || isFetchingNextPage}
             className="icon-button-forensic w-8 h-8 disabled:opacity-30 disabled:cursor-not-allowed"
             aria-label="Next page"
           >
