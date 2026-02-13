@@ -588,7 +588,7 @@ CRITICAL OUTPUT RULES:
 
   // Load and compile foundry template when selected
   useEffect(() => {
-    if (!selectedFoundryId || !context) return
+    if (!selectedFoundryId) return
 
     const loadTemplate = async () => {
       setIsLoadingTemplate(true)
@@ -609,28 +609,28 @@ CRITICAL OUTPUT RULES:
         const blocks = asset.content_json?.blocks || []
         let html = generateStaticHtml(blocks, { skipFooter: true })
 
-        // Build variable map from contact context
-        const contactData = context ? {
-          firstName: context.contactName?.split(' ')[0],
-          lastName: context.contactName?.split(' ').slice(1).join(' '),
-          name: context.contactName,
-          companyName: context.companyName || context.accountName,
-          company: context.companyName || context.accountName,
-          industry: context.industry,
-          accountDescription: context.accountDescription,
-        } : {}
+        // Build variable map from contact context (use empty values if no context)
+        const contactData = {
+          firstName: context?.contactName?.split(' ')[0] || '',
+          lastName: context?.contactName?.split(' ').slice(1).join(' ') || '',
+          name: context?.contactName || '',
+          companyName: context?.companyName || context?.accountName || '',
+          company: context?.companyName || context?.accountName || '',
+          industry: context?.industry || '',
+          accountDescription: context?.accountDescription || '',
+        }
 
         const variableMap = contactToVariableMap(contactData)
 
         // Substitute variables
         html = substituteVariables(html, variableMap)
 
-        // Auto-generate AI blocks if needed
-        const aiBlocksToGenerate = blocks.filter((block: any) => {
+        // Auto-generate AI blocks if needed (only if context is available)
+        const aiBlocksToGenerate = context ? blocks.filter((block: any) => {
           if (block.type !== 'TEXT_MODULE') return false
           const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content || ''), useAi: false, aiPrompt: '' }
           return contentObj.useAi === true && contentObj.aiPrompt?.trim() && !contentObj.text?.trim()
-        })
+        }) : []
 
         if (aiBlocksToGenerate.length > 0) {
           // Generate AI content for each block
@@ -665,8 +665,8 @@ CRITICAL OUTPUT RULES:
 
         setContent(html)
 
-        // Set subject if template has a name-based subject
-        if (asset.name && !subject) {
+        // Set subject from template name
+        if (asset.name) {
           setSubject(asset.name)
         }
 
@@ -680,7 +680,7 @@ CRITICAL OUTPUT RULES:
     }
 
     loadTemplate()
-  }, [selectedFoundryId, context, user, subject])
+  }, [selectedFoundryId, context, user])
 
   const acceptAiContent = useCallback(() => {
     const body = pendingAiContent ?? ''
