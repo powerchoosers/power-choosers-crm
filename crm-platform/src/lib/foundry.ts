@@ -239,6 +239,7 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
       const valueColorStyle = (c: string) => {
         if (c === 'yellow') return 'color: #b45309;'
         if (c === 'red') return 'color: #dc2626;'
+        if (c === 'black') return 'color: #18181b;'
         return 'color: #059669;'
       }
       html += `
@@ -256,9 +257,9 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
         return `
                 <tr>
                   ${row.map((cell: string, ci: number) =>
-          ci === 1
-            ? `<td style="padding: 8px 0; ${valueStyle}">${escapeHtml(cell)}</td>`
-            : `<td style="padding: 8px 0; color: #18181b;">${escapeHtml(cell)}</td>`
+          ci > 0
+            ? `<td style="padding: 8px 12px 8px 0; ${valueStyle}">${escapeHtml(cell)}</td>`
+            : `<td style="padding: 8px 12px 8px 0; color: #18181b;">${escapeHtml(cell)}</td>`
         ).join('')}
                 </tr>
               `}).join('')}

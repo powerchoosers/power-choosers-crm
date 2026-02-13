@@ -4,10 +4,10 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import DOMPurify from 'dompurify'
-import { 
-  Zap, 
-  Layers, 
-  Save, 
+import {
+  Zap,
+  Layers,
+  Save,
   Type,
   Table as TableIcon,
   MousePointer2,
@@ -47,13 +47,14 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 
-type ValueColor = 'yellow' | 'green' | 'red'
+type ValueColor = 'yellow' | 'green' | 'red' | 'black'
 
-const VALUE_COLORS: ValueColor[] = ['yellow', 'green', 'red']
+const VALUE_COLORS: ValueColor[] = ['black', 'yellow', 'green', 'red']
 const VALUE_COLOR_CLASSES: Record<ValueColor, string> = {
   yellow: 'bg-amber-400',
   green: 'bg-emerald-500',
   red: 'bg-red-500',
+  black: 'bg-zinc-900',
 }
 
 interface TextModuleContent {
@@ -124,13 +125,13 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
   // Auto-generate TEXT_MODULE blocks with AI when contact is selected
   useEffect(() => {
     if (!previewContactId || !previewContact || generatingBlockId) return
-    
+
     const blocksToGenerate = blocks.filter(block => {
       if (block.type !== 'TEXT_MODULE') return false
       const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content || ''), useAi: false, aiPrompt: '' }
       return contentObj.useAi === true && contentObj.aiPrompt?.trim() && !contentObj.text?.trim()
     })
-    
+
     // Only generate for blocks that need it, and only once per contact selection
     blocksToGenerate.forEach(block => {
       const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content || ''), useAi: false, aiPrompt: '' }
@@ -290,27 +291,27 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
     const newBlock: Block = {
       id: Math.random().toString(36).substr(2, 9),
       type,
-      content: type === 'TEXT_MODULE' ? { text: '', useAi: false, aiPrompt: '', bullets: [] } : 
-               type === 'TACTICAL_BUTTON' ? '[ INITIATE_PROTOCOL ]' : 
-               type === 'TELEMETRY_GRID' ? { headers: ['ITEM', 'VALUE'], rows: [['Metric', '0.00']], valueColors: ['green'] as const } : 
-               type === 'IMAGE_BLOCK' ? { url: '', description: '', caption: '' } :
-               type === 'LIABILITY_GAUGE' ? {
-                 baselineLabel: 'CURRENT_FIXED_RATE',
-                 baselineValue: '0.082',
-                 riskLabel: 'SCARCITY_EXPOSURE',
-                 riskLevel: 75,
-                 status: 'VOLATILE',
-                 note: '',
-                 bullets: ['Structural variance detected in regional load profiles', 'Architecture leaking $4.2k/mo in ghost capacity', 'Grid volatility index elevated']
-               } :
-               type === 'MARKET_BREADCRUMB' ? {
-                 headline: 'ERCOT_RESERVES_DROP_BELOW_3000MW',
-                 source: 'GridMonitor_Intelligence',
-                 url: 'https://',
-                 nodalAnalysis: 'Detected scarcity risk in {{contact.load_zone}}. Estimated variance: $0.12/kWh.',
-                 impactLevel: 'HIGH_VOLATILITY'
-               } :
-               '{{variable}}'
+      content: type === 'TEXT_MODULE' ? { text: '', useAi: false, aiPrompt: '', bullets: [] } :
+        type === 'TACTICAL_BUTTON' ? '[ INITIATE_PROTOCOL ]' :
+          type === 'TELEMETRY_GRID' ? { headers: ['ITEM', 'VALUE'], rows: [['Metric', '0.00']], valueColors: ['black'] as const } :
+            type === 'IMAGE_BLOCK' ? { url: '', description: '', caption: '' } :
+              type === 'LIABILITY_GAUGE' ? {
+                baselineLabel: 'CURRENT_FIXED_RATE',
+                baselineValue: '0.082',
+                riskLabel: 'SCARCITY_EXPOSURE',
+                riskLevel: 75,
+                status: 'VOLATILE',
+                note: '',
+                bullets: ['Structural variance detected in regional load profiles', 'Architecture leaking $4.2k/mo in ghost capacity', 'Grid volatility index elevated']
+              } :
+                type === 'MARKET_BREADCRUMB' ? {
+                  headline: 'ERCOT_RESERVES_DROP_BELOW_3000MW',
+                  source: 'GridMonitor_Intelligence',
+                  url: 'https://',
+                  nodalAnalysis: 'Detected scarcity risk in {{contact.load_zone}}. Estimated variance: $0.12/kWh.',
+                  impactLevel: 'HIGH_VOLATILITY'
+                } :
+                  '{{variable}}'
     }
     setBlocks([...blocks, newBlock])
     setActiveBlock(newBlock.id)
@@ -331,15 +332,15 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
       let prompt: string
       let blockTypeParam: string
       let contextText: string = ''
-      
+
       if (blockType === 'TEXT_MODULE') {
         const blockIndex = blocks.findIndex(b => b.id === blockId)
         const isFirstBlock = blockIndex === 0
-        const contentObj = typeof currentContent === 'object' 
-          ? currentContent as TextModuleContent 
+        const contentObj = typeof currentContent === 'object'
+          ? currentContent as TextModuleContent
           : { text: String(currentContent), aiPrompt: '', useAi: false, bullets: [] } as TextModuleContent
         const userPrompt = contentObj.aiPrompt?.trim() || ''
-        
+
         // Build context from all other blocks
         const otherBlocks = blocks.filter((b, idx) => idx !== blockIndex)
         const contextParts: string[] = []
@@ -359,11 +360,11 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
           }
         })
         const foundryContext = contextParts.length > 0 ? `\n\nOther blocks in this foundry asset:\n${contextParts.join('\n')}` : ''
-        
+
         const contactInfo = previewContact
           ? `\n\nContact: ${(previewContact as { firstName?: string })?.firstName || '—'} ${(previewContact as { lastName?: string })?.lastName || ''}, Company: ${(previewContact as { companyName?: string })?.companyName || '—'}, Current rate: ${(previewContact as { currentRate?: string })?.currentRate || '—'}/kWh`
           : ''
-        
+
         if (isFirstBlock) {
           prompt = `You are writing the introduction and intelligence briefing for an energy intelligence email. 
           
@@ -461,8 +462,8 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
           const block = blocks.find(b => b.id === blockId)
           if (block) {
             const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content), useAi: false, aiPrompt: '' }
-            updateBlockContent(blockId, { 
-              ...contentObj, 
+            updateBlockContent(blockId, {
+              ...contentObj,
               text: generatedText,
               bullets: generatedBullets.length > 0 ? generatedBullets : (contentObj.bullets ?? [])
             })
@@ -492,21 +493,21 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
     if (direction === 'down' && idx === blocks.length - 1) return
     const next = [...blocks]
     const swap = direction === 'up' ? idx - 1 : idx + 1
-    ;[next[idx], next[swap]] = [next[swap], next[idx]]
+      ;[next[idx], next[swap]] = [next[swap], next[idx]]
     setBlocks(next)
   }
 
   // Handle resizing
   useEffect(() => {
     if (!isResizing) return
-    
+
     const handleMouseMove = (e: MouseEvent) => {
       const newPos = (e.clientX / window.innerWidth) * 100
       setSplitPosition(Math.min(Math.max(newPos, 20), 80))
     }
-    
+
     const handleMouseUp = () => setIsResizing(false)
-    
+
     window.addEventListener('mousemove', handleMouseMove)
     window.addEventListener('mouseup', handleMouseUp)
     return () => {
@@ -524,7 +525,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
             <div className="w-8 h-8 rounded-[10px] bg-zinc-900 border border-white/5 flex items-center justify-center">
               <Zap size={14} className="text-[#002FA7]" />
             </div>
-            <input 
+            <input
               value={assetName}
               onChange={(e) => setAssetName(e.target.value)}
               className="bg-transparent border-none focus:ring-0 font-mono text-sm font-bold tracking-tighter text-white p-0 w-48"
@@ -532,7 +533,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
             />
           </div>
           <div className="h-4 w-px bg-white/10" />
-          <select 
+          <select
             value={assetType}
             onChange={(e) => setAssetType(e.target.value as any)}
             className="bg-transparent border-none focus:ring-0 font-mono text-[10px] uppercase tracking-widest text-zinc-500 cursor-pointer"
@@ -545,34 +546,34 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
 
         <div className="flex items-center gap-3">
           <div className="flex bg-black/40 rounded-lg p-0.5 border border-white/5 mr-2">
-             <button 
-               onClick={() => setIsForensicMode(true)}
-               className={cn(
-                 "px-3 py-1 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all",
-                 isForensicMode ? "bg-[#002FA7] text-white shadow-lg" : "text-zinc-500 hover:text-zinc-300"
-               )}
-             >
-               Forensic_HTML
-             </button>
-             <button 
-               onClick={() => setIsForensicMode(false)}
-               className={cn(
-                 "px-3 py-1 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all",
-                 !isForensicMode ? "bg-[#002FA7] text-white shadow-lg" : "text-zinc-500 hover:text-zinc-300"
-               )}
-             >
-               Stealth_Text
-             </button>
+            <button
+              onClick={() => setIsForensicMode(true)}
+              className={cn(
+                "px-3 py-1 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all",
+                isForensicMode ? "bg-[#002FA7] text-white shadow-lg" : "text-zinc-500 hover:text-zinc-300"
+              )}
+            >
+              Forensic_HTML
+            </button>
+            <button
+              onClick={() => setIsForensicMode(false)}
+              className={cn(
+                "px-3 py-1 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all",
+                !isForensicMode ? "bg-[#002FA7] text-white shadow-lg" : "text-zinc-500 hover:text-zinc-300"
+              )}
+            >
+              Stealth_Text
+            </button>
           </div>
           <Button variant="ghost" size="sm" className="h-8 gap-2 text-zinc-400 hover:text-white hover:bg-white/5 font-mono text-xs uppercase">
             <RefreshCw size={14} /> Optimize
           </Button>
-          <Button 
+          <Button
             onClick={saveAsset}
             disabled={isSaving}
             className="h-8 gap-2 bg-[#002FA7] hover:bg-[#002FA7]/80 text-white font-mono text-xs uppercase rounded-md px-4"
           >
-            {isSaving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />} 
+            {isSaving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
             {assetId && assetId !== 'new' ? 'Update_Asset' : 'Deploy_Asset'}
           </Button>
         </div>
@@ -580,7 +581,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
 
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left Panel: The Forge */}
-        <div 
+        <div
           className="flex flex-col border-r border-white/5 bg-zinc-950 overflow-hidden"
           style={{ width: `${splitPosition}%` }}
         >
@@ -617,8 +618,8 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                     onClick={() => setActiveBlock(block.id)}
                     className={cn(
                       "relative group p-4 rounded-xl border transition-all cursor-pointer",
-                      activeBlock === block.id 
-                        ? "bg-[#002FA7]/5 border-[#002FA7]/30 shadow-[0_0_20px_rgba(0,47,167,0.1)]" 
+                      activeBlock === block.id
+                        ? "bg-[#002FA7]/5 border-[#002FA7]/30 shadow-[0_0_20px_rgba(0,47,167,0.1)]"
                         : "bg-black/40 border-white/5 hover:border-white/10"
                     )}
                   >
@@ -631,23 +632,38 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                       </div>
                       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
                         {block.type === 'TELEMETRY_GRID' && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              const headers = block.content?.headers ?? ['ITEM', 'VALUE']
-                              const numCols = headers.length
-                              const newRow = Array(numCols).fill('')
-                              const newRows = [...(block.content?.rows ?? [['Metric', '0.00']]), newRow]
-                              const prevColors = block.content?.valueColors ?? ['green']
-                              const valueColors = [...prevColors, 'green']
-                              updateBlockContent(block.id, { ...block.content, headers, rows: newRows, valueColors })
-                            }}
-                            className="p-1 hover:text-[#002FA7]"
-                            aria-label="Add data row"
-                          >
-                            <Plus size={14} />
-                          </button>
+                          <div className="flex items-center gap-0.5">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                const headers = block.content?.headers ?? ['ITEM', 'VALUE']
+                                const numCols = headers.length
+                                const newRow = Array(numCols).fill('')
+                                const newRows = [...(block.content?.rows ?? [['Metric', '0.00']]), newRow]
+                                const prevColors = block.content?.valueColors ?? []
+                                const valueColors = [...prevColors, 'black']
+                                updateBlockContent(block.id, { ...block.content, headers, rows: newRows, valueColors })
+                              }}
+                              className="p-1 hover:text-[#002FA7]"
+                              title="Add Row"
+                            >
+                              <Plus size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                const headers = [...(block.content?.headers ?? ['ITEM', 'VALUE']), `COL_${(block.content?.headers?.length ?? 0) + 1}`]
+                                const rows = (block.content?.rows ?? [['Metric', '0.00']]).map((row: string[]) => [...row, ''])
+                                updateBlockContent(block.id, { ...block.content, headers, rows })
+                              }}
+                              className="p-1 hover:text-[#002FA7]"
+                              title="Add Column"
+                            >
+                              <TableIcon size={14} />
+                            </button>
+                          </div>
                         )}
                         <button
                           type="button"
@@ -667,7 +683,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                         >
                           <ChevronDown size={14} />
                         </button>
-                        <button 
+                        <button
                           onClick={(e) => { e.stopPropagation(); removeBlock(block.id); }}
                           className="p-1 hover:text-red-400"
                         >
@@ -681,7 +697,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                       const useAi = contentObj.useAi ?? false
                       const blockIndex = blocks.findIndex(b => b.id === block.id)
                       const isFirstBlock = blockIndex === 0
-                      
+
                       return (
                         <div className="space-y-3">
                           <div className="flex items-center gap-2">
@@ -697,7 +713,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                                 }
                               }}
                             />
-                            <Label 
+                            <Label
                               className={cn(
                                 "text-[10px] font-mono uppercase tracking-widest cursor-pointer transition-colors",
                                 useAi ? "text-emerald-500 font-bold" : "text-zinc-400"
@@ -711,7 +727,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                               </span>
                             )}
                           </div>
-                          
+
                           {useAi ? (
                             <div className="space-y-2">
                               <textarea
@@ -798,7 +814,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                               </div>
                             </div>
                           )}
-                          
+
                           {/* Signal Bullets */}
                           <div className="space-y-2 pt-2">
                             <div className="flex items-center gap-2">
@@ -848,7 +864,8 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                             </div>
                           </div>
                         </div>
-                      )}
+                      )
+                    }
                     )()}
 
                     {block.type === 'TACTICAL_BUTTON' && (
@@ -883,72 +900,137 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                     )}
 
                     {block.type === 'TELEMETRY_GRID' && (
-                      <div className="space-y-2">
-                        <div className="grid grid-cols-2 gap-2">
-                           {block.content.headers.map((h: string, i: number) => (
-                             <input 
-                               key={i}
-                               value={h}
-                               onChange={(e) => {
-                                 const newHeaders = [...block.content.headers]
-                                 newHeaders[i] = e.target.value
-                                 updateBlockContent(block.id, { ...block.content, headers: newHeaders })
-                               }}
-                               className="bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-500 uppercase"
-                             />
-                           ))}
+                      <div className="space-y-3">
+                        <div
+                          className="grid gap-2"
+                          style={{ gridTemplateColumns: `repeat(${block.content.headers.length}, minmax(0, 1fr)) 24px` }}
+                        >
+                          {block.content.headers.map((h: string, i: number) => (
+                            <div key={i} className="relative group/header">
+                              <input
+                                value={h}
+                                onChange={(e) => {
+                                  const newHeaders = [...block.content.headers]
+                                  newHeaders[i] = e.target.value
+                                  updateBlockContent(block.id, { ...block.content, headers: newHeaders })
+                                }}
+                                className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-500 uppercase focus:border-[#002FA7]/50 outline-none"
+                              />
+                            </div>
+                          ))}
+                          <div /> {/* Spacer for col action column */}
                         </div>
+
                         {block.content.rows.map((row: string[], ri: number) => {
-                          const valueColors: ValueColor[] = block.content.valueColors ?? block.content.rows.map(() => 'green' as ValueColor)
-                          const currentColor: ValueColor = valueColors[ri] ?? 'green'
+                          const valueColors: ValueColor[] = block.content.valueColors ?? block.content.rows.map(() => 'black' as ValueColor)
+                          const currentColor: ValueColor = valueColors[ri] ?? 'black'
                           return (
-                            <div key={ri} className="grid grid-cols-2 gap-2">
+                            <div
+                              key={ri}
+                              className="grid gap-2 items-center group"
+                              style={{ gridTemplateColumns: `repeat(${block.content.headers.length}, minmax(0, 1fr)) 24px` }}
+                            >
                               {row.map((cell: string, ci: number) => (
-                                ci === 0 ? (
-                                  <input 
-                                    key={ci}
+                                <div key={ci} className="flex items-center gap-2">
+                                  <input
                                     value={cell}
                                     onChange={(e) => {
                                       const newRows = [...block.content.rows]
                                       newRows[ri][ci] = e.target.value
                                       updateBlockContent(block.id, { ...block.content, rows: newRows })
                                     }}
-                                    className="bg-black/20 border border-white/5 rounded px-2 py-1 text-xs text-zinc-300"
+                                    className={cn(
+                                      "w-full bg-black/20 border border-white/5 rounded px-2 py-1 text-xs text-zinc-300 focus:border-[#002FA7]/50 outline-none",
+                                      ci > 0 && VALUE_COLOR_CLASSES[currentColor].replace('bg-', 'text-')
+                                    )}
                                   />
-                                ) : (
-                                  <div key={ci} className="flex items-center gap-2">
-                                    <input 
-                                      value={cell}
-                                      onChange={(e) => {
-                                        const newRows = [...block.content.rows]
-                                        newRows[ri][ci] = e.target.value
-                                        updateBlockContent(block.id, { ...block.content, rows: newRows })
-                                      }}
-                                      className="flex-1 min-w-0 bg-black/20 border border-white/5 rounded px-2 py-1 text-xs text-zinc-300"
-                                    />
+                                  {ci === row.length - 1 && (
                                     <button
                                       type="button"
                                       onClick={(e) => {
                                         e.stopPropagation()
                                         const nextIndex = (VALUE_COLORS.indexOf(currentColor) + 1) % VALUE_COLORS.length
                                         const nextColor = VALUE_COLORS[nextIndex]
-                                        const nextColors = [...(block.content.valueColors ?? block.content.rows.map(() => 'green' as ValueColor))]
-                                        while (nextColors.length <= ri) nextColors.push('green')
+                                        const nextColors = [...(block.content.valueColors ?? block.content.rows.map(() => 'black' as ValueColor))]
+                                        while (nextColors.length <= ri) nextColors.push('black')
                                         nextColors[ri] = nextColor
                                         updateBlockContent(block.id, { ...block.content, valueColors: nextColors })
                                       }}
                                       className={cn(
-                                        'w-6 h-6 rounded-lg shrink-0 border border-white/20',
+                                        'w-5 h-5 rounded border border-white/10 shrink-0',
                                         VALUE_COLOR_CLASSES[currentColor]
                                       )}
-                                      aria-label={`Value color: ${currentColor}`}
+                                      title={`Cycle color: ${currentColor}`}
                                     />
-                                  </div>
-                                )
+                                  )}
+                                </div>
                               ))}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  const newRows = block.content.rows.filter((_: any, idx: number) => idx !== ri)
+                                  const newValueColors = (block.content.valueColors ?? []).filter((_: any, idx: number) => idx !== ri)
+                                  updateBlockContent(block.id, { ...block.content, rows: newRows, valueColors: newValueColors })
+                                }}
+                                className="p-1 text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Remove Row"
+                              >
+                                <Trash2 size={12} />
+                              </button>
                             </div>
                           )
                         })}
+
+                        {/* Column management footer */}
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newHeaders = [...block.content.headers, 'New Column']
+                              const newRows = block.content.rows.map((row: string[]) => [...row, ''])
+                              updateBlockContent(block.id, { ...block.content, headers: newHeaders, rows: newRows })
+                            }}
+                            className="text-[9px] font-mono text-[#002FA7] hover:underline"
+                          >
+                            + Add Column
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newRow = Array(block.content.headers.length).fill('')
+                              const newRows = [...block.content.rows, newRow]
+                              const newValueColors = [...(block.content.valueColors ?? []), 'black']
+                              updateBlockContent(block.id, { ...block.content, rows: newRows, valueColors: newValueColors })
+                            }}
+                            className="text-[9px] font-mono text-[#002FA7] hover:underline"
+                          >
+                            + Add Row
+                          </button>
+                        </div>
+
+                        {block.content.headers.length > 2 && (
+                          <div
+                            className="grid gap-2"
+                            style={{ gridTemplateColumns: `repeat(${block.content.headers.length}, minmax(0, 1fr)) 24px` }}
+                          >
+                            {block.content.headers.map((_: string, i: number) => (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  const headers = block.content.headers.filter((_: any, idx: number) => idx !== i)
+                                  const rows = block.content.rows.map((row: string[]) => row.filter((_: any, idx: number) => idx !== i))
+                                  updateBlockContent(block.id, { ...block.content, headers, rows })
+                                }}
+                                className="text-[9px] font-mono text-zinc-600 hover:text-red-400 uppercase text-center"
+                              >
+                                [ Delete_Col ]
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -997,12 +1079,12 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                         </div>
                         {block.content?.url && (
                           <div className="rounded-lg border border-white/5 overflow-hidden bg-black/20 max-h-24">
-                            <Image 
-                              src={block.content.url} 
-                              alt="Asset Preview" 
-                              width={200} 
-                              height={96} 
-                              className="w-full h-full object-contain max-h-24" 
+                            <Image
+                              src={block.content.url}
+                              alt="Asset Preview"
+                              width={200}
+                              height={96}
+                              className="w-full h-full object-contain max-h-24"
                             />
                           </div>
                         )}
@@ -1083,7 +1165,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                             {generatingBlockId === block.id ? 'Generating…' : 'Generate with AI'}
                           </button>
                         </div>
-                        
+
                         {/* Signal Bullets */}
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
@@ -1196,23 +1278,23 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
         </div>
 
         {/* Resizer Handle */}
-        <div 
+        <div
           className="absolute top-0 bottom-0 w-1 bg-white/5 hover:bg-[#002FA7]/40 cursor-col-resize z-10 flex items-center justify-center group transition-colors"
           style={{ left: `${splitPosition}%`, transform: 'translateX(-50%)' }}
           onMouseDown={() => setIsResizing(true)}
         >
-           <div className="h-8 w-px bg-white/20 group-hover:bg-[#002FA7] transition-colors" />
+          <div className="h-8 w-px bg-white/20 group-hover:bg-[#002FA7] transition-colors" />
         </div>
 
-                      {/* Right Panel: The Simulation */}
-                      <div
+        {/* Right Panel: The Simulation */}
+        <div
           className="bg-white overflow-hidden flex flex-col"
           style={{ width: `${100 - splitPosition}%` }}
         >
           <div className="h-10 border-b border-zinc-200 bg-zinc-50 flex items-center px-4 justify-between gap-4">
             <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest shrink-0">Live_Simulation</span>
-            <Select 
-              value={previewContactId ?? '__none__'} 
+            <Select
+              value={previewContactId ?? '__none__'}
               onValueChange={(v) => {
                 const contactId = v === '__none__' ? null : v
                 setPreviewContactId(contactId)
@@ -1260,12 +1342,12 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                 <>
                   <div className="border-b border-zinc-200 p-6 flex justify-between items-center">
                     <div className="flex items-center gap-2">
-                      <Image 
-                        src="/images/nodalpoint.png" 
-                        alt="Nodal Point Logo" 
-                        width={24} 
-                        height={24} 
-                        className="h-6 w-auto" 
+                      <Image
+                        src="/images/nodalpoint.png"
+                        alt="Nodal Point Logo"
+                        width={24}
+                        height={24}
+                        className="h-6 w-auto"
                       />
                       <span className="text-[10px] font-mono text-zinc-900 font-bold tracking-[0.2em] uppercase">NODAL_POINT // INTELLIGENCE</span>
                     </div>
@@ -1281,7 +1363,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                           const text = contentObj.text || ''
                           const useAi = contentObj.useAi ?? false
                           const hasText = text.trim().length > 0
-                          
+
                           // Show placeholder when AI is enabled but no text generated yet
                           if (useAi && !hasText) {
                             return (
@@ -1297,7 +1379,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                               </div>
                             )
                           }
-                          
+
                           return (
                             <div className="flex flex-col">
                               {text.split(/\n\n+/).filter((p: string) => p.trim()).map((paragraph: string, pi: number) => (
@@ -1353,12 +1435,12 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                               <tbody>
                                 {block.content.rows.map((row: string[], ri: number) => {
                                   const valueColors: ValueColor[] = block.content.valueColors ?? []
-                                  const rowColor = valueColors[ri] ?? 'green'
-                                  const valueTextClass = rowColor === 'yellow' ? 'text-amber-600' : rowColor === 'red' ? 'text-red-600' : 'text-emerald-600'
+                                  const rowColor = valueColors[ri] ?? 'black'
+                                  const valueTextClass = rowColor === 'yellow' ? 'text-amber-600' : rowColor === 'red' ? 'text-red-600' : rowColor === 'black' ? 'text-zinc-900' : 'text-emerald-600'
                                   return (
                                     <tr key={ri}>
                                       {row.map((cell: string, ci: number) => (
-                                        <td key={ci} className={ci === 1 ? `py-2 text-xs font-mono ${valueTextClass}` : 'py-2 text-xs font-mono text-zinc-900'}>{cell}</td>
+                                        <td key={ci} className={ci > 0 ? `py-2 text-xs font-mono ${valueTextClass}` : 'py-2 text-xs font-mono text-zinc-900'}>{cell}</td>
                                       ))}
                                     </tr>
                                   )
@@ -1369,12 +1451,12 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                         )}
                         {block.type === 'IMAGE_BLOCK' && block.content?.url && (
                           <figure className="my-4">
-                            <Image 
-                              src={block.content.url} 
-                              alt={block.content?.description ?? 'Asset Image'} 
-                              width={600} 
-                              height={400} 
-                              className="max-w-full h-auto block rounded border border-zinc-200" 
+                            <Image
+                              src={block.content.url}
+                              alt={block.content?.description ?? 'Asset Image'}
+                              width={600}
+                              height={400}
+                              className="max-w-full h-auto block rounded border border-zinc-200"
                             />
                             {block.content?.caption && (
                               <figcaption className="text-[10px] font-mono text-zinc-500 mt-2">{block.content.caption}</figcaption>
