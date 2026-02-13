@@ -311,6 +311,13 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
   // Force re-render of iframe content when key dependencies change
   const iframeKey = React.useMemo(() => `${isLightMode}-${html?.length}`, [isLightMode, html])
 
+  // Apply dynamic height via ref to avoid inline style lint warnings
+  useEffect(() => {
+    if (iframeRef.current) {
+      iframeRef.current.style.height = isExpanded ? '100%' : iframeHeight
+    }
+  }, [isExpanded, iframeHeight])
+
   return (
     <div className={cn("relative group flex flex-col w-full", className)}>
       {/* Controls */}
@@ -376,9 +383,6 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
             isExpanded ? "h-[calc(100%-4rem)]" : "min-h-[400px]",
             isLightMode ? "bg-white" : "bg-[#09090b]"
           )}
-          style={{
-            height: isExpanded ? '100%' : iframeHeight
-          }}
           sandbox="allow-popups allow-popups-to-escape-sandbox allow-scripts allow-same-origin"
           title="Email Content"
         />
