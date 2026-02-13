@@ -1,15 +1,14 @@
-
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { signInWithCustomToken } from 'firebase/auth';
 
-export default function LoginCallbackPage() {
+function CallbackContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const token = searchParams.get('token');
+    const token = searchParams ? searchParams.get('token') : null;
     const [status, setStatus] = useState('Authenticating...');
 
     useEffect(() => {
@@ -34,17 +33,29 @@ export default function LoginCallbackPage() {
     }, [token, router]);
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-50">
-            <div className="w-full max-w-md space-y-8 p-8 bg-white rounded-lg shadow text-center">
-                <h2 className="text-2xl font-bold tracking-tight text-gray-900">
+        <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+            <div className="w-full max-w-md space-y-8 p-8 bg-zinc-900 rounded-lg shadow text-center border border-zinc-800">
+                <h2 className="text-2xl font-bold tracking-tight text-white">
                     {status}
                 </h2>
                 {status.includes('Authenticating') && (
                     <div className="mt-4 flex justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
                     </div>
                 )}
             </div>
         </div>
+    );
+}
+
+export default function LoginCallbackPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            </div>
+        }>
+            <CallbackContent />
+        </Suspense>
     );
 }
