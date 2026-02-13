@@ -34,8 +34,14 @@ export class ZohoMailService {
             logger.info(`[Zoho Mail] Sending email to: ${to}`, 'zoho-service');
 
             // Prepare email payload according to Zoho API spec
+            // Format: "Name <email>" for sender display name
+            const senderEmail = from || `lewis@nodalpoint.io`;
+            const fromAddress = fromName
+                ? `${fromName} <${senderEmail}>`
+                : senderEmail;
+
             const payload = {
-                fromAddress: from || `lewis@nodalpoint.io`,
+                fromAddress: fromAddress,
                 toAddress: to,
                 subject: subject,
                 content: html || text,
