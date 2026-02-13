@@ -41,7 +41,7 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
   // Sanitize and transform the HTML content
   const sanitizedHtml = React.useMemo(() => {
     if (!html) return ''
-    
+
     // Preliminary cleanup for common layout breakers
     const processedHtml = html
       .replace(/position:\s*fixed/gi, 'position: static')
@@ -49,7 +49,11 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
       .replace(/width:\s*\d+vw/gi, 'width: 100%')
       .replace(/height:\s*\d+vh/gi, 'height: auto')
 
-    return DOMPurify.sanitize(processedHtml, {
+    // Remove tracking pixel to prevent self-open counting
+    // Matches <img src=".../api/email/track/..." ... />
+    const noTrackingHtml = processedHtml.replace(/<img[^>]*src="[^"]*\/api\/email\/track\/[^"]*"[^>]*>/gi, '')
+
+    return DOMPurify.sanitize(noTrackingHtml, {
       ADD_TAGS: ['style'],
       ADD_ATTR: ['target', 'style'],
       USE_PROFILES: { html: true }
@@ -362,18 +366,18 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
             </Button>
           </div>
         )}
-        
+
         <iframe
           key={iframeKey}
           ref={iframeRef}
           srcDoc={getIframeContent()}
           className={cn(
             "w-full border-none transition-all duration-300 rounded-2xl",
-            isExpanded ? "h-[calc(100%-4rem)]" : "min-h-[400px]"
+            isExpanded ? "h-[calc(100%-4rem)]" : "min-h-[400px]",
+            isLightMode ? "bg-white" : "bg-[#09090b]"
           )}
-          style={{ 
-            height: isExpanded ? '100%' : iframeHeight,
-            backgroundColor: isLightMode ? '#ffffff' : '#09090b'
+          style={{
+            height: isExpanded ? '100%' : iframeHeight
           }}
           sandbox="allow-popups allow-popups-to-escape-sandbox allow-scripts allow-same-origin"
           title="Email Content"
