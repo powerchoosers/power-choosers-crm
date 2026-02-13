@@ -2,32 +2,41 @@
 
 import { Gauge, Layers, Zap, Activity } from 'lucide-react';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
+import { useEffect, useState } from 'react';
 
 export function KPIGrid() {
   const { data: metrics, isLoading } = useDashboardMetrics();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Format values with loading fallbacks
-  const liabilityValue = isLoading 
-    ? '—' 
-    : metrics?.liabilityKWh != null 
+  // During hydration (not mounted), always show the fallback to match server render
+  const isHydrating = !mounted || isLoading;
+
+  const liabilityValue = isHydrating
+    ? '—'
+    : metrics?.liabilityKWh != null
       ? `${metrics.liabilityKWh.toLocaleString('en-US')} kWh`
       : '0 kWh';
-  
-  const positionsValue = isLoading 
-    ? '—' 
+
+  const positionsValue = isHydrating
+    ? '—'
     : metrics?.openPositions?.toString() ?? '0';
-  
-  const velocityValue = isLoading 
-    ? '—' 
+
+  const velocityValue = isHydrating
+    ? '—'
     : metrics?.operationalVelocity?.toString() ?? '0';
-  
-  const volatilityValue = isLoading 
-    ? '—' 
+
+  const volatilityValue = isHydrating
+    ? '—'
     : metrics?.gridVolatilityIndex?.toString() ?? '0';
 
-  const volatilityNum = metrics?.gridVolatilityIndex ?? 0;
-  const gaugeLow = volatilityNum < 30;
-  const gaugeHigh = volatilityNum > 70;
+  const volatilityNum = isHydrating ? 0 : (metrics?.gridVolatilityIndex ?? 0);
+  const gaugeLow = !isHydrating && volatilityNum < 30;
+  const gaugeHigh = !isHydrating && volatilityNum > 70;
 
   const METRICS = [
     {
@@ -88,17 +97,16 @@ export function KPIGrid() {
             <div className="mt-3 flex items-end justify-between gap-2">
               <div className="flex flex-col gap-0.5">
                 <span
-                  className={`text-2xl font-mono font-semibold tabular-nums tracking-tight ${
-                    isLoading
-                      ? 'text-zinc-500'
-                      : m.pulse && positionsNum > 0
-                        ? 'text-amber-400'
-                        : m.gauge && gaugeHigh
-                          ? 'text-rose-400'
-                          : m.gauge && gaugeLow
-                            ? 'text-emerald-400'
-                            : 'text-white'
-                  }`}
+                  className={`text-2xl font-mono font-semibold tabular-nums tracking-tight ${isLoading
+                    ? 'text-zinc-500'
+                    : m.pulse && positionsNum > 0
+                      ? 'text-amber-400'
+                      : m.gauge && gaugeHigh
+                        ? 'text-rose-400'
+                        : m.gauge && gaugeLow
+                          ? 'text-emerald-400'
+                          : 'text-white'
+                    }`}
                 >
                   {m.value}
                 </span>
@@ -112,9 +120,8 @@ export function KPIGrid() {
               {m.gauge && !isLoading && (
                 <div className="w-12 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all ${
-                      gaugeHigh ? 'bg-rose-500' : gaugeLow ? 'bg-emerald-500' : 'bg-amber-500/80'
-                    }`}
+                    className={`h-full rounded-full transition-all ${gaugeHigh ? 'bg-rose-500' : gaugeLow ? 'bg-emerald-500' : 'bg-amber-500/80'
+                      }`}
                     style={{ width: `${Math.min(100, num)}%` }}
                   />
                 </div>

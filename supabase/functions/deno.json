@@ -1,0 +1,12 @@
+{
+    "compilerOptions": {
+        "jsx": "react-jsx",
+        "jsxImportSource": "react"
+    },
+    "imports": {
+        "zod": "npm:zod@^3.22.4"
+    },
+    "tasks": {
+        "dev": "deno serve --watch --env -A index.ts"
+    }
+}
