@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEmails, useEmailsCount, Email } from '@/hooks/useEmails'
-import { useGmailSync } from '@/hooks/useGmailSync'
+import { useZohoSync } from '@/hooks/useZohoSync'
 import { useAuth } from '@/context/AuthContext'
 import { EmailList } from '@/components/emails/EmailList'
 import { ComposeModal } from '@/components/emails/ComposeModal'
@@ -39,32 +39,12 @@ export default function EmailsPage() {
 
   const { data, isLoading: isLoadingEmails, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useEmails(debouncedSearch)
   const { data: totalEmails } = useEmailsCount(debouncedSearch)
-  const { syncGmail, isSyncing, syncStatus, processRedirectResult } = useGmailSync()
+  const { performSync, isSyncing } = useZohoSync()
   const router = useRouter()
 
-  // On load: capture Gmail token if we just returned from redirect, then run sync once after 5s
-  useEffect(() => {
-    if (!user) return
+  // No manual sync trigger needed here as GlobalSync handles it, 
+  // but we keep the manual button for forced refresh.
 
-    let cancelled = false
-    let timer: ReturnType<typeof setTimeout> | null = null
-
-    const run = async () => {
-      await processRedirectResult()
-      if (cancelled || hasRunAutoSync.current) return
-      hasRunAutoSync.current = true
-      timer = setTimeout(() => {
-        if (!cancelled && user) syncGmail(user, { silent: true })
-      }, AUTO_SYNC_DELAY_MS)
-    }
-
-    run()
-    return () => {
-      cancelled = true
-      if (timer) clearTimeout(timer)
-    }
-  }, [user?.uid])
-  
   const [isComposeOpen, setIsComposeOpen] = useState(false)
 
   const emails = data?.pages.flatMap(page => page.emails) || []
@@ -72,7 +52,7 @@ export default function EmailsPage() {
 
   const handleSync = () => {
     if (!user) return
-    syncGmail(user, { silent: false })
+    performSync(false)
   }
 
   const handleSelectionChange = (ids: Set<string>) => setSelectedIds(ids)
@@ -95,7 +75,7 @@ export default function EmailsPage() {
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <CollapsiblePageHeader
         title="Emails"
-        description="Manage your communications and sync with Gmail."
+        description="Manage your communications and sync with Zoho Mail."
         globalFilter={searchTerm}
         onSearchChange={setSearchTerm}
         primaryAction={{
@@ -120,23 +100,23 @@ export default function EmailsPage() {
       />
 
       <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
-            <EmailList 
-                emails={emails} 
-                isLoading={isLoadingEmails} 
-                onRefresh={handleSync}
-                isSyncing={isSyncing}
-                onSelectEmail={(email) => router.push(`/network/emails/${email.id}`)}
-                totalEmails={totalEmails}
-                hasNextPage={hasNextPage}
-                fetchNextPage={fetchNextPage}
-                isFetchingNextPage={isFetchingNextPage}
-                currentPage={pageIndex + 1}
-                onPageChange={(p) => setPage(p - 1)}
-                selectedIds={selectedIds}
-                onSelectionChange={handleSelectionChange}
-                totalAvailable={effectiveTotal}
-                onSelectCount={handleSelectCount}
-            />
+        <EmailList
+          emails={emails}
+          isLoading={isLoadingEmails}
+          onRefresh={handleSync}
+          isSyncing={isSyncing}
+          onSelectEmail={(email) => router.push(`/network/emails/${email.id}`)}
+          totalEmails={totalEmails}
+          hasNextPage={hasNextPage}
+          fetchNextPage={fetchNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          currentPage={pageIndex + 1}
+          onPageChange={(p) => setPage(p - 1)}
+          selectedIds={selectedIds}
+          onSelectionChange={handleSelectionChange}
+          totalAvailable={effectiveTotal}
+          onSelectCount={handleSelectCount}
+        />
       </div>
 
       <BulkActionDeck
@@ -147,9 +127,9 @@ export default function EmailsPage() {
         onSelectCount={handleSelectCount}
       />
 
-      <ComposeModal 
-        isOpen={isComposeOpen} 
-        onClose={() => setIsComposeOpen(false)} 
+      <ComposeModal
+        isOpen={isComposeOpen}
+        onClose={() => setIsComposeOpen(false)}
       />
     </div>
   )
