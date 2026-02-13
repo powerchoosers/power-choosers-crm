@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
@@ -11,6 +12,7 @@ import { Eye, MousePointer2 } from 'lucide-react'
  */
 export function useEmailTrackingNotifications() {
   const { user } = useAuth()
+  const queryClient = useQueryClient()
   const lastEventRef = useRef<Map<string, number>>(new Map())
 
   useEffect(() => {
@@ -68,6 +70,31 @@ export function useEmailTrackingNotifications() {
           const clicked = newClicks > prevClicks
 
           if (!opened && !clicked) return
+
+          // Update React Query caches for instant UI update in the table
+          queryClient.setQueriesData({ queryKey: ['emails'] }, (oldData: any) => {
+            if (!oldData || !oldData.pages) return oldData;
+            return {
+              ...oldData,
+              pages: oldData.pages.map((page: any) => ({
+                ...page,
+                emails: page.emails.map((e: any) =>
+                  e.id === email.id
+                    ? { ...e, openCount: newOpens, clickCount: newClicks }
+                    : e
+                )
+              }))
+            };
+          });
+
+          queryClient.setQueriesData({ queryKey: ['emails-search'] }, (oldData: any) => {
+            if (!Array.isArray(oldData)) return oldData;
+            return oldData.map((e: any) =>
+              e.id === email.id
+                ? { ...e, openCount: newOpens, clickCount: newClicks }
+                : e
+            );
+          });
 
           // Format recipient info
           const recipient = Array.isArray(email.to) ? email.to[0] : 'recipient'
