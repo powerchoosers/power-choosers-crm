@@ -75,6 +75,7 @@ export function useEmails(searchQuery?: string) {
         const { data, error, count } = await query
           .range(from, to)
           .order('timestamp', { ascending: false, nullsFirst: false })
+          .order('createdAt', { ascending: false, nullsFirst: false })
 
         if (error) {
           // Silent abort for network cancellations
