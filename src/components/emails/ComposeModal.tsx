@@ -633,34 +633,117 @@ CRITICAL OUTPUT RULES:
         }) : []
 
         if (aiBlocksToGenerate.length > 0) {
-          // Generate AI content for each block
+          // Clone blocks to avoid mutating original state directly (though likely safe here)
+          const updatedBlocks = JSON.parse(JSON.stringify(blocks))
+
           for (const block of aiBlocksToGenerate) {
+            const blockIndex = updatedBlocks.findIndex((b: any) => b.id === block.id)
+            if (blockIndex === -1) continue
+
             const contentObj = typeof block.content === 'object' ? block.content : { text: '', useAi: false, aiPrompt: '' }
             const userPrompt = contentObj.aiPrompt?.trim() || ''
 
+            // Build context for AI
+            const otherBlocks = updatedBlocks.filter((b: any, idx: number) => idx !== blockIndex)
+            const contextParts: string[] = []
+            otherBlocks.forEach((b: any, idx: number) => {
+              if (b.type === 'TEXT_MODULE') {
+                const txt = typeof b.content === 'string' ? b.content : (b.content?.text || '')
+                if (txt.trim()) contextParts.push(`Block ${idx + 1}: ${txt.slice(0, 200)}...`)
+              } else if (b.type === 'TELEMETRY_GRID') {
+                const headers = b.content?.headers?.join(', ') || ''
+                contextParts.push(`Block ${idx + 1}: Data Metric Grid (${headers})`)
+              }
+            })
+            const foundryContext = contextParts.length > 0 ? `\n\nOther content in this email:\n${contextParts.join('\n')}` : ''
+
             const contactInfo = context
-              ? `\n\nContact: ${context.contactName || '—'}, Company: ${context.companyName || '—'}`
+              ? `\n\nTarget Contact: ${context.contactName || '—'}, Company: ${context.companyName || '—'}`
               : ''
 
-            const prompt = `You are writing content for an energy intelligence email. ${userPrompt}${contactInfo}\n\nReturn a JSON object with "text" (string) and "bullets" (array of strings).`
+            // Prompt engineering for email context
+            const isFirstBlock = blockIndex === 0
+            let prompt = ''
 
-            const aiRes = await fetch('/api/foundry/generate-text', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                prompt,
-                context: '',
-                blockType: 'narrative',
-              }),
-            })
+            if (isFirstBlock) {
+              prompt = `You are writing the introduction for a high-stakes energy intelligence email.
+               
+               STRUCTURE:
+               1. Personalized greeting (e.g., "Lewis,")
+               2. Double newline
+               3. One concise sentence setting context.
+               4. Double newline
+               5. Two concise sentences on the value proposition or intelligence signal.
 
-            const aiData = await aiRes.json()
-            if (aiRes.ok && aiData.text) {
-              // Replace placeholder in HTML
-              const placeholder = '[ AI_GENERATION_IN_PROGRESS ]'
-              html = html.replace(placeholder, aiData.text)
+               RULES:
+               - No fluff. Forensic tone.
+               - Used Nodal Point voice (clinical, precise).
+               - Reference the contact's company if known.
+               
+               FORMAT: Return JSON { "text": "...", "bullets": [] }
+               ${userPrompt ? `\nUser Custom Instruction: "${userPrompt}"` : ''}${contactInfo}${foundryContext}`
+            } else {
+              prompt = `You are writing a body paragraph for an energy intelligence email.
+               
+               STRUCTURE:
+               - 2-3 concise sentences.
+               - Focus on the specific topic requested.
+
+               RULES:
+               - No fluff. Forensic tone.
+               
+               FORMAT: Return JSON { "text": "...", "bullets": [] }
+               ${userPrompt ? `\nUser Custom Instruction: "${userPrompt}"` : ''}${contactInfo}${foundryContext}`
+            }
+
+            try {
+              const aiRes = await fetch('/api/foundry/generate-text', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  prompt,
+                  context: '',
+                  blockType: 'narrative',
+                }),
+              })
+
+              const aiData = await aiRes.json()
+              if (aiRes.ok && aiData.text) {
+                // specific handling for JSON response from AI
+                let generatedText = aiData.text
+                let generatedBullets: string[] = []
+
+                try {
+                  // Start stripping out any potential markdown code blocks if the AI adds them
+                  const cleanText = aiData.text.replace(/```json\n|\n```/g, '').trim()
+                  const parsed = JSON.parse(cleanText)
+                  generatedText = parsed.text || aiData.text
+                  generatedBullets = parsed.bullets || []
+                } catch (e) {
+                  // Fallback: use raw text if not valid JSON
+                  generatedText = aiData.text.trim()
+                }
+
+                // Update the block content
+                updatedBlocks[blockIndex].content = {
+                  ...updatedBlocks[blockIndex].content,
+                  text: generatedText,
+                  bullets: generatedBullets
+                }
+              }
+            } catch (err) {
+              console.error('Failed to generate AI block', err)
+              // Setup fallback error text so user sees something happened
+              updatedBlocks[blockIndex].content = {
+                ...updatedBlocks[blockIndex].content,
+                text: "[ AI GENERATION FAILED - NETWORK ERROR ]"
+              }
             }
           }
+
+          // REGENERATE HTML with the new content
+          const newHtml = generateStaticHtml(updatedBlocks, { profile })
+          html = substituteVariables(newHtml, variableMap)
         }
 
         setContent(html)
