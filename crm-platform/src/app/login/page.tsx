@@ -142,7 +142,7 @@ function LoginContent() {
             {isGoogleLoading ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
-              <Image src="/images/google.svg" width={16} height={16} alt="Google" className="mr-2" />
+              <Chrome className="mr-2 h-4 w-4 text-[#4285F4]" />
             )}
             Sign in with Google
           </Button>

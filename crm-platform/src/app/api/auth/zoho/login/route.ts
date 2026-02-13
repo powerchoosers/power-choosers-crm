@@ -14,10 +14,10 @@ export async function GET() {
     const params = new URLSearchParams({
         response_type: 'code',
         client_id: clientId,
-        scope: 'email', // We only need email to verify identity
+        scope: 'openid email profile', // Standard OIDC scopes for better identity reliability
         redirect_uri: redirectUri,
         access_type: 'offline',
-        prompt: 'consent', // Ensures we get a refresh token if needed (though mainly we need id_token/email)
+        prompt: 'consent',
     });
 
     const url = `https://accounts.zoho.com/oauth/v2/auth?${params.toString()}`;
