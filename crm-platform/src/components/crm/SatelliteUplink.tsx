@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react';
 import { MapPin, Satellite, Wifi, Loader2, Search } from 'lucide-react';
-import Map, { Marker } from 'react-map-gl';
+import Map, { Marker } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
