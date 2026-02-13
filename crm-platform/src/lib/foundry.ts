@@ -169,7 +169,7 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
   // This would be used in the builder to generate the final HTML string
   // for storage in foundry assets compiled_html
   let html = `
-    <div style="font-family: 'Inter', sans-serif; background: #ffffff; color: #18181b; width: 100%; max-width: 600px; margin: 0 auto;">
+    <div style="font-family: 'Inter', sans-serif; background: #ffffff; color: #18181b; width: 100%; max-width: 600px; margin: 20px auto; border: 1px solid #e4e4e7; border-collapse: separate; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); overflow: hidden;">
       <table border="0" cellpadding="0" cellspacing="0" style="border-bottom: 1px solid #e4e4e7; width: 100%; box-sizing: border-box;">
         <tr>
           <td style="padding: 24px; vertical-align: middle;">
