@@ -5,6 +5,7 @@ import logger from '../_logger.js';
 let tokenCache = {
     accessToken: null,
     expiresAt: null,
+    usedEnvToken: false, // Track if we've already tried the token from environment
 };
 
 /**
@@ -24,29 +25,31 @@ export async function refreshAccessToken(refreshToken) {
     try {
         logger.info('[Zoho Token] Refreshing access token...', 'zoho-token-manager');
 
-        const params = new URLSearchParams({
+        const body = new URLSearchParams({
             refresh_token: refreshToken,
             grant_type: 'refresh_token',
             client_id: clientId,
             client_secret: clientSecret,
         });
 
-        const response = await fetch(`${accountsServer}/oauth/v2/token?${params.toString()}`, {
+        const response = await fetch(`${accountsServer}/oauth/v2/token`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
+            body: body.toString()
         });
 
         if (!response.ok) {
             const errorText = await response.text();
-            logger.error(`[Zoho Token] Failed to refresh token: ${response.status} ${errorText}`, 'zoho-token-manager');
-            throw new Error(`Failed to refresh Zoho token: ${response.status}`);
+            logger.error(`[Zoho Token] Failed to refresh token: Status ${response.status} - ${errorText}`, 'zoho-token-manager');
+            throw new Error(`Failed to refresh Zoho token: Status ${response.status} - ${errorText}`);
         }
 
         const data = await response.json();
 
         if (!data.access_token) {
+            logger.error('[Zoho Token] No access_token in response:', data, 'zoho-token-manager');
             throw new Error('No access_token in refresh response');
         }
 
@@ -54,6 +57,7 @@ export async function refreshAccessToken(refreshToken) {
         const expiresIn = data.expires_in || 3600;
         tokenCache.accessToken = data.access_token;
         tokenCache.expiresAt = Date.now() + (expiresIn - 300) * 1000;
+        tokenCache.usedEnvToken = true; // Mark as settled manually
 
         logger.info(`[Zoho Token] Token refreshed successfully, expires in ${expiresIn}s`, 'zoho-token-manager');
 
@@ -75,16 +79,17 @@ export async function getValidAccessToken() {
         return tokenCache.accessToken;
     }
 
-    // Try to use the token from environment first
+    // Try to use the token from environment first, but only once
     const envToken = process.env.ZOHO_ACCESS_TOKEN;
     const refreshToken = process.env.ZOHO_REFRESH_TOKEN;
 
-    // If we have an env token and no cached token, use it and cache it
-    if (envToken && !tokenCache.accessToken) {
-        logger.info('[Zoho Token] Using access token from environment', 'zoho-token-manager');
-        // Assume it's valid for 1 hour minus 5 minutes
+    // If we have an env token and haven't tried it yet, use it
+    if (envToken && !tokenCache.usedEnvToken) {
+        logger.info('[Zoho Token] Attempting to use access token from environment', 'zoho-token-manager');
         tokenCache.accessToken = envToken;
+        // Assume it's valid for 1 hour from "now" (we don't know when it was issued)
         tokenCache.expiresAt = Date.now() + (3600 - 300) * 1000;
+        tokenCache.usedEnvToken = true;
         return envToken;
     }
 
@@ -103,6 +108,7 @@ export function clearTokenCache() {
     tokenCache = {
         accessToken: null,
         expiresAt: null,
+        usedEnvToken: true, // Don't try the environment token again after a failure
     };
     logger.info('[Zoho Token] Token cache cleared', 'zoho-token-manager');
 }
