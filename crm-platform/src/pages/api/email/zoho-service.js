@@ -4,9 +4,14 @@ import logger from '../_logger.js';
 
 export class ZohoMailService {
     constructor() {
-        // Default to v1 which is required for Mail API
-        this.baseUrl = process.env.ZOHO_BASE_URL || 'https://mail.zoho.com/api/v1';
+        // Ensure the URL ends with /v1
+        let url = process.env.ZOHO_BASE_URL || 'https://mail.zoho.com/api/v1';
+        if (url.endsWith('/api')) {
+            url += '/v1';
+        }
+        this.baseUrl = url;
         this.accountId = process.env.ZOHO_ACCOUNT_ID;
+        logger.debug(`[Zoho Mail] Service initialized with baseUrl: ${this.baseUrl}`, 'zoho-service');
     }
 
     /**
