@@ -607,7 +607,7 @@ CRITICAL OUTPUT RULES:
 
         // Generate HTML from blocks
         const blocks = asset.content_json?.blocks || []
-        let html = generateStaticHtml(blocks)
+        let html = generateStaticHtml(blocks, { profile })
 
         // Build variable map from contact context (use empty values if no context)
         const contactData = {

@@ -164,7 +164,7 @@ export async function compileFoundry(assetId: string, contactData: any) {
   return html
 }
 
-export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boolean }) {
+export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boolean; profile?: any }) {
   const skipFooter = options?.skipFooter === true
   // This would be used in the builder to generate the final HTML string
   // for storage in foundry assets compiled_html
@@ -186,7 +186,7 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
       const text = contentObj.text || ''
       const bullets = contentObj.bullets ?? []
       const useAi = contentObj.useAi ?? false
-      
+
       if (useAi && !text.trim()) {
         html += `
           <div style="border: 2px dashed #e4e4e7; border-radius: 8px; padding: 30px; background: #fafafa; text-align: center; margin-bottom: 20px;">
@@ -197,20 +197,20 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
         `
       } else {
         const escaped = text
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                
-              const paragraphs = escaped.split(/\n\n+/).filter((p: string) => p.trim())
-              
-              html += `<div style="margin-bottom: 24px;">`
-              paragraphs.forEach((p: string, idx: number) => {
-                html += `<p style="line-height: 1.25; font-size: 13px; font-family: sans-serif; white-space: pre-wrap; margin: 0 0 16px 0; color: #18181b;">${p.trim()}</p>`
-              })
-              
-              if (bullets.length > 0) {
-                html += `<ul style="list-style: none; padding: 0; margin: 20px 0 0 0;">`
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+
+        const paragraphs = escaped.split(/\n\n+/).filter((p: string) => p.trim())
+
+        html += `<div style="margin-bottom: 24px;">`
+        paragraphs.forEach((p: string, idx: number) => {
+          html += `<p style="line-height: 1.25; font-size: 13px; font-family: sans-serif; white-space: pre-wrap; margin: 0 0 16px 0; color: #18181b;">${p.trim()}</p>`
+        })
+
+        if (bullets.length > 0) {
+          html += `<ul style="list-style: none; padding: 0; margin: 20px 0 0 0;">`
           bullets.forEach((bullet: string) => {
             const escapedBullet = bullet
               .replace(/&/g, '&amp;')
@@ -251,15 +251,15 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
             </thead>
             <tbody>
               ${block.content.rows.map((row: string[], ri: number) => {
-                const rowColor = valueColors[ri] ?? 'green'
-                const valueStyle = valueColorStyle(rowColor)
-                return `
+        const rowColor = valueColors[ri] ?? 'green'
+        const valueStyle = valueColorStyle(rowColor)
+        return `
                 <tr>
                   ${row.map((cell: string, ci: number) =>
-                    ci === 1
-                      ? `<td style="padding: 8px 0; ${valueStyle}">${escapeHtml(cell)}</td>`
-                      : `<td style="padding: 8px 0; color: #18181b;">${escapeHtml(cell)}</td>`
-                  ).join('')}
+          ci === 1
+            ? `<td style="padding: 8px 0; ${valueStyle}">${escapeHtml(cell)}</td>`
+            : `<td style="padding: 8px 0; color: #18181b;">${escapeHtml(cell)}</td>`
+        ).join('')}
                 </tr>
               `}).join('')}
             </tbody>
@@ -310,7 +310,7 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
       const impactLevel = escapeHtml(c.impactLevel ?? 'HIGH_VOLATILITY')
       const url = (c.url && String(c.url).trim()) ? String(c.url).trim().replace(/"/g, '&quot;') : ''
       // nodalAnalysis supports variables like {{contact.load_zone}} - escape HTML but preserve {{...}} placeholders
-      const nodalAnalysis = (c.nodalAnalysis != null && String(c.nodalAnalysis).trim() !== '') 
+      const nodalAnalysis = (c.nodalAnalysis != null && String(c.nodalAnalysis).trim() !== '')
         ? String(c.nodalAnalysis).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
         : ''
       html += `
@@ -349,11 +349,42 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
   })
 
   if (!skipFooter) {
+    const profile = options?.profile
+    const name = [profile?.firstName, profile?.lastName].filter(Boolean).join(' ') || 'Lewis Patterson'
+    const title = profile?.jobTitle || 'Director of Energy Architecture'
+    const phone = profile?.selectedPhoneNumber || '+1 (817) 809-3367'
+    const location = [profile?.city, profile?.state].filter(Boolean).join(', ') || 'Fort Worth, TX'
+    const photoUrl = profile?.hostedPhotoUrl || profile?.photoURL || ''
+    const linkedinUrl = profile?.linkedinUrl || 'https://linkedin.com/company/nodal-point'
+
     html += `
-      <div style="margin-top: 40px; border-top: 1px solid #f4f4f5; padding-top: 20px; font-family: sans-serif;">
-        <div style="font-weight: bold; color: #18181b;">Lewis Patterson</div>
-        <div style="color: #71717a; font-size: 12px; margin-bottom: 4px;">Director of Energy Architecture</div>
-        <div style="color: #71717a; font-size: 10px; font-family: monospace;">+1 (281) 744-5393 • HOUSTON, TX</div>
+      <div style="margin-top: 40px; border-top: 1px solid #f4f4f5; background-color: #fafafa; padding: 32px; font-family: sans-serif;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            ${photoUrl ? `
+            <td style="width: 52px; vertical-align: top; padding-right: 12px;">
+              <img src="${photoUrl}" alt="Profile" style="width: 40px; height: 40px; border-radius: 12px; border: 1px solid #e4e4e7; display: block; object-fit: cover;" />
+            </td>
+            ` : ''}
+            <td style="vertical-align: top;">
+              <div style="font-family: sans-serif; font-weight: bold; color: #18181b; font-size: 14px; margin-bottom: 2px;">
+                ${name}
+              </div>
+              <div style="font-family: sans-serif; color: #71717a; font-size: 12px; margin-bottom: 8px;">
+                ${title}
+              </div>
+              <div style="font-family: monospace; font-size: 11px; color: #52525b; line-height: 1.4; margin-bottom: 12px;">
+                <div>P: ${phone}</div>
+                <div>${location}</div>
+              </div>
+              <div style="font-family: monospace; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em;">
+                <a href="${linkedinUrl}" style="color: #002FA7; text-decoration: none; margin-right: 16px;">LINKEDIN</a>
+                <a href="https://nodalpoint.io" style="color: #002FA7; text-decoration: none; margin-right: 16px;">NETWORK</a>
+                <a href="https://nodalpoint.io/bill-debugger" style="color: #002FA7; text-decoration: none;">[ RUN_AUDIT ]</a>
+              </div>
+            </td>
+          </tr>
+        </table>
       </div>
     `
   }
