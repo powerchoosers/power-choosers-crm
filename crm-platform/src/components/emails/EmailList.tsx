@@ -28,16 +28,16 @@ interface EmailListProps {
   onSelectCount?: (count: number) => void
 }
 
-export function EmailList({ 
-  emails, 
-  isLoading, 
-  onRefresh, 
-  isSyncing, 
-  onSelectEmail, 
-  selectedEmailId, 
-  totalEmails, 
-  hasNextPage, 
-  fetchNextPage, 
+export function EmailList({
+  emails,
+  isLoading,
+  onRefresh,
+  isSyncing,
+  onSelectEmail,
+  selectedEmailId,
+  totalEmails,
+  hasNextPage,
+  fetchNextPage,
   isFetchingNextPage,
   currentPage: externalPage,
   onPageChange: externalOnPageChange,
@@ -48,7 +48,7 @@ export function EmailList({
 }: EmailListProps) {
   const [filter, setFilter] = useState<'all' | 'received' | 'sent'>('all')
   const [internalPage, setInternalPage] = useState(1)
-  
+
   const currentPage = externalPage || internalPage
   const setCurrentPage = externalOnPageChange || setInternalPage
 
@@ -57,18 +57,18 @@ export function EmailList({
   const filteredEmails = emails.filter(email => {
     if (filter === 'all') {
       // All nodes: show received + CRM-sent only (exclude Gmail-synced sent)
-      // CRM-sent IDs start with 'gmail_', Gmail-synced sent IDs are plain like '19c34a3c149e256b'
+      // CRM-sent IDs start with 'gmail_' or 'zoho_', Gmail-synced sent IDs are plain like '19c34a3c149e256b'
       if (email.type === 'sent') {
-        return email.id.startsWith('gmail_')
+        return email.id.startsWith('gmail_') || email.id.startsWith('zoho_')
       }
       return true
     }
     if (filter === 'received') return email.type === 'received'
     if (filter === 'sent') {
-      // Uplink out: only emails sent through CRM (tracking IDs start with 'gmail_')
+      // Uplink out: only emails sent through CRM (tracking IDs start with 'gmail_' or 'zoho_')
       // Gmail-synced sent emails have plain IDs like '19c34a3c149e256b'
-      // CRM-sent emails have IDs like 'gmail_1738881234567_abc123def'
-      return email.type === 'sent' && email.id.startsWith('gmail_')
+      // CRM-sent emails have IDs like 'gmail_1738881234567_abc123def' or 'zoho_1738881234567_abc123def'
+      return email.type === 'sent' && (email.id.startsWith('gmail_') || email.id.startsWith('zoho_'))
     }
     return email.type === filter
   })
@@ -129,7 +129,7 @@ export function EmailList({
           <p className="text-lg font-semibold text-white tracking-tighter">No_Entropy_Detected</p>
           <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Awaiting initial uplink synchronization</p>
         </div>
-        <button 
+        <button
           onClick={onRefresh}
           disabled={isSyncing}
           className="icon-button-forensic text-[10px] font-mono uppercase tracking-widest !text-zinc-500 hover:!text-white px-4 py-2 flex items-center gap-2 group"
@@ -147,15 +147,15 @@ export function EmailList({
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return null;
-      
+
       const threeMonthsAgo = subMonths(new Date(), 3)
       const isRecent = isAfter(date, threeMonthsAgo)
-      
+
       return (
         <div className="flex items-center gap-2 text-zinc-500 font-mono text-[10px] tabular-nums uppercase tracking-widest">
           <Clock size={12} className="text-zinc-600" />
           <span>
-            {isRecent 
+            {isRecent
               ? formatDistanceToNow(date, { addSuffix: true })
               : format(date, 'MMM d, yyyy')}
           </span>
@@ -269,141 +269,141 @@ export function EmailList({
             const hasClicks = clickCount > 0
             const rowIndex = (currentPage - 1) * itemsPerPage + index + 1
             const isSelected = selectedIds.has(email.id)
-            
+
             return (
-            <div
-              key={email.id}
-              onClick={() => onSelectEmail(email)}
-              className={cn(
-                "group grid grid-cols-12 gap-4 p-3 hover:bg-white/5 cursor-pointer transition-all items-center border-l-2",
-                hasClicks ? "border-[#002FA7]" : selectedEmailId === email.id ? "border-[#002FA7]" : "border-transparent",
-                email.unread ? "bg-[#002FA7]/5" : "",
-                isSelected ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10" : ""
-              )}
-            >
-              {/* Select / Row number */}
-              <div className="col-span-1 flex items-center justify-center relative group/select">
-                {onSelectionChange ? (
-                  <>
-                    <span className={cn(
-                      "font-mono text-[10px] text-zinc-700 transition-opacity",
-                      isSelected ? "opacity-0" : "group-hover/select:opacity-0"
-                    )}>
-                      {rowIndex.toString().padStart(2, '0')}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); toggleRow(email); }}
-                      className={cn(
-                        "absolute inset-0 m-auto w-4 h-4 rounded border transition-all flex items-center justify-center",
-                        isSelected
-                          ? "bg-[#002FA7] border-[#002FA7] opacity-100"
-                          : "bg-white/5 border-white/10 opacity-0 group-hover/select:opacity-100"
-                      )}
-                    >
-                      {isSelected && <Check className="w-3 h-3 text-white" />}
-                    </button>
-                  </>
-                ) : (
-                  <span className="font-mono text-[10px] text-zinc-700">{rowIndex.toString().padStart(2, '0')}</span>
+              <div
+                key={email.id}
+                onClick={() => onSelectEmail(email)}
+                className={cn(
+                  "group grid grid-cols-12 gap-4 p-3 hover:bg-white/5 cursor-pointer transition-all items-center border-l-2",
+                  hasClicks ? "border-[#002FA7]" : selectedEmailId === email.id ? "border-[#002FA7]" : "border-transparent",
+                  email.unread ? "bg-[#002FA7]/5" : "",
+                  isSelected ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10" : ""
                 )}
-              </div>
-              {/* Avatar Icon */}
-              <div className="col-span-1 flex justify-center relative -ml-4">
-                 {email.unread && (
-                   <div className="absolute top-0 right-1/4 w-2 h-2 rounded-full bg-[#002FA7] animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.8)] z-10" />
-                 )}
-                 <div className={cn(
-                   "w-9 h-9 rounded-2xl nodal-glass flex items-center justify-center text-[10px] font-mono font-semibold border border-white/10 shadow-sm transition-all",
-                   email.type === 'sent' ? "text-zinc-500" : "text-white"
-                 )}>
-                    {email.type === 'sent' ? 'NP' : (typeof email.from === 'string' ? email.from?.[0]?.toUpperCase() : '?')}
-                </div>
-              </div>
-
-              {/* Participant */}
-              <div className="col-span-3 min-w-0">
-                 <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "text-sm truncate font-mono tracking-tight transition-all origin-left group-hover:scale-[1.02]", 
-                      email.unread ? "font-semibold text-white" : "text-zinc-400 group-hover:text-zinc-200"
-                    )}>
-                        {email.type === 'sent' ? `To: ${Array.isArray(email.to) ? email.to.join(', ') : email.to}` : email.from}
-                    </span>
-                    {email.type === 'sent' ? (
-                        <ArrowUpRight className="w-3 h-3 text-zinc-700 flex-none group-hover:text-zinc-500" />
-                    ) : (
-                        <ArrowDownLeft className="w-3 h-3 text-zinc-600 flex-none group-hover:text-zinc-400" />
-                    )}
-                 </div>
-              </div>
-
-              {/* Message Preview */}
-              <div className={cn("min-w-0 space-y-1", filter === 'sent' ? "col-span-3" : "col-span-5")}>
-                <div className="flex items-center gap-2">
-                  <h4 className={cn(
-                    "text-sm truncate tracking-tight transition-all origin-left group-hover:scale-[1.02] flex-1", 
-                    email.unread ? "font-medium text-zinc-100" : "text-zinc-500 group-hover:text-zinc-300"
-                  )}>
-                      {email.subject}
-                  </h4>
-                  {email.attachments && email.attachments.length > 0 && (
-                    <div className="flex items-center gap-1 text-zinc-500 flex-shrink-0" title={`${email.attachments.length} attachment${email.attachments.length > 1 ? 's' : ''}`}>
-                      <Paperclip className="w-3 h-3" />
-                      {email.attachments.length > 1 && (
-                        <span className="text-[10px] font-mono tabular-nums">{email.attachments.length}</span>
-                      )}
-                    </div>
+              >
+                {/* Select / Row number */}
+                <div className="col-span-1 flex items-center justify-center relative group/select">
+                  {onSelectionChange ? (
+                    <>
+                      <span className={cn(
+                        "font-mono text-[10px] text-zinc-700 transition-opacity",
+                        isSelected ? "opacity-0" : "group-hover/select:opacity-0"
+                      )}>
+                        {rowIndex.toString().padStart(2, '0')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); toggleRow(email); }}
+                        className={cn(
+                          "absolute inset-0 m-auto w-4 h-4 rounded border transition-all flex items-center justify-center",
+                          isSelected
+                            ? "bg-[#002FA7] border-[#002FA7] opacity-100"
+                            : "bg-white/5 border-white/10 opacity-0 group-hover/select:opacity-100"
+                        )}
+                      >
+                        {isSelected && <Check className="w-3 h-3 text-white" />}
+                      </button>
+                    </>
+                  ) : (
+                    <span className="font-mono text-[10px] text-zinc-700">{rowIndex.toString().padStart(2, '0')}</span>
                   )}
                 </div>
-                <p className="text-xs text-zinc-600 truncate group-hover:text-zinc-500 transition-colors">
-                  {email.snippet || email.text || 'No preview available'}
-                </p>
-              </div>
-
-              {/* Telemetry Column - Only show for sent emails filter */}
-              {filter === 'sent' && (
-                <div className="col-span-2 flex items-center">
-                  <div className="flex items-center gap-3 bg-white/5 rounded px-2 py-1 border border-white/5 w-fit">
-                    {/* Opens */}
-                    <div className="flex items-center gap-1">
-                      <Eye 
-                        size={12} 
-                        className={cn(
-                          openCount > 0 ? "text-emerald-400" : "text-zinc-600"
-                        )} 
-                      />
-                      <span className={cn(
-                        "text-[10px] font-mono tabular-nums",
-                        openCount > 2 ? "text-white" : openCount > 0 ? "text-emerald-400" : "text-zinc-600"
-                      )}>
-                        {openCount}
-                      </span>
-                    </div>
-                    {/* Clicks */}
-                    <div className="flex items-center gap-1">
-                      <MousePointer2 
-                        size={12} 
-                        className={cn(
-                          clickCount > 0 ? "text-[#002FA7]" : "text-zinc-600"
-                        )} 
-                      />
-                      <span className={cn(
-                        "text-[10px] font-mono tabular-nums",
-                        clickCount > 0 ? "text-[#002FA7]" : "text-zinc-600"
-                      )}>
-                        {clickCount}
-                      </span>
-                    </div>
+                {/* Avatar Icon */}
+                <div className="col-span-1 flex justify-center relative -ml-4">
+                  {email.unread && (
+                    <div className="absolute top-0 right-1/4 w-2 h-2 rounded-full bg-[#002FA7] animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.8)] z-10" />
+                  )}
+                  <div className={cn(
+                    "w-9 h-9 rounded-2xl nodal-glass flex items-center justify-center text-[10px] font-mono font-semibold border border-white/10 shadow-sm transition-all",
+                    email.type === 'sent' ? "text-zinc-500" : "text-white"
+                  )}>
+                    {email.type === 'sent' ? 'NP' : (typeof email.from === 'string' ? email.from?.[0]?.toUpperCase() : '?')}
                   </div>
                 </div>
-              )}
 
-              {/* Date */}
-              <div className="col-span-2 flex justify-end">
-                {formatDate(email.date)}
+                {/* Participant */}
+                <div className="col-span-3 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      "text-sm truncate font-mono tracking-tight transition-all origin-left group-hover:scale-[1.02]",
+                      email.unread ? "font-semibold text-white" : "text-zinc-400 group-hover:text-zinc-200"
+                    )}>
+                      {email.type === 'sent' ? `To: ${Array.isArray(email.to) ? email.to.join(', ') : email.to}` : email.from}
+                    </span>
+                    {email.type === 'sent' ? (
+                      <ArrowUpRight className="w-3 h-3 text-zinc-700 flex-none group-hover:text-zinc-500" />
+                    ) : (
+                      <ArrowDownLeft className="w-3 h-3 text-zinc-600 flex-none group-hover:text-zinc-400" />
+                    )}
+                  </div>
+                </div>
+
+                {/* Message Preview */}
+                <div className={cn("min-w-0 space-y-1", filter === 'sent' ? "col-span-3" : "col-span-5")}>
+                  <div className="flex items-center gap-2">
+                    <h4 className={cn(
+                      "text-sm truncate tracking-tight transition-all origin-left group-hover:scale-[1.02] flex-1",
+                      email.unread ? "font-medium text-zinc-100" : "text-zinc-500 group-hover:text-zinc-300"
+                    )}>
+                      {email.subject}
+                    </h4>
+                    {email.attachments && email.attachments.length > 0 && (
+                      <div className="flex items-center gap-1 text-zinc-500 flex-shrink-0" title={`${email.attachments.length} attachment${email.attachments.length > 1 ? 's' : ''}`}>
+                        <Paperclip className="w-3 h-3" />
+                        {email.attachments.length > 1 && (
+                          <span className="text-[10px] font-mono tabular-nums">{email.attachments.length}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-zinc-600 truncate group-hover:text-zinc-500 transition-colors">
+                    {email.snippet || email.text || 'No preview available'}
+                  </p>
+                </div>
+
+                {/* Telemetry Column - Only show for sent emails filter */}
+                {filter === 'sent' && (
+                  <div className="col-span-2 flex items-center">
+                    <div className="flex items-center gap-3 bg-white/5 rounded px-2 py-1 border border-white/5 w-fit">
+                      {/* Opens */}
+                      <div className="flex items-center gap-1">
+                        <Eye
+                          size={12}
+                          className={cn(
+                            openCount > 0 ? "text-emerald-400" : "text-zinc-600"
+                          )}
+                        />
+                        <span className={cn(
+                          "text-[10px] font-mono tabular-nums",
+                          openCount > 2 ? "text-white" : openCount > 0 ? "text-emerald-400" : "text-zinc-600"
+                        )}>
+                          {openCount}
+                        </span>
+                      </div>
+                      {/* Clicks */}
+                      <div className="flex items-center gap-1">
+                        <MousePointer2
+                          size={12}
+                          className={cn(
+                            clickCount > 0 ? "text-[#002FA7]" : "text-zinc-600"
+                          )}
+                        />
+                        <span className={cn(
+                          "text-[10px] font-mono tabular-nums",
+                          clickCount > 0 ? "text-[#002FA7]" : "text-zinc-600"
+                        )}>
+                          {clickCount}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Date */}
+                <div className="col-span-2 flex justify-end">
+                  {formatDate(email.date)}
+                </div>
               </div>
-            </div>
             )
           })}
         </div>
@@ -412,48 +412,48 @@ export function EmailList({
       {/* Pagination Footer */}
       <div className="flex-none border-t border-white/5 nodal-recessed p-4 flex items-center justify-between z-10">
         <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
-              <span>Sync_Block {showingStart}–{showingEnd}</span>
-              <div className="h-1 w-1 rounded-full bg-zinc-800" />
-              <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{filteredEmails.length}</span></span>
-            </div>
+          <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
+            <span>Sync_Block {showingStart}–{showingEnd}</span>
+            <div className="h-1 w-1 rounded-full bg-zinc-800" />
+            <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{filteredEmails.length}</span></span>
+          </div>
         </div>
         <div className="flex items-center gap-2">
-            <button 
-                onClick={() => handlePageChange(Math.max(1, currentPage - 1))} 
-                disabled={currentPage === 1}
-                className="icon-button-forensic w-8 h-8 disabled:opacity-30 disabled:cursor-not-allowed"
-                aria-label="Previous page"
-            >
-                <ChevronLeft className="h-4 w-4" />
-            </button>
-            <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
-              {currentPage.toString().padStart(2, '0')}
-            </div>
-            <button 
-                onClick={async () => {
-                  const nextPage = currentPage + 1
-                  const needed = nextPage * itemsPerPage
+          <button
+            onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
+            className="icon-button-forensic w-8 h-8 disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label="Previous page"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
+            {currentPage.toString().padStart(2, '0')}
+          </div>
+          <button
+            onClick={async () => {
+              const nextPage = currentPage + 1
+              const needed = nextPage * itemsPerPage
 
-                  if (
-                    fetchNextPage &&
-                    hasNextPage &&
-                    !isFetchingNextPage &&
-                    filteredEmails.length < needed
-                  ) {
-                    await fetchNextPage()
-                  }
+              if (
+                fetchNextPage &&
+                hasNextPage &&
+                !isFetchingNextPage &&
+                filteredEmails.length < needed
+              ) {
+                await fetchNextPage()
+              }
 
-                  if (hasNextPage || nextPage <= totalPages) {
-                    handlePageChange(nextPage)
-                  }
-                }}
-                disabled={(!hasNextPage && currentPage >= totalPages) || isFetchingNextPage}
-                className="icon-button-forensic w-8 h-8 disabled:opacity-30 disabled:cursor-not-allowed"
-                aria-label="Next page"
-            >
-                <ChevronRight className="h-4 w-4" />
-            </button>
+              if (hasNextPage || nextPage <= totalPages) {
+                handlePageChange(nextPage)
+              }
+            }}
+            disabled={(!hasNextPage && currentPage >= totalPages) || isFetchingNextPage}
+            className="icon-button-forensic w-8 h-8 disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label="Next page"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </div>
