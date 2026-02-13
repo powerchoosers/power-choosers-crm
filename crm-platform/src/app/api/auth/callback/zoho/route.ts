@@ -49,27 +49,44 @@ export async function GET(request: Request) {
         }
 
         const accessToken = tokenData.access_token;
-        console.log('Zoho OAuth: Token exchange successful. Fetching user info...');
+        const idToken = tokenData.id_token; // OIDC token if scope included openid
+        console.log('Zoho OAuth: Token exchange successful.');
 
-        // 2. Get User Info
-        const userResponse = await fetch('https://accounts.zoho.com/oauth/user/info', {
-            headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        let email: string | null = null;
 
-        if (!userResponse.ok) {
-            const errorText = await userResponse.text();
-            console.error('Zoho UserInfo API Error:', errorText);
-            throw new Error(`Failed to fetch user info: ${userResponse.statusText}`);
+        // Try to decode email from id_token first if available (safer/faster)
+        if (idToken) {
+            try {
+                const parts = idToken.split('.');
+                if (parts.length === 3) {
+                    const payload = JSON.parse(atob(parts[1]));
+                    email = payload.email || payload.Email;
+                    console.log('Zoho OAuth: Extracted email from ID Token:', email);
+                }
+            } catch (e) {
+                console.warn('Zoho OAuth: Failed to decode ID Token:', e);
+            }
         }
 
-        const userData = await userResponse.json();
-        console.log('Zoho User Data received:', JSON.stringify(userData));
+        // If no email from id_token, try user info endpoint
+        if (!email) {
+            console.log('Zoho OAuth: Fetching user info from endpoint...');
+            const userResponse = await fetch('https://accounts.zoho.com/oauth/user/info', {
+                headers: { Authorization: `Bearer ${accessToken}` },
+            });
 
-        // Zoho can return email in several field names depending on scopes/API
-        const email = userData.Email || userData.email || userData.email_id || userData.principal_name;
+            if (!userResponse.ok) {
+                const errorText = await userResponse.text();
+                console.error('Zoho UserInfo API Error:', userResponse.status, errorText);
+                throw new Error(`Failed to fetch user info: ${userResponse.status} ${userResponse.statusText}`);
+            }
+
+            const userData = await userResponse.json();
+            console.log('Zoho User Data received:', JSON.stringify(userData));
+            email = userData.Email || userData.email || userData.email_id || userData.principal_name;
+        }
 
         if (!email) {
-            console.error('Zoho User Data missing email:', userData);
             throw new Error('Could not retrieve email identity from Zoho');
         }
 
