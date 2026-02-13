@@ -393,6 +393,7 @@ function ComposePanel({
 
   // Foundry template state
   const [selectedFoundryId, setSelectedFoundryId] = useState<string | null>(null)
+  const foundrySelectValue = selectedFoundryId || 'none'
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false)
 
   // AI Command Rail state
@@ -1111,13 +1112,13 @@ CRITICAL OUTPUT RULES:
 
             {/* Foundry Template Selector */}
             <div className="h-6 w-px bg-white/10" />
-            <Select value={selectedFoundryId || ''} onValueChange={(v) => setSelectedFoundryId(v || null)}>
+            <Select value={foundrySelectValue} onValueChange={(v) => setSelectedFoundryId(v === 'none' ? null : v)}>
               <SelectTrigger className="h-8 w-auto min-w-[140px] bg-white/5 border-white/10 text-[10px] font-mono text-zinc-400 uppercase tracking-wider rounded-lg">
                 <Zap className="w-3.5 h-3.5 text-[#002FA7]" />
                 <SelectValue placeholder="Foundry Template" />
               </SelectTrigger>
               <SelectContent className="bg-zinc-950 nodal-monolith-edge z-[200]">
-                <SelectItem value="" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                <SelectItem value="none" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                   None (Standard Email)
                 </SelectItem>
                 {foundryAssets?.map((asset: any) => (
