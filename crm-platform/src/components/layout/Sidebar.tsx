@@ -4,24 +4,24 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { auth } from '@/lib/firebase'
 import { toast } from 'sonner'
-import { 
-  LayoutGrid, 
-  Building2, 
-  Users, 
-  Map, 
-  Radar, 
-  GitMerge, 
-  CheckSquare, 
-  Mail, 
-  Phone, 
-  Activity, 
-  FileText, 
-  Settings, 
+import {
+  LayoutGrid,
+  Building2,
+  Users,
+  Map,
+  Radar,
+  GitMerge,
+  CheckSquare,
+  Mail,
+  Phone,
+  Activity,
+  FileText,
+  Settings,
   LogOut,
   Plus,
   Zap
@@ -36,14 +36,14 @@ const navigationStructure = [
       { name: 'Dashboard', href: '/network', icon: LayoutGrid }
     ]
   },
-  
+
   // ZONE 2: ASSET INTELLIGENCE (The Grid Entities)
   {
     group: "Assets",
     items: [
       { name: 'Accounts', href: '/network/accounts', icon: Building2 },
       { name: 'People', href: '/network/people', icon: Users },
-      { name: 'Infrastructure', href: '/network/infrastructure', icon: Map } 
+      { name: 'Infrastructure', href: '/network/infrastructure', icon: Map }
     ]
   },
 
@@ -91,71 +91,76 @@ export function Sidebar() {
   const router = useRouter()
   const { user, role } = useAuth()
   const [isHovered, setIsHovered] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleLogout = async () => {
     try {
-        await auth.signOut()
-        document.cookie = 'np_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;'
-        toast.success('Logged out successfully')
-        router.push('/login')
+      await auth.signOut()
+      document.cookie = 'np_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;'
+      toast.success('Logged out successfully')
+      router.push('/login')
     } catch (error) {
-        console.error('Logout error:', error)
-        toast.error('Failed to logout')
+      console.error('Logout error:', error)
+      toast.error('Failed to logout')
     }
   }
 
   // suppressHydrationWarning: browser extensions (e.g. Cursor) can inject data-cursor-ref onto <a> tags
   // after SSR, causing server/client attribute mismatch. Suppress only for this sidebar subtree.
   return (
-    <motion.aside 
+    <motion.aside
       layout
       suppressHydrationWarning
       className={cn(
         "fixed left-0 top-0 bottom-0 z-40 bg-zinc-950 border-r border-white/5 flex flex-col shadow-2xl transition-shadow duration-500"
       )}
-      animate={{ 
+      animate={{
         width: isHovered ? 280 : 70,
         boxShadow: isHovered ? "0 25px 50px -12px rgba(0, 0, 0, 0.5)" : "0 0 0 0 rgba(0, 0, 0, 0)"
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      transition={{ 
-        type: "spring", 
-        stiffness: 300, 
+      transition={{
+        type: "spring",
+        stiffness: 300,
         damping: 30,
         mass: 0.8
       }}
     >
-      <motion.div 
+      <motion.div
         className="h-24 flex items-center justify-start border-b border-white/5 overflow-hidden whitespace-nowrap"
-        animate={{ 
+        animate={{
           paddingLeft: isHovered ? 18 : 11,
-          paddingRight: isHovered ? 18 : 11 
+          paddingRight: isHovered ? 18 : 11
         }}
-        transition={{ 
-          type: "spring", 
-          stiffness: 300, 
+        transition={{
+          type: "spring",
+          stiffness: 300,
           damping: 30,
           mass: 0.8
         }}
       >
-        <motion.div 
-            layout="position"
-            className="w-12 h-12 bg-white rounded-xl flex items-center justify-center flex-shrink-0 p-2 shadow-lg shadow-black/20"
-            transition={{ 
-              type: "spring", 
-              stiffness: 300, 
-              damping: 30,
-              mass: 0.8
-            }}
-          >
+        <motion.div
+          layout="position"
+          className="w-12 h-12 bg-white rounded-xl flex items-center justify-center flex-shrink-0 p-2 shadow-lg shadow-black/20"
+          transition={{
+            type: "spring",
+            stiffness: 300,
+            damping: 30,
+            mass: 0.8
+          }}
+        >
           <div className="relative w-full h-full">
             <Image src="/images/nodalpoint.png" alt="Nodal Point" fill className="object-contain" />
           </div>
         </motion.div>
         <AnimatePresence>
           {isHovered && (
-            <motion.div 
+            <motion.div
               key="sidebar-title"
               layout="position"
               initial={{ opacity: 0, x: -10, filter: "blur(4px)" }}
@@ -169,32 +174,32 @@ export function Sidebar() {
           )}
         </AnimatePresence>
       </motion.div>
-      
-      <motion.nav 
+
+      <motion.nav
         className={cn(
           "flex-1 py-6 flex flex-col overflow-x-hidden",
           isHovered ? "overflow-y-auto custom-scrollbar" : "overflow-y-hidden"
         )}
-        animate={{ 
+        animate={{
           paddingLeft: isHovered ? 18 : 11,
-          paddingRight: isHovered ? 18 : 11 
+          paddingRight: isHovered ? 18 : 11
         }}
-        transition={{ 
-          type: "spring", 
-          stiffness: 300, 
+        transition={{
+          type: "spring",
+          stiffness: 300,
           damping: 30,
           mass: 0.8
         }}
       >
         {navigationStructure.map((group, groupIndex) => (
-          <motion.div 
+          <motion.div
             layout
-            key={group.group} 
+            key={group.group}
             className={cn("flex flex-col gap-1", groupIndex !== navigationStructure.length - 1 && (isHovered ? "mb-8" : "mb-4"))}
           >
             <AnimatePresence mode="popLayout">
               {isHovered ? (
-                <motion.div 
+                <motion.div
                   key="header"
                   layout
                   initial={{ opacity: 0, filter: "blur(4px)" }}
@@ -217,10 +222,10 @@ export function Sidebar() {
                 )
               )}
             </AnimatePresence>
-            
+
             {group.items.map((item: any) => {
               const isActive = pathname === item.href
-              
+
               const content = (
                 <>
                   <AnimatePresence>
@@ -246,20 +251,20 @@ export function Sidebar() {
                       </motion.div>
                     )}
                   </AnimatePresence>
-                  
-                  <motion.div 
+
+                  <motion.div
                     layout
                     className="flex-shrink-0 w-12 flex justify-center items-center relative z-10"
                   >
                     <div className="relative">
-                      <item.icon 
-                        size={20} 
+                      <item.icon
+                        size={20}
                         className={cn(
-                          "transition-all duration-300", 
-                          isActive 
-                            ? "text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]" 
+                          "transition-all duration-300",
+                          isActive
+                            ? "text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]"
                             : "text-zinc-500 group-hover:text-zinc-200 group-hover:scale-110"
-                        )} 
+                        )}
                       />
                       {item.isAction && (
                         <div className="absolute -top-1 -right-1">
@@ -268,10 +273,10 @@ export function Sidebar() {
                       )}
                     </div>
                   </motion.div>
-                  
+
                   <AnimatePresence mode="popLayout">
                     {isHovered && (
-                      <motion.span 
+                      <motion.span
                         key="nav-item-name"
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -288,8 +293,8 @@ export function Sidebar() {
 
               const buttonClasses = cn(
                 "flex items-center rounded-xl group relative h-12 justify-start w-full overflow-hidden",
-                isActive 
-                  ? "text-white" 
+                isActive
+                  ? "text-white"
                   : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.02]"
               );
 
@@ -321,81 +326,85 @@ export function Sidebar() {
           </motion.div>
         ))}
       </motion.nav>
-      
-      <motion.div 
+
+      <motion.div
         layout
         className="border-t border-white/5 overflow-hidden whitespace-nowrap bg-zinc-950/50 backdrop-blur-md"
-        animate={{ 
-           paddingLeft: isHovered ? 18 : 15,
-           paddingRight: isHovered ? 18 : 15,
-           paddingTop: isHovered ? 15 : 15,
-           paddingBottom: isHovered ? 15 : 15
-         }}
-        transition={{ 
-          type: "spring", 
-          stiffness: 300, 
+        animate={{
+          paddingLeft: isHovered ? 18 : 15,
+          paddingRight: isHovered ? 18 : 15,
+          paddingTop: isHovered ? 15 : 15,
+          paddingBottom: isHovered ? 15 : 15
+        }}
+        transition={{
+          type: "spring",
+          stiffness: 300,
           damping: 30,
           mass: 0.8
         }}
       >
         <div className="flex items-center gap-3 h-10">
-            <motion.div 
-              layout="position"
-              className="w-10 h-10 rounded-xl bg-zinc-900 border border-white/10 flex-shrink-0 flex items-center justify-center overflow-hidden shadow-inner"
-              transition={{ 
-                type: "spring", 
-                stiffness: 300, 
-                damping: 30,
-                mass: 0.8
-              }}
-            >
-                {user?.photoURL ? (
-                    <Image 
-                        src={user.photoURL} 
-                        alt="User" 
-                        width={40}
-                        height={40}
-                        className="w-full h-full object-cover" 
-                    />
-                ) : (
-                    <span className="text-sm font-bold text-zinc-500">
-                        {user?.email ? user.email[0].toUpperCase() : 'U'}
-                    </span>
-                )}
-            </motion.div>
-            <AnimatePresence>
-              {isHovered && (
-                <motion.div 
-                  key="user-profile-info"
-                  layout="position"
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  className="flex-1 min-w-0"
-                >
-                    <div className="text-sm text-white font-semibold truncate">{user?.displayName || user?.email?.split('@')[0] || 'User'}</div>
-                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono truncate">{role || 'Network_Agent'}</div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            
-            <AnimatePresence>
-              {isHovered && (
-                <motion.button
-                  key="logout-button"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={handleLogout}
-                  className="p-2.5 hover:bg-red-500/10 rounded-xl text-zinc-500 hover:text-red-400 transition-colors"
-                  title="Terminate Session"
-                >
-                  <LogOut size={18} />
-                </motion.button>
-              )}
-            </AnimatePresence>
+          <motion.div
+            layout="position"
+            className="w-10 h-10 rounded-xl bg-zinc-900 border border-white/10 flex-shrink-0 flex items-center justify-center overflow-hidden shadow-inner"
+            transition={{
+              type: "spring",
+              stiffness: 300,
+              damping: 30,
+              mass: 0.8
+            }}
+          >
+            {user?.photoURL ? (
+              <Image
+                src={user.photoURL}
+                alt="User"
+                width={40}
+                height={40}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-sm font-bold text-zinc-500">
+                {user?.email ? user.email[0].toUpperCase() : 'U'}
+              </span>
+            )}
+          </motion.div>
+          <AnimatePresence>
+            {isHovered && (
+              <motion.div
+                key="user-profile-info"
+                layout="position"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                className="flex-1 min-w-0"
+              >
+                <div className="text-sm text-white font-semibold truncate">
+                  {mounted ? (user?.displayName || user?.email?.split('@')[0] || 'User') : 'User'}
+                </div>
+                <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono truncate">
+                  {mounted ? (role || 'Network_Agent') : 'Network_Agent'}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {isHovered && (
+              <motion.button
+                key="logout-button"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={handleLogout}
+                className="p-2.5 hover:bg-red-500/10 rounded-xl text-zinc-500 hover:text-red-400 transition-colors"
+                title="Terminate Session"
+              >
+                <LogOut size={18} />
+              </motion.button>
+            )}
+          </AnimatePresence>
         </div>
       </motion.div>
     </motion.aside>

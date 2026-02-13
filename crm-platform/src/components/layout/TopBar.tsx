@@ -58,9 +58,23 @@ export function TopBar() {
 
   const { data: marketPulse, isError: isMarketError } = useMarketPulse()
   const storeContext = useGeminiStore((state) => state.activeContext)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Operational Strategy Logic
   const marketStrategy = useMemo(() => {
+    if (!mounted) {
+      return {
+        strategy: 'INITIALIZING',
+        statusColor: 'bg-zinc-500',
+        pulseColor: 'shadow-[0_0_8px_rgba(113,113,122,0.5)]',
+        windowText: 'SYNCHRONIZING_TELEMETRY...'
+      };
+    }
+
     const now = new Date();
     const month = now.getMonth() + 1; // 1-12
     const isSummer = month >= 6 && month <= 9;
