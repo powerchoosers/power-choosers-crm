@@ -228,10 +228,24 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
       })
     const variables = [...new Set([...chipVars.filter(Boolean), ...textVars])]
 
+    // Strip AI-generated text before saving to keep template dynamic
+    const blocksToSave = blocks.map(block => {
+      if (block.type === 'TEXT_MODULE') {
+        const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content || ''), useAi: false, aiPrompt: '' }
+        if (contentObj.useAi) {
+          return {
+            ...block,
+            content: { ...contentObj, text: '', bullets: [] } // Clear text and bullets for AI blocks
+          }
+        }
+      }
+      return block
+    })
+
     const payload = {
       name: assetName,
       type: assetType,
-      content_json: { blocks },
+      content_json: { blocks: blocksToSave },
       compiled_html,
       variables
     }
@@ -516,8 +530,17 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
     }
   }, [isResizing])
 
+  const rootStyle = {
+    '--split-position': `${splitPosition}%`,
+    '--split-position-inv': `${100 - splitPosition}%`
+  } as React.CSSProperties
+
   return (
-    <div className="flex flex-col h-full bg-zinc-950 text-zinc-300 overflow-hidden rounded-2xl border border-white/5 shadow-2xl">
+    <div
+      aria-label="Foundry Builder Interface"
+      className="flex flex-col h-full bg-zinc-950 text-zinc-300 overflow-hidden rounded-2xl border border-white/5 shadow-2xl"
+      style={rootStyle}
+    >
       {/* Top Controls */}
       <div className="h-14 border-b border-white/5 flex items-center justify-between px-4 nodal-recessed bg-black/40">
         <div className="flex items-center gap-4">
@@ -526,6 +549,8 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
               <Zap size={14} className="text-[#002FA7]" />
             </div>
             <input
+              aria-label="Asset Name"
+              title="Asset Name"
               value={assetName}
               onChange={(e) => setAssetName(e.target.value)}
               className="bg-transparent border-none focus:ring-0 font-mono text-sm font-bold tracking-tighter text-white p-0 w-48"
@@ -534,6 +559,8 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
           </div>
           <div className="h-4 w-px bg-white/10" />
           <select
+            aria-label="Asset Type"
+            title="Asset Type"
             value={assetType}
             onChange={(e) => setAssetType(e.target.value as any)}
             className="bg-transparent border-none focus:ring-0 font-mono text-[10px] uppercase tracking-widest text-zinc-500 cursor-pointer"
@@ -582,8 +609,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left Panel: The Forge */}
         <div
-          className="flex flex-col border-r border-white/5 bg-zinc-950 overflow-hidden"
-          style={{ width: `${splitPosition}%` }}
+          className="flex flex-col border-r border-white/5 bg-zinc-950 overflow-hidden w-[var(--split-position)]"
         >
           {/* Block Library */}
           <div className="p-4 border-b border-white/5 nodal-recessed flex gap-2 overflow-x-auto no-scrollbar">
@@ -647,6 +673,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                               }}
                               className="p-1 hover:text-[#002FA7]"
                               title="Add Row"
+                              aria-label="Add Row"
                             >
                               <Plus size={14} />
                             </button>
@@ -660,6 +687,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                               }}
                               className="p-1 hover:text-[#002FA7]"
                               title="Add Column"
+                              aria-label="Add Column"
                             >
                               <TableIcon size={14} />
                             </button>
@@ -671,6 +699,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                           disabled={blocks.findIndex(b => b.id === block.id) === 0}
                           className="p-1 hover:text-[#002FA7] disabled:opacity-30 disabled:cursor-not-allowed"
                           aria-label="Move up"
+                          title="Move up"
                         >
                           <ChevronUp size={14} />
                         </button>
@@ -680,10 +709,13 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                           disabled={blocks.findIndex(b => b.id === block.id) === blocks.length - 1}
                           className="p-1 hover:text-[#002FA7] disabled:opacity-30 disabled:cursor-not-allowed"
                           aria-label="Move down"
+                          title="Move down"
                         >
                           <ChevronDown size={14} />
                         </button>
                         <button
+                          aria-label="Delete block"
+                          title="Delete block"
                           onClick={(e) => { e.stopPropagation(); removeBlock(block.id); }}
                           className="p-1 hover:text-red-400"
                         >
@@ -703,6 +735,8 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                           <div className="flex items-center gap-2">
                             <Switch
                               checked={useAi}
+                              aria-label="Activate AI Generation"
+                              title="Activate AI Generation"
                               onCheckedChange={(checked) => {
                                 const currentContent = typeof block.content === 'object' ? block.content : { text: String(block.content || ''), useAi: false, aiPrompt: '' }
                                 // When turning AI on, clear the text so placeholder shows in preview
@@ -732,6 +766,8 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                             <div className="space-y-2">
                               <textarea
                                 value={contentObj.aiPrompt || ''}
+                                aria-label="AI Prompt"
+                                title="AI Prompt"
                                 onChange={(e) => {
                                   const currentContent = typeof block.content === 'object' ? block.content : { text: String(block.content || ''), useAi: true, aiPrompt: '' }
                                   updateBlockContent(block.id, { ...currentContent, aiPrompt: e.target.value })
@@ -748,6 +784,8 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                               <textarea
                                 ref={(el) => { if (activeBlock === block.id) textModuleTextareaRef.current = el }}
                                 value={contentObj.text || ''}
+                                aria-label="Narrative text"
+                                title="Narrative text"
                                 onChange={(e) => {
                                   const currentContent = typeof block.content === 'object' ? block.content : { text: '', useAi: false, aiPrompt: '' }
                                   updateBlockContent(block.id, { ...currentContent, text: e.target.value })
@@ -851,6 +889,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                                   />
                                   <button
                                     type="button"
+                                    aria-label="Remove bullet"
                                     onClick={() => {
                                       const newBullets = (contentObj.bullets ?? []).filter((_: any, i: number) => i !== bi)
                                       updateBlockContent(block.id, { ...contentObj, bullets: newBullets })
@@ -872,8 +911,11 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                       <div className="space-y-2">
                         <input
                           type="text"
+                          aria-label="Button Text"
+                          title="Button Text"
                           value={block.content}
                           onChange={(e) => updateBlockContent(block.id, e.target.value)}
+                          placeholder="INITIATE_PROTOCOL"
                           className="w-full bg-black/40 border border-white/5 rounded-md px-3 py-2 text-xs font-mono text-[#002FA7] uppercase tracking-widest focus:ring-1 focus:ring-[#002FA7]/50 outline-none"
                         />
                         <button
@@ -892,28 +934,43 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                         <Variable size={12} className="text-[#002FA7]" />
                         <input
                           type="text"
+                          aria-label="Variable Name"
+                          title="Variable Name"
                           value={block.content}
                           onChange={(e) => updateBlockContent(block.id, e.target.value)}
+                          placeholder="variable"
                           className="bg-transparent border-none focus:ring-0 text-[10px] font-mono text-[#002FA7] p-0 w-32"
                         />
                       </div>
                     )}
 
                     {block.type === 'TELEMETRY_GRID' && (
-                      <div className="space-y-3">
+                      <div
+                        aria-label="Telemetry Grid"
+                        className="space-y-3"
+                        // eslint-disable-next-line react/forbid-dom-props
+                        style={{ gridTemplateColumns: 'repeat(var(--num-cols), minmax(0, 1fr)) 24px' } as React.CSSProperties}
+                      >
+                        <style jsx>{`
+                          .space-y-3 {
+                            --num-cols: ${block.content.headers.length};
+                          }
+                        `}</style>
                         <div
-                          className="grid gap-2"
-                          style={{ gridTemplateColumns: `repeat(${block.content.headers.length}, minmax(0, 1fr)) 24px` }}
+                          className="grid gap-2 grid-cols-[repeat(var(--num-cols),minmax(0,1fr))_24px]"
                         >
                           {block.content.headers.map((h: string, i: number) => (
                             <div key={i} className="relative group/header">
                               <input
                                 value={h}
+                                aria-label={`Column Header ${i + 1}`}
+                                title={`Column Header ${i + 1}`}
                                 onChange={(e) => {
                                   const newHeaders = [...block.content.headers]
                                   newHeaders[i] = e.target.value
                                   updateBlockContent(block.id, { ...block.content, headers: newHeaders })
                                 }}
+                                placeholder="Metric"
                                 className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-500 uppercase focus:border-[#002FA7]/50 outline-none"
                               />
                             </div>
@@ -927,40 +984,51 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                           return (
                             <div
                               key={ri}
-                              className="grid gap-2 items-center group"
-                              style={{ gridTemplateColumns: `repeat(${block.content.headers.length}, minmax(0, 1fr)) 24px` }}
+                              className="grid gap-2 items-center group grid-cols-[repeat(var(--num-cols),minmax(0,1fr))_24px]"
                             >
                               {row.map((cell: string, ci: number) => (
                                 <div key={ci} className="flex items-center gap-2">
                                   <input
                                     value={cell}
+                                    aria-label={`Cell Row ${ri + 1} Col ${ci + 1}`}
+                                    title={`Cell Row ${ri + 1} Col ${ci + 1}`}
                                     onChange={(e) => {
                                       const newRows = [...block.content.rows]
                                       newRows[ri][ci] = e.target.value
-                                      updateBlockContent(block.id, { ...block.content, rows: newRows })
+                                      updateBlockContent(block.id, { ...block.content, headers: block.content.headers, rows: newRows })
                                     }}
+                                    placeholder="0.00"
                                     className={cn(
                                       "w-full bg-black/20 border border-white/5 rounded px-2 py-1 text-xs text-zinc-300 focus:border-[#002FA7]/50 outline-none",
                                       ci > 0 && VALUE_COLOR_CLASSES[currentColor].replace('bg-', 'text-')
                                     )}
                                   />
                                   {ci === row.length - 1 && (
-                                    <button
-                                      type="button"
+                                    <div
+                                      role="button"
+                                      tabIndex={0}
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        const nextIndex = (VALUE_COLORS.indexOf(currentColor) + 1) % VALUE_COLORS.length
-                                        const nextColor = VALUE_COLORS[nextIndex]
-                                        const nextColors = [...(block.content.valueColors ?? block.content.rows.map(() => 'black' as ValueColor))]
-                                        while (nextColors.length <= ri) nextColors.push('black')
-                                        nextColors[ri] = nextColor
-                                        updateBlockContent(block.id, { ...block.content, valueColors: nextColors })
+                                        const nextColor = VALUE_COLORS[(VALUE_COLORS.indexOf(currentColor) + 1) % VALUE_COLORS.length]
+                                        const newValueColors = [...(block.content?.valueColors ?? [])]
+                                        newValueColors[ri] = nextColor
+                                        updateBlockContent(block.id, { ...block.content, valueColors: newValueColors })
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                          e.stopPropagation()
+                                          const nextColor = VALUE_COLORS[(VALUE_COLORS.indexOf(currentColor) + 1) % VALUE_COLORS.length]
+                                          const newValueColors = [...(block.content?.valueColors ?? [])]
+                                          newValueColors[ri] = nextColor
+                                          updateBlockContent(block.id, { ...block.content, valueColors: newValueColors })
+                                        }
                                       }}
                                       className={cn(
-                                        'w-5 h-5 rounded border border-white/10 shrink-0',
+                                        "w-3 h-3 rounded-full cursor-pointer border border-white/20 transition-all hover:scale-110",
                                         VALUE_COLOR_CLASSES[currentColor]
                                       )}
                                       title={`Cycle color: ${currentColor}`}
+                                      aria-label={`Cycle color: ${currentColor}`}
                                     />
                                   )}
                                 </div>
@@ -975,6 +1043,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                                 }}
                                 className="p-1 text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
                                 title="Remove Row"
+                                aria-label="Remove Row"
                               >
                                 <Trash2 size={12} />
                               </button>
@@ -1011,8 +1080,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
 
                         {block.content.headers.length > 2 && (
                           <div
-                            className="grid gap-2"
-                            style={{ gridTemplateColumns: `repeat(${block.content.headers.length}, minmax(0, 1fr)) 24px` }}
+                            className="grid gap-2 grid-cols-[repeat(var(--num-cols),minmax(0,1fr))_24px]"
                           >
                             {block.content.headers.map((_: string, i: number) => (
                               <button
@@ -1042,6 +1110,8 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                             accept="image/*"
                             className="hidden"
                             id={`img-${block.id}`}
+                            aria-label="Upload Image"
+                            title="Upload Image"
                             onChange={async (e) => {
                               const file = e.target.files?.[0]
                               if (!file) return
@@ -1091,6 +1161,8 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                         <div className="grid gap-2">
                           <input
                             type="text"
+                            aria-label="Image description"
+                            title="Image description"
                             placeholder="Description (alt text)"
                             value={block.content?.description ?? ''}
                             onChange={(e) => updateBlockContent(block.id, { ...block.content, description: e.target.value })}
@@ -1098,6 +1170,8 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                           />
                           <input
                             type="text"
+                            aria-label="Image caption"
+                            title="Image caption"
                             placeholder="Caption (visible below image)"
                             value={block.content?.caption ?? ''}
                             onChange={(e) => updateBlockContent(block.id, { ...block.content, caption: e.target.value })}
@@ -1114,15 +1188,21 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                             <label className="text-[9px] font-mono text-zinc-500 uppercase">Baseline label</label>
                             <input
                               value={block.content?.baselineLabel ?? ''}
+                              aria-label="Baseline label"
+                              title="Baseline label"
                               onChange={(e) => updateBlockContent(block.id, { ...block.content, baselineLabel: e.target.value })}
+                              placeholder="Baseline label"
                               className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300"
                             />
                           </div>
                           <div className="space-y-1">
-                            <label className="text-[9px] font-mono text-zinc-500 uppercase">Baseline value ($/kWh)</label>
+                            <label className="text-[9px] font-mono text-zinc-500 uppercase">Value</label>
                             <input
                               value={block.content?.baselineValue ?? ''}
+                              aria-label="Baseline value"
+                              title="Baseline value"
                               onChange={(e) => updateBlockContent(block.id, { ...block.content, baselineValue: e.target.value })}
+                              placeholder="Value"
                               className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300"
                             />
                           </div>
@@ -1134,8 +1214,11 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                               type="number"
                               min={0}
                               max={100}
+                              aria-label="Risk percentage"
+                              title="Risk percentage"
                               value={block.content?.riskLevel ?? 75}
                               onChange={(e) => updateBlockContent(block.id, { ...block.content, riskLevel: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })}
+                              placeholder="Risk percentage"
                               className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300"
                             />
                           </div>
@@ -1143,7 +1226,10 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                             <label className="text-[9px] font-mono text-zinc-500 uppercase">Status</label>
                             <input
                               value={block.content?.status ?? ''}
+                              aria-label="Status"
+                              title="Status"
                               onChange={(e) => updateBlockContent(block.id, { ...block.content, status: e.target.value })}
+                              placeholder="Status"
                               className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300"
                             />
                           </div>
@@ -1152,8 +1238,11 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                           <label className="text-[9px] font-mono text-zinc-500 uppercase">Risk diagnosis note</label>
                           <textarea
                             value={block.content?.note ?? ''}
+                            aria-label="Risk diagnosis note"
+                            title="Risk diagnosis note"
                             onChange={(e) => updateBlockContent(block.id, { ...block.content, note: e.target.value })}
                             rows={2}
+                            placeholder="Risk diagnosis note"
                             className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300 resize-none"
                           />
                           <button
@@ -1187,15 +1276,19 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                               <span className="text-[#002FA7] text-[10px]">●</span>
                               <input
                                 value={bullet}
+                                aria-label="Bullet point"
+                                title="Bullet point"
                                 onChange={(e) => {
                                   const newBullets = [...(block.content?.bullets ?? [])]
                                   newBullets[bi] = e.target.value
                                   updateBlockContent(block.id, { ...block.content, bullets: newBullets })
                                 }}
+                                placeholder="Bullet point"
                                 className="flex-1 bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300"
                               />
                               <button
                                 type="button"
+                                aria-label="Remove bullet"
                                 onClick={() => {
                                   const newBullets = (block.content?.bullets ?? []).filter((_: any, i: number) => i !== bi)
                                   updateBlockContent(block.id, { ...block.content, bullets: newBullets })
@@ -1215,6 +1308,8 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                         <div className="space-y-1">
                           <label className="text-[9px] font-mono text-zinc-500 uppercase">Headline</label>
                           <input
+                            aria-label="Headline"
+                            title="Headline"
                             value={block.content?.headline ?? ''}
                             onChange={(e) => updateBlockContent(block.id, { ...block.content, headline: e.target.value })}
                             className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300"
@@ -1225,6 +1320,8 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                           <div className="space-y-1">
                             <label className="text-[9px] font-mono text-zinc-500 uppercase">Source</label>
                             <input
+                              aria-label="Source"
+                              title="Source"
                               value={block.content?.source ?? ''}
                               onChange={(e) => updateBlockContent(block.id, { ...block.content, source: e.target.value })}
                               className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300"
@@ -1234,6 +1331,8 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                           <div className="space-y-1">
                             <label className="text-[9px] font-mono text-zinc-500 uppercase">Impact level</label>
                             <input
+                              aria-label="Impact Level"
+                              title="Impact Level"
                               value={block.content?.impactLevel ?? ''}
                               onChange={(e) => updateBlockContent(block.id, { ...block.content, impactLevel: e.target.value })}
                               className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300"
@@ -1244,6 +1343,8 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                         <div className="space-y-1">
                           <label className="text-[9px] font-mono text-zinc-500 uppercase">URL</label>
                           <input
+                            aria-label="Breadcrumb URL"
+                            title="Breadcrumb URL"
                             value={block.content?.url ?? ''}
                             onChange={(e) => updateBlockContent(block.id, { ...block.content, url: e.target.value })}
                             className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300"
@@ -1254,10 +1355,12 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                           <label className="text-[9px] font-mono text-zinc-500 uppercase">Nodal Architect Analysis</label>
                           <textarea
                             value={block.content?.nodalAnalysis ?? ''}
+                            aria-label="Nodal Analysis"
+                            title="Nodal Analysis"
                             onChange={(e) => updateBlockContent(block.id, { ...block.content, nodalAnalysis: e.target.value })}
                             rows={2}
+                            placeholder="Analysis note"
                             className="w-full bg-black/40 border border-white/5 rounded px-2 py-1 text-[10px] font-mono text-zinc-300 resize-none"
-                            placeholder="Detected scarcity risk in {{contact.load_zone}}. Estimated variance: $0.12/kWh."
                           />
                           <button
                             type="button"
@@ -1279,8 +1382,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
 
         {/* Resizer Handle */}
         <div
-          className="absolute top-0 bottom-0 w-1 bg-white/5 hover:bg-[#002FA7]/40 cursor-col-resize z-10 flex items-center justify-center group transition-colors"
-          style={{ left: `${splitPosition}%`, transform: 'translateX(-50%)' }}
+          className="absolute top-0 bottom-0 w-1 bg-white/5 hover:bg-[#002FA7]/40 cursor-col-resize z-10 flex items-center justify-center group transition-colors left-[var(--split-position)] -translate-x-1/2"
           onMouseDown={() => setIsResizing(true)}
         >
           <div className="h-8 w-px bg-white/20 group-hover:bg-[#002FA7] transition-colors" />
@@ -1288,8 +1390,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
 
         {/* Right Panel: The Simulation */}
         <div
-          className="bg-white overflow-hidden flex flex-col"
-          style={{ width: `${100 - splitPosition}%` }}
+          className="bg-white overflow-hidden flex flex-col w-[var(--split-position-inv)]"
         >
           <div className="h-10 border-b border-zinc-200 bg-zinc-50 flex items-center px-4 justify-between gap-4">
             <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest shrink-0">Live_Simulation</span>
@@ -1312,8 +1413,8 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                 }
               }}
             >
-              <SelectTrigger size="sm" className="!h-6 !py-1 max-w-[220px] text-[10px] font-mono uppercase border-zinc-200 bg-white">
-                <SelectValue placeholder="Preview with contact" />
+              <SelectTrigger aria-label="Select preview contact" title="Select preview contact" className="h-6 bg-transparent border-none text-[10px] font-mono text-[#002FA7] uppercase tracking-widest gap-2 shadow-none focus:ring-0">
+                <SelectValue placeholder="SELECT_CONTACT_PREVIEW" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__" className="text-[10px] font-mono">None</SelectItem>
@@ -1475,9 +1576,12 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                                 <p className="text-xl font-mono text-zinc-900 tabular-nums">{block.content?.riskLevel ?? 75}%</p>
                               </div>
                             </div>
-                            <div className="h-2 w-full bg-zinc-300 rounded-full overflow-hidden">
+                            <div
+                              className="h-2 w-full bg-zinc-300 rounded-full overflow-hidden relative"
+                            >
                               <div
                                 className="h-full bg-[#002FA7] transition-all duration-1000"
+                                // eslint-disable-next-line react/forbid-dom-props
                                 style={{ width: `${Math.min(100, Math.max(0, Number(block.content?.riskLevel) ?? 75))}%` }}
                               />
                             </div>
