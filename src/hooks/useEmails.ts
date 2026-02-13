@@ -49,10 +49,10 @@ export function useEmails(searchQuery?: string) {
         let query = supabase
           .from('emails')
           .select('*', { count: 'exact' })
-        
+
         if (role !== 'admin') {
-           if (!user.email) return { emails: [], nextCursor: null }
-           query = query.eq('metadata->>ownerId', user.email.toLowerCase())
+          if (!user.email) return { emails: [], nextCursor: null }
+          query = query.eq('metadata->>ownerId', user.email.toLowerCase())
         }
 
         // Filter out mailwarming and automated emails
@@ -94,7 +94,7 @@ export function useEmails(searchQuery?: string) {
           // Normalize type from legacy or current formats
           let type: Email['type'] = 'received'
           const rawType = String(item.type || '').toLowerCase()
-          
+
           if (rawType === 'sent' || rawType === 'uplink_out') {
             type = 'sent'
           } else if (rawType === 'scheduled') {
@@ -106,7 +106,7 @@ export function useEmails(searchQuery?: string) {
           }
 
           const date = item.timestamp || item.createdAt || item.created_at
-          
+
           return {
             id: item.id,
             subject: item.subject,
@@ -158,7 +158,7 @@ export function useEmails(searchQuery?: string) {
       const explicitFromName = [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim()
       const fromName = explicitFromName || profile.name || user.displayName || undefined
 
-      const response = await fetch('/api/email/sendgrid-send', {
+      const response = await fetch('/api/email/zoho-send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -225,10 +225,10 @@ export function useSearchEmails(queryTerm: string) {
         let query = supabase
           .from('emails')
           .select('*')
-        
+
         if (role !== 'admin') {
-           if (!user.email) return []
-           query = query.eq('metadata->>ownerId', user.email.toLowerCase())
+          if (!user.email) return []
+          query = query.eq('metadata->>ownerId', user.email.toLowerCase())
         }
 
         // Filter out mailwarming emails
@@ -275,9 +275,9 @@ export function useEmailsCount(searchQuery?: string) {
         let query = supabase
           .from('emails')
           .select('id', { count: 'exact', head: true })
-        
+
         if (role !== 'admin') {
-           query = query.eq('metadata->>ownerId', user.email.toLowerCase())
+          query = query.eq('metadata->>ownerId', user.email.toLowerCase())
         }
 
         // Filter out mailwarming emails
@@ -295,7 +295,7 @@ export function useEmailsCount(searchQuery?: string) {
         }
 
         const { count, error } = await query
-        
+
         if (error) {
           if (error.message === 'FetchUserError: Request was aborted' || error.message?.includes('abort')) {
             throw error
@@ -308,7 +308,7 @@ export function useEmailsCount(searchQuery?: string) {
           })
           throw error
         }
-        
+
         return count || 0
       } catch (error: any) {
         // Suppress logging for aborted requests
