@@ -36,8 +36,8 @@ export function useEmailTrackingNotifications() {
             clickCount?: number
             metadata?: { ownerId?: string }
           }
-          // Only CRM-sent emails have IDs like gmail_*
-          if (!email.id || !email.id.startsWith('gmail_')) return
+          // Only CRM-sent emails have IDs like gmail_* or zoho_*
+          if (!email.id || (!email.id.startsWith('gmail_') && !email.id.startsWith('zoho_'))) return
 
           const oldEmail = payload.old as {
             openCount?: number
