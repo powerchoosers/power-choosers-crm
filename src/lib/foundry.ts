@@ -358,29 +358,40 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
     const linkedinUrl = profile?.linkedinUrl || 'https://linkedin.com/company/nodal-point'
 
     html += `
-      <div style="margin-top: 40px; border-top: 1px solid #f4f4f5; background-color: #fafafa; padding: 32px; font-family: sans-serif;">
+      <div style="margin-top: 40px; border-top: 1px solid #f4f4f5; background-color: #fafafa; padding: 32px 24px; font-family: sans-serif;">
         <table style="width: 100%; border-collapse: collapse;">
           <tr>
-            ${photoUrl ? `
-            <td style="width: 52px; vertical-align: top; padding-right: 12px;">
-              <img src="${photoUrl}" alt="Profile" style="width: 40px; height: 40px; border-radius: 12px; border: 1px solid #e4e4e7; display: block; object-fit: cover;" />
-            </td>
-            ` : ''}
             <td style="vertical-align: top;">
-              <div style="font-family: sans-serif; font-weight: bold; color: #18181b; font-size: 14px; margin-bottom: 2px;">
-                ${name}
-              </div>
-              <div style="font-family: sans-serif; color: #71717a; font-size: 12px; margin-bottom: 8px;">
-                ${title}
-              </div>
-              <div style="font-family: monospace; font-size: 11px; color: #52525b; line-height: 1.4; margin-bottom: 12px;">
+              <!-- Identity Block -->
+              <table style="border-collapse: collapse; margin-bottom: 16px;">
+                <tr>
+                  ${photoUrl ? `
+                  <td style="width: 48px; vertical-align: middle; padding-right: 12px;">
+                    <img src="${photoUrl}" alt="${name}" style="width: 40px; height: 40px; border-radius: 12px; border: 1px solid #e4e4e7; display: block; object-fit: cover;" />
+                  </td>
+                  ` : ''}
+                  <td style="vertical-align: middle;">
+                    <div style="font-family: sans-serif; font-weight: bold; color: #18181b; font-size: 14px; line-height: 1.2;">
+                      ${name}
+                    </div>
+                    <div style="font-family: sans-serif; color: #71717a; font-size: 12px; margin-top: 2px;">
+                      ${title}
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Contact Telemetry -->
+              <div style="font-family: monospace; font-size: 11px; color: #52525b; line-height: 1.5; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 0.02em;">
                 <div>P: ${phone}</div>
                 <div>${location}</div>
               </div>
-              <div style="font-family: monospace; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em;">
-                <a href="${linkedinUrl}" style="color: #002FA7; text-decoration: none; margin-right: 16px;">LINKEDIN</a>
-                <a href="https://nodalpoint.io" style="color: #002FA7; text-decoration: none; margin-right: 16px;">NETWORK</a>
-                <a href="https://nodalpoint.io/bill-debugger" style="color: #002FA7; text-decoration: none;">[ RUN_AUDIT ]</a>
+
+              <!-- Action Links -->
+              <div style="font-family: monospace; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.12em; line-height: 1.6;">
+                <a href="${linkedinUrl}" style="color: #002FA7; text-decoration: none; margin-right: 20px; display: inline-block;">LINKEDIN</a>
+                <a href="https://nodalpoint.io" style="color: #002FA7; text-decoration: none; margin-right: 20px; display: inline-block;">NETWORK</a>
+                <a href="https://nodalpoint.io/bill-debugger" style="color: #002FA7; text-decoration: none; display: inline-block;">[ RUN_AUDIT ]</a>
               </div>
             </td>
           </tr>
