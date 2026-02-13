@@ -345,7 +345,8 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
           </div>
         </div>
       `
-    }) // End of blocks loop
+    }
+  }) // End of blocks loop
 
   html += `</div>` // Close the content padding div (32px) before the footer
 
