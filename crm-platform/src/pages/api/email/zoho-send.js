@@ -213,11 +213,18 @@ export default async function handler(req, res) {
         }));
 
     } catch (error) {
-        logger.error('[Zoho] Global error:', error, 'zoho-send');
-        res.writeHead(error.status || 500, { 'Content-Type': 'application/json' });
+        logger.error('[Zoho] Global error in zoho-send:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name,
+            status: error.status
+        }, 'zoho-send');
+
+        res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-            error: error.message || 'Internal server error',
-            details: error.details || null
+            error: error.message || 'Failed to send email',
+            details: error.message,
+            type: error.name
         }));
     }
 }
