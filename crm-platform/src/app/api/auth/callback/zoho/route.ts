@@ -1,6 +1,13 @@
 
 import { NextResponse } from 'next/server';
 import { firebaseAdmin as admin } from '@/lib/firebase-admin';
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize Supabase Admin for persistent token storage
+const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+);
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -31,7 +38,7 @@ export async function GET(request: Request) {
         // 1. Exchange code for tokens
         const tokenResponse = await fetch('https://accounts.zoho.com/oauth/v2/token', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: { 'Content-Type': 'application/x-form-urlencoded' },
             body: new URLSearchParams({
                 grant_type: 'authorization_code',
                 client_id: clientId,
@@ -49,7 +56,10 @@ export async function GET(request: Request) {
         }
 
         const accessToken = tokenData.access_token;
-        const idToken = tokenData.id_token; // OIDC token if scope included openid
+        const refreshToken = tokenData.refresh_token;
+        const idToken = tokenData.id_token;
+        const expiresIn = tokenData.expires_in || 3600;
+
         console.log('Zoho OAuth: Token exchange successful.');
 
         let email: string | null = null;
@@ -88,6 +98,26 @@ export async function GET(request: Request) {
 
         if (!email) {
             throw new Error('Could not retrieve email identity from Zoho');
+        }
+
+        // --- FETCH ZOHO ACCOUNT ID ---
+        // This is required for Mail API calls
+        let zohoAccountId = null;
+        try {
+            console.log('Zoho OAuth: Fetching Zoho Mail Account ID...');
+            const accountsRes = await fetch('https://mail.zoho.com/api/v1/accounts', {
+                headers: { Authorization: `Zoho-oauthtoken ${accessToken}` }
+            });
+            if (accountsRes.ok) {
+                const accountsData = await accountsRes.json();
+                // Pick the primary account ID (usually the first one)
+                zohoAccountId = accountsData.data?.[0]?.accountId || null;
+                console.log('Zoho OAuth: Found Account ID:', zohoAccountId);
+            } else {
+                console.warn('Zoho OAuth: Failed to fetch accountId from Mail API', accountsRes.status);
+            }
+        } catch (accountErr) {
+            console.error('Zoho OAuth: Error fetching accountId:', accountErr);
         }
 
         console.log(`Zoho OAuth: Authenticating user: ${email}`);
@@ -136,6 +166,41 @@ export async function GET(request: Request) {
 
         if (!finalUid) {
             throw new Error('Could not resolve user identity');
+        }
+
+        // --- SAVE CREDENTIALS TO SUPABASE ---
+        try {
+            console.log('Zoho OAuth: Saving credentials to Supabase...');
+            const updatePayload: any = {
+                zoho_access_token: accessToken,
+                zoho_token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
+                updated_at: new Date().toISOString(),
+            };
+
+            // Only update refresh token if provided (Zoho only sends it on initial consent)
+            if (refreshToken) {
+                updatePayload.zoho_refresh_token = refreshToken;
+            }
+
+            if (zohoAccountId) {
+                updatePayload.zoho_account_id = zohoAccountId;
+            }
+
+            const { error: upsertError } = await supabaseAdmin
+                .from('users')
+                .upsert({
+                    id: finalUid,
+                    email: userEmail,
+                    ...updatePayload
+                }, { onConflict: 'id' });
+
+            if (upsertError) {
+                console.error('Supabase Error saving Zoho tokens:', upsertError);
+            } else {
+                console.log('Zoho OAuth: Successfully stored tokens in Supabase.');
+            }
+        } catch (supabaseErr) {
+            console.error('Exception saving to Supabase:', supabaseErr);
         }
 
         // 4. Create Custom Token
