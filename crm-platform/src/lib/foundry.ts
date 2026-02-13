@@ -170,13 +170,17 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
   // for storage in foundry assets compiled_html
   let html = `
     <div style="font-family: 'Inter', sans-serif; background: #ffffff; color: #18181b; width: 100%; max-width: 600px; margin: 0 auto;">
-      <div style="border-bottom: 1px solid #e4e4e7; padding: 24px; margin-bottom: 0; display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <img src="/images/nodalpoint.png" alt="" style="height: 24px; width: auto;" />
-          <span style="font-family: monospace; font-size: 10px; font-weight: bold; letter-spacing: 2px; color: #18181b;">NODAL_POINT // INTELLIGENCE</span>
-        </div>
-        <span style="font-family: monospace; font-size: 10px; color: #71717a;">REF: {{date}} // {{context_id}}</span>
-      </div>
+      <table border="0" cellpadding="0" cellspacing="0" style="border-bottom: 1px solid #e4e4e7; width: 100%; box-sizing: border-box;">
+        <tr>
+          <td style="padding: 24px; vertical-align: middle;">
+            <img src="https://nodalpoint.io/images/nodalpoint.png" alt="" style="height: 24px; width: auto; display: inline-block; vertical-align: middle;" />
+            <span style="font-family: monospace; font-size: 10px; font-weight: bold; letter-spacing: 2px; color: #18181b; margin-left: 8px; vertical-align: middle;">NODAL_POINT // INTELLIGENCE</span>
+          </td>
+          <td style="padding: 24px; vertical-align: middle; text-align: right;">
+            <span style="font-family: monospace; font-size: 10px; color: #71717a;">REF: {{date}} // {{context_id}}</span>
+          </td>
+        </tr>
+      </table>
       <div style="padding: 32px;">
   `
 
@@ -210,7 +214,7 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
         })
 
         if (bullets.length > 0) {
-          html += `<ul style="list-style: none; padding: 0; margin: 20px 0 0 0;">`
+          html += `<div style="margin: 20px 0 0 0;">`
           bullets.forEach((bullet: string) => {
             const escapedBullet = bullet
               .replace(/&/g, '&amp;')
@@ -218,13 +222,15 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
               .replace(/>/g, '&gt;')
               .replace(/"/g, '&quot;')
             html += `
-              <li style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; font-family: monospace; font-size: 10px; color: #52525b; line-height: 1.25;">
-                <span style="color: #002FA7; margin-top: 2px; shrink-0;">●</span>
-                <span style="display: block;">${escapedBullet}</span>
-              </li>
+              <table border="0" cellpadding="0" cellspacing="0" style="margin-bottom: 10px; width: 100%;">
+                <tr>
+                  <td valign="top" style="width: 20px; color: #002FA7; font-size: 16px; line-height: 1.2;">●</td>
+                  <td valign="top" style="font-family: monospace; font-size: 11px; color: #52525b; line-height: 1.4; padding-left: 10px;">${escapedBullet}</td>
+                </tr>
+              </table>
             `
           })
-          html += `</ul>`
+          html += `</div>`
         }
         html += `</div>`
       }
@@ -324,7 +330,7 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
               [ ${impactLevel} ]
             </span>
           </div>
-          <div style="padding: 16px; space-y: 12px;">
+          <div style="padding: 16px;">
             <h4 style="font-size: 14px; font-weight: bold; color: #18181b; line-height: 1.3; text-transform: uppercase; font-family: monospace; margin: 0 0 12px 0;">
               ${headline}
             </h4>
@@ -358,7 +364,7 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
     const phone = profile?.selectedPhoneNumber || '+1 (817) 809-3367'
     const location = [profile?.city, profile?.state].filter(Boolean).join(', ') || 'Fort Worth, TX'
     const photoUrl = profile?.hostedPhotoUrl || profile?.photoURL || ''
-    const linkedinUrl = profile?.linkedinUrl || 'https://linkedin.com/company/nodal-point'
+    const linkedinUrl = escapeHtml(profile?.linkedinUrl || 'https://linkedin.com/company/nodal-point')
 
     html += `
       <div style="margin-top: 40px; border-top: 1px solid #f4f4f5; background-color: #fafafa; font-family: sans-serif;">
@@ -392,11 +398,19 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
               </div>
 
               <!-- Action Links -->
-              <div style="font-family: monospace; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.12em; line-height: 1.6;">
-                <a href="${linkedinUrl}" style="color: #002FA7; text-decoration: none; margin-right: 20px; display: inline-block;">LINKEDIN</a>
-                <a href="https://nodalpoint.io" style="color: #002FA7; text-decoration: none; margin-right: 20px; display: inline-block;">NETWORK</a>
-                <a href="https://nodalpoint.io/bill-debugger" style="color: #002FA7; text-decoration: none; display: inline-block;">[ RUN_AUDIT ]</a>
-              </div>
+              <table border="0" cellpadding="0" cellspacing="0" style="font-family: monospace; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.12em;">
+                <tr>
+                  <td style="padding-right: 20px;">
+                    <a href="${linkedinUrl}" style="color: #002FA7; text-decoration: none;">LINKEDIN</a>
+                  </td>
+                  <td style="padding-right: 20px;">
+                    <a href="https://nodalpoint.io" style="color: #002FA7; text-decoration: none;">NETWORK</a>
+                  </td>
+                  <td>
+                    <a href="https://nodalpoint.io/bill-debugger" style="color: #002FA7; text-decoration: none;">[ RUN_AUDIT ]</a>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
           </table>

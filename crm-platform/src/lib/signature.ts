@@ -46,19 +46,23 @@ export function generateNodalSignature(profile: UserProfile, user: User | null, 
     <td style="vertical-align: top;">
       
       <!-- IDENTITY VECTOR (avatar left of name/title) -->
-      <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 12px;">
-        ${avatarUrl ? `
-        <img src="${esc(avatarUrl)}" alt="${esc(name)}" style="width: 40px; height: 40px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 2px 10px -2px rgba(0,0,0,0.6);" />
-        ` : ''}
-        <div>
-          <span style="font-weight: 700; letter-spacing: -0.5px; font-size: 16px; color: ${textColor}; display: block;">
-            ${esc(name)}
-          </span>
-          <span style="font-family: 'Courier New', Courier, monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: ${subTextColor}; display: block; margin-top: 4px;">
-            ${esc(jobTitle)}
-          </span>
-        </div>
-      </div>
+      <table border="0" cellpadding="0" cellspacing="0" style="margin-bottom: 8px;">
+        <tr>
+          ${avatarUrl ? `
+          <td style="padding-right: 12px; vertical-align: middle;">
+            <img src="${esc(avatarUrl)}" alt="${esc(name)}" style="width: 40px; height: 40px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 2px 10px -2px rgba(0,0,0,0.6); display: block;" />
+          </td>
+          ` : ''}
+          <td style="vertical-align: middle;">
+            <span style="font-weight: 700; letter-spacing: -0.5px; font-size: 16px; color: ${textColor}; display: block;">
+              ${esc(name)}
+            </span>
+            <span style="font-family: 'Courier New', Courier, monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: ${subTextColor}; display: block; margin-top: 4px;">
+              ${esc(jobTitle)}
+            </span>
+          </td>
+        </tr>
+      </table>
 
       <!-- TELEMETRY (Contact Info: email, phone, city/state) -->
       <div style="margin-bottom: 16px; font-size: 12px; line-height: 1.6; color: ${secondaryTextColor};">
@@ -68,27 +72,34 @@ export function generateNodalSignature(profile: UserProfile, user: User | null, 
       </div>
 
       <!-- COMMAND DECK (Links) -->
-      <div style="font-size: 11px; font-family: 'Courier New', Courier, monospace; letter-spacing: 0.5px;">
-        
-        <!-- LINKEDIN -->
-        <a href="${esc(linkedinUrl)}" style="color: #002FA7; text-decoration: none; font-weight: 700;">
-          LINKEDIN
-        </a>
-        
-        <span style="color: #d4d4d8; margin: 0 8px;">//</span>
-        
-        <!-- NETWORK (Website) -->
-        <a href="https://nodalpoint.io" style="color: #002FA7; text-decoration: none; font-weight: 700;">
-          HQ
-        </a>
-        
-        <span style="color: #d4d4d8; margin: 0 8px;">//</span>
-        
-        <!-- BILL DEBUGGER (The Weapon) -->
-        <a href="https://nodalpoint.io/bill-debugger" style="color: #002FA7; text-decoration: none; font-weight: 700;">
-          [ RUN_FORENSIC_AUDIT ]
-        </a>
-      </div>
+      <table border="0" cellpadding="0" cellspacing="0" style="font-size: 11px; font-family: 'Courier New', Courier, monospace; letter-spacing: 0.5px;">
+        <tr>
+          <!-- LINKEDIN -->
+          <td>
+            <a href="${esc(linkedinUrl)}" style="color: #002FA7; text-decoration: none; font-weight: 700;">
+              LINKEDIN
+            </a>
+          </td>
+          
+          <td style="color: #d4d4d8; padding: 0 8px;">//</td>
+          
+          <!-- NETWORK (Website) -->
+          <td>
+            <a href="https://nodalpoint.io" style="color: #002FA7; text-decoration: none; font-weight: 700;">
+              HQ
+            </a>
+          </td>
+          
+          <td style="color: #d4d4d8; padding: 0 8px;">//</td>
+          
+          <!-- BILL DEBUGGER (The Weapon) -->
+          <td>
+            <a href="https://nodalpoint.io/bill-debugger" style="color: #002FA7; text-decoration: none; font-weight: 700;">
+              [ RUN_FORENSIC_AUDIT ]
+            </a>
+          </td>
+        </tr>
+      </table>
 
       <!-- PHILOSOPHY FOOTER -->
       <div style="margin-top: 12px; border-top: 1px solid ${borderColor}; padding-top: 8px;">
