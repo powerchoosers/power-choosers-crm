@@ -912,7 +912,7 @@ CRITICAL OUTPUT RULES:
               {selectedFoundryId ? (
                 // Show HTML preview for Foundry templates
                 <div
-                  className="w-full min-h-[150px] max-h-[400px] overflow-y-auto np-scroll bg-white/5 rounded-lg p-4 border border-white/10"
+                  className="w-full min-h-[150px] bg-white/5 rounded-lg p-4 border border-white/10"
                   dangerouslySetInnerHTML={{ __html: content }}
                 />
               ) : (
