@@ -30,18 +30,22 @@
   /* Custom colors */
   --color-signal: var(--signal);
   --color-pc-blue: #002FA7;
-  
+
   /* Typography */
   --font-sans: var(--font-inter), system-ui, sans-serif;
   --tracking-normal: -0.02em;
 }
 
 @layer utilities {
+
   /* The Nodal Glass Material */
   .nodal-glass {
     @apply bg-zinc-950/40 border border-white/10;
     backdrop-filter: blur(24px) saturate(150%);
     -webkit-backdrop-filter: blur(24px) saturate(150%);
+    /* GPU Acceleration for Chrome */
+    transform: translateZ(0);
+    will-change: backdrop-filter;
   }
 
   /* Extreme Glass for floating panels */
@@ -49,6 +53,9 @@
     @apply bg-zinc-950/60 border border-white/10 shadow-2xl;
     backdrop-filter: blur(40px) saturate(180%);
     -webkit-backdrop-filter: blur(40px) saturate(180%);
+    /* GPU Acceleration for Chrome */
+    transform: translateZ(0);
+    will-change: backdrop-filter;
   }
 
   /* The Hover Effect (Interactive Elements only) */
@@ -59,6 +66,9 @@
   /* Void Standard: High-Blur Obsidian card (replaces grey gradients) - thinner borders like Target Signals */
   .nodal-void-card {
     @apply rounded-2xl border-t border-white/5 border-b border-black/50 border-l border-white/5 border-r border-white/5 bg-zinc-950/80 backdrop-blur-xl;
+    /* GPU Acceleration for Chrome */
+    transform: translateZ(0);
+    will-change: backdrop-filter;
   }
 
   /* Monolith border only (lighting edge: top light, bottom shadow) - thinner borders */
@@ -84,18 +94,19 @@
   /* Forensic Icon Button - No container, zoom on hover, brighten */
   .icon-button-forensic {
     @apply flex items-center justify-center outline-none cursor-pointer p-0;
-    color: oklch(0.551 0.027 264.364); /* zinc-400 approx */
+    color: oklch(0.551 0.027 264.364);
+    /* zinc-400 approx */
     transition: all 0.3s ease;
   }
-  
+
   .icon-button-forensic:hover {
     color: white;
   }
-  
+
   .icon-button-forensic svg {
     transition: transform 0.3s ease;
   }
-  
+
   .icon-button-forensic:hover svg {
     transform: scale(1.15);
   }
@@ -103,33 +114,50 @@
 
 :root {
   /* Nodal Dark Theme - Deep Zinc & International Klein Blue */
-  
-  --background: oklch(0.13 0.028 261.692); /* zinc-950 */
-  --foreground: oklch(0.985 0.002 247.839); /* zinc-50 */
 
-  --card: oklch(0.13 0.028 261.692); /* zinc-950 */
-  --card-foreground: oklch(0.985 0.002 247.839); /* zinc-50 */
+  --background: oklch(0.13 0.028 261.692);
+  /* zinc-950 */
+  --foreground: oklch(0.985 0.002 247.839);
+  /* zinc-50 */
 
-  --popover: oklch(0.13 0.028 261.692); /* zinc-950 */
-  --popover-foreground: oklch(0.985 0.002 247.839); /* zinc-50 */
+  --card: oklch(0.13 0.028 261.692);
+  /* zinc-950 */
+  --card-foreground: oklch(0.985 0.002 247.839);
+  /* zinc-50 */
 
-  --primary: oklch(0.21 0.034 264.665); /* International Klein Blue / signal */
-  --primary-foreground: oklch(0.985 0.002 247.839); /* zinc-50 */
+  --popover: oklch(0.13 0.028 261.692);
+  /* zinc-950 */
+  --popover-foreground: oklch(0.985 0.002 247.839);
+  /* zinc-50 */
 
-  --secondary: oklch(0.21 0.034 264.665); /* zinc-800 approx */
-  --secondary-foreground: oklch(0.985 0.002 247.839); /* zinc-50 */
+  --primary: oklch(0.21 0.034 264.665);
+  /* International Klein Blue / signal */
+  --primary-foreground: oklch(0.985 0.002 247.839);
+  /* zinc-50 */
 
-  --muted: oklch(0.21 0.034 264.665); /* zinc-800 approx */
-  --muted-foreground: oklch(0.551 0.027 264.364); /* zinc-400 */
+  --secondary: oklch(0.21 0.034 264.665);
+  /* zinc-800 approx */
+  --secondary-foreground: oklch(0.985 0.002 247.839);
+  /* zinc-50 */
 
-  --accent: oklch(0.21 0.034 264.665); /* zinc-800 approx */
-  --accent-foreground: oklch(0.985 0.002 247.839); /* zinc-50 */
+  --muted: oklch(0.21 0.034 264.665);
+  /* zinc-800 approx */
+  --muted-foreground: oklch(0.551 0.027 264.364);
+  /* zinc-400 */
+
+  --accent: oklch(0.21 0.034 264.665);
+  /* zinc-800 approx */
+  --accent-foreground: oklch(0.985 0.002 247.839);
+  /* zinc-50 */
 
   --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0.002 247.839); /* zinc-50 */
+  --destructive-foreground: oklch(0.985 0.002 247.839);
+  /* zinc-50 */
 
-  --border: oklch(0.21 0.034 264.665); /* zinc-800 approx */
-  --input: oklch(0.21 0.034 264.665); /* zinc-800 approx */
+  --border: oklch(0.21 0.034 264.665);
+  /* zinc-800 approx */
+  --input: oklch(0.21 0.034 264.665);
+  /* zinc-800 approx */
   --ring: oklch(0.707 0.022 261.325);
 
   --radius: 0.625rem;
@@ -142,13 +170,20 @@
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
 
-  --sidebar: oklch(0.13 0.028 261.692); /* zinc-950 */
-  --sidebar-foreground: oklch(0.985 0.002 247.839); /* zinc-50 */
-  --sidebar-primary: oklch(0.21 0.034 264.665); /* International Klein Blue */
-  --sidebar-primary-foreground: oklch(0.985 0.002 247.839); /* zinc-50 */
-  --sidebar-accent: oklch(0.21 0.034 264.665); /* zinc-800 approx */
-  --sidebar-accent-foreground: oklch(0.985 0.002 247.839); /* zinc-50 */
-  --sidebar-border: oklch(0.21 0.034 264.665); /* zinc-800 approx */
+  --sidebar: oklch(0.13 0.028 261.692);
+  /* zinc-950 */
+  --sidebar-foreground: oklch(0.985 0.002 247.839);
+  /* zinc-50 */
+  --sidebar-primary: oklch(0.21 0.034 264.665);
+  /* International Klein Blue */
+  --sidebar-primary-foreground: oklch(0.985 0.002 247.839);
+  /* zinc-50 */
+  --sidebar-accent: oklch(0.21 0.034 264.665);
+  /* zinc-800 approx */
+  --sidebar-accent-foreground: oklch(0.985 0.002 247.839);
+  /* zinc-50 */
+  --sidebar-border: oklch(0.21 0.034 264.665);
+  /* zinc-800 approx */
   --sidebar-ring: oklch(0.707 0.022 261.325);
 }
 
@@ -156,6 +191,7 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -167,12 +203,15 @@
     width: 6px;
     height: 6px;
   }
+
   .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;
   }
+
   .scrollbar-thin::-webkit-scrollbar-thumb {
     @apply bg-zinc-800 rounded-full;
   }
+
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     @apply bg-zinc-700;
   }
@@ -181,13 +220,17 @@
   .np-scroll {
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none;  /* IE and Edge */
-    contain: paint; /* Improves scroll performance by containing repaints */
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    contain: paint;
+    /* Improves scroll performance by containing repaints */
   }
 
   .np-scroll::-webkit-scrollbar {
-    display: none; /* Chrome, Safari and Opera */
+    display: none;
+    /* Chrome, Safari and Opera */
   }
 
   /* Landing Page Animations */
@@ -202,10 +245,21 @@
     transform: translateY(0);
   }
 
-  .delay-100 { transition-delay: 100ms; }
-  .delay-200 { transition-delay: 200ms; }
-  .delay-300 { transition-delay: 300ms; }
-  .delay-500 { transition-delay: 500ms; }
+  .delay-100 {
+    transition-delay: 100ms;
+  }
+
+  .delay-200 {
+    transition-delay: 200ms;
+  }
+
+  .delay-300 {
+    transition-delay: 300ms;
+  }
+
+  .delay-500 {
+    transition-delay: 500ms;
+  }
 
   .chart-path {
     stroke-dasharray: 1000;
@@ -221,17 +275,22 @@
   /* FORENSIC SCROLLBARS */
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
-    height: 6px; /* Critical for horizontal scrolling */
+    height: 6px;
+    /* Critical for horizontal scrolling */
   }
+
   .custom-scrollbar::-webkit-scrollbar-track {
     background: rgba(255, 255, 255, 0.02);
   }
+
   .custom-scrollbar::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.1);
     border-radius: 3px;
   }
+
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 47, 167, 0.5); /* Klein Blue on hover */
+    background: rgba(0, 47, 167, 0.5);
+    /* Klein Blue on hover */
   }
 
   .glass-card {
@@ -247,6 +306,9 @@
       inset 0 1px 2px rgba(255, 255, 255, 0.4),
       0 0 0 1px rgba(0, 0, 0, 0.05);
     transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
+    /* GPU Acceleration for Chrome */
+    transform: translateZ(0);
+    will-change: backdrop-filter, transform;
   }
 
   .glass-card:hover {
@@ -264,13 +326,21 @@
   .nodal-input {
     @apply w-full bg-zinc-900/50 border border-white/10 rounded px-3 py-2 text-xs font-mono text-white placeholder:text-zinc-700 outline-none transition-all;
   }
+
   .nodal-input:focus {
     @apply border-[#002FA7] bg-zinc-900 ring-1 ring-[#002FA7]/20;
   }
 
   @keyframes subtle-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(0, 47, 167, 0.2); }
-    50% { box-shadow: 0 0 0 12px rgba(0, 47, 167, 0); }
+
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgba(0, 47, 167, 0.2);
+    }
+
+    50% {
+      box-shadow: 0 0 0 12px rgba(0, 47, 167, 0);
+    }
   }
 }
 
@@ -285,14 +355,16 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: oklch(0.274 0.006 286.033); /* zinc-800 */
+  background-color: oklch(0.274 0.006 286.033);
+  /* zinc-800 */
   border-radius: 9999px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: oklch(0.398 0.014 286.605); /* zinc-600 */
+  background-color: oklch(0.398 0.014 286.605);
+  /* zinc-600 */
 }
 
 ::-webkit-scrollbar-corner {
@@ -378,6 +450,7 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
