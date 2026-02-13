@@ -92,23 +92,55 @@ export async function GET(request: Request) {
 
         console.log(`Zoho OAuth: Authenticating user: ${email}`);
 
-        // 3. Verify Identity (Strict Admin Check)
+        // 3. Verify Identity & Determine UID
         const TARGET_EMAIL = 'l.patterson@nodalpoint.io';
         const TARGET_UID = '4mKkyoZBIKhYGdPBNSHlNaHIfR02';
+        const userEmail = email.toLowerCase();
+        let finalUid: string | null = null;
 
-        if (email.toLowerCase() !== TARGET_EMAIL.toLowerCase()) {
-            console.warn(`Zoho OAuth: Unauthorized email attempt: ${email}`);
-            return NextResponse.redirect(new URL('/login?error=Unauthorized+Zoho+account', request.url));
-        }
-
-        // 4. Create Custom Token
+        // Ensure Firebase Admin is ready
         if (!admin.apps.length) {
             console.error('Firebase Admin not initialized in callback');
             throw new Error('Server authentication service unavailable');
         }
 
-        console.log(`Zoho OAuth: Minting custom token for UID: ${TARGET_UID}`);
-        const customToken = await admin.auth().createCustomToken(TARGET_UID);
+        if (userEmail === TARGET_EMAIL.toLowerCase()) {
+            console.log('Zoho OAuth: Admin match detected. Mapping to preserved identity.');
+            finalUid = TARGET_UID;
+        } else if (userEmail.endsWith('@nodalpoint.io')) {
+            console.log(`Zoho OAuth: Nodal Point domain match: ${userEmail}`);
+            try {
+                // Check if user already exists in Firebase
+                const userRecord = await admin.auth().getUserByEmail(userEmail);
+                finalUid = userRecord.uid;
+                console.log(`Zoho OAuth: Existing user found with UID: ${finalUid}`);
+            } catch (error: any) {
+                if (error.code === 'auth/user-not-found') {
+                    // Create new user for Nodal Point employees
+                    console.log(`Zoho OAuth: Creating new Firebase user for ${userEmail}`);
+                    const newUser = await admin.auth().createUser({
+                        email: userEmail,
+                        emailVerified: true,
+                        displayName: userEmail.split('@')[0], // Basic fallback name
+                    });
+                    finalUid = newUser.uid;
+                } else {
+                    console.error('Firebase Error during user lookup:', error);
+                    throw error;
+                }
+            }
+        } else {
+            console.warn(`Zoho OAuth: Unauthorized domain attempt: ${userEmail}`);
+            return NextResponse.redirect(new URL('/login?error=Only+Nodal+Point+emails+are+authorized', request.url));
+        }
+
+        if (!finalUid) {
+            throw new Error('Could not resolve user identity');
+        }
+
+        // 4. Create Custom Token
+        console.log(`Zoho OAuth: Minting custom token for UID: ${finalUid}`);
+        const customToken = await admin.auth().createCustomToken(finalUid);
 
         // 5. Set Middleware Cookie & Redirect
         const response = NextResponse.redirect(new URL(`/login/callback?token=${customToken}`, request.url));
