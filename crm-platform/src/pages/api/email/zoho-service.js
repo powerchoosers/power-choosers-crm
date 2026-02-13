@@ -27,71 +27,89 @@ export class ZohoMailService {
             throw new Error('ZOHO_ACCOUNT_ID not configured');
         }
 
-        try {
-            // Get valid access token (will auto-refresh if needed)
-            const accessToken = await getValidAccessToken();
+        // Retry logic for token expiration
+        let lastError = null;
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+                // Get valid access token (will auto-refresh if needed)
+                const accessToken = await getValidAccessToken();
 
-            logger.info(`[Zoho Mail] Sending email to: ${to}`, 'zoho-service');
+                logger.info(`[Zoho Mail] Sending email to: ${to} (attempt ${attempt})`, 'zoho-service');
 
-            // Prepare email payload according to Zoho API spec
-            // Format: "Name <email>" for sender display name
-            const senderEmail = from || `lewis@nodalpoint.io`;
-            const fromAddress = fromName
-                ? `${fromName} <${senderEmail}>`
-                : senderEmail;
+                // Prepare email payload according to Zoho API spec
+                // Format: "Name <email>" for sender display name
+                const senderEmail = from || `lewis@nodalpoint.io`;
+                const fromAddress = fromName
+                    ? `${fromName} <${senderEmail}>`
+                    : senderEmail;
 
-            const payload = {
-                fromAddress: fromAddress,
-                toAddress: to,
-                subject: subject,
-                content: html || text,
-                mailFormat: html ? 'html' : 'plaintext',
-            };
+                const payload = {
+                    fromAddress: fromAddress,
+                    toAddress: to,
+                    subject: subject,
+                    content: html || text,
+                    mailFormat: html ? 'html' : 'plaintext',
+                };
 
-            // Add attachments if provided
-            if (attachments && attachments.length > 0) {
-                payload.attachments = attachments.map(att => ({
-                    attachmentName: att.filename,
-                    content: att.content, // base64 encoded
-                }));
-            }
-
-            // Send email via Zoho API
-            const response = await fetch(`${this.baseUrl}/accounts/${this.accountId}/messages`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Zoho-oauthtoken ${accessToken}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                logger.error(`[Zoho Mail] API error: ${response.status} ${errorText}`, 'zoho-service');
-
-                // If token expired (401), the token manager should have refreshed it
-                // This is a fallback error
-                if (response.status === 401) {
-                    throw new Error('Zoho authentication failed - token may be invalid');
+                // Add attachments if provided
+                if (attachments && attachments.length > 0) {
+                    payload.attachments = attachments.map(att => ({
+                        attachmentName: att.filename,
+                        content: att.content, // base64 encoded
+                    }));
                 }
 
-                throw new Error(`Zoho API error: ${response.status} - ${errorText}`);
+                // Send email via Zoho API
+                const response = await fetch(`${this.baseUrl}/accounts/${this.accountId}/messages`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Zoho-oauthtoken ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    logger.error(`[Zoho Mail] API error (attempt ${attempt}): ${response.status} ${errorText}`, 'zoho-service');
+
+                    // If token expired (401) on first attempt, clear cache and retry
+                    if (response.status === 401 && attempt === 1) {
+                        logger.warn('[Zoho Mail] Token expired, clearing cache and retrying...', 'zoho-service');
+                        const { clearTokenCache } = await import('./zoho-token-manager.js');
+                        clearTokenCache();
+                        lastError = new Error(`Token expired, retrying...`);
+                        continue; // Retry
+                    }
+
+                    throw new Error(`Zoho API error: ${response.status} - ${errorText}`);
+                }
+
+                const result = await response.json();
+
+                logger.info(`[Zoho Mail] Email sent successfully on attempt ${attempt}`, 'zoho-service');
+
+                // Zoho returns the message data in the response
+                return {
+                    messageId: result.data?.messageId || result.data?.message_id || 'unknown',
+                    success: true,
+                };
+            } catch (error) {
+                lastError = error;
+
+                // If this is not a 401 or it's the last attempt, throw immediately
+                if (attempt === 2 || !error.message?.includes('401')) {
+                    logger.error(`[Zoho Mail] Send error (attempt ${attempt}):`, error, 'zoho-service');
+                    throw error;
+                }
+
+                // Otherwise continue to retry
+                logger.warn(`[Zoho Mail] Error on attempt ${attempt}, retrying...`, 'zoho-service');
             }
-
-            const result = await response.json();
-
-            logger.info(`[Zoho Mail] Email sent successfully`, 'zoho-service');
-
-            // Zoho returns the message data in the response
-            return {
-                messageId: result.data?.messageId || result.data?.message_id || 'unknown',
-                success: true,
-            };
-        } catch (error) {
-            logger.error('[Zoho Mail] Send error:', error, 'zoho-service');
-            throw error;
         }
+
+        // Should never reach here, but just in case
+        throw lastError || new Error('Failed to send email after retries');
     }
 
     /**
