@@ -607,7 +607,7 @@ CRITICAL OUTPUT RULES:
 
         // Generate HTML from blocks
         const blocks = asset.content_json?.blocks || []
-        let html = generateStaticHtml(blocks, { skipFooter: true })
+        let html = generateStaticHtml(blocks)
 
         // Build variable map from contact context (use empty values if no context)
         const contactData = {
@@ -798,6 +798,7 @@ CRITICAL OUTPUT RULES:
         <div className="flex items-center gap-2">
           <button
             className="icon-button-forensic h-8 w-8 flex items-center justify-center"
+            title={isMinimized ? "Maximize" : "Minimize"}
             onClick={(e) => {
               e.stopPropagation()
               setIsMinimized(!isMinimized)
@@ -807,6 +808,7 @@ CRITICAL OUTPUT RULES:
           </button>
           <button
             className="icon-button-forensic h-8 w-8 flex items-center justify-center hover:text-red-400"
+            title="Close"
             onClick={(e) => {
               e.stopPropagation()
               onClose()
@@ -896,6 +898,7 @@ CRITICAL OUTPUT RULES:
               </span>
               <button
                 type="button"
+                title="Remove Template"
                 onClick={() => setSelectedFoundryId(null)}
                 className="ml-auto text-zinc-400 hover:text-red-400 transition-colors"
               >
@@ -969,6 +972,7 @@ CRITICAL OUTPUT RULES:
                     </div>
                     <button
                       type="button"
+                      title="Remove Attachment"
                       onClick={() => removeAttachment(idx)}
                       className="icon-button-forensic h-6 w-6 flex items-center justify-center hover:text-red-400"
                     >
@@ -1040,6 +1044,7 @@ CRITICAL OUTPUT RULES:
                   </Button>
                   <button
                     type="button"
+                    title="Close AI Rail"
                     onClick={() => setAiRailOpen(false)}
                     className="icon-button-forensic h-8 w-8 flex items-center justify-center ml-1"
                   >
@@ -1092,15 +1097,18 @@ CRITICAL OUTPUT RULES:
               onChange={handleFileSelect}
               className="hidden"
               id="email-attachment-input"
+              aria-label="Select file to attach"
             />
             <label
               htmlFor="email-attachment-input"
+              title="Attach Files"
               className="icon-button-forensic h-8 w-8 flex items-center justify-center cursor-pointer"
             >
               <Paperclip className="w-4 h-4" />
             </label>
             <button
               type="button"
+              title="Open AI Command Rail"
               onClick={() => setAiRailOpen((open) => !open)}
               className={cn(
                 'icon-button-forensic h-8 w-8 flex items-center justify-center',
