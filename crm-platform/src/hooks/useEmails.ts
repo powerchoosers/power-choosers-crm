@@ -155,9 +155,9 @@ export function useEmails(searchQuery?: string) {
 
       // Use provided HTML or fallback to simple wrapping
       const htmlContent = emailData.html || `<div style="white-space:pre-wrap; font-family: sans-serif;">${emailData.content}</div>`
-      // Format: "FirstName | Nodal Point" for sender display
+      // Format: "FirstName • Nodal Point" for sender display (bullet point for compatibility)
       const firstName = profile.firstName || profile.name?.split(' ')[0] || user.displayName?.split(' ')[0] || 'Nodal Point'
-      const fromName = `${firstName} | Nodal Point`
+      const fromName = `${firstName} • Nodal Point`
 
       const response = await fetch('/api/email/zoho-send', {
         method: 'POST',
