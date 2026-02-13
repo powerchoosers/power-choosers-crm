@@ -16,14 +16,13 @@ export default async function handler(req, res) {
         return;
     }
 
-    // Validate Zoho credentials
-    const accountId = process.env.ZOHO_ACCOUNT_ID;
-    const refreshToken = process.env.ZOHO_REFRESH_TOKEN;
+    // Use user-based lookup instead of environment variables
+    const ownerEmail = (req.body.userEmail || req.body.from || '').toLowerCase().trim();
 
-    if (!accountId || !refreshToken) {
-        logger.error('[Zoho] Missing ZOHO_ACCOUNT_ID or ZOHO_REFRESH_TOKEN', 'zoho-send');
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Missing Zoho credentials' }));
+    if (!ownerEmail) {
+        logger.error('[Zoho] Missing user identity (userEmail or from address)', 'zoho-send');
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Missing user identity' }));
         return;
     }
 
@@ -176,7 +175,8 @@ export default async function handler(req, res) {
             text: textContent,
             from: from,
             fromName: fromName,
-            attachments: attachments || undefined
+            attachments: attachments || undefined,
+            userEmail: ownerEmail
         });
 
         // Update email record with sent status and Zoho message ID

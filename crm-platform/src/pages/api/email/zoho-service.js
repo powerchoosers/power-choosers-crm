@@ -1,5 +1,6 @@
-// Zoho Mail service for sending emails via Zoho Mail API
-import { getValidAccessToken } from './zoho-token-manager.js';
+
+// Zoho Mail service for sending and syncing emails via Zoho Mail API
+import { getValidAccessTokenForUser, clearTokenCache } from './zoho-token-manager.js';
 import logger from '../_logger.js';
 
 export class ZohoMailService {
@@ -10,41 +11,29 @@ export class ZohoMailService {
             url += '/v1';
         }
         this.baseUrl = url;
-        this.accountId = process.env.ZOHO_ACCOUNT_ID;
         logger.debug(`[Zoho Mail] Service initialized with baseUrl: ${this.baseUrl}`, 'zoho-service');
     }
 
     /**
      * Send an email via Zoho Mail API
-     * @param {Object} emailData - Email data
-     * @param {string} emailData.to - Recipient email address
-     * @param {string} emailData.subject - Email subject
-     * @param {string} emailData.html - HTML content
-     * @param {string} emailData.text - Plain text content
-     * @param {string} emailData.from - Optional sender email override
-     * @param {string} emailData.fromName - Optional sender name override
-     * @param {Array} emailData.attachments - Optional attachments array
-     * @returns {Promise<Object>} - Response with messageId
      */
     async sendEmail(emailData) {
-        const { to, subject, html, text, from, fromName, attachments } = emailData;
+        const { to, subject, html, text, from, fromName, attachments, userEmail } = emailData;
 
-        if (!this.accountId) {
-            throw new Error('ZOHO_ACCOUNT_ID not configured');
+        if (!userEmail) {
+            throw new Error('userEmail is required for Zoho sending');
         }
 
         // Retry logic for token expiration
         let lastError = null;
         for (let attempt = 1; attempt <= 2; attempt++) {
             try {
-                // Get valid access token (will auto-refresh if needed)
-                const accessToken = await getValidAccessToken();
+                // Get valid access token for this specific user
+                const { accessToken, accountId } = await getValidAccessTokenForUser(userEmail);
 
-                logger.info(`[Zoho Mail] Sending email to: ${to} (attempt ${attempt})`, 'zoho-service');
+                logger.info(`[Zoho Mail] Sending email from ${userEmail} to: ${to} (attempt ${attempt})`, 'zoho-service');
 
-                // Prepare email payload according to Zoho API spec
-                // Format: "Name <email>" for sender display name
-                const senderEmail = from || `lewis@nodalpoint.io`;
+                const senderEmail = from || userEmail;
                 const fromAddress = fromName
                     ? `${fromName} <${senderEmail}>`
                     : senderEmail;
@@ -57,16 +46,14 @@ export class ZohoMailService {
                     mailFormat: html ? 'html' : 'plaintext',
                 };
 
-                // Add attachments if provided
                 if (attachments && attachments.length > 0) {
                     payload.attachments = attachments.map(att => ({
                         attachmentName: att.filename,
-                        content: att.content, // base64 encoded
+                        content: att.content,
                     }));
                 }
 
-                // Send email via Zoho API
-                const response = await fetch(`${this.baseUrl}/accounts/${this.accountId}/messages`, {
+                const response = await fetch(`${this.baseUrl}/accounts/${accountId}/messages`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Zoho-oauthtoken ${accessToken}`,
@@ -77,66 +64,92 @@ export class ZohoMailService {
 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    logger.error(`[Zoho Mail] API error (attempt ${attempt}): Status ${response.status} - ${errorText}`, 'zoho-service');
-
-                    // Detailed error info for debugging
-                    let errorInfo = errorText;
-                    try {
-                        const parsedError = JSON.parse(errorText);
-                        if (parsedError.status && parsedError.status.description) {
-                            errorInfo = parsedError.status.description;
-                        }
-                    } catch (e) {
-                        // Not JSON, use raw text
-                    }
-
-                    // If token expired (401) on first attempt, clear cache and retry
                     if (response.status === 401 && attempt === 1) {
-                        logger.warn('[Zoho Mail] Token expired (401), clearing cache and retrying...', 'zoho-service');
-                        const { clearTokenCache } = await import('./zoho-token-manager.js');
-                        clearTokenCache();
-                        lastError = new Error(`Token expired (401): ${errorInfo}`);
-                        continue; // Retry
+                        clearTokenCache(userEmail);
+                        continue;
                     }
-
-                    throw new Error(`Zoho API error: ${response.status} - ${errorInfo}`);
+                    throw new Error(`Zoho API error: ${response.status} - ${errorText}`);
                 }
 
                 const result = await response.json();
-
-                logger.info(`[Zoho Mail] Email sent successfully on attempt ${attempt}`, 'zoho-service');
-
-                // Zoho returns the message data in the response
                 return {
                     messageId: result.data?.messageId || result.data?.message_id || 'unknown',
                     success: true,
                 };
             } catch (error) {
                 lastError = error;
-
-                // If this is not a 401 or it's the last attempt, throw immediately
-                if (attempt === 2 || !error.message?.includes('401')) {
-                    logger.error(`[Zoho Mail] Send error (attempt ${attempt}):`, error, 'zoho-service');
-                    throw error;
-                }
-
-                // Otherwise continue to retry
-                logger.warn(`[Zoho Mail] Error on attempt ${attempt}, retrying...`, 'zoho-service');
+                if (attempt === 2) throw error;
             }
         }
-
-        // Should never reach here, but just in case
-        throw lastError || new Error('Failed to send email after retries');
     }
 
     /**
-     * Initialize service (for compatibility with Gmail service pattern)
-     * @param {string} userEmail - User email (not needed for Zoho, but kept for compat)
+     * List messages from a Zoho folder
      */
+    async listMessages(userEmail, options = {}) {
+        const { folderId = 'inbox', limit = 50 } = options;
+
+        try {
+            const { accessToken, accountId } = await getValidAccessTokenForUser(userEmail);
+
+            // Build query params
+            const params = new URLSearchParams({
+                folderId,
+                limit: limit.toString()
+            });
+
+            logger.info(`[Zoho Mail] Fetching messages for ${userEmail} (folder: ${folderId})...`, 'zoho-service');
+
+            const response = await fetch(`${this.baseUrl}/accounts/${accountId}/messages/view?${params.toString()}`, {
+                headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` }
+            });
+
+            if (!response.ok) {
+                if (response.status === 401) {
+                    clearTokenCache(userEmail);
+                    // Single retry logic could be added here similar to sendEmail
+                }
+                throw new Error(`Zoho List API error: ${response.status}`);
+            }
+
+            const result = await response.json();
+            return result.data || []; // Array of message summaries
+        } catch (error) {
+            logger.error(`[Zoho Mail] List error for ${userEmail}:`, error, 'zoho-service');
+            throw error;
+        }
+    }
+
+    /**
+     * Get full content for a Zoho message
+     */
+    async getMessageContent(userEmail, messageId, folderId = 'inbox') {
+        try {
+            const { accessToken, accountId } = await getValidAccessTokenForUser(userEmail);
+
+            logger.debug(`[Zoho Mail] Fetching content for message ${messageId}...`, 'zoho-service');
+
+            const response = await fetch(`${this.baseUrl}/accounts/${accountId}/folders/${folderId}/messages/${messageId}/content`, {
+                headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` }
+            });
+
+            if (!response.ok) throw new Error(`Zoho Content API error: ${response.status}`);
+
+            const result = await response.json();
+            return result.data; // Full content object
+        } catch (error) {
+            logger.error(`[Zoho Mail] Content error for ${messageId}:`, error, 'zoho-service');
+            throw error;
+        }
+    }
+
     async initialize(userEmail) {
-        // Zoho uses account-level auth, not per-user
-        // This method is here for compatibility with GmailService pattern
-        logger.debug(`[Zoho Mail] Service initialized for ${userEmail}`, 'zoho-service');
-        return true;
+        // Now actually useful for pre-checking tokens
+        try {
+            await getValidAccessTokenForUser(userEmail);
+            return true;
+        } catch {
+            return false;
+        }
     }
 }

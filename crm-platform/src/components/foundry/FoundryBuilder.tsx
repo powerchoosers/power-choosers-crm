@@ -54,7 +54,7 @@ const VALUE_COLOR_CLASSES: Record<ValueColor, string> = {
   yellow: 'bg-amber-400',
   green: 'bg-emerald-500',
   red: 'bg-red-500',
-  black: 'bg-zinc-900',
+  black: 'bg-zinc-100', // Light in editor for readability, but generates black in HTML
 }
 
 interface TextModuleContent {

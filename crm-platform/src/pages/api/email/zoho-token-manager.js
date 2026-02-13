@@ -1,29 +1,34 @@
+
 // Zoho OAuth token management utility
+import { createClient } from '@supabase/supabase-js';
 import logger from '../_logger.js';
 
-// In-memory token cache
-let tokenCache = {
-    accessToken: null,
-    expiresAt: null,
-    usedEnvToken: false, // Track if we've already tried the token from environment
-};
+// Initialize Supabase Admin
+const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+);
+
+// In-memory token cache (per user email)
+const userTokenCache = new Map();
 
 /**
- * Refreshes the Zoho access token using the refresh token
- * @param {string} refreshToken - The refresh token from environment
- * @returns {Promise<string>} - New access token
+ * Refreshes the Zoho access token for a specific user
+ * @param {string} userEmail - User's email
+ * @param {string} refreshToken - The refresh token
+ * @returns {Promise<Object>} - New access token and expiry info
  */
-export async function refreshAccessToken(refreshToken) {
+export async function refreshAccessTokenForUser(userEmail, refreshToken) {
     const clientId = process.env.ZOHO_CLIENT_ID;
     const clientSecret = process.env.ZOHO_CLIENT_SECRET;
     const accountsServer = process.env.ZOHO_ACCOUNTS_SERVER || 'https://accounts.zoho.com';
 
     if (!refreshToken || !clientId || !clientSecret) {
-        throw new Error('Missing Zoho OAuth credentials in environment variables');
+        throw new Error(`Missing Zoho OAuth credentials for ${userEmail}`);
     }
 
     try {
-        logger.info('[Zoho Token] Refreshing access token...', 'zoho-token-manager');
+        logger.info(`[Zoho Token] Refreshing access token for ${userEmail}...`, 'zoho-token-manager');
 
         const body = new URLSearchParams({
             refresh_token: refreshToken,
@@ -42,73 +47,132 @@ export async function refreshAccessToken(refreshToken) {
 
         if (!response.ok) {
             const errorText = await response.text();
-            logger.error(`[Zoho Token] Failed to refresh token: Status ${response.status} - ${errorText}`, 'zoho-token-manager');
-            throw new Error(`Failed to refresh Zoho token: Status ${response.status} - ${errorText}`);
+            logger.error(`[Zoho Token] Failed to refresh token for ${userEmail}: Status ${response.status} - ${errorText}`, 'zoho-token-manager');
+            throw new Error(`Failed to refresh Zoho token: Status ${response.status}`);
         }
 
         const data = await response.json();
 
         if (!data.access_token) {
-            logger.error('[Zoho Token] No access_token in response:', data, 'zoho-token-manager');
             throw new Error('No access_token in refresh response');
         }
 
-        // Cache the new token with expiry (subtract 5 minutes for safety margin)
         const expiresIn = data.expires_in || 3600;
-        tokenCache.accessToken = data.access_token;
-        tokenCache.expiresAt = Date.now() + (expiresIn - 300) * 1000;
-        tokenCache.usedEnvToken = true; // Mark as settled manually
+        const expiresAt = new Date(Date.now() + (expiresIn - 300) * 1000).toISOString();
 
-        logger.info(`[Zoho Token] Token refreshed successfully, expires in ${expiresIn}s`, 'zoho-token-manager');
+        // Update cache
+        userTokenCache.set(userEmail, {
+            accessToken: data.access_token,
+            expiresAt: new Date(expiresAt).getTime()
+        });
+
+        // Save to Supabase
+        await supabaseAdmin
+            .from('users')
+            .update({
+                zoho_access_token: data.access_token,
+                zoho_token_expires_at: expiresAt,
+                updated_at: new Date().toISOString()
+            })
+            .eq('email', userEmail);
+
+        logger.info(`[Zoho Token] Token refreshed successfully for ${userEmail}`, 'zoho-token-manager');
 
         return data.access_token;
     } catch (error) {
-        logger.error('[Zoho Token] Error refreshing token:', error, 'zoho-token-manager');
+        logger.error(`[Zoho Token] Error refreshing token for ${userEmail}:`, error, 'zoho-token-manager');
         throw error;
     }
 }
 
 /**
- * Gets a valid access token, refreshing if necessary
- * @returns {Promise<string>} - Valid access token
+ * Gets a valid access token for a user, checking Supabase first
+ * @param {string} userEmail - User's email
+ * @returns {Promise<Object>} - { accessToken, accountId }
  */
-export async function getValidAccessToken() {
-    // Check if we have a cached token that's still valid
-    if (tokenCache.accessToken && tokenCache.expiresAt && Date.now() < tokenCache.expiresAt) {
-        logger.debug('[Zoho Token] Using cached access token', 'zoho-token-manager');
-        return tokenCache.accessToken;
+export async function getValidAccessTokenForUser(userEmail) {
+    if (!userEmail) throw new Error('User email is required for Zoho token lookup');
+
+    const lowerEmail = userEmail.toLowerCase();
+
+    // 1. Check in-memory cache
+    const cached = userTokenCache.get(lowerEmail);
+    if (cached && cached.expiresAt > Date.now()) {
+        // We still need the accountId, so fetch from DB if not in cache (could cache that too)
+        const { data: user } = await supabaseAdmin
+            .from('users')
+            .select('zoho_account_id')
+            .eq('email', lowerEmail)
+            .single();
+
+        return {
+            accessToken: cached.accessToken,
+            accountId: user?.zoho_account_id || process.env.ZOHO_ACCOUNT_ID
+        };
     }
 
-    // Try to use the token from environment first, but only once
-    const envToken = process.env.ZOHO_ACCESS_TOKEN;
-    const refreshToken = process.env.ZOHO_REFRESH_TOKEN;
+    // 2. Fetch from Supabase
+    const { data: user, error } = await supabaseAdmin
+        .from('users')
+        .select('zoho_access_token, zoho_refresh_token, zoho_token_expires_at, zoho_account_id')
+        .eq('email', lowerEmail)
+        .single();
 
-    // If we have an env token and haven't tried it yet, use it
-    if (envToken && !tokenCache.usedEnvToken) {
-        logger.info('[Zoho Token] Attempting to use access token from environment', 'zoho-token-manager');
-        tokenCache.accessToken = envToken;
-        // Assume it's valid for 1 hour from "now" (we don't know when it was issued)
-        tokenCache.expiresAt = Date.now() + (3600 - 300) * 1000;
-        tokenCache.usedEnvToken = true;
-        return envToken;
+    if (error || !user) {
+        logger.warn(`[Zoho Token] No Zoho credentials found in Supabase for ${lowerEmail}`, 'zoho-token-manager');
+        // Fallback to Env if this is the admin (compatibility)
+        if (lowerEmail === 'l.patterson@nodalpoint.io' && process.env.ZOHO_REFRESH_TOKEN) {
+            return {
+                accessToken: await getValidAccessToken(), // old method
+                accountId: process.env.ZOHO_ACCOUNT_ID
+            };
+        }
+        throw new Error(`No Zoho credentials found for ${lowerEmail}`);
     }
 
-    // Token expired or not available, refresh it
-    if (!refreshToken) {
-        throw new Error('No refresh token available and access token expired');
+    // 3. Check if current access token is still valid
+    const expiresAt = user.zoho_token_expires_at ? new Date(user.zoho_token_expires_at).getTime() : 0;
+    if (user.zoho_access_token && expiresAt > (Date.now() + 60000)) { // 1 min buffer
+        userTokenCache.set(lowerEmail, {
+            accessToken: user.zoho_access_token,
+            expiresAt: expiresAt
+        });
+        return {
+            accessToken: user.zoho_access_token,
+            accountId: user.zoho_account_id || process.env.ZOHO_ACCOUNT_ID
+        };
     }
 
-    return await refreshAccessToken(refreshToken);
+    // 4. Token expired, use refresh token
+    if (!user.zoho_refresh_token) {
+        throw new Error(`Access token expired and no refresh token available for ${lowerEmail}`);
+    }
+
+    const newAccessToken = await refreshAccessTokenForUser(lowerEmail, user.zoho_refresh_token);
+    return {
+        accessToken: newAccessToken,
+        accountId: user.zoho_account_id || process.env.ZOHO_ACCOUNT_ID
+    };
 }
 
 /**
- * Clears the token cache (useful for testing or forced refresh)
+ * Legacy compatibility method (uses Env vars)
  */
-export function clearTokenCache() {
-    tokenCache = {
-        accessToken: null,
-        expiresAt: null,
-        usedEnvToken: true, // Don't try the environment token again after a failure
-    };
-    logger.info('[Zoho Token] Token cache cleared', 'zoho-token-manager');
+export async function getValidAccessToken() {
+    const refreshToken = process.env.ZOHO_REFRESH_TOKEN;
+    if (!refreshToken) throw new Error('Missing ZOHO_REFRESH_TOKEN in environment');
+
+    // Simple cache check/refresh logic (same as before)
+    return await refreshAccessTokenForUser('ADMIN_ENV', refreshToken);
+}
+
+/**
+ * Clears the token cache
+ */
+export function clearTokenCache(userEmail) {
+    if (userEmail) {
+        userTokenCache.delete(userEmail.toLowerCase());
+    } else {
+        userTokenCache.clear();
+    }
 }
