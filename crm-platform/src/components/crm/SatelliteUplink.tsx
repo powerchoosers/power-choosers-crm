@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react';
 import { MapPin, Satellite, Wifi, Loader2, Search } from 'lucide-react';
-import { GoogleMap, useLoadScript, MarkerF } from '@react-google-maps/api';
+import Map, { Marker } from 'react-map-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -21,8 +22,8 @@ interface SatelliteUplinkProps {
   onSyncComplete?: () => void;
 }
 
-export default function SatelliteUplink({ 
-  address, 
+export default function SatelliteUplink({
+  address,
   name,
   entityId,
   entityType,
@@ -44,9 +45,7 @@ export default function SatelliteUplink({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
 
-  const { isLoaded } = useLoadScript({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY as string,
-  });
+  const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
   // Update local address when prop changes (only if different to prevent unnecessary re-renders)
   useEffect(() => {
@@ -94,7 +93,7 @@ export default function SatelliteUplink({
 
   const establishUplink = async () => {
     if (isLoading) return
-    
+
     // If we already have coordinates and address, just show it
     if (coordinates && activeAddress) {
       setIsActive(true)
@@ -105,22 +104,22 @@ export default function SatelliteUplink({
     try {
       // Resolve Address if missing (Search by Name)
       let resolvedAddress = activeAddress;
-      
+
       if (!resolvedAddress && name) {
         // Build search query: Name + city + state for better results
         let searchQuery = name
-        
+
         // Add location context if available
         if (city || state) {
           const locationParts = [city, state].filter(Boolean)
           searchQuery = `${name} ${locationParts.join(' ')}`
         }
-        
+
         toast.info('Initiating Satellite Scan...', { description: `Searching for ${name}` });
-        
+
         const searchRes = await fetch(`/api/maps/search?q=${encodeURIComponent(searchQuery)}`);
         const searchData = await searchRes.json();
-        
+
         if (searchData.found && searchData.address) {
           resolvedAddress = searchData.address;
           setActiveAddress(resolvedAddress);
@@ -134,36 +133,39 @@ export default function SatelliteUplink({
             setIsLoading(false);
             return;
           }
-          
+
           // Auto-Sync Data (Forensic Enrichment)
           if (entityId && entityType) {
             const updates: Record<string, any> = {};
-            
+
             // Sync Address if empty
             if (!address) {
               updates.address = resolvedAddress;
             }
-            
+
             // Sync Phone if empty
+            // NOTE: Mapbox API does not return phone numbers, so this logic will only work
+            // if the backend search endpoint has another data source or is still key-compatible
+            // but returning null.
             if (!currentPhone && searchData.phone) {
               updates.phone = searchData.phone;
             }
-            
+
             if (Object.keys(updates).length > 0) {
-               const table = entityType === 'contact' ? 'contacts' : 'accounts';
-               const { error } = await supabase
-                 .from(table)
-                 .update(updates)
-                 .eq('id', entityId);
-                 
-               if (!error) {
-                 toast.success('Asset Intelligence Acquired', {
-                   description: `Synced: ${Object.keys(updates).join(', ')}`
-                 });
-                 onSyncComplete?.();
-               } else {
-                 console.error('Sync failed:', error);
-               }
+              const table = entityType === 'contact' ? 'contacts' : 'accounts';
+              const { error } = await supabase
+                .from(table)
+                .update(updates)
+                .eq('id', entityId);
+
+              if (!error) {
+                toast.success('Asset Intelligence Acquired', {
+                  description: `Synced: ${Object.keys(updates).join(', ')}`
+                });
+                onSyncComplete?.();
+              } else {
+                console.error('Sync failed:', error);
+              }
             }
           }
         } else {
@@ -172,9 +174,9 @@ export default function SatelliteUplink({
           return;
         }
       } else if (!resolvedAddress && !name) {
-         toast.warning('Targeting Error', { description: 'Missing Name or Address for uplink.' });
-         setIsLoading(false);
-         return;
+        toast.warning('Targeting Error', { description: 'Missing Name or Address for uplink.' });
+        setIsLoading(false);
+        return;
       }
 
       // Geocode the address to get coordinates
@@ -211,7 +213,7 @@ export default function SatelliteUplink({
       } else {
         toast.error('Geocoding Failed', { description: 'Could not locate coordinates.' });
       }
-      
+
     } catch (err) {
       console.error('Failed to establish uplink:', err)
       toast.error('Uplink Failed', { description: 'Signal interference detected.' });
@@ -222,7 +224,7 @@ export default function SatelliteUplink({
 
   const handleSearch = async () => {
     if (!searchInput.trim()) return;
-    
+
     setIsLoading(true);
     try {
       const coords = await geocodeAddress(searchInput);
@@ -268,27 +270,22 @@ export default function SatelliteUplink({
 
   // All hooks must run before any conditional return (Rules of Hooks)
   const mapExpanded = isActive && !!coordinates;
-  const mapOptions = useMemo(() => ({
-    mapTypeId: 'hybrid' as const, // Hybrid shows satellite with labels by default
-    zoomControl: true,
-    streetViewControl: true,
-    mapTypeControl: true,
-    fullscreenControl: true,
-    styles: [],
-  }), []);
   const stableCoordinates = useMemo(() => coordinates, [coordinates?.lat, coordinates?.lng]);
 
-  if (!isLoaded) {
+  if (!mapboxToken) {
     return (
-      <div className="nodal-module-glass nodal-monolith-edge rounded-3xl overflow-hidden relative h-48 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-[#002FA7] animate-spin" />
+      <div className="nodal-module-glass nodal-monolith-edge rounded-3xl overflow-hidden relative h-48 flex items-center justify-center p-6 text-center">
+        <div className="text-red-500 font-mono text-xs">
+          ERROR: MAPBOX TOKEN MISSING.
+          <br />Check env configuration.
+        </div>
       </div>
     );
   }
 
   return (
     <div className="nodal-module-glass nodal-monolith-edge rounded-3xl overflow-hidden relative group">
-      
+
       {/* UPLINK HEADER */}
       <div className="flex items-center justify-between p-3 nodal-recessed border-b border-white/5">
         <div className="flex items-center gap-3">
@@ -349,7 +346,7 @@ export default function SatelliteUplink({
         transition={{ duration: 0.4, ease: 'easeInOut' }}
       >
         {isLoading ? (
-          <div className="flex flex-col items-center gap-2 absolute inset-0 justify-center">
+          <div className="flex flex-col items-center gap-2 absolute inset-0 justify-center z-10 bg-black/50 backdrop-blur-sm">
             <Loader2 className="w-6 h-6 text-[#002FA7] animate-spin" />
             <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Negotiating Uplink...</span>
           </div>
@@ -360,7 +357,7 @@ export default function SatelliteUplink({
               <div className="mb-3 mx-auto w-10 h-10 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-center text-zinc-500 group-hover:text-white group-hover:border-[#002FA7] transition-all">
                 <Satellite className="w-4 h-4" />
               </div>
-              <button 
+              <button
                 onClick={establishUplink}
                 className="h-8 pl-4 pr-6 text-[10px] font-mono text-[#4D88FF] border border-[#4D88FF]/50 bg-[#4D88FF]/20 rounded-lg hover:bg-[#4D88FF] hover:text-white hover:scale-105 hover:brightness-125 transition-all uppercase tracking-widest flex items-center justify-center gap-2.5 hover:shadow-[0_0_30px_-5px_rgba(77,136,255,0.6)] mx-auto"
                 title="Establish Uplink"
@@ -370,16 +367,22 @@ export default function SatelliteUplink({
             </div>
           </div>
         ) : (
-          /* The "Unlocked" State - Full Interactive Google Map */
-          <GoogleMap
-            key={`map-${stableCoordinates.lat}-${stableCoordinates.lng}`}
-            zoom={18}
-            center={stableCoordinates}
-            mapContainerClassName="w-full h-full min-h-[384px]"
-            options={mapOptions}
+          /* The "Unlocked" State - Mapbox Map with Satellite View */
+          <Map
+            initialViewState={{
+              longitude: stableCoordinates.lng,
+              latitude: stableCoordinates.lat,
+              zoom: 16
+            }}
+            style={{ width: '100%', height: '100%', minHeight: '384px' }}
+            mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
+            mapboxAccessToken={mapboxToken}
+            attributionControl={false}
           >
-            <MarkerF position={stableCoordinates} />
-          </GoogleMap>
+            <Marker longitude={stableCoordinates.lng} latitude={stableCoordinates.lat} anchor="bottom">
+              <MapPin className="text-red-500 w-8 h-8 drop-shadow-lg" fill="currentColor" />
+            </Marker>
+          </Map>
         )}
       </motion.div>
     </div>

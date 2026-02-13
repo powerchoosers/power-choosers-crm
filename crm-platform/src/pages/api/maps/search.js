@@ -25,55 +25,49 @@ export default async function handler(req, res) {
     return;
   }
 
-  const apiKey =
-    process.env.GOOGLE_MAPS_API_KEY ||
-    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
-    process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY ||
-    process.env.GOOGLE_MAPS_API;
+  const apiKey = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
   if (!apiKey) {
-    console.error('Google Maps API key missing');
-    sendJson(500, { error: 'Google Maps API key not configured' });
+    console.error('Mapbox API token missing');
+    sendJson(500, { error: 'Mapbox API token not configured' });
     return;
   }
 
   try {
     const response = await fetch(
-      'https://places.googleapis.com/v1/places:searchText',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': apiKey,
-          'X-Goog-FieldMask':
-            'places.formattedAddress,places.nationalPhoneNumber,places.location,places.name',
-        },
-        body: JSON.stringify({ textQuery: query }),
-      }
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${apiKey}&limit=1`
     );
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('Places API error:', data);
+      console.error('Mapbox Geocoding API error:', data);
       sendJson(response.status, {
-        error: data.error?.message || 'Failed to fetch places',
+        error: data.message || 'Failed to fetch places',
       });
       return;
     }
 
-    const place = data.places?.[0];
-    if (!place) {
+    const feature = data.features?.[0];
+    if (!feature) {
       sendJson(200, { found: false });
       return;
     }
 
+    // Mapbox returns [lng, lat]
+    const [lng, lat] = feature.center || feature.geometry?.coordinates || [];
+
     sendJson(200, {
       found: true,
-      address: place.formattedAddress,
-      phone: place.nationalPhoneNumber,
-      location: place.location,
-      placeName: place.name,
+      address: feature.place_name,
+      phone: null, // Mapbox does not provide phone numbers
+      location: {
+        lat: lat,
+        lng: lng,
+        latitude: lat,
+        longitude: lng
+      },
+      placeName: feature.text,
     });
   } catch (error) {
     console.error('Maps Search Error:', error);

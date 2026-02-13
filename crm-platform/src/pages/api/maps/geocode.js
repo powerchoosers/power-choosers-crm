@@ -25,48 +25,35 @@ export default async function handler(req, res) {
     return;
   }
 
-  const apiKey =
-    process.env.GOOGLE_MAPS_API_KEY ||
-    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
-    process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY ||
-    process.env.GOOGLE_MAPS_API;
+  const apiKey = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
   if (!apiKey) {
-    console.error('Google Maps API key missing');
-    sendJson(500, { error: 'Google Maps API key not configured' });
+    console.error('Mapbox API token missing');
+    sendJson(500, { error: 'Mapbox API token not configured' });
     return;
   }
 
   try {
     const response = await fetch(
-      'https://places.googleapis.com/v1/places:searchText',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': apiKey,
-          'X-Goog-FieldMask': 'places.location,places.formattedAddress',
-        },
-        body: JSON.stringify({ textQuery: address }),
-      }
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${apiKey}&limit=1`
     );
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('Places API geocode error:', data);
-      sendJson(response.status, { error: data.error?.message || 'Geocoding failed' });
+      console.error('Mapbox Geocoding API error:', data);
+      sendJson(response.status, { error: data.message || 'Geocoding failed' });
       return;
     }
 
-    const place = data.places?.[0];
-    if (!place?.location) {
+    const feature = data.features?.[0];
+    if (!feature) {
       sendJson(200, { found: false, lat: null, lng: null });
       return;
     }
 
-    const lat = place.location.latitude ?? place.location.lat;
-    const lng = place.location.longitude ?? place.location.lng;
+    // Mapbox returns [lng, lat]
+    const [lng, lat] = feature.center || feature.geometry?.coordinates || [];
 
     if (lat == null || lng == null) {
       sendJson(200, { found: false, lat: null, lng: null });
@@ -77,7 +64,7 @@ export default async function handler(req, res) {
       found: true,
       lat: Number(lat),
       lng: Number(lng),
-      formattedAddress: place.formattedAddress,
+      formattedAddress: feature.place_name,
     });
   } catch (error) {
     console.error('Geocode API Error:', error);
