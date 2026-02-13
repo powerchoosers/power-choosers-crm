@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
@@ -12,12 +12,23 @@ import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { Loader2, Chrome, Mail } from 'lucide-react'
 
-export default function LoginPage() {
+function LoginContent() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const urlError = searchParams ? searchParams.get('error') : null
+
+  useEffect(() => {
+    if (urlError) {
+      toast.error(decodeURIComponent(urlError))
+      // Clear the error from the URL without refreshing
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
+    }
+  }, [urlError])
 
   useEffect(() => {
     const checkRedirect = async () => {
@@ -203,5 +214,13 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-zinc-950 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>}>
+      <LoginContent />
+    </Suspense>
   )
 }
