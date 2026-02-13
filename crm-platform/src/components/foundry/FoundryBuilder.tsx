@@ -1433,7 +1433,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
           </div>
 
           <div className="flex-1 overflow-y-auto bg-zinc-100 p-8 flex justify-center items-start np-scroll">
-            <div className="w-full max-w-[600px] bg-white shadow-2xl flex flex-col shrink-0">
+            <div className="w-full max-w-[600px] bg-white border border-zinc-200 shadow-2xl flex flex-col shrink-0 my-8 overflow-hidden">
               {previewHtml ? (
                 <div
                   className="foundry-preview w-full"
