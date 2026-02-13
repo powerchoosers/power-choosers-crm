@@ -345,8 +345,9 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
           </div>
         </div>
       `
-    }
-  })
+    }) // End of blocks loop
+
+  html += `</div>` // Close the content padding div (32px) before the footer
 
   if (!skipFooter) {
     const profile = options?.profile
@@ -358,8 +359,9 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
     const linkedinUrl = profile?.linkedinUrl || 'https://linkedin.com/company/nodal-point'
 
     html += `
-      <div style="margin-top: 40px; border-top: 1px solid #f4f4f5; background-color: #fafafa; padding: 32px 24px; font-family: sans-serif;">
-        <table style="width: 100%; border-collapse: collapse;">
+      <div style="margin-top: 40px; border-top: 1px solid #f4f4f5; background-color: #fafafa; font-family: sans-serif;">
+        <div style="padding: 32px 24px;">
+          <table style="width: 100%; border-collapse: collapse;">
           <tr>
             <td style="vertical-align: top;">
               <!-- Identity Block -->
@@ -395,11 +397,13 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
               </div>
             </td>
           </tr>
-        </table>
+          </table>
+        </div>
       </div>
     `
   }
-  html += `</div></div>`
+  html += `</div>` // Close the outer container (600px)
+
 
   return html
 }
