@@ -4,7 +4,8 @@ import logger from '../_logger.js';
 
 export class ZohoMailService {
     constructor() {
-        this.baseUrl = process.env.ZOHO_BASE_URL || 'https://mail.zoho.com/api';
+        // Default to v1 which is required for Mail API
+        this.baseUrl = process.env.ZOHO_BASE_URL || 'https://mail.zoho.com/api/v1';
         this.accountId = process.env.ZOHO_ACCOUNT_ID;
     }
 
@@ -71,18 +72,29 @@ export class ZohoMailService {
 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    logger.error(`[Zoho Mail] API error (attempt ${attempt}): ${response.status} ${errorText}`, 'zoho-service');
+                    logger.error(`[Zoho Mail] API error (attempt ${attempt}): Status ${response.status} - ${errorText}`, 'zoho-service');
+
+                    // Detailed error info for debugging
+                    let errorInfo = errorText;
+                    try {
+                        const parsedError = JSON.parse(errorText);
+                        if (parsedError.status && parsedError.status.description) {
+                            errorInfo = parsedError.status.description;
+                        }
+                    } catch (e) {
+                        // Not JSON, use raw text
+                    }
 
                     // If token expired (401) on first attempt, clear cache and retry
                     if (response.status === 401 && attempt === 1) {
-                        logger.warn('[Zoho Mail] Token expired, clearing cache and retrying...', 'zoho-service');
+                        logger.warn('[Zoho Mail] Token expired (401), clearing cache and retrying...', 'zoho-service');
                         const { clearTokenCache } = await import('./zoho-token-manager.js');
                         clearTokenCache();
-                        lastError = new Error(`Token expired, retrying...`);
+                        lastError = new Error(`Token expired (401): ${errorInfo}`);
                         continue; // Retry
                     }
 
-                    throw new Error(`Zoho API error: ${response.status} - ${errorText}`);
+                    throw new Error(`Zoho API error: ${response.status} - ${errorInfo}`);
                 }
 
                 const result = await response.json();
