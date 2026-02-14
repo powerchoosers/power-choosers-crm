@@ -7,6 +7,7 @@ interface SyncStore {
   setIsSyncing: (syncing: boolean) => void
   setLastSyncTime: (time: number) => void
   incrementSyncCount: () => void
+  setSyncCount: (count: number) => void
 }
 
 export const useSyncStore = create<SyncStore>((set) => ({
@@ -16,4 +17,5 @@ export const useSyncStore = create<SyncStore>((set) => ({
   setIsSyncing: (syncing) => set({ isSyncing: syncing }),
   setLastSyncTime: (time) => set({ lastSyncTime: time }),
   incrementSyncCount: () => set((state) => ({ syncCount: state.syncCount + 1 })),
+  setSyncCount: (count) => set({ syncCount: count }),
 }))
