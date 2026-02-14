@@ -28,6 +28,8 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { generateStaticHtml, substituteVariables, contactToVariableMap } from '@/lib/foundry'
+import { buildFoundryContext, generateSystemPrompt } from '@/lib/foundry-prompt'
+import { supabase } from '@/lib/supabase'
 import { CONTACT_VARIABLES, ACCOUNT_VARIABLES, extractVariableKeysFromText } from '@/lib/foundry-variables'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
@@ -340,115 +342,44 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
     setBlocks(blocks.map(b => b.id === id ? { ...b, content } : b))
   }
 
-  const generateWithAi = async (blockId: string, blockType: 'TEXT_MODULE' | 'TACTICAL_BUTTON' | 'LIABILITY_GAUGE' | 'MARKET_BREADCRUMB', currentContent: string | { text?: string; aiPrompt?: string }, noteField?: string) => {
+  const generateWithAi = async (blockId: string, blockTypeArg: 'TEXT_MODULE' | 'TACTICAL_BUTTON' | 'LIABILITY_GAUGE' | 'MARKET_BREADCRUMB', contentArg: string | { text?: string; aiPrompt?: string }, noteField?: string) => {
+    const block = blocks.find(b => b.id === blockId)
+    if (!block) return
+
     setGeneratingBlockId(blockId)
+
+    // Use the content passed from the UI or fallback to block content
+    const contentToUse = contentArg || block.content
+
     try {
-      let prompt: string
-      let blockTypeParam: string
-      let contextText: string = ''
+      // 1. Build Deep Context using shared library
+      const context = await buildFoundryContext(supabase, previewContactId, null)
 
-      if (blockType === 'TEXT_MODULE') {
-        const blockIndex = blocks.findIndex(b => b.id === blockId)
-        const isFirstBlock = blockIndex === 0
-        const contentObj = typeof currentContent === 'object'
-          ? currentContent as TextModuleContent
-          : { text: String(currentContent), aiPrompt: '', useAi: false, bullets: [] } as TextModuleContent
-        const userPrompt = contentObj.aiPrompt?.trim() || ''
-
-        // Build context from all other blocks
-        const otherBlocks = blocks.filter((b, idx) => idx !== blockIndex)
-        const contextParts: string[] = []
-        otherBlocks.forEach((b, idx) => {
-          if (b.type === 'TEXT_MODULE') {
-            const txt = typeof b.content === 'string' ? b.content : (b.content?.text || '')
-            if (txt.trim()) contextParts.push(`Block ${idx + 1}: ${txt.slice(0, 200)}`)
-          } else if (b.type === 'TACTICAL_BUTTON') {
-            contextParts.push(`Block ${idx + 1}: CTA button "${b.content}"`)
-          } else if (b.type === 'TELEMETRY_GRID') {
-            const headers = b.content?.headers?.join(', ') || ''
-            contextParts.push(`Block ${idx + 1}: Data grid with columns: ${headers}`)
-          } else if (b.type === 'LIABILITY_GAUGE') {
-            contextParts.push(`Block ${idx + 1}: Liability gauge showing ${b.content?.baselineValue || 'rate'}/kWh, ${b.content?.riskLevel || 0}% risk`)
-          } else if (b.type === 'MARKET_BREADCRUMB') {
-            contextParts.push(`Block ${idx + 1}: Market intel "${b.content?.headline || ''}"`)
-          }
-        })
-        const foundryContext = contextParts.length > 0 ? `\n\nOther blocks in this foundry asset:\n${contextParts.join('\n')}` : ''
-
-        const contactInfo = previewContact
-          ? `\n\nContact: ${(previewContact as { firstName?: string })?.firstName || '—'} ${(previewContact as { lastName?: string })?.lastName || ''}, Company: ${(previewContact as { companyName?: string })?.companyName || '—'}, Current rate: ${(previewContact as { currentRate?: string })?.currentRate || '—'}/kWh`
-          : ''
-
-        if (isFirstBlock) {
-          prompt = `You are writing the introduction and intelligence briefing for an energy intelligence email. 
-          
-          STRUCTURE:
-          1. Greeting: "{contact.firstName}," (On its own line)
-          2. Double Newline
-          3. Paragraph 1: EXACTLY 1 concise forensic sentence setting the context.
-          4. Double Newline
-          5. Paragraph 2: EXACTLY 2 forensic sentences detailing the technical requirements or intelligence signals.
-          
-          CONTENT RULES:
-          - CONCISENESS IS MANDATORY. Keep sentences short and clinical.
-          - Use Nodal Point's forensic, intelligence-brief style.
-          - NO bracketed sources like [1], [2], [3].
-          - NO marketing fluff.
-          - Include ${contentObj.bullets?.length || 0} technical signal bullets.
-          
-          FORMAT: Return a JSON object with "text" (string) and "bullets" (array of strings, exactly ${contentObj.bullets?.length || 0} items).
-          Ensure Paragraph 1 and Paragraph 2 are separated by TWO newline characters (\n\n).
-          ${userPrompt ? `\n\nUser instruction: ${userPrompt}` : ''}${foundryContext}${contactInfo}`
-        } else {
-          prompt = `You are writing a body paragraph for an energy intelligence email. 
-          
-          STRUCTURE:
-          1. Narrative: EXACTLY 2-3 concise forensic sentences.
-          
-          CONTENT RULES:
-          - CONCISENESS IS MANDATORY. Keep sentences short and clinical.
-          - Use the contact's first name naturally within the paragraph.
-          - NO bracketed sources like [1], [2], [3].
-          - NO marketing fluff.
-          - Include ${contentObj.bullets?.length || 0} technical signal bullets.
-          
-          FORMAT: Return a JSON object with "text" (string) and "bullets" (array of strings, exactly ${contentObj.bullets?.length || 0} items).
-          ${userPrompt ? `\n\nUser instruction: ${userPrompt}` : ''}${foundryContext}${contactInfo}`
-        }
-        blockTypeParam = 'narrative'
-        contextText = typeof currentContent === 'string' ? currentContent : (currentContent?.text || '')
-      } else if (blockType === 'TACTICAL_BUTTON') {
-        prompt = 'Rewrite as a single tactical CTA label for an intelligence brief.'
-        blockTypeParam = 'button'
-        contextText = typeof currentContent === 'string' ? currentContent : String(currentContent)
-      } else if (blockType === 'LIABILITY_GAUGE') {
-        const contactSummary = previewContact
-          ? ` Contact context: current rate ${(previewContact as { currentRate?: string })?.currentRate ?? '—'}, supplier ${(previewContact as { electricitySupplier?: string })?.electricitySupplier ?? '—'}, contract end ${(previewContact as { contractEnd?: string })?.contractEnd ?? '—'}.`
-          : ''
-        prompt = `Rewrite the following as a one-sentence risk diagnosis for an energy liability gauge. Focus on structural inefficiency and grid physics. Minimalist and forensic. No marketing.${contactSummary}`
-        blockTypeParam = 'narrative'
-        contextText = typeof currentContent === 'string' ? currentContent : String(currentContent)
-      } else if (blockType === 'MARKET_BREADCRUMB') {
-        const contactSummary = previewContact
-          ? ` Contact context: load zone ${(previewContact as { metadata?: { energy?: { loadZone?: string } } })?.metadata?.energy?.loadZone ?? '—'}, company ${(previewContact as { companyName?: string })?.companyName ?? '—'}, current rate ${(previewContact as { currentRate?: string })?.currentRate ?? '—'}.`
-          : ''
-        prompt = `Rewrite this market news into a 2-sentence impact assessment for a client in {{load_zone}}. Focus on how this event increases their 'Liability' or 'Cost Leakage'. Do not summarize the article; interpret its 'Physics' relative to the client's strike price.${contactSummary}`
-        blockTypeParam = 'narrative'
-        contextText = typeof currentContent === 'string' ? currentContent : String(currentContent)
-      } else {
-        prompt = 'Rewrite this for a Nodal Point intelligence brief. Keep it forensic and precise.'
-        blockTypeParam = 'narrative'
-        contextText = typeof currentContent === 'string' ? currentContent : String(currentContent)
+      // 2. Prepare User Prompt
+      let userPrompt = ''
+      if (block.type === 'TEXT_MODULE') {
+        const c = typeof contentToUse === 'object' ? contentToUse : { text: String(contentToUse), aiPrompt: '', useAi: false }
+        userPrompt = c.aiPrompt || ''
       }
+
+      // 3. Generate System Prompt
+      const systemPrompt = generateSystemPrompt(
+        block.type,
+        userPrompt,
+        context,
+        ''
+      )
+
       const res = await fetch('/api/foundry/generate-text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt,
-          context: contextText,
-          blockType: blockTypeParam,
+          prompt: systemPrompt,
+          context: typeof contentToUse === 'string' ? contentToUse : (contentToUse as any)?.text || '',
+          blockType: block.type === 'TACTICAL_BUTTON' ? 'button' : 'narrative'
         }),
       })
+
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         toast.error(data?.error || data?.details || 'AI generation failed')
@@ -460,36 +391,45 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
       let generatedBullets: string[] = []
 
       if (typeof data?.text === 'string') {
+        const rawText = data.text.trim()
+
+        // Try to locate a JSON object in the string if it looks like one might be there
+        let cleanText = rawText
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/)
+        if (jsonMatch) {
+          cleanText = jsonMatch[0]
+        } else {
+          // Fallback cleaning for markdown blocks
+          cleanText = rawText
+            .replace(/^```json\s*/i, '')
+            .replace(/```\s*$/i, '')
+            .trim()
+        }
+
         try {
-          // Check if the AI returned a JSON string inside the text field
-          const parsed = JSON.parse(data.text)
+          const parsed = JSON.parse(cleanText)
           generatedText = (parsed.text || '').replace(/\[\d+\]/g, '').trim()
           generatedBullets = (parsed.bullets || []).map((b: string) => b.replace(/\[\d+\]/g, '').trim())
         } catch {
-          // Fallback to plain text if not JSON
-          generatedText = data.text.replace(/\[\d+\]/g, '').trim()
+          // Fallback to plain text if not valid JSON or if parsing failed
+          generatedText = rawText.replace(/\[\d+\]/g, '').trim()
         }
       }
 
       if (generatedText) {
-        if (blockType === 'TEXT_MODULE') {
-          const block = blocks.find(b => b.id === blockId)
-          if (block) {
-            const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content), useAi: false, aiPrompt: '' }
-            updateBlockContent(blockId, {
-              ...contentObj,
-              text: generatedText,
-              bullets: generatedBullets.length > 0 ? generatedBullets : (contentObj.bullets ?? [])
-            })
-          }
-        } else if (blockType === 'LIABILITY_GAUGE' && noteField === 'note') {
-          const block = blocks.find(b => b.id === blockId)
-          if (block) updateBlockContent(blockId, { ...block.content, note: data.text.trim() })
-        } else if (blockType === 'MARKET_BREADCRUMB' && noteField === 'nodalAnalysis') {
-          const block = blocks.find(b => b.id === blockId)
-          if (block) updateBlockContent(blockId, { ...block.content, nodalAnalysis: data.text.trim() })
+        if (block.type === 'TEXT_MODULE') {
+          const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content), useAi: false, aiPrompt: '' }
+          updateBlockContent(blockId, {
+            ...contentObj,
+            text: generatedText,
+            bullets: generatedBullets.length > 0 ? generatedBullets : (contentObj.bullets ?? [])
+          })
+        } else if (block.type === 'LIABILITY_GAUGE' && noteField === 'note') {
+          updateBlockContent(blockId, { ...block.content, note: generatedText })
+        } else if (block.type === 'MARKET_BREADCRUMB' && noteField === 'nodalAnalysis') {
+          updateBlockContent(blockId, { ...block.content, nodalAnalysis: generatedText })
         } else {
-          updateBlockContent(blockId, data.text.trim())
+          updateBlockContent(blockId, generatedText)
         }
         toast.success('Copy updated')
       }
@@ -499,6 +439,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
       setGeneratingBlockId(null)
     }
   }
+
 
   const moveBlock = (id: string, direction: 'up' | 'down') => {
     const idx = blocks.findIndex(b => b.id === id)
