@@ -52,10 +52,10 @@ export function useZohoSync() {
         // Perform initial sync on mount
         performSync(true);
 
-        // Setup interval for background sync (every 5 minutes)
+        // Setup interval for background sync (every 3 minutes)
         const interval = setInterval(() => {
             performSync(true);
-        }, 5 * 60 * 1000);
+        }, 3 * 60 * 1000);
 
         return () => clearInterval(interval);
     }, [user, performSync]);
