@@ -38,13 +38,14 @@ export default async function handler(req, res) {
         let skippedCount = 0;
 
         for (const msgSummary of messages) {
-            const messageId = msgSummary.messageId || msgSummary.message_id;
+            // Zoho messageId is a 19-digit number as a string
+            const messageId = String(msgSummary.messageId || msgSummary.message_id);
 
-            // 2. Check for duplicates in Supabase
+            // 2. Check for duplicates in Supabase using the primary 'id' column
             const { data: existing } = await supabaseAdmin
                 .from('emails')
                 .select('id')
-                .eq('messageId', messageId)
+                .eq('id', messageId)
                 .maybeSingle();
 
             if (existing) {
@@ -82,12 +83,13 @@ export default async function handler(req, res) {
 
 function parseZohoMessage(summary, content, ownerEmail) {
     const receivedTime = summary.receivedTime || Date.now();
+    const zohoId = String(summary.messageId);
 
     // Zoho summary usually contains sender, subject, etc.
     const emailData = {
-        messageId: summary.messageId,
+        id: zohoId, // Use Zoho Message ID as primary key
         from: summary.sender,
-        to: ownerEmail, // Primarily fetching for the owner
+        to: [ownerEmail], // Store as array to match DB jsonb 'to' column
         subject: summary.subject,
         text: content.content || '',
         html: content.content || '', // Zoho content API might return HTML directly
@@ -100,7 +102,10 @@ function parseZohoMessage(summary, content, ownerEmail) {
         createdBy: ownerEmail,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        status: 'received',
         metadata: {
+            zohoId: zohoId,
+            zohoMessageId: zohoId,
             zohoFolder: summary.folderName || 'inbox',
             sentTime: summary.sentTime,
             hasAttachments: summary.hasAttachments
@@ -131,25 +136,33 @@ async function updateThread(emailDoc) {
         .maybeSingle();
 
     const snippet = emailDoc.text?.slice(0, 140) || '';
+    const recipients = Array.isArray(emailDoc.to) ? emailDoc.to : [emailDoc.to];
 
     if (existingThread) {
+        const currentParticipants = Array.isArray(existingThread.participants) ? existingThread.participants : [];
+        const mergedParticipants = Array.from(new Set([...currentParticipants, emailDoc.from, ...recipients]));
+
         await supabaseAdmin
             .from('threads')
             .update({
                 lastMessageAt: emailDoc.timestamp,
                 lastSnippet: snippet,
                 lastFrom: emailDoc.from,
+                participants: mergedParticipants,
                 messageCount: (existingThread.messageCount || 0) + 1,
                 updatedAt: new Date().toISOString()
             })
             .eq('id', threadId);
     } else {
+        const normalizeSubject = (s) => (s || '').replace(/^\s*(re|fw|fwd)\s*:\s*/i, '').trim().toLowerCase();
+        const subjectNorm = normalizeSubject(emailDoc.subject);
+
         await supabaseAdmin
             .from('threads')
             .insert({
                 id: threadId,
-                subjectNormalized: emailDoc.subject,
-                participants: [emailDoc.from, emailDoc.to],
+                subjectNormalized: subjectNorm,
+                participants: Array.from(new Set([emailDoc.from, ...recipients])),
                 lastMessageAt: emailDoc.timestamp,
                 lastSnippet: snippet,
                 lastFrom: emailDoc.from,
