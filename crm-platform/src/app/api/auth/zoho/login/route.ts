@@ -14,7 +14,7 @@ export async function GET() {
     const params = new URLSearchParams({
         response_type: 'code',
         client_id: clientId,
-        scope: 'openid email profile', // Standard OIDC scopes for better identity reliability
+        scope: 'openid email profile ZohoMail.messages.READ ZohoMail.messages.CREATE ZohoMail.accounts.READ ZohoMail.folders.READ',
         redirect_uri: redirectUri,
         access_type: 'offline',
         prompt: 'consent',
