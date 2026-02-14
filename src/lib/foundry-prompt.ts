@@ -53,12 +53,13 @@ export async function buildFoundryContext(
         let accountData: any = null
 
         if (contactId) {
+            console.log('[FoundryContext] Fetching contact:', contactId)
             const { data, error } = await supabase
                 .from('contacts')
                 .select(`
           *,
           accounts (
-            id, name, domain, industry, description, city, state, website,
+            id, name, domain, industry, description, city, state,
             current_rate, contract_end_date, annual_usage, electricity_supplier,
             service_addresses, load_factor, latitude, longitude, metadata
           )
@@ -66,31 +67,37 @@ export async function buildFoundryContext(
                 .eq('id', contactId)
                 .single()
 
-            if (!error && data) {
+            if (error) {
+                console.error('[FoundryContext] Contact query error:', error.message)
+            }
+
+            if (data) {
                 contactData = data
-                // PostgREST might return accounts as an array or object depending on relationship configuration
                 accountData = Array.isArray(data.accounts) ? data.accounts[0] : data.accounts
 
-                // Fallback: If accounts join didn't work but we have accountId, fetch it directly
                 if (!accountData && contactData.accountId) {
-                    const { data: directAccount } = await supabase
+                    console.log('[FoundryContext] Falling back to direct account fetch for:', contactData.accountId)
+                    const { data: directAccount, error: accError } = await supabase
                         .from('accounts')
                         .select('*')
                         .eq('id', contactData.accountId)
                         .single()
+                    if (accError) console.error('[FoundryContext] Account fallback error:', accError.message)
                     if (directAccount) accountData = directAccount
                 }
+            } else {
+                console.warn('[FoundryContext] No contact data found for ID:', contactId)
             }
         } else if (accountId) {
+            console.log('[FoundryContext] Fetching account:', accountId)
             const { data, error } = await supabase
                 .from('accounts')
                 .select('*')
                 .eq('id', accountId)
                 .single()
 
-            if (!error && data) {
-                accountData = data
-            }
+            if (error) console.error('[FoundryContext] Direct account query error:', error.message)
+            if (data) accountData = data
         }
 
         if (contactData) {
