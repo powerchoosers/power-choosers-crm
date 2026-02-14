@@ -38,7 +38,7 @@ export async function GET(request: Request) {
         // 1. Exchange code for tokens
         const tokenResponse = await fetch('https://accounts.zoho.com/oauth/v2/token', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-form-urlencoded' },
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: new URLSearchParams({
                 grant_type: 'authorization_code',
                 client_id: clientId,
@@ -47,6 +47,12 @@ export async function GET(request: Request) {
                 code: code,
             }),
         });
+
+        if (!tokenResponse.ok) {
+            const errorText = await tokenResponse.text();
+            console.error('Zoho Token Exchange HTTP Error:', tokenResponse.status, errorText);
+            throw new Error(`Token exchange failed with status ${tokenResponse.status}: ${errorText}`);
+        }
 
         const tokenData = await tokenResponse.json();
 
