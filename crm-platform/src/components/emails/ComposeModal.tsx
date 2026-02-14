@@ -34,8 +34,9 @@ export type EmailTypeId = 'cold_first_touch' | 'cold_followup' | 'professional' 
 
 const DELIVERABILITY_RULES = `
 DELIVERABILITY RULES:
-- Avoid promotional spam language ("free", "act now", "discount", "save big", "limited time offer", "urgent", "money-back guarantee").
-- Avoid overuse of dollar signs, percentages, and ALL CAPS in subject/body.
+- Avoid promotional spam language ("free", "act now", "discount", "save big", "limited time offer", "urgent").
+- No em dashes (—) or en dashes (–). They look too machine-generated. Use commas or colons.
+- Bullet points must be one single, short sentence. Max 15 words per bullet.
 - For cold first-touch: do not include any links. Plain text only.`
 
 /** Maps industry to vertical-specific pain points and angles. Used to automatically inject context into prompts. */
@@ -188,8 +189,8 @@ ${DELIVERABILITY_RULES}
       { label: 'PASS_THROUGH', directive: 'Write a 40–70 word first-touch cold email. Describe in plain English: charges from the utility that aren\'t the energy commodity (delivery/utility fees on the bill). Do not say "TDU" or "pass-through" unless RECIPIENT CONTEXT / Audience says energy manager. One question about what share of their bill is those delivery/utility charges. No links, plain text. (Use Audience above: plain English for general, TDU/pass-through only if energy manager.)' },
     ],
     refinementChips: [
-      { label: 'FORENSIC_OPTIMIZE', directive: 'Rewrite to 40–80 words. Concise, direct. One question CTA. Output only the refined body.' },
-      { label: 'EXPAND_TECHNICAL', directive: 'Add one plain-English detail about how the local market or utility rules affect their costs; keep under 80 words. No jargon unless recipient is an energy manager. Output only the refined body.' },
+      { label: 'FORENSIC_OPTIMIZE', directive: 'Rewrite to 40–80 words. Human peer-to-peer tone. No em dashes. Concise, direct. One question CTA. Output only the refined body.' },
+      { label: 'EXPAND_TECHNICAL', directive: 'Add one human, plain-English detail about how local market rules affect their costs; max 15 word bullets if used. No em dashes. Output only the refined body.' },
     ],
   },
   {
@@ -468,22 +469,25 @@ function ComposePanel({
     }
     if (isRefinementMode) {
       base += '\n\n' + effectiveConfig.getRefinementInstruction()
-    } else {
-      base += `
+    }
 
-OUTPUT FORMAT (generation only):
+    base += `
+    
+CORE RULES:
+- TONE: Peer-to-Peer. Professional but human. Speak like a knowledgeable industry colleague.
+- NO JARGON: Use plain English. No buzzwords like "delve", "optimize", "streamline".
+- NO DASHES: Use commas or colons. Never use em dashes (—).
+- BULLET LENGTH: If using bullets, each must be a single sentence, max 15 words.
+- SPECIFICITY: Reference the lead's company and industry naturally.
+`
+
+    if (!isRefinementMode) {
+      base += `
+OUTPUT FORMAT:
 - When generating a new email, output on the first line: SUBJECT: <one-line subject>
 - Then a blank line, then the email body.
-- If the directive is body-only (e.g. "just the intro paragraph"), output only the body with no SUBJECT line.
-
-CRITICAL OUTPUT RULES:
-- You MUST output actual email content (subject + body or body only). NEVER output questions, meta-commentary, or prompt instructions.
-- NEVER ask clarifying questions like "What should I write about?" or "Could you clarify?" or "What angle should I use?"
-- NEVER output instructions or suggestions like "Here's what you could write:" or "Consider mentioning..."
-- NEVER generate a question instead of email content, even if the user's directive is unclear or seems like a question.
-- If the directive is unclear, interpret it as best you can and generate email content anyway. Default to the email type's standard structure.
-- The app handles To/Sender/recipient. Never say you cannot send, cannot use the email address, or ask to verify the sender.
-- Output ONLY the requested content (subject line + body or body only). No meta-commentary, no apologies, no verification requests, no questions, no instructions.`
+- If the directive is body-only, output only the body with no SUBJECT line.
+- Return ONLY the requested content. No meta-commentary.`
     }
     return base
   }, [emailTypeConfig, signerName, to, subject, isRefinementMode, context])
@@ -610,8 +614,7 @@ CRITICAL OUTPUT RULES:
         if (!asset) throw new Error('Template not found')
 
         // Generate HTML from blocks
-        const blocks = asset.content_json?.blocks || []
-        let html = generateStaticHtml(blocks, { profile })
+        let html = generateStaticHtml(asset.content_json?.blocks || [], { profile })
 
         // Build variable map from contact context (use empty values if no context)
         const contactData = {
@@ -630,7 +633,7 @@ CRITICAL OUTPUT RULES:
         html = substituteVariables(html, variableMap)
 
         // Auto-generate AI blocks if needed (only if context is available)
-        const aiBlocksToGenerate = context ? blocks.filter((block: any) => {
+        const aiBlocksToGenerate = context ? (asset.content_json?.blocks || []).filter((block: any) => {
           if (block.type !== 'TEXT_MODULE') return false
           const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content || ''), useAi: false, aiPrompt: '' }
           return contentObj.useAi === true && contentObj.aiPrompt?.trim() && !contentObj.text?.trim()
@@ -638,7 +641,7 @@ CRITICAL OUTPUT RULES:
 
         if (aiBlocksToGenerate.length > 0) {
           // Clone blocks to avoid mutating original state directly (though likely safe here)
-          const updatedBlocks = JSON.parse(JSON.stringify(blocks))
+          const updatedBlocks = JSON.parse(JSON.stringify(asset.content_json?.blocks || []))
 
           // 1. Fetch Deep Context ONCE for all blocks
           const deepContext = await buildFoundryContext(supabase, context?.contactId, context?.accountId)
@@ -1098,7 +1101,7 @@ CRITICAL OUTPUT RULES:
                     </SelectContent>
                   </Select>
                   <Input
-                    placeholder={isRefinementMode ? 'Refine: concise / technical' : '> ENTER_DIRECTIVE...'}
+                    placeholder={isRefinementMode ? 'Refine: human tone / no dashes' : '> ENTER_HUMAN_DIRECTIVE...'}
                     value={aiPrompt}
                     onChange={(e) => setAiPrompt(e.target.value)}
                     onKeyDown={(e) => {
@@ -1107,7 +1110,7 @@ CRITICAL OUTPUT RULES:
                         generateEmailWithAi(aiPrompt)
                       }
                     }}
-                    className="flex-1 min-w-[160px] h-8 bg-transparent border-white/10 rounded-lg text-[11px] font-mono placeholder:text-zinc-500"
+                    className="flex-1 min-w-[160px] h-8 bg-transparent border-white/10 rounded-lg text-[11px] font-mono placeholder:text-zinc-500 focus:ring-0 focus:border-[#002FA7]/30"
                   />
                   <Button
                     size="sm"
@@ -1174,25 +1177,28 @@ CRITICAL OUTPUT RULES:
               id="email-attachment-input"
               aria-label="Select file to attach"
             />
-            <label
-              htmlFor="email-attachment-input"
-              title="Attach Files"
-              className="icon-button-forensic h-8 w-8 flex items-center justify-center cursor-pointer"
+            <Button
+              variant="outline"
+              size="icon"
+              asChild
+              className="h-8 w-8 rounded-full border-zinc-200 hover:bg-zinc-50 hover:text-[#002FA7] transition-all duration-300"
             >
-              <Paperclip className="w-4 h-4" />
-            </label>
-            <button
-              type="button"
-              title="Open AI Command Rail"
-              onClick={() => setAiRailOpen((open) => !open)}
+              <label htmlFor="email-attachment-input" title="Attach Files" className="cursor-pointer">
+                <Paperclip className="w-4 h-4" />
+              </label>
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
               className={cn(
-                'icon-button-forensic h-8 w-8 flex items-center justify-center',
-                aiRailOpen ? 'text-[#002FA7] ring-1 ring-[#002FA7]/30' : 'text-purple-400'
+                "h-8 w-8 rounded-full border-zinc-200 hover:bg-zinc-50 hover:text-[#002FA7] transition-all duration-300",
+                aiRailOpen && "bg-zinc-50 text-[#002FA7] border-[#002FA7]/30 shadow-[0_0_10px_rgba(0,47,167,0.1)]"
               )}
+              onClick={() => setAiRailOpen(!aiRailOpen)}
+              title="AI Assistant (Spark)"
             >
-              <Sparkles className="w-4 h-4" />
-            </button>
-
+              <Sparkles className={cn("h-4 w-4", aiRailOpen && "fill-current")} />
+            </Button>
             {/* Foundry Template Selector */}
             <div className="h-6 w-px bg-white/10" />
             <Select value={foundrySelectValue} onValueChange={(v) => setSelectedFoundryId(v === 'none' ? null : v)}>
