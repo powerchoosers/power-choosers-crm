@@ -137,9 +137,24 @@ export async function getValidAccessTokenForUser(userEmail) {
             accessToken: user.zoho_access_token,
             expiresAt: expiresAt
         });
+        let accountId = user.zoho_account_id;
+        if (!accountId) {
+            // Try to fetch it with current token
+            try {
+                accountId = await fetchZohoAccountId(lowerEmail, user.zoho_access_token);
+            } catch (e) {
+                logger.warn(`[Zoho Token] Failed to auto-fetch account ID with existing token: ${e.message}`);
+                accountId = process.env.ZOHO_ACCOUNT_ID;
+            }
+        }
+
+        userTokenCache.set(lowerEmail, {
+            accessToken: user.zoho_access_token,
+            expiresAt: expiresAt
+        });
         return {
             accessToken: user.zoho_access_token,
-            accountId: user.zoho_account_id || process.env.ZOHO_ACCOUNT_ID
+            accountId: accountId
         };
     }
 
@@ -149,10 +164,41 @@ export async function getValidAccessTokenForUser(userEmail) {
     }
 
     const newAccessToken = await refreshAccessTokenForUser(lowerEmail, user.zoho_refresh_token);
+
+    // Check if account ID is missing and try to fetch it
+    let accountId = user.zoho_account_id;
+    if (!accountId) {
+        try {
+            accountId = await fetchZohoAccountId(lowerEmail, newAccessToken);
+        } catch (e) {
+            logger.warn(`[Zoho Token] Failed to auto-fetch account ID for ${lowerEmail}: ${e.message}`);
+            accountId = process.env.ZOHO_ACCOUNT_ID;
+        }
+    }
+
     return {
         accessToken: newAccessToken,
-        accountId: user.zoho_account_id || process.env.ZOHO_ACCOUNT_ID
+        accountId: accountId || process.env.ZOHO_ACCOUNT_ID
     };
+}
+
+/**
+ * Helper to fetch and save account ID
+ */
+async function fetchZohoAccountId(userEmail, accessToken) {
+    const url = 'https://mail.zoho.com/api/accounts';
+    const response = await fetch(url, { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } });
+    if (!response.ok) throw new Error(`Status ${response.status}`);
+
+    const data = await response.json();
+    const accountId = data.data?.[0]?.accountId;
+
+    if (accountId) {
+        await supabaseAdmin.from('users').update({ zoho_account_id: accountId }).eq('email', userEmail);
+        logger.info(`[Zoho Token] Auto-discovered and saved Account ID ${accountId} for ${userEmail}`);
+        return accountId;
+    }
+    return null;
 }
 
 /**
