@@ -96,15 +96,19 @@ export async function buildFoundryContext(
         if (contactData) {
             const fullName = contactData.name || ''
             const nameParts = fullName.trim().split(/\s+/)
+            const firstName = contactData.firstName || contactData.first_name || contactData.firstname || contactData.FirstName || nameParts[0] || ''
+            const lastName = contactData.lastName || contactData.last_name || contactData.lastname || contactData.LastName || nameParts.slice(1).join(' ') || ''
+
             context.contact = {
                 name: fullName,
-                firstName: contactData.firstName || contactData.first_name || nameParts[0] || '',
-                lastName: contactData.lastName || contactData.last_name || nameParts.slice(1).join(' ') || '',
+                firstName: firstName,
+                lastName: lastName,
                 title: contactData.title || '',
                 email: contactData.email || '',
-                phone: contactData.phone || ''
+                phone: contactData.phone || contactData.mobile || ''
             }
             context.intelligence.summary = contactData.notes || ''
+            console.log('[FoundryContext] Contact resolved:', context.contact.firstName, context.contact.lastName)
         }
 
         if (accountData) {
@@ -126,6 +130,7 @@ export async function buildFoundryContext(
                 loadZone: accountData.load_zone || (meta.energy?.loadZone as string) || '',
                 serviceAddress: (accountData.service_addresses?.[0] as any)?.address || ''
             }
+            console.log('[FoundryContext] Account resolved:', context.company.name, 'Industry:', context.company.industry)
         }
 
         // Fetch Transcripts from 'calls' table
@@ -153,9 +158,8 @@ export async function buildFoundryContext(
                 )
             }
         }
-
     } catch (err) {
-        console.error('Error building Foundry context:', err)
+        console.error('[FoundryContext] Error:', err)
     }
 
     return context
@@ -169,6 +173,8 @@ export function generateSystemPrompt(
     numBullets: number = 0
 ): string {
     const { contact, company, energy, intelligence } = context
+
+    console.log('[FoundryPrompt] Generating prompt for', contact.firstName, 'at', company.name)
 
     const targetStr = `${contact.name}${contact.title ? ` (${contact.title})` : ''}${company.name ? ` @ ${company.name}` : ''}`
     const locStr = [company.city, company.state].filter(Boolean).join(', ')
