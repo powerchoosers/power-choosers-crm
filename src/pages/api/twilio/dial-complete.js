@@ -6,6 +6,7 @@ import logger from '../_logger.js';
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 export default async function handler(req, res) {
+  // Twilio generally POSTs to this endpoint
   if (req.method !== 'POST') {
     res.writeHead(405, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Method not allowed' }));
@@ -13,8 +14,35 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { CallSid, DialCallStatus, DialCallDuration, DialCallSid } = req.body;
-    
+    // robust body parsing similar to status.js
+    let body = req.body;
+    const ct = (req.headers['content-type'] || '').toLowerCase();
+
+    if (typeof body === 'string') {
+      try {
+        if (ct.includes('application/json')) {
+          body = JSON.parse(body);
+        }
+      } catch (_) { }
+
+      if (typeof body === 'string') {
+        try {
+          const params = new URLSearchParams(body);
+          const obj = {};
+          for (const [key, value] of params.entries()) {
+            obj[key] = value;
+          }
+          body = obj;
+        } catch (_) { }
+      }
+    }
+
+    if (!body || typeof body !== 'object') {
+      body = req.query || {};
+    }
+
+    const { CallSid, DialCallStatus, DialCallDuration, DialCallSid } = body;
+
     logger.log('[DialComplete] Call completed:', {
       callSid: CallSid,
       childCallSid: DialCallSid,
@@ -22,69 +50,55 @@ export default async function handler(req, res) {
       duration: DialCallDuration
     });
 
-    // Log completion details for debugging
-    logger.log('[DialComplete] Dial operation completed:', {
-      parentCallSid: CallSid,
-      childCallSid: DialCallSid,
-      finalStatus: DialCallStatus,
-      duration: DialCallDuration
-    });
-    
-    // Note: We do NOT start recording here as the call is already completed
-    // Recording should have been started during 'answered' or 'in-progress' status
-
     // Create TwiML response that ENDS the call without retry
     const twiml = new VoiceResponse();
-    
+
     // Different responses based on dial outcome
+    // We strictly use <Hangup/> to ensure call ends cleanly without system messages
     switch (DialCallStatus) {
       case 'completed':
-        logger.log('[DialComplete] Call completed normally - ending call');
-        // Don't say anything, just hang up
+      case 'answered':
         twiml.hangup();
         break;
-        
+
       case 'busy':
-        logger.log('[DialComplete] Target was busy - ending call');
         twiml.say('The number you called is busy.');
         twiml.hangup();
         break;
-        
+
       case 'no-answer':
-        logger.log('[DialComplete] No answer - ending call');
         twiml.say('No answer.');
         twiml.hangup();
         break;
-        
+
       case 'failed':
-        logger.log('[DialComplete] Call failed - ending call');
         twiml.say('Call failed.');
         twiml.hangup();
         break;
-        
+
       default:
-        logger.log('[DialComplete] Unknown status:', DialCallStatus, '- ending call');
+        // For unknown statuses or cancellations, just hang up silently
+        logger.log('[DialComplete] Unhandled status:', DialCallStatus);
         twiml.hangup();
         break;
     }
 
-    // Send TwiML response
     const xml = twiml.toString();
     res.setHeader('Content-Type', 'text/xml');
     res.writeHead(200);
     res.end(xml);
     return;
-    
+
   } catch (error) {
     logger.error('[DialComplete] Error:', error);
-    
-    // Return hangup TwiML on error
+
+    // CRITICAL: Always return 200 OK with valid TwiML to prevent "Application Error" audio
     const twiml = new VoiceResponse();
     twiml.hangup();
-    
+
     const xml = twiml.toString();
     res.setHeader('Content-Type', 'text/xml');
-    res.writeHead(500);
+    res.writeHead(200);
     res.end(xml);
     return;
   }
