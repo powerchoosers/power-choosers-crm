@@ -60,7 +60,7 @@ export async function buildFoundryContext(
           accounts (
             id, name, domain, industry, description, city, state, website,
             current_rate, contract_end_date, annual_usage, electricity_supplier,
-            service_addresses
+            service_addresses, load_factor, latitude, longitude, metadata
           )
         `)
                 .eq('id', contactId)
@@ -68,7 +68,18 @@ export async function buildFoundryContext(
 
             if (!error && data) {
                 contactData = data
+                // PostgREST might return accounts as an array or object depending on relationship configuration
                 accountData = Array.isArray(data.accounts) ? data.accounts[0] : data.accounts
+
+                // Fallback: If accounts join didn't work but we have accountId, fetch it directly
+                if (!accountData && contactData.accountId) {
+                    const { data: directAccount } = await supabase
+                        .from('accounts')
+                        .select('*')
+                        .eq('id', contactData.accountId)
+                        .single()
+                    if (directAccount) accountData = directAccount
+                }
             }
         } else if (accountId) {
             const { data, error } = await supabase
@@ -94,10 +105,10 @@ export async function buildFoundryContext(
                 phone: contactData.phone || ''
             }
             context.intelligence.summary = contactData.notes || ''
-            console.log('[FoundryPrompt] Built contact context:', context.contact.firstName)
         }
 
         if (accountData) {
+            const meta = accountData.metadata || {}
             context.company = {
                 name: accountData.name || '',
                 domain: accountData.domain || '',
@@ -112,17 +123,15 @@ export async function buildFoundryContext(
                 contractEnd: accountData.contract_end_date || '',
                 annualUsage: accountData.annual_usage || '',
                 supplier: accountData.electricity_supplier || '',
-                loadZone: (accountData as any).load_zone || '',
+                loadZone: accountData.load_zone || (meta.energy?.loadZone as string) || '',
                 serviceAddress: (accountData.service_addresses?.[0] as any)?.address || ''
             }
-            console.log('[FoundryPrompt] Built company context:', context.company.name)
         }
 
         // Fetch Transcripts from 'calls' table
         const targetAccountId = accountId || contactData?.accountId || accountData?.id
         const targetContactId = contactId || contactData?.id
 
-        // We want calls related to this contact OR this account
         if (targetContactId || targetAccountId) {
             let query = supabase
                 .from('calls')
@@ -131,8 +140,6 @@ export async function buildFoundryContext(
                 .order('timestamp', { ascending: false })
                 .limit(3)
 
-            // Priority: Contact calls first, then Account calls
-            // For simplicity in this specialized context builder, we'll try to match exact contact first
             if (targetContactId) {
                 query = query.eq('contactId', targetContactId)
             } else if (targetAccountId) {
@@ -190,7 +197,8 @@ export function generateSystemPrompt(
     2. NO JARGON: Do not use marketing buzzwords like "delve", "optimize", "streamline", "synergy". Use plain English.
     3. CONCISENESS: Sentences must be punchy and direct. No fluff.
     4. NO BRACKETS: Do not use [1], [2] citations.
-    5. FORMATTING: Return ONLY a valid JSON object: { "text": "...", "bullets": [...] }.
+    5. SPECIFICITY: You MUST reference the lead's company name and their industry context if available. Avoid being generic.
+    6. FORMATTING: Return ONLY a valid JSON object: { "text": "...", "bullets": [...] }.
   `
 
     const firstName = contact.firstName || 'Partner'
