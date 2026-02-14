@@ -15,6 +15,8 @@ import { cn } from '@/lib/utils'
 import { ScanlineLoader } from '@/components/chat/ScanlineLoader'
 import { INDUSTRY_VECTORS } from '@/lib/industry-mapping'
 import { generateStaticHtml, substituteVariables, contactToVariableMap } from '@/lib/foundry'
+import { buildFoundryContext, generateSystemPrompt } from '@/lib/foundry-prompt'
+import { supabase } from '@/lib/supabase'
 import { useQuery } from '@tanstack/react-query'
 
 const EMAIL_AI_MODELS = [
@@ -349,6 +351,8 @@ Output ONLY the email body. Plain text, no markdown.`,
 
 /** Optional context passed when opening from a contact/account dossier. Shown in UI and injected into AI prompt. */
 export interface ComposeContext {
+  contactId?: string
+  accountId?: string
   contactName?: string
   contactTitle?: string
   companyName?: string
@@ -636,6 +640,9 @@ CRITICAL OUTPUT RULES:
           // Clone blocks to avoid mutating original state directly (though likely safe here)
           const updatedBlocks = JSON.parse(JSON.stringify(blocks))
 
+          // 1. Fetch Deep Context ONCE for all blocks
+          const deepContext = await buildFoundryContext(supabase, context?.contactId, context?.accountId)
+
           for (const block of aiBlocksToGenerate) {
             const blockIndex = updatedBlocks.findIndex((b: any) => b.id === block.id)
             if (blockIndex === -1) continue
@@ -657,44 +664,13 @@ CRITICAL OUTPUT RULES:
             })
             const foundryContext = contextParts.length > 0 ? `\n\nOther content in this email:\n${contextParts.join('\n')}` : ''
 
-            const contactInfo = context
-              ? `\n\nTarget Contact: ${context.contactName || '—'}, Company: ${context.companyName || '—'}`
-              : ''
-
-            // Prompt engineering for email context
-            const isFirstBlock = blockIndex === 0
-            let prompt = ''
-
-            if (isFirstBlock) {
-              prompt = `You are writing the introduction for a high-stakes energy intelligence email.
-               
-               STRUCTURE:
-               1. Personalized greeting (e.g., "Lewis,")
-               2. Double newline
-               3. One concise sentence setting context.
-               4. Double newline
-               5. Two concise sentences on the value proposition or intelligence signal.
-
-               RULES:
-               - No fluff. Forensic tone.
-               - Used Nodal Point voice (clinical, precise).
-               - Reference the contact's company if known.
-               
-               FORMAT: Return JSON { "text": "...", "bullets": [] }
-               ${userPrompt ? `\nUser Custom Instruction: "${userPrompt}"` : ''}${contactInfo}${foundryContext}`
-            } else {
-              prompt = `You are writing a body paragraph for an energy intelligence email.
-               
-               STRUCTURE:
-               - 2-3 concise sentences.
-               - Focus on the specific topic requested.
-
-               RULES:
-               - No fluff. Forensic tone.
-               
-               FORMAT: Return JSON { "text": "...", "bullets": [] }
-               ${userPrompt ? `\nUser Custom Instruction: "${userPrompt}"` : ''}${contactInfo}${foundryContext}`
-            }
+            // 2. Generate System Prompt
+            const prompt = generateSystemPrompt(
+              block.type || 'TEXT_MODULE',
+              userPrompt,
+              deepContext,
+              foundryContext
+            )
 
             try {
               const aiRes = await fetch('/api/foundry/generate-text', {
@@ -714,11 +690,23 @@ CRITICAL OUTPUT RULES:
                 let generatedBullets: string[] = []
 
                 try {
-                  // Start stripping out any potential markdown code blocks if the AI adds them
-                  const cleanText = aiData.text.replace(/```json\n|\n```/g, '').trim()
+                  const rawText = aiData.text.trim()
+                  // Try to locate a JSON object in the string if it looks like one might be there
+                  let cleanText = rawText
+                  const jsonMatch = rawText.match(/\{[\s\S]*\}/)
+                  if (jsonMatch) {
+                    cleanText = jsonMatch[0]
+                  } else {
+                    // Fallback cleaning for markdown blocks
+                    cleanText = rawText
+                      .replace(/^```json\s*/i, '')
+                      .replace(/```\s*$/i, '')
+                      .trim()
+                  }
+
                   const parsed = JSON.parse(cleanText)
-                  generatedText = parsed.text || aiData.text
-                  generatedBullets = parsed.bullets || []
+                  generatedText = (parsed.text || aiData.text).replace(/\[\d+\]/g, '').trim()
+                  generatedBullets = (parsed.bullets || []).map((b: string) => b.replace(/\[\d+\]/g, '').trim())
                 } catch (e) {
                   // Fallback: use raw text if not valid JSON
                   generatedText = aiData.text.trim()

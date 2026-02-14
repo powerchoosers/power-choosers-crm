@@ -455,6 +455,8 @@ export default function ContactDossierPage() {
       industry: typeof account?.industry === 'string' ? account.industry : undefined,
       accountDescription: typeof account?.description === 'string' ? account.description : undefined,
       contextForAi: parts.length ? parts.join('\n\n') : undefined,
+      contactId: contact.id,
+      accountId: account?.id
     }
   }, [contact, account, forensicNotes, recentCalls, apolloNewsSignals])
 
