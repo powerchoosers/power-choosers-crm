@@ -237,7 +237,12 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
         if (contentObj.useAi) {
           return {
             ...block,
-            content: { ...contentObj, text: '', bullets: [] } // Clear text and bullets for AI blocks
+            content: {
+              ...contentObj,
+              text: '',
+              // Preserve the existence and count of bullets, but clear the generated strings
+              bullets: (contentObj.bullets ?? []).map(() => '')
+            }
           }
         }
       }
@@ -483,7 +488,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
   return (
     <div
       aria-label="Foundry Builder Interface"
-      className="flex flex-col h-full bg-zinc-950 text-zinc-300 overflow-hidden rounded-2xl border border-white/5 shadow-2xl"
+      className="flex flex-col h-full text-zinc-300 overflow-hidden bg-transparent"
       style={rootStyle}
     >
       {/* Top Controls */}
@@ -1395,9 +1400,9 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                         height={24}
                         className="h-6 w-auto"
                       />
-                      <span className="text-[10px] font-mono text-zinc-900 font-bold tracking-[0.2em] uppercase">NODAL_POINT // INTELLIGENCE</span>
+                      <span className="text-[10px] font-mono text-zinc-900 font-bold tracking-[0.2em] uppercase whitespace-nowrap">NODAL_POINT // INTELLIGENCE</span>
                     </div>
-                    <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-tighter">
+                    <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-tighter whitespace-nowrap">
                       REF: {new Date().toISOString().split('T')[0].replace(/-/g, '')} {'//'} TX_001
                     </span>
                   </div>
@@ -1621,6 +1626,22 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Foot Stats */}
+      <div className="flex-none h-11 border-t border-white/5 nodal-recessed flex items-center justify-between px-4">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
+            <span>FORGE_SYNC: 100%</span>
+            <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+          </div>
+          <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-600 uppercase tracking-widest pl-4 border-l border-white/5">
+            <span>MODULES_LOADED: {blocks.length}</span>
+          </div>
+        </div>
+        <div className="text-[10px] font-mono text-zinc-700 uppercase tracking-widest">
+          Foundry_Ref // V1.4-Alpha
         </div>
       </div>
     </div>
