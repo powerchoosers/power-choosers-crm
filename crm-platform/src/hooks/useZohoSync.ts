@@ -30,11 +30,10 @@ export function useZohoSync() {
             const data = await response.json();
 
             if (data.success) {
-                console.log(`[Zoho Sync] Successfully synced ${data.count} emails.`);
+                console.log(`[Zoho Sync] Successfully synced ${data.count} emails.`, data.debug || '');
                 setLastSyncTime(Date.now());
                 if (data.count > 0) {
                     setSyncCount((syncCount || 0) + data.count);
-                    // Refresh current view if needed (could emit an event)
                 }
             } else {
                 console.error('[Zoho Sync] Sync failed:', data.error);
