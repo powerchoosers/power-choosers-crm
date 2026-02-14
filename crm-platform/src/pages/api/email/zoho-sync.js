@@ -1,7 +1,7 @@
-
 import { cors } from '../_cors.js';
 import { supabaseAdmin } from '../_supabase.js';
 import { ZohoMailService } from './zoho-service.js';
+import { getValidAccessTokenForUser } from './zoho-token-manager.js';
 import logger from '../_logger.js';
 import crypto from 'crypto';
 
@@ -24,13 +24,31 @@ export default async function handler(req, res) {
         const zohoService = new ZohoMailService();
         logger.info(`[Zoho Sync] Starting sync for ${userEmail}`, 'zoho-sync');
 
+        // Debug info fetching
+        const { accessToken, accountId } = await getValidAccessTokenForUser(userEmail).catch(e => ({ error: e.message }));
+
         // 1. Fetch recent messages from Zoho inbox
-        // Using a limit of 20 for background sync to keep it fast
         const messages = await zohoService.listMessages(userEmail, { limit: 20 });
 
         if (!messages || messages.length === 0) {
             logger.info(`[Zoho Sync] No messages found for ${userEmail}`, 'zoho-sync');
-            res.status(200).json({ success: true, count: 0 });
+
+            // Resolve folder for debug info
+            const folders = await zohoService.listFolders(userEmail, accessToken, accountId).catch(() => []);
+            const inbox = folders.find(f => f.name.toLowerCase() === 'inbox' || f.path === '/Inbox' || f.path === '/');
+
+            res.status(200).json({
+                success: true,
+                count: 0,
+                debug: {
+                    message: "No messages returned from Zoho API",
+                    user: userEmail,
+                    accountId: accountId,
+                    hasToken: !!accessToken,
+                    folderCount: folders.length,
+                    inboxFolder: inbox ? { id: inbox.folderId, name: inbox.name, path: inbox.path } : "Not Found"
+                }
+            });
             return;
         }
 
