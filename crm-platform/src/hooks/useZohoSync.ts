@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase';
  */
 export function useZohoSync() {
     const { user } = useAuth();
-    const { isSyncing, setSyncing, setLastSyncTime, syncCount, setSyncCount } = useSyncStore();
+    const { isSyncing, setIsSyncing, setLastSyncTime, syncCount, setSyncCount } = useSyncStore();
     const syncInProgress = useRef(false);
 
     const performSync = useCallback(async (isSilent = false) => {
@@ -17,7 +17,7 @@ export function useZohoSync() {
 
         try {
             syncInProgress.current = true;
-            if (!isSilent) setSyncing(true);
+            if (!isSilent) setIsSyncing(true);
 
             console.log(`[Zoho Sync] Initiating sync for ${user.email}...`);
 
@@ -31,7 +31,7 @@ export function useZohoSync() {
 
             if (data.success) {
                 console.log(`[Zoho Sync] Successfully synced ${data.count} emails.`);
-                setLastSyncTime(new Date().toISOString());
+                setLastSyncTime(Date.now());
                 if (data.count > 0) {
                     setSyncCount((syncCount || 0) + data.count);
                     // Refresh current view if needed (could emit an event)
@@ -43,9 +43,9 @@ export function useZohoSync() {
             console.error('[Zoho Sync] Network error:', error);
         } finally {
             syncInProgress.current = false;
-            setSyncing(false);
+            setIsSyncing(false);
         }
-    }, [user, setSyncing, setLastSyncTime, setSyncCount, syncCount]);
+    }, [user, setIsSyncing, setLastSyncTime, setSyncCount, syncCount]);
 
     useEffect(() => {
         if (!user) return;
