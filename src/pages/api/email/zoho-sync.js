@@ -116,6 +116,10 @@ function parseZohoMessage(summary, content, ownerEmail) {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         status: 'received',
+        is_read: !!summary.isRead,
+        is_starred: !!summary.isStarred,
+        contactId: null,
+        accountId: null,
         metadata: {
             provider: 'zoho',
             ownerId: ownerEmail,
