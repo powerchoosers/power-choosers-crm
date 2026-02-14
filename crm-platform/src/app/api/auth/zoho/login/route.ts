@@ -1,13 +1,18 @@
 
 import { NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request: Request) {
     const clientId = process.env.ZOHO_CLIENT_ID;
-    const redirectUri = process.env.ZOHO_REDIRECT_URI; // Check .env.local matches this
 
-    if (!clientId || !redirectUri) {
-        return NextResponse.json({ error: 'Missing Zoho Client ID or Redirect URI' }, { status: 500 });
+    // Dynamically determine the redirect URI based on the request origin
+    const { origin } = new URL(request.url);
+    const redirectUri = `${origin}/api/auth/callback/zoho`;
+
+    if (!clientId) {
+        return NextResponse.json({ error: 'Missing Zoho Client ID' }, { status: 500 });
     }
+
+    console.log(`Zoho Login: Using dynamic redirect URI: ${redirectUri}`);
 
     // Zoho Accounts URL (US Region)
     // https://accounts.zoho.com/oauth/v2/auth

@@ -27,9 +27,12 @@ export async function GET(request: Request) {
     try {
         const clientId = process.env.ZOHO_CLIENT_ID;
         const clientSecret = process.env.ZOHO_CLIENT_SECRET;
-        const redirectUri = process.env.ZOHO_REDIRECT_URI;
 
-        if (!clientId || !clientSecret || !redirectUri) {
+        // Dynamically determine the redirect URI based on the request origin
+        const { origin } = new URL(request.url);
+        const redirectUri = `${origin}/api/auth/callback/zoho`;
+
+        if (!clientId || !clientSecret) {
             console.error('Zoho OAuth Callback: Missing environment variables');
             throw new Error('Configuration error: Missing Zoho credentials');
         }

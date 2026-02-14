@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { draft, type, context, contact, prompt, provider, mode = 'generate_email' } = req.body;
+  const { draft, type, context, contact, prompt, provider, mode = 'generate_email', vectors = [] } = req.body;
 
   if (!draft && !prompt) {
     res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -33,6 +33,13 @@ export default async function handler(req, res) {
       let systemInstruction = '';
       let userContent = '';
 
+      const dataVectors = [
+        vectors.includes('firmographics') && `- CONTACT: ${contact?.name || 'Unknown'} at ${contact?.company || 'Unknown'} (${contact?.industry || 'Unknown'})`,
+        vectors.includes('energy_metrics') && `- GRID_METRICS: Load Zone ${contact?.load_zone || 'Unknown'}, Factor ${contact?.metadata?.loadFactor || 'Unknown'}, Exp ${contact?.contractEndDate || 'Unknown'}`,
+        vectors.includes('recent_news') && `- SIGNALS: ${contact?.metadata?.news?.slice(0, 500) || 'No news signals.'}`,
+        vectors.includes('contract_expiry') && `- RATCHET_RISK: Contract ending ${contact?.contractEndDate || 'Unknown'}`
+      ].filter(Boolean).join('\n');
+
       if (mode === 'optimize_prompt') {
         systemInstruction = `
           You are the Nodal Architect, the cognitive core of the Nodal Point CRM.
@@ -41,9 +48,10 @@ export default async function handler(req, res) {
           PROMPT GUIDELINES:
           - Make the prompt more specific, forensic, and aligned with Nodal Point philosophy.
           - Ensure it focuses on financial variance, market volatility, and technical grid risk.
-          - Use engineering/quantitative terminology.
+          - Tone: Professional but human. Avoid sounding like a template.
+          - RULES: No em-dashes (—). No en-dashes (–). Use commas or colons.
+          - BULLETS: If the prompt mentions bullets, ensure they are max 15 words per item.
           - The optimized prompt should result in emails that are direct and minimalist.
-          - Preserve all existing technical requirements in the prompt while making them more "Forensic".
           
           INSTRUCTIONS:
           - Output ONLY the optimized prompt text.
@@ -54,17 +62,14 @@ export default async function handler(req, res) {
           You are the Nodal Architect. You do not sell; you diagnose.
           
           CORE DIRECTIVES:
-          1. Brevity: Max 80 words. [Source: Instantly.ai Benchmarks]
-          2. Tone: Obsidian, Clinical, "Steve Jobs". No "Hope you are well."
-          3. Objective: Expose financial liability (4CP, Ratchets, Volatility).
+          1. Brevity: Max 80 words.
+          2. Tone: Professional, direct, human. No "Hope you are well."
+          3. Formatting: NO EM-DASHES (—). Use commas or colons.
+          4. Bullets: Each must be a single short sentence, max 15 words.
+          5. Objective: Expose financial liability (4CP, Ratchets, Volatility).
           
-          DATA VECTORS AVAILABLE:
-          - Name: ${contact?.name || 'Unknown'}
-          - Company: ${contact?.company || 'Unknown'}
-          - Industry: ${contact?.industry || 'Unknown'}
-          - Load Zone: ${contact?.load_zone || 'Unknown'}
-          - Calc_Load_Factor: ${contact?.metadata?.loadFactor || 'Unknown'}
-          - Contract_Exp: ${contact?.contractEndDate || 'Unknown'}
+          NEURAL_CONTEXT (Use ONLY these vectors):
+          ${dataVectors || '- No specific data vectors provided. Focus on generic industry volatility.'}
           
           INSTRUCTIONS:
           - You must generate a sequence step (type: ${type}) based on the STRATEGY provided.
@@ -72,7 +77,7 @@ export default async function handler(req, res) {
             {
               "subject_line": "Forensic and direct subject",
               "body_html": "Email body with <p> and <br> tags. Use {{first_name}} for personalization.",
-              "logic_reasoning": "A concise explanation of the AI's decision-making (e.g., 'Detected 4CP risk signal in metadata -> Triggered Volatility Protocol')."
+              "logic_reasoning": "A concise explanation of the AI's decision-making."
             }
         `;
         userContent = `STRATEGY: ${prompt}\n\nDraft/Context: ${draft || '(None)'}`;
@@ -82,8 +87,9 @@ export default async function handler(req, res) {
           
           CORE DIRECTIVES:
           1. Brevity: Max 80 words.
-          2. Tone: Obsidian, Clinical, "Steve Jobs".
-          3. Objective: Expose financial liability.
+          2. Tone: Professional, human, direct.
+          3. Formatting: NO EM-DASHES (—).
+          4. Bullets: Max 15 words per item.
           
           INSTRUCTIONS:
           - Optimize the provided draft (type: ${type}).
@@ -122,14 +128,14 @@ export default async function handler(req, res) {
 
       const data = await response.json();
       const generatedContent = data.choices[0].message.content.trim();
-      
+
       let finalResult;
       if (mode === 'optimize_prompt') {
         finalResult = { optimized: generatedContent };
       } else {
         try {
           const parsed = JSON.parse(generatedContent);
-          finalResult = { 
+          finalResult = {
             optimized: parsed.body_html,
             subject: parsed.subject_line,
             logic: parsed.logic_reasoning
@@ -145,12 +151,10 @@ export default async function handler(req, res) {
       return;
 
     } catch (error) {
-       logger.error('[AI Optimization] OpenRouter Error:', error);
-       // Fallback to Gemini if OpenRouter fails? Or just error out. 
-       // User explicitly asked for OpenRouter, so let's report error if it fails.
-       res.writeHead(500, { 'Content-Type': 'application/json' });
-       res.end(JSON.stringify({ error: 'Failed to generate with OpenRouter', details: error.message }));
-       return;
+      logger.error('[AI Optimization] OpenRouter Error:', error);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Failed to generate with OpenRouter', details: error.message }));
+      return;
     }
   }
 
@@ -179,10 +183,10 @@ export default async function handler(req, res) {
       ${contactContext}
       
       TONE GUIDELINES:
-      - Forensic, Direct, Minimalist.
-      - No marketing fluff, no "hope you're doing well", no "I'd love to chat".
+      - Professional, Human, Direct.
+      - No em-dashes (—). No en-dashes (–). Use commas or colons.
+      - Bullet points must be one single, short sentence. Max 15 words per bullet.
       - Highlight the financial variance, market volatility, or technical risk.
-      - Sound like a grid engineer or a quantitative analyst, not a salesperson.
       
       INSTRUCTIONS:
       - Rewrite the draft to be more impactful and aligned with the Nodal Point philosophy.
@@ -206,9 +210,9 @@ export default async function handler(req, res) {
   } catch (error) {
     logger.error('[AI Optimization] Error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
+    res.end(JSON.stringify({
       error: 'Failed to optimize draft',
-      details: error.message 
+      details: error.message
     }));
   }
 }

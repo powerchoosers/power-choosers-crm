@@ -553,7 +553,8 @@ function ProtocolArchitectInner() {
             load_zone: testContact.metadata?.energy?.loadZone,
             contractEndDate: testContact.metadata?.energy?.contractEndDate,
             metadata: testContact.metadata
-          }
+          },
+          vectors: selectedNode.data.vectors || []
         })
       });
 
@@ -1526,7 +1527,7 @@ function ProtocolArchitectInner() {
                             <input
                               type="text"
                               className="w-full bg-white/5 border border-white/5 rounded-lg p-2 text-xs font-mono text-emerald-400/90 focus:border-emerald-500/50 outline-none transition-all"
-                              placeholder="e.g., Act as a Forensic Energy Auditor..."
+                              placeholder="e.g., Act as a human Energy Architect... peer tone."
                               value={(selectedNode?.data.promptConfig as any)?.role || ''}
                               onChange={(e) => {
                                 const config = (selectedNode?.data.promptConfig as any) || {};
@@ -1542,7 +1543,7 @@ function ProtocolArchitectInner() {
                             <input
                               type="text"
                               className="w-full bg-white/5 border border-white/5 rounded-lg p-2 text-xs font-mono text-emerald-400/90 focus:border-emerald-500/50 outline-none transition-all"
-                              placeholder="e.g., Expose the structural variance in their 4CP charges."
+                              placeholder="e.g., Expose the structural variance in their 4CP charges. No em-dashes."
                               value={(selectedNode?.data.promptConfig as any)?.objective || ''}
                               onChange={(e) => {
                                 const config = (selectedNode?.data.promptConfig as any) || {};
@@ -1558,7 +1559,7 @@ function ProtocolArchitectInner() {
                             <input
                               type="text"
                               className="w-full bg-white/5 border border-white/5 rounded-lg p-2 text-xs font-mono text-emerald-400/90 focus:border-emerald-500/50 outline-none transition-all"
-                              placeholder="e.g., Max 80 words. No sales fluff. Use 'No-Oriented' questions."
+                              placeholder="e.g., Max 80 words. NO EM-DASHES. 15-word bullet limit."
                               value={(selectedNode?.data.promptConfig as any)?.constraints || ''}
                               onChange={(e) => {
                                 const config = (selectedNode?.data.promptConfig as any) || {};
