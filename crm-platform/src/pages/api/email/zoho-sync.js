@@ -113,20 +113,20 @@ function parseZohoMessage(summary, content, ownerEmail) {
         html: content.content || '', // Zoho content API might return HTML directly
         timestamp: new Date(parseInt(receivedTime)).toISOString(),
         type: 'received',
-        emailType: 'received',
-        provider: 'zoho',
-        ownerId: ownerEmail,
-        assignedTo: ownerEmail,
-        createdBy: ownerEmail,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         status: 'received',
         metadata: {
+            provider: 'zoho',
+            ownerId: ownerEmail,
+            assignedTo: ownerEmail,
+            createdBy: ownerEmail,
             zohoId: zohoId,
             zohoMessageId: zohoId,
             zohoFolder: summary.folderName || 'inbox',
             sentTime: summary.sentTime,
-            hasAttachments: summary.hasAttachments
+            hasAttachments: summary.hasAttachments,
+            emailType: 'received'
         }
     };
 
