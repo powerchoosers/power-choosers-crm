@@ -358,7 +358,9 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
 
     try {
       // 1. Build Deep Context using shared library
+      console.log('[FoundryBuilder] Building context for:', previewContactId)
       const context = await buildFoundryContext(supabase, previewContactId, null)
+      console.log('[FoundryBuilder] Context ready:', context.contact.firstName, '@', context.company.name)
 
       // 2. Prepare User Prompt
       let userPrompt = ''
@@ -377,6 +379,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
         '',
         numBullets
       )
+      console.log('[FoundryBuilder] Final System Prompt:', systemPrompt)
 
       const res = await fetch('/api/foundry/generate-text', {
         method: 'POST',
@@ -1383,7 +1386,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
           </div>
 
           <div className="flex-1 overflow-y-auto bg-zinc-100 p-8 flex justify-center items-start np-scroll">
-            <div className="w-full max-w-[600px] bg-white border border-zinc-200 shadow-2xl flex flex-col shrink-0 my-8 overflow-hidden">
+            <div className={`w-full max-w-[600px] flex flex-col shrink-0 mb-8 overflow-hidden ${!previewHtml ? 'bg-white border border-zinc-200 shadow-2xl' : ''}`}>
               {previewHtml ? (
                 <div
                   className="foundry-preview w-full"
@@ -1391,18 +1394,18 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                 />
               ) : (
                 <>
-                  <div className="border-b border-zinc-200 p-6 flex justify-between items-center">
-                    <div className="flex items-center gap-2">
+                  <div className="border-b border-zinc-200 px-5 py-4 flex justify-between items-center gap-4 bg-white shrink-0">
+                    <div className="flex items-center gap-2 min-width-0 flex-1">
                       <Image
                         src="/images/nodalpoint.png"
                         alt="Nodal Point Logo"
                         width={24}
                         height={24}
-                        className="h-6 w-auto"
+                        className="h-4.5 w-auto shrink-0"
                       />
-                      <span className="text-[10px] font-mono text-zinc-900 font-bold tracking-[0.2em] uppercase whitespace-nowrap">NODAL_POINT // INTELLIGENCE</span>
+                      <span className="text-[9px] font-mono text-zinc-900 font-bold tracking-[0.2em] uppercase truncate">NODAL_POINT // INTELLIGENCE</span>
                     </div>
-                    <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-tighter whitespace-nowrap">
+                    <span className="text-[9px] font-mono text-zinc-400 uppercase tracking-tighter truncate shrink-0 max-w-[45%]">
                       REF: {new Date().toISOString().split('T')[0].replace(/-/g, '')} {'//'} TX_001
                     </span>
                   </div>
@@ -1418,13 +1421,10 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                           // Show placeholder when AI is enabled but no text generated yet
                           if (useAi && !hasText) {
                             return (
-                              <div className="border-2 border-dashed border-zinc-300 rounded-lg p-8 bg-zinc-50">
+                              <div className="border-1 border-dashed border-zinc-200 rounded p-6 bg-zinc-50/50">
                                 <div className="text-center">
-                                  <p className="text-zinc-400 text-sm font-mono uppercase tracking-widest">
-                                    AI Generated Content Placeholder
-                                  </p>
-                                  <p className="text-zinc-300 text-xs font-mono mt-2">
-                                    Text will appear here when a contact is selected
+                                  <p className="text-zinc-400 text-[9px] font-mono uppercase tracking-[0.2em]">
+                                    [ AI_GENERATION_IN_PROGRESS ]
                                   </p>
                                 </div>
                               </div>

@@ -169,19 +169,21 @@ export function generateStaticHtml(blocks: any[], options?: { skipFooter?: boole
   // This would be used in the builder to generate the final HTML string
   // for storage in foundry assets compiled_html
   let html = `
-    <div style="font-family: 'Inter', sans-serif; background: #ffffff; color: #18181b; width: 100%; max-width: 600px; margin: 20px auto; border: 1px solid #e4e4e7; border-collapse: separate; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); overflow: hidden;">
-      <table border="0" cellpadding="0" cellspacing="0" style="border-bottom: 1px solid #e4e4e7; width: 100%; box-sizing: border-box;">
+    <div style="font-family: 'Inter', sans-serif; background: #ffffff; color: #18181b; width: 100%; max-width: 600px; border: 1px solid #e4e4e7; border-collapse: separate; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); overflow: hidden;">
+      <table border="0" cellpadding="0" cellspacing="0" style="border-bottom: 1px solid #e4e4e7; width: 100%; box-sizing: border-box; table-layout: fixed;">
         <tr>
-          <td style="padding: 16px 20px; vertical-align: middle; white-space: nowrap; width: 60%;">
-            <img src="https://nodalpoint.io/images/nodalpoint.png" alt="" style="height: 20px; width: auto; display: inline-block; vertical-align: middle; margin-right: 8px;" />
-            <span style="font-family: monospace; font-size: 10px; font-weight: bold; letter-spacing: 2px; color: #18181b; vertical-align: middle;">NODAL_POINT // INTELLIGENCE</span>
+          <td style="padding: 16px 20px; vertical-align: middle; width: 55%; overflow: hidden;">
+            <div style="display: flex; align-items: center; min-width: 0;">
+              <img src="https://nodalpoint.io/images/nodalpoint.png" alt="" style="height: 18px; width: auto; display: inline-block; vertical-align: middle; margin-right: 8px; flex-shrink: 0;" />
+              <span style="font-family: monospace; font-size: 9px; font-weight: bold; letter-spacing: 2px; color: #18181b; vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">NODAL_POINT // INTELLIGENCE</span>
+            </div>
           </td>
-          <td style="padding: 16px 20px; vertical-align: middle; text-align: right; white-space: nowrap; width: 40%;">
-            <span style="font-family: monospace; font-size: 10px; color: #71717a;">REF: {{date}} // {{context_id}}</span>
+          <td style="padding: 16px 20px; vertical-align: middle; text-align: right; width: 45%; overflow: hidden;">
+            <span style="font-family: monospace; font-size: 9px; color: #71717a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;">REF: {{date}} // {{context_id}}</span>
           </td>
         </tr>
       </table>
-      <div style="padding: 32px;">
+      <div style="padding: 24px;">
   `
 
   blocks.forEach((block: any) => {
