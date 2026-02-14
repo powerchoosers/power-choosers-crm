@@ -91,7 +91,7 @@ function parseZohoMessage(summary, content, ownerEmail) {
         subject: summary.subject,
         text: content.content || '',
         html: content.content || '', // Zoho content API might return HTML directly
-        receivedAt: new Date(parseInt(receivedTime)).toISOString(),
+        timestamp: new Date(parseInt(receivedTime)).toISOString(),
         type: 'received',
         emailType: 'received',
         provider: 'zoho',
@@ -136,7 +136,7 @@ async function updateThread(emailDoc) {
         await supabaseAdmin
             .from('threads')
             .update({
-                lastMessageAt: emailDoc.receivedAt,
+                lastMessageAt: emailDoc.timestamp,
                 lastSnippet: snippet,
                 lastFrom: emailDoc.from,
                 messageCount: (existingThread.messageCount || 0) + 1,
@@ -150,7 +150,7 @@ async function updateThread(emailDoc) {
                 id: threadId,
                 subjectNormalized: emailDoc.subject,
                 participants: [emailDoc.from, emailDoc.to],
-                lastMessageAt: emailDoc.receivedAt,
+                lastMessageAt: emailDoc.timestamp,
                 lastSnippet: snippet,
                 lastFrom: emailDoc.from,
                 messageCount: 1,
