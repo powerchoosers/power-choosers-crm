@@ -83,15 +83,18 @@ export async function buildFoundryContext(
         }
 
         if (contactData) {
+            const fullName = contactData.name || ''
+            const nameParts = fullName.trim().split(/\s+/)
             context.contact = {
-                name: contactData.name || '',
-                firstName: contactData.firstName || contactData.first_name || '',
-                lastName: contactData.lastName || contactData.last_name || '',
+                name: fullName,
+                firstName: contactData.firstName || contactData.first_name || nameParts[0] || '',
+                lastName: contactData.lastName || contactData.last_name || nameParts.slice(1).join(' ') || '',
                 title: contactData.title || '',
                 email: contactData.email || '',
                 phone: contactData.phone || ''
             }
             context.intelligence.summary = contactData.notes || ''
+            console.log('[FoundryPrompt] Built contact context:', context.contact.firstName)
         }
 
         if (accountData) {
@@ -112,6 +115,7 @@ export async function buildFoundryContext(
                 loadZone: (accountData as any).load_zone || '',
                 serviceAddress: (accountData.service_addresses?.[0] as any)?.address || ''
             }
+            console.log('[FoundryPrompt] Built company context:', context.company.name)
         }
 
         // Fetch Transcripts from 'calls' table
@@ -154,7 +158,8 @@ export function generateSystemPrompt(
     blockType: string,
     userPrompt: string,
     context: FoundryContext,
-    extraContext: string = ''
+    extraContext: string = '',
+    numBullets: number = 0
 ): string {
     const { contact, company, energy, intelligence } = context
 
@@ -188,12 +193,15 @@ export function generateSystemPrompt(
     5. FORMATTING: Return ONLY a valid JSON object: { "text": "...", "bullets": [...] }.
   `
 
+    const firstName = contact.firstName || 'Partner'
+    const greeting = firstName + ','
+
     if (blockType === 'TEXT_MODULE' && (userPrompt.toLowerCase().includes('intro') || !userPrompt)) {
         return `
         You are writing the introduction for an energy intelligence email to a peer.
         
         STRUCTURE:
-        1. Greeting: "${contact.firstName ? contact.firstName + ',' : 'Partner,'}"
+        1. Greeting: "${greeting}"
         2. Double Newline
         3. Paragraph 1: One concise sentence acknowledging recent context (e.g., "Good speaking with you," or "Reviewing your profile...").
         4. Double Newline
@@ -203,16 +211,18 @@ export function generateSystemPrompt(
         ${coreRules}
         
         USER INSTRUCTION: ${userPrompt || 'Introduce the signals.'}
+        
+        ${numBullets > 0 ? `FORCED STRUCTURE: In your JSON response, you MUST populate the "bullets" array with exactly ${numBullets} items based on the context.` : 'NOTE: If the user requests bullet points in their instruction, populate the "bullets" array in your JSON response. Otherwise, leave it empty.'}
       `
     }
 
     if (blockType === 'TEXT_MODULE') {
         return `
-        You are writing a body paragraph for an energy intelligence email.
+        You are writing a body paragraph or list for an energy intelligence email.
         
         STRUCTURE:
-        - 2-3 concise sentences.
-        - Focus purely on the specific topic requested.
+        - 2-3 concise sentences for the narrative text.
+        - ${numBullets > 0 ? `You MUST populate the "bullets" array with exactly ${numBullets} punchy, data-driven items.` : 'If bullet points are requested or appropriate, populate the "bullets" array with punchy, data-driven items.'}
         - Integrate data points (rates, dates) naturally.
 
         ${contextBlock}
@@ -238,6 +248,7 @@ export function generateSystemPrompt(
         ${contextBlock}
         ${coreRules}
         USER INSTRUCTION: ${userPrompt}
+        ${numBullets > 0 ? `FORCED STRUCTURE: In your JSON response, you MUST populate the "bullets" array with exactly ${numBullets} supporting data points.` : ''}
      `
     }
 
@@ -247,6 +258,7 @@ export function generateSystemPrompt(
         ${contextBlock}
         ${coreRules}
         USER INSTRUCTION: ${userPrompt}
+        ${numBullets > 0 ? `FORCED STRUCTURE: In your JSON response, you MUST populate the "bullets" array with exactly ${numBullets} impact signals.` : ''}
      `
     }
 

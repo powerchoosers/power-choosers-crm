@@ -665,11 +665,13 @@ CRITICAL OUTPUT RULES:
             const foundryContext = contextParts.length > 0 ? `\n\nOther content in this email:\n${contextParts.join('\n')}` : ''
 
             // 2. Generate System Prompt
+            const numBullets = Array.isArray(contentObj.bullets) ? contentObj.bullets.length : 0
             const prompt = generateSystemPrompt(
               block.type || 'TEXT_MODULE',
               userPrompt,
               deepContext,
-              foundryContext
+              foundryContext,
+              numBullets
             )
 
             try {
@@ -677,13 +679,15 @@ CRITICAL OUTPUT RULES:
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  prompt,
+                  systemPrompt: prompt,
+                  prompt: userPrompt,
                   context: '',
                   blockType: 'narrative',
                 }),
               })
 
               const aiData = await aiRes.json()
+              console.log('[FoundryCompose] AI Response:', aiData.text)
               if (aiRes.ok && aiData.text) {
                 // specific handling for JSON response from AI
                 let generatedText = aiData.text

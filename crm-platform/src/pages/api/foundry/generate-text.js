@@ -49,6 +49,7 @@ export default async function handler(req, res) {
       return;
     }
 
+    const systemPromptOverride = typeof body.systemPrompt === 'string' ? body.systemPrompt.trim() : '';
     const userMessage = context ? `${prompt}\n\nCurrent text:\n${context}` : prompt;
     const extra = blockTypeInstruction(blockType);
     const model = process.env.PERPLEXITY_MODEL || 'sonar';
@@ -62,7 +63,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model,
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT + extra },
+          { role: 'system', content: systemPromptOverride || (SYSTEM_PROMPT + extra) },
           { role: 'user', content: userMessage },
         ],
         max_tokens: 1024,
