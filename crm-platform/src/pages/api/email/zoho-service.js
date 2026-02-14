@@ -84,6 +84,42 @@ export class ZohoMailService {
     }
 
     /**
+     * List folders to find IDs
+     */
+    async listFolders(userEmail, accessToken, accountId) {
+        const url = `${this.baseUrl}/accounts/${accountId}/folders`;
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` }
+        });
+
+        if (!response.ok) {
+            const txt = await response.text();
+            throw new Error(`Zoho List Folders API error: ${response.status} - ${txt}`);
+        }
+
+        const result = await response.json();
+        return result.data || [];
+    }
+
+    /**
+     * Helper to resolve 'inbox' or other names to numeric ID
+     */
+    async resolveFolderId(userEmail, accessToken, accountId, folderNameOrId) {
+        if (!folderNameOrId || folderNameOrId === 'inbox') {
+            try {
+                const folders = await this.listFolders(userEmail, accessToken, accountId);
+                const inbox = folders.find(f => f.path === '/' || f.path === '/Inbox' || f.name.toLowerCase() === 'inbox');
+                if (inbox) return inbox.folderId;
+                logger.warn(`[Zoho Mail] Could not resolve 'inbox' folder ID for ${userEmail}`, 'zoho-service');
+            } catch (e) {
+                logger.error(`[Zoho Mail] Error resolving folder ID: ${e.message}`, 'zoho-service');
+            }
+            return 'inbox'; // Fallback if listing fails or not found (might fail API but worth a try)
+        }
+        return folderNameOrId;
+    }
+
+    /**
      * List messages from a Zoho folder
      */
     async listMessages(userEmail, options = {}) {
@@ -92,13 +128,16 @@ export class ZohoMailService {
         try {
             const { accessToken, accountId } = await getValidAccessTokenForUser(userEmail);
 
+            // Resolve folder ID if needed
+            const resolvedFolderId = await this.resolveFolderId(userEmail, accessToken, accountId, folderId);
+
             // Build query params
             const params = new URLSearchParams({
-                folderId,
                 limit: limit.toString()
             });
+            if (resolvedFolderId) params.append('folderId', resolvedFolderId);
 
-            logger.info(`[Zoho Mail] Fetching messages for ${userEmail} (folder: ${folderId})...`, 'zoho-service');
+            logger.info(`[Zoho Mail] Fetching messages for ${userEmail} (folder: ${resolvedFolderId})...`, 'zoho-service');
 
             const response = await fetch(`${this.baseUrl}/accounts/${accountId}/messages/view?${params.toString()}`, {
                 headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` }
@@ -107,9 +146,10 @@ export class ZohoMailService {
             if (!response.ok) {
                 if (response.status === 401) {
                     clearTokenCache(userEmail);
-                    // Single retry logic could be added here similar to sendEmail
+                    // Retry logic would need function recursion or loop, simplifying here to throw
                 }
-                throw new Error(`Zoho List API error: ${response.status}`);
+                const txt = await response.text();
+                throw new Error(`Zoho List API error: ${response.status} - ${txt}`);
             }
 
             const result = await response.json();
@@ -127,9 +167,11 @@ export class ZohoMailService {
         try {
             const { accessToken, accountId } = await getValidAccessTokenForUser(userEmail);
 
+            const resolvedFolderId = await this.resolveFolderId(userEmail, accessToken, accountId, folderId);
+
             logger.debug(`[Zoho Mail] Fetching content for message ${messageId}...`, 'zoho-service');
 
-            const response = await fetch(`${this.baseUrl}/accounts/${accountId}/folders/${folderId}/messages/${messageId}/content`, {
+            const response = await fetch(`${this.baseUrl}/accounts/${accountId}/folders/${resolvedFolderId}/messages/${messageId}/content`, {
                 headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` }
             });
 
