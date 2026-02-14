@@ -1,0 +1,16 @@
+[dotenv@17.2.3] injecting env (49) from .env -- tip: ≡ƒæÑ sync secrets across teammates & machines: https://dotenvx.com/ops
+--- Diagnostics for l.patterson@nodalpoint.io ---
+Account ID: 6109936000000008002
+Total Folders Found: 11
+Resolved Inbox ID: 6109936000000008014
+Fetching: https://mail.zoho.com/api/v1/accounts/6109936000000008002/messages/view?folderId=6109936000000008014&limit=20
+API Status: 200
+API Data Count: 14
+
+Sample Message (First 1):
+- ID: 1771037664306124400
+- Subject: Test
+- Sender: LP3 Basketball Club
+- Received: 1771037664297
+
+Duplicate Check for first message: NOT FOUND
