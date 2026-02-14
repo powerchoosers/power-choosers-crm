@@ -74,9 +74,13 @@ export default async function handler(req, res) {
             // 3. Fetch full content
             const fullContent = await zohoService.getMessageContent(userEmail, messageId);
 
-            // 4. Parse and Save
+            // 4. Parse 
             const emailDoc = parseZohoMessage(msgSummary, fullContent, userEmail);
 
+            // 5. Ensure thread exists (Must be before email insert due to FK constraint)
+            await updateThread(emailDoc);
+
+            // 6. Save email
             const { error: insertError } = await supabaseAdmin
                 .from('emails')
                 .insert(emailDoc);
@@ -85,8 +89,6 @@ export default async function handler(req, res) {
                 logger.error(`[Zoho Sync] Failed to save message ${messageId}:`, insertError, 'zoho-sync');
             } else {
                 syncedCount++;
-                // Handle thread updates (simplified helper)
-                await updateThread(emailDoc);
             }
         }
 
