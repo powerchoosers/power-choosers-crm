@@ -363,18 +363,22 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
       }
 
       // 3. Generate System Prompt
+      const c = typeof contentToUse === 'object' ? contentToUse : { text: String(contentToUse), aiPrompt: '', useAi: false }
+      const numBullets = Array.isArray(c.bullets) ? c.bullets.length : 0
       const systemPrompt = generateSystemPrompt(
-        block.type,
+        block.type as any,
         userPrompt,
         context,
-        ''
+        '',
+        numBullets
       )
 
       const res = await fetch('/api/foundry/generate-text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: systemPrompt,
+          systemPrompt: systemPrompt,
+          prompt: userPrompt,
           context: typeof contentToUse === 'string' ? contentToUse : (contentToUse as any)?.text || '',
           blockType: block.type === 'TACTICAL_BUTTON' ? 'button' : 'narrative'
         }),
