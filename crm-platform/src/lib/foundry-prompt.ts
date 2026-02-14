@@ -206,12 +206,13 @@ export function generateSystemPrompt(
 
     const coreRules = `
     CORE RULES (STRICT COMPLIANCE REQUIRED):
-    1. TONE: Peer-to-Peer. Professional but accessible. Speak like a knowledgeable industry colleague (Energy Broker/Analyst).
+    1. TONE: Peer-to-Peer. Professional but human. Speak like a knowledgeable industry colleague (Energy Broker/Analyst).
     2. NO JARGON: Do not use marketing buzzwords like "delve", "optimize", "streamline", "synergy". Use plain English.
     3. CONCISENESS: Sentences must be punchy and direct. No fluff.
-    4. NO BRACKETS: Do not use [1], [2] citations.
-    5. SPECIFICITY: You MUST reference the lead's company name and their industry context if available. Avoid being generic.
-    6. FORMATTING: Return ONLY a valid JSON object: { "text": "...", "bullets": [...] }.
+    4. NO DASHES: Do not use em dashes (—) or en dashes (–). They look too machine-generated. Use commas, colons, or simple sentences.
+    5. BULLET LENGTH: Bullet points MUST be one single, short sentence. Max 15 words per bullet.
+    6. SPECIFICITY: You MUST reference the lead's company name and their industry context if available. Avoid being generic.
+    7. FORMATTING: Return ONLY a valid JSON object: { "text": "...", "bullets": [...] }.
   `
 
     const firstName = contact.firstName || 'Partner'
@@ -243,8 +244,9 @@ export function generateSystemPrompt(
         
         STRUCTURE:
         - 2-3 concise sentences for the narrative text.
-        - ${numBullets > 0 ? `You MUST populate the "bullets" array with exactly ${numBullets} punchy, data-driven items.` : 'If bullet points are requested or appropriate, populate the "bullets" array with punchy, data-driven items.'}
+        - ${numBullets > 0 ? `You MUST populate the "bullets" array with exactly ${numBullets} items. Each must be exactly one single short sentence (max 15 words).` : 'If bullet points are requested, keep them to a single short sentence.'}
         - Integrate data points (rates, dates) naturally.
+        - NO EM DASHES. Use colons or commas instead.
 
         ${contextBlock}
         ${coreRules}
