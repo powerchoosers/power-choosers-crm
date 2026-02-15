@@ -235,70 +235,10 @@ export async function GET(request: Request) {
         }
 
         const actionLink = linkData.properties.action_link;
-        console.log(`Zoho OAuth: Final hand-off to: ${actionLink.split('?')[0]}...`);
-
-        // Create a 200 OK response with a JS-driven redirect. 
-        // This is much harder for browser security policies to block than a 302/303.
-        const responseHeaders = new Headers();
-        responseHeaders.set('Content-Type', 'text/html; charset=utf-8');
-        responseHeaders.set('Cache-Control', 'no-store, no-cache, must-revalidate');
 
         // Wildcard domain cookie for maximal persistence
         const isProd = !redirectUri.includes('localhost');
         const domainSuffix = isProd ? '; Domain=.nodalpoint.io' : '';
         const cookieOptions = `np_session=1; Path=/; Max-Age=604800; SameSite=Lax${domainSuffix}${isProd ? '; Secure' : ''}`;
-        responseHeaders.append('Set-Cookie', cookieOptions);
-
-        const htmlRedirect = `
-            <!DOCTYPE html>
-            <html>
-                <head>
-                    <title>Authenticating...</title>
-                    <style>
-                        body { background: #0a0a0a; color: #71717a; font-family: monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-                        .loader { border: 2px solid #18181b; border-top: 2px solid #002FA7; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; margin-bottom: 20px; }
-                        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-                    </style>
-                </head>
-                <body>
-                    <div style="text-align: center;">
-                        <div class="loader" style="margin: 0 auto 20px;"></div>
-                        <p style="font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;">Identity_Verified // Secure Link Ready</p>
-                        
-                        <!-- Manual Button -->
-                        <a href="${actionLink}" style="display: inline-block; margin-top: 20px; padding: 12px 24px; background: #002FA7; color: white; text-decoration: none; font-family: monospace; font-size: 12px; letter-spacing: 0.1em; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1);">
-                            ENTER FORENSIC DECK
-                        </a>
-
-                        <!-- Diagnostic Raw Link -->
-                        <div style="margin-top: 30px; padding: 20px; border-top: 1px solid #333;">
-                            <p style="font-size: 10px; color: #666; margin-bottom: 10px;">MANUAL_OVERRIDE_LINK:</p>
-                            <input type="text" value="${actionLink}" readonly style="width: 100%; max-width: 400px; background: #111; border: 1px solid #333; color: #888; padding: 10px; font-family: monospace; font-size: 11px;" onclick="this.select()">
-                        </div>
-
-                        <script>
-                            // Attempt auto-navigation is DISABLED to allow manual debugging
-                            // setTimeout(() => { window.location.replace("${actionLink}"); }, 500); 
-                        </script>
-                    </div>
-                </body>
-            </html>
-        `;
-
-        return new Response(htmlRedirect, {
-            status: 200,
-            headers: responseHeaders
-        });
-
-    } catch (err: any) {
-        console.error('Zoho Auth Bridge Error:', err);
-        const errorMessage = err.message || 'Authentication failed';
-        const loginUrl = new URL('/login', request.url);
-        loginUrl.searchParams.set('error', errorMessage);
-
-        return new Response(`<html><head><meta http-equiv="refresh" content="0; url=${loginUrl.toString()}"></head></html>`, {
-            status: 200,
-            headers: { 'Content-Type': 'text/html' }
-        });
     }
 }
