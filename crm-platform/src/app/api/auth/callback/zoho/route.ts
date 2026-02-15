@@ -224,40 +224,50 @@ export async function GET(request: Request) {
         }
 
         const actionLink = linkData.properties.action_link;
-        console.log(`Zoho OAuth: Final Redirecting to: ${actionLink.split('?')[0]}...`);
+        console.log(`Zoho OAuth: Final hand-off to: ${actionLink.split('?')[0]}...`);
 
-        // Create a 302 Found response (most compatible for OAuth)
+        // Create a 200 OK response with a JS-driven redirect. 
+        // This is much harder for browser security policies to block than a 302/303.
         const responseHeaders = new Headers();
-        responseHeaders.set('Location', actionLink);
+        responseHeaders.set('Content-Type', 'text/html; charset=utf-8');
+        responseHeaders.set('Cache-Control', 'no-store, no-cache, must-revalidate');
 
         // Wildcard domain cookie for maximal persistence
         const isProd = !useOrigin.includes('localhost');
         const domainSuffix = isProd ? '; Domain=.nodalpoint.io' : '';
         const cookieOptions = `np_session=1; Path=/; Max-Age=604800; SameSite=Lax${domainSuffix}${isProd ? '; Secure' : ''}`;
-
         responseHeaders.append('Set-Cookie', cookieOptions);
-        responseHeaders.set('Cache-Control', 'no-store, no-cache, must-revalidate');
 
-        // NUCLEAR FALLBACK: HTML Meta Refresh if the browser blocks the header-based redirect
-        const htmlFallback = `
+        const htmlRedirect = `
             <!DOCTYPE html>
             <html>
                 <head>
-                    <meta http-equiv="refresh" content="0; url=${actionLink}">
-                    <script>window.location.href = "${actionLink}";</script>
-                    <style>body { background: #0a0a0a; color: #71717a; font-family: monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }</style>
+                    <title>Authenticating...</title>
+                    <style>
+                        body { background: #0a0a0a; color: #71717a; font-family: monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                        .loader { border: 2px solid #18181b; border-top: 2px solid #002FA7; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+                        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                    </style>
                 </head>
                 <body>
                     <div style="text-align: center;">
-                        <p>VERIFYING_IDENTITY...</p>
-                        <a href="${actionLink}" style="color: #002FA7; text-decoration: none; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;">Manual Uplink</a>
+                        <div class="loader" style="margin: 0 auto 20px;"></div>
+                        <p style="font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;">Identity_Verified // Redirecting...</p>
+                        <script>
+                            // Force immediate navigation to the secure session link
+                            window.location.replace("${actionLink}");
+                        </script>
+                        <noscript>
+                            <meta http-equiv="refresh" content="0; url=${actionLink}">
+                            <a href="${actionLink}">Click here to continue</a>
+                        </noscript>
                     </div>
                 </body>
             </html>
         `;
 
-        return new Response(htmlFallback, {
-            status: 302,
+        return new Response(htmlRedirect, {
+            status: 200,
             headers: responseHeaders
         });
 
@@ -267,9 +277,9 @@ export async function GET(request: Request) {
         const loginUrl = new URL('/login', request.url);
         loginUrl.searchParams.set('error', errorMessage);
 
-        return new Response(null, {
-            status: 302,
-            headers: { 'Location': loginUrl.toString() }
+        return new Response(`<html><head><meta http-equiv="refresh" content="0; url=${loginUrl.toString()}"></head></html>`, {
+            status: 200,
+            headers: { 'Content-Type': 'text/html' }
         });
     }
 }
