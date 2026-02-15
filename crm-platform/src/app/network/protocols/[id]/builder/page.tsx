@@ -497,6 +497,7 @@ function ProtocolArchitectInner() {
   const [isPreviewMobile, setIsPreviewMobile] = useState(false);
   const [aiLogic, setAiLogic] = useState<string>('');
   const [aiSubject, setAiSubject] = useState<string>('');
+  const [isSendingTest, setIsSendingTest] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const testContact = useMemo(() => {
@@ -605,6 +606,48 @@ function ProtocolArchitectInner() {
       toast.error("Simulation failed");
     } finally {
       setIsOptimizing(false);
+    }
+  };
+
+  const handleSendTest = async () => {
+    if (!testContact || !selectedNode || selectedNode.data.type !== 'email') {
+      toast.error("Select an email node and contact first");
+      return;
+    }
+
+    setIsSendingTest(true);
+    try {
+      const response = await fetch('/api/email/zoho-send-sequence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: {
+            email: testContact.email,
+            name: `${testContact.firstName} ${testContact.lastName}`.trim() || testContact.email
+          },
+          from: {
+            email: senderEmail || user?.email,
+            name: profile?.firstName ? `${profile.firstName} | Nodal Point` : 'Lewis | Nodal Point'
+          },
+          subject: aiSubject || selectedNode.data.subject || 'Test Message from Nodal Point',
+          html: previewBody,
+          trackClicks: true,
+          trackOpens: true,
+          tags: ['test-send', 'protocol-builder']
+        })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText);
+      }
+
+      toast.success("Live test signal transmitted to " + testContact.email);
+    } catch (error: any) {
+      console.error(error);
+      toast.error("Failed to transmit signal: " + error.message);
+    } finally {
+      setIsSendingTest(false);
     }
   };
 
@@ -1045,7 +1088,10 @@ function ProtocolArchitectInner() {
 
           // FORCE ADD: Use concat instead of addEdge to bypass any potential filtering
           setEdges((eds) => eds.concat(newEdge));
-          toast.success(`Connected to ${validHandle?.label}`);
+
+          // Fix: Ensure we don't display "Connected to undefined"
+          const connectionLabel = validHandle?.label || 'Direct Step';
+          toast.success(`Connected via ${connectionLabel}`);
 
           if (debugMode) {
             setDebugData((d) => ({ ...d, edgeId: newEdge.id, sourceHandle: sourceHandle || '' }));
@@ -1794,6 +1840,16 @@ function ProtocolArchitectInner() {
                           </div>
                         )}
                       </div>
+
+                      {/* Send Live Test Signal Button */}
+                      <Button
+                        onClick={handleSendTest}
+                        disabled={isSendingTest || !testContact || selectedNode?.data.type !== 'email'}
+                        className="w-full h-12 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-[10px] uppercase tracking-[0.2em] font-bold rounded-2xl shadow-[0_0_30px_-5px_rgba(0,47,167,0.4)] transition-all disabled:opacity-50"
+                      >
+                        {isSendingTest ? <Clock className="w-4 h-4 animate-spin mr-2" /> : <Zap className="w-4 h-4 mr-2" />}
+                        Send_Live_Test_Signal
+                      </Button>
 
                       {/* Pane 2: Neural Logic Sidebar */}
                       {aiLogic && (
