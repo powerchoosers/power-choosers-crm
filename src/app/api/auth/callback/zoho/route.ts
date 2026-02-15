@@ -27,10 +27,14 @@ export async function GET(request: Request) {
         const clientId = process.env.ZOHO_CLIENT_ID;
         const clientSecret = process.env.ZOHO_CLIENT_SECRET;
 
-        // DYNAMIC REDIRECT URI LOGIC (Must match login/route.ts EXACTLY)
+        // CANONICAL REDIRECT URI LOGIC
+        // To prevent mismatches between login (frontend) and callback (backend),
+        // we force the canonical 'www.nodalpoint.io' URI for all production requests.
         const host = request.headers.get('host') || 'www.nodalpoint.io';
-        const protocol = host.includes('localhost') ? 'http' : 'https';
-        const redirectUri = `${protocol}://${host}/api/auth/callback/zoho`;
+        const isLocal = host.includes('localhost');
+        const redirectUri = isLocal
+            ? 'http://localhost:3000/api/auth/callback/zoho'
+            : 'https://www.nodalpoint.io/api/auth/callback/zoho';
 
         console.log(`Zoho OAuth Callback: Host header: ${host}`);
         console.log(`Zoho OAuth Callback: Using dynamic redirect URI: ${redirectUri}`);
