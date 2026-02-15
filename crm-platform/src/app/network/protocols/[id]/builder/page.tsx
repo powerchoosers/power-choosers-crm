@@ -52,7 +52,8 @@ import {
   Monitor,
   Smartphone,
   Brain,
-  AlertTriangle
+  AlertTriangle,
+  Search
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -79,7 +80,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useContacts, type Contact } from '@/hooks/useContacts';
+import { useContacts, useSearchContacts, useContact, type Contact } from '@/hooks/useContacts';
 import { useProtocolBuilder } from '@/hooks/useProtocolBuilder';
 import { useAuth } from '@/context/AuthContext';
 import { useFoundryAssets } from '@/hooks/useFoundryAssets';
@@ -492,6 +493,10 @@ function ProtocolArchitectInner() {
   // Phase 4: AI & Preview
   const { data: contactsData } = useContacts();
   const [testContactId, setTestContactId] = useState<string>('');
+  const [isContactSearching, setIsContactSearching] = useState(false);
+  const [contactSearchQuery, setContactSearchQuery] = useState('');
+  const { data: searchResults } = useSearchContacts(contactSearchQuery);
+  const { data: fetchedTestContact } = useContact(testContactId);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [emailViewMode, setEmailViewMode] = useState<'payload' | 'ai' | 'asset'>('payload');
   const [isPreviewMobile, setIsPreviewMobile] = useState(false);
@@ -501,9 +506,10 @@ function ProtocolArchitectInner() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const testContact = useMemo(() => {
+    if (fetchedTestContact) return fetchedTestContact;
     const allContacts = contactsData?.pages?.flatMap(page => page.contacts) || [];
     return allContacts.find((c: Contact) => c.id === testContactId);
-  }, [contactsData, testContactId]);
+  }, [contactsData, testContactId, fetchedTestContact]);
 
   const insertVariable = (variable: string) => {
     if (!textareaRef.current || !selectedNode) return;
@@ -1765,18 +1771,75 @@ function ProtocolArchitectInner() {
                 <div className="space-y-8 pb-32">
                   <div className="space-y-3">
                     <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Select_Test_Node</label>
-                    <Select value={testContactId} onValueChange={setTestContactId}>
-                      <SelectTrigger className="w-full bg-black/40 border-white/5 rounded-xl h-12 font-mono text-sm focus:ring-0 focus:border-[#002FA7]">
-                        <SelectValue placeholder="Choose a contact..." />
-                      </SelectTrigger>
-                      <SelectContent className="bg-zinc-950 nodal-monolith-edge">
-                        {contactsData?.pages?.flatMap(page => page.contacts).map((contact: Contact) => (
-                          <SelectItem key={contact.id} value={contact.id}>
-                            {contact.firstName} {contact.lastName} ({contact.metadata?.general?.company})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex gap-2">
+                      {!isContactSearching ? (
+                        <>
+                          <Select value={testContactId} onValueChange={setTestContactId}>
+                            <SelectTrigger className="flex-1 bg-black/40 border-white/5 rounded-xl h-12 font-mono text-sm focus:ring-0 focus:border-[#002FA7]">
+                              <SelectValue placeholder="Choose a contact..." />
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-950 nodal-monolith-edge">
+                              {contactsData?.pages?.flatMap(page => page.contacts).map((contact: Contact) => (
+                                <SelectItem key={contact.id} value={contact.id}>
+                                  {contact.firstName || contact.name} {contact.lastName || ''} ({contact.company || contact.metadata?.general?.company || 'No Company'})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            onClick={() => setIsContactSearching(true)}
+                            variant="ghost"
+                            className="h-12 w-12 bg-black/40 border border-white/5 rounded-xl text-zinc-400 hover:text-white"
+                            title="Search Contacts"
+                          >
+                            <Search className="w-5 h-5" />
+                          </Button>
+                        </>
+                      ) : (
+                        <div className="relative flex-1 group">
+                          <div className="flex gap-2">
+                            <div className="relative flex-1">
+                              <input
+                                type="text"
+                                autoFocus
+                                placeholder="Search contacts..."
+                                className="w-full bg-black/40 border border-white/5 rounded-xl h-12 px-4 font-mono text-sm focus:border-[#002FA7] outline-none transition-all"
+                                value={contactSearchQuery}
+                                onChange={(e) => setContactSearchQuery(e.target.value)}
+                              />
+                              {contactSearchQuery.length >= 2 && searchResults && searchResults.length > 0 && (
+                                <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-950 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden max-h-[240px] overflow-y-auto scrollbar-none">
+                                  {searchResults.map((contact: any) => (
+                                    <button
+                                      key={contact.id}
+                                      onClick={() => {
+                                        setTestContactId(contact.id);
+                                        setIsContactSearching(false);
+                                        setContactSearchQuery('');
+                                      }}
+                                      className="w-full px-4 py-3 text-left hover:bg-white/5 border-b border-white/5 last:border-0 transition-colors"
+                                    >
+                                      <div className="text-sm font-mono text-zinc-200">{contact.name}</div>
+                                      <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-tighter">{contact.company || 'Private Contact'}</div>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <Button
+                              onClick={() => {
+                                setIsContactSearching(false);
+                                setContactSearchQuery('');
+                              }}
+                              variant="ghost"
+                              className="h-12 w-12 bg-black/40 border border-white/5 rounded-xl text-zinc-400 hover:text-white"
+                            >
+                              <XCircle className="w-5 h-5" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-4">
