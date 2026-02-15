@@ -4,11 +4,16 @@ import { NextResponse } from 'next/server';
 export async function GET(request: Request) {
     const clientId = process.env.ZOHO_CLIENT_ID;
 
-    // DYNAMIC REDIRECT URI LOGIC
-    // We must match the host that initiated the request (www vs non-www)
+    // CANONICAL REDIRECT URI LOGIC
+    // Force 'www.nodalpoint.io' as the production callback receiver. 
+    // This allows users to login FROM non-www, but Zoho will always redirect BACK to www.
     const host = request.headers.get('host') || 'www.nodalpoint.io';
-    const protocol = host.includes('localhost') ? 'http' : 'https';
-    const redirectUri = `${protocol}://${host}/api/auth/callback/zoho`;
+    const isLocal = host.includes('localhost');
+    const redirectUri = isLocal
+        ? 'http://localhost:3000/api/auth/callback/zoho'
+        : 'https://www.nodalpoint.io/api/auth/callback/zoho';
+
+    console.log(`Zoho Login: Host header: ${host}`);
 
     console.log(`Zoho Login: Dynamic redirect URI: ${redirectUri}`);
 
