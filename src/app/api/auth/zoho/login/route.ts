@@ -4,12 +4,16 @@ import { NextResponse } from 'next/server';
 export async function GET(request: Request) {
     const clientId = process.env.ZOHO_CLIENT_ID;
 
-    // Use raw origin to exactly match the request for Zoho's redirect_uri check
-    const { origin } = new URL(request.url);
-    const useOrigin = origin.replace(/\/$/, '');
-    const redirectUri = `${useOrigin}/api/auth/callback/zoho`.replace('http://', 'https://');
-    // Ensure localhost still works with http
-    const finalRedirectUri = origin.includes('localhost') ? `${useOrigin}/api/auth/callback/zoho` : redirectUri;
+    // STABILIZED REDIRECT URI LOGIC
+    // Dynamic origin detection is causing mismatches behind Vercel's proxy.
+    // We must use a deterministic URI that matches Zoho Console exactly.
+    const isLocal = request.url.includes('localhost');
+    const redirectUri = isLocal
+        ? 'http://localhost:3000/api/auth/callback/zoho'
+        : 'https://www.nodalpoint.io/api/auth/callback/zoho';
+
+    // NOTE: Ensure 'https://www.nodalpoint.io/api/auth/callback/zoho' is added to Zoho Developer Console
+    console.log(`Zoho Login: Using stabilized redirect URI: ${redirectUri}`);
 
     if (!clientId) {
         return NextResponse.json({ error: 'Missing Zoho Client ID' }, { status: 500 });
@@ -23,7 +27,7 @@ export async function GET(request: Request) {
         response_type: 'code',
         client_id: clientId,
         scope: 'openid email profile ZohoMail.messages.READ ZohoMail.messages.CREATE ZohoMail.accounts.READ ZohoMail.folders.READ',
-        redirect_uri: finalRedirectUri,
+        redirect_uri: redirectUri,
         access_type: 'offline',
         prompt: 'consent',
     });
