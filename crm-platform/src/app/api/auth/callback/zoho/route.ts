@@ -184,7 +184,26 @@ export async function GET(request: Request) {
             }, { onConflict: 'id' });
 
         if (upsertError) {
-            console.error('Supabase Error saving Zoho tokens:', upsertError);
+            console.error('Supabase Error saving Zoho tokens to users table:', upsertError);
+        }
+
+        // --- SYNC TO ZOHO_CONNECTIONS (Used for sender management) ---
+        console.log('Zoho OAuth: Syncing to zoho_connections...');
+        const { error: connectionError } = await supabaseAdmin
+            .from('zoho_connections')
+            .upsert({
+                user_id: finalUid,
+                email: userEmail,
+                access_token: accessToken,
+                refresh_token: refreshToken || undefined,
+                token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
+                zoho_account_id: zohoAccountId, // Handle potential column name difference if it's account_id
+                account_id: zohoAccountId,      // Support both common variations
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id, email' });
+
+        if (connectionError) {
+            console.warn('Supabase Error syncing to zoho_connections:', connectionError);
         }
 
         // --- GENERATE LOGIN SESSION ---
@@ -206,13 +225,22 @@ export async function GET(request: Request) {
 
         console.log('Zoho OAuth: Success. Redirecting to secure session link...');
 
-        const response = NextResponse.redirect(linkData.properties.action_link);
+        const actionLink = linkData.properties.action_link;
+        const response = NextResponse.redirect(actionLink);
+
+        // Determine cookie domain (share across www and root if in production)
+        const isProduction = !normalizedOrigin.includes('localhost');
+        const cookieDomain = isProduction ? `.${normalizedOrigin.split('://')[1]}` : undefined;
+
+        console.log(`Zoho OAuth: Setting session cookie (domain: ${cookieDomain || 'default'})`);
 
         // Ensure middleware cookie is set
         response.cookies.set('np_session', '1', {
             path: '/',
+            domain: cookieDomain,
             httpOnly: false,
             sameSite: 'lax',
+            maxAge: 60 * 60 * 24 * 7, // 7 days
         });
 
         return response;
