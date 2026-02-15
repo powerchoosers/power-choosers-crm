@@ -216,7 +216,7 @@ export async function GET(request: Request) {
             type: 'magiclink',
             email: userEmail,
             options: {
-                redirectTo: `${useOrigin}/network`
+                redirectTo: `${redirectUri.replace('/api/auth/callback/zoho', '/network')}`
             }
         });
 
@@ -235,7 +235,7 @@ export async function GET(request: Request) {
         responseHeaders.set('Cache-Control', 'no-store, no-cache, must-revalidate');
 
         // Wildcard domain cookie for maximal persistence
-        const isProd = !useOrigin.includes('localhost');
+        const isProd = !redirectUri.includes('localhost');
         const domainSuffix = isProd ? '; Domain=.nodalpoint.io' : '';
         const cookieOptions = `np_session=1; Path=/; Max-Age=604800; SameSite=Lax${domainSuffix}${isProd ? '; Secure' : ''}`;
         responseHeaders.append('Set-Cookie', cookieOptions);
