@@ -128,7 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const storedName = data.name || settings.name || null
 
       const inferred =
-        inferNameFromString(currentUser.displayName) ||
+        inferNameFromString(currentUser.user_metadata?.full_name) ||
         inferNameFromString(storedName) ||
         inferNameFromEmail(emailLower)
 
@@ -187,10 +187,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('[Auth] Immediate Dev Bypass Check')
       didResolve = true
       setUser({
-        uid: 'dev-bypass-uid',
+        id: 'dev-bypass-uid',
         email: 'dev@nodalpoint.io',
-        displayName: 'Dev User',
-        emailVerified: true,
+        user_metadata: { full_name: 'Dev User' },
+        aud: 'authenticated',
+        role: 'authenticated',
       } as unknown as User)
       setRole('admin')
       setProfile({
@@ -323,7 +324,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const derivedName = explicitFullName || storedName || (user.user_metadata?.full_name?.trim() || null)
 
               setProfile({
-                email: user.email,
+                email: user.email ?? null,
                 name: derivedName,
                 firstName: resolvedFirstName,
                 lastName: resolvedLastName,
@@ -361,7 +362,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               await supabase.from('users').insert(newProfile)
 
               setProfile({
-                email: user.email,
+                email: user.email ?? null,
                 name: derivedName,
                 firstName: inferred?.firstName || null,
                 lastName: inferred?.lastName || null,

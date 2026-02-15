@@ -2,17 +2,17 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Phone, 
-  Play, 
+import {
+  Phone,
+  Play,
   Pause,
   X,
-  Loader2, 
-  Check, 
-  AlertCircle, 
-  ChevronDown, 
-  ChevronUp, 
-  MessageSquare, 
+  Loader2,
+  Check,
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  MessageSquare,
   Sparkles,
   Building2,
   Zap
@@ -58,7 +58,7 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
   const [duration, setDuration] = useState(0)
   const [hostedAvatarUrl, setHostedAvatarUrl] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
 
   const { status, error, processCall } = useCallProcessor({
     callSid: call.callSid ?? call.id,
@@ -72,8 +72,8 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
   const currentStatus = isProcessed ? 'ready' : status
 
   // Parse AI Insights if they exist
-  const insights = typeof call.aiInsights === 'string' 
-    ? JSON.parse(call.aiInsights) 
+  const insights = typeof call.aiInsights === 'string'
+    ? JSON.parse(call.aiInsights)
     : call.aiInsights
 
   // Compact duration for minimal (e.g. "00:00:16" -> "0:16")
@@ -111,7 +111,7 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
 
   // Preload logged-in user's avatar for agent icon (host Google photo to avoid CORS)
   useEffect(() => {
-    const photoURL = user?.photoURL
+    const photoURL = user?.user_metadata?.avatar_url || profile.hostedPhotoUrl
     if (!photoURL) return
     // Non-Google URLs (e.g. imgur) can be used directly
     if (photoURL.includes('imgur.com') || (!photoURL.includes('googleusercontent.com') && !photoURL.includes('ggpht.com'))) {
@@ -133,7 +133,7 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
         if (!cancelled) setHostedAvatarUrl(photoURL)
       })
     return () => { cancelled = true }
-  }, [user?.photoURL])
+  }, [user?.user_metadata?.avatar_url, profile.hostedPhotoUrl])
 
   const openPlayerAndPlay = () => {
     if (!call.recordingUrl) return
@@ -190,8 +190,8 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
           {!isMinimal && (
             <div className={cn(
               "p-3 rounded-xl transition-colors duration-300 shrink-0",
-              call.type === 'Inbound' 
-                ? "bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500/20" 
+              call.type === 'Inbound'
+                ? "bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500/20"
                 : "bg-[#002FA7]/10 text-[#002FA7] group-hover:bg-[#002FA7]/20"
             )}>
               <Phone className="w-5 h-5" />
@@ -209,13 +209,13 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
                   )}
                 </div>
                 <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider mt-0.5">
-                  {call.date && isValid(new Date(call.date)) 
+                  {call.date && isValid(new Date(call.date))
                     ? (() => {
-                        const d = new Date(call.date!)
-                        const dateStr = format(d, 'MMM d, yyyy')
-                        const timeStr = d.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true })
-                        return `${dateStr} ${timeStr}`
-                      })()
+                      const d = new Date(call.date!)
+                      const dateStr = format(d, 'MMM d, yyyy')
+                      const timeStr = d.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true })
+                      return `${dateStr} ${timeStr}`
+                    })()
                     : 'Unknown Date'}
                 </div>
               </>
@@ -235,13 +235,13 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
                   </span>
                 </div>
                 <div className="text-[10px] font-mono text-zinc-500 uppercase mt-1">
-                  {call.date && isValid(new Date(call.date)) 
+                  {call.date && isValid(new Date(call.date))
                     ? (() => {
-                        const d = new Date(call.date!)
-                        const dateStr = format(d, 'MMM dd, yyyy')
-                        const timeStr = d.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true })
-                        return `${dateStr} • ${timeStr}`
-                      })()
+                      const d = new Date(call.date!)
+                      const dateStr = format(d, 'MMM dd, yyyy')
+                      const timeStr = d.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true })
+                      return `${dateStr} • ${timeStr}`
+                    })()
                     : 'Unknown Date'}
                 </div>
               </>
@@ -387,13 +387,13 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
                 <span className={cn(
                   "px-2 py-0.5 rounded text-[10px] font-mono uppercase shrink-0",
                   insights.sentiment === 'Positive' ? "bg-emerald-500/10 text-emerald-500" :
-                  insights.sentiment === 'Negative' ? "bg-rose-500/10 text-rose-500" :
-                  "bg-zinc-500/10 text-zinc-400"
+                    insights.sentiment === 'Negative' ? "bg-rose-500/10 text-rose-500" :
+                      "bg-zinc-500/10 text-zinc-400"
                 )}>
                   {insights.sentiment || 'Neutral'}
                 </span>
               </div>
-              
+
               <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5">
                 <div className="text-[9px] font-mono text-zinc-500 uppercase mb-2">Executive Summary</div>
                 <p className="text-xs text-zinc-300 leading-relaxed">
@@ -423,7 +423,7 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
             <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400 uppercase tracking-widest">
               <MessageSquare className="w-3 h-3 text-current" /> Two-Channel Transcript
             </div>
-            
+
             <div className="max-h-80 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
               {(() => {
                 // 1. Prefer conversationalIntelligence.sentences (backend maps Agent/Customer by channel)
@@ -469,7 +469,7 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
                 if (turns.length === 0) return null
                 return turns.map((turn, i) => {
                   const isAgent = turn.role === 'agent'
-                  const agentPhotoUrl = hostedAvatarUrl || (user?.photoURL?.includes('imgur.com') ? user.photoURL : null)
+                  const agentPhotoUrl = hostedAvatarUrl || profile.hostedPhotoUrl || user?.user_metadata?.avatar_url || null
                   return (
                     <div key={i} className={cn(
                       "flex gap-3",
@@ -512,8 +512,8 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
                       )}
                       <div className={cn(
                         "p-3 rounded-2xl text-xs leading-relaxed max-w-[85%] relative group/bubble",
-                        isAgent 
-                          ? "bg-[#002FA7]/10 text-zinc-200 border border-[#002FA7]/20 rounded-tr-none" 
+                        isAgent
+                          ? "bg-[#002FA7]/10 text-zinc-200 border border-[#002FA7]/20 rounded-tr-none"
                           : "bg-white/[0.03] text-zinc-400 border border-white/5 rounded-tl-none"
                       )}>
                         <div className={cn(
@@ -528,20 +528,20 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
                   )
                 })
               })() ?? (
-                !call.transcript && !insights?.conversationalIntelligence?.sentences?.length && !insights?.speakerTurns?.length ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-zinc-600">
-                    <MessageSquare className="w-8 h-8 mb-2 opacity-20" />
-                    <p className="text-[10px] font-mono uppercase tracking-widest">Transcript_Not_Found</p>
-                    <Button 
-                      variant="link" 
-                      className="text-[#002FA7] text-[10px] font-mono uppercase p-0 h-auto mt-2"
-                      onClick={processCall}
-                    >
-                      Generate Now
-                    </Button>
-                  </div>
-                ) : null
-              )}
+                  !call.transcript && !insights?.conversationalIntelligence?.sentences?.length && !insights?.speakerTurns?.length ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-zinc-600">
+                      <MessageSquare className="w-8 h-8 mb-2 opacity-20" />
+                      <p className="text-[10px] font-mono uppercase tracking-widest">Transcript_Not_Found</p>
+                      <Button
+                        variant="link"
+                        className="text-[#002FA7] text-[10px] font-mono uppercase p-0 h-auto mt-2"
+                        onClick={processCall}
+                      >
+                        Generate Now
+                      </Button>
+                    </div>
+                  ) : null
+                )}
             </div>
           </div>
 

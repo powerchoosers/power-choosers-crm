@@ -903,7 +903,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                       <div
                         aria-label="Telemetry Grid"
                         className="space-y-3"
-                         
+
                         style={{ gridTemplateColumns: 'repeat(var(--num-cols), minmax(0, 1fr)) 24px' } as React.CSSProperties}
                       >
                         <style jsx>{`
@@ -1533,7 +1533,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                             >
                               <div
                                 className="h-full bg-[#002FA7] transition-all duration-1000"
-                                 
+
                                 style={{ width: `${Math.min(100, Math.max(0, Number(block.content?.riskLevel) ?? 75))}%` }}
                               />
                             </div>
@@ -1594,9 +1594,9 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
               {/* Live signature (builder-only): Settings + hosted avatar, clickable links */}
               <div className="p-8 border-t border-zinc-100 bg-zinc-50 mt-auto">
                 <div className="flex items-center gap-3">
-                  {(profile?.hostedPhotoUrl || user?.photoURL) && (
+                  {(profile?.hostedPhotoUrl || user?.user_metadata?.avatar_url) && (
                     <Image
-                      src={profile?.hostedPhotoUrl || user?.photoURL || ''}
+                      src={profile?.hostedPhotoUrl || user?.user_metadata?.avatar_url || ''}
                       alt="Profile"
                       width={40}
                       height={40}
@@ -1605,7 +1605,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                   )}
                   <div>
                     <div className="font-sans font-bold text-zinc-900 text-sm">
-                      {[profile?.firstName, profile?.lastName].filter(Boolean).join(' ') || profile?.name || user?.displayName || '—'}
+                      {[profile?.firstName, profile?.lastName].filter(Boolean).join(' ') || profile?.name || user?.user_metadata?.full_name || '—'}
                     </div>
                     <div className="font-sans text-zinc-500 text-xs">
                       {profile?.jobTitle || '—'}
