@@ -33,7 +33,15 @@ export default async function handler(req, res) {
         // Exchange Code
         const clientId = process.env.ZOHO_CLIENT_ID;
         const clientSecret = process.env.ZOHO_CLIENT_SECRET;
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+
+        // Reconstruct appUrl exactly as done in connect-secondary.js to match redirect_url
+        let appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
+        if (!appUrl && req.headers.host) {
+            const protocol = req.headers['x-forwarded-proto'] || 'http';
+            appUrl = `${protocol}://${req.headers.host}`;
+        }
+        appUrl = appUrl || 'http://localhost:3000'; // Final fallback
+
         const redirectUri = `${appUrl}/api/auth/callback/zoho-secondary`;
         const accountsServer = process.env.ZOHO_ACCOUNTS_SERVER || 'https://accounts.zoho.com';
 
