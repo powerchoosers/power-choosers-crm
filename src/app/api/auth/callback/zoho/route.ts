@@ -220,7 +220,12 @@ export async function GET(request: Request) {
             type: 'magiclink',
             email: userEmail,
             options: {
-                redirectTo: `${redirectUri.replace('/api/auth/callback/zoho', '/network')}`
+                // FORCE explicit production redirection
+                // If we are on localhost, go to localhost. 
+                // If we are ANYWHERE else (nodalpoint.io, www.nodalpoint.io), go to https://www.nodalpoint.io/network
+                redirectTo: host.includes('localhost')
+                    ? 'http://localhost:3000/network'
+                    : 'https://www.nodalpoint.io/network'
             }
         });
 
