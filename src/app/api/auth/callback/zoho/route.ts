@@ -254,15 +254,19 @@ export async function GET(request: Request) {
                 <body>
                     <div style="text-align: center;">
                         <div class="loader" style="margin: 0 auto 20px;"></div>
-                        <p style="font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;">Identity_Verified // Redirecting...</p>
+                        <p style="font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;">Identity_Verified // Secure Link Ready</p>
+                        
+                        <!-- Manual Button for when auto-redirect is blocked by browser policies -->
+                        <a href="${actionLink}" style="display: inline-block; margin-top: 20px; padding: 12px 24px; background: #002FA7; color: white; text-decoration: none; font-family: monospace; font-size: 12px; letter-spacing: 0.1em; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1);">
+                            ENTER FORENSIC DECK
+                        </a>
+
                         <script>
-                            // Force immediate navigation to the secure session link
-                            window.location.replace("${actionLink}");
+                            // Attempt auto-navigation, but the button ensures success if this is blocked
+                            setTimeout(() => {
+                                window.location.replace("${actionLink}");
+                            }, 500); 
                         </script>
-                        <noscript>
-                            <meta http-equiv="refresh" content="0; url=${actionLink}">
-                            <a href="${actionLink}">Click here to continue</a>
-                        </noscript>
                     </div>
                 </body>
             </html>
