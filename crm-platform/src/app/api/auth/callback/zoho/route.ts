@@ -226,25 +226,38 @@ export async function GET(request: Request) {
         const actionLink = linkData.properties.action_link;
         console.log(`Zoho OAuth: Final Redirecting to: ${actionLink.split('?')[0]}...`);
 
-        // Create a manual 303 Redirect for better browser behavior
+        // Create a 302 Found response (most compatible for OAuth)
         const responseHeaders = new Headers();
         responseHeaders.set('Location', actionLink);
 
-        // Manual cookie setting to ensure compatibility
+        // Wildcard domain cookie for maximal persistence
         const isProd = !useOrigin.includes('localhost');
-        const cookieOptions = [
-            'np_session=1',
-            'Path=/',
-            'Max-Age=604800', // 7 days
-            'SameSite=Lax',
-            isProd ? 'Secure' : ''
-        ].filter(Boolean).join('; ');
+        const domainSuffix = isProd ? '; Domain=.nodalpoint.io' : '';
+        const cookieOptions = `np_session=1; Path=/; Max-Age=604800; SameSite=Lax${domainSuffix}${isProd ? '; Secure' : ''}`;
 
         responseHeaders.append('Set-Cookie', cookieOptions);
-        responseHeaders.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        responseHeaders.set('Cache-Control', 'no-store, no-cache, must-revalidate');
 
-        return new Response(null, {
-            status: 303, // See Other (recommended for POST/GET redirect chains)
+        // NUCLEAR FALLBACK: HTML Meta Refresh if the browser blocks the header-based redirect
+        const htmlFallback = `
+            <!DOCTYPE html>
+            <html>
+                <head>
+                    <meta http-equiv="refresh" content="0; url=${actionLink}">
+                    <script>window.location.href = "${actionLink}";</script>
+                    <style>body { background: #0a0a0a; color: #71717a; font-family: monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }</style>
+                </head>
+                <body>
+                    <div style="text-align: center;">
+                        <p>VERIFYING_IDENTITY...</p>
+                        <a href="${actionLink}" style="color: #002FA7; text-decoration: none; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;">Manual Uplink</a>
+                    </div>
+                </body>
+            </html>
+        `;
+
+        return new Response(htmlFallback, {
+            status: 302,
             headers: responseHeaders
         });
 
@@ -253,8 +266,9 @@ export async function GET(request: Request) {
         const errorMessage = err.message || 'Authentication failed';
         const loginUrl = new URL('/login', request.url);
         loginUrl.searchParams.set('error', errorMessage);
+
         return new Response(null, {
-            status: 303,
+            status: 302,
             headers: { 'Location': loginUrl.toString() }
         });
     }
