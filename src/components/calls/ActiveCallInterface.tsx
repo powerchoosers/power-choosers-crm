@@ -2,17 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Zap, 
-  ShieldAlert, 
-  Mail, 
-  BarChart3, 
-  Send, 
-  Phone, 
-  User,
-  Clock,
-  ArrowRight,
-  Activity as ActivityIcon,
+import {
+  Zap,
+  ShieldAlert,
+  Mail,
+  BarChart3,
+  Send,
   Sparkles
 } from 'lucide-react'
 
@@ -35,13 +30,13 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
   const [selectedGatekeeperIndex, setSelectedGatekeeperIndex] = useState(0)
   const [loadingVector, setLoadingVector] = useState<string | null>(null)
   const [liveInput, setLiveInput] = useState('')
-  const { generateScript, isLoading } = useAI()
-  const { metadata: storeMetadata, status, isActive } = useCallStore()
+  const { generateScript } = useAI()
+  const { metadata: storeMetadata, isActive } = useCallStore()
   const { metadata: voiceMetadata } = useVoice()
   const { profile } = useAuth()
-  
+
   const metadata = isActive ? (voiceMetadata || storeMetadata) : storeMetadata
-  
+
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // Use store metadata if props are missing (e.g., during dialing)
@@ -62,17 +57,17 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
   const handleVectorClick = async (vector: string) => {
     setLoadingVector(vector)
     setAiResponse(null)
-    
+
     const payload = {
       vector_type: vector,
       contact_context: {
         // Agent Info
         agent_name: profile?.firstName || 'Trey',
         agent_title: profile?.jobTitle || 'Energy Consultant',
-        
+
         // Context Type
         is_account_only: metadata?.isAccountOnly || false,
-        
+
         // Contact/Account Context
         name: displayContact.name,
         title: displayContact.title,
@@ -81,13 +76,13 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
         description: displayContact.description || account?.description,
         linkedin_url: displayContact.linkedinUrl || account?.linkedinUrl,
         location: displayContact.location || account?.location,
-        
+
         // Energy Specifics
         annual_usage: displayContact.annualUsage || account?.annualUsage,
         supplier: displayContact.supplier || account?.electricitySupplier,
         current_rate: displayContact.currentRate || account?.currentRate,
         contract_end: displayContact.contractEnd || account?.contractEndDate || 'UNKNOWN',
-        
+
         additional_context: vector === 'LIVE_PIVOT' ? liveInput : undefined
       }
     }
@@ -155,7 +150,7 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
             {loadingVector ? (
               <NeuralScan key="loading" />
             ) : aiResponse ? (
-              <motion.div 
+              <motion.div
                 key="result"
                 initial={{ opacity: 0, y: 10, filter: 'blur(10px)' }}
                 animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
@@ -163,9 +158,9 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
               >
                 {aiResponse.gatekeeperVariants && aiResponse.gatekeeperVariants.length > 0 && selectedVariantIndex === 0 && (
                   <>
-                    <ScriptStep 
-                      label="Gatekeeper (company line)" 
-                      content={aiResponse.gatekeeperVariants[selectedGatekeeperIndex] ?? aiResponse.gatekeeperVariants[0]} 
+                    <ScriptStep
+                      label="Gatekeeper (company line)"
+                      content={aiResponse.gatekeeperVariants[selectedGatekeeperIndex] ?? aiResponse.gatekeeperVariants[0]}
                       delay={0}
                       accent
                     />
@@ -239,7 +234,7 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
               </motion.div>
             ) : (
               <div key="empty" className="py-20 flex flex-col items-center justify-center text-center opacity-40">
-                <ActivityIcon size={32} className="text-zinc-700 animate-pulse mb-4" />
+                <Sparkles size={32} className="text-zinc-700 animate-pulse mb-4" />
                 <div className="text-xs font-mono text-zinc-600 uppercase tracking-[0.3em]">
                   Awaiting Vector Trigger...
                 </div>
@@ -253,14 +248,14 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
       <div className="p-6 bg-zinc-950/20 border-t border-white/5 space-y-6">
         {/* Rapid Context Input */}
         <div className="relative">
-          <input 
+          <input
             value={liveInput}
             onChange={(e) => setLiveInput(e.target.value)}
             onKeyDown={handleLiveContext}
             placeholder="INJECT LIVE CONTEXT..."
             className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-xs font-mono text-white placeholder:text-zinc-700 focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/20 outline-none pr-14 transition-all shadow-inner"
           />
-          <button 
+          <button
             onClick={() => handleVectorClick('LIVE_PIVOT')}
             disabled={!liveInput.trim() || !!loadingVector}
             className="absolute right-4 top-4 p-1 text-zinc-600 hover:text-white transition-colors disabled:opacity-30"
@@ -271,30 +266,30 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
 
         {/* Vector Deck */}
         <div className="grid grid-cols-4 gap-3">
-          <VectorButton 
-            label="Open" 
-            icon={Zap} 
+          <VectorButton
+            label="Open"
+            icon={Zap}
             color="text-[#002FA7]"
             loading={loadingVector === 'OPENER'}
             onClick={() => handleVectorClick('OPENER')}
           />
-          <VectorButton 
-            label="Price" 
-            icon={ShieldAlert} 
+          <VectorButton
+            label="Price"
+            icon={ShieldAlert}
             color="text-red-500"
             loading={loadingVector === 'OBJECTION_PRICE'}
             onClick={() => handleVectorClick('OBJECTION_PRICE')}
           />
-          <VectorButton 
-            label="Email" 
-            icon={Mail} 
+          <VectorButton
+            label="Email"
+            icon={Mail}
             color="text-amber-500"
             loading={loadingVector === 'OBJECTION_EMAIL'}
             onClick={() => handleVectorClick('OBJECTION_EMAIL')}
           />
-          <VectorButton 
-            label="Pulse" 
-            icon={BarChart3} 
+          <VectorButton
+            label="Pulse"
+            icon={BarChart3}
             color="text-emerald-500"
             loading={loadingVector === 'MARKET_DATA'}
             onClick={() => handleVectorClick('MARKET_DATA')}
@@ -307,7 +302,7 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
 
 function VectorButton({ label, icon: Icon, color, loading, onClick }: any) {
   return (
-    <button 
+    <button
       onClick={onClick}
       disabled={loading}
       className="py-4 px-2 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/5 flex flex-col items-center gap-3 transition-all group active:scale-95 disabled:opacity-50 min-w-0"
@@ -333,7 +328,7 @@ function NeuralScan() {
       setStep((s) => (s + 1) % steps.length)
     }, 800)
     return () => clearInterval(timer)
-  }, [])
+  }, [steps.length])
 
   return (
     <div className="py-20 flex flex-col items-center justify-center text-center">
@@ -379,26 +374,8 @@ function ScriptStep({ label, content, delay, accent = false }: { label: string, 
         {label}
       </div>
       <p className="text-sm text-zinc-100 leading-relaxed font-sans italic">
-        "{content}"
+        &quot;{content}&quot;
       </p>
     </motion.div>
-  )
-}
-
-function Activity({ className, size }: { className?: string, size?: number }) {
-  return (
-    <svg 
-      width={size} 
-      height={size} 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-      className={className}
-    >
-      <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-    </svg>
   )
 }

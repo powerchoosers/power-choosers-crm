@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 
 /**
  * Returns a value derived from scroll position, updating on scroll.
@@ -9,7 +9,10 @@ import { useState, useEffect, useRef } from 'react'
 export function useScrollEffect<T>(fn: (scrollY: number) => T, initial: T): T {
   const [value, setValue] = useState<T>(initial)
   const fnRef = useRef(fn)
-  fnRef.current = fn
+
+  useLayoutEffect(() => {
+    fnRef.current = fn
+  })
 
   useEffect(() => {
     const handler = () => setValue(fnRef.current(window.scrollY))

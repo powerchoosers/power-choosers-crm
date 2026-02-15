@@ -462,7 +462,7 @@ export function useContactCalls(contactId: string, companyPhone?: string, accoun
         }
       }
 
-      let data = Array.from(byId.values()).sort((a, b) => {
+      const data = Array.from(byId.values()).sort((a, b) => {
         const ta = (a.timestamp || a.createdAt || '').toString()
         const tb = (b.timestamp || b.createdAt || '').toString()
         return tb.localeCompare(ta)
