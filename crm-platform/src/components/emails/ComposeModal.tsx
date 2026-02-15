@@ -158,11 +158,11 @@ SENDER: ${signerName}
 RECIPIENT: ${to || '(not specified)'}
 SUBJECT: ${subject || '(no subject)'}
 
-GREETING: Optional. Vary your openings — randomly choose one of these patterns:
+GREETING: Optional. If you include a greeting (e.g. "Hi {firstName},"), you MUST follow it with TWO (2) line breaks so a blank line exists before the email body. NEVER put the body on the same line as the greeting. Patterns:
 (a) Plain statement of the problem (no greeting): "When summer peaks hit, a few 15-minute intervals can lock in next year's transmission charges."
 (b) Question about visibility: "Does anyone on your team track how summer peaks affect next year's budget?"
 (c) Brief observation about their footprint: "With three warehouses in DFW, a few summer peaks can lock in charges across the whole footprint."
-(d) Short greeting + problem: "Hi {firstName}, summer peaks can quietly set next year's delivery costs."
+(d) Short greeting + blank line + problem: "Hi {firstName},\n\nSummer peaks can quietly set next year's delivery costs."
 Do NOT use: "I hope this email finds you well", "I'd love to connect", "circle back", "touch base", "you're likely aware", "you're likely seeing", "you're probably aware". These sound templated and AI-written.
 CLOSING: Minimal sign-off: "Best," or "Thanks," followed by the SENDER name from above (first name only for cold, e.g. "Best,\\n[SENDER first name]" or "– [SENDER first name]"). Always use the actual SENDER name from the prompt, not a placeholder. No formal sign-offs.
 
@@ -207,7 +207,7 @@ SENDER: ${signerName}
 RECIPIENT: ${to || '(not specified)'}
 SUBJECT: ${subject || '(no subject)'}
 
-GREETING: Use a short greeting with the recipient's first name: "Hi Sarah," or "Hello Sarah," so it feels like normal 1:1 business communication.
+GREETING: Use a short greeting with the recipient's first name: "Hi Sarah," or "Hello Sarah," followed by exactly TWO (2) line breaks. There MUST be a blank line before the body text starts.
 CLOSING: Use a standard sign-off: "Best," or "Thanks," followed by the SENDER's full name from the prompt above. Always use the actual SENDER name, not a placeholder.
 SUBJECT: Do NOT put the recipient's first name in the subject. You MAY include company/facility name when relevant (e.g. "Summer peak risk at your Dallas DC", "Transmission costs on your DFW sites"). 4–7 words, honest and specific.
 CTA: One clear question or ask. Do not combine multiple asks in one email.
@@ -240,7 +240,7 @@ TONE: Professional, clear, respectful. Adapt to the recipient and subject. Use a
 RECIPIENT: ${to || '(not specified)'}
 SUBJECT: ${subject || '(no subject)'}
 
-GREETING: Use a short greeting with the recipient's first name when drafting a full email (e.g. "Hi Sarah," or "Hello Sarah,").
+GREETING: Use a short greeting with the recipient's first name followed by TWO (2) line breaks (e.g. "Hi Sarah,\n\n").
 CLOSING: Use a standard business sign-off: "Best," or "Thanks," or "Regards," followed by the SENDER's full name from the prompt above.
 
 Output ONLY the email body. Plain text, no markdown.`,
@@ -479,6 +479,7 @@ CORE RULES:
 - NO DASHES: Use commas or colons. Never use em dashes (—).
 - BULLET LENGTH: If using bullets, each must be a single sentence, max 15 words.
 - SPECIFICITY: Reference the lead's company and industry naturally.
+- FORMATTING: If you include a greeting (e.g. "Lorena,"), it MUST be on its own line. You MUST follow it with a BLANK LINE before starting the email body. NEVER start the body on the same line as the greeting.
 `
 
     if (!isRefinementMode) {
@@ -486,6 +487,7 @@ CORE RULES:
 OUTPUT FORMAT:
 - When generating a new email, output on the first line: SUBJECT: <one-line subject>
 - Then a blank line, then the email body.
+- The email body MUST start with the greeting (e.g. "Jenny,") followed by a BLANK LINE before the body content begins.
 - If the directive is body-only, output only the body with no SUBJECT line.
 - Return ONLY the requested content. No meta-commentary.`
     }
@@ -541,7 +543,7 @@ OUTPUT FORMAT:
       })
       const data = await response.json()
       if (data.error) throw new Error(data.message || data.error)
-      let raw = typeof data.content === 'string' ? data.content.trim() : ''
+      const raw = typeof data.content === 'string' ? data.content.trim() : ''
       const metaCommentary = /^(I (?:am |')?(?:sorry|cannot|can't|won't|unable to)|Could you please|Please verify|as an AI|I am an AI|I do not have access|I don't have access|I can't browse|I cannot (?:send|access|use)|I'm unable to)/im
       if (metaCommentary.test(raw)) {
         toast.error('AI returned a verification message instead of draft content. Try again or pick a different model.')
@@ -562,6 +564,9 @@ OUTPUT FORMAT:
           .replace(/^\s*\n+/, '')
           .trim()
       }
+
+      // Force double newline after greeting if missing
+      newBody = newBody.replace(/^((?:Hi|Hello|Dear)?[ \t]*[A-Za-z]+(?: [A-Za-z]+)?,)[ \t\r\n]*/i, '$1\n\n')
       setPendingSubjectFromAi(parsedSubject)
       setPendingAiContent(newBody)
       setAiPrompt('')

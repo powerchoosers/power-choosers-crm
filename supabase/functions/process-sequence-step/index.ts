@@ -247,24 +247,34 @@ async function processEmailStep(execution: any) {
   const { id, contact_id, metadata, sequence_id } = execution
 
   // Resolve sender: sequence owner email -> actual user email + display name (e.g. Lewis | Nodal Point)
+  // Also fetch bgvector to check for explicit sender identity
   const [seqRow]: any[] = await sql`
-    SELECT "ownerId" FROM sequences WHERE id = ${sequence_id}
+    SELECT "ownerId", bgvector FROM sequences WHERE id = ${sequence_id}
   `
   const ownerEmail = seqRow?.ownerId ?? (seqRow as any)?.ownerid
-  // Use actual user email (not burner address) - emails come from the authenticated user
-  const fromEmail = ownerEmail || 'noreply@nodalpoint.io'
+  const bgvector = seqRow?.bgvector ?? (seqRow as any)?.bgvector ?? {}
+
+  // 1. explicit sender from protocol settings
+  // 2. owner email
+  // 3. fallback
+  const settingsSender = bgvector?.settings?.senderEmail
+  const fromEmail = settingsSender || ownerEmail || 'noreply@nodalpoint.io'
+
   let fromName = 'Nodal Point'
-  if (ownerEmail) {
+  if (fromEmail) {
+    // Try to find user by the sending email to get their name
     const [userRow]: any[] = await sql`
-      SELECT first_name FROM users WHERE email = ${ownerEmail}
+      SELECT first_name, last_name FROM users WHERE email = ${fromEmail}
     `
     const firstName = (userRow as any)?.first_name
+    const lastName = (userRow as any)?.last_name
+
     if (firstName && String(firstName).trim()) {
       fromName = `${String(firstName).trim()} | Nodal Point`
     }
   }
 
-  console.log('[ProcessEmail] Fetching contact:', { contact_id, fromEmail, fromName })
+  console.log('[ProcessEmail] Fetching contact:', { contact_id, fromEmail, fromName, usingSettings: !!settingsSender })
 
   // Fetch contact details
   const [contactRow]: any[] = await sql`
@@ -307,6 +317,9 @@ async function processEmailStep(execution: any) {
     bodyLength: htmlBody.length
   })
 
+  // Prepare payload for Zoho Sequence API
+  // Note: zoho-send-sequence expects 'from' to be the userEmail/sender, 
+  // and it will derive the 'userEmail' from field for token lookup.
   const payload = {
     to: {
       email: contact.email,
@@ -324,8 +337,12 @@ async function processEmailStep(execution: any) {
     trackOpens: true
   }
 
-  // Send email via Gmail API through our backend
-  const response = await fetch(`${API_BASE_URL}/api/email/gmail-send-sequence`, {
+  // Send email via Zoho API through our backend
+  // Switched from gmail-send-sequence to zoho-send-sequence
+  const endpoint = `${API_BASE_URL}/api/email/zoho-send-sequence`
+  console.log('[ProcessEmail] Posting to:', endpoint)
+
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -335,7 +352,7 @@ async function processEmailStep(execution: any) {
 
   if (!response.ok) {
     const errorText = await response.text()
-    throw new Error(`Gmail API error: ${response.status} - ${errorText}`)
+    throw new Error(`Email API error (${response.status}): ${errorText}`)
   }
 
   const result = await response.json()

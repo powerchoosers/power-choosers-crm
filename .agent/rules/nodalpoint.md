@@ -70,7 +70,7 @@ Power Choosers CRM/
 **Commands:**
 ```bash
 cd crm-platform
-npm run dev          # Local dev (http://localhost:3000)
+npm run dev:turbo    # Local dev (http://localhost:3000) (Turbo Mode)
 npm run build        # Production build
 npm run typecheck    # TypeScript validation (MUST pass before deploy)
 ```

@@ -12,6 +12,9 @@ export interface Protocol {
   bgvector?: {
     nodes: any[]
     edges: any[]
+    settings?: {
+      senderEmail?: string
+    }
   }
   createdAt: string | Date
   updatedAt?: string | Date
@@ -42,7 +45,7 @@ export function useProtocols(searchQuery?: string) {
         let query = supabase
           .from('sequences')
           .select('*', { count: 'exact' })
-        
+
         if (role !== 'admin' && user.email) {
           query = query.eq('ownerId', user.email)
         }
@@ -57,9 +60,9 @@ export function useProtocols(searchQuery?: string) {
         const { data, error, count } = await query
           .range(from, to)
           .order('createdAt', { ascending: false })
-        
+
         if (error) throw error
-        
+
         return {
           protocols: (data || []).map(item => ({
             ...item,
@@ -91,7 +94,7 @@ export function useProtocols(searchQuery?: string) {
         })
         .select()
         .single()
-      
+
       if (error) throw error
       return data as Protocol
     },
@@ -116,7 +119,7 @@ export function useProtocols(searchQuery?: string) {
         .eq('id', id)
         .select()
         .single()
-      
+
       if (error) throw error
       return data as Protocol
     },
@@ -136,7 +139,7 @@ export function useProtocols(searchQuery?: string) {
         .from('sequences')
         .delete()
         .eq('id', id)
-      
+
       if (error) throw error
       return id
     },
