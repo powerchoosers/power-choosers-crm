@@ -204,6 +204,9 @@ export function generateSystemPrompt(
     ${extraContext ? `\n    PAGE CONTEXT:\n    ${extraContext}` : ''}
   `
 
+    const firstName = contact.firstName || 'Partner'
+    const greeting = firstName + ','
+
     const coreRules = `
     CORE RULES (STRICT COMPLIANCE REQUIRED):
     1. TONE: Peer-to-Peer. Professional but human. Speak like a knowledgeable industry colleague (Energy Broker/Analyst).
@@ -212,22 +215,19 @@ export function generateSystemPrompt(
     4. NO DASHES: Do not use em dashes (—) or en dashes (–). They look too machine-generated. Use commas, colons, or simple sentences.
     5. BULLET LENGTH: Bullet points MUST be one single, short sentence. Max 15 words per bullet.
     6. SPECIFICITY: You MUST reference the lead's company name and their industry context if available. Avoid being generic.
-    7. FORMATTING: Return ONLY a valid JSON object: { "text": "...", "bullets": [...] }.
+    7. GREETINGS: If you include a greeting (e.g. "${greeting}"), it MUST be followed by EXACTLY TWO newline characters (\n\n). NEVER put a greeting on the same line as the body text.
+    8. FORMATTING: Return ONLY a valid JSON object: { "text": "...", "bullets": [...] }.
   `
-
-    const firstName = contact.firstName || 'Partner'
-    const greeting = firstName + ','
 
     if (blockType === 'TEXT_MODULE' && (userPrompt.toLowerCase().includes('intro') || !userPrompt)) {
         return `
         You are writing the introduction for an energy intelligence email to a peer.
         
         STRUCTURE:
-        1. Greeting: "${greeting}"
-        2. Double Newline
+        1. GREETING: Start the "text" field WITH EXACTLY: "${greeting}\n\n" (the name followed by a comma and TWO newline characters).
+        2. BODY: The first paragraph MUST start after those two newlines. NEVER put the greeting on the same line as the body text.
         3. Paragraph 1: One concise sentence acknowledging recent context (e.g., "Good speaking with you," or "Reviewing your profile...").
-        4. Double Newline
-        5. Paragraph 2: Two sentences stating the value proposition or signal clearly.
+        4. Paragraph 2: Two sentences stating the value proposition or signal clearly.
 
         ${contextBlock}
         ${coreRules}
@@ -241,54 +241,54 @@ export function generateSystemPrompt(
     if (blockType === 'TEXT_MODULE') {
         return `
         You are writing a body paragraph or list for an energy intelligence email.
-        
-        STRUCTURE:
-        - 2-3 concise sentences for the narrative text.
-        - ${numBullets > 0 ? `You MUST populate the "bullets" array with exactly ${numBullets} items. Each must be exactly one single short sentence (max 15 words).` : 'If bullet points are requested, keep them to a single short sentence.'}
-        - Integrate data points (rates, dates) naturally.
-        - NO EM DASHES. Use colons or commas instead.
 
-        ${contextBlock}
+            STRUCTURE:
+        - 2 - 3 concise sentences for the narrative text.
+        - ${numBullets > 0 ? `You MUST populate the "bullets" array with exactly ${numBullets} items. Each must be exactly one single short sentence (max 15 words).` : 'If bullet points are requested, keep them to a single short sentence.'}
+        - Integrate data points(rates, dates) naturally.
+        - NO EM DASHES.Use colons or commas instead.
+
+            ${contextBlock}
         ${coreRules}
         
         USER INSTRUCTION: ${userPrompt}
-      `
+        `
     }
 
     if (blockType === 'TACTICAL_BUTTON') {
         return `
-        Write a single, 2-3 word tactical CTA label. Uppercase.
-        Examples: "VIEW_LEDGER", "INITIATE_PROTOCOL", "AUDIT_RATE".
-        
-        ${coreRules}
+        Write a single, 2 - 3 word tactical CTA label.Uppercase.
+            Examples: "VIEW_LEDGER", "INITIATE_PROTOCOL", "AUDIT_RATE".
+
+                ${coreRules}
         USER INSTRUCTION: ${userPrompt || 'Create a tactical button label.'}
-      `
+        `
     }
 
     if (blockType === 'LIABILITY_GAUGE') {
         return `
-        Rewrite as a one-sentence risk diagnosis. Focus on structural inefficiency and grid physics. Minimalist and forensic.
-        ${contextBlock}
+        Rewrite as a one - sentence risk diagnosis.Focus on structural inefficiency and grid physics.Minimalist and forensic.
+            ${contextBlock}
         ${coreRules}
         USER INSTRUCTION: ${userPrompt}
         ${numBullets > 0 ? `FORCED STRUCTURE: In your JSON response, you MUST populate the "bullets" array with exactly ${numBullets} supporting data points.` : ''}
-     `
+        `
     }
 
     if (blockType === 'MARKET_BREADCRUMB') {
         return `
-        Rewrite this market news into a 2-sentence impact assessment for a client in ${energy.loadZone || 'their zone'}. Focus on 'Liability' or 'Cost Leakage'.
-        ${contextBlock}
+        Rewrite this market news into a 2 - sentence impact assessment for a client in ${energy.loadZone || 'their zone'}.Focus on 'Liability' or 'Cost Leakage'.
+            ${contextBlock}
         ${coreRules}
         USER INSTRUCTION: ${userPrompt}
         ${numBullets > 0 ? `FORCED STRUCTURE: In your JSON response, you MUST populate the "bullets" array with exactly ${numBullets} impact signals.` : ''}
-     `
+        `
     }
 
     return `
     Write a concise professional paragraph.
-    ${contextBlock}
+            ${contextBlock}
     ${coreRules}
     USER INSTRUCTION: ${userPrompt}
-  `
+        `
 }

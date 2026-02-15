@@ -76,7 +76,7 @@ export default async function handler(req, res) {
           - Output MUST be a valid JSON object with the following keys:
             {
               "subject_line": "Forensic and direct subject",
-              "body_html": "Email body with <p> and <br> tags. Use {{first_name}} for personalization.",
+              "body_html": "Email body with <p> and <br> tags. If you include a greeting, follow it with two <br> tags. Use {{first_name}} for personalization.",
               "logic_reasoning": "A concise explanation of the AI's decision-making."
             }
         `;

@@ -85,6 +85,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useFoundryAssets } from '@/hooks/useFoundryAssets';
 import { getBurnerFromEmail, getBurnerSenderName } from '@/lib/burner-email';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
 
 // Mock Data for Visualization (The "Test Sequence")
 const MOCK_NODES: Node[] = [
@@ -357,6 +358,33 @@ function ProtocolArchitectInner() {
   const burnerFrom = getBurnerFromEmail(user?.email ?? undefined);
   const burnerSenderName = getBurnerSenderName(profile?.firstName ?? undefined);
 
+  // Sender Identity State
+  const [senderEmail, setSenderEmail] = useState<string>('');
+  const [availableEmails, setAvailableEmails] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchEmails = async () => {
+      if (!user?.email) return;
+      const emails = [user.email];
+      const userId = (user as any).uid || (user as any).id;
+      const { data } = await supabase.from('zoho_connections').select('email').eq('user_id', userId);
+      if (data) {
+        emails.push(...data.map(d => d.email));
+      }
+      setAvailableEmails(emails);
+    };
+    fetchEmails();
+  }, [user]);
+
+  useEffect(() => {
+    // Load saved sender email or default to user email
+    if (protocol?.bgvector?.settings?.senderEmail) {
+      setSenderEmail(protocol.bgvector.settings.senderEmail);
+    } else if (user?.email && !senderEmail) {
+      setSenderEmail(user.email);
+    }
+  }, [protocol, user]);
+
   // State
   const [nodes, setNodes, onNodesChange] = useNodesState(
     id === TEST_PROTOCOL_ID ? MOCK_NODES : FRESH_NODES
@@ -400,7 +428,11 @@ function ProtocolArchitectInner() {
       return;
     }
     try {
-      await saveProtocol({ nodes, edges });
+      await saveProtocol({
+        nodes,
+        edges,
+        settings: { senderEmail }
+      });
       setIsDirty(false);
     } catch (err) {
       // Error handled in hook
@@ -1053,9 +1085,21 @@ function ProtocolArchitectInner() {
                   Status: {isDirty ? 'Unsaved_Changes' : 'Synced'} // Protocol ID: {id?.toString().slice(0, 8)}...
                 </span>
               </div>
-              <p className="text-[10px] font-mono text-zinc-500 mt-1">
-                Sequence emails send from: <span className="text-zinc-400">{burnerSenderName}</span> &lt;{burnerFrom}&gt;
-              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[10px] font-mono text-zinc-500">Send via:</span>
+                <Select value={senderEmail} onValueChange={(val) => { setSenderEmail(val); setIsDirty(true); }}>
+                  <SelectTrigger className="h-6 text-[10px] font-mono bg-white/5 border-white/10 w-[240px] focus:ring-0 focus:border-[#002FA7]">
+                    <SelectValue placeholder="Select Sender Identity" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-zinc-950 nodal-monolith-edge border-white/10">
+                    {availableEmails.map(email => (
+                      <SelectItem key={email} value={email} className="text-[10px] font-mono focus:bg-white/10 focus:text-white cursor-pointer">
+                        {email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         </div>

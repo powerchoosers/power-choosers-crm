@@ -40,7 +40,7 @@ function run(name, cmd, args, cwd, env = {}) {
 console.log('[dev-all] Starting Next.js (3000) and legacy backend (3001)...\n');
 
 // Next.js: npm run dev -- --port 3000 from crm-platform
-const next = run('Next.js', 'npm', ['run', 'dev', '--', '--port', '3000'], platformDir);
+const next = run('Next.js', 'npm', ['run', 'dev:turbo', '--', '--port', '3000'], platformDir);
 
 // Legacy backend: nodemon server.js from root (port 3001)
 const backend = run('Backend', 'npx', ['nodemon', 'server.js'], rootDir, { PORT: '3001' });

@@ -30,7 +30,9 @@ export async function GET(request: Request) {
 
         // Dynamically determine the redirect URI based on the request origin
         const { origin } = new URL(request.url);
-        const redirectUri = `${origin}/api/auth/callback/zoho`;
+        // Normalize origin to remove www. if present (matches login logic)
+        const normalizedOrigin = origin.replace('://www.', '://');
+        const redirectUri = `${normalizedOrigin}/api/auth/callback/zoho`;
 
         if (!clientId || !clientSecret) {
             console.error('Zoho OAuth Callback: Missing environment variables');

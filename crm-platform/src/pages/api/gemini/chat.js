@@ -5,6 +5,7 @@ import { supabaseAdmin } from '../_supabase.js';
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
 import { GmailService } from '../email/gmail-service.js';
+import { ZohoMailService } from '../email/zoho-service.js';
 import { APOLLO_BASE_URL, fetchWithRetry, getApiKey } from '../apollo/_utils.js';
 import { getErcotMarketData } from '../market/ercot.js';
 
@@ -974,8 +975,8 @@ const toolHandlers = {
     return data;
   },
   send_email: async ({ to, subject, content, userEmail }) => {
-    const gmailService = new GmailService();
-    const result = await gmailService.sendEmail({
+    const zohoService = new ZohoMailService();
+    const result = await zohoService.sendEmail({
       to,
       subject,
       html: content,

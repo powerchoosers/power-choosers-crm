@@ -6,7 +6,9 @@ export async function GET(request: Request) {
 
     // Dynamically determine the redirect URI based on the request origin
     const { origin } = new URL(request.url);
-    const redirectUri = `${origin}/api/auth/callback/zoho`;
+    // Ensure we don't accidentally send www. to Zoho (invalid redirect URI)
+    const normalizedOrigin = origin.replace('://www.', '://');
+    const redirectUri = `${normalizedOrigin}/api/auth/callback/zoho`;
 
     if (!clientId) {
         return NextResponse.json({ error: 'Missing Zoho Client ID' }, { status: 500 });

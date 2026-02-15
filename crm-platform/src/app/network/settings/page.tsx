@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -8,7 +9,7 @@ import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Bell, Shield, Palette, Database, Trash2, Plus, Phone, User as UserIcon, Lock } from 'lucide-react'
+import { Bell, Shield, Palette, Database, Trash2, Plus, Phone, User as UserIcon, Lock, Mail, RefreshCw } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { auth } from '@/lib/firebase'
 import { supabase } from '@/lib/supabase'
@@ -18,6 +19,8 @@ import { toast } from 'sonner'
 
 export default function SettingsPage() {
   const { user, profile, role, refreshProfile } = useAuth()
+  const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -36,6 +39,62 @@ export default function SettingsPage() {
   const [newNumber, setNewNumber] = useState('')
   const [newNumberName, setNewNumberName] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+
+  // Email Connections
+  const [connections, setConnections] = useState<any[]>([])
+  const [isConnecting, setIsConnecting] = useState(false)
+
+  const fetchConnections = async () => {
+    if (!user) return
+    const userId = (user as any).uid || (user as any).id
+    const { data } = await supabase.from('zoho_connections').select('*').eq('user_id', userId)
+    if (data) setConnections(data)
+  }
+
+  useEffect(() => {
+    fetchConnections()
+  }, [user])
+
+  // Handle OAuth Callback
+  useEffect(() => {
+    const action = searchParams?.get('action')
+    const code = searchParams?.get('code')
+
+    if (action === 'zoho_callback' && code && !isConnecting) {
+      const finalize = async () => {
+        setIsConnecting(true)
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          const token = session?.access_token
+
+          if (!token) throw new Error("No session found")
+
+          const res = await fetch('/api/auth/zoho/finalize-connection', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ code })
+          })
+
+          if (!res.ok) {
+            const err = await res.json()
+            throw new Error(err.error || 'Failed to connect')
+          }
+
+          toast.success('Account connected successfully')
+          fetchConnections()
+          router.replace('/network/settings')
+        } catch (e: any) {
+          toast.error(e.message || 'Failed to connect account')
+        } finally {
+          setIsConnecting(false)
+        }
+      }
+      finalize()
+    }
+  }, [searchParams])
 
   // Phone number formatter: +1 (XXX)-XXX-XXXX
   const formatPhoneNumber = (value: string) => {
@@ -68,13 +127,13 @@ export default function SettingsPage() {
       digits = digits.substring(1)
     }
     digits = digits.substring(0, 10)
-    
+
     if (digits.length === 0) return ''
-    
+
     const areaCode = digits.substring(0, 3)
     const middle = digits.substring(3, 6)
     const last = digits.substring(6, 10)
-    
+
     if (digits.length > 6) {
       return `+1 (${areaCode})-${middle}-${last}`
     } else if (digits.length > 3) {
@@ -100,7 +159,7 @@ export default function SettingsPage() {
 
     setFirstName(profile.firstName || authFirstName)
     setLastName(profile.lastName || authLastName)
-    
+
     // 2. Other Profile Fields
     setLocalEmail(profile.email || user?.email || '')
     setBio(profile.bio || '')
@@ -163,7 +222,7 @@ export default function SettingsPage() {
       if (targetEmail !== emailLower) {
         console.warn('[Settings] Email change detected. System-wide migration required.');
       }
-      
+
       const { error } = await supabase
         .from('users')
         .update({
@@ -186,10 +245,10 @@ export default function SettingsPage() {
         .eq('email', emailLower)
 
       if (error) throw error
-      
+
       // Refresh the global profile state to update the UI immediately
       await refreshProfile()
-      
+
       toast.success('Profile updated')
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to save profile'
@@ -251,8 +310,12 @@ export default function SettingsPage() {
             <Database className="w-4 h-4 mr-2" />
             Integrations
           </TabsTrigger>
+          <TabsTrigger value="email" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-zinc-400">
+            <Mail className="w-4 h-4 mr-2" />
+            Email Accounts
+          </TabsTrigger>
         </TabsList>
-        
+
         <div className="flex-1 overflow-y-auto pr-2 np-scroll">
           <TabsContent value="profile" className="space-y-6 mt-0">
             <Card className="nodal-glass">
@@ -353,79 +416,79 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-              <Separator className="bg-white/5 my-6" />
+                <Separator className="bg-white/5 my-6" />
 
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="text-sm font-medium text-zinc-200">Phone Numbers</h4>
-                    <p className="text-xs text-zinc-500">Manage your Twilio numbers and routing.</p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Label htmlFor="bridgeToMobile" className="text-xs text-zinc-400">Bridge to Mobile</Label>
-                    <Switch
-                      id="bridgeToMobile"
-                      checked={bridgeToMobile}
-                      onCheckedChange={setBridgeToMobile}
-                      className="data-[state=checked]:bg-[#002FA7]"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  {twilioNumbers.map((num, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 rounded-lg nodal-glass nodal-glass-hover group">
-                      <div className="flex items-center gap-3">
-                        <div 
-                          className={cn(
-                            "w-4 h-4 rounded-full border flex items-center justify-center cursor-pointer transition-colors",
-                            selectedPhoneNumber === num.number 
-                              ? "bg-[#002FA7] border-[#002FA7]" 
-                              : "border-white/20 hover:border-white/40"
-                          )}
-                          onClick={() => setSelectedPhoneNumber(num.number)}
-                        >
-                          {selectedPhoneNumber === num.number && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-zinc-200">{num.name}</p>
-                          <p className="text-xs text-zinc-500 font-mono tabular-nums tracking-tight">{num.number}</p>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={() => handleDeleteNumber(idx)}
-                        className="icon-button-forensic opacity-0 group-hover:opacity-100 h-8 w-8 flex items-center justify-center text-zinc-500 hover:text-red-400 transition-all"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-medium text-zinc-200">Phone Numbers</h4>
+                      <p className="text-xs text-zinc-500">Manage your Twilio numbers and routing.</p>
                     </div>
-                  ))}
+                    <div className="flex items-center space-x-2">
+                      <Label htmlFor="bridgeToMobile" className="text-xs text-zinc-400">Bridge to Mobile</Label>
+                      <Switch
+                        id="bridgeToMobile"
+                        checked={bridgeToMobile}
+                        onCheckedChange={setBridgeToMobile}
+                        className="data-[state=checked]:bg-[#002FA7]"
+                      />
+                    </div>
+                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                    <Input
-                      placeholder="Number Name (e.g. Office)"
-                      value={newNumberName}
-                      onChange={(e) => setNewNumberName(e.target.value)}
-                      className="bg-transparent border-white/10 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-[#002FA7]"
-                    />
-                    <Input
-                      placeholder="+1 (555)-000-0000"
-                      value={newNumber}
-                      onChange={handlePhoneChange}
-                      className="bg-transparent border-white/10 text-zinc-200 font-mono tabular-nums placeholder:text-zinc-600 focus-visible:ring-[#002FA7]"
-                    />
-                    <Button 
-                      onClick={handleAddNumber}
-                      variant="outline"
-                      className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Number
-                    </Button>
+                  <div className="space-y-3">
+                    {twilioNumbers.map((num, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 rounded-lg nodal-glass nodal-glass-hover group">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={cn(
+                              "w-4 h-4 rounded-full border flex items-center justify-center cursor-pointer transition-colors",
+                              selectedPhoneNumber === num.number
+                                ? "bg-[#002FA7] border-[#002FA7]"
+                                : "border-white/20 hover:border-white/40"
+                            )}
+                            onClick={() => setSelectedPhoneNumber(num.number)}
+                          >
+                            {selectedPhoneNumber === num.number && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-zinc-200">{num.name}</p>
+                            <p className="text-xs text-zinc-500 font-mono tabular-nums tracking-tight">{num.number}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteNumber(idx)}
+                          className="icon-button-forensic opacity-0 group-hover:opacity-100 h-8 w-8 flex items-center justify-center text-zinc-500 hover:text-red-400 transition-all"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                      <Input
+                        placeholder="Number Name (e.g. Office)"
+                        value={newNumberName}
+                        onChange={(e) => setNewNumberName(e.target.value)}
+                        className="bg-transparent border-white/10 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-[#002FA7]"
+                      />
+                      <Input
+                        placeholder="+1 (555)-000-0000"
+                        value={newNumber}
+                        onChange={handlePhoneChange}
+                        className="bg-transparent border-white/10 text-zinc-200 font-mono tabular-nums placeholder:text-zinc-600 focus-visible:ring-[#002FA7]"
+                      />
+                      <Button
+                        onClick={handleAddNumber}
+                        variant="outline"
+                        className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Number
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
+              </CardContent>
               <CardFooter>
                 <Button
                   onClick={handleSaveProfile}
@@ -447,27 +510,27 @@ export default function SettingsPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="new" className="text-zinc-400">New password</Label>
-                  <Input 
-                    id="new" 
-                    type="password" 
+                  <Input
+                    id="new"
+                    type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="bg-transparent border-white/10 text-zinc-200 focus-visible:ring-[#002FA7]" 
+                    className="bg-transparent border-white/10 text-zinc-200 focus-visible:ring-[#002FA7]"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="confirm" className="text-zinc-400">Confirm password</Label>
-                  <Input 
-                    id="confirm" 
-                    type="password" 
+                  <Input
+                    id="confirm"
+                    type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="bg-transparent border-white/10 text-zinc-200 focus-visible:ring-[#002FA7]" 
+                    className="bg-transparent border-white/10 text-zinc-200 focus-visible:ring-[#002FA7]"
                   />
                 </div>
               </CardContent>
               <CardFooter>
-                <Button 
+                <Button
                   onClick={handleUpdatePassword}
                   disabled={isUpdatingPassword || !newPassword}
                   className="bg-white text-zinc-950 hover:bg-zinc-200 font-medium"
@@ -477,7 +540,7 @@ export default function SettingsPage() {
               </CardFooter>
             </Card>
           </TabsContent>
-          
+
           <TabsContent value="notifications" className="space-y-6 mt-0">
             <Card className="nodal-glass">
               <CardHeader>
@@ -501,7 +564,7 @@ export default function SettingsPage() {
                   <Switch id="marketing" className="data-[state=checked]:bg-[#002FA7]" />
                 </div>
                 <Separator className="bg-white/5" />
-                 <div className="flex items-center justify-between space-x-2">
+                <div className="flex items-center justify-between space-x-2">
                   <Label htmlFor="security" className="flex flex-col space-y-1 text-zinc-200">
                     <span>Security Emails</span>
                     <span className="font-normal text-xs text-zinc-500">Receive emails about your account security.</span>
@@ -514,57 +577,126 @@ export default function SettingsPage() {
 
           <TabsContent value="integrations" className="space-y-6 mt-0">
             <Card className="nodal-glass">
-               <CardHeader>
+              <CardHeader>
                 <CardTitle className="text-zinc-100">API Integrations</CardTitle>
                 <CardDescription className="text-zinc-500">Manage your connected services.</CardDescription>
               </CardHeader>
-               <CardContent className="space-y-4">
-                 <div className="flex items-center justify-between p-4 rounded-lg nodal-glass nodal-glass-hover">
-                   <div className="flex items-center space-x-4">
-                     <div className="w-10 h-10 rounded-2xl bg-orange-500/20 flex items-center justify-center text-orange-500">
-                       <Database className="w-5 h-5" />
-                     </div>
-                     <div>
-                       <p className="text-sm font-medium text-zinc-200">Firebase</p>
-                       <p className="text-xs text-zinc-500">Connected</p>
-                     </div>
-                   </div>
-                   <Button variant="outline" size="sm" className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5">Configure</Button>
-                 </div>
-                 
-                  <div className="flex items-center justify-between p-4 rounded-lg nodal-glass nodal-glass-hover">
-                   <div className="flex items-center space-x-4">
-                     <div className="w-10 h-10 rounded-2xl bg-red-500/20 flex items-center justify-center text-red-500">
-                       <Phone className="w-5 h-5" />
-                     </div>
-                     <div>
-                       <p className="text-sm font-medium text-zinc-200">Twilio</p>
-                       <p className="text-xs text-zinc-500 font-mono tabular-nums">{twilioNumbers.length > 0 ? 'Connected' : 'Not Configured'}</p>
-                     </div>
-                   </div>
-                   <Button 
-                     variant="outline" 
-                     size="sm" 
-                     onClick={() => document.querySelector('[value="profile"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))}
-                     className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5"
-                   >
-                     Manage Numbers
-                   </Button>
-                 </div>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-4 rounded-lg nodal-glass nodal-glass-hover">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-10 h-10 rounded-2xl bg-orange-500/20 flex items-center justify-center text-orange-500">
+                      <Database className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-zinc-200">Firebase</p>
+                      <p className="text-xs text-zinc-500">Connected</p>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5">Configure</Button>
+                </div>
 
-                 <div className="flex items-center justify-between p-4 rounded-lg bg-transparent border border-white/5">
-                   <div className="flex items-center space-x-4">
-                     <div className="w-10 h-10 rounded-2xl bg-blue-500/20 flex items-center justify-center text-blue-500">
-                       <Database className="w-5 h-5" />
-                     </div>
-                     <div>
-                       <p className="text-sm font-medium text-zinc-200">Stripe</p>
-                       <p className="text-xs text-zinc-500">Not Connected</p>
-                     </div>
-                   </div>
-                   <Button variant="outline" size="sm" className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5">Connect</Button>
-                 </div>
-               </CardContent>
+                <div className="flex items-center justify-between p-4 rounded-lg nodal-glass nodal-glass-hover">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-10 h-10 rounded-2xl bg-red-500/20 flex items-center justify-center text-red-500">
+                      <Phone className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-zinc-200">Twilio</p>
+                      <p className="text-xs text-zinc-500 font-mono tabular-nums">{twilioNumbers.length > 0 ? 'Connected' : 'Not Configured'}</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.querySelector('[value="profile"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))}
+                    className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5"
+                  >
+                    Manage Numbers
+                  </Button>
+                </div>
+
+                <div className="flex items-center justify-between p-4 rounded-lg bg-transparent border border-white/5">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-10 h-10 rounded-2xl bg-blue-500/20 flex items-center justify-center text-blue-500">
+                      <Database className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-zinc-200">Stripe</p>
+                      <p className="text-xs text-zinc-500">Not Connected</p>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5">Connect</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="email" className="space-y-6 mt-0">
+            <Card className="nodal-glass">
+              <CardHeader>
+                <CardTitle className="text-zinc-100">Email Accounts</CardTitle>
+                <CardDescription className="text-zinc-500">Manage connected Zoho Mail accounts for sending.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Primary Account */}
+                <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/5">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-10 h-10 rounded-2xl bg-[#002FA7]/20 flex items-center justify-center text-[#002FA7]">
+                      <Mail className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-zinc-200">{localEmail || 'Primary Account'}</p>
+                      <p className="text-xs text-zinc-500">Primary (Login ID)</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-full">Active</span>
+                  </div>
+                </div>
+
+                {/* Secondary Accounts */}
+                {connections.map((conn) => (
+                  <div key={conn.id} className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/5">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-10 h-10 rounded-2xl bg-purple-500/20 flex items-center justify-center text-purple-500">
+                        <Mail className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-zinc-200">{conn.email}</p>
+                        <p className="text-xs text-zinc-500">Secondary Sender</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-full">Connected</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-zinc-500 hover:text-red-400"
+                        onClick={async () => {
+                          if (!confirm('Disconnect this account?')) return
+                          await supabase.from('zoho_connections').delete().eq('id', conn.id)
+                          fetchConnections()
+                          toast.success('Account disconnected')
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+
+                <div className="pt-4 flex justify-center">
+                  <Button
+                    onClick={() => window.location.href = '/api/auth/zoho/connect-secondary'}
+                    disabled={isConnecting}
+                    variant="outline"
+                    className="bg-transparent border-white/10 text-zinc-300 hover:text-white hover:bg-white/5"
+                  >
+                    {isConnecting ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+                    Connect Secondary Account
+                  </Button>
+                </div>
+              </CardContent>
             </Card>
           </TabsContent>
         </div>

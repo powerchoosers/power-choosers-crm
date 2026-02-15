@@ -428,6 +428,11 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
         }
       }
 
+      // Force double newline after greeting if missing
+      if (generatedText) {
+        generatedText = generatedText.replace(/^((?:Hi|Hello|Dear)?[ \t]*[A-Za-z]+(?: [A-Za-z]+)?,)[ \t\r\n]*/i, '$1\n\n')
+      }
+
       if (generatedText) {
         if (block.type === 'TEXT_MODULE') {
           const contentObj = typeof block.content === 'object' ? block.content : { text: String(block.content), useAi: false, aiPrompt: '' }
@@ -545,9 +550,6 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
               Stealth_Text
             </button>
           </div>
-          <Button variant="ghost" size="sm" className="h-8 gap-2 text-zinc-400 hover:text-white hover:bg-white/5 font-mono text-xs uppercase">
-            <RefreshCw size={14} /> Optimize
-          </Button>
           <Button
             onClick={saveAsset}
             disabled={isSaving}
@@ -901,7 +903,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                       <div
                         aria-label="Telemetry Grid"
                         className="space-y-3"
-                        // eslint-disable-next-line react/forbid-dom-props
+                         
                         style={{ gridTemplateColumns: 'repeat(var(--num-cols), minmax(0, 1fr)) 24px' } as React.CSSProperties}
                       >
                         <style jsx>{`
@@ -1531,7 +1533,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                             >
                               <div
                                 className="h-full bg-[#002FA7] transition-all duration-1000"
-                                // eslint-disable-next-line react/forbid-dom-props
+                                 
                                 style={{ width: `${Math.min(100, Math.max(0, Number(block.content?.riskLevel) ?? 75))}%` }}
                               />
                             </div>

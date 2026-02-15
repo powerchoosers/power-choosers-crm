@@ -23,18 +23,20 @@ export function useProtocolBuilder(id: string) {
   })
 
   const saveProtocolMutation = useMutation({
-    mutationFn: async (data: { 
-      nodes: Node[], 
-      edges: Edge[], 
-      name?: string, 
-      description?: string 
+    mutationFn: async (data: {
+      nodes: Node[],
+      edges: Edge[],
+      settings?: { senderEmail?: string },
+      name?: string,
+      description?: string
     }) => {
       const { error } = await supabase
         .from('sequences')
         .update({
           bgvector: {
             nodes: data.nodes,
-            edges: data.edges
+            edges: data.edges,
+            ...(data.settings && { settings: data.settings })
           },
           updatedAt: new Date().toISOString(),
           ...(data.name && { name: data.name }),
