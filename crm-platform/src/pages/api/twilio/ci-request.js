@@ -1,5 +1,5 @@
 import twilio from 'twilio';
-import { db } from '../_firebase.js';
+import { supabaseAdmin } from '../_supabase.js';
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
 
@@ -81,31 +81,32 @@ export default async function handler(req, res) {
     let ciTranscriptSid = '';
     let existingRecordingSid = '';
     try {
-      if (db && callSid) {
-        // Add 5-second timeout for Firestore read
+      if (supabaseAdmin && callSid) {
+        // Add 5-second timeout for Supabase read
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Firestore timeout')), 5000)
+          setTimeout(() => reject(new Error('Supabase timeout')), 5000)
         );
-        const readPromise = db.collection('calls').doc(callSid).get();
+        const readPromise = supabaseAdmin.from('calls').select('metadata, recordingSid').eq('id', callSid).maybeSingle();
 
-        const snap = await Promise.race([readPromise, timeoutPromise]);
-        if (snap.exists) {
-          const data = snap.data() || {};
-          if (data.ciTranscriptSid) ciTranscriptSid = String(data.ciTranscriptSid);
-          if (data.recordingSid) existingRecordingSid = String(data.recordingSid);
+        const { data: snap, error: readError } = await Promise.race([readPromise, timeoutPromise]);
+        if (readError) throw readError;
+
+        if (snap) {
+          const metadata = snap.metadata || {};
+          if (metadata.ciTranscriptSid) ciTranscriptSid = String(metadata.ciTranscriptSid);
+          if (snap.recordingSid) existingRecordingSid = String(snap.recordingSid);
           // Try to parse from recordingUrl if present
-          if (!existingRecordingSid && data.recordingUrl) {
+          if (!existingRecordingSid && metadata.recordingUrl) {
             try {
               // Match Recording SID from URL - handles both .mp3 and query string formats
-              // Examples: /Recordings/RE123.mp3 or /Recordings/RE123?RequestedChannels=2
-              const m = String(data.recordingUrl).match(/Recordings\/(RE[A-Z0-9]+)/i);
+              const m = String(metadata.recordingUrl).match(/Recordings\/(RE[A-Z0-9]+)/i);
               if (m && m[1]) existingRecordingSid = m[1];
             } catch (_) { }
           }
         }
       }
     } catch (e) {
-      logger.warn('[CI Request] Firestore read failed or timed out:', e.message);
+      logger.warn('[CI Request] Supabase read failed or timed out:', e.message);
     }
 
     // Prefer provided recordingSid, then existing one from Firestore

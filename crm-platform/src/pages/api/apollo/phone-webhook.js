@@ -2,16 +2,14 @@
  * Apollo Phone Number Webhook Endpoint
  *
  * Apollo sends phone numbers asynchronously to this webhook URL.
- * We store them temporarily in memory and optionally persist to Firebase.
- * We also update the linked contact in Supabase so the number appears on the
+ * we update the linked contact in Supabase so the number appears on the
  * contact dossier even if the user left the page (background link).
  */
 
 import { cors, formatPhoneForContact } from './_utils.js';
-import { db } from '../_firebase.js';
 import { supabaseAdmin } from '../_supabase.js';
 
-// In-memory fallback (only for local dev without Firestore)
+// In-memory fallback (only for local dev or temporary cache)
 const memoryStore = new Map();
 
 // Store phone data for 30 minutes
@@ -23,8 +21,7 @@ export default async function handler(req, res) {
 
   // Only accept POST requests from Apollo
   if (req.method !== 'POST') {
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    res.status(405).json({ error: 'Method not allowed' });
     return;
   }
 
@@ -33,36 +30,21 @@ export default async function handler(req, res) {
     let phoneData = req.body;
 
     if (!phoneData || !phoneData.person) {
-      // Check if the body itself is the person object (sometimes Apollo sends flattened structure)
       if (phoneData && phoneData.id && (phoneData.phone_numbers || phoneData.email)) {
         phoneData = { person: phoneData };
-      } else if (phoneData && phoneData.matches) {
-         // Handle potential matches array
-         if (phoneData.matches.length > 0) {
-            phoneData = { person: phoneData.matches[0] };
-         }
-      } else if (phoneData && phoneData.people && Array.isArray(phoneData.people)) {
-         // Handle people array (bulk enrichment format)
-         if (phoneData.people.length > 0) {
-            phoneData = { person: phoneData.people[0] };
-         }
+      } else if (phoneData && phoneData.matches && phoneData.matches.length > 0) {
+        phoneData = { person: phoneData.matches[0] };
+      } else if (phoneData && phoneData.people && Array.isArray(phoneData.people) && phoneData.people.length > 0) {
+        phoneData = { person: phoneData.people[0] };
       } else {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Invalid webhook payload - no person data' }));
+        res.status(400).json({ error: 'Invalid webhook payload' });
         return;
       }
     }
 
-    if (!phoneData.person) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Invalid webhook payload - structure found but empty' }));
-      return;
-    }
-
     const personId = phoneData.person.id;
     if (!personId) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Invalid webhook payload - no person ID' }));
+      res.status(400).json({ error: 'Invalid webhook payload - no person ID' });
       return;
     }
 
@@ -76,18 +58,8 @@ export default async function handler(req, res) {
       expiresAt: new Date(Date.now() + PHONE_DATA_TTL_MS).toISOString()
     };
 
-    // Store in Firestore (distributed state)
-    if (db) {
-      try {
-        await db.collection('apollo_phones').doc(personId).set(payload);
-      } catch (dbError) {
-        // Fallback to memory
-        memoryStore.set(personId, payload);
-      }
-    } else {
-      // Fallback to memory for local dev
-      memoryStore.set(personId, payload);
-    }
+    // Store in memory (temporary cache for active sessions)
+    memoryStore.set(personId, payload);
 
     // Link phones to contact in Supabase (background: works even if user left the page)
     if (personId && Array.isArray(phones) && phones.length > 0 && supabaseAdmin) {
@@ -97,12 +69,14 @@ export default async function handler(req, res) {
           .select('id')
           .eq('metadata->>apollo_person_id', personId)
           .maybeSingle();
+
         if (contactRow?.id) {
           const numbers = phones
             .map(p => p.sanitized_number || p.raw_number)
             .filter(Boolean)
             .map(formatPhoneForContact)
             .filter(Boolean);
+
           const update = {};
           if (numbers[0]) {
             update.phone = numbers[0];
@@ -110,6 +84,7 @@ export default async function handler(req, res) {
           }
           if (numbers[1]) update.workPhone = numbers[1];
           if (numbers[2]) update.otherPhone = numbers[2];
+
           if (Object.keys(update).length > 0) {
             update.updatedAt = new Date().toISOString();
             await supabaseAdmin.from('contacts').update(update).eq('id', contactRow.id);
@@ -120,50 +95,26 @@ export default async function handler(req, res) {
       }
     }
 
-    // Respond to Apollo
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
+    res.status(200).json({
       success: true,
       message: 'Phone numbers received',
       personId
-    }));
+    });
 
   } catch (error) {
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      error: 'Internal server error', 
-      details: error.message 
-    }));
+    res.status(500).json({
+      error: 'Internal server error',
+      details: error.message
+    });
   }
 }
 
 // Export function to retrieve phone data (asynchronous)
 export async function getPhoneData(personId) {
-  // Try Firestore first
-  if (db) {
-    try {
-      const doc = await db.collection('apollo_phones').doc(personId).get();
-      if (doc.exists) {
-        const data = doc.data();
-        // Check expiry
-        if (new Date(data.expiresAt) > new Date()) {
-          return data;
-        } else {
-          // Optional: delete expired doc
-          db.collection('apollo_phones').doc(personId).delete().catch(() => {});
-          return null;
-        }
-      }
-    } catch (e) {
-    }
-  }
-
-  // Fallback to memory store
   const data = memoryStore.get(personId);
   if (data && new Date(data.expiresAt) > new Date()) {
     return data;
   }
-  
   return null;
 }
 

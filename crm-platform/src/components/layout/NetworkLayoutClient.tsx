@@ -31,12 +31,12 @@ export function NetworkLayoutClient({
   }, [loading, user, router])
 
   // Optimistic render: when we have a session cookie (returning user), show the full UI
-  // immediately so LCP isn't blocked by Firebase/Supabase auth. If auth then fails, we redirect.
+  // immediately so LCP isn't blocked by auth. If auth then fails, we redirect.
   const showShell = !loading || (loading && initialHasSessionCookie)
 
   if (!showShell) {
     return (
-      <div className={cn(inter.className, "bg-zinc-950 text-foreground antialiased min-h-screen flex items-center justify-center")}> 
+      <div className={cn(inter.className, "bg-zinc-950 text-foreground antialiased min-h-screen flex items-center justify-center")}>
         <LoadingOrb label="Initialising Terminal..." />
       </div>
     )
@@ -49,13 +49,13 @@ export function NetworkLayoutClient({
       // Fall through to render shell + children
     } else if (process.env.NODE_ENV === 'development' && hasSessionCookie) {
       return (
-        <div className={cn(inter.className, "bg-zinc-950 text-foreground antialiased min-h-screen flex items-center justify-center")}> 
+        <div className={cn(inter.className, "bg-zinc-950 text-foreground antialiased min-h-screen flex items-center justify-center")}>
           <LoadingOrb label="Bypassing Security Protocols..." />
         </div>
       )
     } else {
       return (
-        <div className={cn(inter.className, "bg-zinc-950 text-foreground antialiased min-h-screen flex items-center justify-center")}> 
+        <div className={cn(inter.className, "bg-zinc-950 text-foreground antialiased min-h-screen flex items-center justify-center")}>
           <div className="flex flex-col items-center gap-4">
             <div className="text-sm text-zinc-500 font-mono uppercase tracking-widest">Unauthorized Access Detected</div>
             <button
@@ -73,15 +73,15 @@ export function NetworkLayoutClient({
 
   return (
     <div className={cn(inter.className, "bg-zinc-950 text-foreground antialiased overflow-hidden selection:bg-[#002FA7] selection:text-white h-screen w-screen relative")}>
-        <GlobalSync />
-        <TopBar />
-        <Sidebar />
-        <RightPanel />
-        <main className="absolute top-0 bottom-0 left-[70px] right-0 lg:right-80 overflow-y-auto pt-24 pb-8 transition-all duration-300 scroll-smooth np-scroll">
-          <div className="max-w-[1600px] 2xl:max-w-[1800px] mx-auto px-6 sm:px-8 lg:px-10">
-              {children}
-          </div>
-        </main>
+      <GlobalSync />
+      <TopBar />
+      <Sidebar />
+      <RightPanel />
+      <main className="absolute top-0 bottom-0 left-[70px] right-0 lg:right-80 overflow-y-auto pt-24 pb-8 transition-all duration-300 scroll-smooth np-scroll">
+        <div className="max-w-[1600px] 2xl:max-w-[1800px] mx-auto px-6 sm:px-8 lg:px-10">
+          {children}
+        </div>
+      </main>
     </div>
   );
 }

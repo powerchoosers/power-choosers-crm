@@ -5,7 +5,7 @@
  */
 
 import { cors } from '../_cors.js';
-import { db } from '../_firebase.js';
+import { supabaseAdmin } from '../_supabase.js';
 import logger from '../_logger.js';
 
 // System prompt combining SEO.md guidelines with A+ content optimization
@@ -434,29 +434,29 @@ function buildUserPrompt(existingPosts) {
   const hookInstruction = hookInstructions[selectedHook] || hookInstructions['insider-alert'];
 
   // Determine if TDU tool is relevant based on topic
-  const tduRelevant = randomTopic.toLowerCase().includes('tdu') || 
-                      randomTopic.toLowerCase().includes('delivery charge') ||
-                      randomTopic.toLowerCase().includes('bill') ||
-                      randomTopic.toLowerCase().includes('transmission and distribution');
-  
+  const tduRelevant = randomTopic.toLowerCase().includes('tdu') ||
+    randomTopic.toLowerCase().includes('delivery charge') ||
+    randomTopic.toLowerCase().includes('bill') ||
+    randomTopic.toLowerCase().includes('transmission and distribution');
+
   // Determine if 2026 Market Navigator guide is relevant based on topic
   const guideRelevant = randomTopic.toLowerCase().includes('capacity') ||
-                        randomTopic.toLowerCase().includes('reserve margin') ||
-                        randomTopic.toLowerCase().includes('renewal') ||
-                        randomTopic.toLowerCase().includes('contract timing') ||
-                        randomTopic.toLowerCase().includes('peak-hour') ||
-                        randomTopic.toLowerCase().includes('peak hour') ||
-                        randomTopic.toLowerCase().includes('market outlook') ||
-                        randomTopic.toLowerCase().includes('market forecast') ||
-                        randomTopic.toLowerCase().includes('2026') ||
-                        randomTopic.toLowerCase().includes('2027') ||
-                        randomTopic.toLowerCase().includes('2028') ||
-                        randomTopic.toLowerCase().includes('supply shortage') ||
-                        randomTopic.toLowerCase().includes('supply/demand') ||
-                        randomTopic.toLowerCase().includes('market strategy') ||
-                        randomTopic.toLowerCase().includes('market navigation') ||
-                        randomTopic.toLowerCase().includes('ercot') && (randomTopic.toLowerCase().includes('trend') || randomTopic.toLowerCase().includes('outlook') || randomTopic.toLowerCase().includes('forecast'));
-  
+    randomTopic.toLowerCase().includes('reserve margin') ||
+    randomTopic.toLowerCase().includes('renewal') ||
+    randomTopic.toLowerCase().includes('contract timing') ||
+    randomTopic.toLowerCase().includes('peak-hour') ||
+    randomTopic.toLowerCase().includes('peak hour') ||
+    randomTopic.toLowerCase().includes('market outlook') ||
+    randomTopic.toLowerCase().includes('market forecast') ||
+    randomTopic.toLowerCase().includes('2026') ||
+    randomTopic.toLowerCase().includes('2027') ||
+    randomTopic.toLowerCase().includes('2028') ||
+    randomTopic.toLowerCase().includes('supply shortage') ||
+    randomTopic.toLowerCase().includes('supply/demand') ||
+    randomTopic.toLowerCase().includes('market strategy') ||
+    randomTopic.toLowerCase().includes('market navigation') ||
+    randomTopic.toLowerCase().includes('ercot') && (randomTopic.toLowerCase().includes('trend') || randomTopic.toLowerCase().includes('outlook') || randomTopic.toLowerCase().includes('forecast'));
+
   let resourceInstruction = '';
   if (tduRelevant) {
     resourceInstruction = 'IMPORTANT: Since this post is about TDU charges or delivery charges, include a link to our TDU Delivery Charges Calculator: <a href="https://powerchoosers.com/tdu-delivery-charges">TDU Delivery Charges Calculator</a>. Only use this specific tool link when the topic is directly related to TDU/delivery charges.';
@@ -615,17 +615,20 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch existing posts from Firestore (both published AND drafts to avoid duplicates)
+    // Fetch existing posts from Supabase (both published AND drafts to avoid duplicates)
     let existingPosts = [];
-    if (db) {
+    if (supabaseAdmin) {
       try {
         // Get all posts regardless of status (published + drafts)
-        const snapshot = await db.collection('posts')
-          .limit(100) // Increased to catch more duplicates
-          .get();
+        const { data: snapshot, error: postsError } = await supabaseAdmin
+          .from('posts')
+          .select('title, category, contentType, keywords, metaDescription, content')
+          .limit(100)
+          .order('created_at', { ascending: false });
 
-        existingPosts = snapshot.docs.map(doc => {
-          const data = doc.data();
+        if (postsError) throw postsError;
+
+        existingPosts = (snapshot || []).map(data => {
           // Extract content preview for better duplicate detection
           const content = data.content || '';
           const contentPreview = content.substring(0, 200).toLowerCase();
@@ -637,14 +640,13 @@ export default async function handler(req, res) {
             keywords: data.keywords || '',
             metaDescription: data.metaDescription || '',
             contentPreview: contentPreview, // For topic detection
-            status: data.status || 'draft' // Track status for logging
           };
         });
 
         logger.log(`[AI Post Generation] Loaded ${existingPosts.length} existing posts (published + drafts) for context`);
-      } catch (firestoreError) {
-        logger.warn('[AI Post Generation] Failed to load existing posts:', firestoreError);
-        // Continue without context if Firestore fails
+      } catch (supabaseError) {
+        logger.warn('[AI Post Generation] Failed to load existing posts:', supabaseError);
+        // Continue without context if Supabase fails
       }
     }
 

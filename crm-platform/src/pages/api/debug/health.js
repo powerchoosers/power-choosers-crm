@@ -2,7 +2,7 @@
 // Path: /api/debug/health
 
 import { cors } from '../_cors.js';
-import { db } from '../_firebase.js';
+import { supabaseAdmin } from '../_supabase.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return; // handle OPTIONS
@@ -16,8 +16,9 @@ export default async function handler(req, res) {
 
     const envFlags = {
       FIREBASE_PROJECT_ID: has('FIREBASE_PROJECT_ID'),
-      FIREBASE_CLIENT_EMAIL: has('FIREBASE_CLIENT_EMAIL'),
-      FIREBASE_PRIVATE_KEY: has('FIREBASE_PRIVATE_KEY'),
+      SUPABASE_URL: has('SUPABASE_URL') || has('NEXT_PUBLIC_SUPABASE_URL'),
+      NEXT_PUBLIC_SUPABASE_URL: has('NEXT_PUBLIC_SUPABASE_URL'),
+      SUPABASE_SERVICE_ROLE_KEY: has('SUPABASE_SERVICE_ROLE_KEY'),
       GEMINI_API_KEY: has('GEMINI_API_KEY'),
       FREE_GEMINI_KEY: has('FREE_GEMINI_KEY'),
       TWILIO_ACCOUNT_SID: has('TWILIO_ACCOUNT_SID'),
@@ -33,41 +34,31 @@ export default async function handler(req, res) {
       SUPABASE_SERVICE_ROLE_KEY: has('SUPABASE_SERVICE_ROLE_KEY')
     };
 
-    let firestore = { enabled: false, lastCalls: [], webhooks: [], error: null };
+    let database = { enabled: false, lastCalls: [], error: null };
     try {
-      if (db) {
-        firestore.enabled = true;
-        const snap = await db
-          .collection('calls')
-          .orderBy('timestamp', 'desc')
-          .limit(5)
-          .get();
-        firestore.lastCalls = [];
-        snap.forEach((doc) => {
-          const d = doc.data() || {};
-          firestore.lastCalls.push({
-            id: d.id || doc.id,
+      if (supabaseAdmin) {
+        database.enabled = true;
+        const { data: snapshot, error: dbError } = await supabaseAdmin
+          .from('calls')
+          .select('*')
+          .order('timestamp', { ascending: false })
+          .limit(5);
+
+        if (dbError) throw dbError;
+
+        database.lastCalls = (snapshot || []).map((d) => {
+          return {
+            id: d.id,
             status: d.status || null,
             duration: d.duration || 0,
             hasRecording: Boolean(d.recordingUrl),
             transcriptLen: (d.transcript || '').length,
             updated: d.timestamp || null
-          });
-        });
-
-        // Recent webhook hits
-        const w = await db
-          .collection('twilio_webhooks')
-          .orderBy('ts', 'desc')
-          .limit(5)
-          .get();
-        w.forEach((doc) => {
-          const d = doc.data() || {};
-          firestore.webhooks.push({ type: d.type, event: d.event || null, callSid: d.body?.CallSid || null, status: d.body?.CallStatus || d.body?.RecordingStatus || null, ts: d.ts });
+          };
         });
       }
     } catch (e) {
-      firestore.error = e?.message || String(e);
+      database.error = e?.message || String(e);
     }
 
     const out = {
@@ -75,11 +66,11 @@ export default async function handler(req, res) {
       serverTime: new Date().toISOString(),
       vercelUrl: env.VERCEL_URL ? `https://${env.VERCEL_URL}` : null,
       envFlags,
-      firestore,
+      database,
       notes: [
         'GET /api/twilio/status will return 405 by design; Twilio POSTs to that endpoint.',
         'Recording webhook: /api/twilio/recording should be invoked by Twilio with RecordingSid/CallSid.',
-        'If lastCalls is empty, either webhooks are not arriving or Firestore is not initialized.'
+        'If lastCalls is empty, either webhooks are not arriving or the database is not initialized.'
       ]
     };
 

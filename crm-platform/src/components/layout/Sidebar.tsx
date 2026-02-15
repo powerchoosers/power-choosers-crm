@@ -7,7 +7,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
-import { auth } from '@/lib/firebase'
+import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import {
   LayoutGrid,
@@ -99,10 +99,10 @@ export function Sidebar() {
 
   const handleLogout = async () => {
     try {
-      await auth.signOut()
+      await supabase.auth.signOut()
       document.cookie = 'np_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;'
       toast.success('Logged out successfully')
-      router.push('/login')
+      router.push('/network') // Will be caught by middleware/listener and redirect to /login
     } catch (error) {
       console.error('Logout error:', error)
       toast.error('Failed to logout')
@@ -354,9 +354,9 @@ export function Sidebar() {
               mass: 0.8
             }}
           >
-            {user?.photoURL ? (
+            {user?.user_metadata?.avatar_url ? (
               <Image
-                src={user.photoURL}
+                src={user.user_metadata.avatar_url}
                 alt="User"
                 width={40}
                 height={40}
@@ -379,7 +379,7 @@ export function Sidebar() {
                 className="flex-1 min-w-0"
               >
                 <div className="text-sm text-white font-semibold truncate">
-                  {mounted ? (user?.displayName || user?.email?.split('@')[0] || 'User') : 'User'}
+                  {mounted ? (user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User') : 'User'}
                 </div>
                 <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono truncate">
                   {mounted ? (role || 'Network_Agent') : 'Network_Agent'}

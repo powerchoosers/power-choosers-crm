@@ -11,11 +11,10 @@ interface HealthResponse {
   serverTime: string
   vercelUrl: string | null
   envFlags: Record<string, boolean>
-  firestore: {
+  database: {
     enabled: boolean
     error?: string
     lastCalls: unknown[]
-    webhooks: unknown[]
   }
   notes: string[]
   error?: string
@@ -35,10 +34,9 @@ export default function ConnectivityPage() {
   useEffect(() => {
     // Check client-side environment variables
     setClientEnv({
-      NEXT_PUBLIC_FIREBASE_PROJECT_ID: !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
       NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
       NEXT_PUBLIC_SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      'window.GOOGLE_MAPS_API': typeof window !== 'undefined' && 'GOOGLE_MAPS_API' in window
+      'window.MAPBOX_TOKEN': typeof window !== 'undefined' && 'MAPBOX_TOKEN' in window
     })
 
     checkProxy()
@@ -142,18 +140,18 @@ export default function ConnectivityPage() {
                     <h3 className="text-xs uppercase tracking-widest text-zinc-500 mb-3">Backend State</h3>
                     <div className="space-y-2 text-xs">
                       <div className="flex justify-between">
-                        <span className="text-zinc-400">Firestore</span>
-                        <span className={proxyData.firestore.enabled ? "text-emerald-400" : "text-red-500"}>
-                          {proxyData.firestore.enabled ? 'CONNECTED' : 'DISCONNECTED'}
+                        <span className="text-zinc-400">Database</span>
+                        <span className={proxyData.database.enabled ? "text-emerald-400" : "text-red-500"}>
+                          {proxyData.database.enabled ? 'CONNECTED' : 'DISCONNECTED'}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-zinc-400">Server Time</span>
                         <span className="text-zinc-200">{new Date(proxyData.serverTime).toLocaleTimeString()}</span>
                       </div>
-                      {proxyData.firestore.error && (
+                      {proxyData.database.error && (
                         <div className="mt-2 p-2 bg-red-900/20 rounded text-red-300">
-                          FS Error: {proxyData.firestore.error}
+                          DB Error: {proxyData.database.error}
                         </div>
                       )}
                     </div>

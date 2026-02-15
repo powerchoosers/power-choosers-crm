@@ -5,7 +5,7 @@
  */
 
 import { cors } from '../_cors.js';
-import { admin, db } from '../_firebase.js';
+import { supabaseAdmin } from '../_supabase.js';
 import logger from '../_logger.js';
 
 export const config = {
@@ -16,59 +16,14 @@ export const config = {
   },
 };
 
-// Get Firebase Storage bucket
-function getStorageBucket() {
-  if (!admin.apps || admin.apps.length === 0) {
-    throw new Error('Firebase Admin not initialized');
-  }
+// Supabase Storage Bucket Name
+const STORAGE_BUCKET = 'posts';
 
-  const projectId = process.env.FIREBASE_PROJECT_ID || 'power-choosers-crm';
-
-  // Check for _NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET first (Cloud Run env var)
-  // Then FIREBASE_STORAGE_BUCKET, then default
-  let storageBucket = process.env._NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
-    process.env.FIREBASE_STORAGE_BUCKET;
-
-  // Remove gs:// prefix if present (Admin SDK doesn't need it)
-  if (storageBucket && storageBucket.startsWith('gs://')) {
-    storageBucket = storageBucket.replace('gs://', '');
-  }
-
-  // If no bucket specified, use the project's default bucket name
-  // Try .firebasestorage.app first (newer format), then .appspot.com (legacy)
-  if (!storageBucket || (!storageBucket.includes('.') && !storageBucket.includes('gs://'))) {
-    // Try newer format first
-    storageBucket = `${projectId}.firebasestorage.app`;
-  }
-
-  logger.log('[GenerateStatic] Attempting to use storage bucket:', storageBucket);
-  logger.log('[GenerateStatic] Project ID:', projectId);
-  logger.log('[GenerateStatic] Env vars - _NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET:', process.env._NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
-  logger.log('[GenerateStatic] Env vars - FIREBASE_STORAGE_BUCKET:', process.env.FIREBASE_STORAGE_BUCKET);
-
-  // Firebase Admin SDK: Use default bucket (no name) - this automatically uses the project's default bucket
-  // The default bucket is created automatically when Firebase Storage is enabled
-  // This avoids bucket name format issues between Firebase Storage URLs and GCS bucket names
-  logger.log('[GenerateStatic] Using default bucket (no name specified - uses project default)');
-  try {
-    const bucket = admin.storage().bucket(); // No name = uses default bucket
-    logger.log('[GenerateStatic] Default bucket retrieved successfully');
-    return bucket;
-  } catch (error) {
-    logger.error('[GenerateStatic] Failed to get default bucket:', error);
-
-    // Fallback: Try with explicit bucket name if env var is set
-    if (storageBucket) {
-      logger.log('[GenerateStatic] Trying explicit bucket name as fallback:', storageBucket);
-      try {
-        return admin.storage().bucket(storageBucket);
-      } catch (fallbackError) {
-        logger.error('[GenerateStatic] Fallback bucket also failed:', fallbackError);
-      }
-    }
-
-    throw new Error(`Failed to access storage bucket. Error: ${error.message}`);
-  }
+// Get public URL for a file in Supabase Storage
+function getPublicUrl(filename) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  if (!supabaseUrl) return '';
+  return `${supabaseUrl}/storage/v1/object/public/${STORAGE_BUCKET}/posts/${filename}`;
 }
 
 // Generate HTML for a single post
@@ -79,27 +34,10 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
   const content = post.content || '';
   const tags = (keywords || '').split(',').map(tag => tag.trim()).filter(Boolean);
   const featuredImage = post.featuredImage || '';
-  const publishDate = post.publishDate ?
-    (post.publishDate.toDate ? post.publishDate.toDate() : new Date(post.publishDate)) :
-    new Date();
+  const publishDate = post.publish_at || post.publishDate || new Date();
+  const dateObj = new Date(publishDate);
 
-  // Get storage bucket for public URLs (use .firebasestorage.app format for public URLs)
-  // This is different from Admin SDK bucket name which uses .appspot.com
-  let publicStorageBucket = process.env._NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
-    process.env.FIREBASE_STORAGE_BUCKET ||
-    `${process.env.FIREBASE_PROJECT_ID || 'power-choosers-crm'}.firebasestorage.app`;
-
-  // Convert .appspot.com to .firebasestorage.app for public URLs
-  if (publicStorageBucket.includes('.appspot.com')) {
-    publicStorageBucket = publicStorageBucket.replace('.appspot.com', '.firebasestorage.app');
-  }
-
-  // Ensure we use .firebasestorage.app format for public URLs
-  if (!publicStorageBucket.includes('.firebasestorage.app') && !publicStorageBucket.includes('.appspot.com')) {
-    publicStorageBucket = `${process.env.FIREBASE_PROJECT_ID || 'power-choosers-crm'}.firebasestorage.app`;
-  }
-
-  const formattedDate = publishDate.toLocaleDateString('en-US', {
+  const formattedDate = dateObj.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric'
@@ -260,7 +198,7 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
                   ${post.category ? `<span class="article-category">${escapeHtml(post.category)}</span>` : ''}
                   <h1 class="article-title">${escapeHtml(title)}</h1>
                   <div class="article-meta">
-                      <time datetime="${publishDate.toISOString()}">${formattedDate}</time>
+                      <time datetime="${dateObj.toISOString()}">${formattedDate}</time>
                   </div>
               </header>
               
@@ -322,18 +260,18 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
             <h3>Recent Posts</h3>
             ${recentPosts && recentPosts.length > 0 ? `
               <ul class="sidebar-list">
-                ${recentPosts.slice(0,4).map(rp => {
-                  const slug = rp.slug || rp.id;
-                  const url = `https://powerchoosers.com/posts/${slug}`;
-                  const titleText = rp.title || 'Untitled';
-                  const cat = rp.category || '';
-                  return `
+                ${recentPosts.slice(0, 4).map(rp => {
+    const slug = rp.slug || rp.id;
+    const url = `https://powerchoosers.com/posts/${slug}`;
+    const titleText = rp.title || 'Untitled';
+    const cat = rp.category || '';
+    return `
                     <li>
                       <a href="${escapeHtml(url)}">${escapeHtml(titleText)}</a>
                       ${cat ? `<div style="font-size:12px;color:var(--muted);margin-top:2px;">${escapeHtml(cat)}</div>` : ''}
                     </li>
                   `;
-                }).join('')}
+  }).join('')}
               </ul>
             ` : `<p>No recent posts yet.</p>`}
           </div>
@@ -448,46 +386,24 @@ function escapeHtml(text) {
     .replace(/'/g, '&#039;');
 }
 
-// Upload HTML file to Firebase Storage
-async function uploadHTMLToStorage(bucket, filename, htmlContent) {
+// Upload HTML file to Supabase Storage
+async function uploadHTMLToStorage(filename, htmlContent) {
   try {
-    logger.log('[GenerateStatic] Uploading to bucket:', bucket.name);
-    const file = bucket.file(`posts/${filename}`);
-    logger.log('[GenerateStatic] File path: posts/' + filename);
-
-    // With uniform bucket-level access and domain-restricted sharing, we can't use public IAM
-    // Use signed URLs with long expiration instead (10 years = effectively permanent)
-    await file.save(htmlContent, {
-      metadata: {
+    logger.log('[GenerateStatic] Uploading to Supabase bucket:', STORAGE_BUCKET);
+    const { error } = await supabaseAdmin.storage
+      .from(STORAGE_BUCKET)
+      .upload(`posts/${filename}`, htmlContent, {
         contentType: 'text/html',
-        cacheControl: 'public, max-age=3600',
-      },
-    });
+        cacheControl: '3600',
+        upsert: true
+      });
 
+    if (error) throw error;
     logger.log('[GenerateStatic] File saved successfully');
 
-    // Generate signed URL with 10-year expiration (effectively permanent for blog posts)
-    // This works even with domain-restricted sharing policies
-    const expiresIn = 10 * 365 * 24 * 60 * 60 * 1000; // 10 years in milliseconds
-    const [signedUrl] = await file.getSignedUrl({
-      action: 'read',
-      expires: Date.now() + expiresIn,
-    });
-
-    logger.log('[GenerateStatic] Signed URL generated (expires in 10 years)');
-
-    return signedUrl;
+    return getPublicUrl(filename);
   } catch (error) {
     logger.error('[GenerateStatic] Error uploading HTML file:', error);
-    logger.error('[GenerateStatic] Bucket name:', bucket.name);
-    logger.error('[GenerateStatic] Error code:', error.code);
-    logger.error('[GenerateStatic] Error message:', error.message);
-
-    // If bucket doesn't exist, provide helpful error
-    if (error.code === 404 || error.message.includes('does not exist')) {
-      throw new Error(`Storage bucket "${bucket.name}" does not exist. Please check your Firebase Storage bucket name in the Firebase Console.`);
-    }
-
     throw error;
   }
 }
@@ -506,13 +422,9 @@ async function updatePostsList(bucket, posts) {
       slug: post.slug,
       category: post.category || '',
       metaDescription: post.metaDescription || '',
-      featuredImage: post.featuredImage || '',
-      publishDate: post.publishDate ?
-        (post.publishDate.toDate ? post.publishDate.toDate().toISOString() : new Date(post.publishDate).toISOString()) :
-        null,
-      createdAt: post.createdAt ?
-        (post.createdAt.toDate ? post.createdAt.toDate().toISOString() : new Date(post.createdAt).toISOString()) :
-        null,
+      featuredImage: post.featuredImage || post.featured_image || '',
+      publishDate: post.publish_at || post.publishDate || null,
+      createdAt: post.created_at || post.createdAt || null,
       url: cleanUrl // Use clean URL instead of signed URL
     };
   });
@@ -523,43 +435,23 @@ async function updatePostsList(bucket, posts) {
   };
 
   try {
-    logger.log('[GenerateStatic] Updating posts-list.json in bucket:', bucket.name);
-    const file = bucket.file('posts-list.json');
-
-    // With uniform bucket-level access and domain-restricted sharing, we can't use public IAM
-    // Use signed URLs with long expiration instead (10 years = effectively permanent)
-    await file.save(JSON.stringify(listData, null, 2), {
-      metadata: {
+    logger.log('[GenerateStatic] Updating posts-list.json in Supabase bucket:', STORAGE_BUCKET);
+    const { error } = await supabaseAdmin.storage
+      .from(STORAGE_BUCKET)
+      .upload('posts-list.json', JSON.stringify(listData, null, 2), {
         contentType: 'application/json',
-        cacheControl: 'public, max-age=300',
-      },
-    });
+        cacheControl: '300',
+        upsert: true
+      });
 
+    if (error) throw error;
     logger.log('[GenerateStatic] posts-list.json saved successfully');
 
-    // Generate signed URL with 10-year expiration (effectively permanent)
-    // This works even with domain-restricted sharing policies
-    const expiresIn = 10 * 365 * 24 * 60 * 60 * 1000; // 10 years in milliseconds
-    const [signedUrl] = await file.getSignedUrl({
-      action: 'read',
-      expires: Date.now() + expiresIn,
-    });
-
-    logger.log('[GenerateStatic] posts-list.json created/updated with', posts.length, 'posts');
-    logger.log('[GenerateStatic] posts-list.json signed URL generated (expires in 10 years)');
-
-    return signedUrl;
+    // Return the public URL for posts-list.json
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+    return `${supabaseUrl}/storage/v1/object/public/${STORAGE_BUCKET}/posts-list.json`;
   } catch (error) {
     logger.error('[GenerateStatic] Error updating posts-list.json:', error);
-    logger.error('[GenerateStatic] Bucket name:', bucket.name);
-    logger.error('[GenerateStatic] Error code:', error.code);
-    logger.error('[GenerateStatic] Error message:', error.message);
-
-    // If bucket doesn't exist, provide helpful error
-    if (error.code === 404 || error.message.includes('does not exist')) {
-      throw new Error(`Storage bucket "${bucket.name}" does not exist. Please verify the bucket exists in Firebase Console → Storage.`);
-    }
-
     throw error;
   }
 }
@@ -584,56 +476,22 @@ export default async function handler(req, res) {
 
     // If regenerateList is true, just update posts-list.json without generating HTML
     if (regenerateList) {
-      let bucket;
-      try {
-        bucket = getStorageBucket();
-        logger.log('[GenerateStatic] Bucket retrieved successfully for list regeneration');
-      } catch (bucketError) {
-        logger.error('[GenerateStatic] Failed to get storage bucket:', bucketError);
+      // Get all published posts from Supabase
+      const { data: publishedPosts, error: fetchError } = await supabaseAdmin
+        .from('posts')
+        .select('*')
+        .eq('status', 'published')
+        .order('publishDate', { ascending: false });
+
+      if (fetchError) {
+        logger.error('[GenerateStatic] Error fetching published posts:', fetchError);
         res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          error: 'Failed to access Firebase Storage',
-          details: bucketError.message
-        }));
+        res.end(JSON.stringify({ error: 'Failed to fetch posts from database' }));
         return;
       }
 
-      // Get all published posts
-      let publishedPosts = [];
-      try {
-        const publishedPostsSnapshot = await db.collection('posts')
-          .where('status', '==', 'published')
-          .orderBy('publishDate', 'desc')
-          .get();
-
-        publishedPostsSnapshot.forEach(doc => {
-          publishedPosts.push({ id: doc.id, ...doc.data() });
-        });
-      } catch (indexError) {
-        logger.warn('[GenerateStatic] Composite index not found, using fallback query:', indexError.message);
-        try {
-          const publishedPostsSnapshot = await db.collection('posts')
-            .where('status', '==', 'published')
-            .get();
-
-          publishedPostsSnapshot.forEach(doc => {
-            publishedPosts.push({ id: doc.id, ...doc.data() });
-          });
-
-          // Sort in memory by publishDate
-          publishedPosts.sort((a, b) => {
-            const dateA = a.publishDate ? (a.publishDate.toDate ? a.publishDate.toDate() : new Date(a.publishDate)) : new Date(0);
-            const dateB = b.publishDate ? (b.publishDate.toDate ? b.publishDate.toDate() : new Date(b.publishDate)) : new Date(0);
-            return dateB - dateA;
-          });
-        } catch (fallbackError) {
-          logger.error('[GenerateStatic] Error fetching published posts:', fallbackError);
-          publishedPosts = [];
-        }
-      }
-
       // Update posts-list.json
-      const listUrl = await updatePostsList(bucket, publishedPosts);
+      const listUrl = await updatePostsList(publishedPosts);
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
@@ -651,24 +509,28 @@ export default async function handler(req, res) {
       return;
     }
 
-    if (!db) {
-      logger.error('[GenerateStatic] Firestore not initialized');
+    if (!supabaseAdmin) {
+      logger.error('[GenerateStatic] Supabase not initialized');
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Database not available' }));
       return;
     }
 
-    // Get post from Firestore
-    const postDoc = await db.collection('posts').doc(postId).get();
+    // Get post from Supabase
+    const { data: post, error: postError } = await supabaseAdmin
+      .from('posts')
+      .select('*')
+      .eq('id', postId)
+      .maybeSingle();
 
-    if (!postDoc.exists) {
+    if (postError) throw postError;
+
+    if (!post) {
       logger.log('[GenerateStatic] Post not found:', postId);
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Post not found' }));
       return;
     }
-
-    const post = { id: postDoc.id, ...postDoc.data() };
 
     // Only generate static HTML for published posts
     if (post.status !== 'published') {
@@ -682,72 +544,49 @@ export default async function handler(req, res) {
       return;
     }
 
-    // Get storage bucket
-    let bucket;
-    try {
-      bucket = getStorageBucket();
-      logger.log('[GenerateStatic] Bucket retrieved successfully');
-    } catch (bucketError) {
-      logger.error('[GenerateStatic] Failed to get storage bucket:', bucketError);
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        error: 'Failed to access Firebase Storage',
-        details: bucketError.message
-      }));
-      return;
-    }
+    // No explicit bucket retrieval needed for Supabase Storage
+    logger.log('[GenerateStatic] Ready to upload to Supabase bucket:', STORAGE_BUCKET);
 
-    // Get recent posts (excluding current post, limit to 3 most recent)
+    // Get recent posts (excluding current post, limit to 3 most recent) from Supabase
     let recentPosts = [];
     try {
-      const recentPostsSnapshot = await db.collection('posts')
-        .where('status', '==', 'published')
-        .get();
+      const { data: recentPostsData, error: recentError } = await supabaseAdmin
+        .from('posts')
+        .select('*')
+        .eq('status', 'published')
+        .neq('id', postId)
+        .order('publishDate', { ascending: false })
+        .limit(3);
 
-      const allPublished = [];
-      recentPostsSnapshot.forEach(doc => {
-        if (doc.id !== postId) { // Exclude current post
-          allPublished.push({ id: doc.id, ...doc.data() });
-        }
-      });
-
-      // Sort by publishDate descending
-      allPublished.sort((a, b) => {
-        const dateA = a.publishDate ? (a.publishDate.toDate ? a.publishDate.toDate() : new Date(a.publishDate)) : new Date(0);
-        const dateB = b.publishDate ? (b.publishDate.toDate ? b.publishDate.toDate() : new Date(b.publishDate)) : new Date(0);
-        return dateB - dateA;
-      });
-
-      // Get top 3 most recent
-      const recentPostsData = allPublished.slice(0, 3);
+      if (recentError) throw recentError;
 
       // Use clean URLs for recent posts (powerchoosers.com/posts/slug)
-      recentPosts = recentPostsData.map((rp) => {
+      recentPosts = (recentPostsData || []).map((rp) => {
         const slug = rp.slug || rp.id;
         const cleanUrl = `https://powerchoosers.com/posts/${slug}`;
         return {
           ...rp,
-          signedUrl: cleanUrl // Use clean URL instead of signed URL
+          signedUrl: cleanUrl
         };
       });
     } catch (error) {
       logger.warn('[GenerateStatic] Error fetching recent posts:', error);
-      // Continue without recent posts if there's an error
       recentPosts = [];
     }
 
-    // Fetch author info from settings
+    // Fetch author info from settings in Supabase
     let authorInfo = null;
     try {
-      // Try to get settings - admin uses 'user-settings', employees use 'user-settings-{email}'
-      // For blog posts, we'll use admin settings (user-settings) as default
-      const settingsDoc = await db.collection('settings').doc('user-settings').get();
+      // For blog posts, we'll try to find a global blog-author setting
+      const { data: settings, error: settingsError } = await supabaseAdmin
+        .from('settings')
+        .select('*')
+        .eq('id', 'user-settings')
+        .maybeSingle();
 
-      if (settingsDoc.exists) {
-        const settings = settingsDoc.data();
-        const general = settings.general || {};
+      if (settings && !settingsError) {
+        const general = settings.metadata?.general || {};
 
-        // Only include author info if we have at least a first or last name
         if (general.firstName || general.lastName) {
           authorInfo = {
             firstName: general.firstName || '',
@@ -762,7 +601,6 @@ export default async function handler(req, res) {
       }
     } catch (settingsError) {
       logger.warn('[GenerateStatic] Could not fetch author info from settings:', settingsError.message);
-      // Continue without author info if settings fetch fails
     }
 
     // Generate HTML
@@ -771,50 +609,25 @@ export default async function handler(req, res) {
 
     // Upload HTML file
     logger.log('[GenerateStatic] Uploading HTML file:', filename);
-    const htmlUrl = await uploadHTMLToStorage(bucket, filename, htmlContent);
+    const htmlUrl = await uploadHTMLToStorage(filename, htmlContent);
     logger.log('[GenerateStatic] HTML uploaded:', htmlUrl);
 
-    // Get all published posts for index
-    // Note: This query requires a Firestore composite index on (status, publishDate)
-    // If index doesn't exist, it will fail - we'll catch and use a simpler query
-    let publishedPosts = [];
-    try {
-      const publishedPostsSnapshot = await db.collection('posts')
-        .where('status', '==', 'published')
-        .orderBy('publishDate', 'desc')
-        .get();
+    // Get all published posts for index from Supabase
+    const { data: publishedPosts, error: listFetchError } = await supabaseAdmin
+      .from('posts')
+      .select('*')
+      .eq('status', 'published')
+      .order('publishDate', { ascending: false });
 
-      publishedPostsSnapshot.forEach(doc => {
-        publishedPosts.push({ id: doc.id, ...doc.data() });
-      });
-    } catch (indexError) {
-      // If composite index doesn't exist, fallback to simpler query
-      logger.warn('[GenerateStatic] Composite index not found, using fallback query:', indexError.message);
-      try {
-        const publishedPostsSnapshot = await db.collection('posts')
-          .where('status', '==', 'published')
-          .get();
-
-        publishedPostsSnapshot.forEach(doc => {
-          publishedPosts.push({ id: doc.id, ...doc.data() });
-        });
-
-        // Sort in memory by publishDate
-        publishedPosts.sort((a, b) => {
-          const dateA = a.publishDate ? (a.publishDate.toDate ? a.publishDate.toDate() : new Date(a.publishDate)) : new Date(0);
-          const dateB = b.publishDate ? (b.publishDate.toDate ? b.publishDate.toDate() : new Date(b.publishDate)) : new Date(0);
-          return dateB - dateA; // Descending order
-        });
-      } catch (fallbackError) {
-        logger.error('[GenerateStatic] Error fetching published posts:', fallbackError);
-        // Continue with empty array - at least the current post will be in the list
-        publishedPosts = [{ id: post.id, ...post }];
-      }
+    if (listFetchError) {
+      logger.error('[GenerateStatic] Error fetching published posts for list:', listFetchError);
+      // Fallback with just current post
+      publishedPosts = [post];
     }
 
     // Update posts-list.json
     logger.log('[GenerateStatic] Updating posts-list.json with', publishedPosts.length, 'posts');
-    const listUrl = await updatePostsList(bucket, publishedPosts);
+    const listUrl = await updatePostsList(publishedPosts);
     logger.log('[GenerateStatic] posts-list.json updated:', listUrl);
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
