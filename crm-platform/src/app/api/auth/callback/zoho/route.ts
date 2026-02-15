@@ -260,16 +260,20 @@ export async function GET(request: Request) {
                         <div class="loader" style="margin: 0 auto 20px;"></div>
                         <p style="font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;">Identity_Verified // Secure Link Ready</p>
                         
-                        <!-- Manual Button for when auto-redirect is blocked by browser policies -->
+                        <!-- Manual Button -->
                         <a href="${actionLink}" style="display: inline-block; margin-top: 20px; padding: 12px 24px; background: #002FA7; color: white; text-decoration: none; font-family: monospace; font-size: 12px; letter-spacing: 0.1em; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1);">
                             ENTER FORENSIC DECK
                         </a>
 
+                        <!-- Diagnostic Raw Link -->
+                        <div style="margin-top: 30px; padding: 20px; border-top: 1px solid #333;">
+                            <p style="font-size: 10px; color: #666; margin-bottom: 10px;">MANUAL_OVERRIDE_LINK:</p>
+                            <input type="text" value="${actionLink}" readonly style="width: 100%; max-width: 400px; background: #111; border: 1px solid #333; color: #888; padding: 10px; font-family: monospace; font-size: 11px;" onclick="this.select()">
+                        </div>
+
                         <script>
-                            // Attempt auto-navigation, but the button ensures success if this is blocked
-                            setTimeout(() => {
-                                window.location.replace("${actionLink}");
-                            }, 500); 
+                            // Attempt auto-navigation is DISABLED to allow manual debugging
+                            // setTimeout(() => { window.location.replace("${actionLink}"); }, 500); 
                         </script>
                     </div>
                 </body>
