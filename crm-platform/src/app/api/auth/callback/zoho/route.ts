@@ -32,6 +32,7 @@ export async function GET(request: Request) {
         const protocol = host.includes('localhost') ? 'http' : 'https';
         const redirectUri = `${protocol}://${host}/api/auth/callback/zoho`;
 
+        console.log(`Zoho OAuth Callback: Host header: ${host}`);
         console.log(`Zoho OAuth Callback: Using dynamic redirect URI: ${redirectUri}`);
 
         if (!clientId || !clientSecret) {
