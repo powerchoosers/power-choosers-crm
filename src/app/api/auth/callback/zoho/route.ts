@@ -38,8 +38,7 @@ export async function GET(request: Request) {
             throw new Error('Configuration error: Missing Zoho credentials');
         }
 
-        console.log('Zoho OAuth: Attempting token exchange...');
-        // 1. Exchange code for tokens (with 10s timeout)
+        // 1. Exchange code for tokens
         const tokenResponse = await fetch('https://accounts.zoho.com/oauth/v2/token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -49,8 +48,7 @@ export async function GET(request: Request) {
                 client_secret: clientSecret,
                 redirect_uri: redirectUri,
                 code: code,
-            }),
-            signal: AbortSignal.timeout(10000)
+            })
         });
 
         if (!tokenResponse.ok) {
@@ -92,8 +90,7 @@ export async function GET(request: Request) {
         // If no email from id_token, try user info endpoint
         if (!email) {
             const userResponse = await fetch('https://accounts.zoho.com/oauth/user/info', {
-                headers: { Authorization: `Bearer ${accessToken}` },
-                signal: AbortSignal.timeout(5000)
+                headers: { Authorization: `Bearer ${accessToken}` }
             });
 
             if (!userResponse.ok) {
@@ -122,8 +119,7 @@ export async function GET(request: Request) {
         try {
             console.log('Zoho OAuth: Fetching Zoho Mail Account ID...');
             const accountsRes = await fetch('https://mail.zoho.com/api/v1/accounts', {
-                headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
-                signal: AbortSignal.timeout(5000)
+                headers: { Authorization: `Zoho-oauthtoken ${accessToken}` }
             });
             if (accountsRes.ok) {
                 const accountsData = await accountsRes.json();
@@ -227,24 +223,39 @@ export async function GET(request: Request) {
             throw new Error('Failed to generate secure session link');
         }
 
-        console.log('Zoho OAuth: Success. Redirecting to secure session link...');
-
         const actionLink = linkData.properties.action_link;
-        const response = NextResponse.redirect(actionLink);
+        console.log(`Zoho OAuth: Final Redirecting to: ${actionLink.split('?')[0]}...`);
 
-        // Ensure middleware cookie is set
-        response.cookies.set('np_session', '1', {
-            path: '/',
-            httpOnly: false,
-            sameSite: 'lax',
-            maxAge: 60 * 60 * 24 * 7, // 7 days
+        // Create a manual 303 Redirect for better browser behavior
+        const responseHeaders = new Headers();
+        responseHeaders.set('Location', actionLink);
+
+        // Manual cookie setting to ensure compatibility
+        const isProd = !useOrigin.includes('localhost');
+        const cookieOptions = [
+            'np_session=1',
+            'Path=/',
+            'Max-Age=604800', // 7 days
+            'SameSite=Lax',
+            isProd ? 'Secure' : ''
+        ].filter(Boolean).join('; ');
+
+        responseHeaders.append('Set-Cookie', cookieOptions);
+        responseHeaders.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+
+        return new Response(null, {
+            status: 303, // See Other (recommended for POST/GET redirect chains)
+            headers: responseHeaders
         });
-
-        return response;
 
     } catch (err: any) {
         console.error('Zoho Auth Bridge Error:', err);
         const errorMessage = err.message || 'Authentication failed';
-        return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(errorMessage)}`, request.url));
+        const loginUrl = new URL('/login', request.url);
+        loginUrl.searchParams.set('error', errorMessage);
+        return new Response(null, {
+            status: 303,
+            headers: { 'Location': loginUrl.toString() }
+        });
     }
 }
