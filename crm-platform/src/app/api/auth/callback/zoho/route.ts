@@ -236,9 +236,26 @@ export async function GET(request: Request) {
 
         const actionLink = linkData.properties.action_link;
 
+        // FINAL HAND-OFF: Zero-Click Redirect
+        console.log(`Zoho OAuth: Seamless hand-off to: ${actionLink.split('?')[0]}...`);
+
         // Wildcard domain cookie for maximal persistence
         const isProd = !redirectUri.includes('localhost');
         const domainSuffix = isProd ? '; Domain=.nodalpoint.io' : '';
         const cookieOptions = `np_session=1; Path=/; Max-Age=604800; SameSite=Lax${domainSuffix}${isProd ? '; Secure' : ''}`;
+
+        return NextResponse.redirect(actionLink, {
+            status: 303,
+            headers: {
+                'Cache-Control': 'no-store, no-cache, must-revalidate',
+                'Set-Cookie': cookieOptions
+            }
+        });
+
+    } catch (error: any) {
+        console.error('Zoho Auth Bridge Error:', error);
+        const errorMessage = encodeURIComponent(error.message || 'Authentication failed');
+        const originUrl = new URL(request.url);
+        return NextResponse.redirect(new URL(`/login?error=${errorMessage}`, originUrl.origin));
     }
 }
