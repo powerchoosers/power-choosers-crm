@@ -236,20 +236,74 @@ export async function GET(request: Request) {
 
         const actionLink = linkData.properties.action_link;
 
-        // FINAL HAND-OFF: Zero-Click Redirect
-        console.log(`Zoho OAuth: Seamless hand-off to: ${actionLink.split('?')[0]}...`);
+        // FINAL HAND-OFF: Premium Transition
+        console.log(`Zoho OAuth: Themed hand-off to: ${actionLink.split('?')[0]}...`);
 
         // Wildcard domain cookie for maximal persistence
         const isProd = !redirectUri.includes('localhost');
         const domainSuffix = isProd ? '; Domain=.nodalpoint.io' : '';
         const cookieOptions = `np_session=1; Path=/; Max-Age=604800; SameSite=Lax${domainSuffix}${isProd ? '; Secure' : ''}`;
 
-        return NextResponse.redirect(actionLink, {
-            status: 303,
-            headers: {
-                'Cache-Control': 'no-store, no-cache, must-revalidate',
-                'Set-Cookie': cookieOptions
-            }
+        const responseHeaders = new Headers();
+        responseHeaders.set('Content-Type', 'text/html');
+        responseHeaders.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+        responseHeaders.append('Set-Cookie', cookieOptions);
+
+        return new Response(`
+            <!DOCTYPE html>
+            <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Nodal Point Identity</title>
+                    <style>
+                        body { 
+                            background: #0a0a0a; 
+                            color: #71717a; 
+                            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; 
+                            display: flex; 
+                            align-items: center; 
+                            justify-content: center; 
+                            height: 100vh; 
+                            margin: 0; 
+                            overflow: hidden;
+                        }
+                        .container { text-align: center; }
+                        .loader { 
+                            width: 24px; 
+                            height: 24px; 
+                            border: 1px solid rgba(255,255,255,0.05); 
+                            border-top-color: #002FA7; 
+                            border-radius: 50%; 
+                            animation: spin 0.6s cubic-bezier(0.23, 1, 0.32, 1) infinite; 
+                            margin: 0 auto 24px;
+                        }
+                        .status { 
+                            font-size: 10px; 
+                            letter-spacing: 0.3em; 
+                            text-transform: uppercase; 
+                            font-weight: 500;
+                            animation: pulse 2s ease-in-out infinite;
+                        }
+                        @keyframes spin { to { transform: rotate(360deg); } }
+                        @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="loader"></div>
+                        <div class="status">Identity_Verifying // Accessing_Forensic_Deck</div>
+                    </div>
+                    <script>
+                        // Visual delay for premium feel, then auto-navigate
+                        setTimeout(function() {
+                            window.location.replace("${actionLink}");
+                        }, 800);
+                    </script>
+                </body>
+            </html>
+        `, {
+            status: 200,
+            headers: responseHeaders
         });
 
     } catch (error: any) {
