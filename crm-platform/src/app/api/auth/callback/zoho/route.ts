@@ -27,11 +27,11 @@ export async function GET(request: Request) {
         const clientId = process.env.ZOHO_CLIENT_ID;
         const clientSecret = process.env.ZOHO_CLIENT_SECRET;
 
-        // Dynamically determine the redirect URI based on the request origin
+        // Use raw origin to exactly match the request for Zoho's redirect_uri check
         const { origin } = new URL(request.url);
-        // Normalize origin to remove www. if present (matches login logic)
-        const normalizedOrigin = origin.replace('://www.', '://');
-        const redirectUri = `${normalizedOrigin}/api/auth/callback/zoho`;
+        const useOrigin = origin.replace(/\/$/, '');
+        const redirectUriRaw = `${useOrigin}/api/auth/callback/zoho`.replace('http://', 'https://');
+        const redirectUri = origin.includes('localhost') ? `${useOrigin}/api/auth/callback/zoho` : redirectUriRaw;
 
         if (!clientId || !clientSecret) {
             console.error('Zoho OAuth Callback: Missing environment variables');
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
         }
 
         console.log('Zoho OAuth: Attempting token exchange...');
-        // 1. Exchange code for tokens
+        // 1. Exchange code for tokens (with 10s timeout)
         const tokenResponse = await fetch('https://accounts.zoho.com/oauth/v2/token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -50,12 +50,13 @@ export async function GET(request: Request) {
                 redirect_uri: redirectUri,
                 code: code,
             }),
+            signal: AbortSignal.timeout(10000)
         });
 
         if (!tokenResponse.ok) {
             const errorText = await tokenResponse.text();
             console.error('Zoho Token Exchange HTTP Error:', tokenResponse.status, errorText);
-            throw new Error(`Token exchange failed with status ${tokenResponse.status}: ${errorText}`);
+            throw new Error(`Token exchange failed (Status ${tokenResponse.status})`);
         }
 
         const tokenData = await tokenResponse.json();
@@ -90,19 +91,17 @@ export async function GET(request: Request) {
 
         // If no email from id_token, try user info endpoint
         if (!email) {
-            console.log('Zoho OAuth: Fetching user info from endpoint...');
             const userResponse = await fetch('https://accounts.zoho.com/oauth/user/info', {
                 headers: { Authorization: `Bearer ${accessToken}` },
+                signal: AbortSignal.timeout(5000)
             });
 
             if (!userResponse.ok) {
-                const errorText = await userResponse.text();
-                console.error('Zoho UserInfo API Error:', userResponse.status, errorText);
-                throw new Error(`Failed to fetch user info: ${userResponse.status} ${userResponse.statusText}`);
+                console.warn('Zoho UserInfo API Error:', userResponse.status);
+            } else {
+                const userData = await userResponse.json();
+                email = userData.Email || userData.email || userData.email_id || userData.principal_name;
             }
-
-            const userData = await userResponse.json();
-            email = userData.Email || userData.email || userData.email_id || userData.principal_name;
         }
 
         if (!email) {
@@ -123,7 +122,8 @@ export async function GET(request: Request) {
         try {
             console.log('Zoho OAuth: Fetching Zoho Mail Account ID...');
             const accountsRes = await fetch('https://mail.zoho.com/api/v1/accounts', {
-                headers: { Authorization: `Zoho-oauthtoken ${accessToken}` }
+                headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
+                signal: AbortSignal.timeout(5000)
             });
             if (accountsRes.ok) {
                 const accountsData = await accountsRes.json();
@@ -133,30 +133,35 @@ export async function GET(request: Request) {
             console.error('Zoho OAuth: Error fetching accountId:', accountErr);
         }
 
-        // --- RESOLVE SUPABASE AUTH ID ---
-        console.log(`Zoho OAuth: Resolving Supabase Auth identity for ${userEmail}`);
-        const { data: { users: matchingAuths }, error: authLookupError } = await supabaseAdmin.auth.admin.listUsers();
-        const existingAuth = { user: matchingAuths?.find(u => u.email?.toLowerCase() === userEmail.toLowerCase()) };
+        // Optimistically check public users table first (much faster than listUsers)
+        const { data: publicUser } = await supabaseAdmin
+            .from('users')
+            .select('id')
+            .eq('email', userEmail)
+            .maybeSingle();
 
-        let finalUid: string;
+        let finalUid = publicUser?.id;
 
-        if (existingAuth?.user) {
-            finalUid = existingAuth.user.id;
-            console.log(`Zoho OAuth: Existing Supabase user found: ${finalUid}`);
+        if (finalUid) {
+            console.log(`Zoho OAuth: Existing user resolved via DB: ${finalUid}`);
         } else {
-            console.log(`Zoho OAuth: Creating new Supabase user for ${userEmail}`);
-            const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-                email: userEmail,
-                email_confirm: true,
-                user_metadata: {
-                    full_name: userEmail.split('@')[0]
-                }
-            });
-            if (createError) {
-                console.error('Supabase Auth Creation Error:', createError);
-                throw new Error(`Failed to create user account: ${createError.message}`);
+            console.log(`Zoho OAuth: Resolving Supabase Auth identity for ${userEmail}`);
+            // Fallback to auth lookup if not in public table
+            const { data: { users: matchingAuths } } = await supabaseAdmin.auth.admin.listUsers();
+            const existingAuth = matchingAuths?.find(u => u.email?.toLowerCase() === userEmail.toLowerCase());
+
+            if (existingAuth) {
+                finalUid = existingAuth.id;
+            } else {
+                console.log(`Zoho OAuth: Creating new Supabase user for ${userEmail}`);
+                const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+                    email: userEmail,
+                    email_confirm: true,
+                    user_metadata: { full_name: userEmail.split('@')[0] }
+                });
+                if (createError) throw new Error(`Auth creation failed: ${createError.message}`);
+                finalUid = newUser.user.id;
             }
-            finalUid = newUser.user.id;
         }
 
         // --- SYNC PROFILE & SAVE TOKENS ---
@@ -197,8 +202,7 @@ export async function GET(request: Request) {
                 access_token: accessToken,
                 refresh_token: refreshToken || undefined,
                 token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
-                zoho_account_id: zohoAccountId, // Handle potential column name difference if it's account_id
-                account_id: zohoAccountId,      // Support both common variations
+                account_id: zohoAccountId,
                 updated_at: new Date().toISOString()
             }, { onConflict: 'user_id, email' });
 
@@ -214,7 +218,7 @@ export async function GET(request: Request) {
             type: 'magiclink',
             email: userEmail,
             options: {
-                redirectTo: `${normalizedOrigin}/network`
+                redirectTo: `${useOrigin}/network`
             }
         });
 
@@ -228,16 +232,9 @@ export async function GET(request: Request) {
         const actionLink = linkData.properties.action_link;
         const response = NextResponse.redirect(actionLink);
 
-        // Determine cookie domain (share across www and root if in production)
-        const isProduction = !normalizedOrigin.includes('localhost');
-        const cookieDomain = isProduction ? `.${normalizedOrigin.split('://')[1]}` : undefined;
-
-        console.log(`Zoho OAuth: Setting session cookie (domain: ${cookieDomain || 'default'})`);
-
         // Ensure middleware cookie is set
         response.cookies.set('np_session', '1', {
             path: '/',
-            domain: cookieDomain,
             httpOnly: false,
             sameSite: 'lax',
             maxAge: 60 * 60 * 24 * 7, // 7 days
