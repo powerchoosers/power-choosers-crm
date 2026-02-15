@@ -20,14 +20,12 @@ export default async function handler(req, res) {
 
     const clientId = process.env.ZOHO_CLIENT_ID;
 
-    // Determine the base URL dynamically or from env vars
-    let appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
-    if (!appUrl && req.headers.host) {
-        const protocol = req.headers['x-forwarded-proto'] || 'http';
-        appUrl = `${protocol}://${req.headers.host}`;
-    }
-    appUrl = appUrl || 'http://localhost:3000'; // Final fallback
-    const redirectUri = `${appUrl}/api/auth/callback/zoho-secondary`;
+    // CANONICAL REDIRECT URI LOGIC
+    const host = req.headers.host || 'www.nodalpoint.io';
+    const isLocal = host.includes('localhost');
+    const redirectUri = isLocal
+        ? 'http://localhost:3000/api/auth/callback/zoho-secondary'
+        : 'https://www.nodalpoint.io/api/auth/callback/zoho-secondary';
     const scope = 'ZohoMail.messages.ALL,ZohoMail.accounts.READ';
     const accessType = 'offline';
     const prompt = 'consent';
