@@ -4,16 +4,13 @@ import { NextResponse } from 'next/server';
 export async function GET(request: Request) {
     const clientId = process.env.ZOHO_CLIENT_ID;
 
-    // STABILIZED REDIRECT URI LOGIC
-    // Dynamic origin detection is causing mismatches behind Vercel's proxy.
-    // We must use a deterministic URI that matches Zoho Console exactly.
-    const isLocal = request.url.includes('localhost');
-    const redirectUri = isLocal
-        ? 'http://localhost:3000/api/auth/callback/zoho'
-        : 'https://www.nodalpoint.io/api/auth/callback/zoho';
+    // DYNAMIC REDIRECT URI LOGIC
+    // We must match the host that initiated the request (www vs non-www)
+    const host = request.headers.get('host') || 'www.nodalpoint.io';
+    const protocol = host.includes('localhost') ? 'http' : 'https';
+    const redirectUri = `${protocol}://${host}/api/auth/callback/zoho`;
 
-    // NOTE: Ensure 'https://www.nodalpoint.io/api/auth/callback/zoho' is added to Zoho Developer Console
-    console.log(`Zoho Login: Using stabilized redirect URI: ${redirectUri}`);
+    console.log(`Zoho Login: Dynamic redirect URI: ${redirectUri}`);
 
     if (!clientId) {
         return NextResponse.json({ error: 'Missing Zoho Client ID' }, { status: 500 });

@@ -27,13 +27,12 @@ export async function GET(request: Request) {
         const clientId = process.env.ZOHO_CLIENT_ID;
         const clientSecret = process.env.ZOHO_CLIENT_SECRET;
 
-        // STABILIZED REDIRECT URI LOGIC (Must match login/route.ts exactly)
-        const isLocal = request.url.includes('localhost');
-        const redirectUri = isLocal
-            ? 'http://localhost:3000/api/auth/callback/zoho'
-            : 'https://www.nodalpoint.io/api/auth/callback/zoho';
+        // DYNAMIC REDIRECT URI LOGIC (Must match login/route.ts EXACTLY)
+        const host = request.headers.get('host') || 'www.nodalpoint.io';
+        const protocol = host.includes('localhost') ? 'http' : 'https';
+        const redirectUri = `${protocol}://${host}/api/auth/callback/zoho`;
 
-        console.log(`Zoho OAuth Callback: Using stabilized redirect URI: ${redirectUri}`);
+        console.log(`Zoho OAuth Callback: Using dynamic redirect URI: ${redirectUri}`);
 
         if (!clientId || !clientSecret) {
             console.error('Zoho OAuth Callback: Missing environment variables');
