@@ -33,7 +33,8 @@ export default async function handler(req, res) {
         // Exchange Code
         const clientId = process.env.ZOHO_CLIENT_ID;
         const clientSecret = process.env.ZOHO_CLIENT_SECRET;
-        const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback/zoho-secondary`;
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+        const redirectUri = `${appUrl}/api/auth/callback/zoho-secondary`;
         const accountsServer = process.env.ZOHO_ACCOUNTS_SERVER || 'https://accounts.zoho.com';
 
         const tokenResponse = await fetch(`${accountsServer}/oauth/v2/token`, {
