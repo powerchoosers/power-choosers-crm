@@ -28,7 +28,7 @@ export default async function handler(req, res) {
     }
     appUrl = appUrl || 'http://localhost:3000'; // Final fallback
     const redirectUri = `${appUrl}/api/auth/callback/zoho-secondary`;
-    const scope = 'ZohoMail.messages.ALL,ZohoMail.accounts.READ,ZohoMail.folders.READ,ZohoMail.folders.App.READ,ZohoSearch.search.READ';
+    const scope = 'ZohoMail.messages.ALL,ZohoMail.accounts.READ';
     const accessType = 'offline';
     const prompt = 'consent';
 
