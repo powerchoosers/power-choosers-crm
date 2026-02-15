@@ -1,5 +1,4 @@
 import { UserProfile } from "@/context/AuthContext"
-import { User } from "firebase/auth"
 
 function esc(s: string): string {
   return s
@@ -9,15 +8,16 @@ function esc(s: string): string {
     .replace(/"/g, '&quot;')
 }
 
-export function generateNodalSignature(profile: UserProfile, user: User | null, isDarkMode: boolean = false): string {
-  // Name: first + last from profile, else profile.name, else displayName
+export function generateNodalSignature(profile: UserProfile, user: any, isDarkMode: boolean = false): string {
+  // Name: first + last from profile, else profile.name, else user_metadata.full_name
   const nameParts = [profile.firstName, profile.lastName].filter(Boolean).join(' ')
-  const name = nameParts || profile.name || user?.displayName || 'Nodal Point Team'
+  const authName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'
+  const name = nameParts || profile.name || authName || 'Nodal Point Team'
   const jobTitle = profile.jobTitle || 'Market Architect'
   const email = profile.email || user?.email || 'contact@nodalpoint.io'
   const linkedinUrl = profile.linkedinUrl || 'https://linkedin.com/company/nodal-point'
-  // Use hosted avatar (from host-google-avatar) for email reliability, fallback to Firebase photoURL
-  const avatarUrl = profile.hostedPhotoUrl || user?.photoURL || ''
+  // Use hosted avatar (from host-google-avatar) for email reliability, fallback to Supabase user_metadata
+  const avatarUrl = profile.hostedPhotoUrl || user?.user_metadata?.avatar_url || ''
 
   // Theme-aware colors
   const textColor = isDarkMode ? '#e4e4e7' : '#18181b' // zinc-200 vs zinc-900

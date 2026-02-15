@@ -22,14 +22,11 @@ export default async function handler(req, res) {
     return;
   }
 
-  const apiKey =
-    process.env.GOOGLE_MAPS_API_KEY ||
-    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
-    process.env.GOOGLE_MAPS_API;
+  const apiKey = process.env.OPENWEATHERMAP_API_KEY;
 
   if (!apiKey) {
-    console.error('[Weather] Google Maps API key missing');
-    sendJson(res, 500, { error: 'Weather API not configured' });
+    console.error('[Weather] OpenWeatherMap API key missing');
+    sendJson(res, 500, { error: 'Weather API not configured. Please set OPENWEATHERMAP_API_KEY.' });
     return;
   }
 
@@ -41,10 +38,14 @@ export default async function handler(req, res) {
   const state = url.searchParams.get('state');
   const units = (url.searchParams.get('units') || 'IMPERIAL').toUpperCase();
 
+  // Map units for OpenWeatherMap
+  const owmUnits = units === 'IMPERIAL' ? 'imperial' : 'metric';
+
   // Resolve lat/lng: use provided coords or geocode from address or city+state
   if ((lat == null || lng == null || lat === '' || lng === '') && (address || (city && state))) {
     const geocodeQuery = address || [city, state].filter(Boolean).join(', ');
     try {
+      // Note: We are assuming maps/geocode is now using Mapbox or similar, not Google
       const geoRes = await fetch(
         `http://127.0.0.1:${process.env.PORT || 3001}/api/maps/geocode?address=${encodeURIComponent(geocodeQuery)}`,
         { method: 'GET' }
@@ -70,63 +71,34 @@ export default async function handler(req, res) {
   }
 
   try {
-    const params = new URLSearchParams({
-      key: apiKey,
-      'location.latitude': String(numLat),
-      'location.longitude': String(numLng),
-    });
-    if (units === 'IMPERIAL' || units === 'METRIC') {
-      params.set('unitsSystem', units);
-    }
-
-    const weatherUrl = `https://weather.googleapis.com/v1/currentConditions:lookup?${params.toString()}`;
+    const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${numLat}&lon=${numLng}&units=${owmUnits}&appid=${apiKey}`;
     const response = await fetch(weatherUrl);
 
     if (!response.ok) {
       const errBody = await response.text();
-      console.error('[Weather] API error', response.status, errBody);
+      console.error('[Weather] OpenWeatherMap API error', response.status, errBody);
       sendJson(res, response.status, {
         error: 'Weather API error',
-        message: response.status === 403 ? 'Weather API not enabled or key invalid' : errBody.slice(0, 200),
+        message: response.status === 401 ? 'API key invalid' : 'Failed to fetch weather data',
       });
       return;
     }
 
     const data = await response.json();
 
-    const temp = data.temperature;
-    const feelsLike = data.feelsLikeTemperature;
-    // Google returns weatherCondition.description as { text, languageCode }; extract string
-    const rawDesc = data.weatherCondition?.description;
-    const condition =
-      (typeof data.weatherCondition === 'string' && data.weatherCondition) ||
-      (typeof rawDesc === 'object' && rawDesc !== null && typeof rawDesc.text === 'string' ? rawDesc.text : null) ||
-      (typeof rawDesc === 'string' && rawDesc ? rawDesc : null) ||
-      data.weatherCondition?.text ||
-      data.weatherCondition?.code ||
-      '—';
-    const humidity = data.relativeHumidity ?? null;
-    const wind = data.wind;
-    // API uses "degrees" for temperature value
-    const tempVal = temp?.degrees ?? temp?.value ?? temp;
-    const feelsVal = feelsLike?.degrees ?? feelsLike?.value ?? feelsLike;
-
+    // Mapping OWM data to our existing dashboard schema
     sendJson(res, 200, {
-      temp: tempVal != null ? Number(tempVal) : null,
-      unit: temp?.unit ?? (units === 'IMPERIAL' ? 'FAHRENHEIT' : 'CELSIUS'),
-      feelsLike: feelsVal != null ? Number(feelsVal) : null,
-      condition,
-      humidity,
-      windSpeed: wind?.speed?.value ?? wind?.speed ?? null,
-      windSpeedUnit: wind?.speed?.unit ?? null,
-      windDirection:
-        wind?.direction?.degrees != null
-          ? Number(wind.direction.degrees)
-          : wind?.direction?.value != null
-            ? Number(wind.direction.value)
-            : null,
-      isDaytime: data.isDaytime,
-      uvIndex: data.uvIndex ?? null,
+      temp: data.main?.temp != null ? Math.round(data.main.temp) : null,
+      unit: units === 'IMPERIAL' ? 'FAHRENHEIT' : 'CELSIUS',
+      feelsLike: data.main?.feels_like != null ? Math.round(data.main.feels_like) : null,
+      condition: data.weather?.[0]?.description || '—',
+      humidity: data.main?.humidity ?? null,
+      windSpeed: data.wind?.speed ?? null,
+      windSpeedUnit: units === 'IMPERIAL' ? 'mph' : 'm/s',
+      windDirection: data.wind?.deg ?? null,
+      isDaytime: data.dt > (data.sys?.sunrise || 0) && data.dt < (data.sys?.sunset || 0),
+      uvIndex: null, // OWM 2.5 current weather doesn't include UV index; OneCall API does
+      icon: data.weather?.[0]?.icon || null
     });
   } catch (e) {
     console.error('[Weather] Request failed:', e);

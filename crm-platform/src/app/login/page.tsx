@@ -3,20 +3,14 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
-import { signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import { Loader2, Chrome, Mail } from 'lucide-react'
+import { Loader2, Mail } from 'lucide-react'
+
 
 function LoginContent() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const urlError = searchParams ? searchParams.get('error') : null
@@ -30,83 +24,15 @@ function LoginContent() {
     }
   }, [urlError])
 
-  useEffect(() => {
-    const checkRedirect = async () => {
-      try {
-        const result = await getRedirectResult(auth)
-        if (result) {
-          document.cookie = 'np_session=1; Path=/; SameSite=Lax'
-          toast.success('Logged in with Google successfully')
-          router.push('/network')
-        }
-      } catch (error: unknown) {
-        console.error('Redirect login error:', error)
-        const message = error instanceof Error ? error.message : 'Failed to login with Google'
-        toast.error(message)
-      }
-    }
-
-    checkRedirect()
-  }, [router])
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleZohoLogin = () => {
     setIsLoading(true)
-
-    try {
-      await signInWithEmailAndPassword(auth, email, password)
-      document.cookie = 'np_session=1; Path=/; SameSite=Lax'
-      toast.success('Logged in successfully')
-      router.push('/network')
-    } catch (error: unknown) {
-      console.error('Login error:', error)
-      const message = error instanceof Error ? error.message : 'Failed to login'
-      toast.error(message)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleGoogleLogin = async () => {
-    setIsGoogleLoading(true)
-    try {
-      const provider = new GoogleAuthProvider()
-      await signInWithPopup(auth, provider)
-      document.cookie = 'np_session=1; Path=/; SameSite=Lax'
-      toast.success('Logged in with Google successfully')
-      router.push('/network')
-    } catch (error: any) {
-      console.error('Google login error:', error)
-
-      // Fallback to redirect for embedded environments (like Trae IDE) or mobile
-      if (
-        error.code === 'auth/popup-closed-by-user' ||
-        error.code === 'auth/popup-blocked' ||
-        error.code === 'auth/cancelled-popup-request' ||
-        error.message?.includes('Cross-Origin-Opener-Policy') ||
-        error.message?.includes('popup')
-      ) {
-        toast.info('Popup blocked. Switching to redirect login...')
-        try {
-          const provider = new GoogleAuthProvider()
-          await signInWithRedirect(auth, provider)
-          return
-        } catch (redirectError) {
-          console.error('Redirect error:', redirectError)
-          toast.error('Failed to initiate redirect login')
-        }
-      } else {
-        const message = error instanceof Error ? error.message : 'Failed to login with Google'
-        toast.error(message)
-      }
-      setIsGoogleLoading(false)
-    }
+    // Redirect to the Zoho auth initiation route
+    window.location.href = '/api/auth/zoho/login'
   }
 
   const handleDevBypass = () => {
     document.cookie = 'np_session=1; Path=/; SameSite=Lax'
     toast.success('Dev Bypass Active')
-    // Use window.location.href to force a full page load and refresh AuthContext
     window.location.href = '/network'
   }
 
@@ -127,81 +53,35 @@ function LoginContent() {
               </div>
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight text-white">Welcome Back</CardTitle>
+          <CardTitle className="text-2xl font-bold tracking-tight text-white">Nodal Point CRM</CardTitle>
           <CardDescription className="text-zinc-400">
-            Sign in to Nodal Point CRM
+            Securely access your market intelligence
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <Button
-            variant="outline"
-            className="w-full bg-white text-zinc-900 hover:bg-zinc-100 border-zinc-200 font-medium h-11"
-            onClick={handleGoogleLogin}
-            disabled={isGoogleLoading || isLoading}
-          >
-            {isGoogleLoading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Chrome className="mr-2 h-4 w-4 text-[#4285F4]" />
-            )}
-            Sign in with Google
-          </Button>
+        <CardContent className="space-y-6 pt-4">
+          <div className="space-y-4">
+            <Button
+              className="w-full bg-[#002FA7] hover:bg-blue-700 text-white font-semibold h-12 text-lg shadow-lg shadow-blue-900/20 group relative overflow-hidden"
+              onClick={handleZohoLogin}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <Mail className="mr-3 h-5 w-5" />
+              )}
+              {isLoading ? 'Authenticating...' : 'Sign in with Zoho'}
 
-          <Button
-            variant="outline"
-            className="w-full bg-[#FFD700] text-zinc-900 hover:bg-[#FDB900] border-zinc-200 font-medium h-11 mt-2"
-            onClick={() => window.location.href = '/api/auth/zoho/login'}
-            disabled={isLoading || isGoogleLoading}
-          >
-            <Mail className="mr-2 h-4 w-4" />
-            Sign in with Zoho
-          </Button>
+              <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+            </Button>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-zinc-800" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-zinc-900 px-2 text-zinc-500">Or continue with</span>
-            </div>
+            <p className="text-center text-xs text-zinc-500">
+              Only authorized Nodal Point identities can access this network.
+            </p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="name@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="bg-zinc-950/50 border-zinc-800 text-white placeholder:text-zinc-600 focus-visible:ring-blue-500 h-11"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="bg-zinc-950/50 border-zinc-800 text-white placeholder:text-zinc-600 focus-visible:ring-blue-500 h-11"
-              />
-            </div>
-            <Button
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white h-11"
-              disabled={isLoading || isGoogleLoading}
-            >
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Sign In with Email
-            </Button>
-          </form>
-
           {process.env.NODE_ENV === 'development' && (
-            <div className="pt-2">
+            <div className="pt-4 border-t border-zinc-800">
               <Button
                 variant="ghost"
                 className="w-full text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 text-xs"
@@ -212,6 +92,11 @@ function LoginContent() {
             </div>
           )}
         </CardContent>
+        <CardFooter className="flex justify-center pb-8">
+          <span className="text-[10px] text-zinc-600 font-mono tracking-widest uppercase">
+            Authenticated via Supabase • Identity by Zoho
+          </span>
+        </CardFooter>
       </Card>
     </div>
   )

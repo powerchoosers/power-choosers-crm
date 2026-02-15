@@ -1,27 +1,7 @@
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
-import { supabaseAdmin } from '../_supabase.js';
-import { admin } from '../_firebase.js';
-
-async function requireFirebaseUser(req) {
-  const authHeader = req.headers && (req.headers.authorization || req.headers.Authorization);
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.slice('Bearer '.length).trim();
-    if (token) {
-      const decoded = await admin.auth().verifyIdToken(token);
-      const email = decoded?.email ? String(decoded.email).toLowerCase() : null;
-      return { email };
-    }
-  }
-
-  const isDev = process.env.NODE_ENV !== 'production';
-  const cookie = typeof req.headers?.cookie === 'string' ? req.headers.cookie : '';
-  if (isDev && cookie.includes('np_session=1')) {
-    return { email: 'dev@nodalpoint.io' };
-  }
-
-  return { email: null };
-}
+import { supabaseAdmin, requireUser } from '../_supabase.js';
+import formidable from 'formidable';
 
 function isPlainObject(v) {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -43,7 +23,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { email } = await requireFirebaseUser(req);
+    const { email } = await requireUser(req);
     if (!email) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Unauthorized' }));

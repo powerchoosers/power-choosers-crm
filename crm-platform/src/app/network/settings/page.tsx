@@ -11,10 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Bell, Shield, Palette, Database, Trash2, Plus, Phone, User as UserIcon, Lock, Mail, RefreshCw } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
-import { auth } from '@/lib/firebase'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
-import { updatePassword } from 'firebase/auth'
 import { toast } from 'sonner'
 
 export default function SettingsPage() {
@@ -46,7 +44,7 @@ export default function SettingsPage() {
 
   const fetchConnections = async () => {
     if (!user) return
-    const userId = (user as any).uid || (user as any).id
+    const userId = user.id
     const { data } = await supabase.from('zoho_connections').select('*').eq('user_id', userId)
     if (data) setConnections(data)
   }
@@ -152,7 +150,7 @@ export default function SettingsPage() {
   // Sync with profile
   useEffect(() => {
     // 1. Name Resolution
-    const authDisplayName = user?.displayName || ''
+    const authDisplayName = user?.user_metadata?.full_name || ''
     const authNameParts = authDisplayName.split(' ')
     const authFirstName = authNameParts[0] || ''
     const authLastName = authNameParts.slice(1).join(' ') || ''
@@ -170,12 +168,12 @@ export default function SettingsPage() {
     setTwilioNumbers(profile.twilioNumbers || [])
     setSelectedPhoneNumber(profile.selectedPhoneNumber || null)
     setBridgeToMobile(profile.bridgeToMobile || false)
-  }, [profile, user?.displayName])
+  }, [profile, user?.user_metadata?.full_name])
 
   const computedName = useMemo(() => {
     const full = `${firstName} ${lastName}`.trim()
-    return full || profile.name || user?.displayName || ''
-  }, [firstName, lastName, profile.name, user?.displayName])
+    return full || profile.name || user?.user_metadata?.full_name || ''
+  }, [firstName, lastName, profile.name, user?.user_metadata?.full_name])
 
   const handleUpdatePassword = async () => {
     if (!user) return
@@ -190,18 +188,14 @@ export default function SettingsPage() {
 
     setIsUpdatingPassword(true)
     try {
-      await updatePassword(user, newPassword)
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      if (error) throw error
       toast.success('Password updated successfully')
       setNewPassword('')
       setConfirmPassword('')
-    } catch (error: unknown) {
+    } catch (error: any) {
       console.error('Error updating password:', error)
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'
-      if (error && typeof error === 'object' && 'code' in error && error.code === 'auth/requires-recent-login') {
-        toast.error('Please log out and log back in to change your password')
-      } else {
-        toast.error('Failed to update password: ' + errorMessage)
-      }
+      toast.error('Failed to update password: ' + error.message)
     } finally {
       setIsUpdatingPassword(false)
     }
@@ -625,15 +619,15 @@ export default function SettingsPage() {
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between p-4 rounded-lg nodal-glass nodal-glass-hover">
                   <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 rounded-2xl bg-orange-500/20 flex items-center justify-center text-orange-500">
+                    <div className="w-10 h-10 rounded-2xl bg-blue-500/20 flex items-center justify-center text-blue-500">
                       <Database className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-zinc-200">Firebase</p>
-                      <p className="text-xs text-zinc-500">Connected</p>
+                      <p className="text-sm font-medium text-zinc-200">Supabase</p>
+                      <p className="text-xs text-zinc-500">Connected (Active)</p>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm" className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5">Configure</Button>
+                  <Button variant="outline" size="sm" className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5">DB Stats</Button>
                 </div>
 
                 <div className="flex items-center justify-between p-4 rounded-lg nodal-glass nodal-glass-hover">

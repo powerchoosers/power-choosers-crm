@@ -1,6 +1,6 @@
 /**
  * Power Choosers CRM - SendGrid Inbound Parse Webhook Handler
- * FIXED VERSION - Parses multipart data and saves to Firebase
+ * parses multipart data and saves to Supabase
  */
 
 import { supabaseAdmin } from '../_supabase.js';
@@ -208,8 +208,8 @@ export default async function handler(req, res) {
       // If no raw MIME, sanitize any provided HTML and decode text where possible
       if (emailData.html) {
         emailData.html = sanitizeHtml(decodeQuotedPrintable(emailData.html), {
-          allowedSchemes: ['http','https','mailto','data'],
-          allowedAttributes: { '*': ['style','class','id'], 'a': ['href','target','rel'], 'img': ['src','alt','width','height','style'] },
+          allowedSchemes: ['http', 'https', 'mailto', 'data'],
+          allowedAttributes: { '*': ['style', 'class', 'id'], 'a': ['href', 'target', 'rel'], 'img': ['src', 'alt', 'width', 'height', 'style'] },
           transformTags: {
             'a': (tagName, attribs) => {
               if (attribs.href && attribs.href.startsWith('3D')) {
@@ -251,7 +251,7 @@ export default async function handler(req, res) {
         let s = String(subj || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
         s = s.replace(/^\s*(re|fw|fwd)\s*:\s*/i, '');
         return s.toLowerCase();
-      } catch(_) { return ''; }
+      } catch (_) { return ''; }
     }
 
     function extractEmails(addrText = '') {
@@ -302,7 +302,7 @@ export default async function handler(req, res) {
         // Update existing thread
         const currentParticipants = Array.isArray(existingThread.participants) ? existingThread.participants : [];
         const mergedParticipants = Array.from(new Set([...currentParticipants, ...participants]));
-        
+
         await supabaseAdmin
           .from('threads')
           .update({
@@ -351,13 +351,13 @@ export default async function handler(req, res) {
       const match = emailString.match(/<([^>]+)>/) || emailString.match(/([^\s<>]+@[^\s<>]+)/);
       return match ? match[1].toLowerCase().trim() : emailString.toLowerCase().trim();
     }
-    
+
     const recipientEmail = extractEmailAddress(emailData.to || '');
 
     // Validate recipient email (required for Firestore rules compliance)
     // If no valid recipient email found, log warning (do not fallback to admin)
-    const ownerEmail = (recipientEmail && recipientEmail.includes('@')) 
-      ? recipientEmail 
+    const ownerEmail = (recipientEmail && recipientEmail.includes('@'))
+      ? recipientEmail
       : null;
 
     if (!ownerEmail) {
@@ -377,7 +377,7 @@ export default async function handler(req, res) {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
-      
+
       const { data: insertedEmail, error: insertError } = await supabaseAdmin
         .from('emails')
         .insert(emailDoc)
@@ -392,30 +392,30 @@ export default async function handler(req, res) {
       // Log any suspicious URLs for debugging
       const urlPattern = /(href|src)=["']([^"']*?)["']/gi;
       const matches = [...(emailData.html || '').matchAll(urlPattern)];
-      const suspiciousUrls = matches.filter(m => 
+      const suspiciousUrls = matches.filter(m =>
         m[2].includes('3D') || (m[2].includes('=') && !m[2].startsWith('data:'))
       );
       if (suspiciousUrls.length > 0) {
-        logger.warn('[InboundEmail] Detected potentially malformed URLs:', 
+        logger.warn('[InboundEmail] Detected potentially malformed URLs:',
           suspiciousUrls.map(m => m[2]).slice(0, 5)
         );
       }
 
-    // Return success response
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      success: true, 
-      emailId: emailId,
-      message: 'Email processed successfully' 
-    }));
-    return;
+      // Return success response
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        emailId: emailId,
+        message: 'Email processed successfully'
+      }));
+      return;
     } catch (dbError) {
       logger.error('[InboundEmail] Error saving to Supabase:', dbError);
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
-        success: false, 
+      res.end(JSON.stringify({
+        success: false,
         error: 'Failed to save email to database',
-        message: dbError.message 
+        message: dbError.message
       }));
       return;
     }
@@ -423,9 +423,9 @@ export default async function handler(req, res) {
   } catch (error) {
     logger.error('[InboundEmail] Error processing webhook:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
+    res.end(JSON.stringify({
       error: 'Internal server error',
-      message: error.message 
+      message: error.message
     }));
     return;
   }

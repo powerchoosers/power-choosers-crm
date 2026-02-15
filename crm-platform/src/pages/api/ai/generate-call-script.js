@@ -1,7 +1,7 @@
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
 import crypto from 'crypto';
-import { db } from '../_firebase.js';
+import { supabaseAdmin } from '../_supabase.js';
 
 export default async function handler(req, res) {
     if (cors(req, res)) return;
@@ -41,13 +41,17 @@ export default async function handler(req, res) {
             const RESEARCH_CACHE_MS = 7 * 24 * 60 * 60 * 1000;
 
             const readCache = async () => {
-                if (!db) return null;
+                if (!supabaseAdmin) return null;
                 try {
-                    const doc = await db.collection('aiCache').doc(researchCacheKey).get();
-                    if (!doc.exists) return null;
-                    const data = doc.data() || {};
-                    if (!data.cachedAt || (Date.now() - data.cachedAt) > RESEARCH_CACHE_MS) return null;
-                    return data.research || null;
+                    const { data, error } = await supabaseAdmin
+                        .from('ai_cache')
+                        .select('*')
+                        .eq('key', researchCacheKey)
+                        .maybeSingle();
+
+                    if (error || !data) return null;
+                    if (!data.cached_at || (Date.now() - Number(data.cached_at)) > RESEARCH_CACHE_MS) return null;
+                    return data.insights || null;
                 } catch (e) {
                     logger.warn('[AI Script] Research cache read error:', e.message);
                     return null;
@@ -55,12 +59,13 @@ export default async function handler(req, res) {
             };
 
             const writeCache = async (value) => {
-                if (!db) return;
+                if (!supabaseAdmin) return;
                 try {
-                    await db.collection('aiCache').doc(researchCacheKey).set({
-                        cachedAt: Date.now(),
-                        research: value,
-                        context: { company, industry, location }
+                    await supabaseAdmin.from('ai_cache').upsert({
+                        key: researchCacheKey,
+                        cached_at: Date.now(),
+                        insights: value,
+                        source: 'perplexity-research'
                     });
                 } catch (e) {
                     logger.warn('[AI Script] Research cache write error:', e.message);
@@ -138,16 +143,20 @@ Focus on: latest news (past 12 months), leadership (CEO/CFO/Controller), operati
         const cacheKey = `ai-script-${crypto.createHash('sha256').update(contextStr).digest('hex')}`;
         const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-        // Check Firestore cache
-        if (db) {
+        // Check Supabase cache
+        if (supabaseAdmin) {
             try {
-                const cacheDoc = await db.collection('aiCache').doc(cacheKey).get();
-                if (cacheDoc.exists) {
-                    const cacheData = cacheDoc.data();
-                    if (Date.now() - (cacheData.cachedAt || 0) < CACHE_DURATION_MS) {
+                const { data: cacheData, error: cacheError } = await supabaseAdmin
+                    .from('ai_cache')
+                    .select('*')
+                    .eq('key', cacheKey)
+                    .maybeSingle();
+
+                if (!cacheError && cacheData) {
+                    if (Date.now() - Number(cacheData.cached_at || 0) < CACHE_DURATION_MS) {
                         logger.log('[AI Script] Using cached script');
                         res.writeHead(200, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({ success: true, script: cacheData.script, cached: true }));
+                        res.end(JSON.stringify({ success: true, script: cacheData.insights?.script || cacheData.insights, cached: true }));
                         return;
                     }
                 }
@@ -249,13 +258,14 @@ Generate the script now:
 
         if (lastErr) throw lastErr;
 
-        // Cache the result
-        if (db) {
+        // Cache the result in Supabase
+        if (supabaseAdmin) {
             try {
-                await db.collection('aiCache').doc(cacheKey).set({
-                    script,
-                    cachedAt: Date.now(),
-                    context: { name, company, industry, contractEnd, currentSupplier }
+                await supabaseAdmin.from('ai_cache').upsert({
+                    key: cacheKey,
+                    insights: { script },
+                    cached_at: Date.now(),
+                    source: 'gemini-script'
                 });
             } catch (e) {
                 logger.warn('[AI Script] Cache write error:', e.message);

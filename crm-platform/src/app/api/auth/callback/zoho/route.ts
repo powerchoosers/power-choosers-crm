@@ -1,9 +1,8 @@
 
 import { NextResponse } from 'next/server';
-import { firebaseAdmin as admin } from '@/lib/firebase-admin';
 import { createClient } from '@supabase/supabase-js';
 
-// Initialize Supabase Admin for persistent token storage
+// Initialize Supabase Admin for persistent token storage and auth management
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
     process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -103,7 +102,6 @@ export async function GET(request: Request) {
             }
 
             const userData = await userResponse.json();
-            console.log('Zoho User Data received:', JSON.stringify(userData));
             email = userData.Email || userData.email || userData.email_id || userData.principal_name;
         }
 
@@ -111,8 +109,16 @@ export async function GET(request: Request) {
             throw new Error('Could not retrieve email identity from Zoho');
         }
 
+        const userEmail = email.toLowerCase().trim();
+
+        // --- AUTHORIZATION CHECK ---
+        // Allow nodalpoint.io domain or explicitly listed emails
+        if (!userEmail.endsWith('@nodalpoint.io') && userEmail !== 'l.patterson@nodalpoint.io') {
+            console.warn(`Zoho OAuth: Unauthorized domain attempt: ${userEmail}`);
+            return NextResponse.redirect(new URL('/login?error=Only+Nodal+Point+emails+are+authorized', request.url));
+        }
+
         // --- FETCH ZOHO ACCOUNT ID ---
-        // This is required for Mail API calls
         let zohoAccountId = null;
         try {
             console.log('Zoho OAuth: Fetching Zoho Mail Account ID...');
@@ -121,118 +127,98 @@ export async function GET(request: Request) {
             });
             if (accountsRes.ok) {
                 const accountsData = await accountsRes.json();
-                // Pick the primary account ID (usually the first one)
                 zohoAccountId = accountsData.data?.[0]?.accountId || null;
-                console.log('Zoho OAuth: Found Account ID:', zohoAccountId);
-            } else {
-                console.warn('Zoho OAuth: Failed to fetch accountId from Mail API', accountsRes.status);
             }
         } catch (accountErr) {
             console.error('Zoho OAuth: Error fetching accountId:', accountErr);
         }
 
-        console.log(`Zoho OAuth: Authenticating user: ${email}`);
+        // --- RESOLVE SUPABASE AUTH ID ---
+        console.log(`Zoho OAuth: Resolving Supabase Auth identity for ${userEmail}`);
+        const { data: existingAuth, error: authLookupError } = await supabaseAdmin.auth.admin.getUserByEmail(userEmail);
 
-        // 3. Verify Identity & Determine UID
-        const TARGET_EMAIL = 'l.patterson@nodalpoint.io';
-        const TARGET_UID = '4mKkyoZBIKhYGdPBNSHlNaHIfR02';
-        const userEmail = email.toLowerCase();
-        let finalUid: string | null = null;
+        let finalUid: string;
 
-        // Ensure Firebase Admin is ready
-        if (!admin.apps.length) {
-            console.error('Firebase Admin not initialized in callback');
-            throw new Error('Server authentication service unavailable');
-        }
-
-        if (userEmail === TARGET_EMAIL.toLowerCase()) {
-            console.log('Zoho OAuth: Admin match detected. Mapping to preserved identity.');
-            finalUid = TARGET_UID;
-        } else if (userEmail.endsWith('@nodalpoint.io')) {
-            console.log(`Zoho OAuth: Nodal Point domain match: ${userEmail}`);
-            try {
-                // Check if user already exists in Firebase
-                const userRecord = await admin.auth().getUserByEmail(userEmail);
-                finalUid = userRecord.uid;
-                console.log(`Zoho OAuth: Existing user found with UID: ${finalUid}`);
-            } catch (error: any) {
-                if (error.code === 'auth/user-not-found') {
-                    // Create new user for Nodal Point employees
-                    console.log(`Zoho OAuth: Creating new Firebase user for ${userEmail}`);
-                    const newUser = await admin.auth().createUser({
-                        email: userEmail,
-                        emailVerified: true,
-                        displayName: userEmail.split('@')[0], // Basic fallback name
-                    });
-                    finalUid = newUser.uid;
-                } else {
-                    console.error('Firebase Error during user lookup:', error);
-                    throw error;
-                }
-            }
+        if (existingAuth?.user) {
+            finalUid = existingAuth.user.id;
+            console.log(`Zoho OAuth: Existing Supabase user found: ${finalUid}`);
         } else {
-            console.warn(`Zoho OAuth: Unauthorized domain attempt: ${userEmail}`);
-            return NextResponse.redirect(new URL('/login?error=Only+Nodal+Point+emails+are+authorized', request.url));
+            console.log(`Zoho OAuth: Creating new Supabase user for ${userEmail}`);
+            const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+                email: userEmail,
+                email_confirm: true,
+                user_metadata: {
+                    full_name: userEmail.split('@')[0]
+                }
+            });
+            if (createError) {
+                console.error('Supabase Auth Creation Error:', createError);
+                throw new Error(`Failed to create user account: ${createError.message}`);
+            }
+            finalUid = newUser.user.id;
         }
 
-        if (!finalUid) {
-            throw new Error('Could not resolve user identity');
+        // --- SYNC PROFILE & SAVE TOKENS ---
+        console.log('Zoho OAuth: Updating profile and storing tokens...');
+        const updatePayload: any = {
+            zoho_access_token: accessToken,
+            zoho_token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
+            updated_at: new Date().toISOString(),
+        };
+
+        if (refreshToken) {
+            updatePayload.zoho_refresh_token = refreshToken;
         }
 
-        // --- SAVE CREDENTIALS TO SUPABASE ---
-        try {
-            console.log('Zoho OAuth: Saving credentials to Supabase...');
-            const updatePayload: any = {
-                zoho_access_token: accessToken,
-                zoho_token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
-                updated_at: new Date().toISOString(),
-            };
-
-            // Only update refresh token if provided (Zoho only sends it on initial consent)
-            if (refreshToken) {
-                updatePayload.zoho_refresh_token = refreshToken;
-            }
-
-            if (zohoAccountId) {
-                updatePayload.zoho_account_id = zohoAccountId;
-            }
-
-            const { error: upsertError } = await supabaseAdmin
-                .from('users')
-                .upsert({
-                    id: finalUid,
-                    email: userEmail,
-                    ...updatePayload
-                }, { onConflict: 'id' });
-
-            if (upsertError) {
-                console.error('Supabase Error saving Zoho tokens:', upsertError);
-            } else {
-                console.log('Zoho OAuth: Successfully stored tokens in Supabase.');
-            }
-        } catch (supabaseErr) {
-            console.error('Exception saving to Supabase:', supabaseErr);
+        if (zohoAccountId) {
+            updatePayload.zoho_account_id = zohoAccountId;
         }
 
-        // 4. Create Custom Token
-        console.log(`Zoho OAuth: Minting custom token for UID: ${finalUid}`);
-        const customToken = await admin.auth().createCustomToken(finalUid);
+        const { error: upsertError } = await supabaseAdmin
+            .from('users')
+            .upsert({
+                id: finalUid,
+                email: userEmail,
+                ...updatePayload
+            }, { onConflict: 'id' });
 
-        // 5. Set Middleware Cookie & Redirect
-        const response = NextResponse.redirect(new URL(`/login/callback?token=${customToken}`, request.url));
+        if (upsertError) {
+            console.error('Supabase Error saving Zoho tokens:', upsertError);
+        }
 
+        // --- GENERATE LOGIN SESSION ---
+        // Instead of custom tokens, we use a Magick Link to create a real Supabase session
+        console.log(`Zoho OAuth: Generating Supabase session link for UID: ${finalUid}`);
+
+        const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+            type: 'magiclink',
+            email: userEmail,
+            options: {
+                redirectTo: `${normalizedOrigin}/network`
+            }
+        });
+
+        if (linkError || !linkData.properties?.action_link) {
+            console.error('Supabase Session Link Error:', linkError);
+            throw new Error('Failed to generate secure session link');
+        }
+
+        console.log('Zoho OAuth: Success. Redirecting to secure session link...');
+
+        const response = NextResponse.redirect(linkData.properties.action_link);
+
+        // Ensure middleware cookie is set
         response.cookies.set('np_session', '1', {
             path: '/',
             httpOnly: false,
             sameSite: 'lax',
         });
 
-        console.log('Zoho OAuth: Login process complete. Redirecting to client callback...');
         return response;
 
     } catch (err: any) {
-        console.error('Zoho Auth Flow Exception:', err);
-        const errorMessage = err.message || 'Authentication flow failed';
+        console.error('Zoho Auth Bridge Error:', err);
+        const errorMessage = err.message || 'Authentication failed';
         return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(errorMessage)}`, request.url));
     }
 }

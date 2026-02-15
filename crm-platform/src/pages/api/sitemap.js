@@ -3,7 +3,7 @@
  * Generates sitemap.xml dynamically including all public pages and blog posts
  */
 
-import { db } from './_firebase.js';
+import { supabaseAdmin } from './_supabase.js';
 import logger from './_logger.js';
 
 // Static pages that should always be in the sitemap
@@ -18,30 +18,28 @@ const staticPages = [
 // Generate sitemap XML
 function generateSitemapXML(staticPages, blogPosts) {
   const urls = [...staticPages];
-  
+
   // Add blog posts if they exist in the new structure
   blogPosts.forEach(post => {
     const slug = post.slug || post.id;
     const url = `https://nodalpoint.io/posts/${slug}`;
-    
+
     // Get last modified date
     let lastmod = new Date().toISOString().split('T')[0]; // Default to today
     if (post.publishDate) {
       try {
-        const publishDate = post.publishDate.toDate ? post.publishDate.toDate() : new Date(post.publishDate);
-        lastmod = publishDate.toISOString().split('T')[0];
+        lastmod = new Date(post.publishDate).toISOString().split('T')[0];
       } catch (e) {
         // Use default if date parsing fails
       }
-    } else if (post.updatedAt) {
+    } else if (post.updatedAt || post.updated_at) {
       try {
-        const updatedDate = post.updatedAt.toDate ? post.updatedAt.toDate() : new Date(post.updatedAt);
-        lastmod = updatedDate.toISOString().split('T')[0];
+        lastmod = new Date(post.updatedAt || post.updated_at).toISOString().split('T')[0];
       } catch (e) {
         // Use default if date parsing fails
       }
     }
-    
+
     urls.push({
       url,
       lastmod,
@@ -49,7 +47,7 @@ function generateSitemapXML(staticPages, blogPosts) {
       priority: '0.7'
     });
   });
-  
+
   // Generate XML
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -60,7 +58,7 @@ ${urls.map(page => `  <url>
     <priority>${page.priority || '0.5'}</priority>
   </url>`).join('\n')}
 </urlset>`;
-  
+
   return xml;
 }
 
@@ -81,67 +79,41 @@ export default async function handler(req, res) {
     res.end('Method Not Allowed');
     return;
   }
-  
+
   try {
-    // Get all published blog posts
-    let publishedPosts = [];
-    
-    try {
-      // Try to get posts ordered by publishDate (requires composite index)
-      const publishedPostsSnapshot = await db.collection('posts')
-        .where('status', '==', 'published')
-        .orderBy('publishDate', 'desc')
-        .get();
-      
-      publishedPostsSnapshot.forEach(doc => {
-        publishedPosts.push({ id: doc.id, ...doc.data() });
-      });
-    } catch (indexError) {
-      // If composite index doesn't exist, use simpler query
-      logger.warn('[Sitemap] Composite index not found, using fallback query:', indexError.message);
-      try {
-        const publishedPostsSnapshot = await db.collection('posts')
-          .where('status', '==', 'published')
-          .get();
-        
-        publishedPostsSnapshot.forEach(doc => {
-          publishedPosts.push({ id: doc.id, ...doc.data() });
-        });
-        
-        // Sort in memory by publishDate
-        publishedPosts.sort((a, b) => {
-          const dateA = a.publishDate ? (a.publishDate.toDate ? a.publishDate.toDate() : new Date(a.publishDate)) : new Date(0);
-          const dateB = b.publishDate ? (b.publishDate.toDate ? b.publishDate.toDate() : new Date(b.publishDate)) : new Date(0);
-          return dateB - dateA; // Descending order
-        });
-      } catch (fallbackError) {
-        logger.error('[Sitemap] Error fetching published posts:', fallbackError);
-        publishedPosts = [];
-      }
+    // Get all published blog posts from Supabase
+    const { data: publishedPosts, error: postsError } = await supabaseAdmin
+      .from('posts')
+      .select('*')
+      .eq('status', 'published')
+      .order('publishDate', { ascending: false });
+
+    if (postsError) {
+      logger.error('[Sitemap] Supabase error fetching published posts:', postsError);
     }
-    
+
     // Generate sitemap XML
-    const sitemapXML = generateSitemapXML(staticPages, publishedPosts);
-    
+    const sitemapXML = generateSitemapXML(staticPages, publishedPosts || []);
+
     // Set headers for XML response
     res.writeHead(200, {
       'Content-Type': 'application/xml; charset=utf-8',
       'Cache-Control': 'public, max-age=3600' // Cache for 1 hour
     });
-    
+
     res.end(sitemapXML);
-    
+
   } catch (error) {
     logger.error('[Sitemap] Error generating sitemap:', error);
-    
+
     // Return a basic sitemap with just static pages if blog posts fail
     const basicSitemap = generateSitemapXML(staticPages, []);
-    
+
     res.writeHead(200, {
       'Content-Type': 'application/xml; charset=utf-8',
       'Cache-Control': 'public, max-age=300' // Cache for 5 minutes on error
     });
-    
+
     res.end(basicSitemap);
   }
 }

@@ -134,7 +134,7 @@ function buildSpeakerTurnsFromSentences(sentences, agentChannelStr) {
 }
 
 import twilio from 'twilio';
-import { db } from '../_firebase.js';
+import { supabaseAdmin } from '../_supabase.js';
 
 export default async function handler(req, res) {
     // Compute absolute base URL once for internal posts
@@ -237,11 +237,16 @@ export default async function handler(req, res) {
                     const t = await client.intelligence.v2.transcripts(TranscriptSid).fetch();
                     callSidFromCustomerKey = t?.customerKey || '';
                 } catch (_) { }
-                if (db && callSidFromCustomerKey) {
+                if (supabaseAdmin && callSidFromCustomerKey) {
                     try {
-                        const snap = await db.collection('calls').doc(callSidFromCustomerKey).get();
-                        if (snap.exists) {
-                            const data = snap.data() || {};
+                        const { data: snap } = await supabaseAdmin
+                            .from('calls')
+                            .select('metadata')
+                            .eq('id', callSidFromCustomerKey)
+                            .maybeSingle();
+
+                        if (snap) {
+                            const data = snap.metadata || {};
                             // Only allow if this call explicitly requested CI
                             if (data.ciRequested === true) {
                                 allowed = true;

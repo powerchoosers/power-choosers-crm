@@ -51,13 +51,8 @@ export default async function handler(req, res) {
       event // 'sent', 'opened', 'replied', 'bounced'
     } = req.body;
 
-    // Store tracking data (can be enhanced to store in Firebase or analytics service)
-
-    // TODO: Store in Firebase Firestore for future analysis
-    // Example structure:
-    // collection: 'email_performance'
-    // document: emailId
-    // fields: { subject_style, cta_type, opening_style, events: [{ event, timestamp }] }
+    // Store tracking data (can be enhanced to store in Supabase for analytics)
+    // TODO: Implement Supabase tracking for email performance analysis
 
     // Return success
     res.writeHead(200, { 'Content-Type': 'application/json' });

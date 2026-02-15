@@ -1,6 +1,6 @@
 // Energy News (Serverless)
 import { cors } from './_cors.js';
-import { db } from './_firebase.js';
+import { supabaseAdmin } from './_supabase.js';
 import logger from './_logger.js';
 
 // Only refresh (RSS + Gemini) at 10 AM and 3 PM America/Chicago. Saves Gemini credits.
@@ -14,27 +14,36 @@ function isInRefreshWindow() {
 
 function sendCache(res, cacheData) {
   const cacheAge = Date.now() - (cacheData.timestamp || 0);
-  res.writeHead(200, {
-    'Content-Type': 'application/json',
-    'X-Cache': 'HIT',
-    'X-Cache-Age': Math.floor(cacheAge / 1000),
+  res.status(200).json({
+    ...cacheData.data,
+    _cached: true,
+    _cacheAge: Math.floor(cacheAge / 1000)
   });
-  return res.end(JSON.stringify(cacheData.data));
 }
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
   if (req.method !== 'GET') {
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ error: 'Method not allowed' }));
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
   }
 
   try {
     let cacheData = null;
-    if (db) {
+    if (supabaseAdmin) {
       try {
-        const cacheDoc = await db.collection('cache').doc('energy-news').get();
-        if (cacheDoc.exists) cacheData = cacheDoc.data();
+        const { data: cacheRow, error: cacheError } = await supabaseAdmin
+          .from('ai_cache')
+          .select('insights, cached_at')
+          .eq('key', 'energy-news')
+          .single();
+
+        if (cacheRow && !cacheError) {
+          cacheData = {
+            timestamp: cacheRow.cached_at,
+            data: cacheRow.insights
+          };
+        }
       } catch (cacheError) {
         logger.warn('[Energy News] Cache read failed:', cacheError.message);
       }
@@ -46,7 +55,6 @@ export default async function handler(req, res) {
     // Outside 10 AM / 3 PM: never fetch or call Gemini. Return cache if we have it.
     if (!inWindow) {
       if (cacheData?.data) return sendCache(res, cacheData);
-      // No cache (first run): fetch RSS only, no Gemini
       logger.info('[Energy News] Outside refresh window; no cache — fetching RSS only (no Gemini)', 'EnergyNews');
     } else {
       // Inside window: one refresh per window
@@ -99,7 +107,7 @@ export default async function handler(req, res) {
       rawItems = parseRssItems(xml, 4, 'Energy Intel');
     }
 
-    // Use Gemini only during 10 AM / 3 PM refresh window to save credits. Otherwise use raw headlines.
+    // Use Gemini only during 10 AM / 3 PM refresh window to save credits.
     const items = [];
     const useGemini = inWindow && (process.env.GEMINI_API_KEY || process.env.FREE_GEMINI_KEY);
 
@@ -133,35 +141,32 @@ export default async function handler(req, res) {
       }
     } else {
       items.push(...rawItems);
-      if (inWindow) logger.info('[Energy News] In window but no Gemini key — using raw headlines', 'EnergyNews');
     }
 
-    // Prepare response data
     const responseData = {
       lastRefreshed: new Date().toISOString(),
       items
     };
 
     // Save to cache for future requests
-    if (db) {
+    if (supabaseAdmin) {
       try {
-        await db.collection('cache').doc('energy-news').set({
-          timestamp: Date.now(),
-          data: responseData
-        });
+        await supabaseAdmin
+          .from('ai_cache')
+          .upsert({
+            key: 'energy-news',
+            insights: responseData,
+            cached_at: Date.now(),
+            source: 'energy-news-api'
+          });
       } catch (cacheError) {
-        // If cache write fails, still return the data
         logger.warn('[Energy News] Cache write failed:', cacheError.message);
       }
     }
 
-    res.writeHead(200, { 
-      'Content-Type': 'application/json',
-      'X-Cache': 'MISS'
-    });
-    return res.end(JSON.stringify(responseData));
+    res.status(200).json(responseData);
   } catch (error) {
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ error: 'Failed to fetch energy news', message: error.message }));
+    logger.error('[Energy News] Final handler error:', error);
+    res.status(500).json({ error: 'Failed to fetch energy news', message: error.message });
   }
 }
