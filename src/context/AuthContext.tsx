@@ -1,8 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import { User, onAuthStateChanged } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
+import { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
@@ -34,10 +33,10 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   role: null,
-  profile: { 
+  profile: {
     email: null,
-    name: null, 
-    firstName: null, 
+    name: null,
+    firstName: null,
     lastName: null,
     bio: null,
     jobTitle: null,
@@ -49,17 +48,17 @@ const AuthContext = createContext<AuthContextType>({
     selectedPhoneNumber: null,
     bridgeToMobile: null
   },
-  refreshProfile: async () => {},
+  refreshProfile: async () => { },
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [role, setRole] = useState<string | null>(null)
-  const [profile, setProfile] = useState<UserProfile>({ 
+  const [profile, setProfile] = useState<UserProfile>({
     email: null,
-    name: null, 
-    firstName: null, 
+    name: null,
+    firstName: null,
     lastName: null,
     bio: null,
     jobTitle: null,
@@ -102,7 +101,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [titleize])
 
   const refreshProfile = async () => {
-    const currentUser = user || auth.currentUser
+    const { data: { session } } = await supabase.auth.getSession()
+    const currentUser = session?.user || user
     if (!currentUser?.email) return
 
     const emailLower = currentUser.email.toLowerCase().trim()
@@ -136,12 +136,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const resolvedLastName = lastName || inferred?.lastName || null
       const explicitFullName = resolvedFirstName ? `${resolvedFirstName} ${resolvedLastName || ''}`.trim() : null
 
-      const derivedName = explicitFullName || storedName || (currentUser.displayName?.trim() || null)
+      const derivedName = explicitFullName || storedName || (currentUser.user_metadata?.full_name?.trim() || null)
 
-      setProfile({ 
+      setProfile({
         email: currentUser.email,
-        name: derivedName, 
-        firstName: resolvedFirstName, 
+        name: derivedName,
+        firstName: resolvedFirstName,
         lastName: resolvedLastName,
         bio: data.bio || null,
         jobTitle: data.job_title || null,
@@ -154,10 +154,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         bridgeToMobile: settings.bridgeToMobile || false
       })
 
-      // If user has Google avatar but no hosted URL, host it and save (for email signature)
-      const photoURL = currentUser.photoURL
-      const isGooglePhoto = photoURL && (photoURL.includes('googleusercontent.com') || photoURL.includes('ggpht.com'))
-      if (isGooglePhoto && !data.hosted_photo_url) {
+      // If user has Zoho/External avatar but no hosted URL, host it and save (for email signature)
+      const photoURL = currentUser.user_metadata?.avatar_url
+      const isExternalPhoto = photoURL && !photoURL.includes('imgur.com')
+      if (isExternalPhoto && !data.hosted_photo_url) {
         fetch('/api/upload/host-google-avatar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -170,7 +170,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               supabase.from('users').update({ hosted_photo_url: imageUrl, updated_at: new Date().toISOString() }).eq('email', emailLower).then(() => refreshProfile())
             }
           })
-          .catch(() => {})
+          .catch(() => { })
       }
     }
   }
@@ -235,7 +235,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }, 5000)
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const user = session?.user || null
       didResolve = true
       window.clearTimeout(timeoutId)
 
@@ -246,10 +247,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!user && isDev && hasSessionCookie) {
         console.log('[Auth] Dev Bypass Active')
         const mockUser = {
-          uid: 'dev-bypass-uid',
+          id: 'dev-bypass-uid',
           email: 'dev@nodalpoint.io',
-          displayName: 'Dev User',
-          emailVerified: true,
+          user_metadata: { full_name: 'Dev User' },
+          aud: 'authenticated',
+          role: 'authenticated',
         } as unknown as User
 
         setUser(mockUser)
@@ -270,7 +272,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           bridgeToMobile: false
         })
         setLoading(false)
-        
+
         // Redirect if on login page
         if (window.location.pathname === '/login') {
           router.push('/network')
@@ -279,14 +281,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setUser(user)
-      
+
       if (user) {
         // Ensure session cookie is set for middleware
         document.cookie = 'np_session=1; Path=/; SameSite=Lax'
 
         if (user.email) {
           const emailLower = user.email.toLowerCase().trim()
-          
+
           const fetchProfile = async () => {
             const { data, error } = await supabase
               .from('users')
@@ -310,7 +312,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const storedName = data.name || settings.name || null
 
               const inferred =
-                inferNameFromString(user.displayName) ||
+                inferNameFromString(user.user_metadata?.full_name) ||
                 inferNameFromString(storedName) ||
                 inferNameFromEmail(emailLower)
 
@@ -318,12 +320,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const resolvedLastName = lastName || inferred?.lastName || null
               const explicitFullName = resolvedFirstName ? `${resolvedFirstName} ${resolvedLastName || ''}`.trim() : null
 
-              const derivedName = explicitFullName || storedName || (user.displayName?.trim() || null)
+              const derivedName = explicitFullName || storedName || (user.user_metadata?.full_name?.trim() || null)
 
-              setProfile({ 
+              setProfile({
                 email: user.email,
-                name: derivedName, 
-                firstName: resolvedFirstName, 
+                name: derivedName,
+                firstName: resolvedFirstName,
                 lastName: resolvedLastName,
                 bio: data.bio || null,
                 jobTitle: data.job_title || null,
@@ -339,11 +341,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               // Hardcode l.patterson@nodalpoint.io as admin
               const isAdmin = emailLower === 'l.patterson@nodalpoint.io'
               setRole(isAdmin ? 'admin' : 'employee')
-              const inferred = inferNameFromString(user.displayName) || inferNameFromEmail(emailLower)
-              const derivedName = inferred?.fullName || user.displayName?.trim() || null
-              
+              const inferred = inferNameFromString(user.user_metadata?.full_name) || inferNameFromEmail(emailLower)
+              const derivedName = inferred?.fullName || user.user_metadata?.full_name?.trim() || null
+
               const newProfile = {
-                id: user.uid,
+                id: user.id,
                 email: emailLower,
                 first_name: inferred?.firstName || null,
                 last_name: inferred?.lastName || null,
@@ -358,10 +360,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
               await supabase.from('users').insert(newProfile)
 
-              setProfile({ 
+              setProfile({
                 email: user.email,
-                name: derivedName, 
-                firstName: inferred?.firstName || null, 
+                name: derivedName,
+                firstName: inferred?.firstName || null,
                 lastName: inferred?.lastName || null,
                 bio: null,
                 jobTitle: null,
@@ -404,10 +406,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           unsubscribeProfile = null
         }
         setRole(null)
-        setProfile({ 
+        setProfile({
           email: null,
-          name: null, 
-          firstName: null, 
+          name: null,
+          firstName: null,
           lastName: null,
           bio: null,
           jobTitle: null,
@@ -424,7 +426,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setLoading(false)
-      
+
       const path = window.location.pathname
       if (!user && path.startsWith('/network')) {
         router.push('/login')
@@ -434,7 +436,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
 
     return () => {
-      unsubscribe()
+      subscription.unsubscribe()
       if (unsubscribeProfile) unsubscribeProfile()
       window.clearTimeout(timeoutId)
     }

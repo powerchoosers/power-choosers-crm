@@ -1,22 +1,20 @@
 // API endpoint for creating bookings from public website (schedule.html, index.html)
-// Uses Firebase Admin SDK to bypass Firestore security rules
+// Uses Supabase Admin to bypass RLS for public submissions
 // Creates contact, account, and task with admin ownership
 
-import { admin, db } from './_firebase.js';
+import { supabaseAdmin } from './_supabase.js';
 import { cors } from './_cors.js';
 import logger from './_logger.js';
-import { GmailService } from './email/gmail-service.js';
+import { ZohoMailService } from './email/zoho-service.js';
 
 const ADMIN_EMAIL = 'l.patterson@nodalpoint.io';
-const DEFAULT_OWNER = 'unassigned';
 
 export default async function handler(req, res) {
   // Handle CORS
-  if (cors(req, res)) return; // Early return for OPTIONS
+  if (cors(req, res)) return;
 
   if (req.method !== 'POST') {
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    res.status(405).json({ error: 'Method not allowed' });
     return;
   }
 
@@ -29,374 +27,240 @@ export default async function handler(req, res) {
       appointmentDate,
       selectedTime,
       additionalNotes,
-      source = 'schedule' // 'schedule' or 'home-page'
+      source = 'schedule' // 'schedule', 'home-page', or 'guide-download'
     } = req.body;
 
-    // Validate required fields (phone optional for guide-download)
+    // Validate required fields
     if (!contactName || !companyName || !email) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Missing required fields: contactName, companyName, email' }));
+      res.status(400).json({ error: 'Missing required fields: contactName, companyName, email' });
       return;
     }
-    
+
     // Phone is required for appointments, optional for guide downloads
     if (source !== 'guide-download' && !phone) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Missing required field: phone' }));
+      res.status(400).json({ error: 'Missing required field: phone' });
       return;
     }
 
-    if (!db) {
-      logger.error('[Create Booking] Firebase Admin not initialized');
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Database not available' }));
+    if (!supabaseAdmin) {
+      logger.error('[Create Booking] Supabase Admin not initialized');
+      res.status(500).json({ error: 'Database not available' });
       return;
     }
 
-    const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
     const emailLower = email.toLowerCase().trim();
     const companyNameTrimmed = companyName.trim();
     const contactNameTrimmed = contactName.trim();
     const phoneTrimmed = phone ? phone.trim() : '';
 
-    // Step 1: Check/create contact
-    let contactId = null;
-    const contactsSnapshot = await db.collection('people')
-      .where('email', '==', emailLower)
-      .limit(1)
-      .get();
+    // Step 0: Resolve admin user ID for ownership
+    const { data: adminUser } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('email', ADMIN_EMAIL)
+      .single();
 
-    if (!contactsSnapshot.empty) {
-      // Contact exists - update if needed
-      const contactDoc = contactsSnapshot.docs[0];
-      contactId = contactDoc.id;
-      const contactData = contactDoc.data();
+    const ownerId = adminUser?.id || null;
 
-      const updates = {};
-      if (!contactData.firstName && contactNameTrimmed) {
-        const nameParts = contactNameTrimmed.split(' ');
-        updates.firstName = nameParts[0] || contactNameTrimmed;
-        updates.lastName = nameParts.slice(1).join(' ') || '';
-      }
-      if (!contactData.workDirectPhone && phoneTrimmed) updates.workDirectPhone = phoneTrimmed;
-      if (!contactData.mobile && !contactData.workDirectPhone && phoneTrimmed) updates.mobile = phoneTrimmed;
-      if (!contactData.company && companyNameTrimmed) updates.company = companyNameTrimmed;
+    // Step 1: Check/create account
+    let accountId = null;
+    const { data: existingAccount } = await supabaseAdmin
+      .from('accounts')
+      .select('id')
+      .ilike('name', companyNameTrimmed)
+      .maybeSingle();
 
-      if (Object.keys(updates).length > 0) {
-        updates.updatedAt = serverTimestamp;
-        await db.collection('people').doc(contactId).update(updates);
-      }
+    if (existingAccount) {
+      accountId = existingAccount.id;
     } else {
-      // Create new contact
-      const nameParts = contactNameTrimmed.split(' ');
-      const newContact = {
-        firstName: nameParts[0] || contactNameTrimmed,
-        lastName: nameParts.slice(1).join(' ') || '',
-        email: emailLower,
-        workDirectPhone: phoneTrimmed,
-        company: companyNameTrimmed,
-        ownerId: DEFAULT_OWNER,
-        assignedTo: DEFAULT_OWNER,
-        createdBy: DEFAULT_OWNER,
-        createdAt: serverTimestamp,
-        timestamp: serverTimestamp
-      };
+      const { data: newAccount, error: accError } = await supabaseAdmin
+        .from('accounts')
+        .insert([{
+          name: companyNameTrimmed,
+          ownerId: ownerId,
+          assignedTo: ownerId,
+          createdBy: ownerId,
+          metadata: { source }
+        }])
+        .select('id')
+        .single();
 
-      const contactRef = await db.collection('people').add(newContact);
-      contactId = contactRef.id;
+      if (accError) {
+        logger.error('[Create Booking] Account creation error:', accError);
+      } else {
+        accountId = newAccount.id;
+      }
     }
 
-    // Step 2: Check/create account
-    const accountsSnapshot = await db.collection('accounts')
-      .where('name', '==', companyNameTrimmed)
-      .limit(1)
-      .get();
+    // Step 2: Check/create contact
+    let contactId = null;
+    const { data: existingContact } = await supabaseAdmin
+      .from('contacts')
+      .select('id, firstName, lastName, phone, mobile, workPhone, accountId')
+      .eq('email', emailLower)
+      .maybeSingle();
 
-    if (accountsSnapshot.empty) {
-      const newAccount = {
-        name: companyNameTrimmed,
-        ownerId: DEFAULT_OWNER,
-        assignedTo: DEFAULT_OWNER,
-        createdBy: DEFAULT_OWNER,
-        createdAt: serverTimestamp,
-        timestamp: serverTimestamp
-      };
-      await db.collection('accounts').add(newAccount);
+    if (existingContact) {
+      contactId = existingContact.id;
+      // Update contact if needed (e.g. link to account if missing)
+      const updates = {};
+      if (!existingContact.accountId && accountId) updates.accountId = accountId;
+      if (!existingContact.firstName && contactNameTrimmed) {
+        const nameParts = contactNameTrimmed.split(' ');
+        updates.firstName = nameParts[0];
+        updates.lastName = nameParts.slice(1).join(' ');
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await supabaseAdmin.from('contacts').update(updates).eq('id', contactId);
+      }
+    } else {
+      const nameParts = contactNameTrimmed.split(' ');
+      const { data: newContact, error: conError } = await supabaseAdmin
+        .from('contacts')
+        .insert([{
+          firstName: nameParts[0] || contactNameTrimmed,
+          lastName: nameParts.slice(1).join(' ') || '',
+          email: emailLower,
+          phone: phoneTrimmed,
+          mobile: phoneTrimmed,
+          accountId: accountId,
+          ownerId: ownerId,
+          assignedTo: ownerId,
+          createdBy: ownerId,
+          metadata: { source }
+        }])
+        .select('id')
+        .single();
+
+      if (conError) {
+        logger.error('[Create Booking] Contact creation error:', conError);
+      } else {
+        contactId = newContact.id;
+      }
     }
 
     // Step 3: Create task for admin
     const taskTitle = source === 'home-page'
       ? `New Lead: ${contactNameTrimmed} - ${companyNameTrimmed}`
       : source === 'guide-download'
-      ? `Guide Download: ${contactNameTrimmed} - ${companyNameTrimmed}`
-      : `Consultation: ${contactNameTrimmed} - ${companyNameTrimmed}`;
+        ? `Guide Download: ${contactNameTrimmed} - ${companyNameTrimmed}`
+        : `Consultation: ${contactNameTrimmed} - ${companyNameTrimmed}`;
 
     const taskNotes = source === 'home-page'
       ? `NEW LEAD FROM WEBSITE\n\nContact: ${contactNameTrimmed}\nCompany: ${companyNameTrimmed}\nEmail: ${emailLower}\nPhone: ${phoneTrimmed}\n\nSource: Home Page Lead Form`
       : source === 'guide-download'
-      ? `GUIDE DOWNLOAD REQUEST\n\nContact: ${contactNameTrimmed}\nCompany: ${companyNameTrimmed}\nEmail: ${emailLower}\n\nSource: 2026 Market Navigator Guide Download`
-      : `SCHEDULED CONSULTATION\n\nContact: ${contactNameTrimmed}\nCompany: ${companyNameTrimmed}\nEmail: ${emailLower}\nPhone: ${phoneTrimmed}\nDate: ${appointmentDate || 'Not specified'}\nTime: ${selectedTime || 'Not specified'}\n\nAdditional Notes:\n${additionalNotes || 'None provided'}`;
+        ? `GUIDE DOWNLOAD REQUEST\n\nContact: ${contactNameTrimmed}\nCompany: ${companyNameTrimmed}\nEmail: ${emailLower}\n\nSource: 2026 Market Navigator Guide Download`
+        : `SCHEDULED CONSULTATION\n\nContact: ${contactNameTrimmed}\nCompany: ${companyNameTrimmed}\nEmail: ${emailLower}\nPhone: ${phoneTrimmed}\nDate: ${appointmentDate || 'Not specified'}\nTime: ${selectedTime || 'Not specified'}\n\nAdditional Notes:\n${additionalNotes || 'None provided'}`;
 
-    const taskData = {
-      title: taskTitle,
-      type: 'phone-call',
-      priority: 'high',
-      contact: contactNameTrimmed,
-      account: companyNameTrimmed,
-      status: 'pending',
-      notes: taskNotes,
-      ownerId: DEFAULT_OWNER,
-      assignedTo: DEFAULT_OWNER,
-      createdBy: DEFAULT_OWNER,
-      createdAt: serverTimestamp,
-      timestamp: serverTimestamp
-    };
+    const { data: newTask, error: taskError } = await supabaseAdmin
+      .from('tasks')
+      .insert([{
+        title: taskTitle,
+        type: 'phone-call',
+        priority: 'high',
+        contact: contactNameTrimmed,
+        account: companyNameTrimmed,
+        contactId: contactId,
+        accountId: accountId,
+        status: 'pending',
+        notes: taskNotes,
+        ownerId: ownerId,
+        assignedTo: ownerId,
+        createdBy: ownerId,
+        dueDate: appointmentDate || null,
+        dueTime: selectedTime || null
+      }])
+      .select('id')
+      .single();
 
-    // Add due date/time if provided (for consultations)
-    if (appointmentDate) {
-      taskData.dueDate = appointmentDate;
+    if (taskError) {
+      logger.error('[Create Booking] Task creation error:', taskError);
     }
-    if (selectedTime) {
-      taskData.dueTime = selectedTime;
-    }
+    const taskId = newTask?.id;
 
-    // Create task with Firestore-generated ID
-    const taskRef = await db.collection('tasks').add(taskData);
-    const taskId = taskRef.id;
+    logger.log(`[Create Booking] Successfully processed ${source} for ${contactNameTrimmed} (Task: ${taskId})`);
 
-    // CRITICAL FIX: Add id field to task document for consistency
-    // This ensures tasks can be properly queried and deleted by id field
-    await taskRef.update({ id: taskId });
-
-    logger.log(`[Create Booking] Created task ${taskId} for ${contactNameTrimmed} from ${companyNameTrimmed}`);
-
-    // Send branded email notification to admin
+    // Step 4: Send branded notification to admin via Zoho
     try {
-      const gmailService = new GmailService();
-      
+      const zohoService = new ZohoMailService();
+
       let emailSubject, emailHtml, emailText;
-      
+
       if (source === 'guide-download') {
-        // Guide Download Email Template
         emailSubject = `📥 New Guide Download: ${contactNameTrimmed} from ${companyNameTrimmed}`;
         emailHtml = `
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f6fb;">
-  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f6fb; padding: 40px 20px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background: #ffffff; border-radius: 16px; box-shadow: 0 10px 30px rgba(11, 27, 69, 0.1); overflow: hidden;">
-          <!-- Header with gradient -->
-          <tr>
-            <td style="background: linear-gradient(135deg, #0b1b45 0%, #1e3a8a 100%); padding: 32px 32px 24px; text-align: center;">
-              <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png" alt="Power Choosers" width="48" height="48" style="border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.3); background: #ffffff; padding: 4px;">
-              <h1 style="margin: 16px 0 0; color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">New Guide Download</h1>
-            </td>
-          </tr>
-          
-          <!-- Content -->
-          <tr>
-            <td style="padding: 32px;">
-              <p style="margin: 0 0 20px; color: #0f172a; font-size: 16px; line-height: 1.6;">
-                Someone just downloaded the <strong style="color: #0b1b45;">2026 Electricity Market Navigator</strong> guide.
-              </p>
-              
-              <div style="background: linear-gradient(135deg, #fffaf4 0%, #fff5e6 100%); border-left: 4px solid #f59e0b; border-radius: 8px; padding: 20px; margin: 24px 0;">
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                  <tr>
-                    <td style="padding-bottom: 12px;">
-                      <strong style="color: #0b1b45; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Contact Name</strong>
-                      <p style="margin: 4px 0 0; color: #0f172a; font-size: 16px; font-weight: 600;">${contactNameTrimmed}</p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding-bottom: 12px;">
-                      <strong style="color: #0b1b45; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Company</strong>
-                      <p style="margin: 4px 0 0; color: #0f172a; font-size: 16px; font-weight: 600;">${companyNameTrimmed}</p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <strong style="color: #0b1b45; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Email</strong>
-                      <p style="margin: 4px 0 0; color: #0b1b45; font-size: 16px;">
-                        <a href="mailto:${emailLower}" style="color: #0b1b45; text-decoration: none; font-weight: 600;">${emailLower}</a>
-                      </p>
-                    </td>
-                  </tr>
-                </table>
-              </div>
-              
-              <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #e2e8f0;">
-                <p style="margin: 0; color: #64748b; font-size: 13px; line-height: 1.5;">
-                  A new task has been created in your CRM. Task ID: <code style="background: #f8fafc; padding: 2px 6px; border-radius: 4px; font-size: 12px;">${taskId}</code>
-                </p>
-              </div>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="background: #f8fafc; padding: 20px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="margin: 0; color: #64748b; font-size: 12px;">
-                Power Choosers CRM • Automated Notification
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
+<html>
+<body style="font-family: sans-serif; background-color: #f4f6fb; padding: 20px;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+    <div style="background: #0b1b45; padding: 24px; text-align: center; color: white;">
+      <h2 style="margin: 0;">New Guide Download</h2>
+    </div>
+    <div style="padding: 24px;">
+      <p>Someone just downloaded the <strong>2026 Electricity Market Navigator</strong> guide.</p>
+      <div style="background: #f8fafc; border-left: 4px solid #f59e0b; padding: 16px; margin: 20px 0;">
+        <p><strong>Contact:</strong> ${contactNameTrimmed}</p>
+        <p><strong>Company:</strong> ${companyNameTrimmed}</p>
+        <p><strong>Email:</strong> ${emailLower}</p>
+      </div>
+      <p style="color: #64748b; font-size: 13px;">A new task has been created. Task ID: ${taskId || 'N/A'}</p>
+    </div>
+  </div>
 </body>
 </html>`;
-        emailText = `New Guide Download\n\nSomeone just downloaded the 2026 Electricity Market Navigator guide.\n\nContact: ${contactNameTrimmed}\nCompany: ${companyNameTrimmed}\nEmail: ${emailLower}\n\nA new task has been created in your CRM. Task ID: ${taskId}`;
+        emailText = `New Guide Download\n\nContact: ${contactNameTrimmed}\nCompany: ${companyNameTrimmed}\nEmail: ${emailLower}\n\nTask ID: ${taskId}`;
       } else {
-        // Appointment Booking Email Template
         emailSubject = `📅 New ${source === 'home-page' ? 'Lead' : 'Consultation'}: ${contactNameTrimmed} - ${companyNameTrimmed}`;
         emailHtml = `
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f6fb;">
-  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f6fb; padding: 40px 20px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background: #ffffff; border-radius: 16px; box-shadow: 0 10px 30px rgba(11, 27, 69, 0.1); overflow: hidden;">
-          <!-- Header with gradient -->
-          <tr>
-            <td style="background: linear-gradient(135deg, #0b1b45 0%, #1e3a8a 100%); padding: 32px 32px 24px; text-align: center;">
-              <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png" alt="Power Choosers" width="48" height="48" style="border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.3); background: #ffffff; padding: 4px;">
-              <h1 style="margin: 16px 0 0; color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">${source === 'home-page' ? 'New Lead' : 'Scheduled Consultation'}</h1>
-            </td>
-          </tr>
-          
-          <!-- Content -->
-          <tr>
-            <td style="padding: 32px;">
-              <p style="margin: 0 0 20px; color: #0f172a; font-size: 16px; line-height: 1.6;">
-                ${source === 'home-page' ? 'A new lead has been submitted from your website.' : 'A consultation has been scheduled.'}
-              </p>
-              
-              <div style="background: linear-gradient(135deg, #fffaf4 0%, #fff5e6 100%); border-left: 4px solid #f59e0b; border-radius: 8px; padding: 20px; margin: 24px 0;">
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                  <tr>
-                    <td style="padding-bottom: 12px;">
-                      <strong style="color: #0b1b45; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Contact Name</strong>
-                      <p style="margin: 4px 0 0; color: #0f172a; font-size: 16px; font-weight: 600;">${contactNameTrimmed}</p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding-bottom: 12px;">
-                      <strong style="color: #0b1b45; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Company</strong>
-                      <p style="margin: 4px 0 0; color: #0f172a; font-size: 16px; font-weight: 600;">${companyNameTrimmed}</p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding-bottom: 12px;">
-                      <strong style="color: #0b1b45; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Email</strong>
-                      <p style="margin: 4px 0 0; color: #0b1b45; font-size: 16px;">
-                        <a href="mailto:${emailLower}" style="color: #0b1b45; text-decoration: none; font-weight: 600;">${emailLower}</a>
-                      </p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding-bottom: 12px;">
-                      <strong style="color: #0b1b45; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Phone</strong>
-                      <p style="margin: 4px 0 0; color: #0f172a; font-size: 16px; font-weight: 600;">
-                        <a href="tel:${phoneTrimmed.replace(/\s/g, '')}" style="color: #0b1b45; text-decoration: none;">${phoneTrimmed || 'Not provided'}</a>
-                      </p>
-                    </td>
-                  </tr>
-                  ${source === 'schedule' && appointmentDate ? `
-                  <tr>
-                    <td style="padding-bottom: 12px;">
-                      <strong style="color: #0b1b45; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Appointment Date</strong>
-                      <p style="margin: 4px 0 0; color: #0f172a; font-size: 16px; font-weight: 600;">${appointmentDate}</p>
-                    </td>
-                  </tr>
-                  ` : ''}
-                  ${source === 'schedule' && selectedTime ? `
-                  <tr>
-                    <td style="padding-bottom: 12px;">
-                      <strong style="color: #0b1b45; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Time</strong>
-                      <p style="margin: 4px 0 0; color: #0f172a; font-size: 16px; font-weight: 600;">${selectedTime}</p>
-                    </td>
-                  </tr>
-                  ` : ''}
-                  ${source === 'schedule' && additionalNotes ? `
-                  <tr>
-                    <td>
-                      <strong style="color: #0b1b45; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Additional Notes</strong>
-                      <p style="margin: 4px 0 0; color: #0f172a; font-size: 15px; line-height: 1.5; white-space: pre-wrap;">${additionalNotes}</p>
-                    </td>
-                  </tr>
-                  ` : ''}
-                </table>
-              </div>
-              
-              <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #e2e8f0;">
-                <p style="margin: 0; color: #64748b; font-size: 13px; line-height: 1.5;">
-                  A new task has been created in your CRM. Task ID: <code style="background: #f8fafc; padding: 2px 6px; border-radius: 4px; font-size: 12px;">${taskId}</code>
-                </p>
-              </div>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="background: #f8fafc; padding: 20px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="margin: 0; color: #64748b; font-size: 12px;">
-                Power Choosers CRM • Automated Notification
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
+<html>
+<body style="font-family: sans-serif; background-color: #f4f6fb; padding: 20px;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+    <div style="background: #0b1b45; padding: 24px; text-align: center; color: white;">
+      <h2 style="margin: 0;">${source === 'home-page' ? 'New Website Lead' : 'Consultation Scheduled'}</h2>
+    </div>
+    <div style="padding: 24px;">
+      <div style="background: #f8fafc; border-left: 4px solid #f59e0b; padding: 16px; margin: 20px 0;">
+        <p><strong>Contact:</strong> ${contactNameTrimmed}</p>
+        <p><strong>Company:</strong> ${companyNameTrimmed}</p>
+        <p><strong>Email:</strong> ${emailLower}</p>
+        <p><strong>Phone:</strong> ${phoneTrimmed || 'Not provided'}</p>
+        ${appointmentDate ? `<p><strong>Date:</strong> ${appointmentDate}</p>` : ''}
+        ${selectedTime ? `<p><strong>Time:</strong> ${selectedTime}</p>` : ''}
+      </div>
+      ${additionalNotes ? `<p><strong>Notes:</strong><br/>${additionalNotes}</p>` : ''}
+      <p style="color: #64748b; font-size: 13px;">A new task has been created. Task ID: ${taskId || 'N/A'}</p>
+    </div>
+  </div>
 </body>
 </html>`;
-        emailText = `${source === 'home-page' ? 'New Lead' : 'Scheduled Consultation'}\n\nContact: ${contactNameTrimmed}\nCompany: ${companyNameTrimmed}\nEmail: ${emailLower}\nPhone: ${phoneTrimmed || 'Not provided'}${source === 'schedule' && appointmentDate ? `\nDate: ${appointmentDate}` : ''}${source === 'schedule' && selectedTime ? `\nTime: ${selectedTime}` : ''}${source === 'schedule' && additionalNotes ? `\n\nAdditional Notes:\n${additionalNotes}` : ''}\n\nA new task has been created in your CRM. Task ID: ${taskId}`;
+        emailText = `${source === 'home-page' ? 'New Lead' : 'Scheduled Consultation'}\n\nContact: ${contactNameTrimmed}\nCompany: ${companyNameTrimmed}\nEmail: ${emailLower}\nPhone: ${phoneTrimmed || 'Not provided'}\n\nTask ID: ${taskId}`;
       }
-      
-      await gmailService.sendEmail({
+
+      await zohoService.sendEmail({
         to: ADMIN_EMAIL,
         subject: emailSubject,
         html: emailHtml,
         text: emailText,
-        userEmail: ADMIN_EMAIL,
-        ownerId: ADMIN_EMAIL
+        userEmail: ADMIN_EMAIL
       });
-      
-      logger.log(`[Create Booking] Sent notification email to ${ADMIN_EMAIL} for ${source}`);
+
+      logger.log(`[Create Booking] Sent notification email via Zoho to ${ADMIN_EMAIL}`);
     } catch (emailError) {
-      // Don't fail the booking if email fails - just log it
       logger.warn('[Create Booking] Failed to send notification email:', emailError.message);
     }
 
-    // Return success
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
+    res.status(200).json({
       success: true,
       contactId,
       taskId,
       message: 'Booking created successfully'
-    }));
+    });
 
   } catch (error) {
-    logger.error('[Create Booking] Error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      error: 'Failed to create booking',
-      message: error.message
-    }));
+    logger.error('[Create Booking] Fatal error:', error);
+    res.status(500).json({ error: 'Failed to create booking', details: error.message });
   }
 }
 
