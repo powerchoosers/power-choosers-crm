@@ -135,7 +135,8 @@ export async function GET(request: Request) {
 
         // --- RESOLVE SUPABASE AUTH ID ---
         console.log(`Zoho OAuth: Resolving Supabase Auth identity for ${userEmail}`);
-        const { data: existingAuth, error: authLookupError } = await supabaseAdmin.auth.admin.getUserByEmail(userEmail);
+        const { data: { users: matchingAuths }, error: authLookupError } = await supabaseAdmin.auth.admin.listUsers();
+        const existingAuth = { user: matchingAuths?.find(u => u.email?.toLowerCase() === userEmail.toLowerCase()) };
 
         let finalUid: string;
 
