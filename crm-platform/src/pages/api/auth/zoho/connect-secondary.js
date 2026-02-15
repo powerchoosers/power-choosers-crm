@@ -19,7 +19,14 @@ export default async function handler(req, res) {
     // Here, we want to start a flow that redirects BACK to `callback/zoho-secondary`.
 
     const clientId = process.env.ZOHO_CLIENT_ID;
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+
+    // Determine the base URL dynamically or from env vars
+    let appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
+    if (!appUrl && req.headers.host) {
+        const protocol = req.headers['x-forwarded-proto'] || 'http';
+        appUrl = `${protocol}://${req.headers.host}`;
+    }
+    appUrl = appUrl || 'http://localhost:3000'; // Final fallback
     const redirectUri = `${appUrl}/api/auth/callback/zoho-secondary`;
     const scope = 'ZohoMail.messages.ALL,ZohoMail.accounts.READ,ZohoMail.folders.READ,ZohoMail.folders.App.READ,ZohoSearch.search.READ';
     const accessType = 'offline';
