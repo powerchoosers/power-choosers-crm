@@ -19,7 +19,8 @@ export default async function handler(req, res) {
     // Here, we want to start a flow that redirects BACK to `callback/zoho-secondary`.
 
     const clientId = process.env.ZOHO_CLIENT_ID;
-    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback/zoho-secondary`;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+    const redirectUri = `${appUrl}/api/auth/callback/zoho-secondary`;
     const scope = 'ZohoMail.messages.ALL,ZohoMail.accounts.READ,ZohoMail.folders.READ,ZohoMail.folders.App.READ,ZohoSearch.search.READ';
     const accessType = 'offline';
     const prompt = 'consent';
