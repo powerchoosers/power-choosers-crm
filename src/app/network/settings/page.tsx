@@ -310,10 +310,7 @@ export default function SettingsPage() {
             <Database className="w-4 h-4 mr-2" />
             Integrations
           </TabsTrigger>
-          <TabsTrigger value="email" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-zinc-400">
-            <Mail className="w-4 h-4 mr-2" />
-            Email Accounts
-          </TabsTrigger>
+
         </TabsList>
 
         <div className="flex-1 overflow-y-auto pr-2 np-scroll">
@@ -358,6 +355,50 @@ export default function SettingsPage() {
                   <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">
                     Contact Admin to update system-wide ID
                   </p>
+                </div>
+
+                {/* Secondary Email Accounts */}
+                <div className="space-y-3">
+                  <Label className="text-zinc-400">Connected Accounts (Sending)</Label>
+                  <div className="space-y-2">
+                    {connections.map((conn) => (
+                      <div key={conn.id} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5 group">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-500">
+                            <Mail className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium text-zinc-200">{conn.email}</p>
+                            <p className="text-[10px] text-zinc-500">Secondary Sender</p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={async () => {
+                            if (!confirm('Disconnect this account?')) return
+                            await supabase.from('zoho_connections').delete().eq('id', conn.id)
+                            fetchConnections()
+                            toast.success('Account disconnected')
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ))}
+
+                    <Button
+                      onClick={() => window.location.href = '/api/auth/zoho/connect-secondary'}
+                      disabled={isConnecting}
+                      variant="outline"
+                      size="sm"
+                      className="w-full bg-transparent border-dashed border-white/20 text-zinc-400 hover:text-white hover:bg-white/5 h-9"
+                    >
+                      {isConnecting ? <RefreshCw className="w-3 h-3 mr-2 animate-spin" /> : <Plus className="w-3 h-3 mr-2" />}
+                      Connect Secondary Account
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="bio" className="text-zinc-400">Bio</Label>
@@ -631,74 +672,7 @@ export default function SettingsPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="email" className="space-y-6 mt-0">
-            <Card className="nodal-glass">
-              <CardHeader>
-                <CardTitle className="text-zinc-100">Email Accounts</CardTitle>
-                <CardDescription className="text-zinc-500">Manage connected Zoho Mail accounts for sending.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Primary Account */}
-                <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/5">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 rounded-2xl bg-[#002FA7]/20 flex items-center justify-center text-[#002FA7]">
-                      <Mail className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-zinc-200">{localEmail || 'Primary Account'}</p>
-                      <p className="text-xs text-zinc-500">Primary (Login ID)</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-full">Active</span>
-                  </div>
-                </div>
 
-                {/* Secondary Accounts */}
-                {connections.map((conn) => (
-                  <div key={conn.id} className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/5">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 rounded-2xl bg-purple-500/20 flex items-center justify-center text-purple-500">
-                        <Mail className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-zinc-200">{conn.email}</p>
-                        <p className="text-xs text-zinc-500">Secondary Sender</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-full">Connected</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-zinc-500 hover:text-red-400"
-                        onClick={async () => {
-                          if (!confirm('Disconnect this account?')) return
-                          await supabase.from('zoho_connections').delete().eq('id', conn.id)
-                          fetchConnections()
-                          toast.success('Account disconnected')
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-
-                <div className="pt-4 flex justify-center">
-                  <Button
-                    onClick={() => window.location.href = '/api/auth/zoho/connect-secondary'}
-                    disabled={isConnecting}
-                    variant="outline"
-                    className="bg-transparent border-white/10 text-zinc-300 hover:text-white hover:bg-white/5"
-                  >
-                    {isConnecting ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
-                    Connect Secondary Account
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </div>
       </Tabs>
     </div>
