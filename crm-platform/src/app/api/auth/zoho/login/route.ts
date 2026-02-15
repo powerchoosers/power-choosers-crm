@@ -4,11 +4,12 @@ import { NextResponse } from 'next/server';
 export async function GET(request: Request) {
     const clientId = process.env.ZOHO_CLIENT_ID;
 
-    // Dynamically determine the redirect URI based on the request origin
+    // Use raw origin to exactly match the request for Zoho's redirect_uri check
     const { origin } = new URL(request.url);
-    // Ensure we don't accidentally send www. to Zoho (invalid redirect URI)
-    const normalizedOrigin = origin.replace('://www.', '://');
-    const redirectUri = `${normalizedOrigin}/api/auth/callback/zoho`;
+    const useOrigin = origin.replace(/\/$/, '');
+    const redirectUri = `${useOrigin}/api/auth/callback/zoho`.replace('http://', 'https://');
+    // Ensure localhost still works with http
+    const finalRedirectUri = origin.includes('localhost') ? `${useOrigin}/api/auth/callback/zoho` : redirectUri;
 
     if (!clientId) {
         return NextResponse.json({ error: 'Missing Zoho Client ID' }, { status: 500 });
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
         response_type: 'code',
         client_id: clientId,
         scope: 'openid email profile ZohoMail.messages.READ ZohoMail.messages.CREATE ZohoMail.accounts.READ ZohoMail.folders.READ',
-        redirect_uri: redirectUri,
+        redirect_uri: finalRedirectUri,
         access_type: 'offline',
         prompt: 'consent',
     });
