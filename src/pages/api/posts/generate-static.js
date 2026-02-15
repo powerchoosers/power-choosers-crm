@@ -619,15 +619,15 @@ export default async function handler(req, res) {
       .eq('status', 'published')
       .order('publishDate', { ascending: false });
 
+    let postsForList = publishedPosts || [post];
     if (listFetchError) {
       logger.error('[GenerateStatic] Error fetching published posts for list:', listFetchError);
-      // Fallback with just current post
-      publishedPosts = [post];
+      postsForList = [post];
     }
 
     // Update posts-list.json
-    logger.log('[GenerateStatic] Updating posts-list.json with', publishedPosts.length, 'posts');
-    const listUrl = await updatePostsList(publishedPosts);
+    logger.log('[GenerateStatic] Updating posts-list.json with', postsForList.length, 'posts');
+    const listUrl = await updatePostsList(postsForList);
     logger.log('[GenerateStatic] posts-list.json updated:', listUrl);
 
     res.writeHead(200, { 'Content-Type': 'application/json' });

@@ -1093,7 +1093,7 @@ export function GeminiChatPanel() {
   // Host Google Avatar if needed
   useEffect(() => {
     const hostAvatar = async () => {
-      const photoURL = user?.photoURL
+      const photoURL = user?.user_metadata?.avatar_url || profile?.hostedPhotoUrl
       if (!photoURL) {
         setIsAvatarLoading(false)
         return
@@ -1136,7 +1136,7 @@ export function GeminiChatPanel() {
     if (isOpen) {
       hostAvatar()
     }
-  }, [isOpen, user?.photoURL])
+  }, [isOpen, user?.user_metadata?.avatar_url, profile?.hostedPhotoUrl])
 
   // Initialize with Contextual Greeting (skip when account/contact – proactive report will run instead)
   const isAccountOrContact = contextInfo.type === 'account' || contextInfo.type === 'contact'
