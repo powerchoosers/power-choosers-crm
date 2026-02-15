@@ -14,6 +14,7 @@ import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export default function SettingsPage() {
   const { user, profile, role, refreshProfile } = useAuth()
@@ -61,6 +62,8 @@ export default function SettingsPage() {
     if (action === 'zoho_callback' && code && !isConnecting) {
       const finalize = async () => {
         setIsConnecting(true)
+        const toastId = toast.loading('Establishing secure connection...')
+
         try {
           const { data: { session } } = await supabase.auth.getSession()
           const token = session?.access_token
@@ -81,18 +84,26 @@ export default function SettingsPage() {
             throw new Error(err.error || 'Failed to connect')
           }
 
-          toast.success('Account connected successfully')
-          fetchConnections()
-          router.replace('/network/settings')
+          toast.success('Account connected successfully', { id: toastId })
+
+          // Clear URL immediately to prevent double-processing
+          const newParams = new URLSearchParams(window.location.search)
+          newParams.delete('action')
+          newParams.delete('code')
+          newParams.delete('status')
+          router.replace(`${window.location.pathname}${newParams.toString() ? '?' + newParams.toString() : ''}`)
+
+          // Re-fetch connections to update UI with animation
+          await fetchConnections()
         } catch (e: any) {
-          toast.error(e.message || 'Failed to connect account')
+          toast.error(e.message || 'Failed to connect account', { id: toastId })
         } finally {
           setIsConnecting(false)
         }
       }
       finalize()
     }
-  }, [searchParams])
+  }, [searchParams, router, isConnecting])
 
   // Phone number formatter: +1 (XXX)-XXX-XXXX
   const formatPhoneNumber = (value: string) => {
@@ -355,32 +366,63 @@ export default function SettingsPage() {
                 <div className="space-y-3">
                   <Label className="text-zinc-400">Connected Accounts (Sending)</Label>
                   <div className="space-y-2">
-                    {connections.map((conn) => (
-                      <div key={conn.id} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5 group">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-500">
-                            <Mail className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <p className="text-xs font-medium text-zinc-200">{conn.email}</p>
-                            <p className="text-[10px] text-zinc-500">Secondary Sender</p>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={async () => {
-                            if (!confirm('Disconnect this account?')) return
-                            await supabase.from('zoho_connections').delete().eq('id', conn.id)
-                            fetchConnections()
-                            toast.success('Account disconnected')
-                          }}
+                    <AnimatePresence initial={false}>
+                      {connections.map((conn) => (
+                        <motion.div
+                          key={conn.id}
+                          initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                          animate={{ opacity: 1, height: 'auto', marginTop: 8 }}
+                          exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                          className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5 group overflow-hidden"
                         >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    ))}
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-500">
+                              <Mail className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium text-zinc-200">{conn.email}</p>
+                              <p className="text-[10px] text-zinc-500">Secondary Sender</p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={async () => {
+                              if (!confirm('Disconnect this account?')) return
+                              const toastId = toast.loading('Disconnecting...')
+                              try {
+                                const { error } = await supabase.from('zoho_connections').delete().eq('id', conn.id)
+                                if (error) throw error
+                                setConnections(prev => prev.filter(c => c.id !== conn.id))
+                                toast.success('Account disconnected', { id: toastId })
+                              } catch (e: any) {
+                                toast.error('Failed to disconnect', { id: toastId })
+                              }
+                            }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </motion.div>
+                      ))}
+
+                      {isConnecting && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                          animate={{ opacity: 1, height: 'auto', marginTop: 8 }}
+                          className="flex items-center space-x-3 p-3 rounded-lg bg-white/[0.02] border border-white/5 border-dashed"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
+                            <RefreshCw className="w-4 h-4 text-zinc-500 animate-spin" />
+                          </div>
+                          <div className="space-y-1">
+                            <div className="h-3 w-32 bg-white/5 rounded animate-pulse" />
+                            <div className="h-2 w-20 bg-white/5 rounded animate-pulse" />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
                     <Button
                       onClick={() => window.location.href = '/api/auth/zoho/connect-secondary'}
