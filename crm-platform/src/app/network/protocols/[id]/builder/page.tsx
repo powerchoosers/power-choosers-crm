@@ -366,13 +366,13 @@ function ProtocolArchitectInner() {
   useEffect(() => {
     const fetchEmails = async () => {
       if (!user?.email) return;
-      const emails = [user.email];
+      const emailSet = new Set<string>([user.email]);
       const userId = (user as any).uid || (user as any).id;
       const { data } = await supabase.from('zoho_connections').select('email').eq('user_id', userId);
       if (data) {
-        emails.push(...data.map(d => d.email));
+        data.forEach(d => emailSet.add(d.email));
       }
-      setAvailableEmails(emails);
+      setAvailableEmails(Array.from(emailSet));
     };
     fetchEmails();
   }, [user]);
@@ -601,8 +601,8 @@ function ProtocolArchitectInner() {
 
       const data = await response.json();
       updateNodeData(selectedNode.id, {
-        body: data.optimized,
-        subject: data.subject || selectedNode.data.subject
+        aiBody: data.optimized,
+        aiSubject: data.subject || selectedNode.data.subject
       });
       setAiLogic(data.logic || '');
       setAiSubject(data.subject || '');
@@ -635,7 +635,7 @@ function ProtocolArchitectInner() {
             email: senderEmail || user?.email,
             name: profile?.firstName ? `${profile.firstName} | Nodal Point` : 'Lewis | Nodal Point'
           },
-          subject: aiSubject || selectedNode.data.subject || 'Test Message from Nodal Point',
+          subject: aiSubject || (emailViewMode === 'ai' ? selectedNode.data.aiSubject : selectedNode.data.subject) || 'Test Message from Nodal Point',
           html: previewBody,
           trackClicks: true,
           trackOpens: true,
@@ -657,14 +657,18 @@ function ProtocolArchitectInner() {
     }
   };
 
-  // Auto-generate preview when contact changes
+  // Auto-generate preview when contact changes AND we are in AI mode
   useEffect(() => {
-    if (testContact && selectedNode?.data.prompt && selectedNode?.data.type === 'email') {
+    if (testContact && selectedNode?.data.prompt && selectedNode?.data.type === 'email' && emailViewMode === 'ai') {
       generateEmailPreview();
     }
-  }, [testContact?.id, selectedNode?.id]);
+  }, [testContact?.id, selectedNode?.id, emailViewMode]);
 
-  const previewBody = useMemo(() => {
+  const previewBody = useMemo<string>(() => {
+    if (emailViewMode === 'ai') {
+      return (selectedNode?.data.aiBody as string) || '';
+    }
+
     const body = selectedNode?.data.body as string || '';
     if (!testContact) return body;
 
@@ -674,7 +678,7 @@ function ProtocolArchitectInner() {
       .replace(/{{company_name}}/g, testContact.metadata?.general?.company || 'your company')
       .replace(/{{load_zone}}/g, testContact.metadata?.energy?.loadZone || 'LZ_NORTH')
       .replace(/{{scarcity_risk}}/g, 'HIGH'); // Mocked for now
-  }, [selectedNode?.data.body, testContact]);
+  }, [selectedNode?.data.body, selectedNode?.data.aiBody, testContact, emailViewMode]);
 
   // Phase 2: Two-Way Binding
   const updateNodeData = useCallback((nodeId: string, newData: any) => {
@@ -1775,10 +1779,16 @@ function ProtocolArchitectInner() {
                       {!isContactSearching ? (
                         <>
                           <Select value={testContactId} onValueChange={setTestContactId}>
-                            <SelectTrigger className="flex-1 bg-black/40 border-white/5 rounded-xl h-12 font-mono text-sm focus:ring-0 focus:border-[#002FA7]">
+                            <SelectTrigger className="flex-1 bg-black/40 border-white/5 rounded-xl h-9 font-mono text-xs focus:ring-0 focus:border-[#002FA7]">
                               <SelectValue placeholder="Choose a contact..." />
                             </SelectTrigger>
-                            <SelectContent className="bg-zinc-950 nodal-monolith-edge">
+                            <SelectContent className="bg-zinc-950 nodal-monolith-edge max-h-[240px]">
+                              {/* Inject the selected contact if it's not in the loaded page to ensure label renders */}
+                              {testContact && !contactsData?.pages?.flatMap(page => page.contacts).find(c => c.id === testContactId) && (
+                                <SelectItem key={testContact.id} value={testContact.id}>
+                                  {testContact.firstName || testContact.name} {testContact.lastName || ''} ({testContact.company || testContact.metadata?.general?.company || 'No Company'})
+                                </SelectItem>
+                              )}
                               {contactsData?.pages?.flatMap(page => page.contacts).map((contact: Contact) => (
                                 <SelectItem key={contact.id} value={contact.id}>
                                   {contact.firstName || contact.name} {contact.lastName || ''} ({contact.company || contact.metadata?.general?.company || 'No Company'})
@@ -1789,10 +1799,10 @@ function ProtocolArchitectInner() {
                           <Button
                             onClick={() => setIsContactSearching(true)}
                             variant="ghost"
-                            className="h-12 w-12 bg-black/40 border border-white/5 rounded-xl text-zinc-400 hover:text-white"
+                            className="h-9 w-9 bg-black/40 border border-white/5 rounded-xl text-zinc-400 hover:text-white flex items-center justify-center p-0"
                             title="Search Contacts"
                           >
-                            <Search className="w-5 h-5" />
+                            <Search className="w-4 h-4" />
                           </Button>
                         </>
                       ) : (
@@ -1802,8 +1812,8 @@ function ProtocolArchitectInner() {
                               <input
                                 type="text"
                                 autoFocus
-                                placeholder="Search contacts..."
-                                className="w-full bg-black/40 border border-white/5 rounded-xl h-12 px-4 font-mono text-sm focus:border-[#002FA7] outline-none transition-all"
+                                placeholder="Type name..."
+                                className="w-full bg-black/40 border border-white/5 rounded-xl h-9 px-3 font-mono text-xs focus:border-[#002FA7] outline-none transition-all placeholder:text-zinc-600"
                                 value={contactSearchQuery}
                                 onChange={(e) => setContactSearchQuery(e.target.value)}
                               />
@@ -1817,9 +1827,9 @@ function ProtocolArchitectInner() {
                                         setIsContactSearching(false);
                                         setContactSearchQuery('');
                                       }}
-                                      className="w-full px-4 py-3 text-left hover:bg-white/5 border-b border-white/5 last:border-0 transition-colors"
+                                      className="w-full px-3 py-2 text-left hover:bg-white/5 border-b border-white/5 last:border-0 transition-colors"
                                     >
-                                      <div className="text-sm font-mono text-zinc-200">{contact.name}</div>
+                                      <div className="text-xs font-mono text-zinc-200">{contact.name}</div>
                                       <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-tighter">{contact.company || 'Private Contact'}</div>
                                     </button>
                                   ))}
@@ -1832,9 +1842,9 @@ function ProtocolArchitectInner() {
                                 setContactSearchQuery('');
                               }}
                               variant="ghost"
-                              className="h-12 w-12 bg-black/40 border border-white/5 rounded-xl text-zinc-400 hover:text-white"
+                              className="h-9 w-9 bg-black/40 border border-white/5 rounded-xl text-zinc-400 hover:text-white flex items-center justify-center p-0"
                             >
-                              <XCircle className="w-5 h-5" />
+                              <XCircle className="w-4 h-4" />
                             </Button>
                           </div>
                         </div>
@@ -1875,7 +1885,7 @@ function ProtocolArchitectInner() {
                           <div className="mb-4 pb-4 border-b border-white/5">
                             <span className="text-[10px] text-zinc-500 font-mono block mb-1 uppercase tracking-widest">Subject</span>
                             <span className="text-zinc-100 font-mono">
-                              {aiSubject || selectedNode?.data.subject as string || '(No Subject)'}
+                              {(emailViewMode === 'ai' ? (selectedNode?.data.aiSubject as string) : (selectedNode?.data.subject as string)) || '(No Subject)'}
                             </span>
                           </div>
                         )}

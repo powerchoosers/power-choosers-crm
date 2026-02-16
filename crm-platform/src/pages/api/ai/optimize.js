@@ -76,7 +76,7 @@ export default async function handler(req, res) {
           - Output MUST be a valid JSON object with the following keys:
             {
               "subject_line": "Forensic and direct subject",
-              "body_html": "Email body with <p> and <br> tags. If you include a greeting, follow it with two <br> tags. Use {{first_name}} for personalization.",
+              "body_html": "Email body with <p> and <br> tags. If you include a greeting, follow it with two <br> tags. Use the actual contact name and company name provided in the NEURAL_CONTEXT (e.g. 'Hi Sarah,' or 'your facility in Dallas'). NEVER use placeholders like {{first_name}} when actual names are present in the context.",
               "logic_reasoning": "A concise explanation of the AI's decision-making."
             }
         `;

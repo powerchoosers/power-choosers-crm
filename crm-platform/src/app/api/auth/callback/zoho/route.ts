@@ -196,17 +196,22 @@ export async function GET(request: Request) {
 
         // --- SYNC TO ZOHO_CONNECTIONS (Used for sender management) ---
         console.log('Zoho OAuth: Syncing to zoho_connections...');
+        const connectionPayload: any = {
+            user_id: finalUid,
+            email: userEmail,
+            access_token: accessToken,
+            token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
+            account_id: zohoAccountId,
+            updated_at: new Date().toISOString()
+        };
+
+        if (refreshToken) {
+            connectionPayload.refresh_token = refreshToken;
+        }
+
         const { error: connectionError } = await supabaseAdmin
             .from('zoho_connections')
-            .upsert({
-                user_id: finalUid,
-                email: userEmail,
-                access_token: accessToken,
-                refresh_token: refreshToken || undefined,
-                token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
-                account_id: zohoAccountId,
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id, email' });
+            .upsert(connectionPayload, { onConflict: 'user_id, email' });
 
         if (connectionError) {
             console.warn('Supabase Error syncing to zoho_connections:', connectionError);
