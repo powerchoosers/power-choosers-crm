@@ -82,6 +82,17 @@ export default async function handler(req, res) {
             url: originalUrl.substring(0, 50) + '...',
             deviceType
           });
+
+          // TRIGGER SEQUENCE ADVANCEMENT (If part of a sequence)
+          const memberId = existingMeta.member_id || existingMeta.memberId;
+          if (memberId) {
+            logger.info(`[Email Click] Advancing sequence for member: ${memberId}`, { trackingId });
+            const { error: rpcError } = await supabaseAdmin.rpc('advance_sequence_member', {
+              p_member_id: memberId,
+              p_outcome: 'clicked'
+            });
+            if (rpcError) logger.error('[Email Click] RPC Error advancing sequence:', rpcError);
+          }
         }
       }
     } catch (error) {

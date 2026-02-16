@@ -37,7 +37,7 @@ export default async function handler(req, res) {
     // Extract tracking ID from URL path: /api/email/track/{trackingId}
     // The [id] in the filename means it's a path parameter, not a query parameter
     let trackingId = '';
-    
+
     // Try to get from URL path first (most reliable)
     if (req.url) {
       const urlPath = req.url.split('?')[0]; // Remove query string
@@ -47,12 +47,12 @@ export default async function handler(req, res) {
         trackingId = String(pathParts[trackIndex + 1]).trim();
       }
     }
-    
+
     // Fallback to query parameter if path extraction failed (for compatibility)
     if (!trackingId && req.query?.id) {
       trackingId = String(req.query.id).trim();
     }
-    
+
     // Final fallback: try to extract from req.url directly
     if (!trackingId && req.url) {
       const match = req.url.match(/\/api\/email\/track\/([^/?]+)/);
@@ -60,7 +60,7 @@ export default async function handler(req, res) {
         trackingId = String(match[1]).trim();
       }
     }
-    
+
     trackingId = trackingId || '';
 
     // Log tracking ID extraction for debugging
@@ -95,7 +95,7 @@ export default async function handler(req, res) {
           res.end(PIXEL);
           return;
         }
-        
+
         // CRITICAL FIX: In-memory deduplication to prevent rapid duplicate opens
         // This is especially important for Gmail threads where opening one email
         // may load/render all emails in the thread, triggering multiple pixels
@@ -103,21 +103,21 @@ export default async function handler(req, res) {
         const dedupeKey = `${trackingId}_${userKey}`;
         const now = Date.now();
         const lastOpen = trackingDedupeCache.get(dedupeKey);
-        
+
         if (lastOpen && (now - lastOpen) < DEDUP_WINDOW_MS) {
           // Duplicate open within window - skip recording but still return pixel
-          logger.debug('[Email Track] Duplicate open ignored (in-memory cache):', { 
+          logger.debug('[Email Track] Duplicate open ignored (in-memory cache):', {
             trackingId: trackingId.substring(0, 30),
-            timeSinceLastOpen: now - lastOpen 
+            timeSinceLastOpen: now - lastOpen
           });
           setPixelHeaders(res);
           res.end(PIXEL);
           return;
         }
-        
+
         // Update in-memory cache first (fast path)
         trackingDedupeCache.set(dedupeKey, now);
-        
+
         // Fetch current email data from Supabase (include metadata so we preserve ownerId for Realtime notifications)
         const { data: currentData, error: fetchError } = await supabaseAdmin
           .from('emails')
@@ -173,6 +173,20 @@ export default async function handler(req, res) {
               deviceType,
               openCount: (currentData.openCount || 0) + 1
             });
+
+            // TRIGGER SEQUENCE ADVANCEMENT (If part of a sequence)
+            // We check the metadata for member_id or sequence_id
+            const memberId = existingMeta.member_id || existingMeta.memberId;
+            if (memberId) {
+              logger.info(`[Email Track] Advancing sequence for member: ${memberId}`, { trackingId });
+              // We call the utility function via RPC or direct SQL if possible
+              // For Edge Functions / API routes, we use supabaseAdmin.rpc
+              const { error: rpcError } = await supabaseAdmin.rpc('advance_sequence_member', {
+                p_member_id: memberId,
+                p_outcome: 'opened'
+              });
+              if (rpcError) logger.error('[Email Track] RPC Error advancing sequence:', rpcError);
+            }
           }
         } else {
           logger.debug('[Email Track] Document not found:', { trackingId: trackingId.substring(0, 30) });

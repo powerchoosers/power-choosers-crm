@@ -1,8 +1,8 @@
 /**
  * Process Sequence Step Edge Function
  * 
- * This function processes sequence steps from the queue, sending emails via Gmail API
- * and handling delays, retries, and step completion tracking.
+ * This function processes sequence steps from the queue, handling AI generation,
+ * email sending via Zoho, task creation for manual steps, and sequential advancement.
  */
 
 // Setup type definitions for built-in Supabase Runtime APIs
@@ -15,13 +15,12 @@ const sql = postgres(
   Deno.env.get('SUPABASE_DB_URL')!
 )
 
-// Job schema from queue (permissive metadata for pgmq payload)
+// Job schema from queue
 const jobSchema = z.object({
   jobId: z.number(),
   execution_id: z.string(),
   sequence_id: z.string(),
   member_id: z.string(),
-  step_index: z.number(),
   step_type: z.string(),
   metadata: z.any().optional()
 })
@@ -34,17 +33,7 @@ type Job = z.infer<typeof jobSchema>
 type FailedJob = z.infer<typeof failedJobSchema>
 
 const QUEUE_NAME = 'sequence_jobs'
-const API_BASE_URL = Deno.env.get('API_BASE_URL') || 'https://nodal-point-network.vercel.app'
-/** Burner domain for cold/sequence emails (e.g. getnodalpoint.com). From address = localPart@BURNER_DOMAIN. */
-const BURNER_DOMAIN = Deno.env.get('BURNER_DOMAIN') || 'getnodalpoint.com'
-
-/** Derive burner from address from owner email: l.patterson@nodalpoint.io -> l.patterson@getnodalpoint.com */
-function burnerFromAddress(ownerEmail: string | null | undefined): string {
-  if (!ownerEmail || typeof ownerEmail !== 'string') return `hello@${BURNER_DOMAIN}`
-  const at = ownerEmail.indexOf('@')
-  const localPart = at > 0 ? ownerEmail.slice(0, at).trim() : 'hello'
-  return `${localPart}@${BURNER_DOMAIN}`
-}
+const API_BASE_URL = Deno.env.get('API_BASE_URL') || 'https://nodalpoint.io'
 
 // Listen for HTTP requests
 Deno.serve(async (req) => {
@@ -57,8 +46,8 @@ Deno.serve(async (req) => {
       return new Response('expected json body', { status: 400 })
     }
 
-    // Use Zod to parse and validate the request body
-    const parseResult = z.array(jobSchema).safeParse(await req.json())
+    const body = await req.json()
+    const parseResult = z.array(jobSchema).safeParse(body)
     if (parseResult.error) {
       return new Response(`invalid request body: ${parseResult.error.message}`, {
         status: 400
@@ -66,10 +55,7 @@ Deno.serve(async (req) => {
     }
 
     const pendingJobs = parseResult.data
-
-    // Track jobs that completed successfully
     const completedJobs: Job[] = []
-    // Track jobs that failed due to an error
     const failedJobs: FailedJob[] = []
 
     async function processJobs() {
@@ -88,10 +74,8 @@ Deno.serve(async (req) => {
     }
 
     try {
-      // Process jobs while listening for worker termination
       await Promise.race([processJobs(), catchUnload()])
     } catch (error) {
-      // If the worker is terminating, add pending jobs to fail list
       failedJobs.push(
         ...pendingJobs.map((job) => ({
           ...job,
@@ -100,32 +84,20 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Log completed and failed jobs
     console.log('finished processing sequence steps:', {
       completedJobs: completedJobs.length,
       failedJobs: failedJobs.length
     })
 
     return new Response(
-      JSON.stringify({
-        completedJobs,
-        failedJobs
-      }),
-      {
-        status: 200,
-        headers: {
-          'content-type': 'application/json',
-          'x-completed-jobs': completedJobs.length.toString(),
-          'x-failed-jobs': failedJobs.length.toString()
-        }
-      }
+      JSON.stringify({ completedJobs, failedJobs }),
+      { status: 200, headers: { 'content-type': 'application/json' } }
     )
   } catch (topError) {
     const msg = topError instanceof Error ? topError.message : String(topError)
-    const stack = topError instanceof Error ? topError.stack : ''
-    console.error('[process-sequence-step] top-level error:', msg, stack)
+    console.error('[process-sequence-step] top-level error:', msg)
     return new Response(
-      JSON.stringify({ error: msg, stack: stack?.slice(0, 500) }),
+      JSON.stringify({ error: msg }),
       { status: 200, headers: { 'content-type': 'application/json' } }
     )
   }
@@ -135,254 +107,262 @@ Deno.serve(async (req) => {
  * Processes a sequence step job
  */
 async function processJob(job: Job) {
-  const { jobId, execution_id, sequence_id, member_id, step_type, metadata } = job
+  const { jobId, execution_id } = job
 
-  console.log('[ProcessJob] Starting:', { execution_id, step_type })
+  console.log('[ProcessJob] Starting:', execution_id)
 
   // Fetch execution details
-  const [execRow]: any[] = await sql`
-    SELECT id, sequence_id, member_id, step_index, step_type, status, metadata, retry_count
+  const [execution]: any[] = await sql`
+    SELECT id, sequence_id, member_id, step_type, status, metadata, scheduled_at
     FROM sequence_executions
     WHERE id = ${execution_id}
   `
-  if (!execRow) {
+  if (!execution) {
     throw new Error(`Execution not found: ${execution_id}`)
   }
+
+  // Fetch member/contact details
   const [memberRow]: any[] = await sql`
-    SELECT "targetId", "targetType" FROM sequence_members WHERE id = ${execRow.member_id}
+    SELECT m.id, m."targetId", m."targetType", m.current_node_id, 
+           c.email as contact_email, c."firstName", c."lastName", c."accountId",
+           a.name as company_name,
+           u.email as owner_email, u.first_name as owner_first_name
+    FROM sequence_members m
+    JOIN contacts c ON m."targetId" = c.id
+    LEFT JOIN accounts a ON c."accountId" = a.id
+    JOIN sequences s ON m."sequenceId" = s.id
+    JOIN users u ON s."ownerId" = u.email
+    WHERE m.id = ${execution.member_id}
   `
   if (!memberRow) {
-    throw new Error(`Sequence member not found: ${execRow.member_id}`)
-  }
-  const execution = {
-    ...execRow,
-    contact_id: (memberRow as any).targetId ?? (memberRow as any).targetid,
-    target_type: (memberRow as any).targetType ?? (memberRow as any).targettype
+    throw new Error(`Sequence member/contact not found: ${execution.member_id}`)
   }
 
-  // Update execution status to processing
-  await sql`
-    UPDATE sequence_executions
-    SET 
-      status = 'processing',
-      executed_at = NOW(),
-      updated_at = NOW()
-    WHERE id = ${execution_id}
-  `
+  const context = {
+    execution,
+    member: memberRow,
+    contact: {
+      id: memberRow.targetId,
+      email: memberRow.contact_email,
+      firstName: memberRow.firstName,
+      lastName: memberRow.lastName,
+      companyName: memberRow.company_name
+    },
+    owner: {
+      email: memberRow.owner_email,
+      name: `${memberRow.owner_first_name || 'Nodal Point'} | Nodal Point`
+    }
+  }
 
+  // Handle Multi-Stage Progression
   try {
-    // Process based on step type
-    switch (step_type) {
-      case 'email':
-        await processEmailStep(execution)
+    switch (execution.status) {
+      case 'awaiting_generation':
+        await handleGeneration(context)
         break
-      case 'delay':
-        await processDelayStep(execution)
+      case 'pending':
+      case 'pending_send':
+        await handleExecution(context)
         break
-      case 'call':
-      case 'linkedin':
-      case 'recon':
-      case 'trigger':
-        // These types are not automated yet - mark as skipped
-        await sql`
-          UPDATE sequence_executions
-          SET 
-            status = 'skipped',
-            completed_at = NOW(),
-            updated_at = NOW(),
-            error_message = 'Step type not automated yet'
-          WHERE id = ${execution_id}
-        `
+      case 'processing':
+        console.log('[ProcessJob] Step already processing:', execution_id)
+        break
+      case 'waiting':
+        console.log('[ProcessJob] Step waiting for engagement/timeout:', execution_id)
         break
       default:
-        throw new Error(`Unknown step type: ${step_type}`)
+        console.warn('[ProcessJob] Unknown status:', execution.status)
     }
 
-    // Mark as completed
-    await sql`
-      UPDATE sequence_executions
-      SET 
-        status = 'completed',
-        completed_at = NOW(),
-        updated_at = NOW()
-      WHERE id = ${execution_id}
-    `
-
-    // Delete from queue
+    // Delete from queue if successfully handled or skipped
     await sql`SELECT pgmq.delete(${QUEUE_NAME}, ${jobId}::bigint)`
 
-    console.log('[ProcessJob] Completed:', { execution_id, step_type })
-
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : JSON.stringify(error)
-    const retryCount = (execution.retry_count || 0) + 1
-    const maxRetries = 3
-
-    console.error('[ProcessJob] Failed:', { execution_id, error: errorMessage, retryCount })
-
-    // Update execution with error
+    console.error('[ProcessJob] Error:', error)
+    // Update status to failed for retries
     await sql`
       UPDATE sequence_executions
-      SET 
-        status = ${retryCount >= maxRetries ? 'failed' : 'pending'},
-        error_message = ${errorMessage},
-        retry_count = ${retryCount},
-        updated_at = NOW()
+      SET status = 'failed', error_message = ${error.message}, updated_at = NOW()
       WHERE id = ${execution_id}
     `
-
-    // If max retries reached, delete from queue
-    if (retryCount >= maxRetries) {
-      await sql`SELECT pgmq.delete(${QUEUE_NAME}, ${jobId}::bigint)`
-    }
-
     throw error
   }
 }
 
 /**
- * Process email step - send email via Gmail API
+ * Stage 1: AI Email Generation
  */
-async function processEmailStep(execution: any) {
-  const { id, contact_id, metadata, sequence_id } = execution
+async function handleGeneration(ctx: any) {
+  const { execution, contact, owner } = ctx
+  console.log('[HandleGeneration] Drafting email for:', contact.email)
 
-  // Resolve sender: sequence owner email -> actual user email + display name (e.g. Lewis | Nodal Point)
-  // Also fetch bgvector to check for explicit sender identity
-  const [seqRow]: any[] = await sql`
-    SELECT "ownerId", bgvector FROM sequences WHERE id = ${sequence_id}
-  `
-  const ownerEmail = seqRow?.ownerId ?? (seqRow as any)?.ownerid
-  const bgvector = seqRow?.bgvector ?? (seqRow as any)?.bgvector ?? {}
-
-  // 1. explicit sender from protocol settings
-  // 2. owner email
-  // 3. fallback
-  const settingsSender = bgvector?.settings?.senderEmail
-  const fromEmail = settingsSender || ownerEmail || 'noreply@nodalpoint.io'
-
-  let fromName = 'Nodal Point'
-  if (fromEmail) {
-    // Try to find user by the sending email to get their name
-    const [userRow]: any[] = await sql`
-      SELECT first_name, last_name FROM users WHERE email = ${fromEmail}
-    `
-    const firstName = (userRow as any)?.first_name
-    const lastName = (userRow as any)?.last_name
-
-    if (firstName && String(firstName).trim()) {
-      fromName = `${String(firstName).trim()} | Nodal Point`
-    }
-  }
-
-  console.log('[ProcessEmail] Fetching contact:', { contact_id, fromEmail, fromName, usingSettings: !!settingsSender })
-
-  // Fetch contact details
-  const [contactRow]: any[] = await sql`
-    SELECT id, email, "firstName", "lastName", "accountId"
-    FROM contacts
-    WHERE id = ${contact_id}
-  `
-  if (!contactRow || !contactRow.email) {
-    throw new Error(`Contact not found or has no email: ${contact_id}`)
-  }
-  let companyName = ''
-  if (contactRow.accountId) {
-    const accountRows: any[] = await sql`
-      SELECT name FROM accounts WHERE id = ${contactRow.accountId}
-    `
-    companyName = accountRows[0]?.name ?? ''
-  }
-  const contact = { ...contactRow, companyName }
-
-  // Extract email details from metadata
-  const subject = metadata?.subject || 'Message from Nodal Point'
-  const body = metadata?.body || metadata?.html || ''
-  const prompt = metadata?.prompt || ''
-
-  // If we have a prompt, we should generate the email body using AI
-  // For now, we'll use the body directly
-  let htmlBody = body
-
-  // Replace variables in the email body
-  htmlBody = htmlBody
-    .replace(/\{\{first_name\}\}/g, contact.firstName || '')
-    .replace(/\{\{last_name\}\}/g, contact.lastName || '')
-    .replace(/\{\{company_name\}\}/g, contact.companyName || '')
-  const textBody = htmlBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-
-  console.log('[ProcessEmail] Sending email:', {
-    to: contact.email,
-    from: fromEmail,
-    subject,
-    bodyLength: htmlBody.length
-  })
-
-  // Prepare payload for Zoho Sequence API
-  // Note: zoho-send-sequence expects 'from' to be the userEmail/sender, 
-  // and it will derive the 'userEmail' from field for token lookup.
-  const payload = {
-    to: {
-      email: contact.email,
-      name: `${(contact.firstName || '').trim()} ${(contact.lastName || '').trim()}`.trim() || contact.email
-    },
-    from: {
-      email: fromEmail,
-      name: fromName
-    },
-    subject: subject || 'Message from Nodal Point',
-    html: htmlBody || undefined,
-    text: textBody || htmlBody || 'No content',
-    tags: ['sequence', `sequence_${execution.sequence_id}`],
-    trackClicks: true,
-    trackOpens: true
-  }
-
-  // Send email via Zoho API through our backend
-  // Switched from gmail-send-sequence to zoho-send-sequence
-  const endpoint = `${API_BASE_URL}/api/email/zoho-send-sequence`
-  console.log('[ProcessEmail] Posting to:', endpoint)
-
+  // Call AI optimization API
+  const endpoint = `${API_BASE_URL}/api/ai/optimize`
   const response = await fetch(endpoint, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(payload)
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      prompt: execution.metadata?.prompt || 'Draft a personalized follow-up',
+      mode: 'generate_email',
+      contact: {
+        name: `${contact.firstName} ${contact.lastName}`,
+        company: contact.companyName,
+        email: contact.email
+      }
+    })
   })
 
   if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`Email API error (${response.status}): ${errorText}`)
+    throw new Error(`AI generation failed: ${response.statusText}`)
   }
 
   const result = await response.json()
-  console.log('[ProcessEmail] Email sent:', result)
+  const generatedBody = result.optimizedContent || result.content
+  const subject = result.subject || execution.metadata?.subject || 'Message from Nodal Point'
 
-  // Update execution metadata with send result
+  // Insert into CRM 'emails' table for visibility in "Uplink Out"
+  const emailId = crypto.randomUUID()
+  await sql`
+    INSERT INTO emails (
+      id, "contactId", "accountId", "from", "to", subject, html, status, type, "ownerId", metadata
+    ) VALUES (
+      ${emailId},
+      ${contact.id},
+      ${ctx.member.accountId || null},
+      ${owner.email},
+      ${JSON.stringify({ email: contact.email, name: `${contact.firstName} ${contact.lastName}` })},
+      ${subject},
+      ${generatedBody},
+      'pending',
+      'scheduled',
+      ${owner.email},
+      ${JSON.stringify({
+    execution_id: execution.id,
+    member_id: ctx.member.id,
+    sequence_id: execution.sequence_id,
+    is_uplink_out: true
+  })}
+    )
+  `
+
+  // Update execution with generated content and the email record ID
   await sql`
     UPDATE sequence_executions
     SET 
       metadata = metadata || ${JSON.stringify({
-    messageId: result.messageId,
-    sentAt: new Date().toISOString()
+    body: generatedBody,
+    subject: subject,
+    crm_email_id: emailId
   })},
+      status = 'pending_send',
       updated_at = NOW()
-    WHERE id = ${id}
+    WHERE id = ${execution.id}
   `
 }
 
 /**
- * Process delay step - these are just markers, nothing to do
+ * Stage 2: Execution (Sending Email or Creating Task)
  */
-async function processDelayStep(execution: any) {
-  console.log('[ProcessDelay] Delay step completed:', { execution_id: execution.id })
-  // Delay steps don't require any action - they just mark time
-  // The scheduling is handled by the scheduled_at timestamp
+async function handleExecution(ctx: any) {
+  const { execution, contact, owner } = ctx
+  const { step_type } = execution
+
+  // Check if scheduled_at is in the past
+  if (new Date(execution.scheduled_at) > new Date()) {
+    console.log('[HandleExecution] Step scheduled for future:', execution.scheduled_at)
+    return
+  }
+
+  // Update status to processing
+  await sql`UPDATE sequence_executions SET status = 'processing', updated_at = NOW() WHERE id = ${execution.id}`
+
+  if (step_type === 'email') {
+    await sendEmail(ctx)
+  } else if (['call', 'linkedin', 'recon'].includes(step_type)) {
+    await createTask(ctx)
+  } else {
+    // Other types (delay, trigger) - advance immediately
+    await sql`SELECT util.advance_sequence_member(${ctx.member.id})`
+  }
 }
 
-/**
- * Returns a promise that rejects if the worker is terminating
- */
+async function sendEmail(ctx: any) {
+  const { execution, contact, owner } = ctx
+  console.log('[SendEmail] Delivering via Zoho to:', contact.email)
+
+  const payload = {
+    to: { email: contact.email, name: `${contact.firstName} ${contact.lastName}` },
+    from: { email: owner.email, name: owner.name },
+    subject: execution.metadata?.subject || 'Message from Nodal Point',
+    html: execution.metadata?.body || '',
+    trackClicks: true,
+    trackOpens: true,
+    email_id: execution.metadata?.crm_email_id, // Pass existing CRM record ID
+    metadata: { execution_id: execution.id, member_id: ctx.member.id }
+  }
+
+  const endpoint = `${API_BASE_URL}/api/email/zoho-send-sequence`
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+
+  if (!response.ok) {
+    throw new Error(`Email sending failed: ${await response.text()}`)
+  }
+
+  const result = await response.json()
+
+  // Calculate wait_until for no-reply branch (default 3 days if not specified)
+  const waitDays = execution.metadata?.wait_days || 3
+  const waitUntil = new Date()
+  waitUntil.setDate(waitUntil.getDate() + waitDays)
+
+  // Move to waiting state
+  await sql`
+    UPDATE sequence_executions
+    SET 
+      status = 'waiting',
+      metadata = metadata || ${JSON.stringify({ messageId: result.messageId, sentAt: new Date().toISOString() })},
+      wait_until = ${waitUntil.toISOString()},
+      updated_at = NOW()
+    WHERE id = ${execution.id}
+  `
+}
+
+async function createTask(ctx: any) {
+  const { execution, contact, owner } = ctx
+  console.log('[CreateTask] Creating manual step:', execution.step_type)
+
+  const titleMap: any = {
+    call: `📞 Call: ${contact.firstName} (${contact.companyName || 'Unknown'})`,
+    linkedin: `🔗 LinkedIn: ${contact.firstName} ${contact.lastName}`,
+    recon: `🔍 Recon: ${contact.companyName || 'Research target'}`
+  }
+
+  const taskId = crypto.randomUUID()
+
+  await sql`
+    INSERT INTO tasks (
+      id, title, description, status, priority, "contactId", "accountId", "ownerId", metadata
+    ) VALUES (
+      ${taskId},
+      ${titleMap[execution.step_type] || 'Sequence Task'},
+      ${execution.metadata?.prompt || 'Manual follow-up required'},
+      'pending',
+      'high',
+      ${contact.id},
+      ${ctx.member.accountId || null},
+      ${owner.email},
+      ${JSON.stringify({ execution_id: execution.id, member_id: ctx.member.id, sequence_id: execution.sequence_id })}
+    )
+  `
+
+  // We leave the execution in 'processing' status. 
+  // A trigger or separate sync should call util.advance_sequence_member when taskId is completed.
+}
+
 function catchUnload() {
   return new Promise((reject) => {
     addEventListener('beforeunload', (ev: any) => {
