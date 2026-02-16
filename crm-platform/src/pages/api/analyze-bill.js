@@ -127,28 +127,27 @@ export default async function analyzeBillHandler(req, res) {
             res.end(content);
             return;
           }
+        } else {
+          const errText = await response.text();
+          console.error('[Bill Debugger] OpenRouter Error:', response.status, errText);
         }
-      } else {
-        const errText = await response.text();
-        console.error('[Bill Debugger] OpenRouter Error:', response.status, errText);
+      } catch (error) {
+        console.error('[Bill Debugger] OpenRouter fallback failed:', error);
       }
-    } catch (error) {
-      console.error('[Bill Debugger] OpenRouter fallback failed:', error);
     }
-  }
 
     res.writeHead(500, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({
-    error: 'Analysis failed',
-    message: 'Exhausted both Perplexity and OpenRouter.'
-  }));
+    res.end(JSON.stringify({
+      error: 'Analysis failed',
+      message: 'Exhausted both Perplexity and OpenRouter.'
+    }));
 
-} catch (error) {
-  console.error('[Bill Analysis Error]:', error);
-  res.writeHead(500, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({
-    error: 'Analysis failed',
-    message: error.message
-  }));
-}
+  } catch (error) {
+    console.error('[Bill Analysis Error]:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      error: 'Analysis failed',
+      message: error.message
+    }));
+  }
 }
