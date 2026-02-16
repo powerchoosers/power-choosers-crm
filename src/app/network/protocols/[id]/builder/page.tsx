@@ -1643,56 +1643,24 @@ function ProtocolArchitectInner() {
                       </div>
                     ) : emailViewMode === 'ai' ? (
                       <div className="space-y-4">
-                        {/* Prompt Builder: Role, Objective, Constraints */}
-                        <div className="space-y-4 bg-black/40 border border-white/5 rounded-2xl p-4">
-                          <div className="space-y-2">
-                            <label className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">Architect_Role</label>
-                            <input
-                              type="text"
-                              className="w-full bg-white/5 border border-white/5 rounded-lg p-2 text-xs font-mono text-emerald-400/90 focus:border-emerald-500/50 outline-none transition-all"
-                              placeholder="e.g., Act as a human Energy Architect... peer tone."
-                              value={(selectedNode?.data.promptConfig as any)?.role || ''}
-                              onChange={(e) => {
-                                const config = (selectedNode?.data.promptConfig as any) || {};
-                                updateNodeData(selectedNode!.id, {
-                                  promptConfig: { ...config, role: e.target.value },
-                                  prompt: `${e.target.value}\n${config.objective || ''}\n${config.constraints || ''}`
-                                });
-                              }}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">Liability_Objective</label>
-                            <input
-                              type="text"
-                              className="w-full bg-white/5 border border-white/5 rounded-lg p-2 text-xs font-mono text-emerald-400/90 focus:border-emerald-500/50 outline-none transition-all"
-                              placeholder="e.g., Expose the structural variance in their 4CP charges. No em-dashes."
-                              value={(selectedNode?.data.promptConfig as any)?.objective || ''}
-                              onChange={(e) => {
-                                const config = (selectedNode?.data.promptConfig as any) || {};
-                                updateNodeData(selectedNode!.id, {
-                                  promptConfig: { ...config, objective: e.target.value },
-                                  prompt: `${config.role || ''}\n${e.target.value}\n${config.constraints || ''}`
-                                });
-                              }}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">Forensic_Constraints</label>
-                            <input
-                              type="text"
-                              className="w-full bg-white/5 border border-white/5 rounded-lg p-2 text-xs font-mono text-emerald-400/90 focus:border-emerald-500/50 outline-none transition-all"
-                              placeholder="e.g., Max 80 words. NO EM-DASHES. 15-word bullet limit."
-                              value={(selectedNode?.data.promptConfig as any)?.constraints || ''}
-                              onChange={(e) => {
-                                const config = (selectedNode?.data.promptConfig as any) || {};
-                                updateNodeData(selectedNode!.id, {
-                                  promptConfig: { ...config, constraints: e.target.value },
-                                  prompt: `${config.role || ''}\n${config.objective || ''}\n${e.target.value}`
-                                });
-                              }}
-                            />
-                          </div>
+                        {/* Strategy Directive Field */}
+                        <div className="space-y-3 bg-black/40 border border-white/5 rounded-2xl p-4">
+                          <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest block mb-2">
+                            Strategy_Directive
+                          </label>
+                          <textarea
+                            className="w-full h-32 bg-white/5 border border-white/5 rounded-xl p-3 text-xs font-mono focus:border-[#002FA7] outline-none transition-all text-zinc-300 placeholder:text-zinc-700"
+                            placeholder={
+                              "Write the signal you want.\n\n" +
+                              "Example:\n" +
+                              "Dallas CFOs with high 4CP exposure. Reference their load zone.\n" +
+                              "Two short paragraphs. No bullets."
+                            }
+                            value={(selectedNode?.data.prompt as string) || ""}
+                            onChange={(e) =>
+                              updateNodeData(selectedNode!.id, { prompt: e.target.value })
+                            }
+                          />
                         </div>
 
                         {/* Vector Selection */}
