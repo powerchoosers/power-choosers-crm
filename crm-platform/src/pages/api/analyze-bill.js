@@ -54,8 +54,8 @@ export default async function analyzeBillHandler(req, res) {
                 }
               ]
             }
-          ],
-          response_format: { type: 'json_object' }
+          ]
+          // response_format: { type: 'json_object' } // Perplexity Sonar-Pro does NOT support this yet
         };
 
         const response = await fetch('https://api.perplexity.ai/chat/completions', {
@@ -87,7 +87,7 @@ export default async function analyzeBillHandler(req, res) {
     // 2. Secondary Fallback: OpenRouter (gpt-4o-mini)
     if (openRouterKey) {
       try {
-        console.log(`[Bill Debugger] Falling back to OpenRouter (gpt-4o-mini)...`);
+        console.log(`[Bill Debugger] Falling back to OpenRouter (gpt-5-nano)...`);
 
         // Note: gpt-4o-mini / OpenRouter multimodal support for base64 varies by model.
         // We will try standard message format.
@@ -128,23 +128,27 @@ export default async function analyzeBillHandler(req, res) {
             return;
           }
         }
-      } catch (error) {
-        console.error('[Bill Debugger] OpenRouter fallback failed:', error);
+      } else {
+        const errText = await response.text();
+        console.error('[Bill Debugger] OpenRouter Error:', response.status, errText);
       }
+    } catch (error) {
+      console.error('[Bill Debugger] OpenRouter fallback failed:', error);
     }
-
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      error: 'Analysis failed',
-      message: 'Exhausted both Perplexity and OpenRouter.'
-    }));
-
-  } catch (error) {
-    console.error('[Bill Analysis Error]:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      error: 'Analysis failed',
-      message: error.message
-    }));
   }
+
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({
+    error: 'Analysis failed',
+    message: 'Exhausted both Perplexity and OpenRouter.'
+  }));
+
+} catch (error) {
+  console.error('[Bill Analysis Error]:', error);
+  res.writeHead(500, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({
+    error: 'Analysis failed',
+    message: error.message
+  }));
+}
 }
