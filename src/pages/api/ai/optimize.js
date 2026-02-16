@@ -35,9 +35,9 @@ export default async function handler(req, res) {
 
       const dataVectors = [
         vectors.includes('firmographics') && `- CONTACT: ${contact?.name || 'Unknown'} at ${contact?.company || 'Unknown'} (${contact?.industry || 'Unknown'})`,
-        vectors.includes('energy_metrics') && `- GRID_METRICS: Load Zone ${contact?.load_zone || 'Unknown'}, Factor ${contact?.metadata?.loadFactor || 'Unknown'}, Exp ${contact?.contractEndDate || 'Unknown'}`,
-        vectors.includes('recent_news') && `- SIGNALS: ${contact?.metadata?.news?.slice(0, 500) || 'No news signals.'}`,
-        vectors.includes('contract_expiry') && `- RATCHET_RISK: Contract ending ${contact?.contractEndDate || 'Unknown'}`
+        vectors.includes('energy_intel') && `- ENERGY_INTEL: Load Zone ${contact?.load_zone || 'Unknown'}, Factor ${contact?.load_factor || 'Unknown'}, Annual Usage ${contact?.annual_usage || 'Unknown'}, Contract Exp ${contact?.contractEndDate || 'Unknown'}`,
+        vectors.includes('recent_news') && `- SIGNALS: ${contact?.news || 'No news signals.'}`,
+        vectors.includes('transcripts') && `- PREVIOUS_DIALOG: ${contact?.transcript || 'No previous call transcripts.'}`
       ].filter(Boolean).join('\n');
 
       if (mode === 'optimize_prompt') {
@@ -46,12 +46,11 @@ export default async function handler(req, res) {
           Your task is to optimize an AI prompt that will be used to generate sequence emails.
           
           PROMPT GUIDELINES:
-          - Make the prompt more specific, forensic, and aligned with Nodal Point philosophy.
-          - Ensure it focuses on financial variance, market volatility, and technical grid risk.
-          - Tone: Professional but human. Avoid sounding like a template.
+          - Writing Level: 6th Grade. Use simple words. Short sentences.
+          - Tone: Individual human. Sound like a person typing quickly to a peer.
+          - Style: Forensic but minimalist. Focus on financial liability and grid risk.
           - RULES: No em-dashes (—). No en-dashes (–). Use commas or colons.
-          - BULLETS: If the prompt mentions bullets, ensure they are max 15 words per item.
-          - The optimized prompt should result in emails that are direct and minimalist.
+          - BULLETS: Max 15 words per item. 
           
           INSTRUCTIONS:
           - Output ONLY the optimized prompt text.
@@ -59,25 +58,27 @@ export default async function handler(req, res) {
         userContent = `Optimize this prompt for an email node: ${prompt}`;
       } else if (mode === 'generate_email') {
         systemInstruction = `
-          You are the Nodal Architect. You do not sell; you diagnose.
+          You are a human Energy Analyst at Nodal Point. You do not sell; you diagnose.
           
           CORE DIRECTIVES:
-          1. Brevity: Max 80 words.
-          2. Tone: Professional, direct, human. No "Hope you are well."
-          3. Formatting: NO EM-DASHES (—). Use commas or colons.
-          4. Bullets: Each must be a single short sentence, max 15 words.
-          5. Objective: Expose financial liability (4CP, Ratchets, Volatility).
+          1. Writing Level: 6th Grade. Use very simple language. Avoid corporate buzzwords.
+          2. Tone: Human-to-human. Sound like you're typing this yourself. No "I hope this finds you well" or "reaching out."
+          3. Brevity: Max 60-80 words.
+          4. Formatting: NO EM-DASHES (—).
+          5. Bullets: Max 15 words per bullet.
           
-          NEURAL_CONTEXT (Use ONLY these vectors):
-          ${dataVectors || '- No specific data vectors provided. Focus on generic industry volatility.'}
+          NEURAL_CONTEXT (Use ONLY these vectors if relevant):
+          ${dataVectors || '- No specific data vectors provided.'}
+          - CONTACT_COMPANY: ${contact?.company || 'Unknown'}
           
           INSTRUCTIONS:
-          - You must generate a sequence step (type: ${type}) based on the STRATEGY provided.
-          - Output MUST be a valid JSON object with the following keys:
+          - Generate a sequence step (type: ${type}) based on the STRATEGY provided.
+          - PERSONALIZATION: If high-value news or transcripts are in NEURAL_CONTEXT, mention them specifically (e.g., "I saw the news about..." or "Thinking about our last chat...").
+          - Output MUST be a valid JSON object:
             {
-              "subject_line": "Forensic and direct subject",
-              "body_html": "Email body with <p> and <br> tags. If you include a greeting, follow it with two <br> tags. Use the actual contact name and company name provided in the NEURAL_CONTEXT (e.g. 'Hi Sarah,' or 'your facility in Dallas'). NEVER use placeholders like {{first_name}} when actual names are present in the context.",
-              "logic_reasoning": "A concise explanation of the AI's decision-making."
+              "subject_line": "Direct, non-salesy subject",
+              "body_html": "Simple body with <p> and <br> tags. Two <br> after greeting. Use first name only (e.g. 'Hi Sarah,').",
+              "logic_reasoning": "Explain why this approach fits a human, 6th-grade level tone."
             }
         `;
         userContent = `STRATEGY: ${prompt}\n\nDraft/Context: ${draft || '(None)'}`;
