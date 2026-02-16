@@ -186,8 +186,10 @@ export default async function handler(req, res) {
                 content: [
                   { type: 'text', text: prompt },
                   {
-                    type: 'image_url',
-                    image_url: { url: `data:${mimeType};base64,${base64Data}` }
+                    type: mimeType === 'application/pdf' ? 'file_url' : 'image_url',
+                    [mimeType === 'application/pdf' ? 'file_url' : 'image_url']: {
+                      url: mimeType === 'application/pdf' ? base64Data : `data:${mimeType};base64,${base64Data}`
+                    }
                   }
                 ]
               }

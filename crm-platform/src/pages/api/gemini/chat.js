@@ -2401,9 +2401,9 @@ export default async function handler(req, res) {
     // Only use Gemini models that exist in the frontend dropdown and that have been verified working (see scripts/test-gemini-models.js).
     // Prefer 2.5 over 2.0 (2.0 deprecated soon). Order: 2.5 first, then 3, then 2.0.
     const ALLOWED_GEMINI_MODELS = [
+      'gemini-3-flash-preview',
       'gemini-2.5-flash',
       'gemini-2.5-flash-lite',
-      'gemini-3-flash-preview',
       'gemini-2.0-flash',
     ];
     const envPreferredModel = (process.env.GEMINI_MODEL || '').trim();

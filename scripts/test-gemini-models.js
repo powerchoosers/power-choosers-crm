@@ -18,9 +18,9 @@ const { GoogleGenerativeAI } = await import('@google/generative-ai');
 
 // Same list as api/gemini/chat.js ALLOWED_GEMINI_MODELS (only verified-working models).
 const GEMINI_MODELS = [
+  'gemini-3-flash-preview',
   'gemini-2.5-flash',
   'gemini-2.5-flash-lite',
-  'gemini-3-flash-preview',
   'gemini-2.0-flash',
 ];
 
