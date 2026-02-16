@@ -16,12 +16,12 @@ const tools = [
         name: 'list_contacts',
         description: 'MANDATORY for finding people/contacts in the CRM. Search by first name, last name, full name, or email. ALWAYS call this first if a user mentions a person.',
         parameters: {
-          type: 'OBJECT',
+          type: 'object',
           properties: {
-            search: { type: 'STRING', description: 'Name, first name, last name, or email to search for' },
-            accountId: { type: 'STRING', description: 'Filter by account ID' },
-            title: { type: 'STRING', description: 'Filter by job title (e.g. "Facilities Manager", "CEO")' },
-            limit: { type: 'NUMBER', description: 'Maximum number of contacts to return (default 10)' }
+            search: { type: 'string', description: 'Name, first name, last name, or email to search for' },
+            accountId: { type: 'string', description: 'Filter by account ID' },
+            title: { type: 'string', description: 'Filter by job title (e.g. "Facilities Manager", "CEO")' },
+            limit: { type: 'number', description: 'Maximum number of contacts to return (default 10)' }
           }
         }
       },
@@ -29,9 +29,9 @@ const tools = [
         name: 'get_contact_details',
         description: 'Get full details for a specific contact by ID.',
         parameters: {
-          type: 'OBJECT',
+          type: 'object',
           properties: {
-            contact_id: { type: 'STRING', description: 'The unique ID of the contact' }
+            contact_id: { type: 'string', description: 'The unique ID of the contact' }
           },
           required: ['contact_id']
         }
@@ -40,18 +40,18 @@ const tools = [
         name: 'update_contact',
         description: 'Update contact information.',
         parameters: {
-          type: 'OBJECT',
+          type: 'object',
           properties: {
-            contact_id: { type: 'STRING', description: 'The unique ID of the contact' },
+            contact_id: { type: 'string', description: 'The unique ID of the contact' },
             updates: {
-              type: 'OBJECT',
+              type: 'object',
               properties: {
-                firstName: { type: 'STRING' },
-                lastName: { type: 'STRING' },
-                email: { type: 'STRING' },
-                phone: { type: 'STRING' },
-                status: { type: 'STRING', enum: ['Lead', 'Customer', 'Churned'] },
-                notes: { type: 'STRING' }
+                firstName: { type: 'string' },
+                lastName: { type: 'string' },
+                email: { type: 'string' },
+                phone: { type: 'string' },
+                status: { type: 'string', enum: ['Lead', 'Customer', 'Churned'] },
+                notes: { type: 'string' }
               }
             }
           },
@@ -62,14 +62,14 @@ const tools = [
         name: 'list_accounts',
         description: 'MANDATORY for finding companies/accounts in the CRM. Search by name, domain, industry, or location. ALWAYS call this first if a user mentions a company or a location.',
         parameters: {
-          type: 'OBJECT',
+          type: 'object',
           properties: {
-            search: { type: 'STRING', description: 'Account name, domain, or industry keyword' },
-            industry: { type: 'STRING', description: 'Filter by industry (e.g. "Manufacturing", "Healthcare")' },
-            city: { type: 'STRING', description: 'Filter by city (e.g. "Houston")' },
-            state: { type: 'STRING', description: 'Filter by state (e.g. "Texas")' },
-            expiration_year: { type: 'NUMBER', description: 'Filter accounts by contract expiration year (e.g. 2026)' },
-            limit: { type: 'NUMBER', description: 'Maximum number of accounts to return' }
+            search: { type: 'string', description: 'Account name, domain, or industry keyword' },
+            industry: { type: 'string', description: 'Filter by industry (e.g. "Manufacturing", "Healthcare")' },
+            city: { type: 'string', description: 'Filter by city (e.g. "Houston")' },
+            state: { type: 'string', description: 'Filter by state (e.g. "Texas")' },
+            expiration_year: { type: 'number', description: 'Filter accounts by contract expiration year (e.g. 2026)' },
+            limit: { type: 'number', description: 'Maximum number of accounts to return' }
           }
         }
       },
@@ -77,14 +77,14 @@ const tools = [
         name: 'create_contact',
         description: 'Create a new contact in the CRM.',
         parameters: {
-          type: 'OBJECT',
+          type: 'object',
           properties: {
-            firstName: { type: 'STRING' },
-            lastName: { type: 'STRING' },
-            email: { type: 'STRING' },
-            phone: { type: 'STRING' },
-            accountId: { type: 'STRING', description: 'The ID of the account to associate with' },
-            status: { type: 'STRING', enum: ['Lead', 'Customer', 'Churned'] }
+            firstName: { type: 'string' },
+            lastName: { type: 'string' },
+            email: { type: 'string' },
+            phone: { type: 'string' },
+            accountId: { type: 'string', description: 'The ID of the account to associate with' },
+            status: { type: 'string', enum: ['Lead', 'Customer', 'Churned'] }
           },
           required: ['firstName', 'lastName']
         }
@@ -93,10 +93,10 @@ const tools = [
         name: 'list_tasks',
         description: 'Get a list of tasks.',
         parameters: {
-          type: 'OBJECT',
+          type: 'object',
           properties: {
-            status: { type: 'STRING', enum: ['pending', 'completed', 'all'] },
-            limit: { type: 'NUMBER' }
+            status: { type: 'string', enum: ['pending', 'completed', 'all'] },
+            limit: { type: 'number' }
           }
         }
       },
@@ -104,13 +104,13 @@ const tools = [
         name: 'create_task',
         description: 'Create a new task.',
         parameters: {
-          type: 'OBJECT',
+          type: 'object',
           properties: {
-            title: { type: 'STRING' },
-            description: { type: 'STRING' },
-            dueDate: { type: 'STRING', description: 'ISO date string' },
-            contactId: { type: 'STRING' },
-            priority: { type: 'STRING', enum: ['low', 'medium', 'high'] }
+            title: { type: 'string' },
+            description: { type: 'string' },
+            dueDate: { type: 'string', description: 'ISO date string' },
+            contactId: { type: 'string' },
+            priority: { type: 'string', enum: ['low', 'medium', 'high'] }
           },
           required: ['title']
         }
@@ -119,12 +119,12 @@ const tools = [
         name: 'send_email',
         description: 'Send an email to a contact.',
         parameters: {
-          type: 'OBJECT',
+          type: 'object',
           properties: {
-            to: { type: 'STRING', description: 'Recipient email address' },
-            subject: { type: 'STRING' },
-            content: { type: 'STRING', description: 'The HTML content of the email' },
-            userEmail: { type: 'STRING', description: 'The sender email (your email)' }
+            to: { type: 'string', description: 'Recipient email address' },
+            subject: { type: 'string' },
+            content: { type: 'string', description: 'The HTML content of the email' },
+            userEmail: { type: 'string', description: 'The sender email (your email)' }
           },
           required: ['to', 'subject', 'content', 'userEmail']
         }
@@ -133,10 +133,10 @@ const tools = [
         name: 'search_emails',
         description: 'Search across ALL emails in the CRM by keyword (subject, content, sender). Use this to find emails when you do not know the specific contact.',
         parameters: {
-          type: 'OBJECT',
+          type: 'object',
           properties: {
-            query: { type: 'STRING', description: 'Search term for subject, body, or sender' },
-            limit: { type: 'NUMBER', description: 'Max results (default 10)' }
+            query: { type: 'string', description: 'Search term for subject, body, or sender' },
+            limit: { type: 'number', description: 'Max results (default 10)' }
           },
           required: ['query']
         }
@@ -145,12 +145,12 @@ const tools = [
         name: 'search_transcripts',
         description: 'Search call transcripts and summaries. Use this to find past conversations about specific topics, keywords, or mentions of people/companies.',
         parameters: {
-          type: 'OBJECT',
+          type: 'object',
           properties: {
-            query: { type: 'STRING', description: 'Search term for transcript content, summary, or topic' },
-            account_id: { type: 'STRING', description: 'Filter by account ID' },
-            contact_id: { type: 'STRING', description: 'Filter by contact ID' },
-            limit: { type: 'NUMBER', description: 'Max results (default 10)' }
+            query: { type: 'string', description: 'Search term for transcript content, summary, or topic' },
+            account_id: { type: 'string', description: 'Filter by account ID' },
+            contact_id: { type: 'string', description: 'Filter by contact ID' },
+            limit: { type: 'number', description: 'Max results (default 10)' }
           },
           required: ['query']
         }
@@ -159,12 +159,12 @@ const tools = [
         name: 'search_prospects',
         description: 'Search for new prospects (people) using Apollo API.',
         parameters: {
-          type: 'OBJECT',
+          type: 'object',
           properties: {
-            q_keywords: { type: 'STRING', description: 'Keywords like "Energy Manager" or "CEO"' },
-            person_locations: { type: 'ARRAY', items: { type: 'STRING' }, description: 'Locations like ["Texas", "Houston"]' },
-            q_organization_name: { type: 'STRING', description: 'Company name' },
-            limit: { type: 'NUMBER', description: 'Number of results (default 10)' }
+            q_keywords: { type: 'string', description: 'Keywords like "Energy Manager" or "CEO"' },
+            person_locations: { type: 'array', items: { type: 'string' }, description: 'Locations like ["Texas", "Houston"]' },
+            q_organization_name: { type: 'string', description: 'Company name' },
+            limit: { type: 'number', description: 'Number of results (default 10)' }
           }
         }
       },
@@ -172,7 +172,7 @@ const tools = [
         name: 'get_energy_news',
         description: 'Get the latest Texas energy market and ERCOT news.',
         parameters: {
-          type: 'OBJECT',
+          type: 'object',
           properties: {}
         }
       },
@@ -180,9 +180,9 @@ const tools = [
         name: 'enrich_organization',
         description: 'Enrich organization data using a domain name.',
         parameters: {
-          type: 'OBJECT',
+          type: 'object',
           properties: {
-            domain: { type: 'STRING', description: 'The organization domain (e.g. "google.com")' }
+            domain: { type: 'string', description: 'The organization domain (e.g. "google.com")' }
           },
           required: ['domain']
         }
@@ -191,9 +191,9 @@ const tools = [
         name: 'get_account_details',
         description: 'Get full details for a specific account (company) by ID, including energy metrics and documents.',
         parameters: {
-          type: 'OBJECT',
+          type: 'object',
           properties: {
-            account_id: { type: 'STRING', description: 'The unique ID of the account' }
+            account_id: { type: 'string', description: 'The unique ID of the account' }
           },
           required: ['account_id']
         }
@@ -202,9 +202,9 @@ const tools = [
         name: 'list_account_documents',
         description: 'Get a list of documents (bills, contracts, etc.) for a specific account.',
         parameters: {
-          type: 'OBJECT',
+          type: 'object',
           properties: {
-            account_id: { type: 'STRING', description: 'The unique ID of the account' }
+            account_id: { type: 'string', description: 'The unique ID of the account' }
           },
           required: ['account_id']
         }
@@ -213,12 +213,12 @@ const tools = [
         name: 'search_interactions',
         description: 'Global Semantic Search. Search through past call transcripts, email history, accounts, and contacts. Use this to find ANY information across the entire CRM by keyword or topic.',
         parameters: {
-          type: 'OBJECT',
+          type: 'object',
           properties: {
-            query: { type: 'STRING', description: 'Keyword or topic to search for (e.g. "pricing", "contract renewal")' },
-            contact_id: { type: 'STRING', description: 'Optional: filter by contact ID' },
-            account_id: { type: 'STRING', description: 'Optional: filter by account ID' },
-            limit: { type: 'NUMBER', description: 'Max results per type (default 5)' }
+            query: { type: 'string', description: 'Keyword or topic to search for (e.g. "pricing", "contract renewal")' },
+            contact_id: { type: 'string', description: 'Optional: filter by contact ID' },
+            account_id: { type: 'string', description: 'Optional: filter by account ID' },
+            limit: { type: 'number', description: 'Max results per type (default 5)' }
           }
         }
       },
@@ -226,10 +226,10 @@ const tools = [
         name: 'list_deals',
         description: 'Get a list of sales deals/opportunities.',
         parameters: {
-          type: 'OBJECT',
+          type: 'object',
           properties: {
-            account_id: { type: 'STRING' },
-            status: { type: 'STRING', enum: ['interested', 'proposal', 'won', 'lost', 'all'] }
+            account_id: { type: 'string' },
+            status: { type: 'string', enum: ['interested', 'proposal', 'won', 'lost', 'all'] }
           }
         }
       },
@@ -237,9 +237,9 @@ const tools = [
         name: 'list_all_documents',
         description: 'Get a list of all documents (bills, contracts, etc.) across all accounts, sorted by newest first.',
         parameters: {
-          type: 'OBJECT',
+          type: 'object',
           properties: {
-            limit: { type: 'NUMBER', description: 'Maximum number of documents to return (default 10)' }
+            limit: { type: 'number', description: 'Maximum number of documents to return (default 10)' }
           }
         }
       },
@@ -247,7 +247,7 @@ const tools = [
         name: 'get_market_pulse',
         description: 'Get real-time ERCOT market data: zonal settlement prices (LZ_HOUSTON, LZ_NORTH, LZ_SOUTH, LZ_WEST), hub average, grid load/capacity/reserves, and scarcity. ALWAYS call this when the user asks about market prices, volatility, whether the market is volatile, or conditions in a specific load zone (e.g. "how is LZ_WEST?", "volatility in Houston"). The UI will show the live telemetry card.',
         parameters: {
-          type: 'OBJECT',
+          type: 'object',
           properties: {}
         }
       }

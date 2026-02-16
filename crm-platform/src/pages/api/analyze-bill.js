@@ -109,7 +109,7 @@ export default async function analyzeBillHandler(req, res) {
                   {
                     type: mimeType?.includes('pdf') ? 'file_url' : 'image_url',
                     [mimeType?.includes('pdf') ? 'file_url' : 'image_url']: {
-                      url: `data:${mimeType || 'image/png'};base64,${fileData}`
+                      url: mimeType?.includes('pdf') ? fileData : `data:${mimeType || 'image/png'};base64,${fileData}`
                     }
                   }
                 ]
