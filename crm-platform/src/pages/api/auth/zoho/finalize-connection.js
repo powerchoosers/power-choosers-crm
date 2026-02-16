@@ -86,17 +86,22 @@ export default async function handler(req, res) {
         const expiresIn = tokenData.expires_in || 3600;
         const expiresAt = new Date(Date.now() + (expiresIn - 300) * 1000).toISOString();
 
+        const connectionPayload = {
+            user_id: user.id,
+            email: email,
+            access_token: tokenData.access_token,
+            token_expires_at: expiresAt,
+            account_id: accountId,
+            updated_at: new Date().toISOString()
+        };
+
+        if (tokenData.refresh_token) {
+            connectionPayload.refresh_token = tokenData.refresh_token;
+        }
+
         const { error: dbError } = await supabaseAdmin
             .from('zoho_connections')
-            .upsert({
-                user_id: user.id,
-                email: email,
-                access_token: tokenData.access_token,
-                refresh_token: tokenData.refresh_token, // Only present on first consent or if access_type=offline appropriately requested
-                token_expires_at: expiresAt,
-                account_id: accountId,
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id, email' });
+            .upsert(connectionPayload, { onConflict: 'user_id, email' });
 
         if (dbError) throw dbError;
 
