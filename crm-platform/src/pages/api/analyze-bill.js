@@ -1,17 +1,16 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export default async function analyzeBillHandler(req, res) {
   try {
     const { fileData, mimeType } = req.body || {};
-    
+
     if (!fileData) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'No file data provided' }));
       return;
     }
 
-    const geminiApiKey = process.env.FREE_GEMINI_KEY || process.env.GEMINI_API_KEY;
     const perplexityApiKey = process.env.PERPLEXITY_API_KEY;
+    const openRouterKey = process.env.OPEN_ROUTER_API_KEY;
 
     const prompt = `
       Analyze this energy bill. Extract the following details in JSON format:
@@ -32,74 +31,87 @@ export default async function analyzeBillHandler(req, res) {
       Ensure the output is strictly valid JSON.
     `;
 
-    // 1. Try Gemini Models first (Free tier)
-    if (geminiApiKey) {
-      const genAI = new GoogleGenerativeAI(geminiApiKey);
-      const modelCandidates = [
-        'gemini-2.5-flash',
-        'gemini-3.0-flash-preview',
-        'gemini-3.0-pro-preview',
-        'gemini-2.0-flash',
-        'gemini-1.5-flash'
-      ];
-
-      for (const modelName of modelCandidates) {
-        try {
-          console.log(`[Bill Debugger] Attempting Gemini analysis with: ${modelName}`);
-          const model = genAI.getGenerativeModel({
-            model: modelName,
-            generationConfig: { responseMimeType: "application/json" }
-          });
-          
-          const result = await model.generateContent([
-            prompt,
-            {
-              inlineData: {
-                data: fileData,
-                mimeType: mimeType || 'application/pdf'
-              }
-            }
-          ]);
-
-          const response = await result.response;
-          const text = response.text();
-          const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-          
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(jsonStr);
-          return;
-        } catch (e) {
-          const msg = e.message.toLowerCase();
-          if (msg.includes('quota') || msg.includes('429') || msg.includes('limit')) {
-            console.warn(`[Bill Debugger] Gemini ${modelName} quota exceeded, trying next...`);
-            continue;
-          }
-          console.error(`[Bill Debugger] Gemini ${modelName} fatal error:`, e.message);
-          break; // Stop if it's not a quota error
-        }
-      }
-    }
-
-    // 2. Fallback to Perplexity (Sonar) if Gemini fails or is exhausted
+    // 1. Primary: Perplexity (Sonar-Pro)
     if (perplexityApiKey) {
       try {
-        console.log(`[Bill Debugger] Falling back to Perplexity (Sonar)`);
-        // Perplexity doesn't support file uploads directly in the API yet, 
-        // but we can try to send the prompt. 
-        // NOTE: Since Sonar can't see the PDF/Image either, we log a warning.
-        console.warn(`[Bill Debugger] Sonar fallback initiated, but Sonar lacks vision/PDF support. Analysis may be limited.`);
-        
+        console.log(`[Bill Debugger] Analyzing with Perplexity (Sonar-Pro)...`);
+
+        const isPdf = mimeType === 'application/pdf';
+        // For PDFs, Perplexity expects raw base64. For images, it expects Data URL.
+        const fileUrlContent = isPdf ? fileData : `data:${mimeType || 'image/png'};base64,${fileData}`;
+        const attachmentType = isPdf ? 'file_url' : 'image_url';
+
+        const body = {
+          model: 'sonar-pro',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: prompt },
+                {
+                  type: attachmentType,
+                  [attachmentType]: { url: fileUrlContent }
+                }
+              ]
+            }
+          ],
+          response_format: { type: 'json_object' }
+        };
+
         const response = await fetch('https://api.perplexity.ai/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${perplexityApiKey}`,
           },
+          body: JSON.stringify(body),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const content = data?.choices?.[0]?.message?.content;
+          if (content) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(content);
+            return;
+          }
+        } else {
+          const errorData = await response.json();
+          console.error('[Bill Debugger] Perplexity error:', errorData);
+        }
+      } catch (error) {
+        console.error('[Bill Debugger] Perplexity connection failed:', error);
+      }
+    }
+
+    // 2. Secondary Fallback: OpenRouter (gpt-5-nano)
+    if (openRouterKey) {
+      try {
+        console.log(`[Bill Debugger] Falling back to OpenRouter (gpt-5-nano)...`);
+
+        // Note: gpt-5-nano / OpenRouter multimodal support for base64 varies by model.
+        // We will try standard message format.
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openRouterKey}`,
+            'HTTP-Referer': 'https://nodalpoint.io',
+            'X-Title': 'Nodal Point CRM'
+          },
           body: JSON.stringify({
-            model: 'sonar-pro',
+            model: 'openai/gpt-5-nano',
             messages: [
-              { role: 'system', content: 'You are a forensic bill analyst.' },
-              { role: 'user', content: prompt }
+              {
+                role: 'user',
+                content: [
+                  { type: 'text', text: prompt },
+                  {
+                    type: 'image_url',
+                    image_url: { url: `data:${mimeType || 'image/png'};base64,${fileData}` }
+                  }
+                ]
+              }
             ],
             response_format: { type: 'json_object' }
           }),
@@ -108,30 +120,29 @@ export default async function analyzeBillHandler(req, res) {
         if (response.ok) {
           const data = await response.json();
           const content = data?.choices?.[0]?.message?.content;
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(content);
-          return;
+          if (content) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(content);
+            return;
+          }
         }
       } catch (error) {
-        console.error('[Bill Debugger] Perplexity fallback failed:', error);
+        console.error('[Bill Debugger] OpenRouter fallback failed:', error);
       }
     }
 
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      error: 'Analysis failed', 
-      message: 'Exhausted all available models (Gemini & Sonar).' 
+    res.end(JSON.stringify({
+      error: 'Analysis failed',
+      message: 'Exhausted both Perplexity and OpenRouter.'
     }));
 
   } catch (error) {
     console.error('[Bill Analysis Error]:', error);
-    
-    // Ensure we ALWAYS return JSON to avoid "Non-JSON response" errors
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      error: 'Analysis failed', 
-      message: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    res.end(JSON.stringify({
+      error: 'Analysis failed',
+      message: error.message
     }));
   }
 }

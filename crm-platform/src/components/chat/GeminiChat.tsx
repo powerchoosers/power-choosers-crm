@@ -1078,7 +1078,7 @@ export function GeminiChatPanel() {
   const [messages, setMessages] = useState<GeminiMessage[]>([])
   const [lastProvider, setLastProvider] = useState<string>('openrouter')
   const [lastModel, setLastModel] = useState<string>('gemini-2.5-flash')
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-flash')
+  const [selectedModel, setSelectedModel] = useState<string>('openai/gpt-5-nano')
   const [diagnostics, setDiagnostics] = useState<Diagnostic[] | null>(null)
   const [showDiagnostics, setShowDiagnostics] = useState(false)
 
@@ -1171,7 +1171,7 @@ export function GeminiChatPanel() {
   }, [isOpen, messages.length, isAccountOrContact, hasContextId, contextInfo.type])
 
   const getProvider = (model: string) => {
-    if (model.startsWith('openai/') || model.startsWith('anthropic/')) return 'OpenRouter'
+    if (model.includes('/') || model.startsWith('openai/') || model.startsWith('anthropic/') || model.startsWith('google/') || model.startsWith('meta-llama/') || model.startsWith('mistralai/') || model.startsWith('nvidia/')) return 'OpenRouter'
     if (model.startsWith('gemini-')) return 'Google'
     if (model.startsWith('sonar')) return 'Perplexity'
     return 'AI_NODE'
@@ -1339,7 +1339,7 @@ SELECT * FROM hybrid_search_accounts(
       setLastProvider(typeof data.provider === 'string' ? data.provider : 'gemini')
       setLastModel(typeof data.model === 'string' ? data.model : '')
       // Only update dropdown if the returned model is one we show (avoids "no model selected" when backend fallback used)
-      const allowedGemini = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3-flash-preview', 'gemini-2.0-flash']
+      const allowedGemini = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3-flash-preview', 'gemini-2.0-flash', 'openai/gpt-5-nano', 'google/gemini-2.5-flash-lite', 'google/gemini-2.5-flash', 'google/gemini-2.0-flash']
       if (typeof data.model === 'string' && data.model.trim() && (allowedGemini.includes(data.model) || data.model.startsWith('sonar') || data.model.includes('/'))) setSelectedModel(data.model)
       const isNewsRequest = /news|company news|give me the news|what'?s the news|latest news|news on|any news|news about|reports? about/i.test(messageText.trim())
       const isFirstExchange = messagesForApi.length <= 1
@@ -1772,23 +1772,26 @@ SELECT * FROM hybrid_search_accounts(
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-950 border-white/10 text-white">
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 mb-1">
-                    Gemini Intelligence Stack (2.5 preferred)
+                    OpenRouter Intelligence Stack
                   </div>
-                  <SelectItem value="gemini-2.5-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GEMINI-2.5-FLASH
+                  <SelectItem value="openai/gpt-5-nano" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GPT-5-NANO (DEFAULT)
                   </SelectItem>
-                  <SelectItem value="gemini-2.5-flash-lite" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GEMINI-2.5-FLASH-LITE
+                  <SelectItem value="google/gemini-2.5-flash-lite" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GEMINI-2.5-FLASH-LITE (OR)
                   </SelectItem>
-                  <SelectItem value="gemini-3-flash-preview" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GEMINI-3.0-FLASH-PREVIEW
+                  <SelectItem value="google/gemini-2.5-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GEMINI-2.5-FLASH (OR)
                   </SelectItem>
-                  <SelectItem value="gemini-2.0-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GEMINI-2.0-FLASH
+                  <SelectItem value="google/gemini-2.0-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GEMINI-2.0-FLASH (OR)
+                  </SelectItem>
+                  <SelectItem value="anthropic/claude-3.5-sonnet" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    CLAUDE-3.5-SONNET (OR)
                   </SelectItem>
 
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
-                    Perplexity
+                    Direct Perplexity
                   </div>
                   <SelectItem value="sonar-pro" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                     SONAR-PRO
@@ -1798,13 +1801,10 @@ SELECT * FROM hybrid_search_accounts(
                   </SelectItem>
 
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
-                    OpenRouter
+                    Legacy Gemini
                   </div>
-                  <SelectItem value="openai/gpt-oss-120b:free" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GPT-OSS-120B
-                  </SelectItem>
-                  <SelectItem value="nvidia/nemotron-3-nano-30b-a3b:free" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    NEMOTRON-30B
+                  <SelectItem value="gemini-2.5-flash-lite" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GEMINI-2.5-FLASH-LITE
                   </SelectItem>
                 </SelectContent>
               </Select>
