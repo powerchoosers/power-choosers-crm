@@ -1339,7 +1339,7 @@ SELECT * FROM hybrid_search_accounts(
       setLastProvider(typeof data.provider === 'string' ? data.provider : 'gemini')
       setLastModel(typeof data.model === 'string' ? data.model : '')
       // Only update dropdown if the returned model is one we show (avoids "no model selected" when backend fallback used)
-      const allowedGemini = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3-flash-preview', 'gemini-2.0-flash', 'openai/gpt-5-nano', 'google/gemini-2.5-flash-lite', 'google/gemini-2.5-flash', 'google/gemini-2.0-flash']
+      const allowedGemini = ['gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'openai/gpt-5-nano', 'google/gemini-flash-1.5', 'google/gemini-pro-1.5', 'google/gemini-2.0-flash-001']
       if (typeof data.model === 'string' && data.model.trim() && (allowedGemini.includes(data.model) || data.model.startsWith('sonar') || data.model.includes('/'))) setSelectedModel(data.model)
       const isNewsRequest = /news|company news|give me the news|what'?s the news|latest news|news on|any news|news about|reports? about/i.test(messageText.trim())
       const isFirstExchange = messagesForApi.length <= 1
@@ -1777,14 +1777,14 @@ SELECT * FROM hybrid_search_accounts(
                   <SelectItem value="openai/gpt-5-nano" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                     GPT-5-NANO (DEFAULT)
                   </SelectItem>
-                  <SelectItem value="google/gemini-2.5-flash-lite" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GEMINI-2.5-FLASH-LITE (OR)
+                  <SelectItem value="openai/gpt-5-mini" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GPT-5-MINI (OR)
+                  </SelectItem>
+                  <SelectItem value="google/gemini-3-flash-preview" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GEMINI-3-FLASH (OR)
                   </SelectItem>
                   <SelectItem value="google/gemini-2.5-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                     GEMINI-2.5-FLASH (OR)
-                  </SelectItem>
-                  <SelectItem value="google/gemini-2.0-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GEMINI-2.0-FLASH (OR)
                   </SelectItem>
                   <SelectItem value="anthropic/claude-3.5-sonnet" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                     CLAUDE-3.5-SONNET (OR)
@@ -1797,14 +1797,20 @@ SELECT * FROM hybrid_search_accounts(
                     SONAR-PRO
                   </SelectItem>
                   <SelectItem value="sonar" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    SONAR-STANDARD
+                    SONAR-REASONING
                   </SelectItem>
 
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
-                    Legacy Gemini
+                    Direct Gemini
                   </div>
-                  <SelectItem value="gemini-2.5-flash-lite" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GEMINI-2.5-FLASH-LITE
+                  <SelectItem value="gemini-3-flash-preview" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GEMINI-3-FLASH
+                  </SelectItem>
+                  <SelectItem value="gemini-2.5-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GEMINI-2.5-FLASH
+                  </SelectItem>
+                  <SelectItem value="gemini-2.0-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GEMINI-2.0-FLASH
                   </SelectItem>
                 </SelectContent>
               </Select>

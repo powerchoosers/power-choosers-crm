@@ -84,12 +84,12 @@ export default async function analyzeBillHandler(req, res) {
       }
     }
 
-    // 2. Secondary Fallback: OpenRouter (gpt-5-nano)
+    // 2. Secondary Fallback: OpenRouter (gpt-4o-mini)
     if (openRouterKey) {
       try {
-        console.log(`[Bill Debugger] Falling back to OpenRouter (gpt-5-nano)...`);
+        console.log(`[Bill Debugger] Falling back to OpenRouter (gpt-4o-mini)...`);
 
-        // Note: gpt-5-nano / OpenRouter multimodal support for base64 varies by model.
+        // Note: gpt-4o-mini / OpenRouter multimodal support for base64 varies by model.
         // We will try standard message format.
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
@@ -107,8 +107,10 @@ export default async function analyzeBillHandler(req, res) {
                 content: [
                   { type: 'text', text: prompt },
                   {
-                    type: 'image_url',
-                    image_url: { url: `data:${mimeType || 'image/png'};base64,${fileData}` }
+                    type: mimeType?.includes('pdf') ? 'file_url' : 'image_url',
+                    [mimeType?.includes('pdf') ? 'file_url' : 'image_url']: {
+                      url: `data:${mimeType || 'image/png'};base64,${fileData}`
+                    }
                   }
                 ]
               }
