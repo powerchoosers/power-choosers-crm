@@ -7,7 +7,7 @@
 import { cors } from '../_cors.js';
 import { ZohoMailService } from './zoho-service.js';
 import { injectTracking, hasTrackingPixel } from './tracking-helper.js';
-import { supabaseAdmin as supabase } from '../../../lib/supabase.js';
+import { supabaseAdmin as supabase } from '../_supabase.js';
 import logger from '../_logger.js';
 
 export default async function handler(req, res) {
