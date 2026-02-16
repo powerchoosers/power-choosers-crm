@@ -2267,12 +2267,20 @@ export default async function handler(req, res) {
     let targetModel = bodyModel;
     let provider = 'gemini'; // Default fallback
 
+    const isOpenRouterModel = bodyModel.includes('/') ||
+      bodyModel.startsWith('openai/') ||
+      bodyModel.startsWith('anthropic/') ||
+      bodyModel.startsWith('google/') ||
+      bodyModel.startsWith('meta-llama/') ||
+      bodyModel.startsWith('mistralai/') ||
+      bodyModel.startsWith('nvidia/');
+
     if (!bodyModel || bodyModel === 'default') {
-      targetModel = 'openai/gpt-oss-120b:free';
+      targetModel = 'openai/gpt-5-nano';
       provider = 'openrouter';
     } else if (bodyModel.startsWith('sonar')) {
       provider = 'perplexity';
-    } else if (bodyModel.startsWith('openai/gpt-oss') || bodyModel.startsWith('nvidia/') || bodyModel.startsWith('meta-llama/') || bodyModel.startsWith('mistralai/') || bodyModel.startsWith('anthropic/')) {
+    } else if (isOpenRouterModel) {
       provider = 'openrouter';
     }
 
