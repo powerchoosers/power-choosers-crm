@@ -42,44 +42,46 @@ export default async function handler(req, res) {
 
       if (mode === 'optimize_prompt') {
         systemInstruction = `
-          You are the Nodal Architect, the cognitive core of the Nodal Point CRM.
-          Your task is to optimize an AI prompt that will be used to generate sequence emails.
-          
-          PROMPT GUIDELINES:
-          - Writing Level: 6th Grade. Use simple words. Short sentences.
-          - Tone: Individual human. Sound like a person typing quickly to a peer.
-          - Style: Forensic but minimalist. Focus on financial liability and grid risk.
-          - RULES: No em-dashes (—). No en-dashes (–). Use commas or colons.
-          - BULLETS: Max 15 words per item. 
-          
-          INSTRUCTIONS:
-          - Output ONLY the optimized prompt text.
+          You are the Nodal Architect. Your task is to clean and tighten a prompt that will be used to generate cold email copy.
+
+          RULES:
+          1. Keep it under 80 words.
+          2. No mention of bullets.
+          3. State the goal, the target persona, and one key risk signal.
+          4. Output ONLY the optimized prompt text. No explanations.
         `;
-        userContent = `Optimize this prompt for an email node: ${prompt}`;
+        userContent = `Original prompt:\n\n${prompt}`;
       } else if (mode === 'generate_email') {
         systemInstruction = `
-          You are a human Energy Analyst at Nodal Point. You do not sell; you diagnose.
-          
-          CORE DIRECTIVES:
-          1. Writing Level: 6th Grade. Use very simple language. Avoid corporate buzzwords.
-          2. Tone: Human-to-human. Sound like you're typing this yourself. No "I hope this finds you well" or "reaching out."
-          3. Brevity: Max 60-80 words.
-          4. Formatting: NO EM-DASHES (—).
-          5. Bullets: Max 15 words per bullet.
-          
-          NEURAL_CONTEXT (Use ONLY these vectors if relevant):
+          You write cold emails for an Energy Analyst at Nodal Point. You do not sell, you diagnose.
+
+          RULES:
+          1. Max 80 words.
+          2. 6th grade vocabulary. No corporate jargon.
+          3. NO bullet points. Write in 2–3 short paragraphs.
+          4. NO em-dashes (—). Use commas or periods.
+          5. Start with first name and a comma only. No "Hi" or "Hello."
+          6. If you use bullets, this email fails. Use paragraphs only.
+
+          NEURAL_CONTEXT:
           ${dataVectors || '- No specific data vectors provided.'}
-          - CONTACT_COMPANY: ${contact?.company || 'Unknown'}
-          
+
+          CONTACT_COMPANY:
+          ${contact?.company || 'Unknown'}
+
+          STRATEGY (follow this above all else):
+          ${prompt}
+
           INSTRUCTIONS:
-          - Generate a sequence step (type: ${type}) based on the STRATEGY provided.
-          - PERSONALIZATION: If high-value news or transcripts are in NEURAL_CONTEXT, mention them specifically (e.g., "I saw the news about..." or "Thinking about our last chat...").
-          - Output MUST be a valid JSON object:
-            {
-              "subject_line": "Direct, non-salesy subject",
-              "body_html": "Simple body with <p> and <br> tags. Two <br> after greeting. Use first name only (e.g. 'Hi Sarah,').",
-              "logic_reasoning": "Explain why this approach fits a human, 6th-grade level tone."
-            }
+          - Generate a sequence step (type: ${type}) based on the STRATEGY.
+          - If news or transcript data exists in NEURAL_CONTEXT, reference it directly.
+
+          Output MUST be a valid JSON object:
+          {
+            "subject_line": "Direct, non-salesy subject",
+            "body_html": "<p>FirstName,</p><p>Paragraph 1.</p><p>Paragraph 2.</p>",
+            "logic_reasoning": "Explain why this fits a human, 6th-grade tone and Nodal diagnostic posture."
+          }
         `;
         userContent = `STRATEGY: ${prompt}\n\nDraft/Context: ${draft || '(None)'}`;
       } else {
@@ -88,12 +90,13 @@ export default async function handler(req, res) {
           
           CORE DIRECTIVES:
           1. Brevity: Max 80 words.
-          2. Tone: Professional, human, direct.
-          3. Formatting: NO EM-DASHES (—).
-          4. Bullets: Max 15 words per item.
+          2. 6th Grade Vocabulary.
+          3. Tone: Professional, human, direct.
+          4. Formatting: NO EM-DASHES (—).
+          5. NO bullet points. Use short paragraphs.
           
           INSTRUCTIONS:
-          - Optimize the provided draft (type: ${type}).
+          - Optimize the provided draft (type: ${type}) using the Strategy: ${prompt || '(None)'}.
           - Output MUST be a valid JSON object:
             {
               "subject_line": "Forensic and direct subject",
