@@ -53,7 +53,8 @@ import {
   Smartphone,
   Brain,
   AlertTriangle,
-  Search
+  Search,
+  Mic
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -80,7 +81,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useContacts, useSearchContacts, useContact, type Contact } from '@/hooks/useContacts';
+import { useContacts, useSearchContacts, useContact, type Contact, type ContactDetail } from '@/hooks/useContacts';
+import { useContactCalls } from '@/hooks/useCalls';
+import { useApolloNews } from '@/hooks/useApolloNews';
+import { useAccount } from '@/hooks/useAccounts';
 import { useProtocolBuilder } from '@/hooks/useProtocolBuilder';
 import { useAuth } from '@/context/AuthContext';
 import { useFoundryAssets } from '@/hooks/useFoundryAssets';
@@ -497,6 +501,21 @@ function ProtocolArchitectInner() {
   const [contactSearchQuery, setContactSearchQuery] = useState('');
   const { data: searchResults } = useSearchContacts(contactSearchQuery);
   const { data: fetchedTestContact } = useContact(testContactId);
+  const { data: testCalls } = useContactCalls(testContactId);
+
+  const testAccountDomain = useMemo(() => {
+    if (!fetchedTestContact) return undefined;
+    const w = (fetchedTestContact as { website?: string })?.website?.trim();
+    if (!w) return undefined;
+    try {
+      const u = new URL(w.startsWith('http') ? w : `https://${w}`);
+      return u.hostname.replace(/^www\./, '') || undefined;
+    } catch {
+      return undefined;
+    }
+  }, [fetchedTestContact]);
+
+  const { data: testNews } = useApolloNews(testAccountDomain);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [emailViewMode, setEmailViewMode] = useState<'payload' | 'ai' | 'asset'>('payload');
   const [isPreviewMobile, setIsPreviewMobile] = useState(false);
@@ -506,9 +525,9 @@ function ProtocolArchitectInner() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const testContact = useMemo(() => {
-    if (fetchedTestContact) return fetchedTestContact;
+    if (fetchedTestContact) return fetchedTestContact as ContactDetail;
     const allContacts = contactsData?.pages?.flatMap(page => page.contacts) || [];
-    return allContacts.find((c: Contact) => c.id === testContactId);
+    return allContacts.find((c) => c.id === testContactId) as ContactDetail | undefined;
   }, [contactsData, testContactId, fetchedTestContact]);
 
   const insertVariable = (variable: string) => {
@@ -587,10 +606,14 @@ function ProtocolArchitectInner() {
           mode: 'generate_email',
           contact: {
             name: `${testContact.firstName} ${testContact.lastName}`,
-            company: testContact.metadata?.general?.company,
-            industry: testContact.metadata?.general?.industry,
+            company: testContact.company || testContact.metadata?.general?.company || 'Unknown',
+            industry: testContact.metadata?.general?.industry || 'Unknown',
             load_zone: testContact.metadata?.energy?.loadZone,
             contractEndDate: testContact.metadata?.energy?.contractEndDate,
+            load_factor: testContact.metadata?.energy?.loadFactor,
+            annual_usage: testContact.metadata?.energy?.annualUsage || testContact.annualUsage,
+            transcript: testCalls?.find(c => c.transcript)?.transcript || null,
+            news: testNews?.slice(0, 5).map(n => n.title + ': ' + n.snippet).join(' | '),
             metadata: testContact.metadata
           },
           vectors: selectedNode.data.vectors || []
@@ -1678,9 +1701,9 @@ function ProtocolArchitectInner() {
                           <div className="grid grid-cols-2 gap-2">
                             {[
                               { id: 'firmographics', label: 'Firmographics', icon: Building2 },
-                              { id: 'energy_metrics', label: 'Energy Metrics', icon: Zap },
+                              { id: 'energy_intel', label: 'Energy Intel', icon: Zap },
                               { id: 'recent_news', label: 'Recent News', icon: Newspaper },
-                              { id: 'contract_expiry', label: 'Contract Expiry', icon: Calendar },
+                              { id: 'transcripts', label: 'Transcripts', icon: Mic },
                             ].map((vector) => (
                               <label key={vector.id} className="flex items-center gap-2 cursor-pointer group">
                                 <input
@@ -1703,7 +1726,10 @@ function ProtocolArchitectInner() {
                                 )}>
                                   {((selectedNode?.data.vectors as string[]) || []).includes(vector.id) && <Check className="w-2.5 h-2.5" />}
                                 </div>
-                                <span className="text-[9px] font-mono text-zinc-400 group-hover:text-zinc-200 uppercase tracking-tight">{vector.label}</span>
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <vector.icon className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400 shrink-0" />
+                                  <span className="text-[9px] font-mono text-zinc-400 group-hover:text-zinc-200 uppercase tracking-tight truncate">{vector.label}</span>
+                                </div>
                               </label>
                             ))}
                           </div>
