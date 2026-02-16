@@ -151,8 +151,8 @@ export default async function handler(req, res) {
                   }
                 ]
               }
-            ],
-            response_format: { type: 'json_object' }
+            ]
+            // response_format: { type: 'json_object' }
           }),
         });
 
@@ -204,6 +204,9 @@ export default async function handler(req, res) {
           if (content) {
             analysis = JSON.parse(content);
           }
+        } else {
+          const errText = await response.text();
+          console.error('[Analyze Document] OpenRouter Error:', response.status, errText);
         }
       } catch (e) {
         logger.error('[Analyze Document] OpenRouter error:', e.message);
