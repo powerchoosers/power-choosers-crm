@@ -7,6 +7,7 @@
 import { cors } from '../_cors.js';
 import { ZohoMailService } from './zoho-service.js';
 import { injectTracking, hasTrackingPixel } from './tracking-helper.js';
+import { supabaseAdmin as supabase } from '../../../lib/supabase.js';
 import logger from '../_logger.js';
 
 export default async function handler(req, res) {
@@ -37,7 +38,8 @@ export default async function handler(req, res) {
             personalization,
             tags,
             trackClicks = true,
-            trackOpens = true
+            trackOpens = true,
+            email_id // Existing record ID from Edge Function
         } = body;
 
         // Validate required fields (allow object or string for to/from)
@@ -113,12 +115,36 @@ export default async function handler(req, res) {
 
         logger.info(`[Zoho Sequence] Email sent successfully: messageId=${result.messageId}`, 'zoho-send-sequence');
 
+        // Logic for CRM Recording / Uplink Out Sync
+        if (email_id) {
+            const { error: updateError } = await supabase
+                .from('emails')
+                .update({
+                    status: 'sent',
+                    type: 'sent',
+                    timestamp: new Date().toISOString(),
+                    metadata: {
+                        ...body.metadata,
+                        messageId: result.messageId,
+                        sentAt: new Date().toISOString(),
+                        zohoMessageId: result.messageId,
+                        trackingId: trackingId
+                    }
+                })
+                .eq('id', email_id);
+
+            if (updateError) {
+                logger.error('[Zoho Sequence] Failed to update CRM email record:', updateError);
+            } else {
+                logger.info(`[Zoho Sequence] Updated CRM email record: ${email_id}`);
+            }
+        }
+
         // Return response matching MailerSend format
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
             success: true,
             messageId: result.messageId,
-            // threadId: result.threadId, // Zoho might not return threadId immediately in send response
             to: toEmail,
             subject
         }));
