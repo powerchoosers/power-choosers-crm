@@ -46,8 +46,18 @@ export default function SettingsPage() {
   const fetchConnections = async () => {
     if (!user) return
     const userId = user.id
-    const { data } = await supabase.from('zoho_connections').select('*').eq('user_id', userId)
-    if (data) setConnections(data)
+    const primaryEmail = user.email ? user.email.toLowerCase() : ''
+    const { data } = await supabase.from('zoho_connections')
+      .select('*')
+      .eq('user_id', userId)
+
+    if (data) {
+      // Filter out the primary email to avoid duplication in the UI
+      const secondaryConnections = data.filter(conn =>
+        conn.email?.toLowerCase() !== primaryEmail
+      )
+      setConnections(secondaryConnections)
+    }
   }
 
   useEffect(() => {
