@@ -162,7 +162,11 @@ export default async function handler(req, res) {
           const data = await response.json();
           const content = data?.choices?.[0]?.message?.content;
           if (content) {
-            analysis = JSON.parse(content);
+            let cleanContent = content.trim();
+            if (cleanContent.startsWith('```')) {
+              cleanContent = cleanContent.replace(/^```(json)?\n/, '').replace(/\n```$/, '');
+            }
+            analysis = JSON.parse(cleanContent);
           }
         }
       } catch (e) {

@@ -75,8 +75,12 @@ export default async function analyzeBillHandler(req, res) {
           const data = await response.json();
           const content = data?.choices?.[0]?.message?.content;
           if (content) {
+            let cleanContent = content.trim();
+            if (cleanContent.startsWith('```')) {
+              cleanContent = cleanContent.replace(/^```(json)?\n/, '').replace(/\n```$/, '');
+            }
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(content);
+            res.end(cleanContent);
             return;
           }
         } else {
