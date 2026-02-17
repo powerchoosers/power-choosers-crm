@@ -114,19 +114,19 @@ export default function BillDebuggerPage() {
                         data.billingPeriod.startDate ? `${data.billingPeriod.startDate} - ${data.billingPeriod.endDate}` : 'Unknown Period')
                     : data.billingPeriod) || 'Unknown Period',
 
-                total_usage_kwh: (data.usagekWh || data.totalUsage || data.total_usage_kwh)?.toLocaleString() || '0',
+                total_usage_kwh: (data.usagekWh || data.totalUsage || data.total_usage_kwh || data.baseUsage)?.toLocaleString() || '0',
 
-                // Prioritize 'peakDemand' from new prompt, fallback to old demandKW object
-                billed_demand_kw: (data.peakDemand || (data.demandKW && typeof data.demandKW === 'object' ? data.demandKW.peakDemand : data.demandKW) || data.billed_demand_kw || 0).toLocaleString(),
-                peak_demand: data.peakDemand || (data.demandKW && typeof data.demandKW === 'object' ? data.demandKW.peakDemand : data.demandKW) || 0,
+                // TXU specific: Actual kW/kVA / Billed kW/kVA
+                billed_demand_kw: (data.peakDemand || data.billedDemand || data.actualDemand || 0).toLocaleString(),
+                peak_demand: data.peakDemand || data.billedDemand || data.actualDemand || 0,
 
-                delivery_charges: data.deliveryChargeTotal || data.deliveryCharges || data.delivery_charges,
-                energy_charges: data.energyChargeTotal || data.energyCharges || data.energy_charges,
-                taxes_and_fees: data.taxesAndFees || data.taxes_and_fees,
-                total_amount_due: data.totalAmountDue || data.total_amount_due,
+                delivery_charges: data.deliveryChargeTotal || data.totalDistributionCharges || data.deliveryCharges || data.distributionCharges,
+                energy_charges: data.energyChargeTotal || data.totalCommercialCharges || data.energyCharges || data.supplyCharges,
+                taxes_and_fees: data.taxesAndFees || data.salesTax,
+                total_amount_due: data.totalAmountDue || data.currentCharges || data.totalAmount,
 
                 contract_end_date: data.contractEndDate,
-                retail_plan_name: data.retailPlanName,
+                retail_plan_name: data.retailPlanName || data.product,
                 energy_rate_per_kwh: data.energyRatePerKWh,
                 delivery_rate_per_kwh: data.deliveryRatePerKWh,
 

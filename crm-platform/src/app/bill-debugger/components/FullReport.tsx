@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { Zap, Truck, Activity, ArrowRight, Info, Map as MapIcon, Globe } from 'lucide-react'
+import { Zap, Truck, Activity, ArrowRight, Info, Map as MapIcon, Globe, Calendar, AlertCircle } from 'lucide-react'
 import { generateFeedback } from '../utils/feedbackLogic'
 import { FeedbackBadge } from './FeedbackBadge'
 import { NextStepsCard } from './NextStepsCard'
@@ -128,10 +128,28 @@ export function FullReport({ data }: FullReportProps) {
                 <p className="text-zinc-500 max-w-2xl mx-auto text-lg leading-relaxed mb-6">
                     {feedback.description}
                 </p>
-                <div className="inline-flex items-center gap-2 bg-zinc-100 rounded-full px-4 py-1 text-sm text-zinc-500">
-                    <span className="font-medium text-zinc-900">{data.provider_name}</span>
-                    <span>•</span>
-                    <span>{data.billing_period}</span>
+                <div className="flex flex-wrap justify-center items-center gap-2 mb-6">
+                    <div className="inline-flex items-center gap-2 bg-zinc-100 rounded-full px-4 py-1 text-sm text-zinc-500">
+                        <span className="font-medium text-zinc-900">{data.provider_name}</span>
+                        <span>•</span>
+                        <span>{data.billing_period}</span>
+                    </div>
+                    {data.contract_end_date ? (
+                        <div className="inline-flex items-center gap-2 bg-amber-50 rounded-full px-4 py-1 text-sm text-amber-700 border border-amber-100 shadow-sm">
+                            <Calendar className="w-3.5 h-3.5" />
+                            <span className="font-medium uppercase tracking-tighter">Contract Ends: {data.contract_end_date}</span>
+                        </div>
+                    ) : (
+                        <div className="inline-flex items-center gap-2 bg-zinc-50 rounded-full px-4 py-1 text-sm text-zinc-400 border border-zinc-100 opacity-60">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            <span className="font-medium uppercase tracking-tighter">Contract Date: Not Detected</span>
+                        </div>
+                    )}
+                    {data.retail_plan_name && (
+                        <div className="inline-flex items-center gap-2 bg-blue-50 rounded-full px-4 py-1 text-sm text-blue-700 border border-blue-100">
+                            <span className="font-medium uppercase tracking-tighter">{data.retail_plan_name}</span>
+                        </div>
+                    )}
                 </div>
             </motion.div>
 
@@ -143,36 +161,36 @@ export function FullReport({ data }: FullReportProps) {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 }}
-                    className="bg-[#1e293b] rounded-2xl p-8 border border-zinc-700/50 shadow-xl flex flex-col justify-between"
+                    className="glass-card p-8 flex flex-col justify-between"
                 >
-                    <div>
+                    <div className="relative z-10">
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-sm font-mono uppercase tracking-widest text-[#94a3b8]">Energy</h3>
-                            <Zap className="w-5 h-5 text-[#38bdf8]" />
+                            <h3 className="text-sm font-mono uppercase tracking-widest text-zinc-400">Energy</h3>
+                            <Zap className="w-5 h-5 text-[#002FA7]" />
                         </div>
-                        <div className="text-4xl font-light text-white mb-2">
-                            {data.total_usage_kwh} <span className="text-lg text-zinc-500">kWh</span>
+                        <div className="text-4xl font-semibold text-zinc-900 mb-2">
+                            {data.total_usage_kwh} <span className="text-lg text-zinc-400">kWh</span>
                         </div>
                     </div>
 
-                    <div className="border-t border-zinc-700 pt-4 mt-8">
+                    <div className="border-t border-zinc-100 pt-4 mt-8 relative z-10">
                         <div className="flex justify-between items-center text-sm mb-2">
                             <span className="text-zinc-500">Supply Cost</span>
-                            <span className="text-white font-mono">{energyCost}</span>
+                            <span className="text-zinc-900 font-mono font-medium">{energyCost}</span>
                         </div>
-                        <div className="text-xs text-zinc-500 mt-2">
-                            Effective Rate: <span className="text-zinc-300">
+                        <div className="text-xs text-zinc-400 mt-2">
+                            Effective Rate: <span className="text-zinc-600">
                                 {energyChargesRaw > 0 ? (energyChargesRaw / usage).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 3 }) : 'N/A'} / kWh
                             </span>
                         </div>
                         {data.analysis && (
-                            <div className="mt-4 p-3 bg-white/5 rounded-lg border border-white/10">
+                            <div className="mt-4 p-3 bg-zinc-50 rounded-xl border border-zinc-100">
                                 <div className="text-[10px] text-zinc-400 uppercase tracking-wider mb-1">ERCOT Load Zone Benchmark</div>
                                 <div className="flex justify-between items-end">
                                     <span className="text-xs text-zinc-500">Market Rate (LZ_{data.analysis.zone}):</span>
-                                    <span className="text-xs text-emerald-400 font-mono">{(data.analysis.marketContext.largeEnergyComponent * 100).toFixed(2)}¢</span>
+                                    <span className="text-xs text-[#002FA7] font-mono font-medium">{(data.analysis.marketContext.largeEnergyComponent * 100).toFixed(2)}¢</span>
                                 </div>
-                                <div className="text-[9px] text-zinc-600 mt-1 italic">
+                                <div className="text-[9px] text-zinc-400 mt-1 italic">
                                     Compare against median regional contracts.
                                 </div>
                             </div>
@@ -185,24 +203,24 @@ export function FullReport({ data }: FullReportProps) {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
-                    className="bg-[#1e293b] rounded-2xl p-8 border border-zinc-700/50 shadow-xl flex flex-col justify-between"
+                    className="glass-card p-8 flex flex-col justify-between"
                 >
-                    <div>
+                    <div className="relative z-10">
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-sm font-mono uppercase tracking-widest text-[#94a3b8]">Delivery</h3>
-                            <Truck className="w-5 h-5 text-[#38bdf8]" />
+                            <h3 className="text-sm font-mono uppercase tracking-widest text-zinc-400">Delivery</h3>
+                            <Truck className="w-5 h-5 text-[#002FA7]" />
                         </div>
-                        <div className="text-4xl font-light text-white mb-2">
+                        <div className="text-4xl font-semibold text-zinc-900 mb-2">
                             {deliveryCost}
                         </div>
                     </div>
 
-                    <div className="border-t border-zinc-700 pt-4 mt-8">
+                    <div className="border-t border-zinc-100 pt-4 mt-8 relative z-10">
                         <div className="flex justify-between items-center text-sm mb-2">
                             <span className="text-zinc-500">TDU Charges</span>
-                            <span className="text-white font-mono">{deliveryCost}</span>
+                            <span className="text-zinc-900 font-mono font-medium">{deliveryCost}</span>
                         </div>
-                        <div className="text-xs text-zinc-500 mt-2">
+                        <div className="text-xs text-zinc-400 mt-2 italic">
                             {feedback.facilitySize === 'small'
                                 ? 'High fixed charge impact due to small load.'
                                 : `Includes ${data.analysis?.territory || 'regulated'} utility tariffs.`}
@@ -215,37 +233,37 @@ export function FullReport({ data }: FullReportProps) {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3 }}
-                    className="bg-[#1e293b] rounded-2xl p-8 border border-zinc-700/50 shadow-xl shadow-[#002FA7]/10 flex flex-col justify-between relative overflow-hidden"
+                    className="glass-card p-8 shadow-xl shadow-[#002FA7]/5 flex flex-col justify-between relative overflow-hidden"
                 >
-                    <div className="absolute top-0 right-0 w-20 h-20 bg-[#002FA7]/20 blur-2xl rounded-full pointer-events-none"></div>
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-[#002FA7]/10 blur-3xl rounded-full pointer-events-none z-0"></div>
 
-                    <div>
+                    <div className="relative z-10">
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-sm font-mono uppercase tracking-widest text-[#38bdf8]">Peak Demand</h3>
-                            <Activity className="w-5 h-5 text-[#38bdf8]" />
+                            <h3 className="text-sm font-mono uppercase tracking-widest text-[#002FA7]">Peak Demand</h3>
+                            <Activity className="w-5 h-5 text-[#002FA7]" />
                         </div>
-                        <div className="text-4xl font-light text-white mb-2">
-                            {feedback.missingPeak ? "N/A" : <>{peak.toLocaleString()} <span className="text-lg text-zinc-500">kW</span></>}
+                        <div className="text-4xl font-semibold text-zinc-900 mb-2">
+                            {feedback.missingPeak ? "N/A" : <>{peak.toLocaleString()} <span className="text-lg text-zinc-400">kW</span></>}
                         </div>
                     </div>
 
-                    <div className="border-t border-zinc-700 pt-4 mt-8">
+                    <div className="border-t border-zinc-100 pt-4 mt-8 relative z-10">
                         {feedback.facilitySize === 'large' ? (
                             <>
                                 <div className="flex justify-between items-center text-sm mb-1">
                                     <span className="text-zinc-500">Ratchet Impact</span>
-                                    <span className="text-[#38bdf8] font-mono">{data.analysis ? (parseFloat(data.analysis.demandPercentOfBill) > 0 ? `${data.analysis.demandPercentOfBill}%` : 'Extracted') : 'Modeling...'}</span>
+                                    <span className="text-[#002FA7] font-mono font-semibold">{data.analysis ? (parseFloat(data.analysis.demandPercentOfBill) > 0 ? `${data.analysis.demandPercentOfBill}%` : 'Extracted') : 'Modeling...'}</span>
                                 </div>
-                                <div className="text-xs text-zinc-500 mt-2 flex gap-2 items-start">
-                                    <Info className="w-3 h-3 mt-0.5 shrink-0" />
+                                <div className="text-xs text-zinc-400 mt-2 flex gap-2 items-start">
+                                    <Info className="w-3 h-3 mt-0.5 shrink-0 text-zinc-300" />
                                     <span>
                                         Ratchet locks 80% cost floor for 11 months.
-                                        Est. yearly penalty: <span className="text-zinc-300">{(peak * (data.analysis?.marketContext?.largeDemandCharge || 10.88) * 12 * 0.8).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}</span>
+                                        Est. yearly penalty: <span className="text-[#002FA7] font-medium">{(peak * (data.analysis?.marketContext?.largeDemandCharge || 10.88) * 12 * 0.8).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}</span>
                                     </span>
                                 </div>
                             </>
                         ) : (
-                            <div className="text-xs text-zinc-500 mt-2">
+                            <div className="text-xs text-zinc-400 mt-2 italic">
                                 Small facility (&lt; 10kW). No demand ratchet detected in this tier.
                             </div>
                         )}

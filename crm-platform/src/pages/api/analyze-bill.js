@@ -45,24 +45,34 @@ export default async function analyzeBillHandler(req, res) {
       - billingPeriod (start and end dates as YYYY-MM-DD)
       - totalAmountDue ($)
       - dueDate (YYYY-MM-DD)
-      - contractEndDate (find near the retail plan or TDU details)
+      - contractEndDate (MM/YYYY or YYYY-MM-DD. Look for varied phrasing like "valid through the meter date on or following...", "contract expires...", "ends...", "valid through...". If not found, return null.)
       - retailPlanName (e.g., "Fixed Price", "Index")
       - providerName (The Retail Electric Provider / REP - e.g., Reliant, TXU, Gexa, Direct Energy)
       
-      - totalUsage (kWh)
-      - peakDemand (kW) - IMPORTANT: Look for "Peak Demand", "Billed Demand", or "NCP Demand".
+      - totalUsage (kWh) - Look for "Total Usage", "Base Usage", or the sum of meter reads.
+      - peakDemand (kW) - Look for "Actual kW/kVA", "Billed kW/kVA", or "NCP Demand". If both actual and billed exist, prefer BILLED.
       
-      - energyChargeTotal ($)
-      - deliveryChargeTotal ($) (TDU/TDSP charges)
+      - energyChargeTotal ($) - Look for "Total Commercial Charges" or the sum of energy-specific line items.
+      - deliveryChargeTotal ($) - IMPORTANT: Look for "Total Distribution Charges" or the sum of all delivery/TDU/Distribution line items.
       - taxesAndFees ($)
-      - demandRatchetCharge ($) - Look for "Demand" line items.
+      - demandRatchetCharge ($) - Sum of items like "Distribution System Charge", "Transmission Cost Recov Factor".
       
       - energyRatePerKWh ($/kWh)
-      - deliveryRatePerKWh ($/kWh)
       
-      If you cannot find a specific field, return null.
+      - productType (Extracted from "Product:" field - usually "Fixed Price", "Flex", or "Month-to-Month")
+      
+      If you cannot find a specific field, return null. 
+      IMPORTANT: For numbers, return the string with commas if present.
       Ensure output is valid JSON. 
     `;
+
+    // Improved number parsing
+    const parseNum = (val) => {
+      if (val === null || val === undefined) return 0;
+      const cleaned = String(val).replace(/[$,\s]/g, '');
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? 0 : num;
+    };
 
     // Function to process the AI results with forensic logic
     const processResults = (parsed) => {
@@ -73,12 +83,14 @@ export default async function analyzeBillHandler(req, res) {
       const market = getMarketContext(territory);
 
       // 2. Metrics & Classification
-      const usage = parseFloat(String(parsed.totalUsage).replace(/,/g, '')) || 0;
-      const totalAmount = parseFloat(String(parsed.totalAmountDue).replace(/[$,]/g, '')) || 0;
-      const peakDemand = parseFloat(String(parsed.peakDemand).replace(/,/g, '')) || 0;
-      const energyCharges = parseFloat(String(parsed.energyChargeTotal).replace(/[$,]/g, '')) || 0;
-      const deliveryCharges = parseFloat(String(parsed.deliveryChargeTotal).replace(/[$,]/g, '')) || 0;
-      const demandCharges = parseFloat(String(parsed.demandRatchetCharge).replace(/[$,]/g, '')) || 0;
+      const usage = parseNum(parsed.totalUsage);
+      const totalAmount = parseNum(parsed.totalAmountDue);
+      const peakDemand = parseNum(parsed.peakDemand);
+      const energyCharges = parseNum(parsed.energyChargeTotal);
+      const deliveryCharges = parseNum(parsed.deliveryChargeTotal);
+      const demandCharges = parseNum(parsed.demandRatchetCharge);
+
+      console.log(`[Bill Debugger] Normalized Metrics:`, { usage, peakDemand, totalAmount, deliveryCharges });
 
       const isFacilityLarge = peakDemand > market.demandMeteredThreshold || usage > 20000;
       const allInRate = usage > 0 ? totalAmount / usage : 0;
@@ -93,7 +105,9 @@ export default async function analyzeBillHandler(req, res) {
         totalUsage: usage,
         totalBill: totalAmount,
         billingPeriod: parsed.billingPeriod || '',
-        provider: parsed.providerName || parsed.retailPlanName || 'Unknown'
+        provider: parsed.providerName || parsed.retailPlanName || 'Unknown',
+        productType: parsed.productType || 'Unknown',
+        contractEndDate: parsed.contractEndDate
       }, territory);
 
       return {
@@ -160,7 +174,15 @@ export default async function analyzeBillHandler(req, res) {
             }
 
             try {
+              console.log(`[Bill Debugger] Raw AI JSON:`, jsonString);
               const parsed = JSON.parse(jsonString);
+              console.log(`[Bill Debugger] Parsed Fields:`, {
+                customerName: parsed.customerName,
+                usage: parsed.totalUsage,
+                demand: parsed.peakDemand,
+                address: parsed.serviceAddress,
+                product: parsed.productType
+              });
               const forensicResult = processResults(parsed);
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ success: true, data: forensicResult }));

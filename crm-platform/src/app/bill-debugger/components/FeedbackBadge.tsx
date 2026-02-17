@@ -14,21 +14,21 @@ export function FeedbackBadge({ status, title, isLarge }: FeedbackBadgeProps) {
     // Size-aware color logic
     const colors = {
         green: {
-            bg: "bg-emerald-500/10",
-            border: "border-emerald-500/20",
-            text: "text-emerald-400",
+            bg: "bg-emerald-50",
+            border: "border-emerald-200",
+            text: "text-emerald-700",
             icon: CheckCircle
         },
         yellow: {
-            bg: "bg-amber-500/10",
-            border: "border-amber-500/20",
-            text: "text-amber-400",
+            bg: "bg-amber-50",
+            border: "border-amber-200",
+            text: "text-amber-700",
             icon: AlertTriangle
         },
         red: {
-            bg: "bg-red-500/10",
-            border: "border-red-500/20",
-            text: "text-red-400",
+            bg: "bg-rose-50",
+            border: "border-rose-200",
+            text: "text-rose-700",
             icon: AlertOctagon
         }
     }
@@ -40,7 +40,7 @@ export function FeedbackBadge({ status, title, isLarge }: FeedbackBadgeProps) {
         <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border ${style.bg} ${style.border} backdrop-blur-sm`}
+            className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border shadow-sm ${style.bg} ${style.border} backdrop-blur-md`}
         >
             <Icon className={`w-4 h-4 ${style.text}`} />
             <span className={`text-xs font-medium uppercase tracking-wide ${style.text}`}>
