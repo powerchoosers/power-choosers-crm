@@ -30,6 +30,18 @@ type ExtractedData = {
     peak_demand?: string | number // Use as source of truth for calculations
     energy_rate_per_kwh?: string | number
     delivery_rate_per_kwh?: string | number
+
+    // Forensic Analysis
+    analysis?: {
+        zone: string;
+        territory: string;
+        isFacilityLarge: boolean;
+        facilitySize: 'large' | 'small';
+        allInRateCents: string;
+        demandPercentOfBill: string;
+        feedback: any;
+        marketContext: any;
+    }
 }
 
 type ViewState = 'trust' | 'upload' | 'analyzing' | 'preview' | 'email' | 'report' | 'error'
