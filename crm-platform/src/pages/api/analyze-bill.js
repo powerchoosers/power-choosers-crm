@@ -88,7 +88,8 @@ export default async function analyzeBillHandler(req, res) {
             try {
               const parsed = JSON.parse(jsonString);
               res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify(parsed));
+              // Wrap in success structure
+              res.end(JSON.stringify({ success: true, data: parsed }));
               return;
             } catch (parseError) {
               console.error('[Bill Debugger] JSON Parse Error:', parseError.message);
@@ -99,7 +100,7 @@ export default async function analyzeBillHandler(req, res) {
                 const cleanMarkdown = content.replace(/```json/g, '').replace(/```/g, '').trim();
                 const parsed = JSON.parse(cleanMarkdown);
                 res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify(parsed));
+                res.end(JSON.stringify({ success: true, data: parsed }));
                 return;
               } catch (e2) {
                 // If all fails, send error so frontend doesn't hang or guess
