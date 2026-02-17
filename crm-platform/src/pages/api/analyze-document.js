@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { cors } from './_cors.js';
 import logger from './_logger.js';
-import { supabaseAdmin } from './_supabase.js';
+import { supabaseAdmin } from '@/lib/supabase';
 
 /**
  * AI-powered document analysis for Nodal Point CRM.
