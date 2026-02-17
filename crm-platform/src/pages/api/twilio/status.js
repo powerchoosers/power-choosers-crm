@@ -1,5 +1,6 @@
 import twilio from 'twilio';
 import logger from '../_logger.js';
+import { upsertCallInSupabase } from '../calls.js';
 
 export default async function handler(req, res) {
     // Accept GET for quick verification; Twilio will POST status updates
@@ -306,11 +307,7 @@ export default async function handler(req, res) {
                     if (RecordingUrl) {
                         body.recordingUrl = RecordingUrl.endsWith('.mp3') ? RecordingUrl : `${RecordingUrl}.mp3`;
                     }
-                    await fetch(`${base}/api/calls`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(body)
-                    }).catch(() => { });
+                    await upsertCallInSupabase(body).catch(() => { });
 
                     // Auto-trigger transcription for completed calls with recordings
                     if (RecordingUrl) {
@@ -378,11 +375,7 @@ export default async function handler(req, res) {
                         accountId,
                         timestamp: new Date().toISOString()
                     };
-                    await fetch(`${base}/api/calls`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    }).catch(() => { });
+                    await upsertCallInSupabase(payload).catch(() => { });
                 } else {
                     logger.log(`[Status] No recordings found yet for ${CallSid} on parent or children`);
                 }

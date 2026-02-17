@@ -139,7 +139,7 @@ function mapCallToSupabase(call) {
     status: call.status,
     duration: call.duration || call.durationSec || 0,
     timestamp: call.timestamp || call.callTime || new Date().toISOString(),
-    direction: call.direction || (call.from?.includes('client:') ? 'outbound' : 'inbound'),
+    direction: call.direction || (pickBusinessAndTarget(call).direction),
     recordingUrl: call.recordingUrl,
     recordingSid: call.recordingSid,
     transcript: call.transcript,
@@ -177,7 +177,12 @@ function pickBusinessAndTarget({ to, from, targetPhone, businessPhone }) {
   const isBiz = (p) => !!p && envBiz.includes(p);
   const biz = businessPhone || (isBiz(to10) ? to : (isBiz(from10) ? from : ''));
   const tgt = targetPhone || (isBiz(to10) && !isBiz(from10) ? from10 : (isBiz(from10) && !isBiz(to10) ? to10 : (to10 || from10)));
-  return { businessPhone: biz || '', targetPhone: tgt || '' };
+
+  // Logical direction: if From is a known business number, it's outbound.
+  // Otherwise, if To is a known business number, it's inbound.
+  const direction = isBiz(from10) ? 'outbound' : (isBiz(to10) ? 'inbound' : 'outbound');
+
+  return { businessPhone: biz || '', targetPhone: tgt || '', direction };
 }
 
 async function getCallsFromSupabase(limit = 0, offset = 0, callSid = null, ownerId = null) {
@@ -292,8 +297,8 @@ export async function upsertCallInSupabase(payload) {
     to: payload.to != null ? payload.to : current.to,
     from: payload.from != null ? payload.from : current.from,
     status: payload.status || current.status || 'initiated',
-    duration: payload.duration != null ? payload.duration : (current.duration || 0),
-    durationSec: payload.durationSec != null ? payload.durationSec : (current.durationSec != null ? current.durationSec : (payload.duration || current.duration || 0)),
+    duration: Math.max(payload.duration || 0, payload.durationSec || 0, current.duration || 0),
+    durationSec: Math.max(payload.duration || 0, payload.durationSec || 0, current.durationSec || 0, current.duration || 0),
     timestamp: current.timestamp || payload.callTime || payload.timestamp || nowIso,
     callTime: payload.callTime || current.callTime || current.timestamp || nowIso,
     outcome: payload.outcome || current.outcome || deriveOutcome({ ...current, ...payload }),
@@ -301,7 +306,7 @@ export async function upsertCallInSupabase(payload) {
     formattedTranscript: payload.formattedTranscript != null ? payload.formattedTranscript : current.formattedTranscript,
     aiInsights: payload.aiInsights != null ? payload.aiInsights : current.aiInsights || null,
     aiSummary: payload.aiSummary != null ? payload.aiSummary : current.aiSummary,
-    recordingUrl: payload.recordingUrl != null ? payload.recordingUrl : current.recordingUrl,
+    recordingUrl: payload.recordingUrl || current.recordingUrl,
     recordingChannels: payload.recordingChannels != null ? payload.recordingChannels : current.recordingChannels,
     recordingTrack: payload.recordingTrack != null ? payload.recordingTrack : current.recordingTrack,
     recordingSource: payload.recordingSource != null ? payload.recordingSource : current.recordingSource,
@@ -314,6 +319,7 @@ export async function upsertCallInSupabase(payload) {
     contactName: finalContactName,
     targetPhone: (payload.targetPhone != null ? payload.targetPhone : (current.targetPhone || context.targetPhone)) || '',
     businessPhone: (payload.businessPhone != null ? payload.businessPhone : (current.businessPhone || context.businessPhone)) || '',
+    direction: current.direction || payload.direction || context.direction || 'outbound',
     source: payload.source || current.source || 'unknown',
 
     updatedAt: nowIso,

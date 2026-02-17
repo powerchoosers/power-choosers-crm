@@ -146,30 +146,9 @@ export default async function handler(req, res) {
                 contactId = meta.contactId || '';
                 accountId = meta.accountId || '';
 
-                // Create initial call record as 'initiated'
-                // This ensures the transmission log shows "active call" even before completion
+                // [REMOVED] Initial creation to match "only post on completion" requirement
                 if (meta.contactId || meta.accountId) {
-                    try {
-                        const callRecord = {
-                            callSid: CallSid,
-                            twilioSid: CallSid,
-                            status: 'initiated',
-                            direction: isInboundToBusiness ? 'inbound' : 'outbound',
-                            from: From,
-                            to: To,
-                            contactId: meta.contactId,
-                            accountId: meta.accountId,
-                            metadata: meta,
-                            timestamp: new Date().toISOString()
-                        };
-                        logger.log(`[Voice] Creating initial call record for ${CallSid}`, callRecord);
-                        // Do NOT await here to avoid blocking TwiML generation response latency
-                        upsertCallInSupabase(callRecord).catch(err => {
-                            logger.warn('[Voice] Failed creating initial call record:', err?.message);
-                        });
-                    } catch (e) {
-                        logger.warn('[Voice] Error preparing initial call upsert:', e);
-                    }
+                    logger.log(`[Voice] Call context for ${CallSid}:`, meta);
                 }
             } catch (e) {
                 logger.warn('[Voice] Failed to process call metadata:', e);
