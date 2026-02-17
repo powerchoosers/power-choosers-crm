@@ -1,35 +1,30 @@
-07:33:04.113 
-▲ Next.js 16.1.4 (webpack)
-07:33:04.113 
-07:33:04.232 
-  Creating an optimized production build ...
-07:33:19.036 
-✓ Compiled successfully in 11.6s
-07:33:19.040 
-  Running TypeScript ...
-07:33:35.782 
-Failed to compile.
-07:33:35.782 
-07:33:35.782 
-./src/app/api/auth/callback/zoho/route.ts:219:32
-07:33:35.782 
-Type error: Cannot find name 'useOrigin'. Did you mean 'origin'?
-07:33:35.783 
-07:33:35.783 
-  217 |             email: userEmail,
-07:33:35.783 
-  218 |             options: {
-07:33:35.783 
-> 219 |                 redirectTo: `${useOrigin}/network`
-07:33:35.783 
-      |                                ^
-07:33:35.783 
-  220 |             }
-07:33:35.783 
-  221 |         });
-07:33:35.783 
-  222 |
-07:33:35.828 
-Next.js build worker exited with code: 1 and signal: null
-07:33:35.853 
+11:21:15.139 
+11:21:15.139 
+./src/pages/api/calls/account/[accountId].js
+11:21:15.139 
+Module not found: Can't resolve '../../_supabase.js'
+11:21:15.139 
+11:21:15.139 
+https://nextjs.org/docs/messages/module-not-found
+11:21:15.139 
+11:21:15.139 
+./src/pages/api/calls/contact/[contactId].js
+11:21:15.139 
+Module not found: Can't resolve '../../_supabase.js'
+11:21:15.139 
+11:21:15.139 
+https://nextjs.org/docs/messages/module-not-found
+11:21:15.139 
+11:21:15.139 
+./src/pages/api/cron/refresh-apollo-news.js
+11:21:15.139 
+Module not found: Can't resolve '../_supabase.js'
+11:21:15.139 
+11:21:15.140 
+https://nextjs.org/docs/messages/module-not-found
+11:21:15.140 
+11:21:15.236 
+11:21:15.236 
+> Build failed because of webpack errors
+11:21:15.317 
 Error: Command "npm run build" exited with 1

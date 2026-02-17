@@ -5,11 +5,33 @@ import { AlertTriangle, Activity, Menu, X, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useMarketPulse } from '@/hooks/useMarketPulse';
+import { useEIARetailTexas } from '@/hooks/useEIA';
+import { cn } from '@/lib/utils';
 
 export default function MarketData() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const { data: marketData, isError, error } = useMarketPulse();
+  const { data: marketData, isLoading: marketLoading, isError: marketError } = useMarketPulse();
+  const { data: eiaData } = useEIARetailTexas();
+
+  const prices = marketData?.prices ?? {} as NonNullable<typeof marketData>['prices'];
+  const grid = marketData?.grid ?? {} as NonNullable<typeof marketData>['grid'];
+
+  // Simple logic for consumer-facing Stress Index
+  const getStressLevel = () => {
+    if (marketLoading) return { label: 'Syncing', color: 'text-zinc-500', message: 'Connecting to ERCOT telemetry...' };
+    if (marketError) return { label: 'Offline', color: 'text-rose-500', message: 'Live telemetry stream interrupted.' };
+    const reserves = grid.reserves ?? 5000;
+    if (reserves < 2500) return { label: 'CRITICAL', color: 'text-rose-500', message: 'Grid reserves are low. Scarcity pricing active.' };
+    if (reserves < 4500) return { label: 'Tight', color: 'text-amber-500', message: 'Elevated load detected. Monitoring reserves.' };
+    return { label: 'Optimal', color: 'text-emerald-500', message: 'Reserves are adequate. No scarcity pricing detected.' };
+  };
+
+  const stress = getStressLevel();
+
+  // 4CP Status
+  const currentMonth = new Date().getMonth(); // 0-indexed
+  const is4CPSeason = currentMonth >= 5 && currentMonth <= 8; // June - Sept
 
   useEffect(() => {
     const handleScroll = () => {
@@ -19,11 +41,11 @@ export default function MarketData() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  const displayPrice = marketData?.prices?.houston?.toFixed(2) || "24.15";
+  const displayPrice = marketLoading ? "---" : (prices.hub_avg?.toFixed(2) ?? prices.houston?.toFixed(2) ?? "0.00");
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-[#002FA7]">
-      
+
       {/* HEADER (Reused from other pages for consistency) */}
       <header id="main-header" className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${isScrolled ? 'bg-zinc-950/80 backdrop-blur-xl h-16 shadow-sm' : 'bg-transparent h-24'}`}>
         <div className="w-full px-8 h-full flex items-center justify-between">
@@ -63,10 +85,10 @@ export default function MarketData() {
             { label: 'Market Data', href: '/market-data' },
             { label: 'Contact', href: '/contact' }
           ].map((item, i) => (
-             <a key={item.label} href={item.href}
-             className={`text-4xl md:text-5xl font-light tracking-tight text-white hover:text-[#002FA7] transition-all duration-500 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'} delay-${(i + 1) * 100}`}>
-             {item.label}
-           </a>
+            <a key={item.label} href={item.href}
+              className={`text-4xl md:text-5xl font-light tracking-tight text-white hover:text-[#002FA7] transition-all duration-500 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'} delay-${(i + 1) * 100}`}>
+              {item.label}
+            </a>
           ))}
         </div>
       </div>
@@ -78,7 +100,7 @@ export default function MarketData() {
       <div className="pt-32 px-6">
 
         {/* PAGE HEADER */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
           animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
           transition={{ duration: 0.8, ease: "easeOut" }}
@@ -88,28 +110,33 @@ export default function MarketData() {
             The Signal.
           </h1>
           <p className="text-xl text-zinc-400 max-w-2xl">
-            We do not sell energy. We audit inefficiency. <br/>
+            We do not sell energy. We audit inefficiency. <br />
             Real-time telemetry from the ERCOT Nodal Market.
           </p>
         </motion.div>
 
         {/* THE GRID */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
           animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
           transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
           className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10"
         >
-          
+
           {/* CARD 1: REAL TIME PRICE */}
-          <motion.div 
+          <motion.div
             initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
             className="col-span-1 md:col-span-2 p-10 rounded-3xl bg-zinc-900/50 border border-white/10 backdrop-blur-md relative overflow-hidden"
           >
-            {isError ? (
+            {marketError ? (
               <div className="absolute top-6 right-6 flex items-center gap-2 text-rose-500 animate-pulse">
                 <AlertCircle className="h-4 w-4" />
-                <span className="text-xs font-mono uppercase tracking-widest">error in read</span>
+                <span className="text-xs font-mono uppercase tracking-widest">Connection Lost</span>
+              </div>
+            ) : marketLoading ? (
+              <div className="absolute top-6 right-6 flex items-center gap-2 text-zinc-500">
+                <span className="h-2 w-2 rounded-full bg-zinc-500 animate-pulse"></span>
+                <span className="text-xs font-mono uppercase tracking-widest">Searching...</span>
               </div>
             ) : (
               <div className="absolute top-6 right-6 flex items-center gap-2 text-[#002FA7] animate-pulse">
@@ -117,74 +144,91 @@ export default function MarketData() {
                 <span className="text-xs font-mono uppercase tracking-widest">Live Feed</span>
               </div>
             )}
-            
+
             <h3 className="text-zinc-500 font-mono text-sm uppercase tracking-widest mb-2">ERCOT System Lambda</h3>
             <div className="flex items-baseline gap-4">
               <span className="text-8xl font-bold tracking-tighter font-mono">${displayPrice}</span>
               <span className="text-xl text-zinc-500">/ MWh</span>
             </div>
-            
+
             <div className="mt-8 h-32 w-full bg-gradient-to-t from-[#002FA7]/20 to-transparent rounded-xl border-b border-[#002FA7] relative">
-               {/* Abstract Line Chart representation - The "Jagged Physics" Look */}
-               <svg className="absolute bottom-0 left-0 w-full h-full" preserveAspectRatio="none">
-                  <path d="M0,100 L100,80 L150,95 L200,90 L250,60 L300,50 L350,70 L400,50 L450,85 L500,80 L550,30 L600,20 L650,45 L700,20 L750,55 L800,60 L850,35 L900,40 L950,50 L1000,60 L1000,128 L0,128 Z" fill="url(#grad1)" fillOpacity="0.2" />
-                  <path d="M0,100 L100,80 L150,95 L200,90 L250,60 L300,50 L350,70 L400,50 L450,85 L500,80 L550,30 L600,20 L650,45 L700,20 L750,55 L800,60 L850,35 L900,40 L950,50 L1000,60" stroke="#002FA7" strokeWidth="2" fill="none" vectorEffect="non-scaling-stroke" />
-                  <defs>
-                      <linearGradient id="grad1" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" style={{stopColor:"#002FA7", stopOpacity:1}} />
-                      <stop offset="100%" style={{stopColor:"#002FA7", stopOpacity:0}} />
-                      </linearGradient>
-                  </defs>
-               </svg>
-               <div className="absolute bottom-4 left-4 text-xs text-[#002FA7] font-mono">LZ_HOUSTON</div>
+              {/* Abstract Line Chart representation - The "Jagged Physics" Look */}
+              <svg className="absolute bottom-0 left-0 w-full h-full" preserveAspectRatio="none">
+                <path d="M0,100 L100,80 L150,95 L200,90 L250,60 L300,50 L350,70 L400,50 L450,85 L500,80 L550,30 L600,20 L650,45 L700,20 L750,55 L800,60 L850,35 L900,40 L950,50 L1000,60 L1000,128 L0,128 Z" fill="url(#grad1)" fillOpacity="0.2" />
+                <path d="M0,100 L100,80 L150,95 L200,90 L250,60 L300,50 L350,70 L400,50 L450,85 L500,80 L550,30 L600,20 L650,45 L700,20 L750,55 L800,60 L850,35 L900,40 L950,50 L1000,60" stroke="#002FA7" strokeWidth="2" fill="none" vectorEffect="non-scaling-stroke" />
+                <defs>
+                  <linearGradient id="grad1" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style={{ stopColor: "#002FA7", stopOpacity: 1 }} />
+                    <stop offset="100%" style={{ stopColor: "#002FA7", stopOpacity: 0 }} />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <div className="absolute bottom-4 left-4 text-xs text-[#002FA7] font-mono">LZ_HOUSTON</div>
             </div>
           </motion.div>
 
           {/* CARD 2: THE THREAT LEVEL */}
-          <motion.div 
+          <motion.div
             initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}
             className="col-span-1 p-10 rounded-3xl bg-zinc-900/50 border border-white/10 backdrop-blur-md flex flex-col justify-between"
           >
             <div>
               <div className="flex items-center gap-3 mb-4">
-                <AlertTriangle className="w-5 h-5 text-yellow-500" />
-                <h3 className="text-zinc-500 font-mono text-sm uppercase tracking-widest">Grid Stress Index</h3>
+                <Activity className={cn("w-5 h-5", stress.color)} />
+                <h3 className="text-zinc-500 font-mono text-sm uppercase tracking-widest">Grid Health</h3>
               </div>
-              <div className="text-4xl font-bold text-white mb-2 uppercase tracking-tight">Nominal</div>
-              <p className="text-sm text-zinc-400">Reserves are adequate. No scarcity pricing detected in the Day-Ahead Market.</p>
+              <div className={cn("text-4xl font-bold mb-2 uppercase tracking-tight", stress.color)}>
+                {stress.label}
+              </div>
+              <p className="text-sm text-zinc-400">{stress.message}</p>
             </div>
-            
+
             <div className="mt-8 pt-8 border-t border-white/5">
               <div className="flex justify-between text-sm mb-2">
-                <span className="text-zinc-500">Wind Output</span>
-                <span className="text-white font-mono">12,450 MW</span>
+                <span className="text-zinc-500">Wind Contribution</span>
+                <span className="text-white font-mono">
+                  {grid.wind_gen ? `${Math.round(grid.wind_gen).toLocaleString()} MW` : '---'}
+                </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Predicted Peak</span>
-                <span className="text-white font-mono">58,000 MW</span>
+                <span className="text-zinc-500">Forecasted Load</span>
+                <span className="text-white font-mono">
+                  {grid.forecast_load ? `${Math.round(grid.forecast_load).toLocaleString()} MW` : '---'}
+                </span>
               </div>
             </div>
           </motion.div>
 
           {/* CARD 3: THE 4CP INDICATOR */}
-          <div 
+          <div
             className="col-span-1 md:col-span-3 p-10 rounded-3xl bg-zinc-900/50 border border-white/10 backdrop-blur-md"
           >
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
               <div>
-                <h3 className="text-zinc-500 font-mono text-sm uppercase tracking-widest mb-1">4CP Probability Window</h3>
-                <h2 className="text-3xl font-bold">Transmission Liability Monitor</h2>
+                <h3 className="text-zinc-500 font-mono text-sm uppercase tracking-widest mb-1">Transmission Cost Window</h3>
+                <h2 className="text-3xl font-bold">4CP Probability Monitor</h2>
               </div>
-              <button className="mt-4 md:mt-0 px-6 py-2 rounded-full bg-[#002FA7] hover:bg-blue-700 text-white font-medium text-sm transition-colors">
-                View Forecast
-              </button>
+              <div className={cn(
+                "mt-4 md:mt-0 px-6 py-2 rounded-full font-medium text-sm transition-colors",
+                is4CPSeason ? "bg-amber-500 text-black" : "bg-white/5 text-zinc-400"
+              )}>
+                {is4CPSeason ? "Monitoring Active" : "Off-Season"}
+              </div>
             </div>
-            
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {['June', 'July', 'August', 'September'].map((m) => (
-                <div key={m} className="p-4 rounded-xl bg-black/20 border border-white/5 text-center">
-                  <div className="text-xs text-zinc-500 uppercase mb-2">{m}</div>
-                  <div className="text-white font-mono text-lg">---</div>
+              {[
+                { name: 'June', active: currentMonth === 5 },
+                { name: 'July', active: currentMonth === 6 },
+                { name: 'August', active: currentMonth === 7 },
+                { name: 'September', active: currentMonth === 8 }
+              ].map((m) => (
+                <div key={m.name} className={cn(
+                  "p-4 rounded-xl border transition-all text-center",
+                  m.active ? "bg-[#002FA7]/20 border-[#002FA7] text-white" : "bg-black/20 border-white/5 text-zinc-500"
+                )}>
+                  <div className="text-xs uppercase mb-2 tracking-widest">{m.name}</div>
+                  <div className="font-mono text-lg">{m.active ? "TRACKING" : "---"}</div>
                 </div>
               ))}
             </div>
@@ -202,7 +246,7 @@ export default function MarketData() {
             <span>Initiate Bill Analysis</span>
           </a>
         </div>
-      
+
       </div>
 
       {/* FOOTER - Consistent with other pages */}
@@ -212,7 +256,7 @@ export default function MarketData() {
             <img src="/images/nodalpoint.png" alt="Nodal Point Logo" className="h-12 w-auto" />
           </div>
           <p className="font-mono text-sm tracking-widest opacity-60">&copy; 2026 Nodal Point. All Systems Nominal.</p>
-          
+
           {/* System Status Line - The "Trap Door" */}
           <div className="w-full border-t border-zinc-800/50 mt-8 pt-8 flex justify-center text-center">
             <p className="text-zinc-600 text-xs font-mono tracking-wider">
