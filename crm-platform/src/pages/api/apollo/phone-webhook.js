@@ -7,7 +7,7 @@
  */
 
 import { cors, formatPhoneForContact } from './_utils.js';
-import { supabaseAdmin } from '../_supabase.js';
+import { supabaseAdmin } from '@/lib/supabase';
 
 // In-memory fallback (only for local dev or temporary cache)
 const memoryStore = new Map();

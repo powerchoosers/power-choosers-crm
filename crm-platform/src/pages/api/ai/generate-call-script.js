@@ -1,7 +1,7 @@
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
 import crypto from 'crypto';
-import { supabaseAdmin } from '../_supabase.js';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export default async function handler(req, res) {
     if (cors(req, res)) return;
