@@ -162,9 +162,12 @@ export default async function handler(req, res) {
           const data = await response.json();
           const content = data?.choices?.[0]?.message?.content;
           if (content) {
+            console.log('[Analyze Document] Raw Perplexity Response:', content);
             let cleanContent = content.trim();
-            if (cleanContent.startsWith('```')) {
-              cleanContent = cleanContent.replace(/^```(json)?\n/, '').replace(/\n```$/, '');
+            // Robust JSON extraction
+            const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              cleanContent = jsonMatch[0];
             }
             analysis = JSON.parse(cleanContent);
           }

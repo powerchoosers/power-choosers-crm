@@ -75,9 +75,12 @@ export default async function analyzeBillHandler(req, res) {
           const data = await response.json();
           const content = data?.choices?.[0]?.message?.content;
           if (content) {
+            console.log('[Bill Debugger] Raw Perplexity Response:', content);
             let cleanContent = content.trim();
-            if (cleanContent.startsWith('```')) {
-              cleanContent = cleanContent.replace(/^```(json)?\n/, '').replace(/\n```$/, '');
+            // Robust JSON extraction
+            const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              cleanContent = jsonMatch[0];
             }
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(cleanContent);
