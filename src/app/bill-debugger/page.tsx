@@ -57,6 +57,7 @@ export default function BillDebuggerPage() {
     // Data State
     const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
     const [userEmail, setUserEmail] = useState('')
+    const [encodedFile, setEncodedFile] = useState<{ base64: string, name: string, type: string } | null>(null)
 
     const handleUpload = async (files: FileList | null) => {
         if (!files || files.length === 0) return
@@ -78,6 +79,13 @@ export default function BillDebuggerPage() {
                 reader.onload = () => resolve(reader.result as string)
                 reader.onerror = reject
                 reader.readAsDataURL(file)
+            })
+
+            // Persist file data for later usage (Data Locker / Email Attachment)
+            setEncodedFile({
+                base64: base64Data,
+                name: file.name,
+                type: file.type
             })
 
             // 3. Call API
@@ -139,6 +147,31 @@ export default function BillDebuggerPage() {
             setErrorMsg(message)
         } finally {
             setIsProcessing(false)
+        }
+    }
+
+    const handleEmailUnlock = async (email: string) => {
+        setUserEmail(email)
+        setView('report')
+
+        // Fire-and-forget notification protocol
+        try {
+            fetch('/api/email/analysis-notification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email,
+                    analysisData: extractedData,
+                    fileData: encodedFile?.base64, // Pass the raw file
+                    fileName: encodedFile?.name
+                })
+            }).then(res => {
+                if (!res.ok) console.warn('[Protocol] Notification uplink failed:', res.status);
+            }).catch(err => {
+                console.error('[Protocol] Network error in notification uplink:', err);
+            });
+        } catch (e) {
+            console.error('[Protocol] Error initializing notification sequence:', e);
         }
     }
 
@@ -207,10 +240,7 @@ export default function BillDebuggerPage() {
                     )}
 
                     {view === 'email' && (
-                        <EmailGate key="email" onUnlock={(email) => {
-                            setUserEmail(email)
-                            setView('report')
-                        }} />
+                        <EmailGate key="email" onUnlock={handleEmailUnlock} />
                     )}
 
                     {view === 'report' && extractedData && (
