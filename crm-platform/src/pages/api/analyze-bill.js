@@ -17,21 +17,27 @@ export default async function analyzeBillHandler(req, res) {
     const openRouterKey = process.env.OPEN_ROUTER_API_KEY;
 
     const prompt = `
-      Analyze this energy bill. Extract the following details in JSON format:
+      Analyze this energy bill for a Texas commercial facility. Extract the following details in JSON format:
       - customerName
       - accountNumber
       - serviceAddress
       - billingPeriod (start and end dates)
       - totalAmountDue
       - dueDate
-      - usagekWh (total usage for the period)
-      - demandKW (if available, peak demand)
-      - deliveryCharges (breakdown of TDU/delivery fees)
-      - energyCharges (the supply/generation part of the bill)
-      - taxesAndFees
-      - averageRatePerKWh (total bill / total usage)
+      - contractEndDate (if visible, identifying usually near the plan details)
+      - retailPlanName (e.g., "Fixed Price", "Month-to-Month")
       
-      If you cannot find a specific field, return null for that field.
+      - totalUsage (kWh)
+      - peakDemand (kW) - IMPORTANT: Look for "Billed Demand", "Ratchet Demand", or "Peak kW". If not present, return 0.
+      
+      - energyChargeTotal ($)
+      - deliveryChargeTotal ($) (TDU/TDSP charges)
+      - taxesAndFees ($)
+      
+      - energyRatePerKWh ($/kWh) - If not explicit, calculate: energyChargeTotal / totalUsage
+      - deliveryRatePerKWh ($/kWh) - If not explicit, calculate: deliveryChargeTotal / totalUsage
+      
+      If you cannot find a specific field, return null (or 0 for numbers).
       Ensure the output is strictly valid JSON.
     `;
 
