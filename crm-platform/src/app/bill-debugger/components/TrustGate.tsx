@@ -34,35 +34,32 @@ export function TrustGate({ onNext }: TrustGateProps) {
                 transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
                 className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16 w-full max-w-3xl"
             >
-                {/* Item 1: Privacy */}
-                <div className="flex flex-col items-center space-y-3 p-6 rounded-2xl bg-white/50 border border-zinc-100 backdrop-blur-sm">
-                    <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500">
-                        <Lock className="w-5 h-5" />
+                <div className="glass-card flex flex-col items-center space-y-4 p-8">
+                    <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-[#002FA7]">
+                        <Lock className="w-6 h-6" />
                     </div>
-                    <h3 className="font-medium text-zinc-900">Your data stays private</h3>
-                    <p className="text-sm text-zinc-500 leading-relaxed">
+                    <h3 className="font-semibold text-zinc-900">Your data stays private</h3>
+                    <p className="text-sm text-zinc-500 leading-relaxed font-medium">
                         Read-only analysis. We never reach out to your supplier or switch your account.
                     </p>
                 </div>
 
-                {/* Item 2: Auto-delete */}
-                <div className="flex flex-col items-center space-y-3 p-6 rounded-2xl bg-white/50 border border-zinc-100 backdrop-blur-sm">
-                    <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500">
-                        <FileX className="w-5 h-5" />
+                <div className="glass-card flex flex-col items-center space-y-4 p-8">
+                    <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-[#002FA7]">
+                        <FileX className="w-6 h-6" />
                     </div>
-                    <h3 className="font-medium text-zinc-900">Files auto-delete</h3>
-                    <p className="text-sm text-zinc-500 leading-relaxed">
+                    <h3 className="font-semibold text-zinc-900">Files auto-delete</h3>
+                    <p className="text-sm text-zinc-500 leading-relaxed font-medium">
                         Your invoice is permanently deleted 72 hours after we analyze it.
                     </p>
                 </div>
 
-                {/* Item 3: Security */}
-                <div className="flex flex-col items-center space-y-3 p-6 rounded-2xl bg-white/50 border border-zinc-100 backdrop-blur-sm">
-                    <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500">
-                        <ShieldCheck className="w-5 h-5" />
+                <div className="glass-card flex flex-col items-center space-y-4 p-8">
+                    <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-[#002FA7]">
+                        <ShieldCheck className="w-6 h-6" />
                     </div>
-                    <h3 className="font-medium text-zinc-900">Bank-level security</h3>
-                    <p className="text-sm text-zinc-500 leading-relaxed">
+                    <h3 className="font-semibold text-zinc-900">Bank-level security</h3>
+                    <p className="text-sm text-zinc-500 leading-relaxed font-medium">
                         SOC-2 certified standards. Your file never leaves encrypted servers.
                     </p>
                 </div>
