@@ -14,7 +14,7 @@ export function NextStepsCard({ email }: NextStepsCardProps) {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.2 }}
-            className="glass-card bg-white p-8 md:p-14 text-center max-w-4xl mx-auto shadow-2xl relative overflow-hidden"
+            className="glass-card p-8 md:p-14 text-center max-w-4xl mx-auto shadow-2xl relative overflow-hidden"
         >
             {/* Background Glow */}
             <div className="absolute -top-24 -left-24 w-80 h-80 bg-blue-100/30 blur-[100px] rounded-full pointer-events-none"></div>

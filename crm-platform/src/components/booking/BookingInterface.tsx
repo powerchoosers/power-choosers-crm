@@ -45,7 +45,7 @@ export default function BookingInterface({ email }: { email: string }) {
 
             // Redirect after delay
             setTimeout(() => {
-                router.push('/bill-debugger'); // Or a thank you page
+                router.push('/philosophy'); // Redirect to Philosophy page
             }, 3000);
 
         } catch (error) {
