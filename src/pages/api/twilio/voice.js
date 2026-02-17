@@ -95,6 +95,21 @@ export default async function handler(req, res) {
     try {
         // Read params from body (POST) or query (GET)
         const src = req.method === 'POST' ? (req.body || {}) : (req.query || {});
+
+        // LOOP DETECTION: Check if this request is a fallback from a previous error
+        // If "ErrorCode" or "ErrorUrl" is present, it means Twilio hit an error and is falling back to this URL
+        // We must STOP the loop by hanging up, otherwise it creates an infinite call cycle
+        if (src.ErrorCode || src.ErrorUrl) {
+            logger.warn(`[Voice] Fallback loop detected! ErrorCode: ${src.ErrorCode}, ErrorUrl: ${src.ErrorUrl}`);
+            const twiml = new VoiceResponse();
+            twiml.say('An application error occurred. Goodbye.');
+            twiml.hangup();
+            res.setHeader('Content-Type', 'text/xml');
+            res.writeHead(200);
+            res.end(twiml.toString());
+            return;
+        }
+
         const To = src.To || src.to; // For inbound, this is typically your Twilio number
         const From = src.From || src.from; // For inbound, this is the caller's number; for outbound, this is the selected caller ID
         const CallSid = src.CallSid || src.callSid;
@@ -162,9 +177,6 @@ export default async function handler(req, res) {
                 timeLimit: 14400,
                 // action must return TwiML; use dial-complete endpoint
                 action: `${base}/api/twilio/dial-complete${callbackQuery}`,
-                statusCallback: `${base}/api/twilio/dial-status${callbackQuery}`,
-                statusCallbackEvent: 'initiated ringing answered completed',
-                // Note: statusCallbackMethod is not a valid attribute for Dial verb
                 // Dual-channel from answer
                 record: 'record-from-answer-dual',
                 recordingStatusCallback: `${base}/api/twilio/recording${callbackQuery}`,
@@ -174,7 +186,11 @@ export default async function handler(req, res) {
             twiml.say({ voice: 'alice' }, 'Please hold while we try to connect you.');
 
             // Pass the original caller's number as a custom parameter
-            const client = dial.client('agent');
+            const client = dial.client({
+                statusCallback: `${base}/api/twilio/dial-status${callbackQuery}`,
+                statusCallbackEvent: 'initiated ringing answered completed'
+            }, 'agent');
+
             if (From && From !== businessNumber) {
                 client.parameter({
                     name: 'originalCaller',
@@ -193,15 +209,17 @@ export default async function handler(req, res) {
                 hangupOnStar: false,
                 timeLimit: 14400,
                 action: `${base}/api/twilio/dial-complete${callbackQuery}`,
-                statusCallback: `${base}/api/twilio/dial-status${callbackQuery}`,
-                statusCallbackEvent: 'initiated ringing answered completed',
-                // Note: statusCallbackMethod is not a valid attribute for Dial verb
                 // Dual-channel from answer
                 record: 'record-from-answer-dual',
                 recordingStatusCallback: `${base}/api/twilio/recording${callbackQuery}`,
                 recordingStatusCallbackMethod: 'POST'
             });
-            dial.number(To);
+
+            dial.number({
+                statusCallback: `${base}/api/twilio/dial-status${callbackQuery}`,
+                statusCallbackEvent: 'initiated ringing answered completed'
+            }, To);
+
             logger.log(`[Voice] Generated TwiML to dial number: ${To} with callerId: ${callerIdForDial}`);
         } else {
             // Fallback: no specific target
@@ -214,15 +232,16 @@ export default async function handler(req, res) {
                 timeLimit: 14400,
                 // action must return TwiML; use dial-complete endpoint
                 action: `${base}/api/twilio/dial-complete${callbackQuery}`,
-                statusCallback: `${base}/api/twilio/dial-status${callbackQuery}`,
-                statusCallbackEvent: 'initiated ringing answered completed',
-                // Note: statusCallbackMethod is not a valid attribute for Dial verb
                 // Dual-channel from answer
                 record: 'record-from-answer-dual',
                 recordingStatusCallback: `${base}/api/twilio/recording${callbackQuery}`,
                 recordingStatusCallbackMethod: 'POST'
             });
-            dial.client('agent');
+
+            dial.client({
+                statusCallback: `${base}/api/twilio/dial-status${callbackQuery}`,
+                statusCallbackEvent: 'initiated ringing answered completed'
+            }, 'agent');
         }
 
         // Send TwiML response
