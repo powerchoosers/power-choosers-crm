@@ -158,8 +158,8 @@ export default function BillDebuggerPage() {
     return (
         <div className="min-h-screen w-full bg-white text-zinc-900 selection:bg-[#002FA7] selection:text-white relative overflow-x-hidden font-sans flex flex-col">
 
-            {/* Digital Paper Texture (Dot Grid) - PRESERVED */}
-            <div className="absolute inset-0 z-0 pointer-events-none" style={{
+            {/* Digital Paper Texture (Dot Grid) - FIXED */}
+            <div className="fixed inset-0 z-0 pointer-events-none" style={{
                 backgroundImage: 'radial-gradient(#002FA7 1px, transparent 1px)',
                 backgroundSize: '20px 20px',
                 opacity: 0.1
@@ -214,7 +214,7 @@ export default function BillDebuggerPage() {
                     )}
 
                     {view === 'report' && extractedData && (
-                        <FullReport key="report" data={extractedData} />
+                        <FullReport key="report" data={extractedData} email={userEmail} />
                     )}
 
                     {view === 'error' && (

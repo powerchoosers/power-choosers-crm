@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Calendar, Zap, TrendingUp, Search, ShieldCheck } from 'lucide-react'
+import { Calendar, Zap, TrendingUp, Search, ShieldCheck, ArrowRight } from 'lucide-react'
 import { FeedbackBadge } from './FeedbackBadge'
 
 interface ExtractedData {
@@ -124,20 +124,21 @@ export function ResultsPreview({ data, onUnlock }: ResultsPreviewProps) {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.8 }}
-                className="flex flex-col items-center gap-4 py-8 bg-zinc-50 rounded-3xl border border-dashed border-zinc-200"
+                className="flex flex-col items-center gap-4 py-10 glass-card bg-white/20 border-zinc-200/50"
             >
-                <div className="mb-2 flex items-center gap-2 text-emerald-600 text-xs font-mono uppercase tracking-tighter">
-                    <ShieldCheck className="w-4 h-4" />
-                    Report Ready for Encryption
+                <div className="mb-2 flex items-center gap-2 text-[#002FA7] text-xs font-mono uppercase tracking-widest font-bold">
+                    <ShieldCheck className="w-5 h-5" />
+                    Forensic Report Ready for Decryption
                 </div>
                 <button
                     onClick={onUnlock}
-                    className="w-full md:w-auto px-12 py-4 bg-[#002FA7] text-white rounded-full font-medium text-lg hover:bg-[#002FA7]/90 transition-all shadow-xl hover:shadow-[#002FA7]/30 flex items-center gap-2"
+                    className="w-full md:w-auto px-12 py-5 bg-black text-white rounded-full font-bold text-lg hover:scale-105 transition-all shadow-2xl flex items-center gap-2 group"
                 >
                     Unlock Full Forensic Report
+                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </button>
-                <p className="text-sm text-zinc-400">
-                    Verified access only. Enter email to decrypt results.
+                <p className="text-sm text-zinc-500 font-medium">
+                    Verified access only. Secure SOC-2 encrypted tunnel.
                 </p>
             </motion.div>
 
