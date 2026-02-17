@@ -3,6 +3,7 @@ import { Calendar, Zap, TrendingUp, Search, ShieldCheck } from 'lucide-react'
 import { FeedbackBadge } from './FeedbackBadge'
 
 interface ExtractedData {
+    customer_name: string
     billing_period: string
     total_usage_kwh: string
     billed_demand_kw: string
@@ -78,9 +79,12 @@ export function ResultsPreview({ data, onUnlock }: ResultsPreviewProps) {
                         />
                     </div>
                 )}
-                <h1 className="text-3xl md:text-5xl font-light text-zinc-900 mb-4 tracking-tight">
+                <h1 className="text-3xl md:text-5xl font-light text-zinc-900 mb-2 tracking-tight">
                     Analysis Complete
                 </h1>
+                <div className="text-xl text-[#002FA7] font-medium mb-6 uppercase tracking-tight">
+                    {data.customer_name}
+                </div>
                 <p className="text-zinc-500 max-w-md mx-auto">
                     Our diagnostic engine has extracted the critical volatility markers from your energy profile.
                 </p>

@@ -39,29 +39,29 @@ export default async function analyzeBillHandler(req, res) {
 
     const prompt = `
       Analyze this energy bill for a Texas commercial facility. Extract the following details in JSON format:
-      - customerName
+      - customerName (Look for "Customer Name", "Company Name", or the primary name on the service address)
       - accountNumber
-      - serviceAddress (Full street, city, state, zip)
+      - serviceAddress (Full street, city, state, zip of the facility location)
       - billingPeriod (start and end dates as YYYY-MM-DD)
       - totalAmountDue ($)
       - dueDate (YYYY-MM-DD)
-      - contractEndDate (if visible, identifying usually near the plan details)
-      - retailPlanName (e.g., "Fixed Price", "Month-to-Month")
-      - providerName
+      - contractEndDate (find near the retail plan or TDU details)
+      - retailPlanName (e.g., "Fixed Price", "Index")
+      - providerName (The Retail Electric Provider / REP - e.g., Reliant, TXU, Gexa, Direct Energy)
       
       - totalUsage (kWh)
-      - peakDemand (kW) - IMPORTANT: Look for "Billed Demand", "Ratchet Demand", or "Peak kW". If not present, return 0.
+      - peakDemand (kW) - IMPORTANT: Look for "Peak Demand", "Billed Demand", or "NCP Demand".
       
       - energyChargeTotal ($)
       - deliveryChargeTotal ($) (TDU/TDSP charges)
       - taxesAndFees ($)
-      - demandRatchetCharge ($) - Look specifically for "Demand Charge" or "Distribution Demand".
+      - demandRatchetCharge ($) - Look for "Demand" line items.
       
-      - energyRatePerKWh ($/kWh) - If not explicit, calculate: energyChargeTotal / totalUsage
-      - deliveryRatePerKWh ($/kWh) - If not explicit, calculate: deliveryChargeTotal / totalUsage
+      - energyRatePerKWh ($/kWh)
+      - deliveryRatePerKWh ($/kWh)
       
-      If you cannot find a specific field, return null (or 0 for numbers).
-      Ensure the output is strictly valid JSON.
+      If you cannot find a specific field, return null.
+      Ensure output is valid JSON. 
     `;
 
     // Function to process the AI results with forensic logic
@@ -98,6 +98,9 @@ export default async function analyzeBillHandler(req, res) {
 
       return {
         ...parsed,
+        // Ensure providerName is normalized
+        providerName: parsed.providerName || parsed.supplier || 'Unknown Provider',
+        customerName: parsed.customerName || 'Unknown Client',
         analysis: {
           zone,
           territory,
