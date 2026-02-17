@@ -13,10 +13,15 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Handle GET requests immediately with 200 OK
+  // Handle GET requests immediately with 200 OK and XML Hangup (to silence "Okay")
   if (req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('OK');
+    const twiml = new VoiceResponse();
+    twiml.hangup();
+
+    // Ensure XML content type to prevent Twilio TTS fallback
+    res.setHeader('Content-Type', 'text/xml');
+    res.writeHead(200);
+    res.end(twiml.toString());
     return;
   }
 
