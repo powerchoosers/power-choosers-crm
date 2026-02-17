@@ -62,7 +62,35 @@ export function useDeleteAccounts() {
 
       if (error) throw error
     },
-    onSuccess: () => {
+    onMutate: async (ids) => {
+      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+      await queryClient.cancelQueries({ queryKey: ['accounts'] })
+
+      // Snapshot the previous value
+      const previousAccounts = queryClient.getQueryData(['accounts'])
+
+      // Optimistically update to the new value
+      queryClient.setQueryData(['accounts'], (old: any) => {
+        if (!old) return old
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => ({
+            ...page,
+            accounts: page.accounts.filter((a: Account) => !ids.includes(a.id))
+          }))
+        }
+      })
+
+      // Return a context object with the snapshotted value
+      return { previousAccounts }
+    },
+    onError: (err, ids, context) => {
+      if (context?.previousAccounts) {
+        queryClient.setQueryData(['accounts'], context.previousAccounts)
+      }
+    },
+    onSettled: () => {
+      // Always refetch after error or success to ensure we are in sync with the server
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       queryClient.invalidateQueries({ queryKey: ['accounts-count'] })
       queryClient.invalidateQueries({ queryKey: ['targets'] })
@@ -163,7 +191,7 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
 
         // Apply ownership filter for non-admin users
         if (role !== 'admin' && user?.email) {
-           query = query.eq('ownerId', user.email);
+          query = query.eq('ownerId', user.email);
         }
 
         if (searchQuery) {
@@ -201,14 +229,14 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
           console.error("Supabase error fetching accounts:", error);
           throw error;
         }
-        
+
         if (!data) {
           return { accounts: [], nextCursor: null };
         }
 
         const accounts = data.map(data => {
-          return { 
-            id: data.id, 
+          return {
+            id: data.id,
             name: data.name || 'Unknown Account',
             industry: data.industry || '',
             domain: data.domain || '',
@@ -239,8 +267,8 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
 
         const hasNextPage = count ? from + PAGE_SIZE < count : false;
 
-        return { 
-          accounts, 
+        return {
+          accounts,
           nextCursor: hasNextPage ? pageParam + 1 : null
         };
       } catch (error: any) {
@@ -451,7 +479,7 @@ export function useCreateAccount() {
         console.error('Supabase insert error:', error)
         throw error
       }
-      
+
       return { id: data.id, ...newAccount }
     },
     onSuccess: () => {
@@ -466,7 +494,7 @@ export function useUpsertAccount() {
     mutationFn: async (account: Omit<Account, 'id'> & { id?: string }) => {
       // 1. Try to find existing account by domain or name if ID is missing
       let existingId = account.id;
-      
+
       if (!existingId) {
         if (account.domain) {
           const { data: existing } = await supabase
@@ -474,12 +502,12 @@ export function useUpsertAccount() {
             .select('id, metadata')
             .eq('domain', account.domain)
             .maybeSingle();
-          
+
           if (existing) {
             existingId = existing.id;
           }
         }
-        
+
         // Fallback: Try to find by name if no domain match found
         if (!existingId && account.name) {
           const { data: existing } = await supabase
@@ -487,7 +515,7 @@ export function useUpsertAccount() {
             .select('id, metadata')
             .ilike('name', account.name)
             .maybeSingle();
-          
+
           if (existing) {
             existingId = existing.id;
           }
@@ -511,7 +539,7 @@ export function useUpsertAccount() {
       if (account.address) dbAccount.address = account.address;
       if (account.city) dbAccount.city = account.city;
       if (account.state) dbAccount.state = account.state;
-      
+
       if (!existingId) {
         dbAccount.id = crypto.randomUUID();
         dbAccount.metadata = {
@@ -519,13 +547,13 @@ export function useUpsertAccount() {
           occupancy: account.occupancy,
           ...account.metadata
         };
-        
+
         const { data, error } = await supabase
           .from('accounts')
           .insert(dbAccount)
           .select()
           .single();
-          
+
         if (error) throw error;
         return { id: data.id, ...account, _isNew: true };
       } else {
@@ -535,7 +563,7 @@ export function useUpsertAccount() {
           .select('metadata')
           .eq('id', existingId)
           .single();
-          
+
         dbAccount.metadata = {
           ...(current?.metadata || {}),
           sqft: account.sqft || current?.metadata?.sqft,
@@ -549,7 +577,7 @@ export function useUpsertAccount() {
           .eq('id', existingId)
           .select()
           .single();
-          
+
         if (error) throw error;
         return { id: data.id, ...account, _isNew: false };
       }
@@ -570,11 +598,11 @@ export function useUpdateAccount() {
         .select('metadata')
         .eq('id', id)
         .single()
-      
+
       if (fetchError) {
         console.warn('Could not fetch current metadata, proceeding with empty metadata', fetchError)
       }
-      
+
       const currentMetadata = current?.metadata || {}
 
       // 2. Map updates to DB columns
@@ -610,8 +638,8 @@ export function useUpdateAccount() {
       if (updates.occupancy !== undefined) { newMetadata.occupancy = updates.occupancy; hasMetadataUpdate = true; }
       if (updates.loadFactor !== undefined) { newMetadata.loadFactor = updates.loadFactor; hasMetadataUpdate = true; }
       if (updates.loadZone !== undefined) { newMetadata.loadZone = updates.loadZone; hasMetadataUpdate = true; }
-      if (updates.meters !== undefined) { 
-        newMetadata.meters = updates.meters; 
+      if (updates.meters !== undefined) {
+        newMetadata.meters = updates.meters;
         hasMetadataUpdate = true;
         // Also sync meters back to serviceAddresses for consistency
         const addresses = (updates.meters as any[])?.map((m: any) => m.address).filter(Boolean) || []
@@ -621,7 +649,7 @@ export function useUpdateAccount() {
       }
 
       if (hasMetadataUpdate) {
-         dbUpdates.metadata = newMetadata
+        dbUpdates.metadata = newMetadata
       }
 
       dbUpdates.updatedAt = new Date().toISOString()
@@ -649,8 +677,29 @@ export function useDeleteAccount() {
       if (error) throw error
       return id
     },
-    onSuccess: () => {
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['accounts'] })
+      const previousAccounts = queryClient.getQueryData(['accounts'])
+      queryClient.setQueryData(['accounts'], (old: any) => {
+        if (!old) return old
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => ({
+            ...page,
+            accounts: page.accounts.filter((a: Account) => a.id !== id)
+          }))
+        }
+      })
+      return { previousAccounts }
+    },
+    onError: (err, id, context) => {
+      if (context?.previousAccounts) {
+        queryClient.setQueryData(['accounts'], context.previousAccounts)
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts-count'] })
     }
   })
 }

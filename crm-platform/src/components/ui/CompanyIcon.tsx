@@ -50,14 +50,14 @@ function buildCandidateUrls(logoUrl: string | undefined, domain: string | undefi
   return candidates
 }
 
-const LOAD_TIMEOUT_MS = 4500
-const PRIMARY_LOGO_TIMEOUT_MS = 8000
+const LOAD_TIMEOUT_MS = 2000
+const PRIMARY_LOGO_TIMEOUT_MS = 3500
 
-function CompanyIconInner({ 
-  logoUrl, 
-  domain, 
-  name, 
-  size = 32, 
+function CompanyIconInner({
+  logoUrl,
+  domain,
+  name,
+  size = 32,
   className,
   roundedClassName = DEFAULT_ROUNDED,
   isDeleting = false
@@ -87,7 +87,10 @@ function CompanyIconInner({
   useEffect(() => {
     if (propsKey !== propsKeyRef.current) {
       propsKeyRef.current = propsKey
+      // Reset failure state ONLY if the source identifiers actually changed
+      // This prevents flickering on minor prop updates that don't change the origin
       setFailedSet(new Set())
+      setIsLoaded(false)
     }
   }, [propsKey])
 

@@ -583,7 +583,10 @@ OUTPUT FORMAT:
   const { data: foundryAssets } = useQuery<any[]>({
     queryKey: ['transmission_assets'],
     queryFn: async () => {
-      const idToken = await (user as any)?.getIdToken?.().catch(() => null)
+      const idToken = await (async () => {
+        const { data: { session } } = await supabase.auth.getSession()
+        return session?.access_token || null
+      })()
       const res = await fetch('/api/foundry/list', {
         headers: {
           ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
@@ -606,7 +609,10 @@ OUTPUT FORMAT:
     const loadTemplate = async () => {
       setIsLoadingTemplate(true)
       try {
-        const idToken = await (user as any)?.getIdToken?.().catch(() => null)
+        const idToken = await (async () => {
+          const { data: { session } } = await supabase.auth.getSession()
+          return session?.access_token || null
+        })()
         const res = await fetch(`/api/foundry/assets?id=${encodeURIComponent(selectedFoundryId)}`, {
           headers: {
             ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),

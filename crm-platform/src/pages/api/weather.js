@@ -45,11 +45,13 @@ export default async function handler(req, res) {
   if ((lat == null || lng == null || lat === '' || lng === '') && (address || (city && state))) {
     const geocodeQuery = address || [city, state].filter(Boolean).join(', ');
     try {
-      // Note: We are assuming maps/geocode is now using Mapbox or similar, not Google
-      const geoRes = await fetch(
-        `http://127.0.0.1:${process.env.PORT || 3001}/api/maps/geocode?address=${encodeURIComponent(geocodeQuery)}`,
-        { method: 'GET' }
-      );
+      // Resolve against the current request host (Next.js server)
+      const protocol = req.headers['x-forwarded-proto'] || 'http';
+      const host = req.headers.host || 'localhost:3000';
+      const geocodeUrl = `${protocol}://${host}/api/maps/geocode?address=${encodeURIComponent(geocodeQuery)}`;
+
+      console.log(`[Weather] Resolving location via: ${geocodeUrl}`);
+      const geoRes = await fetch(geocodeUrl, { method: 'GET' });
       const geo = await geoRes.json();
       if (geo?.found && geo.lat != null && geo.lng != null) {
         lat = String(geo.lat);
@@ -57,7 +59,7 @@ export default async function handler(req, res) {
       }
     } catch (e) {
       console.error('[Weather] Geocode failed:', e.message);
-      sendJson(res, 502, { error: 'Could not resolve location' });
+      sendJson(res, 502, { error: 'Could not resolve location', details: e.message });
       return;
     }
   }

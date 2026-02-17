@@ -211,7 +211,7 @@ export default function AccountsPage() {
           const index = row.index + 1 + pagination.pageIndex * PAGE_SIZE
           const isSelected = row.getIsSelected()
           return (
-            <div className="flex items-center justify-center px-2 relative group/select">
+            <div className="flex items-center justify-center px-2 relative group/select h-full min-h-[40px]">
               {/* Default State: Row Number */}
               <span className={cn(
                 "font-mono text-[10px] text-zinc-700 transition-opacity",
@@ -220,20 +220,22 @@ export default function AccountsPage() {
                 {index.toString().padStart(2, '0')}
               </span>
 
-              {/* Hover/Selected State: Ghost Checkbox */}
+              {/* Hover/Selected State: Larger Invisible Click Area */}
               <button
                 onClick={(e) => {
                   e.stopPropagation()
                   row.toggleSelected()
                 }}
-                className={cn(
-                  "absolute inset-0 m-auto w-4 h-4 rounded border transition-all flex items-center justify-center",
+                className="absolute inset-x-[-8px] inset-y-[-12px] z-20 flex items-center justify-center group/check"
+              >
+                <div className={cn(
+                  "w-4 h-4 rounded border transition-all flex items-center justify-center",
                   isSelected
                     ? "bg-[#002FA7] border-[#002FA7] opacity-100"
-                    : "bg-white/5 border-white/10 opacity-0 group-hover/select:opacity-100"
-                )}
-              >
-                {isSelected && <Check className="w-3 h-3 text-white" />}
+                    : "bg-white/5 border-white/10 opacity-0 group-hover/select:opacity-100 group-hover/check:opacity-100"
+                )}>
+                  {isSelected && <Check className="w-3 h-3 text-white" />}
+                </div>
               </button>
             </div>
           )

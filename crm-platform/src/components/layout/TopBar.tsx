@@ -424,7 +424,7 @@ export function TopBar() {
                 <div className="w-full max-w-2xl h-[50px] nodal-glass border-signal/50 rounded-2xl shadow-[0_10px_30px_-10px_rgba(0,47,167,0.5)] flex items-center justify-between px-6">
                   <div className="flex items-center gap-3">
                     <CompanyIcon
-                      key={`callbar-${displayMetadata?.logoUrl ?? ''}-${displayMetadata?.domain ?? ''}`}
+                      key={`callbar-icon-${phoneNumber || 'unknown'}`}
                       logoUrl={displayMetadata?.logoUrl}
                       domain={displayMetadata?.domain}
                       name={displayMetadata?.account || displayMetadata?.name || phoneNumber || 'Caller'}
@@ -480,7 +480,7 @@ export function TopBar() {
                             initial={{ opacity: 0, y: 10, scale: 0.95 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                            className="absolute top-full mt-3 left-1/2 -translate-x-1/2 w-48 bg-zinc-950/90 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50"
+                            className="absolute top-full mt-3 left-1/2 -translate-x-1/2 w-48 glass-panel rounded-2xl p-4 z-50"
                           >
                             <div className="grid grid-cols-3 gap-2">
                               {[
@@ -680,7 +680,7 @@ export function TopBar() {
                 exit={{ opacity: 0, y: 4, scaleY: 0.98, transition: { duration: 0.12 } }}
                 transition={{ duration: 0.18, delay: 0.05 }}
                 style={{ transformOrigin: 'top' }}
-                className="absolute top-12 left-0 right-0 mt-2 mx-2 flex flex-col gap-4 rounded-2xl bg-zinc-950/80 backdrop-blur-3xl border border-white/10 shadow-2xl p-4 overflow-hidden"
+                className="absolute top-12 left-0 right-0 mt-2 mx-2 flex flex-col gap-4 rounded-2xl glass-panel p-4 overflow-hidden"
               >
                 {/* Nodal Point Glass Highlight */}
                 <div className="absolute inset-0 bg-gradient-to-tr from-[#002FA7]/5 via-transparent to-white/5 pointer-events-none" />
@@ -729,7 +729,7 @@ export function TopBar() {
                 exit={{ opacity: 0, y: 4, scaleY: 0.98, transition: { duration: 0.12 } }}
                 transition={{ duration: 0.18, delay: 0.05 }}
                 style={{ transformOrigin: 'top' }}
-                className="absolute top-12 right-2 mt-2 w-[calc(100%-1rem)] max-w-[480px] flex flex-col h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl bg-zinc-950/80 backdrop-blur-3xl border border-white/10 shadow-2xl overflow-hidden z-50"
+                className="absolute top-12 right-2 mt-2 w-[calc(100%-1rem)] max-w-[480px] flex flex-col h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl glass-panel overflow-hidden z-50"
               >
                 <ActiveCallInterface />
               </motion.div>
