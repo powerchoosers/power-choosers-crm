@@ -3,6 +3,7 @@ import { resolveToCallSid, isCallSid } from '../_twilio-ids.js';
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
 import { supabaseAdmin } from '../_supabase.js';
+import { upsertCallInSupabase } from '../calls.js';
 import crypto from 'crypto';
 
 function normalizeBody(req) {
@@ -179,10 +180,10 @@ export default async function handler(req, res) {
                 if (finalCallSid) {
                     // Initial upsert with best-known fields (may be refined later)
                     // #region agent log
-                    const callApiRes = await fetch(`${baseUrl}/api/calls`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
+                    // #region agent log
+                    let callApiRes = { ok: false };
+                    try {
+                        const saved = await upsertCallInSupabase({
                             callSid: finalCallSid,
                             to: callResource?.to || undefined,
                             from: callResource?.from || undefined,
@@ -199,8 +200,12 @@ export default async function handler(req, res) {
                             businessPhone: businessPhone || undefined,
                             contactId: contactId || undefined,
                             accountId: accountId || undefined
-                        })
-                    }).then(r => ({ ok: r.ok, status: r.status })).catch(e => ({ ok: false, status: 0, error: String(e && e.message) }));
+                        });
+                        callApiRes = { ok: !!saved, status: saved ? 200 : 500 };
+                    } catch (e) {
+                        callApiRes = { ok: false, status: 0, error: String(e && e.message) };
+                    }
+                    // #endregion
                     // #region agent log
                     // (Diagnostic fetch removed for production stability)
                     // #endregion

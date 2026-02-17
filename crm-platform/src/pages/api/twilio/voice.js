@@ -1,5 +1,6 @@
 import twilio from 'twilio';
 import logger from '../_logger.js';
+import { upsertCallInSupabase } from '../calls.js';
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 const DEFAULT_TWILIO_BUSINESS_NUMBER = '+18176630380';
@@ -145,10 +146,30 @@ export default async function handler(req, res) {
                 contactId = meta.contactId || '';
                 accountId = meta.accountId || '';
 
-                // [REMOVED] Initial creation to match "only post on completion" requirement
-                // We still log the context for debugging
-                if (meta.id || meta.accountId) {
-                    logger.log(`[Voice] Call context for ${CallSid}:`, meta);
+                // Create initial call record as 'initiated'
+                // This ensures the transmission log shows "active call" even before completion
+                if (meta.contactId || meta.accountId) {
+                    try {
+                        const callRecord = {
+                            callSid: CallSid,
+                            twilioSid: CallSid,
+                            status: 'initiated',
+                            direction: isInboundToBusiness ? 'inbound' : 'outbound',
+                            from: From,
+                            to: To,
+                            contactId: meta.contactId,
+                            accountId: meta.accountId,
+                            metadata: meta,
+                            timestamp: new Date().toISOString()
+                        };
+                        logger.log(`[Voice] Creating initial call record for ${CallSid}`, callRecord);
+                        // Do NOT await here to avoid blocking TwiML generation response latency
+                        upsertCallInSupabase(callRecord).catch(err => {
+                            logger.warn('[Voice] Failed creating initial call record:', err?.message);
+                        });
+                    } catch (e) {
+                        logger.warn('[Voice] Error preparing initial call upsert:', e);
+                    }
                 }
             } catch (e) {
                 logger.warn('[Voice] Failed to process call metadata:', e);
