@@ -1,11 +1,11 @@
 // Vercel API endpoint for email statistics
 import { cors } from '../_cors.js';
-import { supabaseAdmin } from '../_supabase.js';
+import { supabaseAdmin } from '@/lib/supabase';
 import logger from '../_logger.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
-  
+
   if (req.method !== 'GET') {
     res.writeHead(405, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Method not allowed' }));
@@ -14,7 +14,7 @@ export default async function handler(req, res) {
 
   try {
     const { trackingId, _deliverability } = req.query;
-    
+
     if (!trackingId) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Missing trackingId parameter' }));

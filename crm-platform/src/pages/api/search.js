@@ -3,7 +3,7 @@
 // Migrated from Firestore to Supabase (PostgreSQL)
 
 import { cors } from './_cors.js';
-import { supabaseAdmin } from './_supabase.js';
+import { supabaseAdmin, requireUser } from '@/lib/supabase';
 import logger from './_logger.js';
 
 // In-memory fallback is not feasible for global search across all data, 
@@ -12,33 +12,40 @@ const isSupabaseEnabled = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Normalize phone to last 10 digits for comparison
 function norm10(v) {
-  try { 
-    return (v == null ? '' : String(v)).replace(/\D/g, '').slice(-10); 
-  } catch(_) { 
-    return ''; 
+  try {
+    return (v == null ? '' : String(v)).replace(/\D/g, '').slice(-10);
+  } catch (_) {
+    return '';
   }
 }
 
 export default async function handler(req, res) {
   cors(req, res);
-  
+
   // Handle non-GET methods gracefully
   if (req.method !== 'GET') {
     res.setHeader('Content-Type', 'application/json');
-    res.writeHead(200); 
+    res.writeHead(200);
     res.end(JSON.stringify({
       success: false,
       message: 'Phone search is currently disabled'
     }));
     return;
   }
-  
+
   try {
+    const { user, isAdmin } = await requireUser(req);
+    if (!isAdmin && !user) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Unauthorized' }));
+      return;
+    }
+
     const urlObj = new URL(req.url, `http://${req.headers.host}`);
     const phoneNumber = urlObj.searchParams.get('phone');
-    
+
     logger.log('[Search] Incoming request for phone:', phoneNumber);
-    
+
     if (!phoneNumber) {
       res.setHeader('Content-Type', 'application/json');
       res.writeHead(200);
@@ -49,43 +56,37 @@ export default async function handler(req, res) {
       }));
       return;
     }
-    
+
     const searchDigits = norm10(phoneNumber);
-    
+
     if (!searchDigits || searchDigits.length < 10) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Invalid phone number' }));
       return;
     }
-    
+
     logger.log('[Search] Normalized search digits:', searchDigits);
-    
+
     if (!isSupabaseEnabled) {
       logger.error('[Search] Supabase not initialized');
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Database not available',
         details: 'Supabase credentials missing'
       }));
       return;
     }
-    
+
     let contactResult = null;
     let accountResult = null;
 
     // Search Contacts
     try {
       logger.log('[Search] Querying contacts by phone fields...');
-      
-      // We check common phone columns. 
-      // Note: This assumes columns exist. If they don't, Supabase might throw an error.
-      // A more robust approach would be to check metadata or specific known columns.
-      // For now, we assume the migration created these columns.
-      // If the migration put everything in 'metadata', we would need a different query.
-      
+
       const orQuery = `mobile.eq.${searchDigits},workPhone.eq.${searchDigits},otherPhone.eq.${searchDigits},phone.eq.${searchDigits}`;
-      
-      const { data: contacts, error } = await supabaseAdmin
+
+      let query = supabaseAdmin
         .from('contacts')
         .select(`
           id, 
@@ -102,13 +103,18 @@ export default async function handler(req, res) {
           state,
           accounts ( name, domain, logo_url )
         `)
-        .or(orQuery)
-        .limit(1);
+        .or(orQuery);
+
+      if (!isAdmin) {
+        query = query.eq('ownerId', user.email);
+      }
+
+      const { data: contacts, error } = await query.limit(1);
 
       if (!error && contacts && contacts.length > 0) {
         const data = contacts[0];
         logger.log('[Search] Found matching contact:', data.id);
-        
+
         contactResult = {
           id: data.id,
           contactId: data.id,
@@ -139,13 +145,13 @@ export default async function handler(req, res) {
 
     // Search Accounts (if no contact found, or even if found? Legacy logic searched both but prioritized contact return)
     // Legacy logic: if contactResult -> return it. If not -> return accountResult.
-    
+
     if (!contactResult) {
       try {
         logger.log('[Search] Querying accounts by phone fields...');
-        
+
         const orQueryAccount = `phone.eq.${searchDigits}`;
-        
+
         const { data: accounts, error } = await supabaseAdmin
           .from('accounts')
           .select('id, name, phone, city, state, domain, logo_url')
@@ -155,7 +161,7 @@ export default async function handler(req, res) {
         if (!error && accounts && accounts.length > 0) {
           const data = accounts[0];
           logger.log('[Search] Found matching account:', data.id);
-          
+
           accountResult = {
             id: data.id,
             accountId: data.id,
@@ -183,7 +189,7 @@ export default async function handler(req, res) {
       }));
       return;
     }
-    
+
     if (accountResult) {
       logger.log('[Search] Returning account result');
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -194,7 +200,7 @@ export default async function handler(req, res) {
       }));
       return;
     }
-    
+
     logger.log('[Search] No results found - returning 404');
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
@@ -202,13 +208,13 @@ export default async function handler(req, res) {
       error: 'Phone number not found in CRM'
     }));
     return;
-    
+
   } catch (error) {
     logger.error('[Search] Error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
+    res.end(JSON.stringify({
       error: 'Search failed',
-      details: error.message 
+      details: error.message
     }));
     return;
   }

@@ -1,6 +1,6 @@
 // Energy News (Serverless)
 import { cors } from './_cors.js';
-import { supabaseAdmin } from './_supabase.js';
+import { supabaseAdmin } from '@/lib/supabase';
 import logger from './_logger.js';
 
 // Only refresh (RSS + Gemini) at 10 AM and 3 PM America/Chicago. Saves Gemini credits.

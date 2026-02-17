@@ -3,7 +3,7 @@
 
 import { cors } from './_cors.js';
 import logger from './_logger.js';
-import { supabaseAdmin, requireUser } from './_supabase.js';
+import { supabaseAdmin, requireUser } from '@/lib/supabase';
 
 // Normalize phone number to last 10 digits
 function normalizePhone(phone) {

@@ -2,7 +2,7 @@ import twilio from 'twilio';
 import { resolveToCallSid, isCallSid } from '../_twilio-ids.js';
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
-import { supabaseAdmin } from '../_supabase.js';
+import { supabaseAdmin } from '@/lib/supabase';
 import { upsertCallInSupabase } from '../calls.js';
 import crypto from 'crypto';
 

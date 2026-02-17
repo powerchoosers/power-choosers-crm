@@ -1,7 +1,7 @@
 // Email open tracking pixel endpoint (Cloud Run API route)
 // Returns a 1x1 transparent PNG and records an open event
 
-import { supabaseAdmin } from '../../_supabase.js';
+import { supabaseAdmin } from '@/lib/supabase';
 import logger from '../../_logger.js';
 
 // 1x1 transparent PNG (43 bytes)

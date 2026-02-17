@@ -1,6 +1,6 @@
 // API endpoint for sending emails via Zoho Mail API
 import { cors } from '../_cors.js';
-import { supabaseAdmin } from '../_supabase.js';
+import { supabaseAdmin } from '@/lib/supabase';
 import { ZohoMailService } from './zoho-service.js';
 import { injectTracking, hasTrackingPixel } from './tracking-helper.js';
 import logger from '../_logger.js';
