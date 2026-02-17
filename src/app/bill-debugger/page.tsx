@@ -8,194 +8,200 @@ import { X, UploadCloud, Check, AlertCircle, ArrowRight, Loader2 } from 'lucide-
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
 
 type ExtractedData = {
-  customer_name: string
-  provider_name: string
-  billing_period: string
-  total_usage_kwh: string
-  billed_demand_kw: string
+    customer_name: string
+    provider_name: string
+    billing_period: string
+    total_usage_kwh: string
+    billed_demand_kw: string
 }
 
 export default function BillDebuggerPage() {
-  const router = useRouter()
-  const [view, setView] = useState<'upload' | 'console' | 'analyzing' | 'email' | 'success' | 'error'>('upload')
-  const [footerText, setFooterText] = useState('Waiting for input stream...')
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [errorMsg, setErrorMsg] = useState('')
-  
-  // Data State
-  const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
+    const router = useRouter()
+    const [view, setView] = useState<'upload' | 'console' | 'analyzing' | 'email' | 'success' | 'error'>('upload')
+    const [footerText, setFooterText] = useState('Waiting for input stream...')
+    const [isProcessing, setIsProcessing] = useState(false)
+    const [errorMsg, setErrorMsg] = useState('')
 
-  // Console Logic
-  const processMessages = [
-    "Initiating handshake...",
-    "Parsing Load Profile...",
-    "Checking against ERCOT Scarcity Pricing Adders...",
-    "Detecting Volatility Markers...",
-    "Calculating shadow price variance...",
-    "Analysis Complete."
-  ]
+    // Data State
+    const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
 
-  const handleUpload = async (files: FileList | null) => {
-    if (!files || files.length === 0) return
-    if (isProcessing) return
-    
-    setIsProcessing(true)
-    setFooterText('PROCESSING...')
-    setErrorMsg('')
-    
-    // 1. Transition to Console immediately for UX
-    setView('console')
+    // Console Logic
+    const processMessages = [
+        "Initiating handshake...",
+        "Parsing Load Profile...",
+        "Checking against ERCOT Scarcity Pricing Adders...",
+        "Detecting Volatility Markers...",
+        "Calculating shadow price variance...",
+        "Analysis Complete."
+    ]
 
-    try {
-        const file = files[0]
+    const handleUpload = async (files: FileList | null) => {
+        if (!files || files.length === 0) return
+        if (isProcessing) return
 
-        // 2. Convert to Base64
-        const base64Data = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader()
-            reader.onload = () => resolve(reader.result as string)
-            reader.onerror = reject
-            reader.readAsDataURL(file)
-        })
+        setIsProcessing(true)
+        setFooterText('PROCESSING...')
+        setErrorMsg('')
 
-        // 3. Call API
-        const response = await fetch('/api/analyze-bill', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                fileData: base64Data,
-                mimeType: file.type
+        // 1. Transition to Console immediately for UX
+        setView('console')
+
+        try {
+            const file = files[0]
+
+            // 2. Convert to Base64
+            const base64Data = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader()
+                reader.onload = () => resolve(reader.result as string)
+                reader.onerror = reject
+                reader.readAsDataURL(file)
             })
-        })
 
-        // Check for non-JSON response (e.g., 500 Internal Server Error html/text)
-        const contentType = response.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-            const text = await response.text();
-            console.error('Non-JSON response:', text);
-            throw new Error(`Server error (${response.status}): ${text.substring(0, 100)}`);
-        }
+            // 3. Call API
+            const response = await fetch('/api/analyze-bill', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    fileData: base64Data,
+                    mimeType: file.type
+                })
+            })
 
-        const result = await response.json()
+            // Check for non-JSON response (e.g., 500 Internal Server Error html/text)
+            const contentType = response.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                const text = await response.text();
+                console.error('Non-JSON response:', text);
+                throw new Error(`Server error (${response.status}): ${text.substring(0, 100)}`);
+            }
 
-        if (!response.ok || !result.success) {
-            throw new Error(result.error || result.message || 'Failed to analyze bill')
-        }
+            const result = await response.json()
 
-        // 4. Store Data
-        setExtractedData({
-            customer_name: result.data.customer_name || 'Unknown Client',
-            provider_name: result.data.provider_name || 'Unknown Provider',
-            billing_period: result.data.billing_period || 'Unknown Period',
-            total_usage_kwh: result.data.total_usage_kwh?.toLocaleString() || '0',
-            billed_demand_kw: result.data.billed_demand_kw?.toLocaleString() || '0'
-        })
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || result.message || 'Failed to analyze bill')
+            }
 
-    } catch (err: unknown) {
-        console.error('Analysis Error:', err)
-        const message = err instanceof Error ? err.message : 'An error occurred during analysis'
-        setErrorMsg(message)
-        // We let the console finish before showing error
-    }
-  }
-
-  // Handle transition from Console
-  const handleConsoleComplete = () => {
-      if (errorMsg) {
-          setView('error')
-          setFooterText('ANALYSIS FAILED')
-          setIsProcessing(false)
-          return
-      }
-
-      if (extractedData) {
-          // Data is ready, go to email capture
-          setView('email')
-          setFooterText('AWAITING AUTHORIZATION')
-      } else {
-          // Data not ready yet, go to analyzing/loading state
-          setView('analyzing')
-          setFooterText('FINALIZING...')
-      }
-  }
-
-  // Watch for data arrival if we are in 'analyzing' state
-  useEffect(() => {
-      if (view === 'analyzing') {
-          if (errorMsg) {
-              setView('error')
-              setFooterText('ANALYSIS FAILED')
-              setIsProcessing(false)
-          } else if (extractedData) {
-              setView('email')
-              setFooterText('AWAITING AUTHORIZATION')
-          }
-      }
-  }, [view, extractedData, errorMsg])
-
-  return (
-    <div className="min-h-screen w-full bg-white text-zinc-900 selection:bg-[#002FA7] selection:text-white relative overflow-x-hidden font-sans flex flex-col">
+        // 4. Store Data - Normalize API keys (camelCase) to UI keys (snake_case if needed)
+        const data = result.data || result;
         
-        {/* Digital Paper Texture */}
-        <div className="absolute inset-0 z-0 pointer-events-none" style={{
-            backgroundImage: 'radial-gradient(#002FA7 1px, transparent 1px)',
-            backgroundSize: '20px 20px',
-            opacity: 0.1
-        }}></div>
+        setExtractedData({
+            customer_name: data.customerName || data.customer_name || 'Unknown Client',
+            provider_name: data.supplier || data.provider_name || 'Unknown Provider',
+            billing_period: (typeof data.billingPeriod === 'object' ? 
+                (data.billingPeriod.start ? `${data.billingPeriod.start} - ${data.billingPeriod.end}` : 
+                 data.billingPeriod.startDate ? `${data.billingPeriod.startDate} - ${data.billingPeriod.endDate}` : 'Unknown Period') 
+                : data.billingPeriod) || 'Unknown Period',
+            total_usage_kwh: (data.usagekWh || data.total_usage_kwh)?.toLocaleString() || '0',
+            billed_demand_kw: (typeof data.demandKW === 'object' ? 
+                data.demandKW.peakDemand : 
+                (data.demandKW || data.billed_demand_kw))?.toLocaleString() || '0'
+        })
+        } catch (err: unknown) {
+            console.error('Analysis Error:', err)
+            const message = err instanceof Error ? err.message : 'An error occurred during analysis'
+            setErrorMsg(message)
+            // We let the console finish before showing error
+        }
+    }
 
-        {/* Exit Button */}
-        <button 
-            onClick={() => router.back()} 
-            className="absolute top-4 right-4 md:top-6 md:right-8 z-50 p-2 text-zinc-400 hover:text-zinc-800 transition-colors duration-200 cursor-pointer"
-            aria-label="Go back"
-        >
-            <X className="w-8 h-8" />
-        </button>
+    // Handle transition from Console
+    const handleConsoleComplete = () => {
+        if (errorMsg) {
+            setView('error')
+            setFooterText('ANALYSIS FAILED')
+            setIsProcessing(false)
+            return
+        }
 
-        {/* Main Content Container */}
-        <main className="relative z-10 flex-1 flex flex-col items-center justify-center w-full max-w-4xl mx-auto px-6 py-20 md:py-0">
-            <AnimatePresence mode="wait">
-                {view === 'upload' && (
-                    <UploadView key="upload" onUpload={handleUpload} />
-                )}
-                {view === 'console' && (
-                    <ConsoleView 
-                        key="console"
-                        messages={processMessages} 
-                        onComplete={handleConsoleComplete} 
-                    />
-                )}
-                {view === 'analyzing' && (
-                    <AnalyzingView key="analyzing" />
-                )}
-                {view === 'email' && (
-                    <EmailCaptureView key="email" onComplete={() => {
-                        setView('success')
-                        setFooterText('DIAGNOSTIC COMPLETE')
-                    }} />
-                )}
-                {view === 'success' && extractedData && (
-                    <SuccessView key="success" data={extractedData} />
-                )}
-                {view === 'error' && (
-                    <ErrorView key="error" message={errorMsg} onRetry={() => {
-                        setView('upload')
-                        setIsProcessing(false)
-                        setFooterText('Waiting for input stream...')
-                        setExtractedData(null)
-                        setErrorMsg('')
-                    }} />
-                )}
-            </AnimatePresence>
-        </main>
+        if (extractedData) {
+            // Data is ready, go to email capture
+            setView('email')
+            setFooterText('AWAITING AUTHORIZATION')
+        } else {
+            // Data not ready yet, go to analyzing/loading state
+            setView('analyzing')
+            setFooterText('FINALIZING...')
+        }
+    }
 
-        {/* Technical Micro-copy Footer */}
-        <footer className="w-full p-6 text-center z-10 shrink-0">
-            <p className={`font-mono text-xs text-zinc-400 tracking-wider uppercase opacity-60 ${view === 'console' || view === 'analyzing' ? 'animate-pulse' : ''} ${view === 'success' ? 'text-[#002FA7] opacity-100' : ''}`}>
-                {footerText}
-            </p>
-        </footer>
-    </div>
-  )
+    // Watch for data arrival if we are in 'analyzing' state
+    useEffect(() => {
+        if (view === 'analyzing') {
+            if (errorMsg) {
+                setView('error')
+                setFooterText('ANALYSIS FAILED')
+                setIsProcessing(false)
+            } else if (extractedData) {
+                setView('email')
+                setFooterText('AWAITING AUTHORIZATION')
+            }
+        }
+    }, [view, extractedData, errorMsg])
+
+    return (
+        <div className="min-h-screen w-full bg-white text-zinc-900 selection:bg-[#002FA7] selection:text-white relative overflow-x-hidden font-sans flex flex-col">
+
+            {/* Digital Paper Texture */}
+            <div className="absolute inset-0 z-0 pointer-events-none" style={{
+                backgroundImage: 'radial-gradient(#002FA7 1px, transparent 1px)',
+                backgroundSize: '20px 20px',
+                opacity: 0.1
+            }}></div>
+
+            {/* Exit Button */}
+            <button
+                onClick={() => router.back()}
+                className="absolute top-4 right-4 md:top-6 md:right-8 z-50 p-2 text-zinc-400 hover:text-zinc-800 transition-colors duration-200 cursor-pointer"
+                aria-label="Go back"
+            >
+                <X className="w-8 h-8" />
+            </button>
+
+            {/* Main Content Container */}
+            <main className="relative z-10 flex-1 flex flex-col items-center justify-center w-full max-w-4xl mx-auto px-6 py-20 md:py-0">
+                <AnimatePresence mode="wait">
+                    {view === 'upload' && (
+                        <UploadView key="upload" onUpload={handleUpload} />
+                    )}
+                    {view === 'console' && (
+                        <ConsoleView
+                            key="console"
+                            messages={processMessages}
+                            onComplete={handleConsoleComplete}
+                        />
+                    )}
+                    {view === 'analyzing' && (
+                        <AnalyzingView key="analyzing" />
+                    )}
+                    {view === 'email' && (
+                        <EmailCaptureView key="email" onComplete={() => {
+                            setView('success')
+                            setFooterText('DIAGNOSTIC COMPLETE')
+                        }} />
+                    )}
+                    {view === 'success' && extractedData && (
+                        <SuccessView key="success" data={extractedData} />
+                    )}
+                    {view === 'error' && (
+                        <ErrorView key="error" message={errorMsg} onRetry={() => {
+                            setView('upload')
+                            setIsProcessing(false)
+                            setFooterText('Waiting for input stream...')
+                            setExtractedData(null)
+                            setErrorMsg('')
+                        }} />
+                    )}
+                </AnimatePresence>
+            </main>
+
+            {/* Technical Micro-copy Footer */}
+            <footer className="w-full p-6 text-center z-10 shrink-0">
+                <p className={`font-mono text-xs text-zinc-400 tracking-wider uppercase opacity-60 ${view === 'console' || view === 'analyzing' ? 'animate-pulse' : ''} ${view === 'success' ? 'text-[#002FA7] opacity-100' : ''}`}>
+                    {footerText}
+                </p>
+            </footer>
+        </div>
+    )
 }
 
 function UploadView({ onUpload }: { onUpload: (files: FileList | null) => void }) {
@@ -234,17 +240,17 @@ function UploadView({ onUpload }: { onUpload: (files: FileList | null) => void }
                 Suppliers bury volatility in &quot;pass-through&quot; fees. We reverse-engineer the math to find the design flaws taxing your margins.
             </p>
 
-            <div 
+            <div
                 className={`group relative w-full max-w-2xl mx-auto aspect-[2/1] md:aspect-[3/1] rounded-3xl border transition-all duration-400 cubic-bezier(0.4, 0, 0.2, 1) flex flex-col items-center justify-center cursor-pointer shadow-lg backdrop-blur-xl bg-white/80 ${isDragging ? 'scale-105 border-[#002FA7] ring-4 ring-[#002FA7]/10 shadow-2xl' : 'border-zinc-300 hover:border-zinc-400'}`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
             >
-                <input 
-                    type="file" 
+                <input
+                    type="file"
                     ref={fileInputRef}
-                    className="hidden" 
+                    className="hidden"
                     accept=".pdf,image/*"
                     onChange={(e) => onUpload(e.target.files)}
                 />
@@ -278,7 +284,7 @@ function ConsoleView({ messages, onComplete }: { messages: string[], onComplete:
         const currentMessage = messages[currentLineIndex]
         let charIndex = 0
         let currentText = ''
-        
+
         // Add empty line first
         setLines(prev => [...prev, ''])
 
@@ -366,11 +372,11 @@ function EmailCaptureView({ onComplete }: { onComplete: () => void }) {
             <div className="bg-white/80 backdrop-blur-xl border border-zinc-200 rounded-2xl p-8 shadow-xl">
                 <h3 className="text-2xl font-semibold text-zinc-900 mb-2">Unlock Your Report</h3>
                 <p className="text-zinc-500 mb-6">Enter your email to view the forensic analysis of your invoice.</p>
-                
+
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <input 
-                            type="email" 
+                        <input
+                            type="email"
                             required
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
@@ -378,8 +384,8 @@ function EmailCaptureView({ onComplete }: { onComplete: () => void }) {
                             className="w-full px-4 py-3 rounded-xl border border-zinc-200 bg-white focus:ring-2 focus:ring-[#002FA7] focus:border-transparent outline-none transition-all"
                         />
                     </div>
-                    <button 
-                        type="submit" 
+                    <button
+                        type="submit"
                         disabled={loading}
                         className="w-full bg-[#002FA7] text-white font-medium py-3 rounded-xl hover:bg-[#002FA7]/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                     >
@@ -411,10 +417,10 @@ function SuccessView({ data }: { data: ExtractedData }) {
             </div>
 
             <div className="bg-zinc-50/50 backdrop-blur-sm rounded-2xl border border-zinc-200 overflow-hidden relative group hover:border-[#002FA7]/30 transition-colors duration-500 text-left">
-                 {/* Texture Overlay */}
-                 <div className="absolute inset-0 bg-[radial-gradient(#002FA7_1px,transparent_1px)] [background-size:16px_16px] opacity-[0.03] pointer-events-none"></div>
+                {/* Texture Overlay */}
+                <div className="absolute inset-0 bg-[radial-gradient(#002FA7_1px,transparent_1px)] [background-size:16px_16px] opacity-[0.03] pointer-events-none"></div>
 
-                 <div className="p-6 space-y-5 relative z-10">
+                <div className="p-6 space-y-5 relative z-10">
                     {/* Row 1: Period */}
                     <div className="flex justify-between items-center border-b border-zinc-100 pb-3">
                         <span className="text-xs font-mono uppercase tracking-widest text-zinc-400">Billing Period</span>
@@ -449,7 +455,7 @@ function SuccessView({ data }: { data: ExtractedData }) {
                 {/* Bottom Action Bar */}
                 <div className="bg-white p-4 border-t border-zinc-100 flex items-center justify-between">
                     <span className="text-xs font-medium text-zinc-500">
-                        This usage profile reveals <br/> potential 4CP exposure.
+                        This usage profile reveals <br /> potential 4CP exposure.
                     </span>
                     <span className="flex h-2 w-2 relative">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#002FA7] opacity-75"></span>
@@ -477,7 +483,7 @@ function ErrorView({ message, onRetry }: { message: string, onRetry: () => void 
             </div>
             <h3 className="text-2xl font-semibold text-zinc-900 mb-2">Analysis Failed</h3>
             <p className="text-zinc-500 mb-8">{message}</p>
-            <button 
+            <button
                 onClick={onRetry}
                 className="px-6 py-3 bg-zinc-900 text-white rounded-xl hover:bg-zinc-800 transition-colors font-medium"
             >
