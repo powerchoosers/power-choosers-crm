@@ -1,6 +1,6 @@
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
-import { supabaseAdmin, requireUser } from '../_supabase.js';
+import { supabaseAdmin, requireUser } from '@/lib/supabase';
 import formidable from 'formidable';
 
 function isPlainObject(v) {

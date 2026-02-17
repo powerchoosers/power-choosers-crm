@@ -1,7 +1,7 @@
 // Supabase-backed Calls API (GET recent calls, POST upsert by Call SID)
 // Migrated from Firestore to Supabase (PostgreSQL)
 import { cors } from './_cors.js';
-import { supabaseAdmin } from './_supabase.js';
+import { supabaseAdmin, requireUser } from '@/lib/supabase';
 import { resolveToCallSid, isCallSid } from './_twilio-ids.js';
 import logger from './_logger.js';
 
@@ -147,6 +147,7 @@ function mapCallToSupabase(call) {
     aiInsights: call.aiInsights,
     accountId: call.accountId || null,
     contactId: call.contactId || null,
+    ownerId: call.ownerId || null,
     createdAt: call.createdAt || call.timestamp || new Date().toISOString(),
     metadata: {
       outcome: call.outcome || deriveOutcome(call),
@@ -179,7 +180,7 @@ function pickBusinessAndTarget({ to, from, targetPhone, businessPhone }) {
   return { businessPhone: biz || '', targetPhone: tgt || '' };
 }
 
-async function getCallsFromSupabase(limit = 0, offset = 0, callSid = null) {
+async function getCallsFromSupabase(limit = 0, offset = 0, callSid = null, ownerId = null) {
   if (!isSupabaseEnabled) return null;
 
   let query = supabaseAdmin
@@ -189,6 +190,11 @@ async function getCallsFromSupabase(limit = 0, offset = 0, callSid = null) {
 
   if (callSid) {
     query = query.eq('id', callSid);
+  }
+
+  if (ownerId) {
+    // Filter by ownerId, assignedTo, or createdBy for Agents
+    query = query.or(`ownerId.eq.${ownerId},assignedTo.eq.${ownerId},createdBy.eq.${ownerId}`);
   }
 
   if (limit > 0) {
@@ -348,6 +354,16 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
+      const { user, isAdmin } = await requireUser(req);
+      const ownerId = isAdmin ? null : (user?.id || 'unauthorized');
+
+      if (!isAdmin && !user) {
+        res.statusCode = 401;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'Unauthorized' }));
+        return;
+      }
+
       // Optional filter by Call SID
       const urlObj = new URL(req.url, `http://${req.headers.host}`);
       const callSid = urlObj.searchParams.get('callSid');
@@ -356,7 +372,7 @@ export default async function handler(req, res) {
 
       if (isSupabaseEnabled) {
         if (callSid) {
-          const calls = await getCallsFromSupabase(1, 0, callSid);
+          const calls = await getCallsFromSupabase(1, 0, callSid, ownerId);
           res.statusCode = 200;
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ ok: true, calls }));
@@ -364,17 +380,21 @@ export default async function handler(req, res) {
         }
 
         // Support pagination
-        const calls = await getCallsFromSupabase(limit || 50, offset);
+        const calls = await getCallsFromSupabase(limit || 50, offset, null, ownerId);
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ ok: true, calls, hasMore: calls.length === limit }));
         return;
       }
 
-      // Fallback to memory store
-      const calls = Array.from(memoryStore.values())
+      // Fallback to memory store (Admins only for safety, or filter memory store)
+      let calls = Array.from(memoryStore.values())
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
         .map(normalizeCallForResponse);
+
+      if (!isAdmin) {
+        calls = calls.filter(c => c.ownerId === user.id || c.assignedTo === user.id || c.createdBy === user.id);
+      }
 
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json');

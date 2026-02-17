@@ -3,7 +3,7 @@
  * parses multipart data and saves to Supabase
  */
 
-import { supabaseAdmin } from '../_supabase.js';
+import { supabaseAdmin } from '@/lib/supabase';
 import crypto from 'crypto';
 import formidable from 'formidable';
 import { simpleParser } from 'mailparser';

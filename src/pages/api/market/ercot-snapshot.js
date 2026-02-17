@@ -5,7 +5,7 @@
  */
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
-import { supabaseAdmin } from '../_supabase.js';
+import { supabaseAdmin } from '@/lib/supabase';
 import { getErcotMarketData } from './ercot.js';
 
 export default async function handler(req, res) {

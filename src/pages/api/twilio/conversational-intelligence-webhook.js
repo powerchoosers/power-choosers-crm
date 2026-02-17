@@ -134,7 +134,7 @@ function buildSpeakerTurnsFromSentences(sentences, agentChannelStr) {
 }
 
 import twilio from 'twilio';
-import { supabaseAdmin } from '../_supabase.js';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export default async function handler(req, res) {
     // Compute absolute base URL once for internal posts

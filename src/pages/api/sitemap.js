@@ -3,7 +3,7 @@
  * Generates sitemap.xml dynamically including all public pages and blog posts
  */
 
-import { supabaseAdmin } from './_supabase.js';
+import { supabaseAdmin } from '@/lib/supabase';
 import logger from './_logger.js';
 
 // Static pages that should always be in the sitemap

@@ -1,5 +1,5 @@
 import twilio from 'twilio';
-import { supabaseAdmin } from '../_supabase.js';
+import { supabaseAdmin } from '@/lib/supabase';
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
 
