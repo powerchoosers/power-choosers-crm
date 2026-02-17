@@ -76,15 +76,36 @@ export default async function analyzeBillHandler(req, res) {
           const content = data?.choices?.[0]?.message?.content;
           if (content) {
             console.log('[Bill Debugger] Raw Perplexity Response:', content);
-            let cleanContent = content.trim();
-            // Robust JSON extraction
-            const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-              cleanContent = jsonMatch[0];
+
+            let jsonString = content;
+            const firstBrace = content.indexOf('{');
+            const lastBrace = content.lastIndexOf('}');
+
+            if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+              jsonString = content.substring(firstBrace, lastBrace + 1);
             }
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(cleanContent);
-            return;
+
+            try {
+              const parsed = JSON.parse(jsonString);
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify(parsed));
+              return;
+            } catch (parseError) {
+              console.error('[Bill Debugger] JSON Parse Error:', parseError.message);
+              console.error('[Bill Debugger] Failed JSON String:', jsonString);
+
+              // Fallback: Try to clean markdown codes if simple extraction failed
+              try {
+                const cleanMarkdown = content.replace(/```json/g, '').replace(/```/g, '').trim();
+                const parsed = JSON.parse(cleanMarkdown);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(parsed));
+                return;
+              } catch (e2) {
+                // If all fails, send error so frontend doesn't hang or guess
+                throw new Error('Failed to parse AI response as JSON');
+              }
+            }
           }
         } else {
           const errorData = await response.json();
