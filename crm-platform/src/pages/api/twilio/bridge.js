@@ -169,9 +169,6 @@ export default async function handler(req, res) {
             timeLimit: 14400,      // 4 hours max call duration
             // Return to our handler after dial completes
             action: dialCompleteUrl,
-            statusCallback: dialStatusUrl,
-            statusCallbackEvent: 'initiated ringing answered completed',
-            // Note: statusCallbackMethod is not a valid attribute for Dial verb
             // TwiML dual-channel from answer
             record: 'record-from-answer-dual',
             recordingStatusCallback: recordingUrl,
@@ -228,9 +225,12 @@ export default async function handler(req, res) {
         logger.log(`  - target: ${normalizedTarget} (E.164: ${isValidE164(normalizedTarget) ? 'YES' : 'NO'})`);
         logger.log(`  - CallSid: ${CallSid}`);
 
-        // Add the target number to dial
+        // Add the target number to dial with status callbacks
         try {
-            dial.number(normalizedTarget);
+            dial.number({
+                statusCallback: dialStatusUrl,
+                statusCallbackEvent: 'initiated ringing answered completed'
+            }, normalizedTarget);
             logger.log(`[Bridge] Successfully added number ${normalizedTarget} to dial with callerId ${dynamicCallerId}`);
         } catch (dialError) {
             logger.error(`[Bridge] Error adding number to dial:`, dialError);

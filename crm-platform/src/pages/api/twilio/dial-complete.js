@@ -6,10 +6,17 @@ import logger from '../_logger.js';
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 export default async function handler(req, res) {
-  // Twilio generally POSTs to this endpoint
-  if (req.method !== 'POST') {
+  // Twilio generally POSTs to this endpoint, but we allow GET for health checks or debugging
+  if (req.method !== 'POST' && req.method !== 'GET') {
     res.writeHead(405, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
+
+  // Handle GET requests immediately with 200 OK
+  if (req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('OK');
     return;
   }
 
