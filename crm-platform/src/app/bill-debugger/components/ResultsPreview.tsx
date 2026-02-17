@@ -98,22 +98,22 @@ export function ResultsPreview({ data, onUnlock }: ResultsPreviewProps) {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5, delay: i * 0.1 }}
-                        className="bg-[#1e293b] rounded-2xl p-6 text-left border border-zinc-700/50 shadow-xl relative overflow-hidden group"
+                        className="glass-card p-8 text-left relative overflow-hidden group"
                     >
-                        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+                        <div className="absolute inset-0 bg-gradient-to-br from-[#002FA7]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
 
                         <div className="flex items-start justify-between mb-4">
-                            <span className="text-xs font-mono uppercase tracking-widest text-[#94a3b8]">
+                            <span className="text-xs font-mono uppercase tracking-widest text-zinc-400">
                                 {field.label}
                             </span>
-                            <field.icon className="w-5 h-5 text-[#38bdf8] opacity-80" />
+                            <field.icon className="w-5 h-5 text-[#002FA7] opacity-80" />
                         </div>
 
-                        <div className={`font-medium text-white mb-2 ${field.isText ? 'text-lg leading-snug' : 'text-3xl tracking-tight font-mono text-[#38bdf8]'}`}>
+                        <div className={`font-semibold text-zinc-900 mb-2 ${field.isText ? 'text-lg leading-snug' : 'text-3xl tracking-tight font-mono text-[#002FA7]'}`}>
                             {field.value}
                         </div>
 
-                        <div className="text-xs text-[#94a3b8] font-light">
+                        <div className="text-xs text-zinc-500 font-medium">
                             {field.context}
                         </div>
                     </motion.div>
