@@ -121,7 +121,7 @@ export function FullReport({ data, email }: FullReportProps) {
                 </div>
 
                 {data.analysis && (
-                    <div className="mb-10 max-w-4xl mx-auto rounded-3xl overflow-hidden h-[300px] border border-zinc-200 shadow-xl relative group">
+                    <div className="mb-10 max-w-4xl mx-auto rounded-3xl overflow-hidden h-[300px] border border-zinc-200 shadow-xl relative group bg-white/80 backdrop-blur-md">
                         <ForensicMap address={data.service_address} zoneLabel={`ZONE: ${data.analysis.zone}`} />
                     </div>
                 )}
@@ -286,7 +286,7 @@ export function FullReport({ data, email }: FullReportProps) {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {feedback.actionItems.map((item: string, i: number) => (
-                        <div key={i} className="flex items-start gap-4 p-5 bg-zinc-50 rounded-2xl border border-zinc-100 hover:border-[#002FA7]/20 transition-all">
+                        <div key={i} className="flex items-start gap-4 p-5 bg-white/50 backdrop-blur-sm rounded-2xl border border-zinc-200 hover:border-[#002FA7]/30 transition-all">
                             <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${feedback.status === 'green' ? 'bg-emerald-500' : feedback.status === 'yellow' ? 'bg-amber-500' : 'bg-red-500'}`} />
                             <p className="text-zinc-700 text-sm md:text-base leading-snug">{item}</p>
                         </div>

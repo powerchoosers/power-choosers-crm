@@ -18,6 +18,14 @@ function formatBytes(bytes: number, decimals = 2) {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
 }
 
+function parseNum(val: any): number {
+    if (val === null || val === undefined) return 0;
+    if (typeof val === 'number') return val;
+    const cleaned = String(val).replace(/[^0-9.]/g, '');
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? 0 : num;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (cors(req, res)) return;
 
@@ -62,11 +70,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             grade: grade,
             savings: savingsText,
             risk: risk,
-            location: analysisData.service_address || 'Texas Facility',
+            location: analysisData.serviceAddress || analysisData.service_address || 'Texas Facility',
             zone: analysisData.analysis?.zone || 'ERCOT',
-            provider: analysisData.provider?.name || analysisData.provider_name || analysisData.providerName || 'Unknown',
-            rate: analysisData.energy_rate_per_kwh ? Number(String(analysisData.energy_rate_per_kwh).replace(/[^0-9.]/g, '')).toFixed(3) : '0.00',
-            usage: (Number(analysisData.total_usage_kwh || 0) * 12).toLocaleString(),
+            provider: analysisData.providerName || analysisData.provider_name || analysisData.provider?.name || 'Unknown',
+            rate: parseNum(analysisData.energyRatePerKWh || analysisData.energy_rate_per_kwh).toFixed(3),
+            usage: (parseNum(analysisData.totalUsage || analysisData.total_usage_kwh || analysisData.usagekWh) * 12).toLocaleString(),
             term: feedback?.contractInfo?.timeRemaining || 'Unknown'
         };
 
@@ -78,8 +86,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const analysisDetails = {
             id: analysisData.id || `ANL_${Date.now()}`,
             provider: analysisData.providerName || analysisData.provider_name || 'Unknown',
-            rate: analysisData.energy_rate_per_kwh || '0',
-            usage: analysisData.total_usage_kwh || '0',
+            rate: analysisData.energyRatePerKWh || analysisData.energy_rate_per_kwh || '0',
+            usage: analysisData.totalUsage || analysisData.total_usage_kwh || '0',
             grade: stats.grade
         };
 

@@ -54,12 +54,12 @@ export function UploadZone({ onUpload, isAnalyzing }: UploadZoneProps) {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.4 }}
-                className={`relative w-full aspect-[2/1] md:aspect-[3/1] rounded-3xl border-2 transition-all duration-300 flex flex-col items-center justify-center cursor-pointer overflow-hidden backdrop-blur-sm bg-white/60
+                className={`relative w-full aspect-[2/1] md:aspect-[3/1] rounded-3xl border-2 transition-all duration-300 flex flex-col items-center justify-center cursor-pointer overflow-hidden backdrop-blur-xl bg-white/80
           ${isDragging
                         ? 'border-[#002FA7] bg-[#002FA7]/5 scale-[1.02] shadow-xl shadow-[#002FA7]/10'
-                        : 'border-dashed border-zinc-300 hover:border-zinc-400 hover:bg-white/80'
+                        : 'border-dashed border-zinc-300 hover:border-zinc-400 hover:bg-white/90'
                     }
-          ${isAnalyzing ? 'pointer-events-none border-zinc-200 bg-zinc-50/50' : ''}
+          ${isAnalyzing ? 'pointer-events-none border-zinc-200 bg-zinc-50/80 shadow-inner' : ''}
         `}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}

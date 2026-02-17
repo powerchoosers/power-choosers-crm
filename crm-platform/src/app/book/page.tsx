@@ -29,8 +29,7 @@ export default async function BookingPage({ searchParams }: BookingPageProps) {
                         <ArrowLeft className="w-4 h-4" />
                     </div>
                     <div className="flex flex-col">
-                        <span className="font-mono text-[10px] uppercase tracking-widest font-bold text-[#002FA7]">Uplink_Return</span>
-                        <span className="text-xs font-mono uppercase tracking-tighter opacity-70">Return_to_Report</span>
+                        <span className="text-lg font-mono uppercase tracking-tighter text-zinc-300 group-hover:text-white transition-colors">Return_to_Report</span>
                     </div>
                 </Link>
 

@@ -38,9 +38,9 @@ export function TrustGate({ onNext }: TrustGateProps) {
                     <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-[#002FA7]">
                         <Lock className="w-6 h-6" />
                     </div>
-                    <h3 className="font-semibold text-zinc-900">Your data stays private</h3>
+                    <h3 className="font-semibold text-zinc-900 tracking-tight">Forensic Isolation</h3>
                     <p className="text-sm text-zinc-500 leading-relaxed font-medium">
-                        Read-only analysis. We never reach out to your supplier or switch your account.
+                        Read-only analysis protocol. Nodal Point operates in a zero-touch environment. We do not interface with suppliers or modify account structures during the diagnostic phase.
                     </p>
                 </div>
 
@@ -48,9 +48,9 @@ export function TrustGate({ onNext }: TrustGateProps) {
                     <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-[#002FA7]">
                         <FileX className="w-6 h-6" />
                     </div>
-                    <h3 className="font-semibold text-zinc-900">Files auto-delete</h3>
+                    <h3 className="font-semibold text-zinc-900 tracking-tight">Ephemeral Logic</h3>
                     <p className="text-sm text-zinc-500 leading-relaxed font-medium">
-                        Your invoice is permanently deleted 72 hours after we analyze it.
+                        Inactive session data is purged after 72 hours. If a Forensic Audit is initiated, your load profile is encrypted and moved to your private Evidence Locker for architectural review.
                     </p>
                 </div>
 
@@ -58,9 +58,9 @@ export function TrustGate({ onNext }: TrustGateProps) {
                     <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-[#002FA7]">
                         <ShieldCheck className="w-6 h-6" />
                     </div>
-                    <h3 className="font-semibold text-zinc-900">Bank-level security</h3>
+                    <h3 className="font-semibold text-zinc-900 tracking-tight">Cryptographic Vault</h3>
                     <p className="text-sm text-zinc-500 leading-relaxed font-medium">
-                        SOC-2 certified standards. Your file never leaves encrypted servers.
+                        Advanced encryption standards for data at rest and in transit. Your load profile remains isolated within our hardened SOC-2 infrastructure.
                     </p>
                 </div>
             </motion.div>
