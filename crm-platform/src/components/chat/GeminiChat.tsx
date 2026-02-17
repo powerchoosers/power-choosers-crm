@@ -1392,7 +1392,7 @@ SELECT * FROM hybrid_search_accounts(
       exit={{ opacity: 0, y: 4, scaleY: 0.98, transition: { duration: 0.12 } }}
       transition={{ duration: 0.18, delay: 0.05 }}
       style={{ transformOrigin: 'top' }}
-      className="absolute top-12 right-2 mt-2 w-[calc(100%-1rem)] max-w-[480px] flex flex-col h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl bg-zinc-950/80 backdrop-blur-3xl nodal-monolith-edge shadow-2xl overflow-hidden z-50"
+      className="absolute top-12 right-2 mt-2 w-[calc(100%-1rem)] max-w-[480px] flex flex-col h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl glass-panel nodal-monolith-edge overflow-hidden z-50"
     >
       {/* Nodal Point Glass Highlight */}
 

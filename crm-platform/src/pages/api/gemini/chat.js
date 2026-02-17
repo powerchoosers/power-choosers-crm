@@ -2037,30 +2037,26 @@ export default async function handler(req, res) {
 
       const hasSystemPrompt = cleanedMessages.some(m => m.role === 'system');
 
-      let currentMessages = hasSystemPrompt
-        ? cleanedMessages.slice(-15).map(m => {
-          const msg = {
-            role: m.role === 'tool' ? 'tool' : (m.role === 'user' ? 'user' : (m.role === 'system' ? 'system' : 'assistant')),
-            content: m.content || null,
-          };
-          if (m.tool_calls) msg.tool_calls = m.tool_calls;
-          if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
-          if (m.name) msg.name = m.name;
-          return msg;
-        })
-        : [
-          { role: 'system', content: buildSystemPrompt().trim() },
-          ...cleanedMessages.slice(-15).map(m => {
-            const msg = {
-              role: m.role === 'tool' ? 'tool' : (m.role === 'user' ? 'user' : 'assistant'),
-              content: m.content || null,
-            };
-            if (m.tool_calls) msg.tool_calls = m.tool_calls;
-            if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
-            if (m.name) msg.name = m.name;
-            return msg;
-          })
-        ];
+      let currentMessages = [];
+
+      // Ensure we have a system prompt
+      const systemContent = buildSystemPrompt().trim();
+      currentMessages.push({ role: 'system', content: systemContent });
+
+      // Append history, limited to last 15 exchanges
+      cleanedMessages.slice(-15).forEach(m => {
+        // Skip existing system messages in cleanedMessages to avoid duplicates
+        if (m.role === 'system') return;
+
+        const msg = {
+          role: m.role === 'model' ? 'assistant' : m.role,
+          content: m.content || null,
+        };
+        if (m.tool_calls) msg.tool_calls = m.tool_calls;
+        if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
+        if (m.name) msg.name = m.name;
+        currentMessages.push(msg);
+      });
 
       // Ensure the last message is from the user if it's not already
       if (currentMessages[currentMessages.length - 1].role !== 'user' && currentMessages[currentMessages.length - 1].role !== 'tool') {
@@ -2096,7 +2092,7 @@ export default async function handler(req, res) {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`,
-            'HTTP-Referer': 'https://nodal-point-network.vercel.app',
+            'HTTP-Referer': 'https://nodalpoint.io',
             'X-Title': 'Nodal Point CRM',
           },
           body: JSON.stringify(requestBody),
@@ -2110,9 +2106,12 @@ export default async function handler(req, res) {
         }
 
         const data = await response.json();
+        console.log(`[AI Router] OpenRouter Response [Turn ${turnCount}]:`, JSON.stringify(data, null, 2));
+
         const message = data?.choices?.[0]?.message;
 
         if (!message) {
+          console.error('[AI Router] Empty message in choices:', data?.choices);
           throw new Error('OpenRouter returned an empty response');
         }
 
