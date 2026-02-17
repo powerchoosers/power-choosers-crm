@@ -23,6 +23,13 @@ type ExtractedData = {
     energy_charges?: string | number
     taxes_and_fees?: string | number
     total_amount_due?: string | number
+
+    // New Fields
+    contract_end_date?: string
+    retail_plan_name?: string
+    peak_demand?: string | number // Use as source of truth for calculations
+    energy_rate_per_kwh?: string | number
+    delivery_rate_per_kwh?: string | number
 }
 
 type ViewState = 'trust' | 'upload' | 'analyzing' | 'preview' | 'email' | 'report' | 'error'
@@ -92,14 +99,22 @@ export default function BillDebuggerPage() {
                     (data.billingPeriod.start ? `${data.billingPeriod.start} - ${data.billingPeriod.end}` :
                         data.billingPeriod.startDate ? `${data.billingPeriod.startDate} - ${data.billingPeriod.endDate}` : 'Unknown Period')
                     : data.billingPeriod) || 'Unknown Period',
-                total_usage_kwh: (data.usagekWh || data.total_usage_kwh)?.toLocaleString() || '0',
-                billed_demand_kw: (data.demandKW && typeof data.demandKW === 'object' ?
-                    data.demandKW.peakDemand :
-                    (data.demandKW || data.billed_demand_kw))?.toLocaleString() || '0',
-                delivery_charges: data.deliveryCharges || data.delivery_charges,
-                energy_charges: data.energyCharges || data.energy_charges,
+
+                total_usage_kwh: (data.usagekWh || data.totalUsage || data.total_usage_kwh)?.toLocaleString() || '0',
+
+                // Prioritize 'peakDemand' from new prompt, fallback to old demandKW object
+                billed_demand_kw: (data.peakDemand || (data.demandKW && typeof data.demandKW === 'object' ? data.demandKW.peakDemand : data.demandKW) || data.billed_demand_kw || 0).toLocaleString(),
+                peak_demand: data.peakDemand || (data.demandKW && typeof data.demandKW === 'object' ? data.demandKW.peakDemand : data.demandKW) || 0,
+
+                delivery_charges: data.deliveryChargeTotal || data.deliveryCharges || data.delivery_charges,
+                energy_charges: data.energyChargeTotal || data.energyCharges || data.energy_charges,
                 taxes_and_fees: data.taxesAndFees || data.taxes_and_fees,
-                total_amount_due: data.totalAmountDue || data.total_amount_due
+                total_amount_due: data.totalAmountDue || data.total_amount_due,
+
+                contract_end_date: data.contractEndDate,
+                retail_plan_name: data.retailPlanName,
+                energy_rate_per_kwh: data.energyRatePerKWh,
+                delivery_rate_per_kwh: data.deliveryRatePerKWh
             })
         } catch (err: unknown) {
             console.error('Analysis Error:', err)
