@@ -63,7 +63,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             savings: savingsText,
             risk: risk,
             location: analysisData.service_address || 'Texas Facility',
-            zone: analysisData.analysis?.zone || 'ERCOT'
+            zone: analysisData.analysis?.zone || 'ERCOT',
+            provider: analysisData.providerName || analysisData.provider_name || 'Unknown',
+            rate: analysisData.energy_rate_per_kwh ? Number(analysisData.energy_rate_per_kwh).toFixed(3) : '0.00',
+            usage: (Number(analysisData.total_usage_kwh) || 0).toLocaleString(),
+            term: feedback?.contractInfo?.timeRemaining || 'Unknown'
         };
 
         const companyInfo = {
@@ -80,7 +84,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         };
 
         // Links
-        const reportLink = `https://nodalpoint.io/book`;
+        const reportLink = `https://nodalpoint.io/book?email=${encodeURIComponent(email)}`;
         const crmLink = `https://nodalpoint.io/network/contacts/${email}`;
         const analysisLink = reportLink;
 
