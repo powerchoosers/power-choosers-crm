@@ -619,7 +619,7 @@ OUTPUT FORMAT:
         if (!asset) throw new Error('Template not found')
 
         // Generate HTML from blocks
-        let html = generateStaticHtml(asset.content_json?.blocks || [], { profile })
+        let html = await generateStaticHtml(asset.content_json?.blocks || [], { profile })
 
         // Build variable map from contact context (use empty values if no context)
         const contactData = {
@@ -742,7 +742,7 @@ OUTPUT FORMAT:
           }
 
           // REGENERATE HTML with the new content
-          const newHtml = generateStaticHtml(updatedBlocks, { profile })
+          const newHtml = await generateStaticHtml(updatedBlocks, { profile })
           html = substituteVariables(newHtml, variableMap)
         }
 

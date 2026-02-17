@@ -117,11 +117,22 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
   const { data: contactsData } = useContacts()
   const contacts = useMemo(() => contactsData?.pages?.flatMap((p: { contacts: any[] }) => p.contacts) ?? [], [contactsData])
   const { data: previewContact } = useContact(previewContactId ?? '')
-  const previewHtml = useMemo(() => {
-    if (!previewContactId || !previewContact) return null
-    const html = generateStaticHtml(blocks, { skipFooter: true })
-    const data = contactToVariableMap(previewContact)
-    return substituteVariables(html, data)
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!previewContactId || !previewContact) {
+      setPreviewHtml(null)
+      return
+    }
+
+    const generatePreview = async () => {
+      const html = await generateStaticHtml(blocks, { skipFooter: true })
+      const data = contactToVariableMap(previewContact)
+      const substituted = substituteVariables(html, data)
+      setPreviewHtml(substituted)
+    }
+
+    generatePreview()
   }, [blocks, previewContactId, previewContact])
 
   // Auto-generate TEXT_MODULE blocks with AI when contact is selected
@@ -218,7 +229,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
 
   const saveAsset = async () => {
     setIsSaving(true)
-    const compiled_html = generateStaticHtml(blocks)
+    const compiled_html = await generateStaticHtml(blocks)
     const chipVars = blocks
       .filter(b => b.type === 'VARIABLE_CHIP')
       .map(b => (typeof b.content === 'string' ? b.content.replace(/{{|}}/g, '') : ''))
