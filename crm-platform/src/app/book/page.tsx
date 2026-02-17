@@ -3,6 +3,7 @@ import IdentityDossier from '@/components/booking/IdentityDossier';
 import { Metadata } from 'next';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
     title: 'Nodal Protocol | Booking Interface',
@@ -18,44 +19,74 @@ export default async function BookingPage({ searchParams }: BookingPageProps) {
     const email = resolvedParams?.email || "";
 
     return (
-        <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center p-4 md:p-8 relative overflow-hidden font-sans">
-            {/* Background Ambience / Glows */}
-            <div className="absolute top-[-20%] left-[-10%] w-[800px] h-[800px] bg-[#002FA7]/5 blur-[120px] rounded-full pointer-events-none" />
-            <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-[#002FA7]/5 blur-[120px] rounded-full pointer-events-none" />
+        <div className="flex flex-col h-screen bg-[#050505] text-white overflow-hidden font-sans selection:bg-pc-blue/30">
+            {/* Header: Global Navigation Mirror */}
+            <header className="flex-none h-24 flex items-center px-8 border-b border-white/5 bg-zinc-950/20 backdrop-blur-md relative z-40">
+                <Link
+                    href="/bill-debugger"
+                    className="flex items-center gap-3 text-zinc-500 hover:text-white transition-all group"
+                >
+                    <div className="p-2 rounded-lg bg-white/5 border border-white/5 group-hover:border-white/10 group-hover:bg-white/10 transition-all">
+                        <ArrowLeft className="w-4 h-4" />
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="font-mono text-[10px] uppercase tracking-widest font-bold text-[#002FA7]">Uplink_Return</span>
+                        <span className="text-xs font-mono uppercase tracking-tighter opacity-70">Return_to_Report</span>
+                    </div>
+                </Link>
 
-            {/* Back Button */}
-            <Link
-                href="/bill-debugger"
-                className="absolute top-8 left-8 flex items-center gap-2 text-zinc-500 hover:text-white transition-colors group z-20"
-            >
-                <div className="p-2 rounded-lg bg-white/5 group-hover:bg-white/10 transition-colors">
-                    <ArrowLeft className="w-4 h-4" />
+                <div className="ml-auto flex items-center gap-6">
+                    <div className="flex flex-col items-end">
+                        <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest leading-none">Protocol_Active</span>
+                        <span className="text-xs font-mono text-zinc-400 mt-1 uppercase tracking-tighter tabular-nums">NODAL_ACCESS_v1.0.4</span>
+                    </div>
                 </div>
-                <span className="font-mono text-xs uppercase tracking-widest font-bold">Return_to_Report</span>
-            </Link>
+            </header>
 
-            <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-0 border border-white/10 rounded-[2.5rem] bg-[#0a0a0a]/90 backdrop-blur-3xl shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] overflow-hidden relative z-10">
+            {/* Main Application Frame */}
+            <main className="flex-1 overflow-hidden p-4 md:p-6 lg:p-8 flex flex-col relative">
+                {/* Background Ambience / Glows */}
+                <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-[#002FA7]/5 blur-[120px] rounded-full pointer-events-none animate-pulse" />
+                <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-[#002FA7]/3 blur-[100px] rounded-full pointer-events-none" />
 
-                {/* LEFT PANEL: Tactical Calendar (Cols 1-7) */}
-                <div className="lg:col-span-7 p-8 md:p-12 border-b lg:border-b-0 lg:border-r border-white/5">
-                    <TacticalCalendar />
+                <div className="flex-1 nodal-void-card flex flex-col relative z-10 overflow-hidden shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)]">
+                    <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+                        {/* LEFT PANEL: Tactical Calendar (Cols 1-7) */}
+                        <div className="flex-[7] p-6 md:p-10 border-b lg:border-b-0 lg:border-r border-white/5 overflow-y-auto np-scroll">
+                            <TacticalCalendar />
+                        </div>
+
+                        {/* RIGHT PANEL: Live Recon / Context (Cols 8-12) */}
+                        <div className="flex-[5] bg-black/20 p-6 md:p-10 overflow-y-auto np-scroll relative">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+                                <span className="font-mono text-[80px] font-bold leading-none tracking-tighter select-none">
+                                    RECON
+                                </span>
+                            </div>
+                            <IdentityDossier email={email} />
+                        </div>
+                    </div>
                 </div>
+            </main>
 
-                {/* RIGHT PANEL: Live Recon / Context (Cols 8-12) */}
-                <div className="lg:col-span-5 bg-zinc-900/10 p-8 md:p-12 flex flex-col justify-between">
-                    <IdentityDossier email={email} />
+            {/* Foot Stats: Mirrors Network Footer */}
+            <footer className="flex-none h-11 border-t border-white/5 bg-black/40 backdrop-blur-md flex items-center justify-between px-6 z-40">
+                <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                        <span>Identity_Resolved: {email ? 'SECURE' : 'ANONYMOUS'}</span>
+                    </div>
+                    <div className="h-4 w-[1px] bg-white/5 hidden md:block" />
+                    <div className="hidden md:flex items-center gap-4 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
+                        <span>Uplink_Node: stable</span>
+                        <span>Protocol: Signal_Transmission</span>
+                    </div>
                 </div>
-
-            </div>
-
-            {/* Subtle HUD Overlay */}
-            <div className="fixed bottom-8 left-8 pointer-events-none opacity-20 hidden md:block">
-                <div className="font-mono text-[10px] space-y-1">
-                    <p>// PROTOCOL: NODAL_ACCESS_v1.0.4</p>
-                    <p>// STATUS: IDENTITY_RESOLVED_SECURE</p>
-                    <p>// UPLINK: STABLE</p>
+                <div className="text-[10px] font-mono text-zinc-700 uppercase tracking-widest space-x-4">
+                    <span>Nodal_Ref // V2.1</span>
+                    <span className="hidden sm:inline">System_Clock: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}</span>
                 </div>
-            </div>
+            </footer>
         </div>
     );
 }

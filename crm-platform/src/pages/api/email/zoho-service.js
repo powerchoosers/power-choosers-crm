@@ -2,6 +2,7 @@
 // Zoho Mail service for sending and syncing emails via Zoho Mail API
 import { getValidAccessTokenForUser, clearTokenCache } from './zoho-token-manager.js';
 import logger from '../_logger.js';
+import { FormData } from 'formdata-node'; // Ensure you have this or use native FormData in Node 18+
 
 export class ZohoMailService {
     constructor() {
@@ -15,10 +16,64 @@ export class ZohoMailService {
     }
 
     /**
+     * Upload an attachment to Zoho Mail File Store
+     * @param {string} userEmail - The user sending the email
+     * @param {Buffer|Blob} fileData - The file content
+     * @param {string} fileName - The name of the file
+     */
+    async uploadAttachment(userEmail, fileData, fileName) {
+        try {
+            const { accessToken, accountId } = await getValidAccessTokenForUser(userEmail);
+
+            logger.info(`[Zoho Mail] Uploading attachment '${fileName}' for ${userEmail}...`, 'zoho-service');
+
+            const formData = new FormData();
+            // Create a Blob from buffer if needed, or pass directly
+            const blob = new Blob([fileData]);
+            formData.append('attach', blob, fileName);
+
+            const response = await fetch(`${this.baseUrl}/accounts/${accountId}/messages/attachments?uploadType=multipart`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Zoho-oauthtoken ${accessToken}`,
+                    // Content-Type is set automatically by fetch with FormData
+                },
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Zoho Upload API error: ${response.status} - ${errorText}`);
+            }
+
+            const result = await response.json();
+
+            // Zoho returns data as an array for multipart uploads
+            const attachmentData = Array.isArray(result.data) ? result.data[0] : result.data;
+
+            if (!attachmentData) {
+                throw new Error('No data returned from Zoho Upload API');
+            }
+
+            logger.info(`[Zoho Mail] Attachment uploaded successfully: ${attachmentData.attachmentName}`, 'zoho-service');
+
+            return {
+                storeName: attachmentData.storeName,
+                attachmentPath: attachmentData.attachmentPath,
+                attachmentName: attachmentData.attachmentName,
+            };
+
+        } catch (error) {
+            logger.error(`[Zoho Mail] Upload failed for ${fileName}:`, error, 'zoho-service');
+            throw error;
+        }
+    }
+
+    /**
      * Send an email via Zoho Mail API
      */
     async sendEmail(emailData) {
-        const { to, subject, html, text, from, fromName, attachments, userEmail } = emailData;
+        const { to, subject, html, text, from, fromName, attachments, uploadedAttachments, userEmail } = emailData;
 
         if (!userEmail) {
             throw new Error('userEmail is required for Zoho sending');
@@ -46,11 +101,23 @@ export class ZohoMailService {
                     mailFormat: html ? 'html' : 'plaintext',
                 };
 
+                // Handle Inline/Content Attachments (Legacy/Small files)
                 if (attachments && attachments.length > 0) {
                     payload.attachments = attachments.map(att => ({
                         attachmentName: att.filename,
                         content: att.content,
                     }));
+                }
+
+                // Handle Pre-Uploaded Attachments (Recommended for documents)
+                if (uploadedAttachments && uploadedAttachments.length > 0) {
+                    const existingAtts = payload.attachments || [];
+                    const newAtts = uploadedAttachments.map(att => ({
+                        storeName: att.storeName,
+                        attachmentPath: att.attachmentPath,
+                        attachmentName: att.attachmentName,
+                    }));
+                    payload.attachments = [...existingAtts, ...newAtts];
                 }
 
                 const response = await fetch(`${this.baseUrl}/accounts/${accountId}/messages`, {

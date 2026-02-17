@@ -15,6 +15,7 @@ interface IdentityData {
     location: string;
     linkedinUrl?: string;
     phone?: string;
+    accountId?: string;
 }
 
 /**
@@ -47,6 +48,65 @@ async function apolloMatchByEmail(email: string) {
 }
 
 /**
+ * Find or Create Account based on Domain/Apollo Data
+ */
+async function ensureAccount(domain: string, apolloOrg: any, companyName: string): Promise<string | null> {
+    if (!domain || domain === 'gmail.com' || domain === 'outlook.com' || domain === 'yahoo.com') return null;
+
+    try {
+        // 1. Try to find by domain
+        const { data: existing } = await supabaseAdmin
+            .from('accounts')
+            .select('id')
+            .eq('domain', domain)
+            .maybeSingle();
+
+        if (existing) return existing.id;
+
+        // 2. Create new Account
+        console.log(`Creating new account for domain: ${domain}`);
+
+        const newAccount = {
+            id: crypto.randomUUID(),
+            name: apolloOrg?.name || companyName,
+            domain: domain,
+            industry: apolloOrg?.industry || 'Unknown',
+            description: apolloOrg?.short_description || '',
+            logo_url: apolloOrg?.logo_url || '',
+            phone: apolloOrg?.phone || '',
+            linkedin_url: apolloOrg?.linkedin_url || '',
+            employees: apolloOrg?.estimated_num_employees || null,
+            city: apolloOrg?.city,
+            state: apolloOrg?.state,
+            address: apolloOrg?.address,
+            status: 'PROSPECT',
+            updatedAt: new Date().toISOString(),
+            metadata: {
+                source: 'Bill Debugger Auto-Creation',
+                apollo_raw_data: apolloOrg
+            }
+        };
+
+        const { data: created, error } = await supabaseAdmin
+            .from('accounts')
+            .insert(newAccount)
+            .select('id')
+            .single();
+
+        if (error) {
+            console.error('Failed to create account:', error);
+            return null;
+        }
+
+        return created.id;
+
+    } catch (e) {
+        console.error('Account Resolution Error:', e);
+        return null;
+    }
+}
+
+/**
  * Resolve Identity: Supabase First -> Apollo Enrichment
  */
 export async function resolveIdentity(email: string): Promise<IdentityData | null> {
@@ -56,7 +116,7 @@ export async function resolveIdentity(email: string): Promise<IdentityData | nul
         // 1. Check local DB first (Fastest)
         const { data: existing, error: fetchError } = await supabaseAdmin
             .from('contacts')
-            .select('*, accounts(name)') // Join with accounts to get company name
+            .select('*, accounts(id, name)')
             .eq('email', email)
             .maybeSingle();
 
@@ -71,7 +131,8 @@ export async function resolveIdentity(email: string): Promise<IdentityData | nul
                 email: existing.email,
                 location: [existing.city, existing.state].filter(Boolean).join(', ') || 'Unknown Location',
                 linkedinUrl: existing.linkedinUrl,
-                phone: existing.phone
+                phone: existing.phone,
+                accountId: (existing.accounts as any)?.id
             };
         }
 
@@ -79,17 +140,38 @@ export async function resolveIdentity(email: string): Promise<IdentityData | nul
         console.log('Identity not found in DB, enriching via Apollo:', email);
         const apolloPerson = await apolloMatchByEmail(email);
 
+        const domain = email.split('@')[1];
+        const companyName = apolloPerson?.organization?.name || domain.split('.')[0].toUpperCase();
+
+        // 3. Ensure Account Exists
+        const accountId = await ensureAccount(domain, apolloPerson?.organization, companyName);
+
         if (!apolloPerson) {
-            return {
+            // Fallback for non-Apollo matches
+            const identity = {
                 name: 'Unknown Entity',
                 title: 'Professional',
-                company: email.split('@')[1].split('.')[0].toUpperCase(),
+                company: companyName,
                 email: email,
-                location: 'CST'
+                location: 'CST',
+                accountId: accountId || undefined
             };
+
+            // Save minimalist contact
+            const contactId = crypto.randomUUID();
+            await supabaseAdmin.from('contacts').insert({
+                id: contactId,
+                name: identity.name,
+                email: identity.email,
+                account_id: accountId, // Link to account if created
+                status: 'Active',
+                metadata: { source: 'Bill Debugger (Raw)' }
+            });
+
+            return identity;
         }
 
-        // 3. Map Apollo data
+        // 4. Map Apollo data
         const identity: IdentityData = {
             name: apolloPerson.name || `${apolloPerson.first_name} ${apolloPerson.last_name}`.trim(),
             firstName: apolloPerson.first_name,
@@ -99,12 +181,11 @@ export async function resolveIdentity(email: string): Promise<IdentityData | nul
             email: apolloPerson.email || email,
             location: [apolloPerson.city, apolloPerson.state, apolloPerson.country].filter(Boolean).join(', '),
             linkedinUrl: apolloPerson.linkedin_url,
-            phone: apolloPerson.phone_numbers?.[0]?.sanitized_number || apolloPerson.phone_numbers?.[0]?.raw_number
+            phone: apolloPerson.phone_numbers?.[0]?.sanitized_number || apolloPerson.phone_numbers?.[0]?.raw_number,
+            accountId: accountId || undefined
         };
 
-        // 4. Save to Supabase for next time
-        // Note: we don't have an account ID here necessarily, so we might just save to contacts
-        // In a real flow, we might want to also create/find an account.
+        // 5. Save to Supabase for next time
         const contactData = {
             id: crypto.randomUUID(),
             name: identity.name,
@@ -117,6 +198,7 @@ export async function resolveIdentity(email: string): Promise<IdentityData | nul
             city: apolloPerson.city,
             state: apolloPerson.state,
             status: 'Active',
+            account_id: accountId, // LINK THE CONTACT TO THE ACCOUNT
             metadata: {
                 source: 'Bill Debugger Identity Resolution',
                 acquired_at: new Date().toISOString(),

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { User, Building2, MapPin, ShieldCheck, Loader2, Globe, Linkedin, Mail, Phone } from 'lucide-react';
 import { resolveIdentity } from '@/actions/enrich-contact';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CompanyIcon } from '@/components/ui/CompanyIcon';
 
 interface IdentityData {
     name: string;
@@ -86,8 +87,12 @@ export default function IdentityDossier({ email }: { email: string }) {
                 <div className="p-5 rounded-2xl bg-black/40 border border-white/5 relative overflow-hidden group transition-all hover:border-[#002FA7]/30">
                     <div className="absolute top-0 left-0 w-1 h-full bg-[#002FA7]" />
                     <div className="flex items-start gap-4">
-                        <div className="p-2 rounded-lg bg-white/5">
-                            <Building2 className="w-5 h-5 text-zinc-400" />
+                        <div className="p-2 rounded-lg bg-white/5 w-12 h-12 flex items-center justify-center overflow-hidden">
+                            <CompanyIcon
+                                domain={data?.email?.split('@')[1]}
+                                name={data?.company || 'Company'}
+                                className="w-8 h-8 object-contain"
+                            />
                         </div>
                         <div>
                             <p className="text-[10px] font-mono text-zinc-500 uppercase mb-1 tracking-widest font-bold">Organization</p>
