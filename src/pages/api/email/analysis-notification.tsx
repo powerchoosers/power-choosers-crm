@@ -64,9 +64,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             risk: risk,
             location: analysisData.service_address || 'Texas Facility',
             zone: analysisData.analysis?.zone || 'ERCOT',
-            provider: analysisData.providerName || analysisData.provider_name || 'Unknown',
-            rate: analysisData.energy_rate_per_kwh ? Number(analysisData.energy_rate_per_kwh).toFixed(3) : '0.00',
-            usage: (Number(analysisData.total_usage_kwh) || 0).toLocaleString(),
+            provider: analysisData.provider?.name || analysisData.provider_name || analysisData.providerName || 'Unknown',
+            rate: analysisData.energy_rate_per_kwh ? Number(String(analysisData.energy_rate_per_kwh).replace(/[^0-9.]/g, '')).toFixed(3) : '0.00',
+            usage: (Number(analysisData.total_usage_kwh || 0) * 12).toLocaleString(),
             term: feedback?.contractInfo?.timeRemaining || 'Unknown'
         };
 

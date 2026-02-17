@@ -1,5 +1,4 @@
-import TacticalCalendar from '@/components/booking/TacticalCalendar';
-import IdentityDossier from '@/components/booking/IdentityDossier';
+import BookingInterface from '@/components/booking/BookingInterface';
 import { Metadata } from 'next';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
@@ -50,22 +49,7 @@ export default async function BookingPage({ searchParams }: BookingPageProps) {
                 <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-[#002FA7]/3 blur-[100px] rounded-full pointer-events-none" />
 
                 <div className="flex-1 nodal-void-card flex flex-col relative z-10 overflow-hidden shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)]">
-                    <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-                        {/* LEFT PANEL: Tactical Calendar (Cols 1-7) */}
-                        <div className="flex-[7] p-6 md:p-10 border-b lg:border-b-0 lg:border-r border-white/5 overflow-y-auto np-scroll">
-                            <TacticalCalendar />
-                        </div>
-
-                        {/* RIGHT PANEL: Live Recon / Context (Cols 8-12) */}
-                        <div className="flex-[5] bg-black/20 p-6 md:p-10 overflow-y-auto np-scroll relative">
-                            <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-                                <span className="font-mono text-[80px] font-bold leading-none tracking-tighter select-none">
-                                    RECON
-                                </span>
-                            </div>
-                            <IdentityDossier email={email} />
-                        </div>
-                    </div>
+                    <BookingInterface email={email} />
                 </div>
             </main>
 
