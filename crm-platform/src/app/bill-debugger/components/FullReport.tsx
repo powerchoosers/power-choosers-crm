@@ -4,6 +4,7 @@ import { Zap, Truck, Activity, ArrowRight, Info, Map as MapIcon, Globe } from 'l
 import { generateFeedback } from '../utils/feedbackLogic'
 import { FeedbackBadge } from './FeedbackBadge'
 import { NextStepsCard } from './NextStepsCard'
+import { ForensicMap } from './ForensicMap'
 
 interface ExtractedData {
     customer_name: string
@@ -15,6 +16,7 @@ interface ExtractedData {
     energy_charges?: string | number
     taxes_and_fees?: string | number
     total_amount_due?: string | number
+    service_address?: string
 
     // New Fields
     contract_end_date?: string
@@ -110,25 +112,16 @@ export function FullReport({ data }: FullReportProps) {
                         </div>
                     )}
                 </div>
-                <h1 className="text-3xl md:text-5xl font-light text-zinc-900 mb-6">
+                <h1 className="text-3xl md:text-5xl font-light text-zinc-900 mb-2">
                     Forensic Analysis Complete
                 </h1>
+                <div className="text-xl text-[#002FA7] font-medium mb-8 uppercase tracking-tight">
+                    {data.customer_name}
+                </div>
 
                 {data.analysis && (
-                    <div className="mb-10 max-w-4xl mx-auto rounded-3xl overflow-hidden h-48 bg-zinc-100 border border-zinc-200 relative group">
-                        <div className="absolute inset-0 bg-blue-50/50 flex items-center justify-center opacity-40 group-hover:opacity-60 transition-opacity">
-                            <Globe className="w-24 h-24 text-[#002FA7]" />
-                        </div>
-                        <div className="absolute top-4 left-4 bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-zinc-200 flex items-center gap-2">
-                            <MapIcon className="w-4 h-4 text-[#002FA7]" />
-                            <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Digital Site Map: {data.analysis.zone}</span>
-                        </div>
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div className="w-32 h-32 border-2 border-[#002FA7]/20 rounded-full animate-ping"></div>
-                        </div>
-                        <div className="absolute bottom-4 right-4 text-[10px] font-mono text-zinc-400 bg-white/50 px-2 py-0.5 rounded">
-                            PRECISION GEO-LOCATION: ACTIVE
-                        </div>
+                    <div className="mb-10 max-w-4xl mx-auto rounded-3xl overflow-hidden h-[300px] border border-zinc-200 shadow-xl relative group">
+                        <ForensicMap address={data.service_address} zoneLabel={`ZONE: ${data.analysis.zone}`} />
                     </div>
                 )}
 
@@ -174,10 +167,13 @@ export function FullReport({ data }: FullReportProps) {
                         </div>
                         {data.analysis && (
                             <div className="mt-4 p-3 bg-white/5 rounded-lg border border-white/10">
-                                <div className="text-[10px] text-zinc-400 uppercase tracking-wider mb-1">Shadow Pricing</div>
+                                <div className="text-[10px] text-zinc-400 uppercase tracking-wider mb-1">ERCOT Load Zone Benchmark</div>
                                 <div className="flex justify-between items-end">
-                                    <span className="text-xs text-zinc-500">Market Median:</span>
+                                    <span className="text-xs text-zinc-500">Market Rate (LZ_{data.analysis.zone}):</span>
                                     <span className="text-xs text-emerald-400 font-mono">{(data.analysis.marketContext.largeEnergyComponent * 100).toFixed(2)}¢</span>
+                                </div>
+                                <div className="text-[9px] text-zinc-600 mt-1 italic">
+                                    Compare against median regional contracts.
                                 </div>
                             </div>
                         )}

@@ -23,6 +23,7 @@ type ExtractedData = {
     energy_charges?: string | number
     taxes_and_fees?: string | number
     total_amount_due?: string | number
+    service_address?: string
 
     // New Fields
     contract_end_date?: string
@@ -106,7 +107,8 @@ export default function BillDebuggerPage() {
 
             setExtractedData({
                 customer_name: data.customerName || data.customer_name || 'Unknown Client',
-                provider_name: data.supplier || data.provider_name || 'Unknown Provider',
+                provider_name: data.providerName || data.provider_name || data.supplier || 'Unknown Provider',
+                service_address: data.serviceAddress || data.service_address,
                 billing_period: (data.billingPeriod && typeof data.billingPeriod === 'object' ?
                     (data.billingPeriod.start ? `${data.billingPeriod.start} - ${data.billingPeriod.end}` :
                         data.billingPeriod.startDate ? `${data.billingPeriod.startDate} - ${data.billingPeriod.endDate}` : 'Unknown Period')
