@@ -81,21 +81,21 @@ export default function BillDebuggerPage() {
                 throw new Error(result.error || result.message || 'Failed to analyze bill')
             }
 
-        // 4. Store Data - Normalize API keys (camelCase) to UI keys (snake_case if needed)
-        const data = result.data || result;
-        
-        setExtractedData({
-            customer_name: data.customerName || data.customer_name || 'Unknown Client',
-            provider_name: data.supplier || data.provider_name || 'Unknown Provider',
-            billing_period: (typeof data.billingPeriod === 'object' ? 
-                (data.billingPeriod.start ? `${data.billingPeriod.start} - ${data.billingPeriod.end}` : 
-                 data.billingPeriod.startDate ? `${data.billingPeriod.startDate} - ${data.billingPeriod.endDate}` : 'Unknown Period') 
-                : data.billingPeriod) || 'Unknown Period',
-            total_usage_kwh: (data.usagekWh || data.total_usage_kwh)?.toLocaleString() || '0',
-            billed_demand_kw: (typeof data.demandKW === 'object' ? 
-                data.demandKW.peakDemand : 
-                (data.demandKW || data.billed_demand_kw))?.toLocaleString() || '0'
-        })
+            // 4. Store Data - Normalize API keys (camelCase) to UI keys (snake_case if needed)
+            const data = result.data || result;
+
+            setExtractedData({
+                customer_name: data.customerName || data.customer_name || 'Unknown Client',
+                provider_name: data.supplier || data.provider_name || 'Unknown Provider',
+                billing_period: (data.billingPeriod && typeof data.billingPeriod === 'object' ?
+                    (data.billingPeriod.start ? `${data.billingPeriod.start} - ${data.billingPeriod.end}` :
+                        data.billingPeriod.startDate ? `${data.billingPeriod.startDate} - ${data.billingPeriod.endDate}` : 'Unknown Period')
+                    : data.billingPeriod) || 'Unknown Period',
+                total_usage_kwh: (data.usagekWh || data.total_usage_kwh)?.toLocaleString() || '0',
+                billed_demand_kw: (data.demandKW && typeof data.demandKW === 'object' ?
+                    data.demandKW.peakDemand :
+                    (data.demandKW || data.billed_demand_kw))?.toLocaleString() || '0'
+            })
         } catch (err: unknown) {
             console.error('Analysis Error:', err)
             const message = err instanceof Error ? err.message : 'An error occurred during analysis'
