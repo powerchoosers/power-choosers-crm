@@ -231,14 +231,16 @@ export default function TargetDetailPage() {
                 e.stopPropagation()
                 row.toggleSelected()
               }}
-              className={cn(
-                "absolute inset-0 m-auto w-4 h-4 rounded border transition-all flex items-center justify-center",
+              className="absolute inset-x-[-8px] inset-y-[-12px] z-20 flex items-center justify-center group/check"
+            >
+              <div className={cn(
+                "w-4 h-4 rounded border transition-all flex items-center justify-center",
                 isSelected
                   ? "bg-[#002FA7] border-[#002FA7] opacity-100"
-                  : "bg-white/5 border-white/10 opacity-0 group-hover/select:opacity-100"
-              )}
-            >
-              {isSelected && <Check className="w-3 h-3 text-white" />}
+                  : "bg-white/5 border-white/10 opacity-0 group-hover/select:opacity-100 group-hover/check:opacity-100"
+              )}>
+                {isSelected && <Check className="w-3 h-3 text-white" />}
+              </div>
             </button>
           </div>
         )
@@ -395,14 +397,16 @@ export default function TargetDetailPage() {
                 e.stopPropagation()
                 row.toggleSelected()
               }}
-              className={cn(
-                "absolute inset-0 m-auto w-4 h-4 rounded border transition-all flex items-center justify-center",
+              className="absolute inset-x-[-8px] inset-y-[-12px] z-20 flex items-center justify-center group/check"
+            >
+              <div className={cn(
+                "w-4 h-4 rounded border transition-all flex items-center justify-center",
                 isSelected
                   ? "bg-[#002FA7] border-[#002FA7] opacity-100"
-                  : "bg-white/5 border-white/10 opacity-0 group-hover/select:opacity-100"
-              )}
-            >
-              {isSelected && <Check className="w-3 h-3 text-white" />}
+                  : "bg-white/5 border-white/10 opacity-0 group-hover/select:opacity-100 group-hover/check:opacity-100"
+              )}>
+                {isSelected && <Check className="w-3 h-3 text-white" />}
+              </div>
             </button>
           </div>
         )

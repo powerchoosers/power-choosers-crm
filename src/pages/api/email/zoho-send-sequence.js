@@ -79,10 +79,17 @@ export default async function handler(req, res) {
 
         if (!isFoundry && !hasSignature && htmlContent) {
             try {
+                // Normalize fromEmail for lookups (handle cold-outreach burner domain)
+                let lookupEmail = fromEmail;
+                if (fromEmail.endsWith('@getnodalpoint.com')) {
+                    lookupEmail = fromEmail.replace('@getnodalpoint.com', '@nodalpoint.io');
+                    logger.info(`[Zoho Sequence] Burner domain detected. Mapping ${fromEmail} -> ${lookupEmail} for profile lookup.`, 'zoho-send-sequence');
+                }
+
                 const { data: userData, error: userError } = await supabase
                     .from('users')
                     .select('first_name, last_name, job_title, hosted_photo_url')
-                    .eq('email', fromEmail)
+                    .eq('email', lookupEmail)
                     .maybeSingle();
 
                 if (userData && !userError) {
@@ -96,7 +103,9 @@ export default async function handler(req, res) {
 
                     // Simple append for sequence emails
                     htmlContent = `<div style="font-family: sans-serif; font-size: 14px; color: #09090b;">${htmlContent}</div>${forensicSig}`;
-                    logger.info(`[Zoho Sequence] Injected Forensic Signature for ${fromEmail}`);
+                    logger.info(`[Zoho Sequence] Injected Forensic Signature for ${fromEmail} (via ${lookupEmail})`, 'zoho-send-sequence');
+                } else {
+                    logger.warn(`[Zoho Sequence] No profile found for ${lookupEmail}. Signature injection skipped.`, 'zoho-send-sequence');
                 }
             } catch (sigError) {
                 logger.error('[Zoho Sequence] Failed to inject signature:', sigError);

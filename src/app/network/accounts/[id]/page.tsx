@@ -507,7 +507,7 @@ export default function AccountDossierPage() {
                       transition={{ duration: 0.4, ease: 'easeOut' }}
                     >
                       <CompanyIcon
-                        key={`dossier-logo-${(editLogoUrl?.trim() || account.logoUrl?.trim()) || ''}-${(editDomain?.trim() || account.domain?.trim()) || ''}`}
+                        key={`dossier-logo-${account.id}`}
                         logoUrl={(editLogoUrl?.trim() || account.logoUrl?.trim()) || undefined}
                         domain={(editDomain?.trim() || account.domain?.trim()) || undefined}
                         name={account.name}
@@ -521,7 +521,7 @@ export default function AccountDossierPage() {
                     </motion.div>
                   ) : (
                     <CompanyIcon
-                      key={`dossier-logo-${(editLogoUrl?.trim() || account.logoUrl?.trim()) || ''}-${(editDomain?.trim() || account.domain?.trim()) || ''}`}
+                      key={`dossier-logo-${account.id}`}
                       logoUrl={(editLogoUrl?.trim() || account.logoUrl?.trim()) || undefined}
                       domain={(editDomain?.trim() || account.domain?.trim()) || undefined}
                       name={account.name}

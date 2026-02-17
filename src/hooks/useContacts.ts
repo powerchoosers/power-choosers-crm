@@ -78,7 +78,29 @@ export function useDeleteContacts() {
 
       if (error) throw error
     },
-    onSuccess: () => {
+    onMutate: async (ids) => {
+      await queryClient.cancelQueries({ queryKey: ['contacts'] })
+      const previousContacts = queryClient.getQueryData(['contacts'])
+
+      queryClient.setQueryData(['contacts'], (old: any) => {
+        if (!old) return old
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => ({
+            ...page,
+            contacts: page.contacts.filter((c: Contact) => !ids.includes(c.id))
+          }))
+        }
+      })
+
+      return { previousContacts }
+    },
+    onError: (err, ids, context: any) => {
+      if (context?.previousContacts) {
+        queryClient.setQueryData(['contacts'], context.previousContacts)
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
       queryClient.invalidateQueries({ queryKey: ['contacts-count'] })
       queryClient.invalidateQueries({ queryKey: ['targets'] })
@@ -277,11 +299,11 @@ export function useAccountContacts(accountId: string) {
 
       return (data || []).map(row => ({
         id: row.id,
-        name: buildContactName({ 
-          firstName: row.firstName || row.first_name, 
-          lastName: row.lastName || row.last_name, 
-          rawName: row.name, 
-          email: row.email 
+        name: buildContactName({
+          firstName: row.firstName || row.first_name,
+          lastName: row.lastName || row.last_name,
+          rawName: row.name,
+          email: row.email
         }),
         email: row.email || '',
         phone: row.phone || '',
@@ -331,7 +353,7 @@ export function useSearchContacts(queryTerm: string) {
 
         return (data as ContactRow[]).map(item => {
           const account = Array.isArray(item.accounts) ? item.accounts[0] : item.accounts;
-          
+
           const fName = item.firstName || item.first_name || item.firstname || item.FirstName;
           const lName = item.lastName || item.last_name || item.lastname || item.LastName;
 
@@ -399,7 +421,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
 
         // Admin and dev see all contacts; others filtered by ownerId
         if (role !== 'admin' && role !== 'dev' && user?.email) {
-           query = query.eq('ownerId', user.email);
+          query = query.eq('ownerId', user.email);
         }
 
         if (searchQuery) {
@@ -414,14 +436,14 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
         if (filters?.title && filters.title.length > 0) {
           query = query.in('title', filters.title);
         }
-        
+
         // Industry and Location filters are tricky for contacts because they often live on the account
         // but some contacts might have them directly. We'll check both if possible, or focus on account join
         if (filters?.industry && filters.industry.length > 0) {
           // Filter by account industry
           query = query.filter('accounts.industry', 'in', `(${filters.industry.map((i: string) => `"${i}"`).join(',')})`);
         }
-        
+
         if (filters?.location && filters.location.length > 0) {
           // Filter by account location (city or state)
           const conditions = filters.location.flatMap((loc: string) => [
@@ -451,7 +473,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
         const contacts = (data as ContactRow[]).map(item => {
           const account = Array.isArray(item.accounts) ? item.accounts[0] : item.accounts
           const metadata = normalizeMetadata(item.metadata)
-          
+
           const fName = item.firstName
             || item.first_name
             || item.firstname
@@ -505,11 +527,11 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
             metadata: metadata
           }
         }) as Contact[];
-        
+
         const hasNextPage = count ? from + PAGE_SIZE < count : false;
 
-        return { 
-          contacts, 
+        return {
+          contacts,
           nextCursor: hasNextPage ? pageParam + 1 : null
         };
       } catch (error) {
@@ -536,8 +558,8 @@ export function useContactsCount(searchQuery?: string, filters?: ContactFilters,
       // For count with filters on joined tables, we need to select something from the joined table
       // but only if industry or location filters are present.
       const needsAccountJoin = (filters?.industry && filters.industry.length > 0) || (filters?.location && filters.location.length > 0);
-      
-      let query = needsAccountJoin 
+
+      let query = needsAccountJoin
         ? supabase.from('contacts').select('id, accounts!inner(industry, city, state)', { count: 'exact', head: true })
         : supabase.from('contacts').select('id', { count: 'exact', head: true });
 
@@ -577,11 +599,11 @@ export function useContactsCount(searchQuery?: string, filters?: ContactFilters,
       if (filters?.title && filters.title.length > 0) {
         query = query.in('title', filters.title);
       }
-      
+
       if (filters?.industry && filters.industry.length > 0) {
         query = query.filter('accounts.industry', 'in', `(${filters.industry.map((i: string) => `"${i}"`).join(',')})`);
       }
-      
+
       if (filters?.location && filters.location.length > 0) {
         const conditions = filters.location.flatMap((loc: string) => [
           `city.ilike.%${loc}%`,
@@ -636,7 +658,7 @@ export function useContact(id: string) {
       if (error) return null
 
       const typedData = data as ContactRow
-      
+
       // Fetch list membership separately to avoid join errors
       const { data: listMembership } = await supabase
         .from('list_members')
@@ -659,20 +681,20 @@ export function useContact(id: string) {
       if (!account) {
         const companyName = metadata?.company || metadata?.companyName || metadata?.general?.company || metadata?.general?.companyName
         if (companyName) {
-           const { data: foundAccount } = await supabase
-             .from('accounts')
-             .select('name, domain, logo_url, city, state, industry, electricity_supplier, annual_usage, current_rate, contract_end_date, service_addresses, description, phone, id')
-             .ilike('name', companyName)
-             .limit(1)
-             .maybeSingle()
-           
-           if (foundAccount) {
-             account = foundAccount
-             typedData.accountId = foundAccount.id // logical link for the UI
-           }
+          const { data: foundAccount } = await supabase
+            .from('accounts')
+            .select('name, domain, logo_url, city, state, industry, electricity_supplier, annual_usage, current_rate, contract_end_date, service_addresses, description, phone, id')
+            .ilike('name', companyName)
+            .limit(1)
+            .maybeSingle()
+
+          if (foundAccount) {
+            account = foundAccount
+            typedData.accountId = foundAccount.id // logical link for the UI
+          }
         }
       }
-      
+
       const fName = typedData.firstName || typedData.first_name || typedData.firstname || typedData.FirstName
       const lName = typedData.lastName || typedData.last_name || typedData.lastname || typedData.LastName
 
@@ -695,7 +717,7 @@ export function useContact(id: string) {
         logoUrl: account?.logo_url || '',
         status: typedData.status || 'Lead',
         lastContact: typedData.lastContactedAt || new Date().toISOString(),
-        
+
         // Detail fields (title and LinkedIn from contact row or metadata e.g. bulk import)
         firstName: fName,
         lastName: lName,
@@ -709,7 +731,7 @@ export function useContact(id: string) {
         website: account?.domain,
         accountId: typedData.accountId || undefined,
         linkedAccountId: typedData.accountId || undefined,
-        
+
         // Enhanced account details
         electricitySupplier: account?.electricity_supplier,
         annualUsage: account?.annual_usage,
@@ -717,7 +739,7 @@ export function useContact(id: string) {
         contractEnd: account?.contract_end_date,
         serviceAddresses: account?.service_addresses,
         accountDescription: account?.description,
-        
+
         // Location
         address: getFirstServiceAddressAddress(account?.service_addresses) || '',
 
@@ -759,12 +781,12 @@ export function useCreateContact() {
         city: (newContact as any).city || null,
         state: (newContact as any).state || null,
         metadata: {
-            company: newContact.company, // Fallback if no account ID
-            domain: newContact.companyDomain,
-            ...newContact.metadata
+          company: newContact.company, // Fallback if no account ID
+          domain: newContact.companyDomain,
+          ...newContact.metadata
         }
       }
-      
+
       const { data, error } = await supabase
         .from('contacts')
         .insert(dbContact)
@@ -790,7 +812,7 @@ export function useUpsertContact() {
     mutationFn: async (contact: Omit<Contact, 'id'> & { id?: string }) => {
       // 1. Try to find existing contact by email or name+company if ID is missing
       let existingId = contact.id;
-      
+
       if (!existingId) {
         if (contact.email) {
           const { data: existing } = await supabase
@@ -798,12 +820,12 @@ export function useUpsertContact() {
             .select('id, metadata')
             .eq('email', contact.email)
             .maybeSingle();
-          
+
           if (existing) {
             existingId = existing.id;
           }
         }
-        
+
         // Fallback: Try to find by first name, last name, and company if no email match found
         if (!existingId && contact.firstName && contact.lastName && contact.company) {
           const { data: nameMatches } = await supabase
@@ -811,14 +833,14 @@ export function useUpsertContact() {
             .select('id, metadata')
             .ilike('firstName', contact.firstName)
             .ilike('lastName', contact.lastName);
-            
+
           if (nameMatches && nameMatches.length > 0) {
             // Filter by company name in metadata
             const companyMatch = nameMatches.find(m => {
               const existingCompany = m.metadata?.company || m.metadata?.companyName;
               return existingCompany && existingCompany.toLowerCase() === contact.company.toLowerCase();
             });
-            
+
             if (companyMatch) {
               existingId = companyMatch.id;
             }
@@ -829,14 +851,14 @@ export function useUpsertContact() {
       // --- ACCOUNT LINKING LOGIC ---
       // If accountId is not provided but company name exists, find or create account
       let finalAccountId = contact.accountId;
-      
+
       if (!finalAccountId && contact.company) {
         const { data: matchingAccount } = await supabase
           .from('accounts')
           .select('id')
           .ilike('name', contact.company)
           .maybeSingle();
-        
+
         if (matchingAccount) {
           finalAccountId = matchingAccount.id;
         } else {
@@ -887,7 +909,7 @@ export function useUpsertContact() {
 
       if ((contact as any).city) dbContact.city = (contact as any).city;
       if ((contact as any).state) dbContact.state = (contact as any).state;
-      
+
       if (!existingId) {
         dbContact.id = crypto.randomUUID();
         dbContact.ownerId = user?.email || null;
@@ -896,13 +918,13 @@ export function useUpsertContact() {
           domain: contact.companyDomain,
           ...contact.metadata
         };
-        
+
         const { data, error } = await supabase
           .from('contacts')
           .insert(dbContact)
           .select()
           .single();
-          
+
         if (error) throw error;
         return { id: data.id, ...contact, _isNew: true };
       } else {
@@ -912,7 +934,7 @@ export function useUpsertContact() {
           .select('metadata, accountId')
           .eq('id', existingId)
           .single();
-        
+
         // If contact doesn't have accountId yet but has company name, find or create account
         if (!current?.accountId && !finalAccountId && contact.company) {
           const { data: matchingAccount } = await supabase
@@ -920,7 +942,7 @@ export function useUpsertContact() {
             .select('id')
             .ilike('name', contact.company)
             .maybeSingle();
-          
+
           if (matchingAccount) {
             finalAccountId = matchingAccount.id;
             dbContact.accountId = finalAccountId;
@@ -954,7 +976,7 @@ export function useUpsertContact() {
             }
           }
         }
-          
+
         dbContact.metadata = {
           ...(current?.metadata || {}),
           company: contact.company || current?.metadata?.company,
@@ -968,7 +990,7 @@ export function useUpsertContact() {
           .eq('id', existingId)
           .select()
           .single();
-          
+
         if (error) throw error;
         return { id: data.id, ...contact, _isNew: false };
       }
@@ -1018,7 +1040,7 @@ export function useUpdateContact() {
       // 2. Update Account Table if account-specific fields are present
       // We first need to get the accountId if not provided in updates
       let targetAccountId = updates.accountId || updates.linkedAccountId
-      
+
       if (!targetAccountId) {
         const { data: contactData } = await supabase
           .from('contacts')
@@ -1043,7 +1065,7 @@ export function useUpdateContact() {
             .from('accounts')
             .update(accountUpdates)
             .eq('id', targetAccountId)
-          
+
           if (accountError) {
             console.error('Failed to update associated account:', accountError)
             // We don't throw here to avoid failing the whole sync if only account update fails
@@ -1068,8 +1090,31 @@ export function useDeleteContact() {
       if (error) throw error
       return id
     },
-    onSuccess: () => {
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['contacts'] })
+      const previousContacts = queryClient.getQueryData(['contacts'])
+
+      queryClient.setQueryData(['contacts'], (old: any) => {
+        if (!old) return old
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => ({
+            ...page,
+            contacts: page.contacts.filter((c: Contact) => c.id !== id)
+          }))
+        }
+      })
+
+      return { previousContacts }
+    },
+    onError: (err, id, context: any) => {
+      if (context?.previousContacts) {
+        queryClient.setQueryData(['contacts'], context.previousContacts)
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      queryClient.invalidateQueries({ queryKey: ['contacts-count'] })
     }
   })
 }

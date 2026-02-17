@@ -193,7 +193,11 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
       }
 
       // Use API so we bypass RLS (backend uses supabaseAdmin)
-      const idToken = await (user as any)?.getIdToken?.().catch(() => null)
+      const idToken = await (async () => {
+        const { data: { session } } = await supabase.auth.getSession()
+        return session?.access_token || null
+      })()
+
       const res = await fetch(`/api/foundry/assets?id=${encodeURIComponent(id)}`, {
         method: 'GET',
         headers: {
@@ -269,7 +273,11 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
     }
 
     try {
-      const idToken = await (user as any)?.getIdToken?.().catch(() => null)
+      const idToken = await (async () => {
+        const { data: { session } } = await supabase.auth.getSession()
+        return session?.access_token || null
+      })()
+
       const res = await fetch('/api/foundry/assets', {
         method: 'POST',
         headers: {
