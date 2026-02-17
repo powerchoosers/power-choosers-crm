@@ -52,7 +52,7 @@ export default async function handler(req, res) {
         const contactId = req.query.contactId || '';
         const accountId = req.query.accountId || '';
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'recording.js:entry', message: 'Recording webhook received', data: { RecordingStatus, CallSid: CallSid || '', contactId, accountId }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H1' }) }).catch(() => { });
+        // (Diagnostic fetch removed for production stability)
         // #endregion
 
         // Use shared logger for Cloud Run cost optimization
@@ -97,7 +97,7 @@ export default async function handler(req, res) {
         }
 
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'recording.js:beforeCompletedBlock', message: 'Recording status and URL check', data: { RecordingStatus, effectiveRecordingUrl: !!effectiveRecordingUrl, RecordingUrl: !!RecordingUrl, willEnterBlock: !!(RecordingStatus === 'completed' && (effectiveRecordingUrl || RecordingUrl)) }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H2' }) }).catch(() => { });
+        // (Diagnostic fetch removed for production stability)
         // #endregion
         if (RecordingStatus === 'completed' && (effectiveRecordingUrl || RecordingUrl)) {
             // Resolve a reliable Call SID to avoid duplicate rows keyed by recording/transcript IDs
@@ -148,7 +148,7 @@ export default async function handler(req, res) {
             const envBase = process.env.PUBLIC_BASE_URL || process.env.API_BASE_URL || '';
             const baseUrl = host ? `${proto}://${host}` : (envBase || 'https://nodal-point-network.vercel.app');
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'recording.js:baseUrl', message: 'Base URL for /api/calls', data: { baseUrl, host: host || '', envBase: envBase || '' }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H3' }) }).catch(() => { });
+            // (Diagnostic fetch removed for production stability)
             // #endregion
 
             // Upsert into central /api/calls so the UI can see the recording immediately
@@ -201,7 +201,8 @@ export default async function handler(req, res) {
                             accountId: accountId || undefined
                         })
                     }).then(r => ({ ok: r.ok, status: r.status })).catch(e => ({ ok: false, status: 0, error: String(e && e.message) }));
-                    fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'recording.js:fetchApiCalls', message: 'POST /api/calls result', data: { finalCallSid, baseUrl, ...callApiRes }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H3' }) }).catch(() => { });
+                    // #region agent log
+                    // (Diagnostic fetch removed for production stability)
                     // #endregion
 
                     // If duration is 0 or metadata looked incomplete, schedule a follow-up refresh
@@ -245,14 +246,11 @@ export default async function handler(req, res) {
             // Trigger background processing (non-blocking) - FIXED FREEZE ISSUE
             try {
                 if (finalCallSid) {
-                    // Schedule background processing without blocking webhook response
-                    setImmediate(async () => {
-                        try {
-                            await processRecordingWithTwilio(recordingMp3Url, finalCallSid, effectiveRecordingSid || RecordingSid, baseUrl);
-                        } catch (error) {
-                            logger.error('[Recording] Background processing error:', error);
-                        }
-                    });
+                    // On Vercel/Serverless, `setImmediate` may be frozen immediately after res.end().
+                    // We skip the heavy in-process polling here to ensure the webhook returns success efficiently.
+                    // The recording is already saved to the DB above via /api/calls.
+                    // Future: Use Inngest or a separate worker for transcription processing.
+                    logger.log('[Recording] Saved recording metadata. Background processing skipped in favor of async events.');
                 } else {
                     logger.warn('[Recording] Skipping processing due to unresolved Call SID', { CallSid, RecordingSid: effectiveRecordingSid || RecordingSid });
                 }
