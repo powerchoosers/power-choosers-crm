@@ -79,7 +79,9 @@ export default async function handler(req, res) {
 
     // 2. Prepare file data
     const arrayBuffer = await fileData.arrayBuffer();
-    const base64Data = Buffer.from(arrayBuffer).toString('base64');
+    const rawBase64 = Buffer.from(arrayBuffer).toString('base64');
+    // Ensure we don't have a prefix in the raw variable
+    const base64Data = rawBase64.replace(/^data:.*?;base64,/, '');
     let mimeType = fileData.type || 'application/pdf';
 
     const safeFileName = typeof fileName === 'string' ? fileName : '';
