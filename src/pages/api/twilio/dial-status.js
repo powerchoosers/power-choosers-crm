@@ -1,6 +1,7 @@
 // Dial status callback: start dual-channel recording on the bridged child leg
 import twilio from 'twilio';
 import logger from '../_logger.js';
+import { upsertCallInSupabase } from '../calls.js';
 
 export default async function handler(req, res) {
   // Twilio posts x-www-form-urlencoded data for dial status callbacks
@@ -140,12 +141,9 @@ export default async function handler(req, res) {
             };
 
             logger.log(`[Dial-Status] Posting completed call to /api/calls: ${payload.callSid}`);
-            await fetch(`${base}/api/calls`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-            }).catch(err => {
-              logger.warn('[Dial-Status] Failed posting to /api/calls:', err?.message);
+
+            await upsertCallInSupabase(payload).catch(err => {
+              logger.warn('[Dial-Status] Failed saving to DB via upsertCallInSupabase:', err?.message);
             });
           } catch (innerError) {
             logger.warn('[Dial-Status] Error preparing /api/calls post:', innerError?.message);

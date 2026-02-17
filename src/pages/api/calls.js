@@ -15,10 +15,10 @@ function deriveOutcome(call) {
   const status = (call.status || '').toLowerCase();
   const duration = call.durationSec || call.duration || 0;
   const answeredBy = (call.answeredBy || '').toLowerCase();
-  
+
   // If we have an explicit outcome, use it
   if (call.outcome) return call.outcome;
-  
+
   // Derive from status
   if (status === 'completed') {
     if (answeredBy === 'machine_start' || answeredBy === 'machine_end_beep' || answeredBy === 'machine_end_silence') {
@@ -26,12 +26,12 @@ function deriveOutcome(call) {
     }
     return duration > 0 ? 'Connected' : 'No Answer';
   }
-  
+
   if (status === 'no-answer' || status === 'no_answer') return 'No Answer';
   if (status === 'busy') return 'Busy';
   if (status === 'failed') return 'Failed';
   if (status === 'canceled' || status === 'cancelled') return 'Canceled';
-  
+
   // Default
   return status ? status.charAt(0).toUpperCase() + status.slice(1) : '';
 }
@@ -165,7 +165,7 @@ function mapCallToSupabase(call) {
 }
 
 function norm10(v) {
-  try { return (v == null ? '' : String(v)).replace(/\D/g, '').slice(-10); } catch(_) { return ''; }
+  try { return (v == null ? '' : String(v)).replace(/\D/g, '').slice(-10); } catch (_) { return ''; }
 }
 
 function pickBusinessAndTarget({ to, from, targetPhone, businessPhone }) {
@@ -181,7 +181,7 @@ function pickBusinessAndTarget({ to, from, targetPhone, businessPhone }) {
 
 async function getCallsFromSupabase(limit = 0, offset = 0, callSid = null) {
   if (!isSupabaseEnabled) return null;
-  
+
   let query = supabaseAdmin
     .from('calls')
     .select('*')
@@ -194,24 +194,24 @@ async function getCallsFromSupabase(limit = 0, offset = 0, callSid = null) {
   if (limit > 0) {
     query = query.limit(limit);
   }
-  
+
   if (offset > 0) {
     query = query.range(offset, offset + limit - 1);
   }
 
   const { data, error } = await query;
-  
+
   if (error) {
     logger.error('Supabase fetch error:', error);
     return [];
   }
-  
+
   return data.map(row => normalizeCallForResponse(mapSupabaseToCall(row)));
 }
 
-async function upsertCallInSupabase(payload) {
+export async function upsertCallInSupabase(payload) {
   if (!isSupabaseEnabled) return null;
-  
+
   const nowIso = new Date().toISOString();
   // Resolve a proper Twilio Call SID. Never create a document without a valid Call SID.
   let callId = (payload.callSid && String(payload.callSid)) || '';
@@ -222,11 +222,11 @@ async function upsertCallInSupabase(payload) {
         recordingSid: payload.recordingSid,
         transcriptSid: payload.transcriptSid
       });
-    } catch (_) {}
+    } catch (_) { }
   }
   if (!isCallSid(callId)) {
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calls.js:upsertCallInSupabase',message:'Upsert skipped invalid callSid',data:{callId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'calls.js:upsertCallInSupabase', message: 'Upsert skipped invalid callSid', data: { callId }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H4' }) }).catch(() => { });
     // #endregion
     // No valid Call SID → do not persist
     return null;
@@ -260,22 +260,22 @@ async function upsertCallInSupabase(payload) {
 
   // AUTO-LINKING: If no contact is linked, try to find one by phone number
   if (!finalContactId && (payload.to || payload.from)) {
-     const phoneCandidates = [payload.to, payload.from].filter(p => p && p.length > 5);
-     for (const phone of phoneCandidates) {
-        const { data: match } = await supabaseAdmin
-          .from('contacts')
-          .select('id, name')
-          .or(`mobile.eq.${phone},workPhone.eq.${phone},phone.eq.${phone},otherPhone.eq.${phone}`)
-          .limit(1)
-          .maybeSingle();
+    const phoneCandidates = [payload.to, payload.from].filter(p => p && p.length > 5);
+    for (const phone of phoneCandidates) {
+      const { data: match } = await supabaseAdmin
+        .from('contacts')
+        .select('id, name')
+        .or(`mobile.eq.${phone},workPhone.eq.${phone},phone.eq.${phone},otherPhone.eq.${phone}`)
+        .limit(1)
+        .maybeSingle();
 
-        if (match) {
-           finalContactId = match.id;
-           finalContactName = match.name;
-           logger.log(`[Calls API] Auto-linked call ${primaryId} to contact ${match.name} (${match.id}) via phone ${phone}`);
-           break; 
-        }
-     }
+      if (match) {
+        finalContactId = match.id;
+        finalContactName = match.name;
+        logger.log(`[Calls API] Auto-linked call ${primaryId} to contact ${match.name} (${match.id}) via phone ${phone}`);
+        break;
+      }
+    }
   }
 
   const merged = {
@@ -290,7 +290,7 @@ async function upsertCallInSupabase(payload) {
     durationSec: payload.durationSec != null ? payload.durationSec : (current.durationSec != null ? current.durationSec : (payload.duration || current.duration || 0)),
     timestamp: current.timestamp || payload.callTime || payload.timestamp || nowIso,
     callTime: payload.callTime || current.callTime || current.timestamp || nowIso,
-    outcome: payload.outcome || current.outcome || deriveOutcome({...current, ...payload}),
+    outcome: payload.outcome || current.outcome || deriveOutcome({ ...current, ...payload }),
     transcript: payload.transcript != null ? payload.transcript : current.transcript,
     formattedTranscript: payload.formattedTranscript != null ? payload.formattedTranscript : current.formattedTranscript,
     aiInsights: payload.aiInsights != null ? payload.aiInsights : current.aiInsights || null,
@@ -309,17 +309,17 @@ async function upsertCallInSupabase(payload) {
     targetPhone: (payload.targetPhone != null ? payload.targetPhone : (current.targetPhone || context.targetPhone)) || '',
     businessPhone: (payload.businessPhone != null ? payload.businessPhone : (current.businessPhone || context.businessPhone)) || '',
     source: payload.source || current.source || 'unknown',
-    
+
     updatedAt: nowIso,
     createdAt: current.createdAt || nowIso
   };
 
   // Ownership logic
   const hasExistingOwner = current.ownerId && current.ownerId.trim();
-  const finalOwnerEmail = (userEmail && userEmail.trim()) 
-    ? userEmail.toLowerCase().trim() 
+  const finalOwnerEmail = (userEmail && userEmail.trim())
+    ? userEmail.toLowerCase().trim()
     : (hasExistingOwner ? current.ownerId : 'unassigned');
-  
+
   merged.ownerId = finalOwnerEmail;
   merged.assignedTo = finalOwnerEmail;
   merged.createdBy = current.createdBy || finalOwnerEmail;
@@ -333,7 +333,7 @@ async function upsertCallInSupabase(payload) {
     .upsert(dbRow);
 
   // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calls.js:supabaseUpsert',message:'Supabase upsert result',data:{error:error?String(error.message):null,code:error&&error.code},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
+  fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'calls.js:supabaseUpsert', message: 'Supabase upsert result', data: { error: error ? String(error.message) : null, code: error && error.code }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H5' }) }).catch(() => { });
   // #endregion
   if (error) {
     logger.error('Supabase upsert error:', error);
@@ -386,7 +386,7 @@ export default async function handler(req, res) {
       // Support bulk or single delete by Call SID (id)
       let body = (req.body && typeof req.body === 'object') ? req.body : {};
       if (!Object.keys(body).length) {
-        try { body = await readJson(req); } catch(_) { body = {}; }
+        try { body = await readJson(req); } catch (_) { body = {}; }
       }
       const ids = [];
       const pushId = (v) => { if (typeof v === 'string' && v.trim()) ids.push(v.trim()); };
@@ -394,7 +394,7 @@ export default async function handler(req, res) {
       pushId(body.callSid);
       pushId(body.twilioSid);
       if (Array.isArray(body.ids)) body.ids.forEach(pushId);
-      
+
       const urlObj = new URL(req.url, `http://${req.headers.host}`);
       const qId = urlObj.searchParams.get('id');
       const qCallSid = urlObj.searchParams.get('callSid');
@@ -405,7 +405,7 @@ export default async function handler(req, res) {
       for (const raw of ids) {
         let sid = raw;
         if (!isCallSid(sid)) {
-          try { sid = await resolveToCallSid({ callSid: raw, recordingSid: body.recordingSid, transcriptSid: body.transcriptSid }); } catch(_) {}
+          try { sid = await resolveToCallSid({ callSid: raw, recordingSid: body.recordingSid, transcriptSid: body.transcriptSid }); } catch (_) { }
         }
         if (isCallSid(sid)) resolved.push(sid);
       }
@@ -413,10 +413,10 @@ export default async function handler(req, res) {
       if (isSupabaseEnabled) {
         let deleted = 0;
         for (const sid of resolved) {
-          try { 
+          try {
             const { error } = await supabaseAdmin.from('calls').delete().eq('id', sid);
             if (!error) deleted++;
-          } catch(_) {}
+          } catch (_) { }
         }
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
@@ -436,7 +436,7 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const payload = (req.body && typeof req.body === 'object') ? req.body : await readJson(req);
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calls.js:POST entry',message:'POST /api/calls received',data:{callSid:payload&&payload.callSid,contactId:payload&&payload.contactId,accountId:payload&&payload.accountId,source:payload&&payload.source},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'calls.js:POST entry', message: 'POST /api/calls received', data: { callSid: payload && payload.callSid, contactId: payload && payload.contactId, accountId: payload && payload.accountId, source: payload && payload.source }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H4' }) }).catch(() => { });
       // #endregion
 
       let callId = (payload.callSid && String(payload.callSid)) || '';
@@ -447,16 +447,16 @@ export default async function handler(req, res) {
             recordingSid: payload.recordingSid,
             transcriptSid: payload.transcriptSid
           });
-        } catch (_) {}
+        } catch (_) { }
       }
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calls.js:afterResolve',message:'Call SID resolution',data:{callId,isValid:isCallSid(callId),isSupabaseEnabled},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'calls.js:afterResolve', message: 'Call SID resolution', data: { callId, isValid: isCallSid(callId), isSupabaseEnabled }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H4' }) }).catch(() => { });
       // #endregion
 
       if (isSupabaseEnabled) {
         const saved = await upsertCallInSupabase({ ...payload, callSid: callId || payload.callSid });
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calls.js:afterUpsert',message:'Upsert result',data:{saved:!!saved},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4,H5'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'calls.js:afterUpsert', message: 'Upsert result', data: { saved: !!saved }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H4,H5' }) }).catch(() => { });
         // #endregion
         if (!saved) {
           res.statusCode = 202;
@@ -494,7 +494,7 @@ export default async function handler(req, res) {
         durationSec: payload.durationSec != null ? payload.durationSec : (existing.durationSec != null ? existing.durationSec : (payload.duration || existing.duration || 0)),
         timestamp: existing.timestamp || payload.callTime || payload.timestamp || nowIso,
         callTime: payload.callTime || existing.callTime || existing.timestamp || nowIso,
-        outcome: payload.outcome || existing.outcome || deriveOutcome({...existing, ...payload}),
+        outcome: payload.outcome || existing.outcome || deriveOutcome({ ...existing, ...payload }),
         transcript: payload.transcript != null ? payload.transcript : existing.transcript,
         formattedTranscript: payload.formattedTranscript != null ? payload.formattedTranscript : existing.formattedTranscript,
         aiInsights: payload.aiInsights != null ? payload.aiInsights : existing.aiInsights || null,
@@ -531,12 +531,12 @@ export default async function handler(req, res) {
           const updateData = {};
           if (contactName) updateData.contact_name = contactName;
           if (contactId) updateData.contact_id = contactId;
-          
+
           await supabaseAdmin
             .from('calls')
             .update(updateData)
             .eq('id', callId);
-          
+
           res.statusCode = 200;
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ ok: true, updated: true }));
@@ -556,7 +556,7 @@ export default async function handler(req, res) {
         if (contactName) existing.contactName = contactName;
         if (contactId) existing.contactId = contactId;
         memoryStore.set(callId, existing);
-        
+
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ ok: true, updated: true }));
