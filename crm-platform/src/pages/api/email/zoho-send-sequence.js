@@ -8,6 +8,7 @@ import { cors } from '../_cors.js';
 import { ZohoMailService } from './zoho-service.js';
 import { injectTracking, hasTrackingPixel } from './tracking-helper.js';
 import { supabaseAdmin as supabase } from '@/lib/supabase';
+import { generateForensicSignature } from '@/lib/signature';
 import logger from '../_logger.js';
 
 export default async function handler(req, res) {
@@ -68,6 +69,40 @@ export default async function handler(req, res) {
 
         // Prepare HTML content with tracking if enabled
         let htmlContent = html || '';
+
+        // Forensic Signature Injection for Sequences
+        // Rules: 
+        // 1. Only injection if it's not a Foundry template (detected by full-width table or specific marker)
+        // 2. Only if content isn't already a full HTML document
+        const isFoundry = htmlContent.includes('<!-- FOUNDRY_TEMPLATE -->') || htmlContent.includes('data-foundry');
+        const hasSignature = htmlContent.includes('NODAL_FORENSIC_SIGNATURE') || htmlContent.includes('nodal-signature');
+
+        if (!isFoundry && !hasSignature && htmlContent) {
+            try {
+                const { data: userData, error: userError } = await supabase
+                    .from('users')
+                    .select('first_name, last_name, job_title, hosted_photo_url')
+                    .eq('email', fromEmail)
+                    .maybeSingle();
+
+                if (userData && !userError) {
+                    const profile = {
+                        firstName: userData.first_name,
+                        lastName: userData.last_name,
+                        jobTitle: userData.job_title,
+                        hostedPhotoUrl: userData.hosted_photo_url
+                    };
+                    const forensicSig = generateForensicSignature(profile);
+
+                    // Simple append for sequence emails
+                    htmlContent = `<div style="font-family: sans-serif; font-size: 14px; color: #09090b;">${htmlContent}</div>${forensicSig}`;
+                    logger.info(`[Zoho Sequence] Injected Forensic Signature for ${fromEmail}`);
+                }
+            } catch (sigError) {
+                logger.error('[Zoho Sequence] Failed to inject signature:', sigError);
+            }
+        }
+
         if (htmlContent && trackOpens && !hasTrackingPixel(htmlContent)) {
             htmlContent = injectTracking(htmlContent, trackingId, {
                 enableOpenTracking: trackOpens,

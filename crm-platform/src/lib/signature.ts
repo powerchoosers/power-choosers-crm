@@ -112,3 +112,55 @@ export function generateNodalSignature(profile: UserProfile, user: any, isDarkMo
 </table>
   `
 }
+
+export function generateForensicSignature(profile: UserProfile): string {
+  if (!profile) return '';
+
+  const initials = `${profile.firstName?.[0] || ''}${profile.lastName?.[0] || ''}`;
+  const fullName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'Nodal Point Architect';
+  const NODAL_BLUE = '#002FA7';
+  const ZINC_500 = '#71717a';
+  const ZINC_950 = '#09090b';
+
+  return `
+<!-- NODAL_FORENSIC_SIGNATURE -->
+<div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #f3f4f6; max-width: 500px;">
+  <table cellpadding="0" cellspacing="0" style="border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+    <tr>
+      <td style="padding-right: 12px; vertical-align: top;">
+        ${profile.hostedPhotoUrl ? `
+          <img 
+            src="${profile.hostedPhotoUrl}" 
+            alt="${fullName}" 
+            style="width: 48px; height: 48px; border-radius: 14px; object-fit: cover; display: block;"
+          />
+        ` : `
+          <div style="width: 48px; height: 48px; background-color: ${ZINC_950}; border-radius: 14px; color: white; display: block; line-height: 48px; text-align: center; font-weight: bold; font-size: 14px;">
+            ${initials}
+          </div>
+        `}
+      </td>
+      <td style="border-left: 2px solid ${NODAL_BLUE}; padding-left: 12px; vertical-align: middle;">
+        <p style="margin: 0; font-size: 14px; font-weight: 700; color: #09090b; letter-spacing: -0.02em; line-height: 1.2;">
+          ${fullName}
+        </p>
+        <p style="margin: 2px 0; font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: ${ZINC_500}; text-transform: uppercase; letter-spacing: 0.05em; line-height: 1.2;">
+          ${profile.jobTitle || 'Market Architect'} // [VECTOR_OPS]
+        </p>
+        <a href="https://nodalpoint.io" style="font-size: 12px; color: ${NODAL_BLUE}; text-decoration: none; font-weight: 500;">
+          nodalpoint.io
+        </a>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2" style="padding-top: 12px;">
+        <div style="font-family: ui-monospace, Consolas, monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.05em; line-height: 1.4;">
+          <div style="color: #10b981;">// SYSTEM_STATUS: OPERATIONAL</div>
+          <div style="color: ${ZINC_950};">// ACTIVE_DIAGNOSTIC: <span style="color: ${NODAL_BLUE};">[ RUN_FORENSIC_SNAPSHOT ]</span></div>
+        </div>
+      </td>
+    </tr>
+  </table>
+</div>
+  `;
+}
