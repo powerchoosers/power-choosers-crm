@@ -91,6 +91,7 @@ import { useFoundryAssets } from '@/hooks/useFoundryAssets';
 import { getBurnerFromEmail, getBurnerSenderName } from '@/lib/burner-email';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
+import ForensicSignature from '@/components/emails/ForensicSignature';
 
 // Mock Data for Visualization (The "Test Sequence")
 const MOCK_NODES: Node[] = [
@@ -1888,6 +1889,13 @@ function ProtocolArchitectInner() {
                           className="text-zinc-300 font-mono whitespace-pre-wrap leading-relaxed"
                           dangerouslySetInnerHTML={{ __html: previewBody || '(No content to preview)' }}
                         />
+
+                        {/* Forensic Signature Preview (Exclude if Foundry template) */}
+                        {selectedNode?.data.type === 'email' && emailViewMode !== 'asset' && testContact && (
+                          <div className="mt-8 opacity-90 grayscale-[0.5] hover:grayscale-0 transition-all">
+                            <ForensicSignature />
+                          </div>
+                        )}
 
                         {!testContact && (
                           <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex items-center justify-center p-8 text-center z-10">
