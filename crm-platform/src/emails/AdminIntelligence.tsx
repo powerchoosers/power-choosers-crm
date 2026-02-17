@@ -39,12 +39,15 @@ export default function AdminIntelligence({ person, company, analysis, crmLink, 
                 <Container style={container}>
                     {/* Header */}
                     <Section style={{ marginBottom: "24px" }}>
-                        <div style={{ backgroundColor: "#ffffff", display: "inline-block", padding: "8px 12px", borderRadius: "4px" }}>
+                        <div style={{ display: 'flex', alignItems: 'center' }}>
                             <img
-                                src="https://nodalpoint.io/images/nodalpoint.png"
+                                src="https://nodalpoint.io/images/nodalpoint-webicon.png"
                                 alt="Nodal Point"
-                                style={{ height: "20px", width: "auto", display: "block" }}
+                                style={{ width: "32px", height: "32px", display: "block", marginRight: "12px" }}
                             />
+                            <Text style={{ fontSize: "16px", fontWeight: "bold", fontFamily: "monospace", margin: 0, letterSpacing: "-0.5px", color: "#ffffff" }}>
+                                NODAL_POINT <span style={{ color: "#444" }}>//</span> <span style={{ color: "#002FA7" }}>INTELLIGENCE</span>
+                            </Text>
                         </div>
                     </Section>
 

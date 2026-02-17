@@ -10,6 +10,10 @@ interface CustomerDiagnosticProps {
         risk: string;
         location: string;
         zone: string;
+        provider: string;
+        rate: string;
+        usage: string;
+        term: string;
     };
     reportLink: string;
 }
@@ -23,12 +27,15 @@ export default function CustomerDiagnostic({ name, company, stats, reportLink }:
                 <Container style={container}>
                     {/* Header */}
                     <Section style={{ marginBottom: "24px" }}>
-                        <div style={{ backgroundColor: "#ffffff", display: "inline-block", padding: "8px 12px", borderRadius: "4px" }}>
+                        <div style={{ display: 'flex', alignItems: 'center' }}>
                             <img
-                                src="https://nodalpoint.io/images/nodalpoint.png"
+                                src="https://nodalpoint.io/images/nodalpoint-webicon.png"
                                 alt="Nodal Point"
-                                style={{ height: "20px", width: "auto", display: "block" }}
+                                style={{ width: "32px", height: "32px", display: "block", marginRight: "12px" }}
                             />
+                            <Text style={{ fontSize: "16px", fontWeight: "bold", fontFamily: "monospace", margin: 0, letterSpacing: "-0.5px", color: "#ffffff" }}>
+                                NODAL_POINT <span style={{ color: "#444" }}>//</span> <span style={{ color: "#002FA7" }}>FORENSICS</span>
+                            </Text>
                         </div>
                     </Section>
 
@@ -46,7 +53,7 @@ export default function CustomerDiagnostic({ name, company, stats, reportLink }:
                     </Text>
 
                     <Text style={bodyText}>
-                        Based on the data extracted from your utility bills, your facility in {stats.location.split(',')[0]} is currently graded as a <strong>{stats.grade}</strong> risk.
+                        Based on the data extracted from your utility bills, your facility in {stats.location.split(',')[0]} has been assigned a Health Grade of <strong>{stats.grade}</strong>.
                     </Text>
 
                     {/* Data Card */}
@@ -79,6 +86,30 @@ export default function CustomerDiagnostic({ name, company, stats, reportLink }:
                         <Text style={{ color: "#666", fontSize: "11px", fontFamily: "monospace", marginTop: "10px" }}>
                             VECTOR: {stats.location} // ZONE: {stats.zone}
                         </Text>
+                    </Section>
+
+                    {/* Extended Metrics */}
+                    <Section style={{ margin: "0 0 30px" }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #1a1a1a', paddingTop: '20px' }}>
+                            <div style={{ width: '48%' }}>
+                                <Text style={smallLabel}>CURRENT PROVIDER</Text>
+                                <Text style={smallValue}>{stats.provider}</Text>
+                            </div>
+                            <div style={{ width: '48%' }}>
+                                <Text style={smallLabel}>DETECTED RATE</Text>
+                                <Text style={smallValue}>{stats.rate} ¢/kWh</Text>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '15px' }}>
+                            <div style={{ width: '48%' }}>
+                                <Text style={smallLabel}>ANNUAL USAGE</Text>
+                                <Text style={smallValue}>{stats.usage} kWh</Text>
+                            </div>
+                            <div style={{ width: '48%' }}>
+                                <Text style={smallLabel}>CONTRACT STATUS</Text>
+                                <Text style={smallValue}>{stats.term}</Text>
+                            </div>
+                        </div>
                     </Section>
 
                     {/* Enrichment Context */}
@@ -204,4 +235,21 @@ const footer = {
     marginTop: "60px",
     textAlign: 'center' as const,
     letterSpacing: "1px",
+};
+
+const smallLabel = {
+    color: "#666",
+    fontSize: "9px",
+    fontFamily: "monospace",
+    letterSpacing: "1px",
+    margin: "0 0 4px",
+    textTransform: 'uppercase' as const,
+};
+
+const smallValue = {
+    color: "#eee",
+    fontSize: "14px",
+    fontWeight: "bold",
+    margin: "0",
+    fontFamily: "sans-serif",
 };
