@@ -17,10 +17,20 @@ import {
 } from 'date-fns';
 import { cn } from '@/lib/utils';
 
-export default function TacticalCalendar() {
+interface TacticalCalendarProps {
+    selectedDate: Date | null;
+    onDateSelect: (date: Date) => void;
+    selectedTime: string | null;
+    onTimeSelect: (time: string) => void;
+}
+
+export default function TacticalCalendar({
+    selectedDate,
+    onDateSelect,
+    selectedTime,
+    onTimeSelect
+}: TacticalCalendarProps) {
     const [currentMonth, setCurrentMonth] = useState(new Date());
-    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-    const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
     // Calendar logic
     const monthStart = startOfMonth(currentMonth);
@@ -94,8 +104,8 @@ export default function TacticalCalendar() {
                                 key={idx}
                                 onClick={() => {
                                     if (isCurrentMonth) {
-                                        setSelectedDate(day);
-                                        setSelectedTime(null);
+                                        onDateSelect(day);
+                                        onTimeSelect(''); // Reset time on date change
                                     }
                                 }}
                                 className={cn(
@@ -135,7 +145,7 @@ export default function TacticalCalendar() {
                             {timeSlots.map((time) => (
                                 <button
                                     key={time}
-                                    onClick={() => setSelectedTime(time)}
+                                    onClick={() => onTimeSelect(time)}
                                     className={cn(
                                         "flex items-center justify-between px-4 py-4 rounded-xl border transition-all duration-200 group",
                                         selectedTime === time

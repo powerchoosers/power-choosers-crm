@@ -18,7 +18,21 @@ interface IdentityData {
     phone?: string;
 }
 
-export default function IdentityDossier({ email }: { email: string }) {
+interface IdentityDossierProps {
+    email: string;
+    onIdentityResolved?: (data: IdentityData) => void;
+    onConfirm?: () => void;
+    isValid?: boolean;
+    isBooking?: boolean;
+}
+
+export default function IdentityDossier({
+    email,
+    onIdentityResolved,
+    onConfirm,
+    isValid = false,
+    isBooking = false
+}: IdentityDossierProps) {
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<IdentityData | null>(null);
 
@@ -31,6 +45,9 @@ export default function IdentityDossier({ email }: { email: string }) {
             try {
                 const result = await resolveIdentity(email);
                 setData(result);
+                if (onIdentityResolved && result) {
+                    onIdentityResolved(result);
+                }
             } catch (error) {
                 console.error('Enrichment failed:', error);
             } finally {
@@ -173,11 +190,21 @@ export default function IdentityDossier({ email }: { email: string }) {
             <div className="mt-8 pt-6 border-t border-white/5">
                 <button
                     className="w-full group relative overflow-hidden rounded-xl bg-white text-black py-4 font-bold text-lg hover:bg-zinc-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_20px_40px_-10px_rgba(255,255,255,0.1)] active:scale-95"
-                    disabled={loading}
+                    disabled={loading || !isValid || isBooking}
+                    onClick={onConfirm}
                 >
                     <span className="relative z-10 flex items-center justify-center gap-2 uppercase tracking-wide">
-                        <ShieldCheck className="w-5 h-5" />
-                        Confirm Booking Protocol
+                        {isBooking ? (
+                            <>
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                                Initializing Protocol...
+                            </>
+                        ) : (
+                            <>
+                                <ShieldCheck className="w-5 h-5" />
+                                {isValid ? 'Confirm Booking Protocol' : 'Select Date & Time'}
+                            </>
+                        )}
                     </span>
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
                 </button>
