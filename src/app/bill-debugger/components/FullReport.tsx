@@ -39,10 +39,11 @@ interface ExtractedData {
 }
 
 interface FullReportProps {
-    data: ExtractedData
+    data: ExtractedData;
+    email?: string;
 }
 
-export function FullReport({ data }: FullReportProps) {
+export function FullReport({ data, email }: FullReportProps) {
 
     // Clean Numbers for Logic
     const usage = parseFloat(String(data.total_usage_kwh).replace(/,/g, '')) || 0
@@ -278,7 +279,7 @@ export function FullReport({ data }: FullReportProps) {
                 whileInView={{ opacity: 1 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.1 }}
-                className="mb-20 bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm"
+                className="mb-20 glass-card p-10 shadow-xl"
             >
                 <h3 className="text-lg font-semibold text-zinc-900 mb-6 flex items-center gap-2">
                     Forensic Recommendations
@@ -294,7 +295,7 @@ export function FullReport({ data }: FullReportProps) {
             </motion.div>
 
             {/* Next Steps CTA */}
-            <NextStepsCard />
+            <NextStepsCard email={email} />
 
         </div>
     )
