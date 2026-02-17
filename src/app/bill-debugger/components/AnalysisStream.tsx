@@ -5,26 +5,27 @@ interface AnalysisStreamProps {
     onComplete: () => void
 }
 
+const MESSAGES = [
+    "Initiating handshake...",
+    "Parsing Load Profile...",
+    "Checking against ERCOT Scarcity Pricing Adders...",
+    "Detecting Volatility Markers...",
+    "Calculating shadow price variance...",
+    "Analysis Complete."
+]
+
 export function AnalysisStream({ onComplete }: AnalysisStreamProps) {
-    const messages = [
-        "Initiating handshake...",
-        "Parsing Load Profile...",
-        "Checking against ERCOT Scarcity Pricing Adders...",
-        "Detecting Volatility Markers...",
-        "Calculating shadow price variance...",
-        "Analysis Complete."
-    ]
 
     const [lines, setLines] = useState<string[]>([])
     const [currentLineIndex, setCurrentLineIndex] = useState(0)
 
     useEffect(() => {
-        if (currentLineIndex >= messages.length) {
+        if (currentLineIndex >= MESSAGES.length) {
             const timeout = setTimeout(onComplete, 800)
             return () => clearTimeout(timeout)
         }
 
-        const currentMessage = messages[currentLineIndex]
+        const currentMessage = MESSAGES[currentLineIndex]
         let charIndex = 0
         let currentText = ''
 
@@ -49,7 +50,7 @@ export function AnalysisStream({ onComplete }: AnalysisStreamProps) {
         }, 30)
 
         return () => clearInterval(typeInterval)
-    }, [currentLineIndex, messages, onComplete])
+    }, [currentLineIndex, onComplete])
 
     return (
         <motion.div
