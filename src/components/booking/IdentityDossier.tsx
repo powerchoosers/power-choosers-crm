@@ -101,58 +101,58 @@ export default function IdentityDossier({
             {/* Forensic Grid */}
             <div className="flex-1 space-y-4">
                 {/* Company Node */}
-                <div className="p-5 rounded-2xl bg-black/40 border border-white/5 relative overflow-hidden group transition-all hover:border-[#002FA7]/30">
+                <div className="p-3 rounded-2xl bg-black/40 border border-white/5 relative overflow-hidden group transition-all hover:border-[#002FA7]/30">
                     <div className="absolute top-0 left-0 w-1 h-full bg-[#002FA7]" />
                     <div className="flex items-start gap-4">
-                        <div className="p-2 rounded-lg bg-white/5 w-12 h-12 flex items-center justify-center overflow-hidden">
+                        <div className="p-1.5 rounded-lg bg-white/5 w-10 h-10 flex items-center justify-center overflow-hidden">
                             <CompanyIcon
                                 domain={data?.email?.split('@')[1]}
                                 name={data?.company || 'Company'}
-                                className="w-8 h-8 object-contain"
+                                className="w-6 h-6 object-contain"
                             />
                         </div>
                         <div>
-                            <p className="text-[10px] font-mono text-zinc-500 uppercase mb-1 tracking-widest font-bold">Organization</p>
+                            <p className="text-[9px] font-mono text-zinc-500 uppercase mb-0.5 tracking-widest font-bold">Organization</p>
                             {loading ? (
-                                <div className="h-5 w-32 bg-white/5 rounded animate-pulse mt-1" />
+                                <div className="h-4 w-28 bg-white/5 rounded animate-pulse mt-0.5" />
                             ) : (
-                                <p className="text-white text-lg font-medium">{data?.company || 'Nodal Point (Legacy)'}</p>
+                                <p className="text-white text-base font-medium">{data?.company || 'Nodal Point (Legacy)'}</p>
                             )}
                         </div>
                     </div>
                 </div>
 
                 {/* Role Node */}
-                <div className="p-5 rounded-2xl bg-black/40 border border-white/5 relative overflow-hidden group transition-all hover:border-zinc-700">
+                <div className="p-3 rounded-2xl bg-black/40 border border-white/5 relative overflow-hidden group transition-all hover:border-zinc-700">
                     <div className="absolute top-0 left-0 w-1 h-full bg-zinc-800" />
                     <div className="flex items-start gap-4">
                         <div className="p-2 rounded-lg bg-white/5">
-                            <User className="w-5 h-5 text-zinc-400" />
+                            <User className="w-4 h-4 text-zinc-400" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-mono text-zinc-500 uppercase mb-1 tracking-widest font-bold">Role Designation</p>
+                            <p className="text-[9px] font-mono text-zinc-500 uppercase mb-0.5 tracking-widest font-bold">Role Designation</p>
                             {loading ? (
-                                <div className="h-5 w-40 bg-white/5 rounded animate-pulse mt-1" />
+                                <div className="h-4 w-32 bg-white/5 rounded animate-pulse mt-0.5" />
                             ) : (
-                                <p className="text-zinc-200 font-medium">{data?.title || 'Professional Entity'}</p>
+                                <p className="text-zinc-200 text-sm font-medium">{data?.title || 'Professional Entity'}</p>
                             )}
                         </div>
                     </div>
                 </div>
 
                 {/* Location Node */}
-                <div className="p-5 rounded-2xl bg-black/40 border border-white/5 relative overflow-hidden group transition-all hover:border-zinc-700">
+                <div className="p-3 rounded-2xl bg-black/40 border border-white/5 relative overflow-hidden group transition-all hover:border-zinc-700">
                     <div className="absolute top-0 left-0 w-1 h-full bg-zinc-800" />
                     <div className="flex items-start gap-4">
                         <div className="p-2 rounded-lg bg-white/5">
-                            <MapPin className="w-5 h-5 text-zinc-400" />
+                            <MapPin className="w-4 h-4 text-zinc-400" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-mono text-zinc-500 uppercase mb-1 tracking-widest font-bold">Geo-Location</p>
+                            <p className="text-[9px] font-mono text-zinc-500 uppercase mb-0.5 tracking-widest font-bold">Geo-Location</p>
                             {loading ? (
-                                <div className="h-5 w-24 bg-white/5 rounded animate-pulse mt-1" />
+                                <div className="h-4 w-20 bg-white/5 rounded animate-pulse mt-0.5" />
                             ) : (
-                                <p className="text-zinc-200 font-medium">{data?.location || 'Operational Area'}</p>
+                                <p className="text-zinc-200 text-sm font-medium">{data?.location || 'Operational Area'}</p>
                             )}
                         </div>
                     </div>

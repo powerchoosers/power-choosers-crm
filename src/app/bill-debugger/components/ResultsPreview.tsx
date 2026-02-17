@@ -124,7 +124,7 @@ export function ResultsPreview({ data, onUnlock }: ResultsPreviewProps) {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.8 }}
-                className="flex flex-col items-center gap-4 py-10 glass-card bg-white/20 border-zinc-200/50"
+                className="flex flex-col items-center gap-4 py-10 glass-card bg-white/50 border-zinc-200"
             >
                 <div className="mb-2 flex items-center gap-2 text-[#002FA7] text-xs font-mono uppercase tracking-widest font-bold">
                     <ShieldCheck className="w-5 h-5" />
