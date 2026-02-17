@@ -22,6 +22,16 @@ export default function CustomerDiagnostic({ name, company, stats, reportLink }:
             <Body style={main}>
                 <Container style={container}>
                     {/* Header */}
+                    <Section style={{ marginBottom: "24px" }}>
+                        <div style={{ backgroundColor: "#ffffff", display: "inline-block", padding: "8px 12px", borderRadius: "4px" }}>
+                            <img
+                                src="https://nodalpoint.io/images/nodalpoint.png"
+                                alt="Nodal Point"
+                                style={{ height: "20px", width: "auto", display: "block" }}
+                            />
+                        </div>
+                    </Section>
+
                     <Text style={headerLabel}>
                         ● SIGNAL_DETECTED
                     </Text>
@@ -33,6 +43,10 @@ export default function CustomerDiagnostic({ name, company, stats, reportLink }:
                     <Text style={bodyText}>
                         {name},<br /><br />
                         Our forensic engine has processed the energy profile for <strong style={{ color: "#fff" }}>{company}</strong>. We detected structural inefficiencies exposing your ledger to unnecessary volatility.
+                    </Text>
+
+                    <Text style={bodyText}>
+                        Based on the data extracted from your utility bills, your facility in {stats.location.split(',')[0]} is currently graded as a <strong>{stats.grade}</strong> risk.
                     </Text>
 
                     {/* Data Card */}
@@ -72,13 +86,12 @@ export default function CustomerDiagnostic({ name, company, stats, reportLink }:
                         We also noted your facility in {stats.location.split(',')[0]} operates in a {stats.zone} current experiencing reserve capacity tightness.
                     </Text>
 
-                    {/* CTA */}
                     <Section style={{ textAlign: 'center', marginTop: '40px' }}>
                         <Button
                             href={reportLink}
                             style={button}
                         >
-                            Access Forensic Report
+                            Schedule Forensic Briefing
                         </Button>
                     </Section>
 

@@ -39,10 +39,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // 1. Resolve Identity (Silent Handshake)
         const identity = await resolveIdentity(email);
 
+        const feedback = analysisData.analysis?.feedback; // Extract feedback object
+
+        // Map Status to Grade
+        const gradeMap: Record<string, string> = {
+            'green': 'A',
+            'yellow': 'C',
+            'red': 'F'
+        };
+        const grade = gradeMap[feedback?.status] || 'B'; // Default to B if unknown
+
+        // Calculate Variance/Savings Display
+        const variance = feedback?.variance || 0;
+        const savingsText = variance > 0
+            ? `+${(variance * 100).toFixed(2)}¢ (OVER)`
+            : `${(variance * 100).toFixed(2)}¢ (UNDER)`;
+
+        // Map Risk
+        const risk = feedback?.contractInfo?.riskLevel ? feedback.contractInfo.riskLevel.toUpperCase() : (feedback?.status === 'red' ? 'HIGH' : 'LOW');
+
         const stats = {
-            grade: analysisData.analysis?.grade || 'N/A',
-            savings: analysisData.analysis?.potentialSavings || '$0',
-            risk: analysisData.analysis?.riskLevel || 'MEDIUM',
+            grade: grade,
+            savings: savingsText,
+            risk: risk,
             location: analysisData.service_address || 'Texas Facility',
             zone: analysisData.analysis?.zone || 'ERCOT'
         };
@@ -61,7 +80,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         };
 
         // Links
-        const reportLink = `https://nodalpoint.io/bill-debugger?id=${analysisDetails.id}`;
+        const reportLink = `https://nodalpoint.io/book`;
         const crmLink = `https://nodalpoint.io/network/contacts/${email}`;
         const analysisLink = reportLink;
 

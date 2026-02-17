@@ -38,8 +38,18 @@ export default function AdminIntelligence({ person, company, analysis, crmLink, 
             <Body style={main}>
                 <Container style={container}>
                     {/* Header */}
+                    <Section style={{ marginBottom: "24px" }}>
+                        <div style={{ backgroundColor: "#ffffff", display: "inline-block", padding: "8px 12px", borderRadius: "4px" }}>
+                            <img
+                                src="https://nodalpoint.io/images/nodalpoint.png"
+                                alt="Nodal Point"
+                                style={{ height: "20px", width: "auto", display: "block" }}
+                            />
+                        </div>
+                    </Section>
+
                     <Text style={headerLabel}>
-            /// NEW_NODE_INGESTED
+                        ● NEW_INTEL_ACQUIRED
                     </Text>
                     <Text style={mainHeading}>
                         Target Intelligence Packet
