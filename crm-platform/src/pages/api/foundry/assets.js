@@ -23,7 +23,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { email } = await requireUser(req);
+    const { email, id: userId } = await requireUser(req);
     if (!email) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Unauthorized' }));
@@ -90,6 +90,7 @@ export default async function handler(req, res) {
       compiled_html,
       variables,
       updated_at: new Date().toISOString(),
+      ...(id ? {} : { user_id: userId })
     };
 
     const query = id

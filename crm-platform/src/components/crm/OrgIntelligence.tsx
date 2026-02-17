@@ -138,7 +138,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   useEffect(() => {
     async function loadCache() {
       if (typeof window === 'undefined') return;
-      
+
       // Clear current data immediately to prevent stale views when switching entities
       setData([]);
       setCompanySummary(null);
@@ -146,7 +146,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       setContactsLoading(false);
       setSearchTerm('');
       setCurrentPage(1);
-      
+
       const key = cacheKeyFromDomainOrName(domain, companyName);
       if (!key) return;
 
@@ -163,7 +163,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           setData(contacts);
           setCompanySummary(company);
           setScanStatus('complete');
-          
+
           const cacheKey = `apollo_cache_${key}`;
           localStorage.setItem(cacheKey, JSON.stringify({
             company,
@@ -179,7 +179,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       // 2. Fallback to LocalStorage
       const cacheKey = `apollo_cache_${key}`;
       const cached = localStorage.getItem(cacheKey);
-      
+
       if (cached) {
         try {
           const parsed = JSON.parse(cached);
@@ -212,10 +212,10 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     setScanStatus('scanning'); // This will trigger the blur overlay
     try {
       // Parse employees to integer (database schema uses int, not text)
-      const employeesValue = companySummary.employees 
-        ? (typeof companySummary.employees === 'number' 
-            ? companySummary.employees 
-            : parseInt(String(companySummary.employees).replace(/[^0-9]/g, ''), 10) || null)
+      const employeesValue = companySummary.employees
+        ? (typeof companySummary.employees === 'number'
+          ? companySummary.employees
+          : parseInt(String(companySummary.employees).replace(/[^0-9]/g, ''), 10) || null)
         : null;
 
       // Get existing account data to preserve service_addresses if they exist
@@ -227,7 +227,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
 
       // Build service_addresses array - preserve existing or create new with HQ address
       let serviceAddresses = existingAccount?.service_addresses || [];
-      
+
       // If we have address data from Apollo and no existing service addresses, add it as HQ
       if (serviceAddresses.length === 0 && (companySummary.address || companySummary.city || companySummary.state)) {
         serviceAddresses = [{
@@ -246,7 +246,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         .select('metadata')
         .eq('id', accountId)
         .single();
-      
+
       const currentMetadata = currentData?.metadata || {};
 
       // Build meters array with service address if we have address data
@@ -325,7 +325,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
 
   const saveToCache = (company: ApolloCompany | null, contacts: ApolloContactRow[]) => {
     if (typeof window === 'undefined') return;
-    
+
     const key = cacheKeyFromDomainOrName(domain, companyName);
     if (!key) return;
 
@@ -338,7 +338,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     // Local Storage
     const cacheKey = `apollo_cache_${key}`;
     localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-    
+
     // Supabase Persistence
     saveToSupabase(key, cacheData);
   };
@@ -348,21 +348,21 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       toast.error('No account ID provided for acquisition');
       return;
     }
-    
+
     // Email button: only reveal email (fast)
     // Phone button: reveal BOTH email AND phone (slower, reveals everything)
     const revealEmails = type === 'email' || type === 'phone' || type === 'both';
     const revealPhones = type === 'phone' || type === 'both';
 
     setAcquiringEmail(person.id);
-    
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       // 1. Reveal & Enrich (Consume Apollo Credits)
       const enrichResp = await fetch('/api/apollo/enrich', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`
         },
@@ -380,7 +380,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         console.error('Apollo enrich API error:', errorText);
         throw new Error(`Enrichment failed: ${enrichResp.status} ${errorText}`);
       }
-      const enrichData = await enrichResp.json() as { 
+      const enrichData = await enrichResp.json() as {
         contacts?: Array<{
           fullName?: string;
           firstName?: string;
@@ -505,7 +505,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       // Trigger blur-in on contact dossier for enriched fields
       setLastEnrichedContactId(crmId ?? null);
       setTimeout(() => setLastEnrichedContactId(null), 3500);
-      
+
       // 3. Update local state (phones from immediate response; keep type for W/M/O display)
       const newPhonesTyped: PhoneEntry[] = (enriched.phones || []).map((ph: { number?: string; type?: string }) =>
         ph?.number ? { number: ph.number, type: ph.type } : null
@@ -536,9 +536,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           phones: mergedPhones
         } : p
       );
-      
+
       setData(updatedData);
-      
+
       // 4. Save updated contact list to cache so refresh doesn't lose revealed data
       saveToCache(companySummary, updatedData);
 
@@ -600,7 +600,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
               }
               return;
             }
-          } catch (_) {}
+          } catch (_) { }
           setTimeout(pollForPhones, intervalMs);
         };
         setTimeout(pollForPhones, intervalMs);
@@ -622,18 +622,18 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     setScanStatus('scanning');
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       // 1. Fetch Company Summary
       let currentSummary: ApolloCompany | null = null;
       const summaryParams = new URLSearchParams();
       if (domain) summaryParams.append('domain', domain);
       if (companyName) summaryParams.append('company', companyName);
-      
+
       try {
         const summaryResp = await fetch(`/api/apollo/company?${summaryParams.toString()}`, {
           headers: { 'Authorization': `Bearer ${session?.access_token}` }
         });
-        
+
         if (summaryResp.ok) {
           currentSummary = await summaryResp.json();
           setCompanySummary(currentSummary);
@@ -645,7 +645,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       // 2. Get Decision Makers (Initial Batch)
       const peopleResp = await fetch('/api/apollo/search-people', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`
         },
@@ -663,7 +663,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       }
 
       const result: unknown = await peopleResp.json();
-      
+
       // The search-people endpoint returns { people: [...], pagination: {...} }
       // while handleScan previously expected { contacts: [...] }
       const apolloContacts: unknown[] =
@@ -681,12 +681,12 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           .from('contacts')
           .select('email')
           .in('email', emailsToCheck);
-        
+
         if (!error && existingContacts) {
           existingEmails = new Set(existingContacts.map(c => c.email));
         }
       }
-      
+
       // Fallback: If company summary is still null, try to derive it from the first contact
       if (!currentSummary && apolloContacts.length > 0) {
         const first = apolloContacts[0];
@@ -714,11 +714,11 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           if (!isRecord(contact)) return null
           const name = typeof contact.name === 'string' ? contact.name : ''
           if (!name) return null
-          
-          const id = typeof contact.id === 'string' ? contact.id : 
-                     typeof contact.contactId === 'string' ? contact.contactId : 
-                     typeof contact.person_id === 'string' ? contact.person_id : '';
-          
+
+          const id = typeof contact.id === 'string' ? contact.id :
+            typeof contact.contactId === 'string' ? contact.contactId :
+              typeof contact.person_id === 'string' ? contact.person_id : '';
+
           if (!id) return null;
 
           const firstName = typeof contact.first_name === 'string' ? contact.first_name : name.split(' ')[0]
@@ -728,14 +728,14 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           const emailStatus = typeof contact.email_status === 'string' ? contact.email_status : ''
           const status: ApolloContactRow['status'] = emailStatus === 'verified' ? 'verified' : 'unverified'
           const isMonitored = email !== 'N/A' && existingEmails.has(email)
-          
+
           const location = [
             typeof contact.city === 'string' ? contact.city : null,
             typeof contact.state === 'string' ? contact.state : null
           ].filter(Boolean).join(', ')
 
           const linkedin = typeof contact.linkedin_url === 'string' ? contact.linkedin_url : undefined
-          
+
           // Apollo phone numbers are often in a 'phones' array
           const phones: string[] = []
           if (Array.isArray(contact.phones)) {
@@ -746,14 +746,14 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             })
           }
 
-          return { 
+          return {
             id,
-            name, 
-            firstName, 
-            lastName, 
-            title, 
-            email, 
-            status, 
+            name,
+            firstName,
+            lastName,
+            title,
+            email,
+            status,
             isMonitored,
             location,
             linkedin,
@@ -764,7 +764,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
 
       setData(mappedData);
       setScanStatus('complete');
-      
+
       // Save to cache
       saveToCache(currentSummary, mappedData);
     } catch (error) {
@@ -901,7 +901,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
               const parsed = JSON.parse(cached);
               existingContacts = Array.isArray(parsed?.contacts) ? parsed.contacts : [];
             }
-          } catch (_) {}
+          } catch (_) { }
           const existingIds = new Set(existingContacts.map(c => c.id));
           const newContacts = mappedData.filter(c => !existingIds.has(c.id));
           if (newContacts.length > 0) {
@@ -951,7 +951,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       animate={{ minHeight: contentExpanded ? 400 : 140 }}
       transition={{ duration: 0.4, ease: 'easeInOut' }}
     >
-      
+
       {/* HEADER - Status & Controls */}
       <div className="p-4 pb-2 flex justify-between items-center border-b border-white/5 nodal-recessed">
         <div className="flex items-center gap-2">
@@ -962,7 +962,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         </div>
         <div className="flex items-center gap-2">
           {scanStatus === 'complete' && (
-            <button 
+            <button
               onClick={() => {
                 setScanStatus('idle');
                 setData([]);
@@ -984,7 +984,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           <div className="flex items-center gap-2">
             <div className="relative group flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-600 group-focus-within:text-[#002FA7] transition-colors" />
-              <input 
+              <input
                 type="text"
                 placeholder="Search decision makers..."
                 value={searchTerm}
@@ -1061,7 +1061,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             <p className="text-[9px] font-mono text-zinc-600 uppercase leading-relaxed mb-4">
               Apollo API gateway closed. Initiate scan to extract organizational hierarchy.
             </p>
-            <Button 
+            <Button
               onClick={handleScan}
               className="bg-white text-zinc-950 hover:bg-zinc-200 font-medium h-8 px-6 rounded-lg text-[10px] uppercase tracking-widest transition-all duration-300 hover:shadow-[0_0_30px_-5px_rgba(255,255,255,0.6)] group/btn flex items-center gap-2"
             >
@@ -1105,7 +1105,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                   <div className="relative group/logo">
                     {/* Key by account logo/domain so when CRM account loads we remount and show same logo as dossier header (avoids wrong Apollo fallback) */}
                     <CompanyIcon
-                      key={`org-logo-${accountLogoUrl ?? ''}-${accountDomain ?? ''}`}
+                      key={`org-logo-${accountId || initialDomain || companyName || 'static'}`}
                       logoUrl={accountLogoUrl && accountLogoUrl.trim() ? accountLogoUrl.trim() : companySummary.logoUrl}
                       domain={accountDomain && accountDomain.trim() ? accountDomain.trim() : companySummary.domain}
                       name={companySummary.name || companyName || ''}
@@ -1114,9 +1114,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                       className="w-10 h-10 transition-all"
                     />
                     {companySummary.domain && (
-                      <a 
-                        href={`https://${companySummary.domain}`} 
-                        target="_blank" 
+                      <a
+                        href={`https://${companySummary.domain}`}
+                        target="_blank"
                         rel="noopener noreferrer"
                         className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#002FA7] rounded-full flex items-center justify-center text-white opacity-0 group-hover/logo:opacity-100 transition-opacity shadow-lg"
                       >
@@ -1130,9 +1130,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                         <h4 className="text-xs font-semibold text-white truncate">{companySummary.name}</h4>
                       </div>
                       {companySummary.linkedin && (
-                        <a 
-                          href={companySummary.linkedin} 
-                          target="_blank" 
+                        <a
+                          href={companySummary.linkedin}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="icon-button-forensic w-6 h-6 flex items-center justify-center"
                         >
@@ -1151,7 +1151,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                         </div>
                       )}
                       {companySummary.companyPhone && (
-                        <button 
+                        <button
                           onClick={() => handleCompanyCall(companySummary.companyPhone!, companySummary.name)}
                           className="flex items-center gap-1 text-[9px] font-mono text-zinc-500 hover:text-white transition-colors uppercase tracking-widest"
                         >
@@ -1172,7 +1172,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                       {companySummary.description}
                     </p>
                     {companySummary.description.length > 100 && (
-                      <button 
+                      <button
                         onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
                         className="flex items-center gap-1 text-[8px] font-mono text-zinc-600 hover:text-zinc-400 transition-colors uppercase tracking-widest"
                       >
@@ -1197,16 +1197,16 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                 </div>
               ) : paginatedData.length > 0 ? (
                 paginatedData.map((person) => (
-                  <div 
-                    key={person.id} 
+                  <div
+                    key={person.id}
                     className="group flex flex-col p-2.5 rounded-xl hover:bg-black/30 transition-all border border-transparent hover:border-white/5 space-y-2"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex flex-col min-w-0 flex-1 mr-2">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span className="text-[11px] font-semibold text-zinc-200 truncate group-hover:text-white transition-colors">
-                            {person.isMonitored 
-                              ? person.name 
+                            {person.isMonitored
+                              ? person.name
                               : `${person.firstName} ${person.lastName?.charAt(0) || ''}.`
                             }
                           </span>
@@ -1218,13 +1218,13 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                           {person.title || 'Nodal Analyst'}
                         </span>
                       </div>
-                      
+
                       <div className="flex items-center gap-1.5">
                         {person.isMonitored ? (
                           person.linkedin ? (
-                            <a 
-                              href={person.linkedin} 
-                              target="_blank" 
+                            <a
+                              href={person.linkedin}
+                              target="_blank"
                               rel="noopener noreferrer"
                               className="icon-button-forensic w-7 h-7 flex items-center justify-center"
                             >
@@ -1233,7 +1233,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                           ) : null
                         ) : (
                           <div className="flex items-center gap-1">
-                            <button 
+                            <button
                               onClick={() => handleAcquire(person, 'email')}
                               disabled={acquiringEmail === person.id}
                               className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
@@ -1246,7 +1246,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                               )}
                               Email
                             </button>
-                            <button 
+                            <button
                               onClick={() => handleAcquire(person, 'phone')}
                               disabled={acquiringEmail === person.id}
                               className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
@@ -1271,7 +1271,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 items-center">
                           {/* Email Column */}
                           {person.email !== 'N/A' ? (
-                            <div 
+                            <div
                               className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-400 uppercase tracking-tighter min-w-0"
                               title={person.email}
                             >
@@ -1279,21 +1279,21 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                               <span className="truncate">{person.email}</span>
                             </div>
                           ) : (
-                             <button 
-                                onClick={() => handleAcquire(person, 'email')}
-                                disabled={acquiringEmail === person.id}
-                                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
-                                title="Reveal Email"
-                              >
-                                {acquiringEmail === person.id ? (
-                                  <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
-                                ) : (
-                                  <Mail className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
-                                )}
-                                Email
-                              </button>
+                            <button
+                              onClick={() => handleAcquire(person, 'email')}
+                              disabled={acquiringEmail === person.id}
+                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
+                              title="Reveal Email"
+                            >
+                              {acquiringEmail === person.id ? (
+                                <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
+                              ) : (
+                                <Mail className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
+                              )}
+                              Email
+                            </button>
                           )}
-                          
+
                           {/* Phone Column — W: Work direct, M: Mobile, O: Other */}
                           {person.phones && person.phones.length > 0 ? (
                             <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
@@ -1327,22 +1327,22 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                               })}
                             </div>
                           ) : (
-                              <button 
-                                onClick={() => handleAcquire(person, 'phone')}
-                                disabled={acquiringEmail === person.id}
-                                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest shrink-0"
-                                title="Reveal Phone"
-                              >
-                                {acquiringEmail === person.id ? (
-                                  <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
-                                ) : (
-                                  <Phone className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
-                                )}
-                                Phone
-                              </button>
+                            <button
+                              onClick={() => handleAcquire(person, 'phone')}
+                              disabled={acquiringEmail === person.id}
+                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest shrink-0"
+                              title="Reveal Phone"
+                            >
+                              {acquiringEmail === person.id ? (
+                                <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
+                              ) : (
+                                <Phone className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
+                              )}
+                              Phone
+                            </button>
                           )}
                         </div>
-                        
+
                         {/* Location Row */}
                         {person.location && (
                           <div className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-tighter">
