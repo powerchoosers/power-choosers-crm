@@ -21,9 +21,12 @@ export default async function handler(req, res) {
   const address = url.searchParams.get('address') || url.searchParams.get('q');
 
   if (!address) {
+    console.warn('[Geocode API] Missing address/q parameter');
     sendJson(400, { error: 'Query parameter "address" or "q" is required' });
     return;
   }
+
+  console.log(`[Geocode API] Attempting to resolve: "${address}"`);
 
   const apiKey = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -56,9 +59,12 @@ export default async function handler(req, res) {
     const [lng, lat] = feature.center || feature.geometry?.coordinates || [];
 
     if (lat == null || lng == null) {
+      console.warn(`[Geocode API] No coordinates found for: "${address}"`);
       sendJson(200, { found: false, lat: null, lng: null });
       return;
     }
+
+    console.log(`[Geocode API] Resolved "${address}" to [${lat}, ${lng}]`);
 
     sendJson(200, {
       found: true,
