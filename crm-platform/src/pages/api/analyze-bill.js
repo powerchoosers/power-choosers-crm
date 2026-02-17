@@ -9,6 +9,10 @@ export default async function analyzeBillHandler(req, res) {
       return;
     }
 
+    // Sanitize fileData - remove any existing data prefix if present
+    const base64Data = fileData.replace(/^data:.*?;base64,/, '');
+
+
     const perplexityApiKey = process.env.PERPLEXITY_API_KEY;
     const openRouterKey = process.env.OPEN_ROUTER_API_KEY;
 
@@ -38,7 +42,7 @@ export default async function analyzeBillHandler(req, res) {
 
         const isPdf = mimeType === 'application/pdf';
         // For PDFs, Perplexity expects raw base64. For images, it expects Data URL.
-        const fileUrlContent = isPdf ? fileData : `data:${mimeType || 'image/png'};base64,${fileData}`;
+        const fileUrlContent = isPdf ? base64Data : `data:${mimeType || 'image/png'};base64,${base64Data}`;
         const attachmentType = isPdf ? 'file_url' : 'image_url';
 
         const body = {
@@ -109,7 +113,7 @@ export default async function analyzeBillHandler(req, res) {
                   {
                     type: mimeType?.includes('pdf') ? 'file_url' : 'image_url',
                     [mimeType?.includes('pdf') ? 'file_url' : 'image_url']: {
-                      url: mimeType?.includes('pdf') ? fileData : `data:${mimeType || 'image/png'};base64,${fileData}`
+                      url: mimeType?.includes('pdf') ? base64Data : `data:${mimeType || 'image/png'};base64,${base64Data}`
                     }
                   }
                 ]
