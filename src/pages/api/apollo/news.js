@@ -9,7 +9,7 @@
  */
 
 import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL, normalizeDomain } from './_utils.js';
-import { supabaseAdmin } from '../_supabase.js';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
