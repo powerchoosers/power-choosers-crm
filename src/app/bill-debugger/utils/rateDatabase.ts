@@ -39,9 +39,30 @@ export const FEEDBACK_THRESHOLDS = {
     yellow_large_high: 0.1050,  // 9.50–10.50¢ = yellow (at market)
     red_large: 0.1050,     // > this = red (above market)
 
-    // Small facility thresholds
+    // Small Facility thresholds
     green_small: 0.1400,   // < this = green (below market)
     yellow_small_low: 0.1400,
     yellow_small_high: 0.1600,  // 14.0–16.0¢ = yellow (at market)
     red_small: 0.1600,     // > this = red (above market, likely post-term)
 };
+
+/**
+ * Maps an ERCOT Load Zone to a specific TDU territory for benchmarking.
+ */
+export function getTerritoryFromZone(zone: string): "Oncor" | "CenterPoint" {
+    const z = zone.toUpperCase();
+    if (z.includes('HOUSTON')) return "CenterPoint";
+    // Default to Oncor for North, West, South for commercial benchmarking in this CRM's primary footprint
+    return "Oncor";
+}
+
+/**
+ * Gets the market context metadata for a given zone/territory.
+ */
+export function getMarketContext(zoneOrTerritory: string) {
+    const territory = zoneOrTerritory.includes('LZ_')
+        ? getTerritoryFromZone(zoneOrTerritory)
+        : (zoneOrTerritory === "CenterPoint" ? "CenterPoint" : "Oncor");
+
+    return RATE_CONTEXT[territory];
+}

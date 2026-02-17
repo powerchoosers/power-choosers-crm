@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { Zap, Truck, Activity, ArrowRight, Info } from 'lucide-react'
+import { Zap, Truck, Activity, ArrowRight, Info, Map as MapIcon, Globe } from 'lucide-react'
 import { generateFeedback } from '../utils/feedbackLogic'
 import { FeedbackBadge } from './FeedbackBadge'
+import { NextStepsCard } from './NextStepsCard'
 
 interface ExtractedData {
     customer_name: string
@@ -21,6 +22,18 @@ interface ExtractedData {
     peak_demand?: string | number
     energy_rate_per_kwh?: string | number
     delivery_rate_per_kwh?: string | number
+
+    // Forensic Analysis
+    analysis?: {
+        zone: string;
+        territory: string;
+        isFacilityLarge: boolean;
+        facilitySize: 'large' | 'small';
+        allInRateCents: string;
+        demandPercentOfBill: string;
+        feedback: any;
+        marketContext: any;
+    }
 }
 
 interface FullReportProps {
@@ -48,8 +61,10 @@ export function FullReport({ data }: FullReportProps) {
         return num.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
     }
 
-    // Generate Feedback
+    // Use Backend Feedback if available, fallback to frontend generation
     const feedback = useMemo(() => {
+        if (data.analysis?.feedback) return data.analysis.feedback;
+
         return generateFeedback({
             allInRate: totalBillRaw > 0 && usage > 0 ? totalBillRaw / usage : 0,
             energyComponent: energyChargesRaw > 0 && usage > 0 ? energyChargesRaw / usage : 0,
@@ -59,18 +74,18 @@ export function FullReport({ data }: FullReportProps) {
             totalBill: totalBillRaw,
             billingPeriod: data.billing_period,
             provider: data.provider_name
-        }, "Oncor") // Defaulting to Oncor for now as per Context
-    }, [totalBillRaw, usage, energyChargesRaw, deliveryChargesRaw, peak, data.billing_period, data.provider_name])
+        }, "Oncor")
+    }, [data.analysis, totalBillRaw, usage, energyChargesRaw, deliveryChargesRaw, peak, data.billing_period, data.provider_name])
 
-    // Fallback estimates
+    // Fallback/Extracted estimates
     const estEnergy = usage * 0.045
     const estDelivery = usage * 0.038
     const estDemand = peak * 12
 
     const energyCost = formatCurrency(data.energy_charges, estEnergy)
     const deliveryCost = formatCurrency(data.delivery_charges, estDelivery)
-    const demandCost = formatCurrency(0, estDemand) // Demand usually bundled in delivery but highlighted
-    const totalCost = formatCurrency(data.total_amount_due, estEnergy + estDelivery)
+    const demandCost = formatCurrency(0, estDemand)
+    const totalCost = formatCurrency(data.total_amount_due, totalBillRaw || (estEnergy + estDelivery))
 
     return (
         <div className="w-full max-w-5xl mx-auto px-4 pb-20">
@@ -81,16 +96,42 @@ export function FullReport({ data }: FullReportProps) {
                 animate={{ opacity: 1, y: 0 }}
                 className="text-center mb-16"
             >
-                <div className="flex justify-center mb-4">
+                <div className="flex flex-col items-center gap-4 mb-4">
                     <FeedbackBadge
                         status={feedback.status}
                         title={feedback.title}
                         isLarge={feedback.facilitySize === 'large'}
                     />
+                    {data.analysis && (
+                        <div className="flex items-center gap-3 text-[10px] md:text-xs font-mono tracking-widest text-[#002FA7] uppercase opacity-80">
+                            <span>ZONE: {data.analysis.zone}</span>
+                            <span>/</span>
+                            <span>TDU: {data.analysis.territory}</span>
+                        </div>
+                    )}
                 </div>
                 <h1 className="text-3xl md:text-5xl font-light text-zinc-900 mb-6">
                     Forensic Analysis Complete
                 </h1>
+
+                {data.analysis && (
+                    <div className="mb-10 max-w-4xl mx-auto rounded-3xl overflow-hidden h-48 bg-zinc-100 border border-zinc-200 relative group">
+                        <div className="absolute inset-0 bg-blue-50/50 flex items-center justify-center opacity-40 group-hover:opacity-60 transition-opacity">
+                            <Globe className="w-24 h-24 text-[#002FA7]" />
+                        </div>
+                        <div className="absolute top-4 left-4 bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-zinc-200 flex items-center gap-2">
+                            <MapIcon className="w-4 h-4 text-[#002FA7]" />
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Digital Site Map: {data.analysis.zone}</span>
+                        </div>
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-32 h-32 border-2 border-[#002FA7]/20 rounded-full animate-ping"></div>
+                        </div>
+                        <div className="absolute bottom-4 right-4 text-[10px] font-mono text-zinc-400 bg-white/50 px-2 py-0.5 rounded">
+                            PRECISION GEO-LOCATION: ACTIVE
+                        </div>
+                    </div>
+                )}
+
                 <p className="text-zinc-500 max-w-2xl mx-auto text-lg leading-relaxed mb-6">
                     {feedback.description}
                 </p>
@@ -131,6 +172,15 @@ export function FullReport({ data }: FullReportProps) {
                                 {energyChargesRaw > 0 ? (energyChargesRaw / usage).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 3 }) : 'N/A'} / kWh
                             </span>
                         </div>
+                        {data.analysis && (
+                            <div className="mt-4 p-3 bg-white/5 rounded-lg border border-white/10">
+                                <div className="text-[10px] text-zinc-400 uppercase tracking-wider mb-1">Shadow Pricing</div>
+                                <div className="flex justify-between items-end">
+                                    <span className="text-xs text-zinc-500">Market Median:</span>
+                                    <span className="text-xs text-emerald-400 font-mono">{(data.analysis.marketContext.largeEnergyComponent * 100).toFixed(2)}¢</span>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </motion.div>
 
@@ -157,7 +207,9 @@ export function FullReport({ data }: FullReportProps) {
                             <span className="text-white font-mono">{deliveryCost}</span>
                         </div>
                         <div className="text-xs text-zinc-500 mt-2">
-                            Pass-through costs from {feedback.facilitySize === 'small' ? 'high fixed charges' : 'grid maintenance'}.
+                            {feedback.facilitySize === 'small'
+                                ? 'High fixed charge impact due to small load.'
+                                : `Includes ${data.analysis?.territory || 'regulated'} utility tariffs.`}
                         </div>
                     </div>
                 </motion.div>
@@ -184,18 +236,21 @@ export function FullReport({ data }: FullReportProps) {
                     <div className="border-t border-zinc-700 pt-4 mt-8">
                         {feedback.facilitySize === 'large' ? (
                             <>
-                                <div className="flex justify-between items-center text-sm mb-2">
-                                    <span className="text-zinc-500">Est. Ratchet Impact</span>
-                                    <span className="text-[#38bdf8] font-mono">{demandCost}</span>
+                                <div className="flex justify-between items-center text-sm mb-1">
+                                    <span className="text-zinc-500">Ratchet Impact</span>
+                                    <span className="text-[#38bdf8] font-mono">{data.analysis ? (parseFloat(data.analysis.demandPercentOfBill) > 0 ? `${data.analysis.demandPercentOfBill}%` : 'Extracted') : 'Modeling...'}</span>
                                 </div>
                                 <div className="text-xs text-zinc-500 mt-2 flex gap-2 items-start">
                                     <Info className="w-3 h-3 mt-0.5 shrink-0" />
-                                    Demand Ratchet locks 80% of peak cost for 11 months.
+                                    <span>
+                                        Ratchet locks 80% cost floor for 11 months.
+                                        Est. yearly penalty: <span className="text-zinc-300">{(peak * (data.analysis?.marketContext?.largeDemandCharge || 10.88) * 12 * 0.8).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}</span>
+                                    </span>
                                 </div>
                             </>
                         ) : (
                             <div className="text-xs text-zinc-500 mt-2">
-                                Small facility (&lt; 10kW). No demand ratchet detected.
+                                Small facility (&lt; 10kW). No demand ratchet detected in this tier.
                             </div>
                         )}
                     </div>
@@ -203,50 +258,29 @@ export function FullReport({ data }: FullReportProps) {
 
             </div>
 
-            {/* Action Items List */}
+            {/* Forensic Recommendations List */}
             <motion.div
                 initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-                className="mb-12 bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm"
+                whileInView={{ opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.1 }}
+                className="mb-20 bg-white border border-zinc-200 rounded-3xl p-8 shadow-sm"
             >
                 <h3 className="text-lg font-semibold text-zinc-900 mb-6 flex items-center gap-2">
-                    Start Saving Now
+                    Forensic Recommendations
                 </h3>
-                <div className="space-y-4">
-                    {feedback.actionItems.map((item, i) => (
-                        <div key={i} className="flex items-start gap-4 p-4 bg-zinc-50 rounded-xl border border-zinc-100">
-                            <div className={`mt-1 w-2 h-2 rounded-full ${feedback.status === 'green' ? 'bg-emerald-500' : feedback.status === 'yellow' ? 'bg-amber-500' : 'bg-red-500'}`} />
-                            <p className="text-zinc-700 text-sm md:text-base">{item}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {feedback.actionItems.map((item: string, i: number) => (
+                        <div key={i} className="flex items-start gap-4 p-5 bg-zinc-50 rounded-2xl border border-zinc-100 hover:border-[#002FA7]/20 transition-all">
+                            <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${feedback.status === 'green' ? 'bg-emerald-500' : feedback.status === 'yellow' ? 'bg-amber-500' : 'bg-red-500'}`} />
+                            <p className="text-zinc-700 text-sm md:text-base leading-snug">{item}</p>
                         </div>
                     ))}
                 </div>
             </motion.div>
 
             {/* Next Steps CTA */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-                className="bg-zinc-900 text-white rounded-3xl p-8 md:p-12 text-center max-w-3xl mx-auto shadow-2xl shadow-[#002FA7]/20"
-            >
-                <h2 className="text-3xl font-light mb-4">Talk to an Analyst</h2>
-                <p className="text-zinc-400 mb-8 max-w-xl mx-auto text-center font-light">
-                    We'll clarify these numbers and build a custom strategy for your facility.
-                </p>
-
-                <div className="flex flex-col items-center gap-4">
-                    <a
-                        href="https://calendly.com/nodalpoint/discovery"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-8 py-4 bg-white text-zinc-900 rounded-full font-medium text-lg hover:bg-zinc-100 transition-all flex items-center gap-2"
-                    >
-                        Book 15-Min Review <ArrowRight className="w-5 h-5" />
-                    </a>
-                </div>
-
-            </motion.div>
+            <NextStepsCard />
 
         </div>
     )
