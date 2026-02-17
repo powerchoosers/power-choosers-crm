@@ -114,7 +114,10 @@ export default function BillDebuggerPage() {
                 contract_end_date: data.contractEndDate,
                 retail_plan_name: data.retailPlanName,
                 energy_rate_per_kwh: data.energyRatePerKWh,
-                delivery_rate_per_kwh: data.deliveryRatePerKWh
+                delivery_rate_per_kwh: data.deliveryRatePerKWh,
+
+                // Attach Forensic Analysis
+                analysis: data.analysis
             })
         } catch (err: unknown) {
             console.error('Analysis Error:', err)

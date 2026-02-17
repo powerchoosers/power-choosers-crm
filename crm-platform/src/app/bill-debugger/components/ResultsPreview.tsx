@@ -1,11 +1,20 @@
-import React from 'react'
-import { motion } from 'framer-motion'
-import { Calendar, Zap, TrendingUp, Search } from 'lucide-react'
+import { Calendar, Zap, TrendingUp, Search, ShieldCheck } from 'lucide-react'
+import { FeedbackBadge } from './FeedbackBadge'
 
 interface ExtractedData {
     billing_period: string
     total_usage_kwh: string
     billed_demand_kw: string
+    analysis?: {
+        zone: string;
+        territory: string;
+        isFacilityLarge: boolean;
+        facilitySize: 'large' | 'small';
+        allInRateCents: string;
+        demandPercentOfBill: string;
+        feedback: any;
+        marketContext: any;
+    }
 }
 
 interface ResultsPreviewProps {
@@ -15,15 +24,8 @@ interface ResultsPreviewProps {
 
 export function ResultsPreview({ data, onUnlock }: ResultsPreviewProps) {
 
-    // Dynamic "Findings" logic based on demand
-    const demandValue = parseFloat(data.billed_demand_kw.replace(/,/g, '')) || 0
-    let findingText = "Your detailed usage profile has been generated."
-
-    if (demandValue > 100) {
-        findingText = "High peak demand detected. Significant potential for reduction strategies."
-    } else if (demandValue > 0) {
-        findingText = "Peak demand charges found. Optimization opportunities available."
-    }
+    // Use actual forensic feedback if available
+    const feedback = data.analysis?.feedback;
 
     const snapshotFields = [
         {
@@ -31,7 +33,7 @@ export function ResultsPreview({ data, onUnlock }: ResultsPreviewProps) {
             label: 'BILLING PERIOD',
             value: data.billing_period,
             icon: Calendar,
-            context: 'Based on bill dates'
+            context: 'Verified bill dates'
         },
         {
             id: 'usage',
@@ -49,10 +51,10 @@ export function ResultsPreview({ data, onUnlock }: ResultsPreviewProps) {
         },
         {
             id: 'finding',
-            label: 'WHAT WE FOUND',
-            value: findingText,
+            label: 'DIAGNOSTIC STATUS',
+            value: feedback ? feedback.title : "Analyzing load profile...",
             icon: Search,
-            context: 'Algorithmic summary',
+            context: 'Forensic summary',
             isText: true
         }
     ]
@@ -64,13 +66,22 @@ export function ResultsPreview({ data, onUnlock }: ResultsPreviewProps) {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.6 }}
-                className="mb-12"
+                className="mb-12 flex flex-col items-center"
             >
-                <h1 className="text-3xl md:text-5xl font-light text-zinc-900 mb-4">
+                {feedback && (
+                    <div className="mb-6">
+                        <FeedbackBadge
+                            status={feedback.status}
+                            title="Forensic Signal Detected"
+                            isLarge={feedback.facilitySize === 'large'}
+                        />
+                    </div>
+                )}
+                <h1 className="text-3xl md:text-5xl font-light text-zinc-900 mb-4 tracking-tight">
                     Analysis Complete
                 </h1>
-                <p className="text-zinc-500">
-                    We've extracted the critical data points driving your cost.
+                <p className="text-zinc-500 max-w-md mx-auto">
+                    Our diagnostic engine has extracted the critical volatility markers from your energy profile.
                 </p>
             </motion.div>
 
@@ -84,7 +95,6 @@ export function ResultsPreview({ data, onUnlock }: ResultsPreviewProps) {
                         transition={{ duration: 0.5, delay: i * 0.1 }}
                         className="bg-[#1e293b] rounded-2xl p-6 text-left border border-zinc-700/50 shadow-xl relative overflow-hidden group"
                     >
-                        {/* Subtle internal glow */}
                         <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
 
                         <div className="flex items-start justify-between mb-4">
@@ -109,16 +119,20 @@ export function ResultsPreview({ data, onUnlock }: ResultsPreviewProps) {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.8 }}
-                className="flex flex-col items-center gap-4"
+                className="flex flex-col items-center gap-4 py-8 bg-zinc-50 rounded-3xl border border-dashed border-zinc-200"
             >
+                <div className="mb-2 flex items-center gap-2 text-emerald-600 text-xs font-mono uppercase tracking-tighter">
+                    <ShieldCheck className="w-4 h-4" />
+                    Report Ready for Encryption
+                </div>
                 <button
                     onClick={onUnlock}
-                    className="w-full md:w-auto px-12 py-4 bg-[#002FA7] text-white rounded-xl font-medium text-lg hover:bg-[#002FA7]/90 transition-all shadow-lg hover:shadow-[#002FA7]/30"
+                    className="w-full md:w-auto px-12 py-4 bg-[#002FA7] text-white rounded-full font-medium text-lg hover:bg-[#002FA7]/90 transition-all shadow-xl hover:shadow-[#002FA7]/30 flex items-center gap-2"
                 >
-                    See Full Report
+                    Unlock Full Forensic Report
                 </button>
                 <p className="text-sm text-zinc-400">
-                    Unlock your complete breakdown with your email.
+                    Verified access only. Enter email to decrypt results.
                 </p>
             </motion.div>
 
