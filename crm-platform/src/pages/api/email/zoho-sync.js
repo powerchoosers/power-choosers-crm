@@ -1,5 +1,5 @@
 import { cors } from '../_cors.js';
-import { supabaseAdmin } from '../_supabase.js';
+import { supabaseAdmin } from '@/lib/supabase';
 import { ZohoMailService } from './zoho-service.js';
 import { getValidAccessTokenForUser } from './zoho-token-manager.js';
 import logger from '../_logger.js';
@@ -122,6 +122,7 @@ function parseZohoMessage(summary, content, ownerEmail) {
         is_starred: !!summary.isStarred,
         contactId: null,
         accountId: null,
+        ownerId: ownerEmail,
         metadata: {
             provider: 'zoho',
             ownerId: ownerEmail,

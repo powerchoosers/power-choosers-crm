@@ -4,7 +4,7 @@
  */
 
 import { cors } from '../_cors.js';
-import { supabaseAdmin } from '../_supabase.js';
+import { supabaseAdmin } from '@/lib/supabase';
 import logger from '../_logger.js';
 
 export default async function handler(req, res) {

@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import crypto from 'crypto';
 import { generateEmbedding } from '../utils/embeddings.js';
-import { supabaseAdmin } from '../_supabase.js';
+import { supabaseAdmin } from '@/lib/supabase';
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
 import { ZohoMailService } from '../email/zoho-service.js';

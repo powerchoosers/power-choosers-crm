@@ -1,42 +1,42 @@
 import twilio from 'twilio';
-import { supabaseAdmin } from '../_supabase.js';
+import { supabaseAdmin } from '@/lib/supabase';
 import { resolveToCallSid } from '../_twilio-ids.js';
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
 
 export default async function handler(req, res) {
     if (cors(req, res)) return; // handle OPTIONS centrally
-    
+
     if (req.method !== 'POST') {
         res.writeHead(405, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Method not allowed' }));
         return;
     }
-    
+
     try {
         logger.log('[Process Existing Transcripts] Starting to process existing transcripts...');
-        
+
         // Initialize Twilio client
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
         const serviceSid = process.env.TWILIO_INTELLIGENCE_SERVICE_SID;
-        
+
         if (!serviceSid) {
             res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ 
+            res.end(JSON.stringify({
                 error: 'Conversational Intelligence Service not configured',
                 message: 'Please set TWILIO_INTELLIGENCE_SERVICE_SID environment variable'
             }));
             return;
         }
-        
+
         // Get all completed transcripts from the service
         const transcripts = await client.intelligence.v2.transcripts.list({
             serviceSid: serviceSid,
             limit: 50
         });
-        
+
         logger.log(`[Process Existing Transcripts] Found ${transcripts.length} transcripts`);
-        
+
         // Log sample transcript structure for debugging
         if (transcripts.length > 0) {
             logger.log(`[Process Existing Transcripts] Sample transcript structure:`, {
@@ -47,14 +47,14 @@ export default async function handler(req, res) {
                 availableFields: Object.keys(transcripts[0])
             });
         }
-        
+
         const results = [];
-        
+
         for (const transcript of transcripts) {
             if (transcript.status === 'completed' && transcript.sourceSid && transcript.sourceSid.trim()) {
                 try {
                     logger.log(`[Process Existing Transcripts] Processing transcript: ${transcript.sid} for source: ${transcript.sourceSid}`);
-                    
+
                     // Get sentences
                     let transcriptText = '';
                     let sentences = [];
@@ -62,7 +62,7 @@ export default async function handler(req, res) {
                         const sentencesResponse = await client.intelligence.v2
                             .transcripts(transcript.sid)
                             .sentences.list();
-                        
+
                         sentences = sentencesResponse.map(s => ({
                             text: s.text || '',
                             confidence: s.confidence,
@@ -70,20 +70,20 @@ export default async function handler(req, res) {
                             endTime: s.endTime,
                             channel: s.channel
                         }));
-                        
+
                         transcriptText = sentences.map(s => s.text || '').filter(text => text.trim()).join(' ');
                         logger.log(`[Process Existing Transcripts] Transcript ${transcript.sid}: ${sentences.length} sentences, ${transcriptText.length} characters`);
                     } catch (error) {
                         logger.error(`[Process Existing Transcripts] Error fetching sentences for ${transcript.sid}:`, error);
                     }
-                    
+
                     // Get operator results
                     let operatorResults = null;
                     try {
                         const resultsResponse = await client.intelligence.v2
                             .transcripts(transcript.sid)
                             .operatorResults.list();
-                        
+
                         if (resultsResponse.length > 0) {
                             operatorResults = resultsResponse.map(r => ({
                                 name: r.name,
@@ -94,27 +94,27 @@ export default async function handler(req, res) {
                     } catch (error) {
                         logger.warn(`[Process Existing Transcripts] No operator results for ${transcript.sid}:`, error.message);
                     }
-                    
+
                     // Generate AI insights
                     let aiInsights = null;
                     if (transcriptText) {
                         aiInsights = await generateAdvancedAIInsights(transcriptText, sentences, operatorResults);
                     }
-                    
+
                     // Update the call data directly in Supabase (only with a valid Call SID)
                     try {
                         // Resolve a true Call SID to avoid creating rows keyed by Recording/Transcript SIDs
                         let finalCallSid = null;
                         try {
                             finalCallSid = await resolveToCallSid({ callSid: transcript.sourceSid, recordingSid: transcript.sourceSid, transcriptSid: transcript.sid });
-                        } catch (_) {}
+                        } catch (_) { }
 
                         if (!finalCallSid) {
                             logger.warn(`[Process Existing Transcripts] Skipping Supabase update for ${transcript.sid}: unresolved Call SID (sourceSid=${transcript.sourceSid})`);
                             results.push({ transcriptSid: transcript.sid, sourceSid: transcript.sourceSid, status: 'skipped', error: 'Unresolved Call SID' });
                         } else {
                             logger.log(`[Process Existing Transcripts] Updating Supabase: table='calls', id='${finalCallSid}'`);
-                            
+
                             // Check if the call exists first to avoid overwriting metadata with defaults
                             const { data: existingCall } = await supabaseAdmin
                                 .from('calls')
@@ -145,7 +145,7 @@ export default async function handler(req, res) {
                                         updated_at: new Date().toISOString()
                                     })
                                     .eq('id', finalCallSid);
-                                    
+
                                 if (updateError) throw updateError;
                                 logger.log(`[Process Existing Transcripts] Successfully updated existing call data for ${transcript.sid} in Supabase`);
                             } else {
@@ -167,7 +167,7 @@ export default async function handler(req, res) {
                                         created_at: new Date().toISOString(),
                                         updated_at: new Date().toISOString()
                                     });
-                                    
+
                                 if (insertError) throw insertError;
                                 logger.log(`[Process Existing Transcripts] Successfully inserted new call data for ${transcript.sid} in Supabase`);
                             }
@@ -178,7 +178,7 @@ export default async function handler(req, res) {
                         logger.error(`[Process Existing Transcripts] Error updating call data for ${transcript.sid}:`, error);
                         results.push({ transcriptSid: transcript.sid, sourceSid: transcript.sourceSid, status: 'error', error: error.message });
                     }
-                    
+
                 } catch (error) {
                     logger.error(`[Process Existing Transcripts] Error processing transcript ${transcript.sid}:`, error);
                     results.push({
@@ -191,7 +191,7 @@ export default async function handler(req, res) {
             } else if (transcript.status === 'completed') {
                 // Try to find alternative source identifiers
                 let alternativeSourceId = null;
-                
+
                 // Check for other possible source fields
                 if (transcript.callSid) {
                     alternativeSourceId = transcript.callSid;
@@ -201,10 +201,10 @@ export default async function handler(req, res) {
                     // Use transcript SID as fallback
                     alternativeSourceId = transcript.sid;
                 }
-                
+
                 if (alternativeSourceId) {
                     logger.log(`[Process Existing Transcripts] Processing transcript ${transcript.sid} with alternative source: ${alternativeSourceId}`);
-                    
+
                     try {
                         // Get sentences
                         let transcriptText = '';
@@ -213,7 +213,7 @@ export default async function handler(req, res) {
                             const sentencesResponse = await client.intelligence.v2
                                 .transcripts(transcript.sid)
                                 .sentences.list();
-                            
+
                             sentences = sentencesResponse.map(s => ({
                                 text: s.text || '',
                                 confidence: s.confidence,
@@ -221,32 +221,32 @@ export default async function handler(req, res) {
                                 endTime: s.endTime,
                                 channel: s.channel
                             }));
-                            
+
                             transcriptText = sentences.map(s => s.text || '').filter(text => text.trim()).join(' ');
                             logger.log(`[Process Existing Transcripts] Transcript ${transcript.sid}: ${sentences.length} sentences, ${transcriptText.length} characters`);
                         } catch (error) {
                             logger.error(`[Process Existing Transcripts] Error fetching sentences for ${transcript.sid}:`, error);
                         }
-                        
+
                         // Generate AI insights
                         let aiInsights = null;
                         if (transcriptText) {
                             aiInsights = await generateAdvancedAIInsights(transcriptText, sentences, null);
                         }
-                        
+
                         // Update the call data directly in Supabase (only with a valid Call SID)
                         try {
                             let finalCallSid = null;
                             try {
                                 finalCallSid = await resolveToCallSid({ callSid: alternativeSourceId, recordingSid: alternativeSourceId, transcriptSid: transcript.sid });
-                            } catch (_) {}
+                            } catch (_) { }
 
                             if (!finalCallSid) {
                                 logger.warn(`[Process Existing Transcripts] Skipping Supabase update for ${transcript.sid} (alt source): unresolved Call SID (alt=${alternativeSourceId})`);
                                 results.push({ transcriptSid: transcript.sid, sourceSid: alternativeSourceId, status: 'skipped', error: 'Unresolved Call SID' });
                             } else {
                                 logger.log(`[Process Existing Transcripts] Updating Supabase: table='calls', id='${finalCallSid}' (alt)`);
-                                
+
                                 // Check if existing
                                 const { data: existingCall } = await supabaseAdmin
                                     .from('calls')
@@ -299,14 +299,14 @@ export default async function handler(req, res) {
                                     if (insertError) throw insertError;
                                     logger.log(`[Process Existing Transcripts] Successfully inserted new call data for ${transcript.sid} in Supabase (alt)`);
                                 }
-                                
+
                                 results.push({ transcriptSid: transcript.sid, sourceSid: finalCallSid, transcriptLength: transcriptText.length, status: 'success-alternative' });
                             }
                         } catch (error) {
                             logger.error(`[Process Existing Transcripts] Error updating call data for ${transcript.sid}:`, error);
                             results.push({ transcriptSid: transcript.sid, sourceSid: alternativeSourceId, status: 'error', error: error.message });
                         }
-                        
+
                     } catch (error) {
                         logger.error(`[Process Existing Transcripts] Error processing transcript ${transcript.sid} with alternative source:`, error);
                         results.push({
@@ -328,22 +328,22 @@ export default async function handler(req, res) {
                 }
             }
         }
-        
+
         logger.log(`[Process Existing Transcripts] Completed processing ${results.length} transcripts`);
-        
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
             success: true,
             message: `Processed ${results.length} transcripts`,
             results: results
         }));
-        
+
     } catch (error) {
         logger.error('[Process Existing Transcripts] Error:', error);
         res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ 
+        res.end(JSON.stringify({
             error: 'Failed to process existing transcripts',
-            details: error.message 
+            details: error.message
         }));
         return;
     }
@@ -353,14 +353,14 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
     try {
         const words = transcript.toLowerCase().split(/\s+/);
         const wordCount = words.length;
-        
+
         // Enhanced sentiment analysis
         const positiveWords = ['good', 'great', 'excellent', 'perfect', 'love', 'happy', 'satisfied', 'interested', 'yes', 'sure', 'definitely', 'amazing', 'fantastic', 'wonderful'];
         const negativeWords = ['bad', 'terrible', 'awful', 'hate', 'angry', 'frustrated', 'disappointed', 'no', 'not', 'never', 'problem', 'issue', 'concern', 'worried'];
-        
+
         const positiveCount = words.filter(word => positiveWords.includes(word)).length;
         const negativeCount = words.filter(word => negativeWords.includes(word)).length;
-        
+
         let sentiment = 'Neutral';
         let sentimentScore = 0;
         if (positiveCount > negativeCount) {
@@ -370,7 +370,7 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
             sentiment = 'Negative';
             sentimentScore = -(negativeCount - positiveCount) / wordCount;
         }
-        
+
         // Extract key topics with confidence
         const businessTopics = {
             'price': ['price', 'cost', 'expensive', 'cheap', 'budget', 'afford', 'dollar', 'payment'],
@@ -381,7 +381,7 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
             'meeting': ['meeting', 'demo', 'presentation', 'call', 'schedule', 'appointment'],
             'proposal': ['proposal', 'quote', 'estimate', 'offer', 'deal', 'package']
         };
-        
+
         const detectedTopics = [];
         for (const [topic, keywords] of Object.entries(businessTopics)) {
             const matches = keywords.filter(keyword => words.includes(keyword));
@@ -393,23 +393,23 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
                 });
             }
         }
-        
+
         // Extract next steps
         const nextStepKeywords = ['call', 'email', 'meeting', 'demo', 'proposal', 'quote', 'follow', 'schedule', 'send', 'review', 'next step', 'what happens next'];
         const nextSteps = nextStepKeywords.filter(step => words.includes(step));
-        
+
         // Extract pain points
         const painKeywords = ['problem', 'issue', 'concern', 'worry', 'challenge', 'difficult', 'expensive', 'slow', 'complicated', 'confused'];
         const painPoints = painKeywords.filter(pain => words.includes(pain));
-        
+
         // Check for budget discussion
         const budgetKeywords = ['budget', 'cost', 'price', 'expensive', 'cheap', 'afford', 'money', 'dollar', 'payment', 'investment'];
         const budgetDiscussed = budgetKeywords.some(keyword => words.includes(keyword));
-        
+
         // Check for timeline discussion
         const timelineKeywords = ['when', 'timeline', 'schedule', 'deadline', 'urgent', 'soon', 'quickly', 'time', 'date'];
         const timelineMentioned = timelineKeywords.some(keyword => words.includes(keyword));
-        
+
         // Extract decision makers (simple name detection)
         const decisionMakers = [];
         const namePattern = /\b[A-Z][a-z]+ [A-Z][a-z]+\b/g;
@@ -417,7 +417,7 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
         if (names.length > 0) {
             decisionMakers.push(...names.slice(0, 3)); // Limit to 3 names
         }
-        
+
         // Use operator results if available - extract Twilio-generated summary
         let enhancedInsights = {};
         let twilioSummary = '';
@@ -425,27 +425,27 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
             // Look for the summary in operator results - check multiple locations
             for (const op of operatorResults) {
                 // Check for text_generation type or summary-related names
-                if (op.operatorType === 'text_generation' || 
+                if (op.operatorType === 'text_generation' ||
                     ['summary', 'conversation_summary', 'call_summary'].includes(op.name?.toLowerCase())) {
                     // Check multiple possible locations for the summary
-                    const summaryText = op.textGenerationResults || 
-                                       op.summary || 
-                                       op.results?.textGenerationResults || 
-                                       op.results?.summary ||
-                                       op.extractionResults?.summary ||
-                                       (typeof op.result === 'string' ? op.result : null);
+                    const summaryText = op.textGenerationResults ||
+                        op.summary ||
+                        op.results?.textGenerationResults ||
+                        op.results?.summary ||
+                        op.extractionResults?.summary ||
+                        (typeof op.result === 'string' ? op.result : null);
                     if (summaryText) {
                         twilioSummary = String(summaryText).trim();
                         logger.log('[Process Existing] Found Twilio summary from operator:', op.name, 'length:', twilioSummary.length);
                         break;
                     }
                 }
-                
+
                 // Also check extraction operators which may contain parsed JSON with summary
                 if (op.operatorType === 'extraction' && op.extractionResults) {
                     try {
-                        const extracted = typeof op.extractionResults === 'string' 
-                            ? JSON.parse(op.extractionResults) 
+                        const extracted = typeof op.extractionResults === 'string'
+                            ? JSON.parse(op.extractionResults)
                             : op.extractionResults;
                         if (extracted.summary) {
                             twilioSummary = String(extracted.summary).trim();
@@ -457,17 +457,17 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
                     }
                 }
             }
-            
+
             enhancedInsights = {
                 operatorAnalysis: operatorResults,
                 confidence: operatorResults.reduce((acc, r) => acc + (r.confidence || 0), 0) / operatorResults.length,
                 hasTwilioSummary: !!twilioSummary
             };
         }
-        
+
         // Use Twilio-generated summary if available, otherwise generate one
         const generatedSummary = `Advanced AI analysis of ${wordCount}-word conversation. ${sentiment} sentiment detected (${(sentimentScore * 100).toFixed(1)}% confidence). ${detectedTopics.length > 0 ? 'Key topics: ' + detectedTopics.map(t => t.topic).join(', ') : 'General business discussion.'}`;
-        
+
         return {
             summary: twilioSummary || generatedSummary,
             sentiment: sentiment,
@@ -484,7 +484,7 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
             source: 'twilio-conversational-intelligence',
             ...enhancedInsights
         };
-        
+
     } catch (error) {
         logger.error('[Process Existing Transcripts] Insights generation error:', error);
         return {

@@ -4,7 +4,7 @@
  * Requires Authorization: Bearer <APOLLO_NEWS_CRON_SECRET or CRON_SECRET>.
  */
 
-import { supabaseAdmin } from '../_supabase.js';
+import { supabaseAdmin } from '@/lib/supabase';
 import { fetchWithRetry, getApiKey, APOLLO_BASE_URL, normalizeDomain } from '../apollo/_utils.js';
 
 const REFRESH_WINDOW_DAYS = 7;

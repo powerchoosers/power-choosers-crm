@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '../_supabase.js';
+import { supabaseAdmin } from '@/lib/supabase';
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
 
@@ -13,7 +13,7 @@ export default async function handler(req, res) {
 
   try {
     const { email } = req.body;
-    
+
     if (!email) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Email address is required' }));
@@ -58,7 +58,7 @@ export default async function handler(req, res) {
     // 2. Update contact record(s) in contacts table
     // We update metadata to reflect the unsubscribe status
     let updatedContactsCount = 0;
-    
+
     try {
       const { data: contacts, error: fetchError } = await supabaseAdmin
         .from('contacts')
@@ -106,7 +106,7 @@ export default async function handler(req, res) {
     // or need to update 'sequence_members' / 'sequence_activations'.
     // For now, we log this as a pending action.
     logger.warn(`[Unsubscribe] Sequence pausing skipped for ${email} - Logic pending migration to Supabase sequences`);
-    
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: true,
@@ -118,9 +118,9 @@ export default async function handler(req, res) {
   } catch (error) {
     logger.error('[Unsubscribe] Error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
+    res.end(JSON.stringify({
       error: 'Failed to process unsubscribe request',
-      message: error.message 
+      message: error.message
     }));
     return;
   }
