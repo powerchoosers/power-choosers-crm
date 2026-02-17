@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion'
 import { Calendar, Zap, TrendingUp, Search, ShieldCheck } from 'lucide-react'
 import { FeedbackBadge } from './FeedbackBadge'
 
