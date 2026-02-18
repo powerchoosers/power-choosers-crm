@@ -1077,8 +1077,8 @@ export function GeminiChatPanel() {
 
   const [messages, setMessages] = useState<GeminiMessage[]>([])
   const [lastProvider, setLastProvider] = useState<string>('openrouter')
-  const [lastModel, setLastModel] = useState<string>('gemini-2.5-flash')
-  const [selectedModel, setSelectedModel] = useState<string>('openai/gpt-5-nano')
+  const [lastModel, setLastModel] = useState<string>('google/gemini-2.5-flash')
+  const [selectedModel, setSelectedModel] = useState<string>('google/gemini-2.5-flash')
   const [diagnostics, setDiagnostics] = useState<Diagnostic[] | null>(null)
   const [showDiagnostics, setShowDiagnostics] = useState(false)
 
@@ -1773,45 +1773,36 @@ SELECT * FROM hybrid_search_accounts(
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-950 border-white/10 text-white">
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 mb-1">
-                    OpenRouter Intelligence Stack
+                    Gemini Intelligence
                   </div>
-                  <SelectItem value="openai/gpt-5-nano" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GPT-5-NANO (DEFAULT)
-                  </SelectItem>
-                  <SelectItem value="openai/gpt-5-mini" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GPT-5-MINI (OR)
+                  <SelectItem value="google/gemini-2.5-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GEMINI-2.5-FLASH
                   </SelectItem>
                   <SelectItem value="google/gemini-3-flash-preview" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GEMINI-3-FLASH (OR)
+                    GEMINI-3-FLASH
                   </SelectItem>
-                  <SelectItem value="google/gemini-2.5-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GEMINI-2.5-FLASH (OR)
+                  <SelectItem value="openai/gpt-5-nano" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GPT-5-NANO
                   </SelectItem>
-                  <SelectItem value="anthropic/claude-3.5-sonnet" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    CLAUDE-3.5-SONNET (OR)
+                  <SelectItem value="openai/gpt-5-mini" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    GPT-5-MINI
                   </SelectItem>
 
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
-                    Direct Perplexity
+                    Claude Intelligence
+                  </div>
+                  <SelectItem value="anthropic/claude-3.5-sonnet" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                    CLAUDE-3.5-SONNET
+                  </SelectItem>
+
+                  <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
+                    Perplexity Intelligence
                   </div>
                   <SelectItem value="sonar-pro" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                     SONAR-PRO
                   </SelectItem>
                   <SelectItem value="sonar" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                     SONAR-REASONING
-                  </SelectItem>
-
-                  <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
-                    Direct Gemini
-                  </div>
-                  <SelectItem value="gemini-3-flash-preview" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GEMINI-3-FLASH
-                  </SelectItem>
-                  <SelectItem value="gemini-2.5-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GEMINI-2.5-FLASH
-                  </SelectItem>
-                  <SelectItem value="gemini-2.0-flash" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GEMINI-2.0-FLASH
                   </SelectItem>
                 </SelectContent>
               </Select>
