@@ -34,13 +34,16 @@ export default async function handler(req, res) {
     }
 
     // Extract CRM context from query parameters
-    let contactId, accountId;
+    let contactId, accountId, agentId, agentEmail, targetPhoneFromQuery;
     try {
       const protocol = req.headers['x-forwarded-proto'] || 'https';
       const host = req.headers.host || req.headers['x-forwarded-host'] || '';
       const requestUrl = new URL(req.url, `${protocol}://${host}`);
       contactId = requestUrl.searchParams.get('contactId');
       accountId = requestUrl.searchParams.get('accountId');
+      agentId = requestUrl.searchParams.get('agentId');
+      agentEmail = requestUrl.searchParams.get('agentEmail');
+      targetPhoneFromQuery = requestUrl.searchParams.get('targetPhone');
     } catch (_) { }
 
     // Determine the dial status event - prioritize more specific status fields
@@ -137,6 +140,9 @@ export default async function handler(req, res) {
               duration: parseInt(body.DialCallDuration || body.CallDuration || '0', 10),
               contactId,
               accountId,
+              agentId,
+              agentEmail,
+              targetPhone: targetPhoneFromQuery || body.To || '',
               source: 'dial-status'
             };
 

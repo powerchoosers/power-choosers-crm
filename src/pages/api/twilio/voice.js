@@ -111,25 +111,23 @@ export default async function handler(req, res) {
             return;
         }
 
-        const To = src.To || src.to; // For inbound, this is typically your Twilio number
-        const From = src.From || src.from; // For inbound, this is the caller's number; for outbound, this is the selected caller ID
+        const To = src.targetNumber || src.target || src.To || src.to;
+        const From = src.callerId || src.From || src.from;
         const CallSid = src.CallSid || src.callSid;
 
         const inboundPhoneNumbers = await resolveInboundPhoneNumbers();
         const primaryBusinessNumber = inboundPhoneNumbers[0] || DEFAULT_TWILIO_BUSINESS_NUMBER;
-        const toDigits = digitsOnly(To);
-        const matchedInboundNumber = toDigits
-            ? inboundPhoneNumbers.find((num) => digitsOnly(num) === toDigits)
-            : null;
-        const isInboundToBusiness = Boolean(matchedInboundNumber);
-        const businessNumber = matchedInboundNumber || primaryBusinessNumber;
+
+        // Logical check for inbound vs outbound
+        const isInboundToBusiness = Boolean(inboundPhoneNumbers.find((num) => digitsOnly(num) === digitsOnly(src.To || src.to)));
+        const businessNumber = isInboundToBusiness ? (inboundPhoneNumbers.find((num) => digitsOnly(num) === digitsOnly(src.To || src.to)) || primaryBusinessNumber) : primaryBusinessNumber;
 
         // For outbound calls, use From as callerId (this is the selected Twilio number from settings)
         // For inbound calls, use businessNumber as callerId when dialing to browser client
-        const sanitizedFrom = normalizePhoneNumber(From);
+        const sanitizedFrom = normalizePhoneNumber(src.From || src.from);
         const callerIdForDial = isInboundToBusiness ? businessNumber : (sanitizedFrom || businessNumber);
 
-        // Ensure absolute base URL for Twilio callbacks (prefer PUBLIC_BASE_URL for stability)
+        // Ensure absolute base URL
         const envBase = process.env.PUBLIC_BASE_URL || '';
         const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
         const host = req.headers['x-forwarded-host'] || req.headers.host || '';
@@ -140,6 +138,7 @@ export default async function handler(req, res) {
         let accountId = '';
         let agentId = '';
         let agentEmail = '';
+        let targetPhone = '';
 
         if (CallSid && src.metadata) {
             try {
@@ -150,6 +149,7 @@ export default async function handler(req, res) {
                 accountId = meta.accountId || '';
                 agentId = meta.agentId || '';
                 agentEmail = meta.agentEmail || '';
+                targetPhone = meta.targetPhone || To || '';
 
                 // Create initial call record as 'initiated'
                 // [REMOVED] This ensures the transmission log only shows calls when complete
@@ -161,12 +161,12 @@ export default async function handler(req, res) {
             }
         }
 
-        // Build callback URLs with CRM context if available
         const callbackParams = new URLSearchParams();
         if (contactId) callbackParams.append('contactId', contactId);
         if (accountId) callbackParams.append('accountId', accountId);
         if (agentId) callbackParams.append('agentId', agentId);
         if (agentEmail) callbackParams.append('agentEmail', agentEmail);
+        if (targetPhone) callbackParams.append('targetPhone', targetPhone);
         const callbackQuery = callbackParams.toString() ? `?${callbackParams.toString()}` : '';
 
         logger.log(`[Voice Webhook] From: ${From || 'N/A'} To: ${To || 'N/A'} CallSid: ${CallSid || 'N/A'} inbound=${isInboundToBusiness} callerId=${callerIdForDial}`);
