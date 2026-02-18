@@ -617,10 +617,10 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                     exit={{ opacity: 0, scale: 0.95 }}
                     onClick={() => setActiveBlock(block.id)}
                     className={cn(
-                      "relative group p-4 rounded-xl border transition-all cursor-pointer",
+                      "relative group p-4 rounded-xl border transition-all cursor-pointer nodal-recessed nodal-monolith-edge",
                       activeBlock === block.id
-                        ? "bg-[#002FA7]/5 border-[#002FA7]/30 shadow-[0_0_20px_rgba(0,47,167,0.1)]"
-                        : "bg-black/40 border-white/5 hover:border-white/10"
+                        ? "bg-[#002FA7]/10 border-[#002FA7]/30 shadow-[0_0_20px_rgba(0,47,167,0.1)]"
+                        : "hover:bg-zinc-900/60 hover:border-white/10"
                     )}
                   >
                     <div className="flex items-center justify-between mb-3">
