@@ -2275,7 +2275,7 @@ export default async function handler(req, res) {
       bodyModel.startsWith('nvidia/');
 
     if (!bodyModel || bodyModel === 'default') {
-      targetModel = 'openai/gpt-5-nano';
+      targetModel = 'google/gemini-2.5-flash';
       provider = 'openrouter';
     } else if (bodyModel.startsWith('sonar')) {
       provider = 'perplexity';
