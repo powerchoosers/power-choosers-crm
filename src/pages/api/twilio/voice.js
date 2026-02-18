@@ -138,6 +138,9 @@ export default async function handler(req, res) {
         // Extract metadata and create initial call record to ensure it appears in CRM immediately
         let contactId = '';
         let accountId = '';
+        let agentId = '';
+        let agentEmail = '';
+
         if (CallSid && src.metadata) {
             try {
                 const meta = typeof src.metadata === 'string' ? JSON.parse(src.metadata) : src.metadata;
@@ -145,35 +148,13 @@ export default async function handler(req, res) {
                 // Extract IDs for propagation to dial status callbacks
                 contactId = meta.contactId || '';
                 accountId = meta.accountId || '';
+                agentId = meta.agentId || '';
+                agentEmail = meta.agentEmail || '';
 
                 // Create initial call record as 'initiated'
                 // [REMOVED] This ensures the transmission log only shows calls when complete
                 /*
-                if (meta.contactId || meta.accountId) {
-                    try {
-                        const callRecord = {
-                            callSid: CallSid,
-                            twilioSid: CallSid,
-                            status: 'initiated',
-                            direction: isInboundToBusiness ? 'inbound' : 'outbound',
-                            from: From,
-                            to: To,
-                            contactId: meta.contactId,
-                            accountId: meta.accountId,
-                            metadata: meta,
-                            agentId: meta.agentId,
-                            agentEmail: meta.agentEmail,
-                            timestamp: new Date().toISOString()
-                        };
-                        logger.log(`[Voice] Creating initial call record for ${CallSid}`, callRecord);
-                        // Do NOT await here to avoid blocking TwiML generation response latency
-                        upsertCallInSupabase(callRecord).catch(err => {
-                            logger.warn('[Voice] Failed creating initial call record:', err?.message);
-                        });
-                    } catch (e) {
-                        logger.warn('[Voice] Error preparing initial call upsert:', e);
-                    }
-                }
+                if (meta.contactId || meta.accountId) { ... }
                 */
             } catch (e) {
                 logger.warn('[Voice] Failed to process call metadata:', e);
@@ -184,6 +165,8 @@ export default async function handler(req, res) {
         const callbackParams = new URLSearchParams();
         if (contactId) callbackParams.append('contactId', contactId);
         if (accountId) callbackParams.append('accountId', accountId);
+        if (agentId) callbackParams.append('agentId', agentId);
+        if (agentEmail) callbackParams.append('agentEmail', agentEmail);
         const callbackQuery = callbackParams.toString() ? `?${callbackParams.toString()}` : '';
 
         logger.log(`[Voice Webhook] From: ${From || 'N/A'} To: ${To || 'N/A'} CallSid: ${CallSid || 'N/A'} inbound=${isInboundToBusiness} callerId=${callerIdForDial}`);
