@@ -103,19 +103,19 @@ export function SequenceAssignmentModal({ isOpen, onClose, selectedContactIds, o
                     </div>
                 </div>
 
-                <DialogFooter className="p-6 pt-2 bg-white/[0.02] border-t border-white/5">
+                <DialogFooter className="p-4 border-t border-white/5 nodal-recessed flex items-center justify-between gap-2">
                     <Button variant="ghost" onClick={onClose} className="text-zinc-500 hover:text-white">
                         Cancel
                     </Button>
                     <Button
                         onClick={handleEnroll}
                         disabled={!selectedProtocolId || enrollContacts.isPending}
-                        className="bg-blue-600 hover:bg-blue-500 text-white min-w-[100px]"
+                        className="bg-white hover:bg-zinc-200 text-zinc-950 min-w-[100px] font-mono tracking-wide text-xs border border-white/10"
                     >
                         {enrollContacts.isPending ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
-                            'Initiate Sequence'
+                            'Initiate Protocol'
                         )}
                     </Button>
                 </DialogFooter>
