@@ -15,10 +15,10 @@ interface StakeholderMapProps {
 
 export const StakeholderMap: React.FC<StakeholderMapProps> = ({ contacts = [], className }) => {
   const router = useRouter()
-  
+
   // Get all contact IDs
   const contactIds = contacts.map(c => c.id)
-  
+
   // Query which contacts are in target lists
   const { data: contactsInLists } = useContactsInTargetLists(contactIds)
 
@@ -29,26 +29,26 @@ export const StakeholderMap: React.FC<StakeholderMapProps> = ({ contacts = [], c
       <h3 className="text-xs font-mono text-zinc-500 mb-4 uppercase tracking-[0.2em] flex items-center gap-2">
         <User className="w-3 h-3" /> Command Chain
       </h3>
-      
+
       <div className="space-y-2">
         {contacts.map((contact) => {
           const isInTargetList = contactsInLists?.has(contact.id) || false
-          
+
           return (
-            <div 
+            <div
               key={contact.id}
               onClick={() => router.push(`/network/contacts/${contact.id}`)}
-              className="group flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 border border-transparent hover:border-white/5 transition-all cursor-pointer"
+              className="group flex items-center gap-3 p-2 rounded-lg hover:bg-zinc-950/40 border border-transparent hover:border-white/5 transition-all cursor-pointer"
             >
               {/* Avatar with Target Badge */}
-              <ContactAvatar 
-                name={contact.name || ''} 
-                size={32} 
+              <ContactAvatar
+                name={contact.name || ''}
+                size={32}
                 className="w-8 h-8 rounded-[14px]"
                 textClassName="text-[10px]"
                 showListBadge={isInTargetList}
               />
-              
+
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-medium text-zinc-300 group-hover:text-white group-hover:scale-[1.02] transition-all origin-left truncate">
                   {contact.name}
