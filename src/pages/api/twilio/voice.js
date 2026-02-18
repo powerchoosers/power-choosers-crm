@@ -160,6 +160,8 @@ export default async function handler(req, res) {
                             contactId: meta.contactId,
                             accountId: meta.accountId,
                             metadata: meta,
+                            agentId: meta.agentId,
+                            agentEmail: meta.agentEmail,
                             timestamp: new Date().toISOString()
                         };
                         logger.log(`[Voice] Creating initial call record for ${CallSid}`, callRecord);
