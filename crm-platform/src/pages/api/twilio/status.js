@@ -34,7 +34,7 @@ export default async function handler(req, res) {
         if (!body || typeof body !== 'object') body = {};
 
         // Extract CRM context from query parameters
-        let contactId, accountId, agentId, agentEmail;
+        let contactId, accountId, agentId, agentEmail, targetPhoneFromQuery;
         try {
             const protocol = req.headers['x-forwarded-proto'] || 'https';
             const host = req.headers.host || req.headers['x-forwarded-host'] || '';
@@ -43,6 +43,7 @@ export default async function handler(req, res) {
             accountId = requestUrl.searchParams.get('accountId');
             agentId = requestUrl.searchParams.get('agentId');
             agentEmail = requestUrl.searchParams.get('agentEmail');
+            targetPhoneFromQuery = requestUrl.searchParams.get('targetPhone');
         } catch (_) { }
 
         const {
@@ -58,6 +59,9 @@ export default async function handler(req, res) {
             DialCallStatus
         } = body;
 
+        let targetPhone = targetPhoneFromQuery || '';
+        let businessPhone = '';
+
         // #region agent log
         if (CallStatus === 'completed') {
             console.log(`[Status] Completed event for ${CallSid}:`, {
@@ -65,10 +69,12 @@ export default async function handler(req, res) {
                 Duration,
                 DialCallDuration,
                 DialCallSid,
-                DialCallStatus
+                DialCallStatus,
+                agentId,
+                agentEmail
             });
         }
-        // #endregion  CallDuration
+        // #endregion
 
         const sig = req.headers['x-twilio-signature'] || null;
         logger.debug('[TwilioWebhook] Twilio status callback received', {
@@ -77,11 +83,6 @@ export default async function handler(req, res) {
             from: From,
             to: To,
             duration: Duration || CallDuration
-        });
-        logger.debug('[TwilioWebhook] Status callback details', {
-            host: req.headers.host,
-            hasSignature: !!sig,
-            payloadSize: JSON.stringify(body).length
         });
 
         // Handle call completion - terminate all related legs when any leg completes
@@ -100,7 +101,7 @@ export default async function handler(req, res) {
                     const client = twilio(accountSid, authToken);
                     const callSidsToTerminate = [CallSid];
 
-                    // Find all related calls (children of this call)
+                    // Find all related calls (parent and children)
                     try {
                         const children = await client.calls.list({ parentCallSid: CallSid, limit: 20 });
                         for (const child of children) {
@@ -112,32 +113,13 @@ export default async function handler(req, res) {
                         logger.warn('[TwilioWebhook] Could not fetch child calls for termination', { error: fetchError.message });
                     }
 
-                    // Also check if this is a child call and terminate parent
-                    try {
-                        const call = await client.calls(CallSid).fetch();
-                        if (call.parentCallSid && call.parentCallSid !== CallSid) {
-                            callSidsToTerminate.push(call.parentCallSid);
-                        }
-                    } catch (fetchError) {
-                        // Ignore if call not found
-                    }
-
-                    // Terminate all related legs
                     for (const sid of callSidsToTerminate) {
-                        if (sid === CallSid) continue; // Already completed
                         try {
                             const call = await client.calls(sid).fetch();
                             if (call.status !== 'completed' && call.status !== 'canceled') {
                                 await client.calls(sid).update({ status: 'completed' });
-                                logger.info('[TwilioWebhook] Terminated related call leg', {
-                                    callSid: sid,
-                                    direction: call.direction,
-                                    from: call.from,
-                                    to: call.to
-                                });
                             }
                         } catch (termError) {
-                            // Ignore errors for calls already completed
                             if (termError.code !== 20404) {
                                 logger.error('[TwilioWebhook] Error terminating related call leg', {
                                     callSid: sid,
@@ -161,23 +143,10 @@ export default async function handler(req, res) {
         const envBase = process.env.PUBLIC_BASE_URL || process.env.API_BASE_URL || '';
         const base = host ? `${proto}://${host}` : (envBase || 'https://nodal-point-network.vercel.app');
 
-        // Precompute targetPhone/businessPhone for early visibility on UI
-        const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
-        const envBiz = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
-            .split(',').map(norm).filter(Boolean);
-        const to10 = norm(To);
-        const from10 = norm(From);
-        const isBiz = (p) => !!p && envBiz.includes(p);
-        const businessPhone = isBiz(to10) ? To : (isBiz(from10) ? From : (envBiz[0] || ''));
-        const targetPhone = isBiz(to10) && !isBiz(from10) ? from10 : (isBiz(from10) && !isBiz(to10) ? to10 : (to10 || from10));
-
-        // Fallback: attempt to start a dual-channel recording when the call is answered/in-progress
-        // This complements the /api/twilio/dial-status path and covers cases where Dial callbacks are missed
+        // Logic for dual-channel REST recording fallback if needed
         async function startDualIfNeeded() {
             try {
-                const event = String(CallStatus || '').toLowerCase();
-                if (!(event === 'answered' || event === 'in-progress' || event === 'completed')) return;
-
+                if (CallStatus !== 'in-progress' && CallStatus !== 'answered') return;
                 const accountSid = process.env.TWILIO_ACCOUNT_SID;
                 const authToken = process.env.TWILIO_AUTH_TOKEN;
                 if (!accountSid || !authToken) { logger.warn('[Status] Missing Twilio creds; cannot start recording'); return; }
@@ -188,17 +157,16 @@ export default async function handler(req, res) {
                 // PSTN legs = non-client endpoints with direction outbound-dial
                 const candidates = new Set();
                 const pstnCandidates = new Set();
-                const DialCallSid = body.DialCallSid || body.DialCallSid0 || body.DialSid || '';
+                const DialCallSidActual = body.DialCallSid || body.DialCallSid0 || body.DialSid || '';
                 const looksLikeSid = (sid) => sid && /^CA[0-9a-f]{32}$/i.test(String(sid));
                 const isClient = (v) => typeof v === 'string' && v.startsWith('client:');
                 // Classify provided Dial child if available
-                if (looksLikeSid(DialCallSid)) {
+                if (looksLikeSid(DialCallSidActual)) {
                     const childLooksPstn = (body.To && body.From && !isClient(body.To) && !isClient(body.From) && String(body.Direction || '').toLowerCase() === 'outbound-dial');
                     if (childLooksPstn) {
-                        pstnCandidates.add(DialCallSid);
-                        logger.log('[Status] Identified PSTN Dial child:', DialCallSid, 'To:', body.To);
+                        pstnCandidates.add(DialCallSidActual);
                     } else {
-                        candidates.add(DialCallSid);
+                        candidates.add(DialCallSidActual);
                     }
                 }
                 // Add parent at lower priority
@@ -207,43 +175,32 @@ export default async function handler(req, res) {
                 try {
                     if (CallSid) {
                         const kids = await client.calls.list({ parentCallSid: CallSid, limit: 10 });
-                        // Separate PSTN vs others for priority ordering
                         for (const k of kids) {
                             const kidIsClient = (k.from || '').startsWith('client:') || (k.to || '').startsWith('client:');
                             const isPstn = !kidIsClient && String(k.direction || '').toLowerCase() === 'outbound-dial';
                             if (isPstn) pstnCandidates.add(k.sid); else candidates.add(k.sid);
                         }
-                        logger.log('[Status] Discovered child legs:', kids.map(c => ({ sid: c.sid, from: c.from, to: c.to, direction: c.direction, isPstn: !(String(c.from || '').startsWith('client:') || String(c.to || '').startsWith('client:')) && String(c.direction || '').toLowerCase() === 'outbound-dial' })));
                     }
-                } catch (discErr) {
-                    logger.log('[Status] Child discovery failed:', discErr?.message);
-                }
+                } catch (discErr) { }
 
                 const pstnList = Array.from(pstnCandidates);
                 const ordered = [...pstnList, ...Array.from(candidates)];
-                logger.log('[Status] Candidate priority order:', { pstnFirst: pstnList, others: Array.from(candidates) });
 
-                // Try candidates in priority order; skip if DialVerb recording exists to avoid interference
+                // Try candidates in priority order
                 for (const sid of ordered) {
                     try {
                         const existing = await client.calls(sid).recordings.list({ limit: 5 });
                         const hasDialVerbRecording = existing.some(r => r.source === 'DialVerb' && r.status !== 'stopped');
-                        if (hasDialVerbRecording) {
-                            logger.log('[Status] DialVerb recording already exists on', sid, '- skipping REST API fallback to avoid interference');
-                            return;
-                        }
+                        if (hasDialVerbRecording) return;
                         const hasDual = existing.some(r => (Number(r.channels) || 0) === 2 && r.status !== 'stopped');
-                        if (hasDual) { logger.log('[Status] Dual recording already active on', sid); return; }
+                        if (hasDual) return;
 
-                        // Safety: stop active mono recording so dual can start
+                        // Safety: stop active mono recording
                         const active = existing.find(r => r.status !== 'stopped');
                         if (active && (Number(active.channels) || 0) === 1) {
                             try {
                                 await client.calls(sid).recordings('Twilio.CURRENT').update({ status: 'stopped' });
-                                logger.log('[Status] ⏹️ Stopped active mono recording on', sid, '->', active.sid);
-                            } catch (stopErr) {
-                                logger.log('[Status] Could not stop active recording on', sid, ':', stopErr?.message);
-                            }
+                            } catch (stopErr) { }
                         }
 
                         const rec = await client.calls(sid).recordings.create({
@@ -252,59 +209,22 @@ export default async function handler(req, res) {
                             recordingStatusCallback: baseUrl + '/api/twilio/recording',
                             recordingStatusCallbackMethod: 'POST'
                         });
-                        logger.log('[Status] Started recording via REST on', sid, '→', { recordingSid: rec.sid, channels: rec.channels, source: rec.source, track: rec.track });
                         return; // Stop after first success
-                    } catch (tryErr) {
-                        logger.log('[Status] Could not start recording on', sid, ':', tryErr?.message);
-                    }
+                    } catch (tryErr) { }
                 }
-
-                if (!candidates.size) logger.log('[Status] No candidate call SIDs to start recording on');
             } catch (e) {
                 logger.log('[Status] startDualIfNeeded error:', e?.message);
             }
         }
         await startDualIfNeeded();
 
-        // [REMOVED] Webhook telemetry logging - was causing excessive Firestore writes (~10-15 per call)
-        // Only essential call data is now logged to /api/calls collection on 'completed' status
-
         // Handle different call statuses
         switch (CallStatus) {
-            case 'ringing':
-                logger.log(`  📞 Call is ringing...`);
-                // [REMOVED] Early upsert to match "only post on completion" requirement
-                break;
-            case 'in-progress':
-                logger.log(`  📞 Call answered and in progress`);
-                // [REMOVED] Early upsert to match "only post on completion" requirement
-                break;
-            case 'completed':
-                // Logging only - actual duration calculation for DB is below
-                logger.log(`  ✅ Call completed. Duration: ${Duration || CallDuration || DialCallDuration || '0'}s (DialDuration: ${DialCallDuration || 'N/A'})`);
-                if (RecordingUrl) {
-                    logger.log(`  🎵 Recording: ${RecordingUrl}`);
-                }
-                break;
-            case 'busy':
-                logger.log(`  📵 Line busy`);
-                break;
-            case 'no-answer':
-                logger.log(`  📵 No answer`);
-                break;
-            case 'failed':
-                logger.log(`  ❌ Call failed`);
-                break;
-            case 'canceled':
-                logger.log(`  ❌ Call canceled`);
-                break;
-            default:
-                logger.log(`  ℹ️ Status: ${CallStatus}`);
+            case 'completed': break;
+            default: break;
         }
 
         // Upsert into central /api/calls on completed status with full fields
-        // Previously wrote on every status change (initiated, ringing, in-progress, etc.) = ~8-10 writes per call
-        // Now only writes once when call completes = ~1 write per call (88% reduction)
         try {
             if (CallStatus === 'completed') {
                 let correctedDuration = parseInt((DialCallDuration || Duration || CallDuration || '0'), 10);
@@ -315,7 +235,6 @@ export default async function handler(req, res) {
                         const authToken = process.env.TWILIO_AUTH_TOKEN;
                         if (accountSid && authToken) {
                             const client = twilio(accountSid, authToken);
-                            // If we have DialCallSid (child leg), fetch it directly. Otherwise look for kids.
                             const targetForDuration = DialCallSid || CallSid;
                             const kids = await client.calls.list({ parentCallSid: targetForDuration, limit: 1 });
                             const child = kids.find(k => k.direction === 'outbound-dial') || (DialCallSid ? await client.calls(DialCallSid).fetch() : null);
@@ -324,17 +243,14 @@ export default async function handler(req, res) {
                                 const childDuration = parseInt(child.duration, 10);
                                 if (childDuration > correctedDuration) {
                                     correctedDuration = childDuration;
-                                    logger.log(`[Status] Corrected duration for ${CallSid} using child leg ${child.sid}: ${childDuration}s`);
                                 }
                             }
                         }
                     }
-                } catch (durErr) {
-                    logger.warn('[Status] Failed to correct duration from child leg:', durErr.message);
-                }
+                } catch (durErr) { }
 
                 try {
-                    const body = {
+                    const bodyPayload = {
                         callSid: CallSid,
                         to: To,
                         from: From,
@@ -348,21 +264,17 @@ export default async function handler(req, res) {
                         agentEmail
                     };
                     if (RecordingUrl) {
-                        body.recordingUrl = RecordingUrl.endsWith('.mp3') ? RecordingUrl : `${RecordingUrl}.mp3`;
+                        bodyPayload.recordingUrl = RecordingUrl.endsWith('.mp3') ? RecordingUrl : `${RecordingUrl}.mp3`;
                     }
-                    await upsertCallInSupabase(body).catch(() => { });
+                    await upsertCallInSupabase(bodyPayload).catch(() => { });
 
                     // Auto-trigger transcription for completed calls with recordings
                     if (RecordingUrl) {
-                        logger.log(`[Status] Auto-triggering transcription for completed call: ${CallSid}`);
-                        // Trigger transcription in background (don't wait for response)
                         fetch(`${base}/api/process-call`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ callSid: CallSid })
-                        }).catch(err => {
-                            logger.warn(`[Status] Failed to trigger transcription for ${CallSid}:`, err?.message);
-                        });
+                        }).catch(err => { });
                     }
                 } catch (innerError) {
                     logger.warn('[Status] Failed posting to /api/calls (inner):', innerError?.message);
@@ -378,21 +290,17 @@ export default async function handler(req, res) {
                 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
                 let foundUrl = '';
                 let foundRecSid = '';
-                // 1) Try parent CallSid first
                 try {
                     const recs = await client.recordings.list({ callSid: CallSid, limit: 5 });
                     const best = (recs || []).find(r => (Number(r.channels) || 0) === 2) || (recs || [])[0];
                     if (best) {
                         foundRecSid = best.sid;
                         foundUrl = `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Recordings/${foundRecSid}.mp3`;
-                        logger.log(`[Status] Found parent-leg recording for ${CallSid}: ${foundUrl}`);
                     }
                 } catch (_) { }
-                // 2) If not found on parent, look on child legs (PSTN priority)
                 if (!foundUrl) {
                     try {
                         const kids = await client.calls.list({ parentCallSid: CallSid, limit: 10 });
-                        // Prefer dual-channel
                         for (const k of kids) {
                             try {
                                 const rs = await client.recordings.list({ callSid: k.sid, limit: 5 });
@@ -400,7 +308,6 @@ export default async function handler(req, res) {
                                 if (best) {
                                     foundRecSid = best.sid;
                                     foundUrl = `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Recordings/${foundRecSid}.mp3`;
-                                    logger.log(`[Status] Found child-leg recording for ${CallSid} on ${k.sid}: ${foundUrl}`);
                                     break;
                                 }
                             } catch (_) { }
@@ -416,11 +323,10 @@ export default async function handler(req, res) {
                         recordingSid: foundRecSid,
                         agentId,
                         agentEmail,
+                        targetPhone: targetPhone || undefined,
                         timestamp: new Date().toISOString()
                     };
                     await upsertCallInSupabase(payload).catch(() => { });
-                } else {
-                    logger.log(`[Status] No recordings found yet for ${CallSid} on parent or children`);
                 }
             }
         } catch (err) {
