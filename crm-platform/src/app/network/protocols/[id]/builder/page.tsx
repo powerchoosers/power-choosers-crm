@@ -22,6 +22,7 @@ import {
   useUpdateNodeInternals,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Mail,
   Phone,
@@ -54,7 +55,8 @@ import {
   Brain,
   AlertTriangle,
   Search,
-  Mic
+  Mic,
+  RotateCcw
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -172,7 +174,75 @@ const FRESH_EDGES: Edge[] = [];
 
 const TEST_PROTOCOL_ID = '123'; // The hardcoded ID for the demo/test sequence
 
-const ProtocolNode = ({ data, id, selected }: NodeProps) => {
+const DELAY_UNITS = ['minutes', 'hours', 'days', 'weeks', 'months'];
+
+const DelayCycle = ({ value, unit, nodeId }: { value: string; unit: string; nodeId: string }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const { setNodes } = useReactFlow();
+
+  const currentIndex = DELAY_UNITS.indexOf(unit);
+  const nextUnit = DELAY_UNITS[currentIndex === -1 ? 2 : (currentIndex + 1) % DELAY_UNITS.length];
+
+  const cycleUnit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setNodes((nds) => nds.map((n) => {
+      if (n.id === nodeId) {
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            delayUnit: nextUnit,
+            label: `Wait: ${value} ${nextUnit}`
+          }
+        };
+      }
+      return n;
+    }));
+  };
+
+  return (
+    <div
+      className="flex items-center gap-1.5 cursor-pointer group"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={cycleUnit}
+    >
+      <span className="text-xs font-semibold text-white tracking-widest">{value}</span>
+      <div className="relative h-4 min-w-[60px] flex items-center">
+        <AnimatePresence mode="popLayout">
+          {!isHovered ? (
+            <motion.span
+              key="current"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest absolute"
+            >
+              {unit}
+            </motion.span>
+          ) : (
+            <motion.div
+              key="next"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="flex items-center gap-1 absolute"
+            >
+              <RotateCcw className="w-2.5 h-2.5 text-[#002FA7] animate-spin" style={{ animationDuration: '3s' }} />
+              <span className="text-[10px] font-mono font-bold text-[#002FA7] uppercase tracking-widest">
+                {nextUnit}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+};
+
+const ProtocolNode = ({ data, id, selected }: any) => {
   const updateNodeInternals = useUpdateNodeInternals();
   const outcomes = data.outcomes as { id: string; label: string }[] || [];
 
@@ -252,13 +322,18 @@ const ProtocolNode = ({ data, id, selected }: NodeProps) => {
           <div className={cn("p-1.5 rounded-lg", isInput ? "bg-white/20" : "bg-[#002FA7]/10")}>
             {getIcon()}
           </div>
-          <div className="flex flex-col">
+          <div className="flex flex-col flex-1 min-w-0">
             <span className={cn("text-[10px] font-mono uppercase tracking-widest", isInput ? "text-white/70" : "text-zinc-500")}>
               {isInput ? 'Entry_Point' : (type || 'Vector')}
             </span>
-            <span className="text-xs font-semibold tracking-tight text-white leading-tight">
-              {data.label as string}
-            </span>
+
+            {type === 'delay' ? (
+              <DelayCycle value={String(data.delay || '1')} unit={String(data.delayUnit || 'days')} nodeId={id} />
+            ) : (
+              <span className="text-xs font-semibold tracking-tight text-white leading-tight truncate">
+                {data.label as string}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -1063,11 +1138,12 @@ function ProtocolArchitectInner() {
         type: 'protocolNode',
         position: finalPosition,
         data: {
-          label: isSplit ? 'Interaction Split' : `${type.charAt(0).toUpperCase() + type.slice(1)} Node`,
+          label: isSplit ? 'Interaction Split' : type === 'delay' ? 'Wait: 1 days' : `${type.charAt(0).toUpperCase() + type.slice(1)} Node`,
           type: type,
           subject: '',
           body: '',
           delay: '1',
+          delayUnit: 'days',
           signalType: 'VIEW',
           templateId: '',
           condition: 'opened',
@@ -1569,9 +1645,30 @@ function ProtocolArchitectInner() {
                         type="number"
                         className="bg-black/40 border border-white/5 rounded-xl p-3 w-20 text-center font-mono text-sm focus:border-[#002FA7] outline-none transition-all"
                         value={selectedNode?.data.delay as string || '1'}
-                        onChange={(e) => updateNodeData(selectedNode!.id, { delay: e.target.value })}
+                        onChange={(e) => updateNodeData(selectedNode!.id, {
+                          delay: e.target.value,
+                          label: `Wait: ${e.target.value} ${selectedNode?.data.delayUnit || 'days'}`
+                        })}
                       />
-                      <span className="text-xs text-zinc-400 font-mono">Days after previous node</span>
+                      <Select
+                        value={selectedNode?.data.delayUnit as string || 'days'}
+                        onValueChange={(val) => updateNodeData(selectedNode!.id, {
+                          delayUnit: val,
+                          label: `Wait: ${selectedNode?.data.delay || '1'} ${val}`
+                        })}
+                      >
+                        <SelectTrigger className="w-32 bg-black/40 border-white/5 rounded-xl h-11 font-mono text-xs focus:ring-0 focus:border-[#002FA7]">
+                          <SelectValue placeholder="Unit" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-950 nodal-monolith-edge">
+                          <SelectItem value="minutes">Minutes</SelectItem>
+                          <SelectItem value="hours">Hours</SelectItem>
+                          <SelectItem value="days">Days</SelectItem>
+                          <SelectItem value="weeks">Weeks</SelectItem>
+                          <SelectItem value="months">Months</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-[10px] text-zinc-600 font-mono uppercase tracking-widest ml-2">Latency</span>
                     </div>
                   </div>
 
