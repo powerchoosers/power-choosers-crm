@@ -50,7 +50,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   const [isReady, setIsReady] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
   const [metadata, setMetadata] = useState<VoiceMetadata | null>(null)
-  
+
   const { user } = useAuth()
   const pathname = usePathname()
   const { setStatus, setActive } = useCallStore()
@@ -115,14 +115,14 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     // Helper to check if we are in the platform area (check at call time)
     const currentPath = window.location.pathname
     const isPlatform = currentPath?.startsWith('/network') || currentPath?.startsWith('/dashboard')
-    
+
     // Only initialize on the client side, when user is authenticated, and in platform routes
     if (typeof window === 'undefined' || !user || !isPlatform || !document.cookie.includes('np_session=')) {
       // We don't clean up the device here anymore to avoid dropping active calls if navigating away,
       // but the error guards (isPlatform) will prevent toasts on public pages.
       return
     }
-    
+
     // Prevent overlapping initializations
     if (isInitializing.current) {
       console.log('[Voice] Initialization already in progress, skipping...')
@@ -145,7 +145,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     try {
       isInitializing.current = true
       console.log('[Voice] Fetching new access token...')
-      
+
       const response = await fetch('/api/twilio/token?identity=agent')
       if (!response.ok) {
         throw new Error(`Failed to fetch token: ${response.statusText}`)
@@ -160,7 +160,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       if (deviceRef.current) {
         const d = deviceRef.current
         console.log('[Voice] Cleaning up existing device... State:', d.state)
-        
+
         try {
           // Only unregister if in a valid state
           if (d.state === 'registered' || d.state === 'registering') {
@@ -173,13 +173,13 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         } catch (cleanupError) {
           console.warn('[Voice] Error during device unregister:', cleanupError)
         }
-        
+
         try {
           d.destroy()
         } catch (destroyError) {
           console.warn('[Voice] Error during device destroy:', destroyError)
         }
-        
+
         deviceRef.current = null
       }
 
@@ -187,7 +187,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         codecPreferences: [Call.Codec.Opus, Call.Codec.PCMU],
         enableImprovedSignalingErrorPrecision: true,
         // Twilio suggests these for better reliability in browser environments
-        edge: ['ashburn', 'roaming'], 
+        edge: ['ashburn', 'roaming'],
         maxCallSignalingTimeoutMs: 30000,
       })
 
@@ -234,7 +234,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         setIsReady(true)
         isInitializing.current = false
         reconnectAttemptsRef.current = 0 // Reset reconnect counter on success
-        
+
         // Set up proactive token refresh (refresh at 23 hours, 1 hour before 24h expiry)
         if (tokenRefreshTimer.current) {
           clearTimeout(tokenRefreshTimer.current)
@@ -251,7 +251,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
       newDevice.on('error', (error) => {
         console.error('[Voice] Device error:', error)
-        
+
         // Don't show toast for "transport unavailable" as we'll try to recover
         // Also only show toasts if we are in the platform area
         const currentPath = window.location.pathname
@@ -259,23 +259,23 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         if (error.code !== 31009 && isInPlatform) {
           toast.error('Twilio Device Error', { description: error.message })
         }
-        
+
         if (error.code === 20101 || error.code === 31204 || error.code === 31009) {
           // Token expired, invalid, or transport lost - trigger re-init with exponential backoff
           console.log('[Voice] Triggering device re-initialization due to error:', error.code)
           isInitializing.current = false // Allow re-init
-          
+
           if (reconnectAttemptsRef.current < maxReconnectAttempts) {
             const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000) // Max 30s
             reconnectAttemptsRef.current++
             console.log(`[Voice] Reconnect attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts} in ${delay}ms`)
-            
+
             setTimeout(() => {
               initDevice()
             }, delay)
           } else {
             console.error('[Voice] Max reconnection attempts reached. Please refresh the page.')
-            toast.error('Connection Lost', { 
+            toast.error('Connection Lost', {
               description: 'Unable to reconnect to Twilio. Please refresh the page.',
               duration: Infinity
             })
@@ -285,7 +285,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
       newDevice.on('incoming', async (call) => {
         console.log('[Voice] Incoming call')
-        
+
         // Only show incoming call UI if in platform
         const currentPath = window.location.pathname
         const isInPlatform = currentPath?.startsWith('/network') || currentPath?.startsWith('/dashboard')
@@ -303,49 +303,49 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         const toastId = toast.info(
           <IncomingCallToast meta={meta} from={from} />,
           {
-          action: {
-            label: 'Answer',
-            onClick: async () => {
-              // Ported from legacy phone.js: Set audio devices before answering
-              if (newDevice.audio) {
-                try {
-                  const inputDevices = newDevice.audio.availableInputDevices
-                  let inputDeviceId = 'default'
-                  if (inputDevices && inputDevices.size > 0) {
-                    const deviceIds = Array.from(inputDevices.keys())
-                    if (!deviceIds.includes('default') && deviceIds.length > 0) {
-                      inputDeviceId = deviceIds[0] as string
-                    }
-                  }
-                  await newDevice.audio.setInputDevice(inputDeviceId)
-
-                  if (newDevice.audio.isOutputSelectionSupported) {
-                    const outputDevices = newDevice.audio.availableOutputDevices
-                    let outputDeviceId = 'default'
-                    if (outputDevices && outputDevices.size > 0) {
-                      const deviceIds = Array.from(outputDevices.keys())
+            action: {
+              label: 'Answer',
+              onClick: async () => {
+                // Ported from legacy phone.js: Set audio devices before answering
+                if (newDevice.audio) {
+                  try {
+                    const inputDevices = newDevice.audio.availableInputDevices
+                    let inputDeviceId = 'default'
+                    if (inputDevices && inputDevices.size > 0) {
+                      const deviceIds = Array.from(inputDevices.keys())
                       if (!deviceIds.includes('default') && deviceIds.length > 0) {
-                        outputDeviceId = deviceIds[0] as string
+                        inputDeviceId = deviceIds[0] as string
                       }
                     }
-                    newDevice.audio.speakerDevices.set(outputDeviceId)
-                  }
-                } catch (audioError) {
-                  console.warn('[Voice] Audio setup failed for incoming call:', audioError)
-                }
-              }
+                    await newDevice.audio.setInputDevice(inputDeviceId)
 
-              call.accept()
-              setCurrentCall(call)
-              setActive(true)
-              setStatus('connected')
-              toast.dismiss(toastId)
-            }
-          },
-          duration: 30000, // Longer duration for incoming call
+                    if (newDevice.audio.isOutputSelectionSupported) {
+                      const outputDevices = newDevice.audio.availableOutputDevices
+                      let outputDeviceId = 'default'
+                      if (outputDevices && outputDevices.size > 0) {
+                        const deviceIds = Array.from(outputDevices.keys())
+                        if (!deviceIds.includes('default') && deviceIds.length > 0) {
+                          outputDeviceId = deviceIds[0] as string
+                        }
+                      }
+                      newDevice.audio.speakerDevices.set(outputDeviceId)
+                    }
+                  } catch (audioError) {
+                    console.warn('[Voice] Audio setup failed for incoming call:', audioError)
+                  }
+                }
+
+                call.accept()
+                setCurrentCall(call)
+                setActive(true)
+                setStatus('connected')
+                toast.dismiss(toastId)
+              }
+            },
+            duration: 30000, // Longer duration for incoming call
           }
         )
-        
+
         call.on('cancel', () => {
           console.log('[Voice] Call cancelled by caller')
           toast.dismiss(toastId)
@@ -381,8 +381,8 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       const currentPath = window.location.pathname
       const isInPlatform = currentPath?.startsWith('/network') || currentPath?.startsWith('/dashboard')
       if (isInPlatform) {
-        toast.error('Voice System Offline', { 
-          description: 'Could not connect to Twilio service.' 
+        toast.error('Voice System Offline', {
+          description: 'Could not connect to Twilio service.'
         })
       }
     } finally {
@@ -508,7 +508,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
     try {
       console.log(`[Voice] Connecting call To: ${toE164}, From: ${fromE164}`)
-      
+
       // Resolve metadata for outbound call if not provided
       const meta = params.metadata || await resolvePhoneMeta(toE164)
       setMetadata(meta)
@@ -525,7 +525,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
               inputDeviceId = deviceIds[0] as string
             }
           }
-          
+
           try {
             await device.audio.setInputDevice(inputDeviceId)
           } catch (e) {
@@ -556,12 +556,14 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (params.metadata) {
-        connectParams.metadata = JSON.stringify(params.metadata)
+        connectParams.metadata = JSON.stringify({ ...params.metadata, agentId: user?.uid || user?.id, agentEmail: user?.email })
       } else if (meta) {
-        connectParams.metadata = JSON.stringify(meta)
+        connectParams.metadata = JSON.stringify({ ...meta, agentId: user?.uid || user?.id, agentEmail: user?.email })
+      } else {
+        connectParams.metadata = JSON.stringify({ agentId: user?.uid || user?.id, agentEmail: user?.email })
       }
 
-      const call = await device.connect({ 
+      const call = await device.connect({
         params: connectParams
       })
 
@@ -624,13 +626,13 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   }, [currentCall])
 
   return (
-    <VoiceContext.Provider value={{ 
-      device, 
-      currentCall, 
-      isReady, 
-      connect, 
-      disconnect, 
-      sendDigits, 
+    <VoiceContext.Provider value={{
+      device,
+      currentCall,
+      isReady,
+      connect,
+      disconnect,
+      sendDigits,
       mute,
       isMuted,
       metadata
