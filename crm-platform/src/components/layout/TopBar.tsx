@@ -362,10 +362,19 @@ export function TopBar() {
     // Updated positioning: constrained to match main content area with "Frost Shield" scroll effect
     <header className={cn(
       "fixed top-0 left-[70px] right-0 lg:right-80 z-40 flex items-center justify-center h-24 pointer-events-none transition-all duration-300 ease-in-out",
-      isScrolled
-        ? "bg-zinc-950/80 backdrop-blur-xl border-b border-r border-white/5 shadow-[0_0_30px_rgba(0,0,0,0.5)] backdrop-saturate-150"
-        : "bg-transparent border-b border-transparent"
+      "border-b border-transparent"
     )}>
+      {/* Visual background and blur layer - Moved here to prevent nested backdrop-filter issues */}
+      <AnimatePresence>
+        {isScrolled && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-zinc-950/80 backdrop-blur-xl border-b border-r border-white/5 shadow-[0_0_30px_rgba(0,0,0,0.5)] pointer-events-none z-[-1] backdrop-saturate-150"
+          />
+        )}
+      </AnimatePresence>
       <div className="w-full px-8 flex items-center justify-between gap-6 pointer-events-auto">
         {/* Operational Sentinel */}
         <div className="flex items-center gap-6 shrink-0">
@@ -543,12 +552,18 @@ export function TopBar() {
             mass: 0.8
           }}
           className={cn(
-            "glass-panel !shadow-[0_0_20px_rgba(0,0,0,0.5)] overflow-visible flex flex-col relative h-12 transition-all",
-            isDialerOpen && "hover:bg-white/5 hover:border-white/10 group/dialer"
+            "overflow-visible flex flex-col relative h-12 transition-all",
+            isDialerOpen && "group/dialer"
           )}
         >
+          {/* Glass Background Layer - Absolute to prevent nesting filters with children */}
+          <div className={cn(
+            "absolute inset-0 rounded-[24px] bg-zinc-950/90 backdrop-blur-md border border-white/5 !shadow-[0_0_20px_rgba(0,0,0,0.5)] z-0 pointer-events-none transition-colors",
+            isDialerOpen && "bg-white/5 border-white/10"
+          )} />
+
           {/* Left Side Buttons - Absolute to prevent vertical jumps */}
-          <div className="absolute left-2 top-0 h-12 flex items-center gap-2 pointer-events-auto leading-none">
+          <div className="absolute left-2 top-0 h-12 flex items-center gap-2 pointer-events-auto leading-none z-10">
             <AnimatePresence>
               {(isDialerOpen || isGeminiOpen) && (
                 <motion.div
@@ -586,7 +601,7 @@ export function TopBar() {
           </div>
 
           {/* Right Side Buttons - Pinned Absolute */}
-          <div className="absolute right-2 top-0 h-12 flex items-center gap-1 pointer-events-auto leading-none">
+          <div className="absolute right-2 top-0 h-12 flex items-center gap-1 pointer-events-auto leading-none z-10">
             {/* Gemini Trigger (Bot/X icon) - Restored to original right-side position */}
             <GeminiChatTrigger
               onToggle={() => {
@@ -670,7 +685,7 @@ export function TopBar() {
             )}
           </div>
 
-          {/* Expanded Content: Dialer, Gemini, or Active Call HUD */}
+          {/* Expanded Content: Modals stay inside for positioning, relying on sibling glass layers to avoid conflict */}
           <AnimatePresence>
             {isDialerOpen && (
               <motion.div
@@ -680,7 +695,7 @@ export function TopBar() {
                 exit={{ opacity: 0, y: 4, scaleY: 0.98, transition: { duration: 0.12 } }}
                 transition={{ duration: 0.18, delay: 0.05 }}
                 style={{ transformOrigin: 'top' }}
-                className="absolute top-12 left-0 right-0 mt-2 mx-2 flex flex-col gap-4 rounded-2xl glass-panel p-4 overflow-hidden"
+                className="absolute top-16 left-2 right-2 flex flex-col gap-4 rounded-2xl glass-panel nodal-monolith-edge !bg-zinc-950/90 backdrop-blur-xl p-4 overflow-hidden z-[60] pointer-events-auto"
               >
                 {/* Nodal Point Glass Highlight */}
                 <div className="absolute inset-0 bg-gradient-to-tr from-[#002FA7]/5 via-transparent to-white/5 pointer-events-none" />
@@ -696,7 +711,7 @@ export function TopBar() {
                     </div>
                   )}
                 </div>
-                <div className="flex-1 flex items-center min-w-0 bg-zinc-950/50 border border-white/10 rounded-xl relative z-10 px-3 transition-all duration-300 group/input focus-within:border-white/20 focus-within:ring-1 focus-within:ring-white/5 shadow-2xl">
+                <div className="flex-1 flex items-center min-w-0 nodal-recessed border border-white/10 rounded-xl relative z-10 px-3 transition-all duration-300 group/input focus-within:border-white/20 focus-within:ring-1 focus-within:ring-white/5 shadow-2xl">
                   <div className="w-8 h-8 flex items-center justify-center text-zinc-500 group-focus-within/input:text-emerald-500 transition-colors">
                     <Phone size={18} />
                   </div>
@@ -719,7 +734,11 @@ export function TopBar() {
               </motion.div>
             )}
             {isGeminiOpen && (
-              <GeminiChatPanel />
+              <div className="absolute top-16 left-2 right-2 pointer-events-none z-[60]">
+                <div className="pointer-events-auto h-full">
+                  <GeminiChatPanel />
+                </div>
+              </div>
             )}
             {isCallHUDOpen && (
               <motion.div
@@ -729,14 +748,14 @@ export function TopBar() {
                 exit={{ opacity: 0, y: 4, scaleY: 0.98, transition: { duration: 0.12 } }}
                 transition={{ duration: 0.18, delay: 0.05 }}
                 style={{ transformOrigin: 'top' }}
-                className="absolute top-12 right-2 mt-2 w-[calc(100%-1rem)] max-w-[480px] flex flex-col h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl glass-panel overflow-hidden z-50"
+                className="absolute top-16 left-2 right-2 flex flex-col h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl glass-panel overflow-hidden z-[60] pointer-events-auto"
               >
                 <ActiveCallInterface />
               </motion.div>
             )}
           </AnimatePresence>
         </motion.div>
-      </div>
-    </header>
+      </div >
+    </header >
   )
 }

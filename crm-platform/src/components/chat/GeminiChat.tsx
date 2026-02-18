@@ -1392,7 +1392,7 @@ SELECT * FROM hybrid_search_accounts(
       exit={{ opacity: 0, y: 4, scaleY: 0.98, transition: { duration: 0.12 } }}
       transition={{ duration: 0.18, delay: 0.05 }}
       style={{ transformOrigin: 'top' }}
-      className="absolute top-12 right-2 mt-2 w-[calc(100%-1rem)] max-w-[480px] flex flex-col h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl glass-panel nodal-monolith-edge overflow-hidden z-50"
+      className="flex flex-col h-[600px] max-h-[calc(100vh-8rem)] rounded-2xl glass-panel nodal-monolith-edge overflow-hidden z-50 relative w-full"
     >
       {/* Nodal Point Glass Highlight */}
 
@@ -1585,7 +1585,8 @@ SELECT * FROM hybrid_search_accounts(
       </AnimatePresence>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 w-full overflow-hidden relative z-10" ref={scrollRef}>
+      {/* Messages */}
+      <ScrollArea className="flex-1 w-full overflow-hidden relative z-10 nodal-recessed" ref={scrollRef}>
         <div className="p-4 space-y-8 min-w-0 w-full max-w-full overflow-x-hidden flex flex-col">
           <AnimatePresence initial={false}>
             {messages.map((m: GeminiMessage, i) => (
