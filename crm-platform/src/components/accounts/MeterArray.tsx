@@ -45,7 +45,7 @@ export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], isEditing =
   }
 
   const handleUpdateMeter = (id: string, field: keyof Meter, value: string) => {
-    const updated = localMeters.map(m => 
+    const updated = localMeters.map(m =>
       m.id === id ? { ...m, [field]: value } : m
     )
     setLocalMeters(updated)
@@ -61,7 +61,7 @@ export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], isEditing =
           Grid_Connection_Points <span className="text-zinc-700">[{localMeters.length}]</span>
         </h3>
         {isEditing && (
-          <button 
+          <button
             onClick={handleAddMeter}
             className="text-[10px] text-[#002FA7] hover:text-white font-mono flex items-center gap-1 uppercase tracking-widest transition-colors animate-in fade-in slide-in-from-right-2 duration-300"
           >
@@ -74,12 +74,12 @@ export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], isEditing =
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {localMeters.length > 0 ? (
             localMeters.map((meter, index) => (
-              <div 
-                key={meter.id || `meter-${index}`} 
+              <div
+                key={meter.id || `meter-${index}`}
                 className={cn(
-                  "group relative bg-black/40 p-4 rounded-xl border transition-all duration-300",
-                  isEditing 
-                    ? "border-white/10 hover:border-[#002FA7]/50" 
+                  "group relative bg-zinc-950/40 p-4 rounded-xl border transition-all duration-300",
+                  isEditing
+                    ? "border-white/10 hover:border-[#002FA7]/50"
                     : "border-white/5 hover:border-[#002FA7]/30"
                 )}
               >
@@ -101,12 +101,12 @@ export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], isEditing =
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    
+
                     <input
                       type="text"
                       value={meter.esiId}
                       onChange={(e) => handleUpdateMeter(meter.id, 'esiId', e.target.value)}
-                      className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs font-mono text-zinc-300 focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
+                      className="w-full bg-zinc-950/50 border border-white/5 rounded-lg px-3 py-2 text-xs font-mono text-zinc-300 focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
                       placeholder="10000000000000000000"
                     />
 
@@ -116,7 +116,7 @@ export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], isEditing =
                         type="text"
                         value={meter.address}
                         onChange={(e) => handleUpdateMeter(meter.id, 'address', e.target.value)}
-                        className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-[10px] text-zinc-400 focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
+                        className="w-full bg-zinc-950/50 border border-white/5 rounded-lg px-3 py-2 text-[10px] text-zinc-400 focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
                         placeholder="123 Main St, Dallas, TX 75201"
                       />
                     </div>
@@ -128,7 +128,7 @@ export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], isEditing =
                           type="text"
                           value={meter.rate}
                           onChange={(e) => handleUpdateMeter(meter.id, 'rate', e.target.value)}
-                          className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-sm font-mono text-white tabular-nums focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
+                          className="w-full bg-zinc-950/50 border border-white/5 rounded-lg px-3 py-2 text-sm font-mono text-white tabular-nums focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
                           placeholder="0.045"
                         />
                       </div>
@@ -138,7 +138,7 @@ export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], isEditing =
                           type="text"
                           value={meter.endDate}
                           onChange={(e) => handleUpdateMeter(meter.id, 'endDate', e.target.value)}
-                          className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-[9px] font-mono text-emerald-500 uppercase focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
+                          className="w-full bg-zinc-950/50 border border-white/5 rounded-lg px-3 py-2 text-[9px] font-mono text-emerald-500 uppercase focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
                           placeholder="03/25"
                         />
                       </div>
@@ -163,7 +163,7 @@ export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], isEditing =
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="text-[10px] text-zinc-500 font-medium truncate mb-2">
                       {meter.address || 'No address provided'}
                     </div>
@@ -176,10 +176,10 @@ export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], isEditing =
               </div>
             ))
           ) : (
-            <div className="col-span-2 p-8 rounded-xl border border-dashed border-white/5 bg-black/20 flex flex-col items-center justify-center gap-2">
+            <div className="col-span-2 p-8 rounded-xl border border-dashed border-white/5 bg-zinc-950/20 flex flex-col items-center justify-center gap-2">
               <Landmark className="w-6 h-6 text-zinc-700" />
               <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest text-center">
-                No grid connection points identified.<br/>
+                No grid connection points identified.<br />
                 {isEditing ? 'Click "Add Meter" to begin tracking.' : 'Initialize meter array to begin asset tracking.'}
               </p>
             </div>

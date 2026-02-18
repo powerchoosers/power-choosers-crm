@@ -32,6 +32,7 @@ import DestructModal from '@/components/network/DestructModal'
 import FilterCommandDeck from '@/components/network/FilterCommandDeck'
 import { ForensicTableSkeleton } from '@/components/network/ForensicTableSkeleton'
 import Link from 'next/link'
+import { SequenceAssignmentModal } from '@/components/network/SequenceAssignmentModal'
 import {
   Table,
   TableBody,
@@ -93,6 +94,7 @@ export default function PeoplePage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isComposeOpen, setIsComposeOpen] = useState(false)
   const [composeTarget, setComposeTarget] = useState<{ email: string; name: string; company: string } | null>(null)
+  const [isSequenceModalOpen, setIsSequenceModalOpen] = useState(false)
 
   const contacts = useMemo(() => data?.pages.flatMap(page => page.contacts) || [], [data])
   const contactIds = useMemo(() => contacts.map(c => c.id), [contacts])
@@ -178,6 +180,8 @@ export default function PeoplePage() {
 
     if (action === 'delete') {
       setIsDestructModalOpen(true)
+    } else if (action === 'sequence') {
+      setIsSequenceModalOpen(true)
     } else {
       console.log(`Executing ${action} for ${selectedCount} nodes`)
       // Implement other actions as needed
@@ -657,6 +661,13 @@ export default function PeoplePage() {
         onClose={() => setIsDestructModalOpen(false)}
         onConfirm={handleConfirmPurge}
         count={selectedCount}
+      />
+
+      <SequenceAssignmentModal
+        isOpen={isSequenceModalOpen}
+        onClose={() => setIsSequenceModalOpen(false)}
+        selectedContactIds={Object.keys(rowSelection).filter(Boolean)}
+        onSuccess={() => setRowSelection({})}
       />
 
       <ComposeModal

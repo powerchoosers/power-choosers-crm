@@ -1335,7 +1335,7 @@ export default function AccountDossierPage() {
                             )}
 
                             {terminalInput.startsWith('/') && (
-                              <div className="mt-4 p-4 bg-black/60 rounded-xl border border-[#002FA7]/30 animate-in fade-in zoom-in-95 duration-200">
+                              <div className="mt-4 p-4 bg-zinc-950/80 rounded-xl border border-[#002FA7]/30 animate-in fade-in zoom-in-95 duration-200 nodal-monolith-edge">
                                 <div className="text-[10px] font-mono text-[#002FA7] uppercase tracking-[0.3em] mb-3 border-b border-[#002FA7]/20 pb-2">Available Protocols</div>
                                 <div className="grid grid-cols-2 gap-x-6 gap-y-2">
                                   <div className="text-[10px] font-mono flex justify-between"><span className="text-zinc-300">/clear</span> <span className="text-zinc-600">WIPE_DOSSIER</span></div>
@@ -1453,7 +1453,7 @@ export default function AccountDossierPage() {
                         </AnimatePresence>
                       </div>
                     ) : (
-                      <div className="p-8 rounded-2xl border border-dashed border-white/5 bg-black/20 flex flex-col items-center justify-center gap-3 group/empty">
+                      <div className="p-8 rounded-2xl border border-dashed border-white/5 bg-zinc-950/20 flex flex-col items-center justify-center gap-3 group/empty">
                         <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-[0.3em]">No signals detected</p>
                       </div>
                     )}
