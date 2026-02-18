@@ -263,8 +263,8 @@ export default async function handler(req, res) {
                 // [REMOVED] Early upsert to match "only post on completion" requirement
                 break;
             case 'completed':
-                const duration = Duration || CallDuration || '0';
-                logger.log(`  ✅ Call completed. Duration: ${duration}s`);
+                // Logging only - actual duration calculation for DB is below
+                logger.log(`  ✅ Call completed. Duration: ${Duration || CallDuration || '0'}s`);
                 if (RecordingUrl) {
                     logger.log(`  🎵 Recording: ${RecordingUrl}`);
                 }
@@ -292,13 +292,35 @@ export default async function handler(req, res) {
             if (CallStatus === 'completed') {
                 // targetPhone/businessPhone precomputed above
 
+                let correctedDuration = parseInt((Duration || CallDuration || '0'), 10);
+                try {
+                    if (correctedDuration < 5) {
+                        const accountSid = process.env.TWILIO_ACCOUNT_SID;
+                        const authToken = process.env.TWILIO_AUTH_TOKEN;
+                        if (accountSid && authToken && CallSid) {
+                            const client = twilio(accountSid, authToken);
+                            const kids = await client.calls.list({ parentCallSid: CallSid, limit: 1 });
+                            const child = kids.find(k => k.direction === 'outbound-dial');
+                            if (child && child.duration) {
+                                const childDuration = parseInt(child.duration, 10);
+                                if (childDuration > correctedDuration) {
+                                    correctedDuration = childDuration;
+                                    logger.log(`[Status] Using corrected duration from child leg for DB: ${childDuration}s`);
+                                }
+                            }
+                        }
+                    }
+                } catch (durErr) {
+                    logger.warn('[Status] Failed to correct duration from child leg:', durErr.message);
+                }
+
                 try {
                     const body = {
                         callSid: CallSid,
                         to: To,
                         from: From,
                         status: CallStatus,
-                        duration: parseInt((Duration || CallDuration || '0'), 10),
+                        duration: correctedDuration,
                         targetPhone: targetPhone || undefined,
                         businessPhone: businessPhone || undefined,
                         contactId,
