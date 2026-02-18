@@ -251,8 +251,9 @@ export async function upsertCallInSupabase(payload) {
     businessPhone: payload.businessPhone
   });
 
-  // Extract user email for ownership
+  // Extract user identifier for ownership (prioritize UUID if available)
   const userEmail = (payload.userEmail || payload.agentEmail || '').toLowerCase().trim();
+  const userId = payload.agentId || payload.userId || '';
 
   // Fetch current state to merge
   const { data: currentData } = await supabaseAdmin
@@ -328,14 +329,16 @@ export async function upsertCallInSupabase(payload) {
 
   // Ownership logic
   const hasExistingOwner = current.ownerId && current.ownerId.trim();
-  const finalOwnerEmail = (userEmail && userEmail.trim())
-    ? userEmail.toLowerCase().trim()
-    : (hasExistingOwner ? current.ownerId : 'unassigned');
+  const finalOwnerId = (userId && userId.trim())
+    ? userId.trim()
+    : ((userEmail && userEmail.trim())
+      ? userEmail.toLowerCase().trim()
+      : (hasExistingOwner ? current.ownerId : 'unassigned'));
 
-  merged.ownerId = finalOwnerEmail;
-  merged.assignedTo = finalOwnerEmail;
-  merged.createdBy = current.createdBy || finalOwnerEmail;
-  merged.agentEmail = finalOwnerEmail;
+  merged.ownerId = finalOwnerId;
+  merged.assignedTo = finalOwnerId;
+  merged.createdBy = current.createdBy || finalOwnerId;
+  merged.agentEmail = userEmail || finalOwnerId;
 
   // Convert to DB row
   const dbRow = mapCallToSupabase(merged);
