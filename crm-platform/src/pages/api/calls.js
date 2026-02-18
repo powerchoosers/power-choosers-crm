@@ -345,7 +345,10 @@ export async function upsertCallInSupabase(payload) {
     .upsert(dbRow);
 
   // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'calls.js:supabaseUpsert', message: 'Supabase upsert result', data: { error: error ? String(error.message) : null, code: error && error.code }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H5' }) }).catch(() => { });
+  // #region agent log
+  // fetch('http://127.0.0.1:7242/ingest/1f8f3489-3694-491c-a2fd-b2e7bd6a92e0', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'calls.js:supabaseUpsert', message: 'Supabase upsert result', data: { error: error ? String(error.message) : null, code: error && error.code }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H5' }) }).catch(() => { });
+  console.log(`[Calls API] Supabase upsert result for ${callId}:`, { error: error ? error.message : 'success', status: error ? error.code : 'ok' });
+  // #endregion
   // #endregion
   if (error) {
     logger.error('Supabase upsert error:', error);
