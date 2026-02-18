@@ -997,13 +997,13 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                     handleSearch();
                   }
                 }}
-                className="w-full bg-black/40 border border-white/5 rounded-lg pl-8 pr-16 py-1.5 text-[10px] font-mono text-zinc-300 focus:outline-none focus:border-[#002FA7]/50 transition-all placeholder:text-zinc-700"
+                className="w-full bg-zinc-950/40 border border-white/5 rounded-lg pl-8 pr-16 py-1.5 text-[10px] font-mono text-zinc-300 focus:outline-none focus:border-[#002FA7]/50 transition-all placeholder:text-zinc-700"
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                 {searchTerm && (
                   <button
                     onClick={handleSearch}
-                    className="p-1 rounded bg-black/20 hover:bg-black/30 text-[#002FA7] transition-colors"
+                    className="p-1 rounded bg-zinc-950/20 hover:bg-zinc-950/40 text-[#002FA7] transition-colors"
                     title="Search Apollo"
                   >
                     <Search className="w-2.5 h-2.5" />
@@ -1014,7 +1014,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             {accountId && (
               <button
                 onClick={handleEnrichAccount}
-                className="px-2 py-1.5 rounded-lg bg-black/20 hover:bg-black/30 border border-white/5 text-[9px] font-mono text-white transition-all flex items-center gap-1.5 group uppercase tracking-widest whitespace-nowrap"
+                className="px-2 py-1.5 rounded-lg bg-zinc-950/20 hover:bg-zinc-950/40 border border-white/5 text-[9px] font-mono text-white transition-all flex items-center gap-1.5 group uppercase tracking-widest whitespace-nowrap"
                 title="Deep_Enrich Account Profile"
               >
                 <Sparkles className="w-2.5 h-2.5 text-blue-400 group-hover:animate-pulse" />
@@ -1054,7 +1054,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         {/* STATE 1: IDLE */}
         {scanStatus === 'idle' && (
           <div className="h-full flex flex-col items-center justify-center py-8 px-4 text-center">
-            <div className="w-10 h-10 bg-black/30 rounded-2xl flex items-center justify-center mb-3 text-zinc-600 border border-white/5">
+            <div className="w-10 h-10 bg-zinc-950/30 rounded-2xl flex items-center justify-center mb-3 text-zinc-600 border border-white/5">
               <Lock className="w-4 h-4" />
             </div>
             <h4 className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 mb-1">Target_Locked</h4>
@@ -1199,7 +1199,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                 paginatedData.map((person) => (
                   <div
                     key={person.id}
-                    className="group flex flex-col p-2.5 rounded-xl hover:bg-black/30 transition-all border border-transparent hover:border-white/5 space-y-2"
+                    className="group flex flex-col p-2.5 rounded-xl hover:bg-zinc-950/40 transition-all border border-transparent hover:border-white/5 space-y-2"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex flex-col min-w-0 flex-1 mr-2">
@@ -1236,7 +1236,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                             <button
                               onClick={() => handleAcquire(person, 'email')}
                               disabled={acquiringEmail === person.id}
-                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
+                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-950/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
                               title="Reveal Email"
                             >
                               {acquiringEmail === person.id ? (
@@ -1249,7 +1249,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                             <button
                               onClick={() => handleAcquire(person, 'phone')}
                               disabled={acquiringEmail === person.id}
-                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
+                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-950/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
                               title="Reveal Phone"
                             >
                               {acquiringEmail === person.id ? (
@@ -1282,7 +1282,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                             <button
                               onClick={() => handleAcquire(person, 'email')}
                               disabled={acquiringEmail === person.id}
-                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
+                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-950/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
                               title="Reveal Email"
                             >
                               {acquiringEmail === person.id ? (
@@ -1330,7 +1330,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                             <button
                               onClick={() => handleAcquire(person, 'phone')}
                               disabled={acquiringEmail === person.id}
-                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest shrink-0"
+                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-950/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest shrink-0"
                               title="Reveal Phone"
                             >
                               {acquiringEmail === person.id ? (

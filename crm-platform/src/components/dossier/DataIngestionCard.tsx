@@ -95,7 +95,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     if (!accountId) {
       toast.error('No account context found');
       return;
@@ -144,7 +144,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
           // Use backend API URL in production, local in development
           const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
           const apiUrl = apiBaseUrl ? `${apiBaseUrl}/api/analyze-document` : '/api/analyze-document';
-          
+
           const response = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -164,21 +164,21 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
             const t = result.analysis?.type;
             const label = t === 'SIGNED_CONTRACT' ? 'CONTRACT SECURED' : t === 'BILL' ? 'BILL ANALYZED' : t === 'USAGE_DATA' ? 'TELEMETRY LABELED' : t === 'PROPOSAL' ? 'PROPOSAL LABELED' : 'DATA NODES UPDATED';
             toast.success(`${label}: Data Nodes Updated`, { id: toastId });
-            
+
             // ============================================
             // THE REFRACTION EVENT (from build.md)
             // ============================================
-            
+
             // 1. Trigger blur/desaturation state
             setIsRecalibrating(true);
-            
+
             // 2. Animate Klein Blue scan line
             setScanProgress(0);
             const scanDuration = 800; // ms
             const scanInterval = 20; // ms
             const scanSteps = scanDuration / scanInterval;
             const scanIncrement = 100 / scanSteps;
-            
+
             let currentScan = 0;
             const scanTimer = setInterval(() => {
               currentScan += scanIncrement;
@@ -189,7 +189,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
                 setScanProgress(currentScan);
               }
             }, scanInterval);
-            
+
             // 3. Invalidate AND refetch account so dossier (meters, energy, docs, status) updates immediately
             await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'account' && q.queryKey[1] === accountId });
             await queryClient.refetchQueries({ predicate: (q) => q.queryKey[0] === 'account' && q.queryKey[1] === accountId });
@@ -233,7 +233,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
       const { error: storageError } = await supabase.storage
         .from('vault')
         .remove([doc.storage_path]);
-      
+
       if (storageError) {
         console.error('Storage delete error:', storageError);
       }
@@ -253,19 +253,19 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
   };
 
   const handleDownload = async (doc: Document) => {
-     try {
-       const { data, error } = await supabase.storage
-         .from('vault')
-         .createSignedUrl(doc.storage_path, 60); // 60 seconds access
+    try {
+      const { data, error } = await supabase.storage
+        .from('vault')
+        .createSignedUrl(doc.storage_path, 60); // 60 seconds access
 
-       if (error) throw error;
-       if (data?.signedUrl) {
-         window.open(data.signedUrl, '_blank');
-       }
-     } catch (err) {
-       console.error('Signed URL error:', err);
-       toast.error('Failed to access file');
-     }
+      if (error) throw error;
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank');
+      }
+    } catch (err) {
+      console.error('Signed URL error:', err);
+      toast.error('Failed to access file');
+    }
   };
 
   if (!accountId) {
@@ -286,14 +286,14 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
   }
 
   return (
-    <div 
+    <div
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={`
         relative overflow-hidden rounded-2xl transition-all duration-300
-        ${isDragging 
-          ? 'bg-[#002FA7]/10 border-[#002FA7] shadow-[0_0_30px_-10px_rgba(0,47,167,0.5)]' 
+        ${isDragging
+          ? 'bg-[#002FA7]/10 border-[#002FA7] shadow-[0_0_30px_-10px_rgba(0,47,167,0.5)]'
           : 'nodal-module-glass border-white/5'}
         border flex flex-col
         ${isRecalibrating ? 'grayscale' : ''}
@@ -304,26 +304,26 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
         <div className="absolute inset-0 z-50 pointer-events-none">
           {/* High-Intensity Blur Layer */}
           <div className="absolute inset-0 backdrop-blur-xl bg-black/30 animate-in fade-in duration-200" />
-          
+
           {/* Klein Blue Laser Scan Line */}
-          <div 
+          <div
             className="absolute left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#002FA7] to-transparent shadow-[0_0_20px_#002FA7] transition-all duration-100 ease-linear"
             style={{ top: `${scanProgress}%` }}
           >
             {/* Glow effect */}
             <div className="absolute inset-0 bg-[#002FA7] blur-md opacity-70" />
           </div>
-          
+
           {/* Scan line trail effect */}
           {scanProgress > 10 && (
-            <div 
+            <div
               className="absolute left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#002FA7]/30 to-transparent transition-all duration-100"
               style={{ top: `${scanProgress - 5}%` }}
             />
           )}
         </div>
       )}
-    
+
       {/* HEADER - NOW INSIDE CONTAINER */}
       <div className="flex justify-between items-center p-4 border-b border-white/5 nodal-recessed">
         <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
@@ -335,14 +335,14 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
         </h3>
         <label className="text-zinc-600 hover:text-white transition-colors cursor-pointer">
           <UploadCloud className="w-4 h-4" />
-          <input 
-            type="file" 
-            className="hidden" 
-            multiple 
+          <input
+            type="file"
+            className="hidden"
+            multiple
             onChange={(e) => {
               if (e.target.files && e.target.files.length > 0) {
                 const fakeEvent = {
-                  preventDefault: () => {},
+                  preventDefault: () => { },
                   dataTransfer: { files: e.target.files }
                 } as unknown as React.DragEvent;
                 handleDrop(fakeEvent);
@@ -354,69 +354,69 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
 
       {/* FILE LIST (The Evidence) */}
       <div className="p-2 space-y-1 flex-1">
-          {loading && files.length === 0 ? (
-            <div className="flex justify-center py-4">
-              <Loader2 className="w-4 h-4 animate-spin text-zinc-700" />
-            </div>
-          ) : files.length === 0 ? (
-            <div className="py-8 text-center">
-              <p className="text-[10px] text-zinc-700 font-mono uppercase tracking-widest">
-                No Evidence Found
-              </p>
-            </div>
-          ) : (
-            files.map((file) => (
-              <motion.div
-                key={file.id}
-                initial={{ filter: 'blur(6px)', opacity: 0.6 }}
-                animate={{ filter: 'blur(0px)', opacity: 1 }}
-                transition={{ duration: 0.35, ease: 'easeOut' }}
-                className="group flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer border border-transparent hover:border-white/5"
+        {loading && files.length === 0 ? (
+          <div className="flex justify-center py-4">
+            <Loader2 className="w-4 h-4 animate-spin text-zinc-700" />
+          </div>
+        ) : files.length === 0 ? (
+          <div className="py-8 text-center">
+            <p className="text-[10px] text-zinc-700 font-mono uppercase tracking-widest">
+              No Evidence Found
+            </p>
+          </div>
+        ) : (
+          files.map((file) => (
+            <motion.div
+              key={file.id}
+              initial={{ filter: 'blur(6px)', opacity: 0.6 }}
+              animate={{ filter: 'blur(0px)', opacity: 1 }}
+              transition={{ duration: 0.35, ease: 'easeOut' }}
+              className="group flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer border border-transparent hover:border-white/5"
+            >
+              <div
+                className="flex items-center gap-3 overflow-hidden flex-1"
+                onClick={() => handleDownload(file)}
               >
-                <div
-                  className="flex items-center gap-3 overflow-hidden flex-1"
-                  onClick={() => handleDownload(file)}
-                >
-                  <div className="p-2 rounded-lg bg-black/40 border border-white/5 text-zinc-400 group-hover:text-[#002FA7] transition-colors">
-                    <FileText className="w-4 h-4" />
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-sm text-zinc-300 font-mono truncate">{file.name}</span>
-                    <span className="text-[10px] text-zinc-600 font-mono flex gap-2">
-                      {file.size} • {formatDistanceToNow(new Date(file.created_at), { addSuffix: true })}
-                    </span>
-                  </div>
+                <div className="p-2 rounded-lg bg-zinc-950/40 border border-white/5 text-zinc-400 group-hover:text-[#002FA7] transition-colors">
+                  <FileText className="w-4 h-4" />
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(file);
-                  }}
-                  className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-red-400 transition-all"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </motion.div>
-            ))
-          )}
-        </div>
-
-        {/* DROP ZONE OVERLAY (Only visible when dragging) */}
-        {isDragging && (
-          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950/90 backdrop-blur-sm pointer-events-none">
-            <div className="w-16 h-16 rounded-2xl bg-[#002FA7]/20 flex items-center justify-center mb-4 animate-bounce">
-              <UploadCloud className="w-8 h-8 text-[#002FA7]" />
-            </div>
-            <p className="text-[#002FA7] font-mono text-sm tracking-widest">RELEASE TO INGEST</p>
-          </div>
-        )}
-
-        {/* UPLOADING STATE (Terminal Effect) */}
-        {uploading && (
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/40">
-            <div className="h-full bg-[#002FA7] animate-progress w-full origin-left" />
-          </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-sm text-zinc-300 font-mono truncate">{file.name}</span>
+                  <span className="text-[10px] text-zinc-600 font-mono flex gap-2">
+                    {file.size} • {formatDistanceToNow(new Date(file.created_at), { addSuffix: true })}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(file);
+                }}
+                className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-red-400 transition-all"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </motion.div>
+          ))
         )}
       </div>
-    );
+
+      {/* DROP ZONE OVERLAY (Only visible when dragging) */}
+      {isDragging && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950/90 backdrop-blur-sm pointer-events-none">
+          <div className="w-16 h-16 rounded-2xl bg-[#002FA7]/20 flex items-center justify-center mb-4 animate-bounce">
+            <UploadCloud className="w-8 h-8 text-[#002FA7]" />
+          </div>
+          <p className="text-[#002FA7] font-mono text-sm tracking-widest">RELEASE TO INGEST</p>
+        </div>
+      )}
+
+      {/* UPLOADING STATE (Terminal Effect) */}
+      {uploading && (
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-950/40">
+          <div className="h-full bg-[#002FA7] animate-progress w-full origin-left" />
+        </div>
+      )}
+    </div>
+  );
 }
