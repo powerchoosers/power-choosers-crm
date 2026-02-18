@@ -27,8 +27,8 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { to, subject, content, plainTextContent, from, fromName, _deliverability, threadId, inReplyTo, references, isHtmlEmail, userEmail, emailSettings, contactId, contactName, contactCompany, dryRun, attachments } = req.body;
-        logger.info(`[Zoho] Attempting to send email to: ${to}, subject: ${subject}, user: ${userEmail}, attachments: ${attachments?.length || 0}`, 'zoho-send');
+        const { to, cc, subject, content, plainTextContent, from, fromName, _deliverability, threadId, inReplyTo, references, isHtmlEmail, userEmail, emailSettings, contactId, contactName, contactCompany, dryRun, attachments } = req.body;
+        logger.info(`[Zoho] Attempting to send email to: ${to}, cc: ${cc || 'none'}, subject: ${subject}, user: ${userEmail}, attachments: ${attachments?.length || 0}`, 'zoho-send');
 
         if (!to || !subject || !content) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -170,6 +170,7 @@ export default async function handler(req, res) {
 
         const result = await zohoService.sendEmail({
             to,
+            cc,
             subject,
             html: trackedContent,
             text: textContent,

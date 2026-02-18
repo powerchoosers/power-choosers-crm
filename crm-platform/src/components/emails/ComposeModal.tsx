@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,6 +18,8 @@ import { generateStaticHtml, substituteVariables, contactToVariableMap } from '@
 import { buildFoundryContext, generateSystemPrompt } from '@/lib/foundry-prompt'
 import { supabase } from '@/lib/supabase'
 import { useQuery } from '@tanstack/react-query'
+import { useSearchContacts } from '@/hooks/useContacts'
+import { ContactAvatar } from '@/components/ui/ContactAvatar'
 
 const EMAIL_AI_MODELS = [
   { value: 'gemini-2.5-flash', label: 'GEMINI-2.5-FLASH' },
@@ -377,6 +379,75 @@ interface ComposeModalProps {
   context?: ComposeContext | null
 }
 
+function SearchResultsDropdown({
+  results,
+  isLoading,
+  onSelect,
+  onClose
+}: {
+  results: any[]
+  isLoading: boolean
+  onSelect: (email: string) => void
+  onClose: () => void
+}) {
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        onClose()
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [onClose])
+
+  if (!isLoading && results.length === 0) return null
+
+  return (
+    <div
+      ref={dropdownRef}
+      className="absolute top-full left-0 right-0 mt-1 z-[110] nodal-module-glass rounded-xl border border-white/10 shadow-2xl max-h-[250px] overflow-y-auto np-scroll animate-in fade-in slide-in-from-top-2 duration-200"
+    >
+      {isLoading ? (
+        <div className="p-4 flex items-center justify-center">
+          <Loader2 className="w-4 h-4 animate-spin text-signal" />
+        </div>
+      ) : (
+        <div className="p-1.5 space-y-1">
+          {results.map((contact) => (
+            <button
+              key={contact.id}
+              onClick={() => onSelect(contact.email)}
+              className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors text-left group"
+            >
+              <ContactAvatar
+                name={contact.name}
+                size={32}
+                className="w-8 h-8 rounded-lg"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium text-zinc-100 group-hover:text-white truncate">
+                  {contact.name}
+                </div>
+                <div className="flex items-center gap-2 text-[10px] text-zinc-500 truncate">
+                  <span className="truncate">{contact.email}</span>
+                  {contact.company && (
+                    <>
+                      <span className="text-white/10">•</span>
+                      <span className="truncate">{contact.company}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ComposePanel({
   initialTo,
   initialSubject,
@@ -389,6 +460,8 @@ function ComposePanel({
   onClose: () => void
 }) {
   const [to, setTo] = useState(initialTo)
+  const [cc, setCc] = useState('')
+  const [showCc, setShowCc] = useState(false)
   const [subject, setSubject] = useState(initialSubject)
   const context = initialContext
   const [content, setContent] = useState('')
@@ -415,6 +488,15 @@ function ComposePanel({
   /** In-modal toggle: when true and type is cold, send as plain text with minimal signature (Option B). */
   const [sendAsPlainText, setSendAsPlainText] = useState(false)
   const [attachments, setAttachments] = useState<File[]>([])
+
+  // Search suggestions state
+  const [toQuery, setToQuery] = useState(initialTo)
+  const [ccQuery, setCcQuery] = useState('')
+  const [showToSuggestions, setShowToSuggestions] = useState(false)
+  const [showCcSuggestions, setShowCcSuggestions] = useState(false)
+
+  const { data: toResults = [], isLoading: isToSearching } = useSearchContacts(toQuery)
+  const { data: ccResults = [], isLoading: isCcSearching } = useSearchContacts(ccQuery)
 
   // Suppress signature when using foundry template
   const shouldShowSignature = !selectedFoundryId
@@ -854,6 +936,7 @@ OUTPUT FORMAT:
     sendEmail(
       {
         to,
+        cc: showCc ? cc : undefined,
         subject,
         content: coldPlaintextBody ?? content,
         html: fullHtml ?? (coldPlaintextBody ?? content),
@@ -914,6 +997,115 @@ OUTPUT FORMAT:
           isMinimized ? "opacity-0 invisible" : "opacity-100 visible"
         )}
       >
+        {/* Fixed Header Section */}
+        <div className="flex-none px-6 py-2 border-b border-white/5 bg-zinc-950/50 backdrop-blur-md space-y-1 z-20">
+          <div className="flex items-center gap-2 relative">
+            <span className="text-xs font-mono text-zinc-500 w-8">To</span>
+            <div className="flex-1 relative">
+              <Input
+                placeholder="Recipient"
+                value={to}
+                onChange={(e) => {
+                  setTo(e.target.value)
+                  setToQuery(e.target.value)
+                  setShowToSuggestions(true)
+                }}
+                onFocus={() => {
+                  if (to.length >= 2) setShowToSuggestions(true)
+                }}
+                className="bg-transparent border-0 border-b border-transparent hover:border-white/10 focus-visible:border-signal/50 rounded-none px-0 h-9 text-sm focus-visible:ring-0 transition-all"
+              />
+              {showToSuggestions && toQuery.length >= 2 && (
+                <SearchResultsDropdown
+                  results={toResults}
+                  isLoading={isToSearching}
+                  onSelect={(email) => {
+                    setTo(email)
+                    setShowToSuggestions(false)
+                  }}
+                  onClose={() => setShowToSuggestions(false)}
+                />
+              )}
+            </div>
+            {!showCc && (
+              <button
+                onClick={() => setShowCc(true)}
+                className="text-[10px] font-mono text-zinc-500 hover:text-signal transition-colors px-2 py-1 rounded hover:bg-white/5"
+              >
+                CC
+              </button>
+            )}
+          </div>
+
+          <AnimatePresence>
+            {showCc && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+                className="overflow-hidden flex items-center gap-2 relative"
+              >
+                <span className="text-xs font-mono text-zinc-500 w-8">Cc</span>
+                <div className="flex-1 relative">
+                  <Input
+                    placeholder="Carbon copy"
+                    value={cc}
+                    onChange={(e) => {
+                      setCc(e.target.value)
+                      setCcQuery(e.target.value)
+                      setShowCcSuggestions(true)
+                    }}
+                    onFocus={() => {
+                      if (cc.length >= 2) setShowCcSuggestions(true)
+                    }}
+                    className="bg-transparent border-0 border-b border-transparent hover:border-white/10 focus-visible:border-signal/50 rounded-none px-0 h-9 text-sm focus-visible:ring-0 transition-all"
+                  />
+                  {showCcSuggestions && ccQuery.length >= 2 && (
+                    <SearchResultsDropdown
+                      results={ccResults}
+                      isLoading={isCcSearching}
+                      onSelect={(email) => {
+                        setCc(email)
+                        setShowCcSuggestions(false)
+                      }}
+                      onClose={() => setShowCcSuggestions(false)}
+                    />
+                  )}
+                </div>
+                <button
+                  onClick={() => {
+                    setShowCc(false)
+                    setCc('')
+                  }}
+                  className="text-zinc-500 hover:text-red-400 transition-colors p-1"
+                >
+                  <X size={14} />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono text-zinc-500 w-8">Sub</span>
+            <div className="flex-1">
+              <motion.div
+                key={subjectAnimationKey}
+                initial={{ opacity: 0, x: -4 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.25, ease: 'easeOut' }}
+              >
+                <Input
+                  placeholder="Subject"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  className="bg-transparent border-0 border-b border-transparent hover:border-white/10 focus-visible:border-signal/50 rounded-none px-0 h-9 text-sm font-medium focus-visible:ring-0 transition-all"
+                />
+              </motion.div>
+            </div>
+          </div>
+        </div>
+
         <div className="flex-1 overflow-y-auto np-scroll px-6 py-4 space-y-4">
           {pendingAiContent !== null && (
             <motion.div
@@ -949,30 +1141,7 @@ OUTPUT FORMAT:
               </div>
             </motion.div>
           )}
-          <div className="space-y-2">
-            <Input
-              placeholder="To"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="bg-transparent border-0 border-b border-white/10 rounded-none px-0 focus-visible:ring-0 focus-visible:border-white/20"
-            />
-          </div>
 
-          <div className="space-y-2">
-            <motion.div
-              key={subjectAnimationKey}
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
-            >
-              <Input
-                placeholder="Subject"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                className="bg-transparent border-0 border-b border-white/10 rounded-none px-0 focus-visible:ring-0 focus-visible:border-white/20 font-medium"
-              />
-            </motion.div>
-          </div>
 
           {/* Foundry Template Indicator */}
           {selectedFoundryId && foundryAssets && (

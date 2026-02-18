@@ -96,6 +96,7 @@ export class ZohoMailService {
                 const payload = {
                     fromAddress: fromAddress,
                     toAddress: to,
+                    ccAddress: emailData.cc || undefined,
                     subject: subject,
                     content: html || text,
                     mailFormat: html ? 'html' : 'plaintext',
