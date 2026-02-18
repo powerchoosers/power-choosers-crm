@@ -147,7 +147,8 @@ export default async function handler(req, res) {
                 accountId = meta.accountId || '';
 
                 // Create initial call record as 'initiated'
-                // This ensures the transmission log shows "active call" even before completion
+                // [REMOVED] This ensures the transmission log only shows calls when complete
+                /*
                 if (meta.contactId || meta.accountId) {
                     try {
                         const callRecord = {
@@ -173,6 +174,7 @@ export default async function handler(req, res) {
                         logger.warn('[Voice] Error preparing initial call upsert:', e);
                     }
                 }
+                */
             } catch (e) {
                 logger.warn('[Voice] Failed to process call metadata:', e);
             }
