@@ -997,13 +997,10 @@ async function generateGeminiAIInsights(transcript) {
         }
     }
 
-    // Cache miss - call Gemini API
-    const { GoogleGenerativeAI } = await import('@google/generative-ai');
-    const apiKey = process.env.GEMINI_API_KEY || process.env.FREE_GEMINI_KEY;
-    if (!apiKey) throw new Error('Missing GEMINI_API_KEY or FREE_GEMINI_KEY');
+    // Cache miss - call OpenRouter API
+    const openRouterKey = process.env.OPEN_ROUTER_API_KEY;
+    if (!openRouterKey) throw new Error('Missing OPEN_ROUTER_API_KEY');
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     const prompt = `
 Analyze this sales call transcript and provide insights:
 
@@ -1020,12 +1017,35 @@ Provide a JSON response with:
 - timeline: Timeline mentioned or "Not specified"
 - decisionMakers: Array of decision makers identified
 `;
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${openRouterKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://nodalpoint.io",
+            "X-Title": "Nodal Point CRM Analyst"
+        },
+        body: JSON.stringify({
+            model: 'google/gemini-2.5-flash',
+            messages: [
+                { role: 'user', content: prompt }
+            ],
+            response_format: { type: 'json_object' }
+        })
+    });
+
+    if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`OpenRouter API Error: ${errText}`);
+    }
+
+    const data = await response.json();
+    const text = data.choices[0].message.content.trim();
+
     let insights;
     try {
-        insights = JSON.parse(text.replace(/```json|```/g, ''));
+        insights = JSON.parse(text);
     } catch {
         insights = {
             summary: text.substring(0, 300),
