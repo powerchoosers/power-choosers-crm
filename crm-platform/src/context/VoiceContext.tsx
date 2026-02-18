@@ -556,11 +556,11 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (params.metadata) {
-        connectParams.metadata = JSON.stringify({ ...params.metadata, agentId: user?.uid || user?.id, agentEmail: user?.email })
+        connectParams.metadata = JSON.stringify({ ...params.metadata, agentId: user?.id, agentEmail: user?.email })
       } else if (meta) {
-        connectParams.metadata = JSON.stringify({ ...meta, agentId: user?.uid || user?.id, agentEmail: user?.email })
+        connectParams.metadata = JSON.stringify({ ...meta, agentId: user?.id, agentEmail: user?.email })
       } else {
-        connectParams.metadata = JSON.stringify({ agentId: user?.uid || user?.id, agentEmail: user?.email })
+        connectParams.metadata = JSON.stringify({ agentId: user?.id, agentEmail: user?.email })
       }
 
       const call = await device.connect({
