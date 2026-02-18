@@ -1,6 +1,9 @@
 // @ts-nocheck
 /**
- * Process Sequence Step Edge Function
+ * Process Sequence Step Edge Function - Version 26
+ * - Resolves 503 error by using direct Vercel API.
+ * - Supports dynamic delay units (minutes, hours, days, etc.) from metadata.
+ * - Controls 'wait_until' window based on node settings.
  */
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
@@ -19,7 +22,7 @@ const jobSchema = z.object({
 })
 
 const QUEUE_NAME = 'sequence_jobs'
-const API_BASE_URL = Deno.env.get('API_BASE_URL') || 'https://nodalpoint.io'
+const API_BASE_URL = 'https://nodal-point-network.vercel.app';
 
 Deno.serve(async (req: Request) => {
     console.log('[DEBUG] Received request:', req.method);
@@ -40,7 +43,6 @@ Deno.serve(async (req: Request) => {
                 results.push({ jobId: job.jobId, status: 'success' });
             } catch (err) {
                 console.error('[DEBUG] Job failed:', job.jobId, err.message);
-                // Record failure in DB
                 await sql`
           UPDATE sequence_executions 
           SET status = 'failed', error_message = ${err.message}, updated_at = NOW()
@@ -76,18 +78,16 @@ async function processJob(job) {
     if (effectiveType === 'email') {
         const hasBody = !!(execution.metadata?.body || execution.metadata?.aiBody);
         if (!hasBody) {
-            console.log('[DEBUG] Routing to handleGeneration');
             await handleGeneration(execution, job)
         } else {
-            console.log('[DEBUG] Routing to handleSend');
             await handleSend(execution, job)
         }
     } else {
-        console.log('[DEBUG] Routing to skipNode (other node type)');
+        // Delay node or other passive node
+        console.log('[DEBUG] Processing passive node:', effectiveType);
         await skipNode(execution, job)
     }
 
-    // Delete from queue only if we didn't throw an error
     await sql`SELECT pgmq.delete(${QUEUE_NAME}, ${jobId}::bigint)`
 }
 
@@ -100,27 +100,17 @@ async function handleGeneration(execution, job) {
     WHERE m.id = ${execution.member_id}
   `
 
-    const endpoint = `${API_BASE_URL}/api/ai/optimize`
-    console.log('[DEBUG] Calling AI endpoint:', endpoint);
-
-    const response = await fetch(endpoint, {
+    const response = await fetch(`${API_BASE_URL}/api/ai/optimize`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'User-Agent': 'SupabaseEdgeFunction/1.0' },
         body: JSON.stringify({
             prompt: execution.metadata?.prompt || 'Draft a personalized follow-up',
             mode: 'generate_email',
-            contact: {
-                name: `${member.firstName} ${member.lastName}`,
-                email: member.contact_email,
-                company: member.company_name
-            }
+            contact: { name: `${member.firstName} ${member.lastName}`, email: member.contact_email, company: member.company_name }
         })
     })
 
-    if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`AI generation API failed (${response.status}): ${text.substring(0, 200)}`);
-    }
+    if (!response.ok) throw new Error(`AI generation failed (${response.status})`);
 
     const result = await response.json()
     const body = result.optimizedContent || result.content
@@ -134,15 +124,9 @@ async function handleGeneration(execution, job) {
 }
 
 async function handleSend(execution, job) {
-    // Logic to find burner email: 
-    // 1. Get user UUID from sequence owner
-    // 2. Look for any connection with @getnodalpoint.com
-    // 3. Fallback to primary email
-
     const [member] = await sql`
     SELECT m.id, c.email as target_email, c."firstName", c."lastName", 
-           s."ownerId" as owner_uuid, 
-           u.email as primary_owner_email
+           s."ownerId" as owner_uuid, u.email as primary_owner_email
     FROM sequence_members m
     JOIN contacts c ON m."targetId" = c.id
     JOIN sequences s ON m."sequenceId" = s.id
@@ -151,45 +135,33 @@ async function handleSend(execution, job) {
     LIMIT 1
   `
 
-    if (!member) throw new Error(`Could not find member details for ${execution.member_id}`);
+    const connections = await sql`SELECT email FROM zoho_connections WHERE user_id = ${member.owner_uuid} AND email LIKE '%@getnodalpoint.com' LIMIT 1`
+    const fromEmail = connections[0]?.email || member.primary_owner_email;
 
-    // Fetch burner email from zoho_connections if it exists for this user
-    const connections = await sql`
-    SELECT email FROM zoho_connections 
-    WHERE user_id = ${member.owner_uuid} 
-    AND email LIKE '%@getnodalpoint.com'
-    LIMIT 1
-  `
-
-    const burnerEmail = connections[0]?.email;
-    const fromEmail = burnerEmail || member.primary_owner_email;
-
-    console.log('[DEBUG] Resolved sender:', fromEmail, burnerEmail ? '(Burner found)' : '(Using primary)');
-
-    const payload = {
-        to: { email: member.target_email, name: `${member.firstName} ${member.lastName}` },
-        from: { email: fromEmail, name: 'Lewis Patterson' },
-        subject: execution.metadata?.subject || execution.metadata?.aiSubject || 'Message from Nodal Point',
-        html: execution.metadata?.body || execution.metadata?.aiBody,
-        email_id: execution.metadata?.crm_email_id,
-        metadata: { execution_id: execution.id, member_id: member.id }
-    }
-
-    const endpoint = `${API_BASE_URL}/api/email/zoho-send-sequence`
-    console.log('[DEBUG] Calling Send Email endpoint:', endpoint);
-
-    const response = await fetch(endpoint, {
+    const response = await fetch(`${API_BASE_URL}/api/email/zoho-send-sequence`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        headers: { 'Content-Type': 'application/json', 'User-Agent': 'SupabaseEdgeFunction/1.0' },
+        body: JSON.stringify({
+            to: { email: member.target_email, name: `${member.firstName} ${member.lastName}` },
+            from: { email: fromEmail, name: 'Lewis Patterson' },
+            subject: execution.metadata?.subject || execution.metadata?.aiSubject || 'Message from Nodal Point',
+            html: execution.metadata?.body || execution.metadata?.aiBody,
+            metadata: { execution_id: execution.id, member_id: member.id }
+        })
     })
 
     if (response.ok) {
         const result = await response.json();
+
+        // Determine wait window for interaction (default 3 days if not specified)
+        const delayVal = parseInt(execution.metadata?.delay || execution.metadata?.interval || '3');
+        const delayUnit = execution.metadata?.delayUnit || 'days';
+
+        // Update to 'waiting' state
         await sql`
        UPDATE sequence_executions 
        SET status = 'waiting', 
-           wait_until = NOW() + INTERVAL '3 days',
+           wait_until = NOW() + (${delayVal} || ' ' || ${delayUnit})::INTERVAL,
            metadata = metadata || ${JSON.stringify({
             messageId: result.messageId,
             sentAt: new Date().toISOString(),
@@ -198,8 +170,7 @@ async function handleSend(execution, job) {
        WHERE id = ${execution.id}
     `
     } else {
-        const errorText = await response.text();
-        throw new Error(`Email server responded with ${response.status}: ${errorText.substring(0, 200)}`)
+        throw new Error(`Email API failed (${response.status})`)
     }
 }
 
