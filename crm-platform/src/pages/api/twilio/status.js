@@ -34,13 +34,15 @@ export default async function handler(req, res) {
         if (!body || typeof body !== 'object') body = {};
 
         // Extract CRM context from query parameters
-        let contactId, accountId;
+        let contactId, accountId, agentId, agentEmail;
         try {
             const protocol = req.headers['x-forwarded-proto'] || 'https';
             const host = req.headers.host || req.headers['x-forwarded-host'] || '';
             const requestUrl = new URL(req.url, `${protocol}://${host}`);
             contactId = requestUrl.searchParams.get('contactId');
             accountId = requestUrl.searchParams.get('accountId');
+            agentId = requestUrl.searchParams.get('agentId');
+            agentEmail = requestUrl.searchParams.get('agentEmail');
         } catch (_) { }
 
         const {
@@ -341,7 +343,9 @@ export default async function handler(req, res) {
                         targetPhone: targetPhone || undefined,
                         businessPhone: businessPhone || undefined,
                         contactId,
-                        accountId
+                        accountId,
+                        agentId,
+                        agentEmail
                     };
                     if (RecordingUrl) {
                         body.recordingUrl = RecordingUrl.endsWith('.mp3') ? RecordingUrl : `${RecordingUrl}.mp3`;
@@ -410,8 +414,8 @@ export default async function handler(req, res) {
                         duration: Duration || CallDuration,
                         recordingUrl: foundUrl,
                         recordingSid: foundRecSid,
-                        contactId,
-                        accountId,
+                        agentId,
+                        agentEmail,
                         timestamp: new Date().toISOString()
                     };
                     await upsertCallInSupabase(payload).catch(() => { });

@@ -52,6 +52,8 @@ export default async function handler(req, res) {
         // Extract CRM context from query params
         const contactId = req.query.contactId || '';
         const accountId = req.query.accountId || '';
+        const agentId = req.query.agentId || '';
+        const agentEmail = req.query.agentEmail || '';
         // #region agent log
         // (Diagnostic fetch removed for production stability)
         // #endregion
@@ -199,7 +201,9 @@ export default async function handler(req, res) {
                             targetPhone: targetPhone || undefined,
                             businessPhone: businessPhone || undefined,
                             contactId: contactId || undefined,
-                            accountId: accountId || undefined
+                            accountId: accountId || undefined,
+                            agentId: agentId || undefined,
+                            agentEmail: agentEmail || undefined
                         });
                         callApiRes = { ok: !!saved, status: saved ? 200 : 500 };
                     } catch (e) {
