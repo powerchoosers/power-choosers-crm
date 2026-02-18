@@ -11,6 +11,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useVoice } from '@/context/VoiceContext'
 import { toast } from 'sonner'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
+import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { usePathname, useParams } from 'next/navigation'
 import { GeminiChatTrigger, GeminiChatPanel } from '@/components/chat/GeminiChat'
 import { useGeminiStore } from '@/store/geminiStore'
@@ -432,14 +433,23 @@ export function TopBar() {
               >
                 <div className="w-full max-w-2xl h-[50px] nodal-glass border-signal/50 rounded-2xl shadow-[0_10px_30px_-10px_rgba(0,47,167,0.5)] flex items-center justify-between px-6">
                   <div className="flex items-center gap-3">
-                    <CompanyIcon
-                      key={`callbar-icon-${phoneNumber || 'unknown'}`}
-                      logoUrl={displayMetadata?.logoUrl}
-                      domain={displayMetadata?.domain}
-                      name={displayMetadata?.account || displayMetadata?.name || phoneNumber || 'Caller'}
-                      size={32}
-                      roundedClassName="rounded-[14px]"
-                    />
+                    {displayMetadata?.isAccountOnly ? (
+                      <CompanyIcon
+                        key={`callbar-icon-${phoneNumber || 'unknown'}`}
+                        logoUrl={displayMetadata?.logoUrl}
+                        domain={displayMetadata?.domain}
+                        name={displayMetadata?.account || displayMetadata?.name || phoneNumber || 'Caller'}
+                        size={32}
+                        roundedClassName="rounded-[14px]"
+                      />
+                    ) : (
+                      <ContactAvatar
+                        key={`callbar-avatar-${phoneNumber || 'unknown'}`}
+                        name={displayMetadata?.name || phoneNumber || 'Caller'}
+                        size={32}
+                        className="rounded-[14px]"
+                      />
+                    )}
                     <div>
                       <div className="text-sm font-medium text-white leading-none mb-1">{displayMetadata?.name || phoneNumber || "Unknown Caller"}</div>
                       <div className="text-[10px] text-signal font-mono uppercase tracking-tighter flex items-center gap-2">

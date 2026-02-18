@@ -98,6 +98,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       account: name,
       logoUrl: logoUrl || undefined,
       domain: domainForCall || undefined,
+      isAccountOnly: true,
     });
     toast.info(`Initiating call to ${name}...`);
   };

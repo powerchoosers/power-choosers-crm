@@ -156,8 +156,8 @@ export function useAI() {
 
 ## Target
 ${isCompanyPhone
-  ? `- Calling the COMPANY PHONE (corporate line). No contact name yet; you must get past the gatekeeper first.`
-  : `- Name: ${payload.contact_context.name}\n- Title: ${payload.contact_context.title}\n- Company: ${payload.contact_context.company}`}
+        ? `- Calling the COMPANY PHONE (corporate line). No contact name yet; you must get past the gatekeeper first.`
+        : `- Name: ${payload.contact_context.name}\n- Title: ${payload.contact_context.title}\n- Company: ${payload.contact_context.company}`}
 - Company: ${payload.contact_context.company}
 - Industry: ${payload.contact_context.industry}
 - Location: ${payload.contact_context.location || 'Houston'}
@@ -242,26 +242,26 @@ OUTPUT (valid JSON only):
             : `Generate a bespoke cold call script for ${payload.contact_context.name} at ${payload.contact_context.company}. Primary + 2–3 variants.`
       }
 
-        const response = await fetch('/api/gemini/chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            messages: [
-              {
-                role: 'system',
-                content: systemPrompt
-              },
-              {
-                role: 'user',
-                content: userContent
-              }
-            ],
-            model: 'gemini-2.5-flash-lite',
-            jsonMode: true
-          }),
-        })
+      const response = await fetch('/api/gemini/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+            {
+              role: 'user',
+              content: userContent
+            }
+          ],
+          model: 'google/gemini-2.5-flash',
+          jsonMode: true
+        }),
+      })
 
       if (!response.ok) {
         throw new Error('Failed to generate AI response')

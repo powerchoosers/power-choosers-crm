@@ -8,6 +8,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 interface CompanyIconProps {
   /** Account/company logo URL. Always prioritized; only when this is blank or fails do we use fallbacks. */
   logoUrl?: string
+  /** Safety fallback for snake_case metadata */
+  logo_url?: string
   /** Used for favicon/logo fallbacks when logoUrl is blank or has failed. */
   domain?: string
   name: string
@@ -55,6 +57,7 @@ const PRIMARY_LOGO_TIMEOUT_MS = 3500
 
 function CompanyIconInner({
   logoUrl,
+  logo_url, // Added logo_url
   domain,
   name,
   size = 32,
@@ -62,12 +65,14 @@ function CompanyIconInner({
   roundedClassName = DEFAULT_ROUNDED,
   isDeleting = false
 }: CompanyIconProps) {
-  const effectiveLogoUrl = (typeof logoUrl === 'string' && logoUrl.trim()) ? logoUrl.trim() : undefined
+  // Prioritize logoUrl, fallback to logo_url
+  const activeLogoUrl = (typeof logoUrl === 'string' && logoUrl.trim()) ? logoUrl.trim() :
+    (typeof logo_url === 'string' && logo_url.trim()) ? logo_url.trim() : undefined
   const effectiveDomain = (typeof domain === 'string' && domain.trim()) ? domain.trim() : undefined
 
   const candidates = useMemo(
-    () => buildCandidateUrls(effectiveLogoUrl, effectiveDomain),
-    [effectiveLogoUrl, effectiveDomain]
+    () => buildCandidateUrls(activeLogoUrl, effectiveDomain), // Use activeLogoUrl
+    [activeLogoUrl, effectiveDomain]
   )
 
   const [failedSet, setFailedSet] = useState<Set<string>>(() => new Set())
@@ -82,7 +87,7 @@ function CompanyIconInner({
     return next
   }, [candidates, failedSet])
 
-  const propsKey = `${effectiveLogoUrl ?? ''}|${effectiveDomain ?? ''}`
+  const propsKey = `${activeLogoUrl ?? ''}|${effectiveDomain ?? ''}`
 
   useEffect(() => {
     if (propsKey !== propsKeyRef.current) {
