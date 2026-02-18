@@ -30,8 +30,24 @@ async function resolveToCallSid({ callSid, recordingSid, transcriptSid }) {
     if (isRecordingSid(recordingSid)) {
       try {
         const rec = await client.recordings(recordingSid.trim()).fetch();
-        if (rec && isCallSid(rec.callSid)) return rec.callSid.trim();
+        if (rec && isCallSid(rec.callSid)) {
+          // Check if this is a child call leg; if so, resolve to parent
+          try {
+            const callObj = await client.calls(rec.callSid).fetch();
+            if (callObj.parentCallSid) return callObj.parentCallSid;
+          } catch (_) { }
+          return rec.callSid.trim();
+        }
       } catch (_) { /* swallow and continue */ }
+    }
+
+    // If we have a Call SID directly, check if it has a parent
+    if (isCallSid(callSid)) {
+      try {
+        const callObj = await client.calls(callSid.trim()).fetch();
+        if (callObj.parentCallSid) return callObj.parentCallSid;
+        return callSid.trim();
+      } catch (_) { }
     }
 
     // If we have a Transcript SID from Twilio CI, fetch it, get sourceSid (usually Recording SID), then resolve
@@ -39,11 +55,23 @@ async function resolveToCallSid({ callSid, recordingSid, transcriptSid }) {
       try {
         const tr = await client.intelligence.v2.transcripts(transcriptSid.trim()).fetch();
         const sourceSid = (tr && tr.sourceSid) ? String(tr.sourceSid) : '';
-        if (isCallSid(sourceSid)) return sourceSid.trim();
+        if (isCallSid(sourceSid)) {
+          try {
+            const cObj = await client.calls(sourceSid.trim()).fetch();
+            if (cObj.parentCallSid) return cObj.parentCallSid;
+          } catch (_) { }
+          return sourceSid.trim();
+        }
         if (isRecordingSid(sourceSid)) {
           try {
             const rec = await client.recordings(sourceSid.trim()).fetch();
-            if (rec && isCallSid(rec.callSid)) return rec.callSid.trim();
+            if (rec && isCallSid(rec.callSid)) {
+              try {
+                const innerCall = await client.calls(rec.callSid).fetch();
+                if (innerCall.parentCallSid) return innerCall.parentCallSid;
+              } catch (_) { }
+              return rec.callSid.trim();
+            }
           } catch (_) { /* ignore */ }
         }
       } catch (_) { /* ignore */ }
