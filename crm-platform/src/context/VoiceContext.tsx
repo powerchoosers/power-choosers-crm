@@ -507,7 +507,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      console.log(`[Voice] Connecting call To: ${toE164}, From: ${fromE164}`)
+      console.log(`[Voice] Connecting call Target: ${toE164}, CallerId: ${fromE164}`)
 
       // Resolve metadata for outbound call if not provided
       const meta = params.metadata || await resolvePhoneMeta(toE164)
@@ -551,16 +551,18 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       }
 
       const connectParams: Record<string, string> = {
-        To: toE164,
-        From: fromE164,
+        targetNumber: toE164,
+        callerId: fromE164,
       }
 
+      const agentData = { agentId: user?.id, agentEmail: user?.email };
+
       if (params.metadata) {
-        connectParams.metadata = JSON.stringify({ ...params.metadata, agentId: user?.id, agentEmail: user?.email })
+        connectParams.metadata = JSON.stringify({ ...params.metadata, ...agentData })
       } else if (meta) {
-        connectParams.metadata = JSON.stringify({ ...meta, agentId: user?.id, agentEmail: user?.email })
+        connectParams.metadata = JSON.stringify({ ...meta, ...agentData })
       } else {
-        connectParams.metadata = JSON.stringify({ agentId: user?.id, agentEmail: user?.email })
+        connectParams.metadata = JSON.stringify(agentData)
       }
 
       const call = await device.connect({

@@ -24,13 +24,15 @@ export default async function handler(req, res) {
         logger.log('[Bridge] Request Host:', req.headers.host);
 
         // Get query parameters (server.js should populate req.query, but fallback to manual parsing)
-        let target, callerId, contactId, accountId;
+        let target, callerId, contactId, accountId, agentId, agentEmail;
         if (req.query && typeof req.query === 'object') {
             // Use req.query from server.js if available
             target = req.query.target;
             callerId = req.query.callerId;
             contactId = req.query.contactId;
             accountId = req.query.accountId;
+            agentId = req.query.agentId;
+            agentEmail = req.query.agentEmail;
             logger.log('[Bridge] Using req.query from server.js');
         } else {
             // Fallback: manually parse query parameters from req.url
@@ -43,6 +45,8 @@ export default async function handler(req, res) {
                 callerId = requestUrl.searchParams.get('callerId');
                 contactId = requestUrl.searchParams.get('contactId');
                 accountId = requestUrl.searchParams.get('accountId');
+                agentId = requestUrl.searchParams.get('agentId');
+                agentEmail = requestUrl.searchParams.get('agentEmail');
                 logger.log('[Bridge] Manually parsed from req.url (fallback)');
             } catch (parseError) {
                 logger.error('[Bridge] Error parsing URL query parameters:', parseError.message);
@@ -57,11 +61,15 @@ export default async function handler(req, res) {
         if (callerId) callerId = decodeURIComponent(callerId);
         if (contactId) contactId = decodeURIComponent(contactId);
         if (accountId) accountId = decodeURIComponent(accountId);
+        if (agentId) agentId = decodeURIComponent(agentId);
+        if (agentEmail) agentEmail = decodeURIComponent(agentEmail);
 
         logger.log('[Bridge] Parsed target:', target);
         logger.log('[Bridge] Parsed callerId:', callerId);
         logger.log('[Bridge] Parsed contactId:', contactId);
         logger.log('[Bridge] Parsed accountId:', accountId);
+        logger.log('[Bridge] Parsed agentId:', agentId);
+        logger.log('[Bridge] Parsed agentEmail:', agentEmail);
 
         // Use req.body that was already parsed by server.js (avoid re-reading stream)
         // If req.body doesn't exist (shouldn't happen with server.js), fallback to empty object
@@ -152,6 +160,9 @@ export default async function handler(req, res) {
         const dialParams = new URLSearchParams();
         if (contactId) dialParams.append('contactId', contactId);
         if (accountId) dialParams.append('accountId', accountId);
+        if (agentId) dialParams.append('agentId', agentId);
+        if (agentEmail) dialParams.append('agentEmail', agentEmail);
+        if (target) dialParams.append('targetPhone', target);
         const dialQuery = dialParams.toString();
 
         if (dialQuery) {

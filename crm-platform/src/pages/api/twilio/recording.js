@@ -54,6 +54,8 @@ export default async function handler(req, res) {
         const accountId = req.query.accountId || '';
         const agentId = req.query.agentId || '';
         const agentEmail = req.query.agentEmail || '';
+        const targetPhone = req.query.targetPhone || '';
+        const businessPhone = req.query.businessPhone || '';
         // #region agent log
         // (Diagnostic fetch removed for production stability)
         // #endregion
