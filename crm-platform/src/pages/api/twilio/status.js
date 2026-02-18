@@ -48,10 +48,25 @@ export default async function handler(req, res) {
             CallStatus,
             To,
             From,
+            CallDuration,
             Duration,
             RecordingUrl,
-            CallDuration
+            DialCallDuration,
+            DialCallSid,
+            DialCallStatus
         } = body;
+
+        // #region agent log
+        if (CallStatus === 'completed') {
+            console.log(`[Status] Completed event for ${CallSid}:`, {
+                CallDuration,
+                Duration,
+                DialCallDuration,
+                DialCallSid,
+                DialCallStatus
+            });
+        }
+        // #endregion  CallDuration
 
         const sig = req.headers['x-twilio-signature'] || null;
         logger.debug('[TwilioWebhook] Twilio status callback received', {
@@ -264,7 +279,7 @@ export default async function handler(req, res) {
                 break;
             case 'completed':
                 // Logging only - actual duration calculation for DB is below
-                logger.log(`  ✅ Call completed. Duration: ${Duration || CallDuration || '0'}s`);
+                logger.log(`  ✅ Call completed. Duration: ${Duration || CallDuration || DialCallDuration || '0'}s (DialDuration: ${DialCallDuration || 'N/A'})`);
                 if (RecordingUrl) {
                     logger.log(`  🎵 Recording: ${RecordingUrl}`);
                 }
@@ -290,22 +305,24 @@ export default async function handler(req, res) {
         // Now only writes once when call completes = ~1 write per call (88% reduction)
         try {
             if (CallStatus === 'completed') {
-                // targetPhone/businessPhone precomputed above
-
-                let correctedDuration = parseInt((Duration || CallDuration || '0'), 10);
+                let correctedDuration = parseInt((DialCallDuration || Duration || CallDuration || '0'), 10);
+                // Attempt to fetch correct duration from child leg if duration is still very short (bridging only)
                 try {
-                    if (correctedDuration < 5) {
+                    if (correctedDuration < 5 && (DialCallSid || CallSid)) {
                         const accountSid = process.env.TWILIO_ACCOUNT_SID;
                         const authToken = process.env.TWILIO_AUTH_TOKEN;
-                        if (accountSid && authToken && CallSid) {
+                        if (accountSid && authToken) {
                             const client = twilio(accountSid, authToken);
-                            const kids = await client.calls.list({ parentCallSid: CallSid, limit: 1 });
-                            const child = kids.find(k => k.direction === 'outbound-dial');
+                            // If we have DialCallSid (child leg), fetch it directly. Otherwise look for kids.
+                            const targetForDuration = DialCallSid || CallSid;
+                            const kids = await client.calls.list({ parentCallSid: targetForDuration, limit: 1 });
+                            const child = kids.find(k => k.direction === 'outbound-dial') || (DialCallSid ? await client.calls(DialCallSid).fetch() : null);
+
                             if (child && child.duration) {
                                 const childDuration = parseInt(child.duration, 10);
                                 if (childDuration > correctedDuration) {
                                     correctedDuration = childDuration;
-                                    logger.log(`[Status] Using corrected duration from child leg for DB: ${childDuration}s`);
+                                    logger.log(`[Status] Corrected duration for ${CallSid} using child leg ${child.sid}: ${childDuration}s`);
                                 }
                             }
                         }
