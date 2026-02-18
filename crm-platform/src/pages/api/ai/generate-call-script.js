@@ -165,31 +165,10 @@ Focus on: latest news (past 12 months), leadership (CEO/CFO/Controller), operati
             }
         }
 
-        const { GoogleGenerativeAI } = await import('@google/generative-ai');
-        const apiKey = process.env.GEMINI_API_KEY || process.env.FREE_GEMINI_KEY;
-
-        if (!apiKey) {
-            throw new Error('Missing GEMINI_API_KEY or FREE_GEMINI_KEY');
+        const openRouterKey = process.env.OPEN_ROUTER_API_KEY;
+        if (!openRouterKey) {
+            throw new Error('Missing OPEN_ROUTER_API_KEY');
         }
-
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const envPreferredModel = (process.env.GEMINI_MODEL || '').trim();
-        const preferredModel = envPreferredModel || 'gemini-2.5-flash-lite';
-        const modelCandidates = Array.from(
-            new Set(
-                [
-                    preferredModel,
-                    'gemini-2.5-flash-lite',
-                    'gemini-2.5-flash-lite-preview',
-                    'gemini-2.5-flash',
-                    'gemini-2.5-flash-preview',
-                    'gemini-2.0-flash',
-                    'gemini-2.0-flash-exp',
-                    'gemini-1.5-flash',
-                    'gemini-1.5-pro'
-                ].filter(Boolean)
-            )
-        );
 
         const prompt = `
 You are Lewis Patterson, Lead Energy Strategist at Power Choosers. You are preparing for a cold call to a potential commercial energy client.
@@ -238,25 +217,31 @@ RULES:
 Generate the script now:
 `;
 
-        let script = '';
-        let lastErr = null;
-        for (const modelName of modelCandidates) {
-            try {
-                const model = genAI.getGenerativeModel({ model: modelName });
-                const result = await model.generateContent(prompt);
-                const response = await result.response;
-                script = response.text();
-                lastErr = null;
-                break;
-            } catch (e) {
-                lastErr = e;
-                const msg = (e && (e.message || String(e))) || '';
-                const modelNotFound = msg.includes('not found for API version') || msg.includes('models/') || msg.includes('404');
-                if (!modelNotFound) break;
-            }
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${openRouterKey}`,
+                'HTTP-Referer': 'https://nodalpoint.io',
+                'X-Title': 'Nodal Point CRM',
+            },
+            body: JSON.stringify({
+                model: 'google/gemini-2.5-flash',
+                messages: [
+                    { role: 'user', content: prompt }
+                ],
+                temperature: 0.7,
+                max_tokens: 2048,
+            }),
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`OpenRouter API Error: ${errText}`);
         }
 
-        if (lastErr) throw lastErr;
+        const data = await response.json();
+        const script = data.choices[0].message.content.trim();
 
         // Cache the result in Supabase
         if (supabaseAdmin) {

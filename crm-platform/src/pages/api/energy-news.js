@@ -113,10 +113,10 @@ export default async function handler(req, res) {
 
     if (useGemini) {
       try {
-        const { GoogleGenerativeAI } = await import('@google/generative-ai');
-        const apiKey = process.env.GEMINI_API_KEY || process.env.FREE_GEMINI_KEY;
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const openRouterKey = process.env.OPEN_ROUTER_API_KEY;
+        if (!openRouterKey) {
+          throw new Error('Missing OPEN_ROUTER_API_KEY');
+        }
 
         const reformattedItems = await Promise.all(rawItems.map(async (item) => {
           try {
@@ -124,19 +124,40 @@ export default async function handler(req, res) {
 
 "${item.title}"`;
 
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            const reformattedTitle = response.text().trim().replace(/^["']|["']$/g, '');
+            const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${openRouterKey}`,
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://nodalpoint.io",
+                "X-Title": "Nodal Point CRM Analyst"
+              },
+              body: JSON.stringify({
+                model: 'google/gemini-2.5-flash',
+                messages: [
+                  { role: 'user', content: prompt }
+                ],
+                temperature: 0.3,
+              })
+            });
+
+            if (!response.ok) {
+              const errText = await response.text();
+              throw new Error(`OpenRouter API Error: ${errText}`);
+            }
+
+            const data = await response.json();
+            const reformattedTitle = data.choices[0].message.content.trim().replace(/^["']|["']$/g, '');
 
             return { ...item, title: reformattedTitle || item.title };
           } catch (err) {
-            logger.error('[Energy News] Gemini reformatting failed for headline:', err);
+            logger.error('[Energy News] OpenRouter reformatting failed for headline:', err);
             return item;
           }
         }));
         items.push(...reformattedItems);
       } catch (error) {
-        logger.error('[Energy News] Gemini processing failed:', error);
+        logger.error('[Energy News] OpenRouter processing failed:', error);
         items.push(...rawItems);
       }
     } else {

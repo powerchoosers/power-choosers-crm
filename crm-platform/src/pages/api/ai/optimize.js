@@ -1,4 +1,3 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
 
@@ -116,7 +115,7 @@ export default async function handler(req, res) {
           "X-Title": "Nodal Point CRM"
         },
         body: JSON.stringify({
-          "model": "openai/gpt-4o-mini",
+          "model": "google/gemini-2.5-flash",
           "response_format": { "type": "json_object" },
           "messages": [
             { "role": "system", "content": systemInstruction },
@@ -171,8 +170,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const openRouterKey = process.env.OPEN_ROUTER_API_KEY;
+    if (!openRouterKey) {
+      throw new Error('OpenRouter API key not configured');
+    }
 
     const contactContext = contact ? `
       TARGET CONTACT:
@@ -200,13 +201,30 @@ export default async function handler(req, res) {
       CONTEXT: ${context || 'sequence_step_optimization'}
     `;
 
-    const result = await model.generateContent([
-      { text: systemPrompt },
-      { text: `Draft to optimize: ${draft}` }
-    ]);
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${openRouterKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env.API_BASE_URL || "https://nodalpoint.io",
+        "X-Title": "Nodal Point CRM"
+      },
+      body: JSON.stringify({
+        "model": "google/gemini-2.5-flash",
+        "messages": [
+          { "role": "system", "content": systemPrompt },
+          { "role": "user", "content": `Draft to optimize: ${draft}` }
+        ]
+      })
+    });
 
-    const response = await result.response;
-    const optimizedText = response.text().trim();
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`OpenRouter API Error: ${errText}`);
+    }
+
+    const data = await response.json();
+    const optimizedText = data.choices[0].message.content.trim();
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ optimized: optimizedText }));

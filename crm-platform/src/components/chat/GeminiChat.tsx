@@ -1781,12 +1781,6 @@ SELECT * FROM hybrid_search_accounts(
                   <SelectItem value="google/gemini-3-flash-preview" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
                     GEMINI-3-FLASH
                   </SelectItem>
-                  <SelectItem value="openai/gpt-5-nano" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GPT-5-NANO
-                  </SelectItem>
-                  <SelectItem value="openai/gpt-5-mini" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
-                    GPT-5-MINI
-                  </SelectItem>
 
                   <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 my-1">
                     Claude Intelligence
