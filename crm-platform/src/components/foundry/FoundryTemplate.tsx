@@ -287,13 +287,19 @@ export default function FoundryTemplate({
                                 </Section>
 
                                 <Section style={footerLinksContainer}>
-                                    <Text style={footerLinks}>
-                                        <a href={linkedinUrl} style={linkStyle}>LINKEDIN</a>
-                                        <span style={linkSeparator}>//</span>
-                                        <a href="https://nodalpoint.io" style={linkStyle}>HQ</a>
-                                        <span style={linkSeparator}>//</span>
-                                        <a href="https://nodalpoint.io/bill-debugger" style={linkStyle}>[ RUN_AUDIT ]</a>
-                                    </Text>
+                                    <Row style={footerLinksRow}>
+                                        <Column style={linkColumn}>
+                                            <a href={linkedinUrl} style={linkStyle}>LINKEDIN</a>
+                                        </Column>
+                                        <Column style={separatorColumn}>//</Column>
+                                        <Column style={linkColumn}>
+                                            <a href="https://nodalpoint.io" style={linkStyle}>HQ</a>
+                                        </Column>
+                                        <Column style={separatorColumn}>//</Column>
+                                        <Column style={linkColumn}>
+                                            <a href="https://nodalpoint.io/bill-debugger" style={linkStyle}>[ RUN_AUDIT ]</a>
+                                        </Column>
+                                    </Row>
                                 </Section>
                             </Section>
                         </Section>
@@ -697,21 +703,32 @@ const footerLinksContainer = {
     marginTop: '0px',
 }
 
-const footerLinks = {
-    fontFamily: 'monospace',
-    fontSize: '10px',
-    fontWeight: 'bold',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.12em',
-    margin: 0,
+const footerLinksRow = {
+    width: '100%',
+    maxWidth: '400px',
 }
 
-const linkSeparator = {
+const linkColumn = {
+    width: 'auto',
+    textAlign: 'left' as const,
+    paddingRight: '0px',
+}
+
+const separatorColumn = {
     color: '#d4d4d8',
     padding: '0 8px',
+    width: '24px',
+    textAlign: 'center' as const,
+    fontFamily: 'monospace',
+    fontSize: '10px',
 }
 
 const linkStyle = {
     color: '#002FA7',
     textDecoration: 'none',
+    fontFamily: 'monospace',
+    fontSize: '10px',
+    fontWeight: 'bold',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.12em',
 }
