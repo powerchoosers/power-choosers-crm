@@ -63,8 +63,8 @@ export default function FoundryTemplate({
                             <Column style={headerLeft}>
                                 <Img
                                     src="https://nodalpoint.io/images/nodalpoint-webicon.png"
-                                    width="20"
-                                    height="20"
+                                    width="18"
+                                    height="18"
                                     alt="Nodal Point"
                                     style={logo}
                                 />
@@ -287,7 +287,7 @@ export default function FoundryTemplate({
                                 </Section>
 
                                 <Section style={footerLinksContainer}>
-                                    <Row style={footerLinksRow}>
+                                    <Row style={{ width: 'auto' }}>
                                         <Column style={linkColumn}>
                                             <a href={linkedinUrl} style={linkStyle}>LINKEDIN</a>
                                         </Column>
@@ -329,7 +329,7 @@ const container = {
 
 const header = {
     borderBottom: '1px solid #e4e4e7',
-    padding: '24px 40px',
+    padding: '20px 32px',
     width: '100%',
 }
 
@@ -347,9 +347,9 @@ const headerRight = {
 const logo = {
     display: 'inline-block',
     verticalAlign: 'middle',
-    marginRight: '12px',
-    width: '20px',
-    height: '20px',
+    marginRight: '10px',
+    width: '18px',
+    height: '18px',
 }
 
 const brandText = {
@@ -372,7 +372,7 @@ const refText = {
 }
 
 const contentSection = {
-    padding: '48px 60px',
+    padding: '32px 32px',
 }
 
 const blockMargin = {
@@ -651,7 +651,7 @@ const footer = {
 }
 
 const footerContent = {
-    padding: '48px 60px',
+    padding: '32px 32px',
 }
 
 const footerPhotoCol = {
@@ -705,15 +705,10 @@ const footerLinksContainer = {
     marginTop: '0px',
 }
 
-const footerLinksRow = {
-    width: '100%',
-    maxWidth: '400px',
-}
-
 const linkColumn = {
     width: 'auto',
     textAlign: 'left' as const,
-    paddingRight: '0px',
+    whiteSpace: 'nowrap' as const,
 }
 
 const separatorColumn = {
@@ -732,5 +727,5 @@ const linkStyle = {
     fontSize: '10px',
     fontWeight: 'bold',
     textTransform: 'uppercase' as const,
-    letterSpacing: '0.12em',
+    letterSpacing: '0.1em',
 }
