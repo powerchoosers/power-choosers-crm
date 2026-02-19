@@ -36,6 +36,29 @@ const EMAIL_AI_MODELS = [
 
 export type EmailTypeId = 'cold_first_touch' | 'cold_followup' | 'professional' | 'followup' | 'internal' | 'support'
 
+function EmailIframePreview({ content }: { content: string }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+
+  useEffect(() => {
+    if (iframeRef.current) {
+      const doc = iframeRef.current.contentDocument
+      if (doc) {
+        doc.open()
+        doc.write(content)
+        doc.close()
+      }
+    }
+  }, [content])
+
+  return (
+    <iframe
+      ref={iframeRef}
+      className="w-full h-[600px] border-0 bg-white"
+      title="Email Preview"
+    />
+  )
+}
+
 const DELIVERABILITY_RULES = `
 DELIVERABILITY RULES:
 - Avoid promotional spam language ("free", "act now", "discount", "save big", "limited time offer", "urgent").
@@ -1192,26 +1215,20 @@ OUTPUT FORMAT:
           <div className="flex flex-col relative">
             <div className="relative">
               {selectedFoundryId ? (
-                // Show HTML preview for Foundry templates - Refined for inbox parity
-                <div className="w-full min-h-[300px] bg-zinc-100 rounded-xl p-4 md:p-12 flex justify-center items-start overflow-hidden border border-white/5 shadow-inner transition-all duration-500">
-                  <div className="w-full max-w-[600px] bg-white shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden rounded-sm ring-1 ring-zinc-200 flex flex-col">
-                    <div className="h-8 border-b border-zinc-100 bg-zinc-50 flex items-center px-4 justify-between shrink-0">
-                      <div className="flex gap-1.5">
-                        <div className="w-2 h-2 rounded-full bg-zinc-200" />
-                        <div className="w-2 h-2 rounded-full bg-zinc-200" />
-                        <div className="w-2 h-2 rounded-full bg-zinc-200" />
+                // Show HTML preview for Foundry templates - Refined for inbox parity with Iframe Isolation
+                <div className="w-full min-h-[400px] bg-zinc-100/50 rounded-xl p-6 md:p-14 flex justify-center items-start overflow-hidden border border-white/5 shadow-inner transition-all duration-500">
+                  <div className="w-full max-w-[650px] bg-white shadow-[0_30px_70px_rgba(0,0,0,0.25)] overflow-hidden rounded-md ring-1 ring-zinc-200 flex flex-col scale-[1.02] transform transition-transform duration-700">
+                    <div className="h-10 border-b border-zinc-100 bg-zinc-50 flex items-center px-5 justify-between shrink-0">
+                      <div className="flex gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full bg-zinc-200" />
+                        <div className="w-2.5 h-2.5 rounded-full bg-zinc-200" />
+                        <div className="w-2.5 h-2.5 rounded-full bg-zinc-200" />
                       </div>
-                      <span className="text-[9px] font-mono text-zinc-400 uppercase tracking-[0.2em]">Live_Transmission_Preview</span>
+                      <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-[0.3em] font-semibold">Live_Transmission_Preview</span>
                     </div>
-                    <div
-                      className="flex-1 overflow-x-hidden"
-                      dangerouslySetInnerHTML={{
-                        __html: DOMPurify.sanitize(content, {
-                          ALLOWED_TAGS: ['p', 'div', 'span', 'a', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'figure', 'img', 'figcaption', 'br', 'ul', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
-                          ALLOWED_ATTR: ['href', 'src', 'alt', 'style', 'title']
-                        })
-                      }}
-                    />
+                    <div className="flex-1 overflow-x-hidden min-h-[600px] bg-white">
+                      <EmailIframePreview content={content} />
+                    </div>
                   </div>
                 </div>
               ) : (

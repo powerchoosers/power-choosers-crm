@@ -59,6 +59,29 @@ const VALUE_COLOR_CLASSES: Record<ValueColor, string> = {
   black: 'bg-zinc-100', // Light in editor for readability, but generates black in HTML
 }
 
+function EmailIframePreview({ content }: { content: string }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+
+  useEffect(() => {
+    if (iframeRef.current) {
+      const doc = iframeRef.current.contentDocument
+      if (doc) {
+        doc.open()
+        doc.write(content)
+        doc.close()
+      }
+    }
+  }, [content])
+
+  return (
+    <iframe
+      ref={iframeRef}
+      className="w-full h-full border-0 bg-white min-h-[600px]"
+      title="Email Preview"
+    />
+  )
+}
+
 interface TextModuleContent {
   text: string;
   useAi: boolean;
@@ -1407,15 +1430,14 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
           </div>
 
           <div className="flex-1 overflow-y-auto bg-zinc-100 p-4 md:p-8 flex justify-center items-start np-scroll">
-            <div className="w-full max-w-[600px] bg-white border border-zinc-200 shadow-2xl flex flex-col mb-8 overflow-hidden">
+            <div className="w-full max-w-[650px] bg-white border border-zinc-200 shadow-2xl flex flex-col mb-8 overflow-hidden rounded-md transition-all duration-500">
               {previewHtml ? (
-                <div
-                  className="foundry-preview w-full min-h-[400px]"
-                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewHtml, { ALLOWED_TAGS: ['p', 'div', 'span', 'a', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'figure', 'img', 'figcaption', 'br', 'ul', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'], ALLOWED_ATTR: ['href', 'src', 'alt', 'style', 'title'] }) }}
-                />
+                <div className="foundry-preview w-full min-h-[600px] bg-white">
+                  <EmailIframePreview content={previewHtml} />
+                </div>
               ) : (
                 <>
-                  <div className="border-b border-zinc-200 px-10 py-5 flex justify-between items-center gap-4 bg-white shrink-0">
+                  <div className="border-b border-zinc-100 px-12 py-7 flex justify-between items-center gap-4 bg-zinc-50/50 shrink-0">
                     <div className="flex items-center gap-3 min-width-0 flex-1">
                       <Image
                         src="/images/nodalpoint-webicon.png"
@@ -1424,7 +1446,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                         height={20}
                         className="h-5 w-auto shrink-0"
                       />
-                      <span className="text-[9px] font-mono text-zinc-900 font-bold tracking-[0.2em] uppercase truncate">NODAL_POINT // INTELLIGENCE</span>
+                      <span className="text-[10px] font-mono text-zinc-900 font-bold tracking-[0.3em] uppercase truncate">NODAL_POINT // INTELLIGENCE</span>
                     </div>
                     <span className="text-[9px] font-mono text-zinc-400 uppercase tracking-tighter truncate shrink-0 max-w-[45%]">
                       REF: {new Date().toISOString().split('T')[0].replace(/-/g, '')} {'//'} TX_001

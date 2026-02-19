@@ -329,17 +329,19 @@ const container = {
 
 const header = {
     borderBottom: '1px solid #e4e4e7',
-    padding: '16px 20px',
+    padding: '24px 40px',
     width: '100%',
 }
 
 const headerLeft = {
-    width: '55%',
+    width: '70%',
+    verticalAlign: 'middle',
 }
 
 const headerRight = {
-    width: '45%',
+    width: '30%',
     textAlign: 'right' as const,
+    verticalAlign: 'middle',
 }
 
 const logo = {
@@ -359,6 +361,7 @@ const brandText = {
     display: 'inline-block',
     verticalAlign: 'middle',
     margin: 0,
+    whiteSpace: 'nowrap' as const,
 }
 
 const refText = {
@@ -369,7 +372,7 @@ const refText = {
 }
 
 const contentSection = {
-    padding: '32px 40px',
+    padding: '48px 60px',
 }
 
 const blockMargin = {
@@ -648,7 +651,7 @@ const footer = {
 }
 
 const footerContent = {
-    padding: '40px 40px',
+    padding: '48px 60px',
 }
 
 const footerPhotoCol = {
