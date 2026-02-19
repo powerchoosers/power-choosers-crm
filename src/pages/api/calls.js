@@ -85,17 +85,22 @@ function normalizeCallForResponse(call) {
     contactName: call.contactName || '',
 
     // Ownership fields (required for client-side scoping + KPI widget)
-    ownerId: call.ownerId || call.agentEmail || call.userEmail || '',
-    assignedTo: call.assignedTo || call.ownerId || call.agentEmail || call.userEmail || '',
-    createdBy: call.createdBy || call.ownerId || call.agentEmail || call.userEmail || '',
-    agentEmail: call.agentEmail || call.ownerId || call.userEmail || '',
-    userEmail: call.userEmail || call.agentEmail || call.ownerId || ''
+    // IMPORTANT: ownerId must be a UUID (auth.uid()), never an email.
+    // RLS policy checks ownerId = auth.uid() — email would never match.
+    ownerId: call.ownerId || '',
+    assignedTo: call.assignedTo || call.ownerId || '',
+    createdBy: call.createdBy || call.ownerId || '',
+    agentEmail: call.agentEmail || call.userEmail || '',
+    userEmail: call.userEmail || call.agentEmail || ''
   };
 }
 
 // Map Supabase row to camelCase object (calls table uses camelCase columns)
+// NOTE: Do NOT spread row.metadata here — it can contain stale ownerId/email
+// values that would overwrite clean column values and break RLS filtering.
 function mapSupabaseToCall(row) {
   if (!row) return {};
+  const meta = (row.metadata && typeof row.metadata === 'object') ? row.metadata : {};
   return {
     id: row.id,
     callSid: row.callSid,
@@ -113,7 +118,23 @@ function mapSupabaseToCall(row) {
     accountId: row.accountId,
     contactId: row.contactId,
     createdAt: row.createdAt,
-    ...row.metadata // Spread any extra metadata
+    // ownerId comes from the column only — never from metadata
+    ownerId: row.ownerId || null,
+    // Pull supplementary metadata fields that aren't columns
+    outcome: meta.outcome,
+    accountName: meta.accountName,
+    contactName: meta.contactName,
+    targetPhone: meta.targetPhone,
+    businessPhone: meta.businessPhone,
+    recordingChannels: meta.recordingChannels,
+    recordingTrack: meta.recordingTrack,
+    recordingSource: meta.recordingSource,
+    conversationalIntelligence: meta.conversationalIntelligence,
+    source: meta.source,
+    agentEmail: meta.agentEmail,
+    userEmail: meta.userEmail,
+    assignedTo: meta.assignedTo,
+    createdBy: meta.createdBy,
   };
 }
 
@@ -328,12 +349,14 @@ export async function upsertCallInSupabase(payload) {
   };
 
   // Ownership logic
-  const hasExistingOwner = current.ownerId && current.ownerId.trim();
-  const finalOwnerId = (userId && userId.trim())
+  // CRITICAL: ownerId must ONLY be a UUID (auth.uid()) for RLS to work.
+  // Never store an email as ownerId — agents would never be able to see their calls.
+  // A UUID looks like: eecc7422-84fb-4295-83b2-d73cbedd95dc
+  const isUuid = (v) => v && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v).trim());
+  const hasExistingOwner = isUuid(current.ownerId);
+  const finalOwnerId = isUuid(userId)
     ? userId.trim()
-    : ((userEmail && userEmail.trim())
-      ? userEmail.toLowerCase().trim()
-      : (hasExistingOwner ? current.ownerId : 'unassigned'));
+    : (hasExistingOwner ? current.ownerId : 'unassigned');
 
   merged.ownerId = finalOwnerId;
   merged.assignedTo = finalOwnerId;
