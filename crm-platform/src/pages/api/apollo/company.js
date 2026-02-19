@@ -9,36 +9,36 @@ import { cors, fetchWithRetry, normalizeDomain, getApiKey, APOLLO_BASE_URL, form
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
-  
+
   if (req.method !== 'GET') {
     res.writeHead(405, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Method not allowed' }));
     return;
   }
-  
+
   try {
     const { domain, company, companyId } = req.query || {};
-    
+
     if (!domain && !companyId && !company) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
-        error: 'Missing required parameter: domain, companyId, or company name required for enrichment' 
+      res.end(JSON.stringify({
+        error: 'Missing required parameter: domain, companyId, or company name required for enrichment'
       }));
       return;
     }
 
     const APOLLO_API_KEY = getApiKey();
-    
+
     // ============================================================================
     // PRIMARY METHOD: Organization Enrichment by Domain (most accurate!)
     // Apollo's Organization Enrichment endpoint supports domain-based lookups
     // This eliminates name-matching issues and uses domain as source of truth
     // ============================================================================
-    
+
     if (domain) {
       const normalizedDomain = normalizeDomain(domain);
       const enrichUrl = `${APOLLO_BASE_URL}/organizations/enrich?domain=${encodeURIComponent(normalizedDomain)}`;
-      
+
       const enrichResp = await fetchWithRetry(enrichUrl, {
         method: 'GET',
         headers: {
@@ -50,7 +50,7 @@ export default async function handler(req, res) {
 
       if (enrichResp.ok) {
         const enrichData = await enrichResp.json();
-        
+
         if (enrichData.organization) {
           const companyData = mapApolloCompanyToLushaFormat(enrichData.organization);
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -81,13 +81,11 @@ export default async function handler(req, res) {
           companyType: '',
           _notFoundInApollo: true
         };
-        
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(minimalCompany));
         return;
       } else {
-        const text = await enrichResp.text();
-        
         // Return minimal data on error to allow contacts search
         const minimalCompany = {
           id: null,
@@ -110,24 +108,21 @@ export default async function handler(req, res) {
           companyType: '',
           _notFoundInApollo: true
         };
-        
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(minimalCompany));
         return;
       }
     }
-    
+
     // ============================================================================
     // FALLBACK METHOD: Enrichment by Company ID
     // Used when widget extracts company ID from contact data
     // ============================================================================
-    
+
     if (companyId) {
-      const enrichUrl = `${APOLLO_BASE_URL}/organizations/enrich?domain=placeholder.com`; // Note: ID enrichment uses GET with query param
-      
-      // Try GET with ID in query string
       const enrichUrlWithId = `${APOLLO_BASE_URL}/organizations/${companyId}`;
-      
+
       const enrichResp = await fetchWithRetry(enrichUrlWithId, {
         method: 'GET',
         headers: {
@@ -139,15 +134,13 @@ export default async function handler(req, res) {
 
       if (enrichResp.ok) {
         const enrichData = await enrichResp.json();
-        
+
         if (enrichData.organization) {
           const companyData = mapApolloCompanyToLushaFormat(enrichData.organization);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(companyData));
           return;
         }
-      } else {
-        const text = await enrichResp.text();
       }
     }
 
@@ -155,7 +148,7 @@ export default async function handler(req, res) {
     // FALLBACK METHOD: Search by Company Name
     // Used when domain is missing (e.g. from search results)
     // ============================================================================
-    
+
     if (company) {
       const searchUrl = `${APOLLO_BASE_URL}/organizations/search`;
       const searchResp = await fetchWithRetry(searchUrl, {
@@ -175,8 +168,6 @@ export default async function handler(req, res) {
         const searchData = await searchResp.json();
         if (searchData.organizations && searchData.organizations.length > 0) {
           const org = searchData.organizations[0];
-          // If we found an org, we can either return it directly or try to enrich it further
-          // Usually search results are rich enough for our needs
           const companyData = mapApolloCompanyToLushaFormat(org);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(companyData));
@@ -184,19 +175,19 @@ export default async function handler(req, res) {
         }
       }
     }
-    
+
     // If we get here, both methods failed
     res.writeHead(400, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
+    res.end(JSON.stringify({
       error: 'Unable to enrich company data',
       details: 'Domain or company ID required'
     }));
-    
+
   } catch (e) {
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      error: 'Server error', 
-      details: e.message 
+    res.end(JSON.stringify({
+      error: 'Server error',
+      details: e.message
     }));
   }
 }
@@ -204,7 +195,7 @@ export default async function handler(req, res) {
 function mapApolloCompanyToLushaFormat(apolloOrg) {
   const derivedDomain = apolloOrg.primary_domain || normalizeDomain(apolloOrg.website_url || '');
   const website = apolloOrg.website_url || (derivedDomain ? `https://${derivedDomain}` : '');
-  
+
   return {
     id: apolloOrg.id,
     name: apolloOrg.name || '',
@@ -215,6 +206,7 @@ function mapApolloCompanyToLushaFormat(apolloOrg) {
     industry: apolloOrg.industry || (apolloOrg.industries && apolloOrg.industries[0]) || '',
     city: apolloOrg.city || '',
     state: apolloOrg.state || '',
+    zip: apolloOrg.postal_code || '',
     country: apolloOrg.country || '',
     address: apolloOrg.raw_address || apolloOrg.street_address || '',
     companyPhone: apolloOrg.phone || apolloOrg.sanitized_phone || (apolloOrg.primary_phone && apolloOrg.primary_phone.number) || '',
@@ -222,10 +214,7 @@ function mapApolloCompanyToLushaFormat(apolloOrg) {
     linkedin: apolloOrg.linkedin_url || '',
     logoUrl: apolloOrg.logo_url || null,
     foundedYear: apolloOrg.founded_year || '',
-    revenue: apolloOrg.annual_revenue_printed || '',
+    revenue: apolloOrg.annual_revenue_printed || formatRevenue(apolloOrg.annual_revenue),
     companyType: (apolloOrg.industries && apolloOrg.industries[0]) || ''
   };
 }
-
-
-

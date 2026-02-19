@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { formatPhoneNumber } from '@/lib/formatPhone';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUIStore } from '@/store/uiStore';
+import { useAuth } from '@/context/AuthContext';
 
 interface OrgIntelligenceProps {
   domain?: string;
@@ -69,6 +70,8 @@ interface ApolloCompany {
   logoUrl?: string;
   linkedin?: string;
   companyPhone?: string;
+  zip?: string;
+  revenue?: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -76,6 +79,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export default function OrgIntelligence({ domain: initialDomain, companyName, website, accountId, accountLogoUrl, accountDomain }: OrgIntelligenceProps) {
+  const { user } = useAuth();
   const [data, setData] = useState<ApolloContactRow[]>([]);
   const [companySummary, setCompanySummary] = useState<ApolloCompany | null>(null);
   const [scanStatus, setScanStatus] = useState<'idle' | 'scanning' | 'complete'>('idle');
@@ -275,6 +279,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           logo_url: companySummary.logoUrl || null, // Replace with Apollo logo when enriching
           linkedin_url: companySummary.linkedin || null,
           phone: formatPhoneNumber(companySummary.companyPhone) || null,
+          revenue: companySummary.revenue || null,
+          zip: companySummary.zip || null,
           metadata: {
             ...currentMetadata,
             meters: meters, // Save meter with service address
@@ -417,6 +423,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         title: enriched.jobTitle || person.title,
         email: enriched.email || person.email,
         accountId: accountId,
+        ownerId: user?.id || null,
         status: 'Active',
         ...(linkedinUrl ? { linkedinUrl } : {}),
         ...(contactCity ? { city: contactCity } : {}),
@@ -1143,12 +1150,13 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                     </div>
                     <p className="text-[9px] font-mono text-zinc-400 truncate uppercase tracking-tighter">
                       {companySummary.industry || 'Enterprise'} • {companySummary.employees || '0-50'} Emp
+                      {companySummary.revenue && ` • ${companySummary.revenue}`}
                     </p>
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                      {(companySummary.city || companySummary.state) && (
+                      {(companySummary.city || companySummary.state || companySummary.zip) && (
                         <div className="flex items-center gap-1 text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
                           <MapPin className="w-2.5 h-2.5" />
-                          {[companySummary.city, companySummary.state].filter(Boolean).join(', ')}
+                          {[companySummary.city, companySummary.state, companySummary.zip].filter(Boolean).join(', ')}
                         </div>
                       )}
                       {companySummary.companyPhone && (
