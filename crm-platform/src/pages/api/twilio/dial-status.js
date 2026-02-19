@@ -1,15 +1,14 @@
-// Dial status callback: start dual-channel recording on the bridged child leg
+// Dial status callback: log completed calls and start dual-channel recording
 import twilio from 'twilio';
 import logger from '../_logger.js';
 import { upsertCallInSupabase } from '../calls.js';
 
 export default async function handler(req, res) {
-  // Twilio posts x-www-form-urlencoded data for dial status callbacks
   try {
+    // --- Parse body (Twilio posts x-www-form-urlencoded) ---
     const ct = (req.headers['content-type'] || '').toLowerCase();
     let body = req.body;
 
-    // Robust body parsing for different content types
     if (typeof body === 'string') {
       try {
         if (ct.includes('application/json')) {
@@ -21,362 +20,183 @@ export default async function handler(req, res) {
         try {
           const params = new URLSearchParams(body);
           const obj = {};
-          for (const [key, value] of params.entries()) {
-            obj[key] = value;
-          }
+          for (const [key, value] of params.entries()) obj[key] = value;
           body = obj;
         } catch (_) { }
       }
     }
 
-    if (!body || typeof body !== 'object') {
-      body = req.query || {};
-    }
+    if (!body || typeof body !== 'object') body = req.query || {};
 
-    // Extract CRM context from query parameters
-    let contactId, accountId, agentId, agentEmail, targetPhoneFromQuery;
+    // --- Extract CRM context from query params (passed by voice.js) ---
+    let contactId = '', accountId = '', agentId = '', agentEmail = '', targetPhoneFromQuery = '';
     try {
       const protocol = req.headers['x-forwarded-proto'] || 'https';
       const host = req.headers.host || req.headers['x-forwarded-host'] || '';
       const requestUrl = new URL(req.url, `${protocol}://${host}`);
-      contactId = requestUrl.searchParams.get('contactId');
-      accountId = requestUrl.searchParams.get('accountId');
-      agentId = requestUrl.searchParams.get('agentId');
-      agentEmail = requestUrl.searchParams.get('agentEmail');
-      targetPhoneFromQuery = requestUrl.searchParams.get('targetPhone');
+      contactId = requestUrl.searchParams.get('contactId') || '';
+      accountId = requestUrl.searchParams.get('accountId') || '';
+      agentId = requestUrl.searchParams.get('agentId') || '';
+      agentEmail = requestUrl.searchParams.get('agentEmail') || '';
+      targetPhoneFromQuery = requestUrl.searchParams.get('targetPhone') || '';
     } catch (_) { }
 
-    // Determine the dial status event - prioritize more specific status fields
-    const event = (body.DialCallStatus || body.CallStatus || body.DialStatus || body.CallStatusEvent || '').toLowerCase();
-    const parentSid = body.ParentCallSid || body.CallSid || '';
-    const childSid = body.DialCallSid || '';
+    // --- Parse event details ---
+    // For <Number statusCallback>: body.CallStatus is the child leg status,
+    // body.CallSid is the PARENT (browser leg), body.DialCallSid is the child (PSTN leg)
+    const event = (body.DialCallStatus || body.CallStatus || '').toLowerCase();
+    const parentSid = body.CallSid || ''; // parent browser leg SID
+    const childSid = body.DialCallSid || ''; // child PSTN leg SID (has real phone numbers)
 
-    // Prefer starting recordings on the PARENT call for reliable dual-channel capture
-    const targetSid = parentSid || childSid;
+    // For logging purposes, prefer child PSTN sid; fall back to parent
+    const logCallSid = childSid || parentSid;
 
-    logger.debug('[TwilioWebhook] Dial status event received', {
+    logger.log('[Dial-Status] Event received:', {
       event,
       parentSid,
       childSid,
-      targetSid,
-      from: body.From,
-      to: body.To,
-      direction: body.Direction
+      logCallSid,
+      To: body.To,
+      From: body.From,
+      DialCallDuration: body.DialCallDuration,
+      CallStatus: body.CallStatus,
+      DialCallStatus: body.DialCallStatus,
+      agentEmail,
+      contactId,
+      accountId
     });
 
-    // Handle call completion events - terminate all related legs when any leg completes
-    if (event === 'completed' && (parentSid || childSid)) {
-      logger.info('[TwilioWebhook] Call completed event detected - terminating all related legs', {
-        parentSid,
-        childSid,
-        from: body.From,
-        to: body.To
-      });
-
+    // ================================================================
+    // STEP 1: LOG COMPLETED CALL — Do this FIRST before any other work
+    // ================================================================
+    if (event === 'completed' && logCallSid) {
       try {
-        const accountSid = process.env.TWILIO_ACCOUNT_SID;
-        const authToken = process.env.TWILIO_AUTH_TOKEN;
+        // For <Number statusCallback>:
+        //   body.To = the dialed phone number (e.g. +19728342317)
+        //   body.From = the Twilio caller ID number (e.g. +18176630380)
+        // These are the real phone numbers on the PSTN child leg context.
+        let resolvedTo = body.To || '';
+        let resolvedFrom = body.From || '';
+        let resolvedDuration = parseInt(body.DialCallDuration || body.CallDuration || '0', 10);
 
-        if (accountSid && authToken) {
-          const client = twilio(accountSid, authToken);
-          const callSidsToTerminate = [];
+        const isClientId = (v) => !v || String(v).startsWith('client:') || String(v).startsWith('AP');
 
-          // Collect all CallSids to terminate
-          if (parentSid) callSidsToTerminate.push(parentSid);
-          if (childSid && childSid !== parentSid) callSidsToTerminate.push(childSid);
-
-          // Find all related calls (parent and children)
-          if (parentSid) {
-            try {
-              const children = await client.calls.list({ parentCallSid: parentSid, limit: 20 });
-              for (const child of children) {
-                if (child.status !== 'completed' && child.status !== 'canceled') {
-                  callSidsToTerminate.push(child.sid);
-                }
-              }
-            } catch (fetchError) {
-              logger.warn('[TwilioWebhook] Could not fetch child calls for termination', { error: fetchError.message });
-            }
-          }
-
-          // Terminate all related legs
-          for (const sid of callSidsToTerminate) {
-            try {
-              const call = await client.calls(sid).fetch();
-              if (call.status !== 'completed' && call.status !== 'canceled') {
-                await client.calls(sid).update({ status: 'completed' });
-                logger.info('[TwilioWebhook] Terminated call leg on completed event', {
-                  callSid: sid,
-                  direction: call.direction,
-                  from: call.from,
-                  to: call.to
-                });
-              }
-            } catch (termError) {
-              // Ignore errors for calls already completed
-              if (termError.code !== 20404) {
-                logger.error('[TwilioWebhook] Error terminating call leg', {
-                  callSid: sid,
-                  error: termError.message
-                });
-              }
-            }
-          }
-
-          // Post to /api/calls on completion if we have CRM context
-          // This ensures browser-initiated calls show up in the dossier log
+        // Only fetch from Twilio if phone numbers are missing/invalid (rare case)
+        if (isClientId(resolvedTo) || isClientId(resolvedFrom)) {
+          logger.warn('[Dial-Status] Phone numbers not in body, attempting Twilio REST fetch fallback');
           try {
-            // Compute absolute base URL
-            const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
-            const host = req.headers['x-forwarded-host'] || req.headers.host || '';
-            const envBase = process.env.PUBLIC_BASE_URL || '';
-            const base = host ? `${proto}://${host}` : (envBase || 'https://nodal-point-network.vercel.app');
-
-            // Log the full body so we can debug what Twilio sends
-            logger.log('[Dial-Status] Completed event body:', JSON.stringify({
-              ParentCallSid: body.ParentCallSid,
-              CallSid: body.CallSid,
-              DialCallSid: body.DialCallSid,
-              To: body.To,
-              From: body.From,
-              Direction: body.Direction,
-              DialCallStatus: body.DialCallStatus,
-              DialCallDuration: body.DialCallDuration,
-              CallDuration: body.CallDuration
-            }));
-
-            // Derive real phone numbers.
-            // For dial-status callbacks, body.To is the number dialed (PSTN target)
-            // and body.From is the caller ID (Twilio number). If these are empty or 
-            // look like client: identifiers, fetch from Twilio REST API.
-            let resolvedTo = body.To || '';
-            let resolvedFrom = body.From || '';
-            let resolvedDuration = parseInt(body.DialCallDuration || body.CallDuration || '0', 10);
-
-            const isClientId = (v) => !v || String(v).startsWith('client:') || String(v).startsWith('AP');
-
-            // If To/From are missing or not real phone numbers, fetch them from Twilio
-            if ((isClientId(resolvedTo) || isClientId(resolvedFrom)) && childSid) {
-              try {
-                const accountSid = process.env.TWILIO_ACCOUNT_SID;
-                const authToken = process.env.TWILIO_AUTH_TOKEN;
-                if (accountSid && authToken) {
-                  const client = twilio(accountSid, authToken);
-                  // Fetch the child (PSTN) leg - it has the real To/From numbers
-                  const childCall = await client.calls(childSid).fetch();
-                  if (childCall && !isClientId(childCall.to)) {
-                    resolvedTo = childCall.to;
-                    resolvedFrom = childCall.from;
-                    const childDuration = parseInt(childCall.duration || '0', 10);
-                    if (childDuration > resolvedDuration) resolvedDuration = childDuration;
-                    logger.log(`[Dial-Status] Fetched child leg ${childSid}: to=${resolvedTo}, from=${resolvedFrom}, duration=${resolvedDuration}`);
-                  } else if (parentSid) {
-                    // Try parent leg as fallback
-                    const parentCall = await client.calls(parentSid).fetch();
-                    if (parentCall && !isClientId(parentCall.to)) {
-                      resolvedTo = parentCall.to;
-                      resolvedFrom = parentCall.from;
-                      logger.log(`[Dial-Status] Fetched parent leg ${parentSid}: to=${resolvedTo}, from=${resolvedFrom}`);
-                    }
-                  }
-                }
-              } catch (fetchErr) {
-                logger.warn('[Dial-Status] Failed to fetch call details from Twilio:', fetchErr?.message);
+            const accountSid = process.env.TWILIO_ACCOUNT_SID;
+            const authToken = process.env.TWILIO_AUTH_TOKEN;
+            if (accountSid && authToken && childSid) {
+              const client = twilio(accountSid, authToken);
+              const childCall = await client.calls(childSid).fetch();
+              if (childCall && !isClientId(childCall.to)) {
+                resolvedTo = childCall.to;
+                resolvedFrom = childCall.from;
+                const d = parseInt(childCall.duration || '0', 10);
+                if (d > resolvedDuration) resolvedDuration = d;
+                logger.log(`[Dial-Status] Fetched from Twilio: to=${resolvedTo}, from=${resolvedFrom}`);
               }
             }
-
-            // Use targetPhone from query params if To is still not a real number
-            if (isClientId(resolvedTo) && targetPhoneFromQuery) {
-              resolvedTo = targetPhoneFromQuery;
-            }
-
-            // Use the child SID (PSTN leg) as the call SID for logging when available
-            // because this is the leg with the real phone numbers
-            const logCallSid = childSid || parentSid;
-
-            const payload = {
-              callSid: logCallSid,
-              to: resolvedTo,
-              from: resolvedFrom,
-              status: 'completed',
-              duration: resolvedDuration,
-              contactId,
-              accountId,
-              agentId,
-              agentEmail,
-              targetPhone: targetPhoneFromQuery || resolvedTo || '',
-              source: 'dial-status'
-            };
-
-            logger.log(`[Dial-Status] Posting completed call to DB: sid=${logCallSid}, to=${resolvedTo}, from=${resolvedFrom}, agent=${agentEmail}`);
-
-            await upsertCallInSupabase(payload).catch(err => {
-              logger.warn('[Dial-Status] Failed saving to DB via upsertCallInSupabase:', err?.message);
-            });
-          } catch (innerError) {
-            logger.warn('[Dial-Status] Error preparing /api/calls post:', innerError?.message);
+          } catch (fetchErr) {
+            logger.warn('[Dial-Status] Twilio fetch fallback failed:', fetchErr?.message);
           }
         }
-      } catch (error) {
-        logger.error('[TwilioWebhook] Error in call completion termination logic', {
-          error: error.message,
-          parentSid,
-          childSid
+
+        // Last resort: use targetPhone from query string
+        if (isClientId(resolvedTo) && targetPhoneFromQuery) {
+          resolvedTo = targetPhoneFromQuery;
+        }
+
+        const payload = {
+          callSid: logCallSid,
+          to: resolvedTo,
+          from: resolvedFrom,
+          status: 'completed',
+          duration: resolvedDuration,
+          contactId: contactId || null,
+          accountId: accountId || null,
+          agentId: agentId || null,
+          agentEmail: agentEmail || null,
+          targetPhone: targetPhoneFromQuery || resolvedTo || '',
+          source: 'dial-status'
+        };
+
+        logger.log('[Dial-Status] Upserting completed call:', {
+          sid: logCallSid,
+          to: resolvedTo,
+          from: resolvedFrom,
+          duration: resolvedDuration,
+          agentEmail,
+          contactId,
+          accountId
         });
+
+        await upsertCallInSupabase(payload).catch(err => {
+          logger.error('[Dial-Status] upsertCallInSupabase failed:', err?.message);
+        });
+
+        logger.log('[Dial-Status] ✅ Call logged to Supabase:', logCallSid);
+      } catch (logErr) {
+        logger.error('[Dial-Status] Error logging call:', logErr?.message);
       }
     }
 
-    // Start dual-channel recording when answered/in-progress/completed (to catch edge cases)
-    // IMPORTANT: Only start REST API recording if NO TwiML DialVerb recording exists to avoid interference
-    if ((event === 'in-progress' || event === 'answered' || event === 'completed') && targetSid) {
-      logger.debug('[TwilioWebhook] Event triggered, checking for DialVerb recordings');
+    // ================================================================
+    // STEP 2: Respond 200 immediately to Twilio so it doesn't time out
+    // ================================================================
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('OK');
 
-      // Wait 5 seconds for TwiML recording to appear in REST API, then check for DialVerb recording
-      setTimeout(async () => {
-        try {
-          const accountSid = process.env.TWILIO_ACCOUNT_SID;
-          const authToken = process.env.TWILIO_AUTH_TOKEN;
-          // Compute absolute base URL from request headers first; fallback to env
-          const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
-          const host = req.headers['x-forwarded-host'] || req.headers.host || '';
-          const envBase = process.env.PUBLIC_BASE_URL || '';
-          const baseUrl = host ? `${proto}://${host}` : (envBase || 'https://nodal-point-network.vercel.app');
+    // ================================================================
+    // STEP 3: Start dual-channel recording (after response, fire-and-forget)
+    // Only attempt if TwiML DialVerb recording isn't already handling it
+    // ================================================================
+    if ((event === 'answered' || event === 'in-progress') && (childSid || parentSid)) {
+      const targetSid = childSid || parentSid;
+      const accountSid = process.env.TWILIO_ACCOUNT_SID;
+      const authToken = process.env.TWILIO_AUTH_TOKEN;
 
-          if (accountSid && authToken) {
+      if (accountSid && authToken) {
+        // Fire after 3 seconds to let the TwiML DialVerb recording kick in first
+        setTimeout(async () => {
+          try {
             const client = twilio(accountSid, authToken);
+            const proto = 'https';
+            const envBase = process.env.PUBLIC_BASE_URL || '';
+            const baseUrl = envBase || 'https://nodal-point-network.vercel.app';
 
-            // Build a candidate list of call SIDs to try, prioritizing PSTN child legs
-            const candidates = new Set();
-            const pstnCandidates = new Set();
+            // Check if DialVerb recording already exists
+            const existing = await client.calls(targetSid).recordings.list({ limit: 5 });
+            const hasDialVerb = existing.some(r => r.source === 'DialVerb' && r.status !== 'stopped');
+            const hasDual = existing.some(r => Number(r.channels) === 2 && r.status !== 'stopped');
 
-            // Identify if provided child is PSTN (not client)
-            if (childSid) {
-              const isChildPstn = body.To && body.From &&
-                !body.To.startsWith('client:') &&
-                !body.From.startsWith('client:') &&
-                body.Direction === 'outbound-dial';
-              if (isChildPstn) {
-                pstnCandidates.add(childSid);
-                logger.log('[Dial-Status] Identified PSTN child leg:', childSid, 'To:', body.To);
-              } else {
-                candidates.add(childSid);
-              }
-            }
-            if (parentSid) candidates.add(parentSid);
-
-            // Discover children of the parent and separate PSTN vs client legs
-            try {
-              if (parentSid) {
-                const kids = await client.calls.list({ parentCallSid: parentSid, limit: 10 });
-                for (const k of kids) {
-                  const isClient = (k.from || '').startsWith('client:') || (k.to || '').startsWith('client:');
-                  const isPstn = !isClient && k.direction === 'outbound-dial';
-                  if (isPstn) {
-                    pstnCandidates.add(k.sid);
-                    logger.log('[Dial-Status] Found PSTN child leg:', k.sid, 'To:', k.to, 'Direction:', k.direction);
-                  } else {
-                    candidates.add(k.sid);
-                  }
-                }
-                logger.log('[Dial-Status] Discovered child legs:', kids.map(c => ({ sid: c.sid, from: c.from, to: c.to, direction: c.direction, isPstn: !((c.from || '').startsWith('client:') || (c.to || '').startsWith('client:')) && c.direction === 'outbound-dial' })));
-              }
-            } catch (discErr) {
-              logger.log('[Dial-Status] Child discovery failed:', discErr?.message);
+            if (hasDialVerb || hasDual) {
+              logger.log('[Dial-Status] Recording already active on', targetSid, '- skipping REST API fallback');
+              return;
             }
 
-            // Try to start a dual-channel recording on the first candidate that succeeds
-            // Prioritize PSTN child legs first, then other candidates
-            let started = false; let startedOn = ''; let channelsSeen = 0;
-            const pstnList = Array.from(pstnCandidates);
-            const candList = [...pstnList, ...Array.from(candidates)];
-
-            logger.log('[Dial-Status] Candidate priority order:', { pstnFirst: pstnList, others: Array.from(candidates) });
-            for (let i = 0; i < candList.length; i++) {
-              const sid = candList[i];
-              try {
-                // Check specifically for DialVerb recordings (TwiML dual-channel)
-                const existing = await client.calls(sid).recordings.list({ limit: 5 });
-                logger.log('[Dial-Status] Existing recordings on', sid, ':', existing.map(r => ({
-                  sid: r.sid,
-                  channels: r.channels,
-                  status: r.status,
-                  source: r.source,
-                  track: r.track
-                })));
-
-                // Skip REST API fallback if DialVerb recording exists (TwiML dual-channel)
-                const hasDialVerbRecording = existing.some(r => r.source === 'DialVerb' && r.status !== 'stopped');
-                if (hasDialVerbRecording) {
-                  logger.log('[Dial-Status] DialVerb recording already exists on', sid, '- skipping REST API fallback to avoid interference');
-                  started = true;
-                  startedOn = sid;
-                  channelsSeen = 2;
-                  break;
-                }
-
-                const hasDual = existing.some(r => (Number(r.channels) || 0) === 2 && r.status !== 'stopped');
-                if (hasDual) { logger.log('[Dial-Status] Dual recording already active on', sid); started = true; startedOn = sid; channelsSeen = 2; break; }
-
-                // If some mono recording is active, stop it so we can start dual
-                const active = existing.find(r => r.status !== 'stopped');
-                if (active && (Number(active.channels) || 0) === 1) {
-                  try {
-                    await client.calls(sid).recordings('Twilio.CURRENT').update({ status: 'stopped' });
-                    logger.log('[Dial-Status] ⏹️ Stopped active mono recording on', sid, '->', active.sid);
-                  } catch (stopErr) {
-                    logger.log('[Dial-Status] Could not stop active recording on', sid, ':', stopErr?.message);
-                  }
-                }
-
-                const rec = await client.calls(sid).recordings.create({
-                  recordingChannels: 'dual',
-                  recordingTrack: 'both',
-                  recordingStatusCallback: baseUrl + '/api/twilio/recording',
-                  recordingStatusCallbackMethod: 'POST'
-                });
-                logger.log('[Dial-Status] ➕ start result:', { sid: rec.sid, channels: rec.channels, source: rec.source, track: rec.track, callSid: sid });
-                const ch = Number(rec.channels) || 0;
-                if (ch === 2) { started = true; startedOn = sid; channelsSeen = 2; break; }
-                // If mono came back, try the next candidate after stopping this one
-                channelsSeen = Math.max(channelsSeen, ch);
-                try {
-                  await client.calls(sid).recordings(rec.sid).update({ status: 'stopped' });
-                  logger.log('[Dial-Status] ⏹️ Immediately stopped mono recording', rec.sid, 'on', sid, 'and trying next candidate');
-                } catch (_) { }
-              } catch (tryErr) {
-                logger.log('[Dial-Status] Try start on', sid, 'failed:', tryErr?.message);
-              }
-            }
-
-            if (started) {
-              logger.log('[Dial-Status] ✅ Started recording on', startedOn, '(dual confirmed)');
-              // [REMOVED] Webhook telemetry logging - was causing excessive Firestore writes (~2-3 per call)
-              // Recording status is tracked via recording callbacks and call records
-            } else {
-              logger.warn('[Dial-Status] ❌ Unable to start dual recording (last channels seen:', channelsSeen, ')');
-              // [REMOVED] Webhook telemetry logging - was causing excessive Firestore writes
-              // Failures are logged to console for debugging
-            }
-          } else {
-            logger.warn('[Dial-Status] Missing Twilio credentials');
+            const rec = await client.calls(targetSid).recordings.create({
+              recordingChannels: 'dual',
+              recordingTrack: 'both',
+              recordingStatusCallback: baseUrl + '/api/twilio/recording',
+              recordingStatusCallbackMethod: 'POST'
+            });
+            logger.log('[Dial-Status] Started recording:', rec.sid, 'channels:', rec.channels, 'on:', targetSid);
+          } catch (recErr) {
+            logger.warn('[Dial-Status] Recording start failed (non-critical):', recErr?.message);
           }
-        } catch (e) {
-          logger.warn('[Dial-Status] Failed to start recording:', e?.message);
-        }
-      }, 5000); // 5-second delay as recommended by Twilio
-    } else if (!childSid && event === 'answered') {
-      logger.warn('[Dial-Status] No DialCallSid available for recording - Dial may not be configured properly');
+        }, 3000);
+      }
     }
 
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('OK');
     return;
   } catch (e) {
-    logger.error('[Dial-Status] Error:', e);
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('OK');
+    logger.error('[Dial-Status] Unhandled error:', e?.message);
+    try {
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end('OK');
+    } catch (_) { }
     return;
   }
 }
-
-

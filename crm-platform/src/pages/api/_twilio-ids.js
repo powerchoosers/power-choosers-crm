@@ -13,41 +13,30 @@ function isRecordingSid(id) {
 
 async function resolveToCallSid({ callSid, recordingSid, transcriptSid }) {
   try {
-    // If caller already provided a proper Call SID, use it
+    // If caller already provided a proper Call SID, use it directly.
+    // NOTE: We intentionally do NOT resolve child SIDs to parent SIDs here.
+    // The parent leg (browser/client:agent) is skipped by status.js, so using
+    // the child PSTN SID directly as the record ID is correct and avoids extra
+    // Twilio API calls that may time out in serverless (Vercel) environments.
     if (isCallSid(callSid)) return callSid.trim();
 
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     if (!accountSid || !authToken) {
-      // Without credentials we cannot resolve; return best-known valid Call SID or null
       return isCallSid(callSid) ? callSid.trim() : null;
     }
 
     const twilio = await import('twilio');
     const client = twilio.default(accountSid, authToken);
 
-    // If we have a Recording SID, fetch it and read callSid
+    // If we have a Recording SID, fetch it and read callSid (use as-is, no parent resolution)
     if (isRecordingSid(recordingSid)) {
       try {
         const rec = await client.recordings(recordingSid.trim()).fetch();
         if (rec && isCallSid(rec.callSid)) {
-          // Check if this is a child call leg; if so, resolve to parent
-          try {
-            const callObj = await client.calls(rec.callSid).fetch();
-            if (callObj.parentCallSid) return callObj.parentCallSid;
-          } catch (_) { }
           return rec.callSid.trim();
         }
       } catch (_) { /* swallow and continue */ }
-    }
-
-    // If we have a Call SID directly, check if it has a parent
-    if (isCallSid(callSid)) {
-      try {
-        const callObj = await client.calls(callSid.trim()).fetch();
-        if (callObj.parentCallSid) return callObj.parentCallSid;
-        return callSid.trim();
-      } catch (_) { }
     }
 
     // If we have a Transcript SID from Twilio CI, fetch it, get sourceSid (usually Recording SID), then resolve
@@ -56,20 +45,12 @@ async function resolveToCallSid({ callSid, recordingSid, transcriptSid }) {
         const tr = await client.intelligence.v2.transcripts(transcriptSid.trim()).fetch();
         const sourceSid = (tr && tr.sourceSid) ? String(tr.sourceSid) : '';
         if (isCallSid(sourceSid)) {
-          try {
-            const cObj = await client.calls(sourceSid.trim()).fetch();
-            if (cObj.parentCallSid) return cObj.parentCallSid;
-          } catch (_) { }
           return sourceSid.trim();
         }
         if (isRecordingSid(sourceSid)) {
           try {
             const rec = await client.recordings(sourceSid.trim()).fetch();
             if (rec && isCallSid(rec.callSid)) {
-              try {
-                const innerCall = await client.calls(rec.callSid).fetch();
-                if (innerCall.parentCallSid) return innerCall.parentCallSid;
-              } catch (_) { }
               return rec.callSid.trim();
             }
           } catch (_) { /* ignore */ }
@@ -77,7 +58,7 @@ async function resolveToCallSid({ callSid, recordingSid, transcriptSid }) {
       } catch (_) { /* ignore */ }
     }
 
-    // Last resort: return a valid Call SID if we had one; else null
+    // Last resort
     return isCallSid(callSid) ? callSid.trim() : null;
   } catch (_) {
     return isCallSid(callSid) ? callSid.trim() : null;
