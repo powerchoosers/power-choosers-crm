@@ -689,7 +689,6 @@ const footerContact = {
     color: '#52525b',
     lineHeight: '1.5',
     marginBottom: '20px',
-    textTransform: 'uppercase' as const,
     letterSpacing: '0.02em',
     marginTop: '16px',
 }
