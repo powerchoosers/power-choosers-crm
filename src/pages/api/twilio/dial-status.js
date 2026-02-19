@@ -41,28 +41,12 @@ export default async function handler(req, res) {
       targetPhoneFromQuery = requestUrl.searchParams.get('targetPhone') || '';
     } catch (_) { }
 
-    // ================================================================
-    // RESPOND 200 TO TWILIO IMMEDIATELY - before any async work
-    // This guarantees no timeout regardless of what we do next
-    // ================================================================
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('OK');
-
     // --- Parse event details ---
-    // IMPORTANT: For <Number statusCallback> callbacks:
-    //   body.CallSid      = the CHILD (PSTN) call SID being dialed
-    //   body.CallStatus   = the status of the child leg
-    //   body.To           = the phone number being called (+1xxxxxxxxxx)
-    //   body.From         = the Twilio caller ID number
-    //   body.DialCallSid  = NOT present (only in <Dial> action callbacks)
-    //   body.DialCallStatus = NOT present
     const event = (body.DialCallStatus || body.CallStatus || '').toLowerCase();
     const callSidFromBody = body.CallSid || '';
     const dialCallSid = body.DialCallSid || '';
     const parentCallSid = body.ParentCallSid || '';
 
-    // For <Number statusCallback>: CallSid IS the child PSTN leg SID
-    // For <Dial> action callback: DialCallSid is the child, CallSid is parent
     const childSid = dialCallSid || (parentCallSid ? callSidFromBody : '');
     const parentSid = parentCallSid || (dialCallSid ? callSidFromBody : callSidFromBody);
     const logCallSid = childSid || callSidFromBody;
@@ -72,21 +56,19 @@ export default async function handler(req, res) {
     logger.log('[Dial-Status] Event:', event, '| logCallSid:', logCallSid, '| childSid:', childSid, '| parentSid:', parentSid, '| To:', body.To, '| From:', body.From, '| agentEmail:', agentEmail);
 
     // ================================================================
-    // STEP 1: LOG COMPLETED CALL — Do this FIRST before any other work
+    // STEP 1: LOG TO SUPABASE *BEFORE* responding to Twilio.
+    // We must finish the upsert before calling res.end(), because
+    // Vercel can kill the function immediately after the response ends.
     // ================================================================
     if (event === 'completed' && logCallSid) {
       try {
-        // For <Number statusCallback>:
-        //   body.To = the dialed phone number (e.g. +19728342317)
-        //   body.From = the Twilio caller ID number (e.g. +18176630380)
-        // These are the real phone numbers on the PSTN child leg context.
         let resolvedTo = body.To || '';
         let resolvedFrom = body.From || '';
         let resolvedDuration = parseInt(body.DialCallDuration || body.CallDuration || '0', 10);
 
         const isClientId = (v) => !v || String(v).startsWith('client:') || String(v).startsWith('AP');
 
-        // Only fetch from Twilio if phone numbers are missing/invalid (rare case)
+        // Only fetch from Twilio if phone numbers are missing (rare case)
         if (isClientId(resolvedTo) || isClientId(resolvedFrom)) {
           logger.warn('[Dial-Status] Phone numbers not in body, attempting Twilio REST fetch fallback');
           try {
@@ -100,7 +82,6 @@ export default async function handler(req, res) {
                 resolvedFrom = childCall.from;
                 const d = parseInt(childCall.duration || '0', 10);
                 if (d > resolvedDuration) resolvedDuration = d;
-                logger.log(`[Dial-Status] Fetched from Twilio: to=${resolvedTo}, from=${resolvedFrom}`);
               }
             }
           } catch (fetchErr) {
@@ -148,8 +129,15 @@ export default async function handler(req, res) {
     }
 
     // ================================================================
-    // Start dual-channel recording (fire-and-forget, after 200 already sent)
-    // Only attempt if TwiML DialVerb recording isn't already handling it
+    // NOW respond 200 to Twilio — after the upsert is complete.
+    // Twilio allows up to 15s for webhooks, and our upsert should
+    // take < 2s. This guarantees the data is persisted.
+    // ================================================================
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('OK');
+
+    // ================================================================
+    // STEP 2: Start dual-channel recording (fire-and-forget AFTER response)
     // ================================================================
     if ((event === 'answered' || event === 'in-progress') && (childSid || parentSid)) {
       const targetSid = childSid || parentSid;
@@ -157,21 +145,17 @@ export default async function handler(req, res) {
       const authToken = process.env.TWILIO_AUTH_TOKEN;
 
       if (accountSid && authToken) {
-        // Fire after 3 seconds to let the TwiML DialVerb recording kick in first
         setTimeout(async () => {
           try {
             const client = twilio(accountSid, authToken);
-            const proto = 'https';
-            const envBase = process.env.PUBLIC_BASE_URL || '';
-            const baseUrl = envBase || 'https://nodal-point-network.vercel.app';
+            const baseUrl = process.env.PUBLIC_BASE_URL || 'https://nodal-point-network.vercel.app';
 
-            // Check if DialVerb recording already exists
             const existing = await client.calls(targetSid).recordings.list({ limit: 5 });
             const hasDialVerb = existing.some(r => r.source === 'DialVerb' && r.status !== 'stopped');
             const hasDual = existing.some(r => Number(r.channels) === 2 && r.status !== 'stopped');
 
             if (hasDialVerb || hasDual) {
-              logger.log('[Dial-Status] Recording already active on', targetSid, '- skipping REST API fallback');
+              logger.log('[Dial-Status] Recording already active on', targetSid);
               return;
             }
 
@@ -181,7 +165,7 @@ export default async function handler(req, res) {
               recordingStatusCallback: baseUrl + '/api/twilio/recording',
               recordingStatusCallbackMethod: 'POST'
             });
-            logger.log('[Dial-Status] Started recording:', rec.sid, 'channels:', rec.channels, 'on:', targetSid);
+            logger.log('[Dial-Status] Started recording:', rec.sid, 'on:', targetSid);
           } catch (recErr) {
             logger.warn('[Dial-Status] Recording start failed (non-critical):', recErr?.message);
           }
