@@ -41,30 +41,35 @@ export default async function handler(req, res) {
       targetPhoneFromQuery = requestUrl.searchParams.get('targetPhone') || '';
     } catch (_) { }
 
+    // ================================================================
+    // RESPOND 200 TO TWILIO IMMEDIATELY - before any async work
+    // This guarantees no timeout regardless of what we do next
+    // ================================================================
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('OK');
+
     // --- Parse event details ---
-    // For <Number statusCallback>: body.CallStatus is the child leg status,
-    // body.CallSid is the PARENT (browser leg), body.DialCallSid is the child (PSTN leg)
+    // IMPORTANT: For <Number statusCallback> callbacks:
+    //   body.CallSid      = the CHILD (PSTN) call SID being dialed
+    //   body.CallStatus   = the status of the child leg
+    //   body.To           = the phone number being called (+1xxxxxxxxxx)
+    //   body.From         = the Twilio caller ID number
+    //   body.DialCallSid  = NOT present (only in <Dial> action callbacks)
+    //   body.DialCallStatus = NOT present
     const event = (body.DialCallStatus || body.CallStatus || '').toLowerCase();
-    const parentSid = body.CallSid || ''; // parent browser leg SID
-    const childSid = body.DialCallSid || ''; // child PSTN leg SID (has real phone numbers)
+    const callSidFromBody = body.CallSid || '';
+    const dialCallSid = body.DialCallSid || '';
+    const parentCallSid = body.ParentCallSid || '';
 
-    // For logging purposes, prefer child PSTN sid; fall back to parent
-    const logCallSid = childSid || parentSid;
+    // For <Number statusCallback>: CallSid IS the child PSTN leg SID
+    // For <Dial> action callback: DialCallSid is the child, CallSid is parent
+    const childSid = dialCallSid || (parentCallSid ? callSidFromBody : '');
+    const parentSid = parentCallSid || (dialCallSid ? callSidFromBody : callSidFromBody);
+    const logCallSid = childSid || callSidFromBody;
 
-    logger.log('[Dial-Status] Event received:', {
-      event,
-      parentSid,
-      childSid,
-      logCallSid,
-      To: body.To,
-      From: body.From,
-      DialCallDuration: body.DialCallDuration,
-      CallStatus: body.CallStatus,
-      DialCallStatus: body.DialCallStatus,
-      agentEmail,
-      contactId,
-      accountId
-    });
+    // Full raw body dump for debugging
+    logger.log('[Dial-Status] RAW BODY:', JSON.stringify(body));
+    logger.log('[Dial-Status] Event:', event, '| logCallSid:', logCallSid, '| childSid:', childSid, '| parentSid:', parentSid, '| To:', body.To, '| From:', body.From, '| agentEmail:', agentEmail);
 
     // ================================================================
     // STEP 1: LOG COMPLETED CALL — Do this FIRST before any other work
@@ -143,13 +148,7 @@ export default async function handler(req, res) {
     }
 
     // ================================================================
-    // STEP 2: Respond 200 immediately to Twilio so it doesn't time out
-    // ================================================================
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('OK');
-
-    // ================================================================
-    // STEP 3: Start dual-channel recording (after response, fire-and-forget)
+    // Start dual-channel recording (fire-and-forget, after 200 already sent)
     // Only attempt if TwiML DialVerb recording isn't already handling it
     // ================================================================
     if ((event === 'answered' || event === 'in-progress') && (childSid || parentSid)) {
