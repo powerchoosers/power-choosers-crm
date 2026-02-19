@@ -2040,7 +2040,9 @@ export default async function handler(req, res) {
       let currentMessages = [];
 
       // Ensure we have a system prompt
-      const systemContent = buildSystemPrompt().trim();
+      const systemContent = hasSystemPrompt
+        ? cleanedMessages.find(m => m.role === 'system')?.content
+        : buildSystemPrompt().trim();
       currentMessages.push({ role: 'system', content: systemContent });
 
       // Append history, limited to last 15 exchanges
@@ -2208,14 +2210,20 @@ export default async function handler(req, res) {
       }
 
       // Clearer system prompt for Perplexity to prevent tool hallucinations
+      const hasSystemPrompt = cleanedMessages.some(m => m.role === 'system');
+      const baseSystemPrompt = hasSystemPrompt
+        ? cleanedMessages.find(m => m.role === 'system')?.content
+        : buildSystemPrompt().trim();
+
       const perplexitySystemPrompt = `
-        ${buildSystemPrompt().trim()}
+        ${baseSystemPrompt}
         
         CRITICAL_NOTICE: You are currently running in SEARCH_ONLY mode via Perplexity because the primary CRM model failed ${failureContext}. 
         You DO NOT have direct access to the CRM database tools (list_accounts, list_contacts, etc.) in this session.
         Do NOT attempt to use them or tell the user you have access to them.
         Instead, provide the best answer possible using your internal knowledge and web search.
-        If the user asks for CRM data, explain that the primary model encountered an error and suggest they retry their request in a few moments or switch to a different Gemini model.
+        If the context provided in your system prompt above covers the user's request (e.g. they are asking for an email draft and the context has contact details), USE THAT CONTEXT and complete the task.
+        ONLY if someone asks for a direct real-time database query that isn't in your context, explain that the primary model encountered an error.
       `.trim();
 
       const perplexityMessages = [
