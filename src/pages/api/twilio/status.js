@@ -75,48 +75,44 @@ export default async function handler(req, res) {
         }
 
         // ================================================================
-        // STEP 1: LOG COMPLETED CALL TO SUPABASE — Do this BEFORE res.end()
-        // Vercel can kill the function immediately after res.end(), so we
-        // must finish the upsert while the response is still pending.
-        // Twilio allows 15s for webhook responses; our upsert takes < 2s.
+        // STEP 1: LOG TO SUPABASE — Do this BEFORE res.end()
+        // We log all states (initiated, ringing, etc.) to ensure visibility.
         // ================================================================
-        if (CallStatus === 'completed' && CallSid) {
+        if (CallSid) {
             try {
                 const correctedDuration = parseInt(DialCallDuration || Duration || CallDuration || '0', 10);
+                const event = (CallStatus || 'initiated').toLowerCase();
 
                 const bodyPayload = {
                     callSid: CallSid,
                     to: To,
                     from: From,
-                    status: 'completed',
+                    status: event,
                     duration: correctedDuration,
                     targetPhone: targetPhoneFromQuery || undefined,
                     contactId,
                     accountId,
                     agentId,
                     agentEmail,
-                    source: 'status'
+                    source: 'status-v2'
                 };
 
                 if (RecordingUrl) {
                     bodyPayload.recordingUrl = RecordingUrl.endsWith('.mp3') ? RecordingUrl : `${RecordingUrl}.mp3`;
                 }
 
-                logger.log('[Status] Upserting completed call:', {
-                    sid: CallSid,
-                    to: To,
-                    from: From,
-                    duration: correctedDuration,
-                    agentEmail,
-                    contactId,
-                    accountId
-                });
+                // If it's a completion event, mark it as completed
+                if (['completed', 'busy', 'no-answer', 'failed', 'canceled'].includes(event)) {
+                    bodyPayload.status = 'completed';
+                }
+
+                logger.log(`[Status] Logging call state [${event}]:`, CallSid);
 
                 await upsertCallInSupabase(bodyPayload).catch(err => {
                     logger.error('[Status] upsertCallInSupabase failed:', err?.message);
                 });
 
-                logger.log('[Status] ✅ Call logged to Supabase:', CallSid);
+                logger.log(`[Status] ✅ Call state [${event}] logged:`, CallSid);
             } catch (logErr) {
                 logger.error('[Status] Error logging call:', logErr?.message);
             }
@@ -129,8 +125,7 @@ export default async function handler(req, res) {
         res.end('OK');
 
         // ================================================================
-        // STEP 2: Recording fallback — if call completed without recording,
-        // try to fetch it from Twilio API (fire-and-forget via setTimeout)
+        // STEP 2: Recording fallback
         // ================================================================
         if (CallStatus === 'completed' && !RecordingUrl && CallSid) {
             setTimeout(async () => {

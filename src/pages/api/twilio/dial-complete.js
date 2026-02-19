@@ -62,6 +62,40 @@ export default async function handler(req, res) {
       duration: DialCallDuration
     });
 
+    // ================================================================
+    // STEP 1: LOG TO SUPABASE *BEFORE* responding to Twilio.
+    // ================================================================
+    if (CallSid) {
+      try {
+        const protocol = req.headers['x-forwarded-proto'] || 'https';
+        const host = req.headers.host || req.headers['x-forwarded-host'] || '';
+        const requestUrl = new URL(req.url, `${protocol}://${host}`);
+        const contactId = requestUrl.searchParams.get('contactId');
+        const accountId = requestUrl.searchParams.get('accountId');
+        const agentId = requestUrl.searchParams.get('agentId');
+        const agentEmail = requestUrl.searchParams.get('agentEmail');
+        const targetPhoneFromQuery = requestUrl.searchParams.get('targetPhone');
+
+        const { upsertCallInSupabase } = await import('../calls.js');
+        await upsertCallInSupabase({
+          callSid: DialCallSid || CallSid,
+          status: 'completed',
+          duration: parseInt(DialCallDuration || '0', 10),
+          contactId: contactId || null,
+          accountId: accountId || null,
+          agentId: agentId || null,
+          agentEmail: agentEmail || null,
+          targetPhone: targetPhoneFromQuery || body.To || '',
+          source: 'dial-complete'
+        }).catch(err => {
+          logger.error('[DialComplete] Supabase log failed:', err?.message);
+        });
+        logger.log('[DialComplete] ✅ Final state logged to Supabase');
+      } catch (logErr) {
+        logger.error('[DialComplete] Error logging call:', logErr?.message);
+      }
+    }
+
     // Create TwiML response that ENDS the call without retry
     const twiml = new VoiceResponse();
 
