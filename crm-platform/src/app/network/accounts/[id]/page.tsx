@@ -507,7 +507,7 @@ export default function AccountDossierPage() {
                       transition={{ duration: 0.4, ease: 'easeOut' }}
                     >
                       <CompanyIcon
-                        key={`dossier-logo-${account.id}`}
+                        key={`dossier-logo-${account.id}-${(editLogoUrl?.trim() || account.logoUrl?.trim()) || 'none'}`}
                         logoUrl={(editLogoUrl?.trim() || account.logoUrl?.trim()) || undefined}
                         domain={(editDomain?.trim() || account.domain?.trim()) || undefined}
                         name={account.name}
@@ -521,7 +521,7 @@ export default function AccountDossierPage() {
                     </motion.div>
                   ) : (
                     <CompanyIcon
-                      key={`dossier-logo-${account.id}`}
+                      key={`dossier-logo-${account.id}-${(editLogoUrl?.trim() || account.logoUrl?.trim()) || 'none'}`}
                       logoUrl={(editLogoUrl?.trim() || account.logoUrl?.trim()) || undefined}
                       domain={(editDomain?.trim() || account.domain?.trim()) || undefined}
                       name={account.name}
@@ -893,9 +893,11 @@ export default function AccountDossierPage() {
                     <AccountUplinkCard
                       account={{
                         ...account,
-                        companyPhone: editCompanyPhone ?? account.companyPhone,
-                        domain: editDomain ?? account.domain,
-                        address: editAddress ?? account.address
+                        companyPhone: editCompanyPhone || account.companyPhone,
+                        domain: editDomain || account.domain,
+                        address: editAddress || account.address,
+                        logoUrl: editLogoUrl || account.logoUrl,
+                        metadata: account.metadata
                       }}
                       isEditing={isEditing}
                       onUpdate={handleUpdate}
@@ -905,9 +907,11 @@ export default function AccountDossierPage() {
                   <AccountUplinkCard
                     account={{
                       ...account,
-                      companyPhone: editCompanyPhone ?? account.companyPhone,
-                      domain: editDomain ?? account.domain,
-                      address: editAddress ?? account.address
+                      companyPhone: editCompanyPhone || account.companyPhone,
+                      domain: editDomain || account.domain,
+                      address: editAddress || account.address,
+                      logoUrl: editLogoUrl || account.logoUrl,
+                      metadata: account.metadata
                     }}
                     isEditing={isEditing}
                     onUpdate={handleUpdate}
